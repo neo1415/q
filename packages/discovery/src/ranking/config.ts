@@ -54,6 +54,13 @@ export const RANKING_REASON_CODES = [
   "TAXONOMY_EXACT",
   "TAXONOMY_RELATED",
   "TAXONOMY_MISMATCH",
+  /**
+   * QO-11: the taxonomy match is in a business model, a customer type or
+   * another named vocabulary, not in the company's sector.
+   */
+  "BUSINESS_MODEL_ALIGNED",
+  "CUSTOMER_TYPE_ALIGNED",
+  "TAXONOMY_OTHER_ALIGNED",
   "SEMANTIC_SIMILARITY_PRESENT",
   /** cheque-fit.v1 (ranking-config.v5): the round and the declared range. */
   "CHEQUE_WITHIN_ROUND",

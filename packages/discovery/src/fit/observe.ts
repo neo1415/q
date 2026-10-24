@@ -192,6 +192,12 @@ export function hardRuleFrom(
   return null;
 }
 
+const SECTOR_OUTCOME = {
+  EXACT: "STRONG",
+  DESCENDANT: "PARTIAL",
+  NONE: "MISMATCH",
+} as const;
+
 export function observeFit(input: ObserveFitInput): FitInputs {
   const { snapshot, declared: d, config } = input;
   const feature = (id: string) =>
@@ -222,21 +228,47 @@ export function observeFit(input: ObserveFitInput): FitInputs {
     };
   };
 
-  const observations: Record<FitParameter, FitObservation> = {
-    STAGE: fromCategory(
-      "declared_fit.stage",
-      { MATCH: "STRONG", NO_MATCH: "MISMATCH" },
-      { companyStage: d.companyStage, mandateStages: d.mandateStages },
-    ),
-    SECTOR: fromCategory(
+  // QO-11 (QA 2026-10-23): Sector is the company's sector. A taxonomy
+  // match only in a business model or customer type the mandate names
+  // (each its own parameter) is never a strong sector; the feature's
+  // `sectorOverlap` says how the sector itself stands. Older snapshots
+  // without it read the category as before.
+  const sectorObservation = (): FitObservation => {
+    const f = feature("declared_fit.taxonomy");
+    // A snapshot from before `sectorOverlap` (or a bare one) has none.
+    const provenance: Readonly<Record<string, unknown>> | undefined =
+      f?.status === "PRESENT" ? f.provenance : undefined;
+    const sector = provenance?.["sectorOverlap"];
+    const facts = { companySector: d.companySector };
+    if (sector === "UNKNOWN") return unknownObservation(facts);
+    if (sector === "EXACT" || sector === "DESCENDANT" || sector === "NONE") {
+      return fromCategory(
+        "declared_fit.taxonomy",
+        {
+          EXACT_OVERLAP: SECTOR_OUTCOME[sector],
+          DESCENDANT_OVERLAP: SECTOR_OUTCOME[sector],
+        },
+        facts,
+      );
+    }
+    return fromCategory(
       "declared_fit.taxonomy",
       {
         EXACT_OVERLAP: "STRONG",
         DESCENDANT_OVERLAP: "PARTIAL",
         NO_OVERLAP: "MISMATCH",
       },
-      { companySector: d.companySector },
+      facts,
+    );
+  };
+
+  const observations: Record<FitParameter, FitObservation> = {
+    STAGE: fromCategory(
+      "declared_fit.stage",
+      { MATCH: "STRONG", NO_MATCH: "MISMATCH" },
+      { companyStage: d.companyStage, mandateStages: d.mandateStages },
     ),
+    SECTOR: sectorObservation(),
     GEOGRAPHY: fromCategory(
       "declared_fit.geography",
       {

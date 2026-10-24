@@ -49,6 +49,7 @@ import {
   createDeterministicRanker,
   normalizeFactorValue,
   rankSnapshots,
+  scoreSnapshot,
   type EnrichedCandidate,
   type RankingContext,
 } from "../src/ranking/ranker.js";
@@ -1400,5 +1401,98 @@ describe("performance (§84)", () => {
     console.info(
       `[REC-005 performance] candidates=200 featuresProcessed=${String(200 * DEFINITIONS.length)} rankMs=${ms.toFixed(2)} scored=${String(ranked.filter((r) => r.scored).length)} unscored=${String(ranked.filter((r) => !r.scored).length)} dbQueries=0 providerCalls=0`,
     );
+  });
+});
+
+describe("QO-11 (QA 2026-10-23): a business-model match is never said to be a sector", () => {
+  const B2B_SAAS = "44444444-0000-4000-8000-000000000071";
+  const DIGITAL_HEALTH = "44444444-0000-4000-8000-000000000072";
+  const node = (preferredNodeId: string, vocabularyCode: string) => ({
+    preferredNodeId,
+    vocabularyCode,
+    unrestricted: false,
+    descendantNodeIds: [],
+    countryCode: null,
+    descendantCountryCodes: [],
+  });
+  // Fintech and B2B SaaS named; the company is digital health, B2B SaaS.
+  const mandate = gmMandate({
+    taxonomyPreferences: [
+      {
+        nodeId: FINTECH,
+        vocabularyCode: "industry",
+        preferenceStrength: "STRONG",
+        isExclusion: false,
+        source: "user_selected",
+      },
+      {
+        nodeId: B2B_SAAS,
+        vocabularyCode: "business_model",
+        preferenceStrength: "STRONG",
+        isExclusion: false,
+        source: "user_selected",
+      },
+    ],
+  });
+  const hierarchy = [
+    node(FINTECH, "industry"),
+    node(B2B_SAAS, "business_model"),
+  ];
+  const kliniqa: Company = {
+    n: 71,
+    stage: "seed",
+    country: "NG",
+    nodes: [
+      {
+        nodeId: DIGITAL_HEALTH,
+        vocabularyCode: "industry",
+        source: "user_selected",
+      },
+      {
+        nodeId: B2B_SAAS,
+        vocabularyCode: "business_model",
+        source: "user_selected",
+      },
+    ],
+    semantic: 0.5,
+    structured: true,
+  };
+
+  it("keeps the overlap's score, and names it a business model, with the sector not matching", () => {
+    const snapshot = snapshotFor(kliniqa, { mandate, hierarchy });
+    const taxonomy = snapshot.features.find(
+      (f) => f.featureId === "declared_fit.taxonomy",
+    );
+    expect(taxonomy).toMatchObject({
+      value: "EXACT_OVERLAP",
+      provenance: { vocabularyCode: "business_model", sectorOverlap: "NONE" },
+    });
+    const scored = scoreSnapshot(RANKING_CONFIG_CURRENT, snapshot);
+    expect(scored.reasonCodes).toContain("BUSINESS_MODEL_ALIGNED");
+    expect(scored.reasonCodes).not.toContain("TAXONOMY_EXACT");
+    const factor = scored.factors.find(
+      (f) => f.featureId === "declared_fit.taxonomy",
+    );
+    expect(factor?.normalizedValue).toBe(1);
+  });
+
+  it("a company in a named sector is still a sector match", () => {
+    const snapshot = snapshotFor(
+      {
+        ...kliniqa,
+        n: 72,
+        nodes: [
+          {
+            nodeId: FINTECH,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
+      },
+      { mandate, hierarchy },
+    );
+    expect(
+      scoreSnapshot(RANKING_CONFIG_CURRENT, snapshot).reasonCodes,
+    ).toContain("TAXONOMY_EXACT");
   });
 });

@@ -38,6 +38,9 @@ const OUTCOME_BY_REASON: Readonly<Record<string, ExplanationOutcome>> = {
   TAXONOMY_EXACT: "MATCH",
   TAXONOMY_RELATED: "PARTIAL",
   TAXONOMY_MISMATCH: "MISMATCH",
+  BUSINESS_MODEL_ALIGNED: "MATCH",
+  CUSTOMER_TYPE_ALIGNED: "MATCH",
+  TAXONOMY_OTHER_ALIGNED: "MATCH",
   SEMANTIC_SIMILARITY_PRESENT: "MATCH",
   CHEQUE_WITHIN_ROUND: "MATCH",
   CHEQUE_PARTLY_WITHIN_ROUND: "PARTIAL",
@@ -100,11 +103,36 @@ const MISSING_LABEL: Readonly<Record<string, string>> = {
   SOURCE_NOT_AUTHORISED: "Not available for this comparison",
 };
 
+/**
+ * QO-11: a taxonomy match that is not the company's sector, said as what
+ * it is (never "Sector matches").
+ */
+const NOT_SECTOR: Readonly<
+  Record<string, { readonly label: string; readonly noun: string }>
+> = {
+  BUSINESS_MODEL_ALIGNED: {
+    label: "Business model matches one your mandate names",
+    noun: "business model",
+  },
+  CUSTOMER_TYPE_ALIGNED: {
+    label: "Customer type matches one your mandate names",
+    noun: "customer type",
+  },
+  TAXONOMY_OTHER_ALIGNED: {
+    label: "A category your mandate names, though not its sector",
+    noun: "a named category",
+  },
+};
+
 function labelFor(
   dimension: ExplanationDimension,
   outcome: ExplanationOutcome,
   missingReason: string | null,
+  reasonCode?: string,
 ): string {
+  const notSector =
+    reasonCode === undefined ? undefined : NOT_SECTOR[reasonCode];
+  if (notSector !== undefined) return notSector.label;
   switch (outcome) {
     case "MATCH":
       return ALIGNED_LABEL[dimension];
@@ -156,7 +184,12 @@ export function toExplanationFactors(
     const entry: ExplanationFactor = {
       dimension,
       outcome,
-      label: labelFor(dimension, outcome, factor.missingReason),
+      label: labelFor(
+        dimension,
+        outcome,
+        factor.missingReason,
+        factor.reasonCode,
+      ),
       reasonCode: factor.reasonCode,
     };
     if (outcome === "MATCH" || outcome === "PARTIAL")
@@ -174,7 +207,9 @@ function joinNouns(nouns: readonly string[]): string {
 }
 
 const nounsOf = (factors: readonly ExplanationFactor[]): readonly string[] => [
-  ...new Set(factors.map((f) => NOUN[f.dimension])),
+  ...new Set(
+    factors.map((f) => NOT_SECTOR[f.reasonCode]?.noun ?? NOUN[f.dimension]),
+  ),
 ];
 
 /**

@@ -309,7 +309,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v26_comm.v1",
+      "q-system.v2_company-analyst.v27_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -434,7 +434,8 @@ describe("renderer", () => {
     expect(historical.characters / 4).toBeLessThan(4_500);
     // v26 (L-13): ~40 tokens for PICTURE and pictureQuery, then ~280 tokens
     // of repeated wording said once, so it keeps at least 5% headroom.
-    expect(rendered.bundle.task).toBe("company-analyst/v26");
+    // v27 (QO-04): ~75 tokens for speaking to the person.
+    expect(rendered.bundle.task).toBe("company-analyst/v27");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

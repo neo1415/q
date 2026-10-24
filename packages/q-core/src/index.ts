@@ -1765,3 +1765,8 @@ export {
   V26_TRIMS,
   V26_VISUAL_LINE,
 } from "./prompts/tasks/company-analyst.v26.js";
+export {
+  COMPANY_ANALYST_V27,
+  V27_PERSON_LINE,
+  V27_TRIMS,
+} from "./prompts/tasks/company-analyst.v27.js";

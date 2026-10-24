@@ -25,7 +25,7 @@ describe("COMPANY_ANALYST v23: precise shape beside tools", () => {
   it("activates the new guidance on the same strict result contract", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("COMPANY_ANALYST").definition;
-    expect(active.version).toBe(26);
+    expect(active.version).toBe(27);
     // v26 (L-13) added PICTURE; v23-v25 wrote to v22's contract.
     expect(registry.get("COMPANY_ANALYST", 25)?.definition.output).toBe(
       COMPANY_ANALYST_V22.output,

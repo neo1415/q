@@ -412,6 +412,29 @@ describe("one presentation controller (audit 2026-10-15 §4)", () => {
     expect(container.querySelector("[data-answer-chip]")).toBeNull();
     expect(store.cardsState().keys).toContain("chip:a1");
   });
+
+  it("never covers a document being read, and its mark is still (F-56)", () => {
+    const turns: QTurn[] = [
+      answer("a1", "Three stand out.", { blocks: [demoTop(3)] }),
+    ];
+    const chip = (path: string, shownTurns: readonly QTurn[]) => (
+      <AnswerChipFor
+        pathname={path}
+        turns={shownTurns}
+        loading={false}
+        conversationId="conv-1"
+      />
+    );
+    const reading = render(chip("/company/data-room", []));
+    reading.rerender(chip("/company/data-room", turns));
+    expect(reading.container.querySelector("[data-answer-chip]")).toBeNull();
+    reading.unmount();
+    const elsewhere = render(chip("/discover", []));
+    elsewhere.rerender(chip("/discover", turns));
+    const shown = elsewhere.container.querySelector("[data-answer-chip]");
+    expect(shown).not.toBeNull();
+    expect(shown?.querySelector("[data-q-aperture]")).toBeNull();
+  });
 });
 
 describe("artifacts live, round 2", () => {

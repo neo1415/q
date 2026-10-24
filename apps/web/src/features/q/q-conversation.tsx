@@ -817,14 +817,16 @@ export function QConversationPanel({
       }
       if (interceptTyped(text)) return;
       if (typedOpenerAnswer(text, lineOpen)) return;
-      if (lineOpen) {
-        sendText(text);
-        return;
-      }
+      // QO-12 (QA 2026-10-23): typing is a written turn. The voice room
+      // shows no reply (its transcript is Chat), so a typed question sent
+      // into the open line left the stage on "Listening" with only a
+      // picture. Typing switches to the written conversation: the line
+      // closes as End closes it, and the answer is written on the stage.
+      if (lineOpen) end();
       await qAsk(text);
       markAttachmentsSent();
     },
-    [lineOpen, sendText, qAsk],
+    [lineOpen, end, qAsk],
   );
 
   // The same answer, said on a voice line: the person's own transcript,

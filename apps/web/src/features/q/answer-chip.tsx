@@ -7,8 +7,7 @@ import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { ICON_SIZE, ICON_STROKE, PanelRight, X } from "@capital-q/ui/icons";
-
-import { QAperture } from "@/features/q-aperture";
+import { QMark } from "@capital-q/ui/q-mark";
 
 import { answerChipFor, type AnswerChipContent } from "./answer-canvas-logic";
 import { hideKey, useCardsState } from "./cards/card-visibility";
@@ -17,6 +16,19 @@ import { useQSessionOptional } from "./q-session";
 import { useT } from "@/features/i18n/language";
 
 const Q_PAGE = "/home";
+
+/**
+ * F-56 (QA 2026-10-23): pages where the person reads a document. A chip
+ * floating over them covered the document on a phone; there the answer
+ * waits on the Board and on Q's page instead.
+ */
+const READING_PAGES = ["/documents", "/company/data-room"];
+
+function readingPage(pathname: string): boolean {
+  return READING_PAGES.some(
+    (page) => pathname === page || pathname.startsWith(`${page}/`),
+  );
+}
 /** The controller's key for a chip put away: one answer, every page. */
 const CHIP_KEY = "chip:";
 
@@ -83,7 +95,9 @@ export function AnswerChipFor({
     () => (before === null ? null : answerChipFor(turns, before, dismissed)),
     [turns, before, dismissed],
   );
-  if (pathname === Q_PAGE || chip === null) return null;
+  if (pathname === Q_PAGE || readingPage(pathname) || chip === null) {
+    return null;
+  }
   const conversation = conversationId;
   const home =
     conversation === null
@@ -116,8 +130,9 @@ export function AnswerChipView({
       aria-label={t("Q answer ready")}
       data-answer-chip
     >
+      {/* F-56: a still mark; a notice that has arrived is not working. */}
       <span className="mark">
-        <QAperture state="IDLE" size={40} />
+        <QMark size="sm" state="IDLE" />
       </span>
       <div className="min-w-0">
         <strong>{chip.heading}</strong>

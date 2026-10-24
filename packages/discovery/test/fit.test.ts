@@ -437,6 +437,31 @@ describe("comparators", () => {
     expect(noPreference.SECTOR.applicable).toBe(true);
   });
 
+  it("QO-11: a business-model overlap is never a strong sector; the sector itself decides", () => {
+    const withSector = (sectorOverlap: string) => {
+      const snapshot = snapshotWith({
+        "declared_fit.taxonomy": "EXACT_OVERLAP",
+      });
+      const [taxonomy] = snapshot.features;
+      if (taxonomy === undefined) throw new Error("no taxonomy feature");
+      return {
+        ...snapshot,
+        features: [
+          {
+            ...taxonomy,
+            provenance: { vocabularyCode: "business_model", sectorOverlap },
+          },
+        ],
+      };
+    };
+    const sector = (sectorOverlap: string) =>
+      observe({}, [], withSector(sectorOverlap)).observations.SECTOR.outcome;
+    expect(sector("NONE")).toBe("MISMATCH");
+    expect(sector("UNKNOWN")).toBe("UNKNOWN");
+    expect(sector("DESCENDANT")).toBe("PARTIAL");
+    expect(sector("EXACT")).toBe("STRONG");
+  });
+
   it("a hard rule comes only from a declared mandate rule, and names it", () => {
     expect(
       observe({}, ["COMPANY_STAGE_UNKNOWN", "RELATIONSHIP_CLOSED"]).hardRule,
