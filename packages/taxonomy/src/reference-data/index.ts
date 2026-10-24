@@ -601,8 +601,9 @@ const VOCABULARIES: readonly VocabularySpec[] = [
     // v2 (CQ-ACCEPT-001): an investor named Côte d'Ivoire and only Ghana
     // could be recorded. More of the markets investors here name, and a
     // Central Africa region. v3 (2026-10-15): Qatar and the other GCC
-    // countries under the Middle East.
-    version: 3,
+    // countries under the Middle East. v4 (2026-10-24): the Gulf (GCC)
+    // region between them.
+    version: 4,
     nodes: [
       {
         code: "global",
@@ -654,22 +655,34 @@ const VOCABULARIES: readonly VocabularySpec[] = [
       country("united_states", "United States", "US", "north_america"),
       country("canada", "Canada", "CA", "north_america"),
       { code: "middle_east", name: "Middle East" },
-      country(
-        "united_arab_emirates",
-        "United Arab Emirates",
-        "AE",
-        "middle_east",
-      ),
+      // v4 (QA F-81, 2026-10-24): "Egypt, Morocco and the Gulf" kept only
+      // Egypt and Morocco, as nothing named the Gulf. The six GCC countries
+      // now sit under their own region (same ids), so "the Gulf" means those
+      // six and the Middle East still contains them.
+      {
+        code: "gcc",
+        name: "Gulf (GCC)",
+        parent: "middle_east",
+        description: "The Gulf Cooperation Council countries.",
+        aliases: [
+          "the Gulf",
+          "Gulf",
+          "Gulf states",
+          "Arabian Gulf",
+          { alias: "GCC", type: "ABBREVIATION" },
+        ],
+      },
+      country("united_arab_emirates", "United Arab Emirates", "AE", "gcc"),
       // v3 (2026-10-15): the Gulf. Qatar-based founders and investors had
       // no node to name their own market.
-      withAliases(country("qatar", "Qatar", "QA", "middle_east"), ["Doha"]),
-      withAliases(
-        country("saudi_arabia", "Saudi Arabia", "SA", "middle_east"),
-        ["KSA", "Saudi"],
-      ),
-      country("kuwait", "Kuwait", "KW", "middle_east"),
-      country("bahrain", "Bahrain", "BH", "middle_east"),
-      country("oman", "Oman", "OM", "middle_east"),
+      withAliases(country("qatar", "Qatar", "QA", "gcc"), ["Doha"]),
+      withAliases(country("saudi_arabia", "Saudi Arabia", "SA", "gcc"), [
+        "KSA",
+        "Saudi",
+      ]),
+      country("kuwait", "Kuwait", "KW", "gcc"),
+      country("bahrain", "Bahrain", "BH", "gcc"),
+      country("oman", "Oman", "OM", "gcc"),
       { code: "asia", name: "Asia" },
       country("india", "India", "IN", "asia"),
       country("singapore", "Singapore", "SG", "asia"),
