@@ -104,7 +104,9 @@ export {
 } from "./company/validation.js";
 
 export {
+  answerSteps,
   createSpecialistQAnswer,
+  type BoardKeeper,
   type SpecialistQAnswer,
   type SpecialistQAnswerDependencies,
   type QVisibilityNotebook,

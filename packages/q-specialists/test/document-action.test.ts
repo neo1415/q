@@ -19,7 +19,11 @@ import type {
 import { ActorContextSchema } from "@capital-q/security";
 
 import { composeAnswerDocument } from "../src/answer-document.js";
-import { createSpecialistQAnswer } from "../src/answer.js";
+import {
+  answerSteps,
+  createSpecialistQAnswer,
+  type BoardKeeper,
+} from "../src/answer.js";
 import type {
   CompanyFinding,
   CompanyIntelligenceRequest,
@@ -199,6 +203,8 @@ function seam(options: {
   readonly subjects?: QAnswerRequest["subjects"];
   /** Sees each request handed to the conversational answer. */
   readonly onDelegate?: (request: QAnswerRequest) => void;
+  /** The person's own work board (reader v61 boardAsk). */
+  readonly board?: BoardKeeper;
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -235,6 +241,7 @@ function seam(options: {
       },
     },
     artifacts,
+    ...(options.board === undefined ? {} : { board: options.board }),
     ...(options.ownRecords === undefined
       ? {}
       : {
@@ -882,5 +889,145 @@ describe("an answer as a document, deterministically", () => {
   it("is nothing when the answer holds no words", () => {
     expect(composeAnswerDocument({ answer: "  \n# \n" })).toBeNull();
     expect(composeAnswerDocument({ answer: "# Title only" })).toBeNull();
+  });
+});
+
+/**
+ * The work board (owner 2026-10-23, reader v61 boardAsk): "save that plan
+ * to my board" files Q's last answer exactly as written and keeps it on
+ * their own board; "break it into tasks" adds the steps that answer itself
+ * lists, in its words, and never invents one. No model call, no card.
+ */
+describe("board asks about Q's last answer", () => {
+  function boardKeeper() {
+    const added: {
+      kind: string;
+      title: string;
+      refId?: string;
+      key: string;
+    }[] = [];
+    const board: BoardKeeper = {
+      add: (_actor, request, options) => {
+        added.push({ ...request, key: options.idempotencyKey });
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    return { board, added };
+  }
+  const boardReading = (
+    boardAsk: "SAVE" | "BREAKDOWN",
+    namedOther: QTurnReading["namedOther"] = null,
+  ): QTurnReading => ({
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: namedOther !== null,
+    tool: null,
+    boardAsk,
+    namedOther,
+  });
+  const PLAN = [
+    "# Your 12-month plan",
+    "",
+    "1. **Hire** a head of sales by March.",
+    "2. Close the bridge round.",
+    "- Launch in Kenya.",
+  ].join("\n");
+
+  it("SAVE: files the answer and keeps it on their board as a document, with no model call", async () => {
+    const { board, added } = boardKeeper();
+    const s = seam({
+      history: [
+        message("USER", "Give me a 12-month plan."),
+        message("Q", PLAN),
+        message("USER", "Save that plan to my board."),
+      ],
+      reading: boardReading("SAVE"),
+      board,
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    expect(s.prepared).toHaveLength(1);
+    expect(added).toEqual([
+      expect.objectContaining({
+        kind: "DOCUMENT",
+        refId: ARTIFACT,
+        title: "Your 12-month plan",
+      }),
+    ]);
+    expect(added[0]?.key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5/u);
+    expect(s.stored[0]?.content).toMatch(/on your board, in To do/u);
+    expect(s.stored[0]?.blocks).toEqual([
+      expect.objectContaining({ kind: "ARTIFACT_REFERENCE" }),
+    ]);
+  });
+
+  it("BREAKDOWN: adds the steps the answer lists, in its words, after the document", async () => {
+    const { board, added } = boardKeeper();
+    const s = seam({
+      history: [
+        message("USER", "Give me a 12-month plan."),
+        message("Q", PLAN),
+        message("USER", "Save it and break it into tasks."),
+      ],
+      reading: boardReading("BREAKDOWN"),
+      board,
+    });
+    await s.run();
+    expect(added.map((one) => [one.kind, one.title])).toEqual([
+      ["DOCUMENT", "Your 12-month plan"],
+      ["TASK", "Hire a head of sales by March."],
+      ["TASK", "Close the bridge round."],
+      ["TASK", "Launch in Kenya."],
+    ]);
+    expect(s.stored[0]?.content).toMatch(/its steps as 3 tasks in To do/u);
+  });
+
+  it("BREAKDOWN of an answer with no list of steps adds no tasks and says so", async () => {
+    const { board, added } = boardKeeper();
+    const s = seam({
+      history: [
+        message("USER", "How do I come across?"),
+        message(
+          "Q",
+          "You come across as focused and early. Lead with the traction.",
+        ),
+        message("USER", "Break it into tasks on my board."),
+      ],
+      reading: boardReading("BREAKDOWN"),
+      board,
+    });
+    await s.run();
+    expect(added.map((one) => one.kind)).toEqual(["DOCUMENT"]);
+    expect(s.stored[0]?.content).toMatch(/rather than make up tasks/u);
+  });
+
+  it("leaves a board ask about someone named (keep Kestrel on my board) to the board tool", async () => {
+    const { board, added } = boardKeeper();
+    const s = seam({
+      history: [message("USER", "Keep Kestrel Capital on my board.")],
+      reading: boardReading("SAVE", {
+        name: "Kestrel Capital",
+        kind: "COMPANY",
+      }),
+      board,
+    });
+    await s.run();
+    expect(added).toEqual([]);
+    expect(s.prepared).toHaveLength(0);
+  });
+});
+
+describe("answerSteps", () => {
+  it("takes numbered and bulleted lines only, without markers or emphasis, at most twelve", () => {
+    expect(answerSteps("Intro\n1) **One** thing\n* two\n\nnot a step")).toEqual(
+      ["One thing", "two"],
+    );
+    expect(
+      answerSteps(
+        Array.from({ length: 20 }, (_v, i) => `- step ${String(i)}`).join("\n"),
+      ),
+    ).toHaveLength(12);
   });
 });

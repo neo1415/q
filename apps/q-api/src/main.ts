@@ -2985,6 +2985,12 @@ const pushSettings = createPushSubscriptionStore(database.sql);
 // Q room W4b: what each run's own authorised tool calls named, so the
 // silence ladder can say whose deck it is reading (never a browser id).
 const runSubjects = createRunSubjects();
+// The work board (owner 2026-10-23): one service for Q's my_board tool and
+// the answer seam's "save that plan to my board".
+const qBoard = createQApiBoard({
+  sql: database.sql,
+  transactions: database.transactions,
+});
 const qTools = createQTools({
   ports: {
     // BILLING block
@@ -2995,10 +3001,7 @@ const qTools = createQTools({
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
     // The work board (owner 2026-10-23): their own items, and Q's work on them.
-    board: createQApiBoard({
-      sql: database.sql,
-      transactions: database.transactions,
-    }),
+    board: qBoard,
     // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
     // new matches and Q's activity, for "what needs me".
     attention: createAttentionSources({ sql: database.sql }),
@@ -4547,6 +4550,9 @@ const qIntelligence = composeQIntelligence({
   // person as it is written rather than after it.
   deltas: liveDeltas,
   artifacts: qArtifacts.preparation,
+  // Board asks (reader v61 boardAsk): Q's answer filed and kept on their
+  // own board, its steps as tasks when they ask for that.
+  board: qBoard,
   artifactReviser: qArtifacts.reviser,
   receipts: qReceipts,
   visibility: profileBoard,
