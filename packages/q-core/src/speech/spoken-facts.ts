@@ -801,7 +801,7 @@ const ATTENTION_SOURCE_WORDS: Readonly<Record<QAttentionSource, string>> = {
   UNANSWERED_MESSAGE: "your messages",
   APPROVAL: "your approvals",
   HELD_DRAFT: "drafts held back",
-  AGENT_BLOCKED: "Q's agents",
+  AGENT_BLOCKED: "Q's work",
   DOCUMENT_REQUEST: "document requests",
   INTEREST_REQUEST: "interest requests",
   MEETING: "your calls",

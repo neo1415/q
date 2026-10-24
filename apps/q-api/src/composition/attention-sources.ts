@@ -11,6 +11,41 @@ function heldWhy(reason: string | null): string | null {
   return entry?.[1] ?? null;
 }
 
+type JobRow = {
+  readonly id: string;
+  readonly goal: string;
+  readonly status: string;
+  readonly updated_at: Date;
+};
+
+/**
+ * Stopped and held work, one item per piece of work (QA 2026-10-24, I1:
+ * "An agent's job stopped: …", the same job three times). The person sees
+ * Q's work, never an agent; repeats of the same goal and status are one
+ * line, the newest kept (rows arrive newest first), with how often.
+ */
+export function jobAttentionItems(rows: readonly JobRow[]): QAttentionItem[] {
+  const groups = new Map<string, { row: JobRow; times: number }>();
+  for (const row of rows) {
+    const key = `${row.status}\u0000${row.goal.trim().toLowerCase()}`;
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, { row, times: 1 });
+    else group.times += 1;
+  }
+  return [...groups.values()].map(({ row, times }) => {
+    const goal = row.goal.trim().slice(0, 140);
+    const state = row.status === "FAILED" ? "stopped" : "is waiting on you";
+    return {
+      key: `job:${row.id}:${row.status}`,
+      source: "AGENT_BLOCKED",
+      title: `Q's work on “${goal}” ${state}${times > 1 ? ` (${String(times)} times)` : ""}`,
+      entity: { kind: "JOB", id: row.id },
+      since: new Date(row.updated_at).toISOString(),
+      decidable: true,
+    };
+  });
+}
+
 /**
  * RECOVERY-2026-10 B1: the "what needs you" sources no tool port holds,
  * read from the person's own rows. Every predicate is their user id (or
@@ -24,7 +59,7 @@ function heldWhy(reason: string | null): string | null {
  * no decision yet.
  * New matches: companies in their organisation's current Discover slate
  * that were not in the slate they had at `since`.
- * Activity: counts of what Q and its agents recorded doing since `since`.
+ * Activity: counts of what Q's work recorded doing since `since`.
  */
 export function createAttentionSources(dependencies: {
   readonly sql: DatabaseExecutor;
@@ -99,14 +134,7 @@ export function createAttentionSources(dependencies: {
                and updated_at > now() - interval '14 days'
              order by updated_at desc
              limit 20`;
-          return rows.map((row): QAttentionItem => ({
-            key: `job:${row.id}:${row.status}`,
-            source: "AGENT_BLOCKED",
-            title: `${row.status === "FAILED" ? "An agent's job stopped" : "An agent's job is waiting on you"}: ${row.goal.slice(0, 140)}`,
-            entity: { kind: "JOB", id: row.id },
-            since: new Date(row.updated_at).toISOString(),
-            decidable: true,
-          }));
+          return jobAttentionItems(rows);
         },
       ],
       NOTICE: [
