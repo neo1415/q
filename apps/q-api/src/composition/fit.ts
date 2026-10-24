@@ -178,8 +178,10 @@ export function createFitComposition(
     fxRates,
     sql: dependencies.sql,
     eligibilityPorts: dependencies.eligibilityPorts,
-    identities: async (companyIds) => {
+    identities: async (companyIds, options) => {
       const found = await Promise.all(companyIds.map(identity));
+      // A ranking reads names only (owner 2026-10-24, egress incident).
+      const lines = options?.lines !== false;
       // The company's own one line, only where its profile is classified
       // for the network (or beyond): the fit service asks only for
       // companies eligibility already admitted for this reader, and a
@@ -187,6 +189,7 @@ export function createFitComposition(
       const profiles = await Promise.all(
         found.map((c) =>
           c === null ||
+          !lines ||
           dependencies.companies.findCanonicalCompanyProfile === undefined
             ? Promise.resolve(null)
             : dependencies.companies
@@ -392,5 +395,56 @@ export function createFitComposition(
     },
   };
 
-  return { fit, qViews };
+  return { fit: withRankCache(fit), qViews };
+}
+
+/** How long one person's network ranking is reused. */
+export const RANK_CACHE_MS = 120_000;
+const RANK_CACHE_MAX = 200;
+
+/**
+ * Owner 2026-10-24 (egress incident): a ranking over the whole network,
+ * the fallback when no slate is servable, is kept for two minutes per
+ * person, so the typed, spoken and translated turns of one session do not
+ * each read the network again. Keyed by the person (user, tenant,
+ * organisation) and the exact companies and limit: never shared between
+ * people. A mandate edited in those two minutes is ranked on the next
+ * ask after they pass; a failure is never kept.
+ */
+export function withRankCache(
+  fit: FitService,
+  clock: () => Date = () => new Date(),
+): FitService {
+  const rank = fit.rank;
+  if (rank === undefined) return fit;
+  const kept = new Map<
+    string,
+    { readonly at: number; readonly result: Awaited<ReturnType<typeof rank>> }
+  >();
+  return {
+    ...fit,
+    rank: async (actor, companyIds, limit) => {
+      const key = [
+        actor.userId,
+        actor.tenantId,
+        actor.organisationId ?? "",
+        String(limit),
+        [...new Set(companyIds)].sort().join(","),
+      ].join("|");
+      const now = clock().getTime();
+      const hit = kept.get(key);
+      if (hit !== undefined && now - hit.at < RANK_CACHE_MS) return hit.result;
+      const result = await rank(actor, companyIds, limit);
+      if (result.kind === "OK") {
+        kept.delete(key);
+        kept.set(key, { at: now, result });
+        // Bounded: the oldest goes first.
+        for (const old of kept.keys()) {
+          if (kept.size <= RANK_CACHE_MAX) break;
+          kept.delete(old);
+        }
+      }
+      return result;
+    },
+  };
 }

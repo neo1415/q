@@ -202,3 +202,38 @@ export async function readCurrentFeatureSnapshot(
        and s.status = 'CURRENT'`;
   return toSnapshot(rows[0]);
 }
+
+/**
+ * The current snapshots of many companies for one mandate, in one query
+ * (owner 2026-10-24, egress incident: a fit ranking read them one query
+ * per company). Absent companies have none.
+ */
+export async function readCurrentFeatureSnapshots(
+  sql: DatabaseExecutor,
+  input: {
+    readonly investorOrganisationId: string;
+    readonly mandateId: string;
+    readonly companyIds: readonly string[];
+    readonly mode: string;
+  },
+): Promise<ReadonlyMap<string, RecommendationFeatureSnapshot>> {
+  const out = new Map<string, RecommendationFeatureSnapshot>();
+  if (input.companyIds.length === 0) return out;
+  const rows = await sql`
+    select s.tenant_id, s.investor_organisation_id, s.mandate_id, s.mandate_version, s.company_id,
+           s.company_tenant_id, s.company_projection_version, s.mode, s.feature_schema_version,
+           s.eligibility_policy_version, s.eligibility_decision, s.structured_generator_version,
+           s.semantic_generator_version, s.taxonomy_version, s.candidate_provenance, s.sensitivity,
+           s.features, s.fingerprint, s.computed_at
+      from recommendation.feature_snapshots s
+     where s.investor_organisation_id = ${input.investorOrganisationId}
+       and s.mandate_id = ${input.mandateId}
+       and s.company_id = any(${[...input.companyIds]}::uuid[])
+       and s.mode = ${input.mode}
+       and s.status = 'CURRENT'`;
+  for (const row of rows) {
+    const snapshot = toSnapshot(row);
+    if (snapshot !== null) out.set(snapshot.companyId, snapshot);
+  }
+  return out;
+}

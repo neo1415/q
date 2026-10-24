@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { EligibilityPorts } from "@capital-q/discovery";
 import type { ActorContext } from "@capital-q/security";
 
-import { createFitComposition } from "../src/composition/fit.js";
+import {
+  createFitComposition,
+  RANK_CACHE_MS,
+  withRankCache,
+} from "../src/composition/fit.js";
 
 /**
  * The Q API's fit composition (ADR 0052): the raise reaches the fit only
@@ -26,8 +30,14 @@ const PRIVATE = ID(2);
  * The database as the fit sees it: empty, except a company's Q Card when a
  * test publishes one (read through public-identity's own repository).
  */
+/** Queries the fit composition sent, by what they read (egress counts). */
+const queries = { snapshots: 0, profiles: 0 };
+
 function cardSql(published: ReadonlyMap<string, unknown>) {
   return ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    if (strings.join("?").includes("recommendation.feature_snapshots")) {
+      queries.snapshots += 1;
+    }
     if (!strings.join("?").includes("core.shareable_identities")) {
       return Promise.resolve([]);
     }
@@ -114,6 +124,10 @@ function compose(
         ),
     },
     companies: {
+      findCanonicalCompanyProfile: () => {
+        queries.profiles += 1;
+        return Promise.resolve(null);
+      },
       findCanonicalCompany: (id) =>
         Promise.resolve({
           id,
@@ -237,11 +251,17 @@ describe("fit composition", () => {
       (id) => id === SILO,
       (id) => (id === SILO ? "Silo Credit" : `A company ${id.slice(-4)}`),
     );
+    queries.snapshots = 0;
+    queries.profiles = 0;
     const result = await fit.rank?.(actor, ids, 5);
     expect(result?.kind).toBe("OK");
     if (result?.kind !== "OK") return;
     expect(result.comparison.considered).toBe(463);
     expect(result.comparison.entries[0]?.companyId).toBe(SILO);
+    // Egress (owner 2026-10-24): one snapshot query per batch of 100,
+    // never one per company, and no profile one-liners for a ranking.
+    expect(queries.snapshots).toBe(5);
+    expect(queries.profiles).toBe(0);
   });
 
   it("top N reads the reader's own lists, and one list failing does not fail it", async () => {
@@ -275,5 +295,40 @@ describe("fit composition", () => {
       correlationId: "cor_2",
     });
     expect(calls.n).toBe(1);
+  });
+});
+
+describe("the network ranking is reused for two minutes, per person (egress, owner 2026-10-24)", () => {
+  it("the same person and companies read once; another person, a later ask or a failure read again", async () => {
+    let calls = 0;
+    let fail = false;
+    let now = Date.parse("2026-10-24T23:00:00Z");
+    const base = {
+      profiles: () => Promise.reject(new Error("not used")),
+      top: () => Promise.reject(new Error("not used")),
+      compare: () => Promise.reject(new Error("not used")),
+      rank: () => {
+        calls += 1;
+        return Promise.resolve(
+          fail
+            ? ({ kind: "NO_MANDATE" } as const)
+            : ({ kind: "OK", comparison: {} as never } as const),
+        );
+      },
+    };
+    const fit = withRankCache(base, () => new Date(now));
+    const other = { ...actor, userId: ID(99) } as ActorContext;
+    await fit.rank?.(actor, [ID(1), ID(2)], 5);
+    await fit.rank?.(actor, [ID(2), ID(1)], 5);
+    expect(calls).toBe(1);
+    await fit.rank?.(other, [ID(1), ID(2)], 5);
+    expect(calls).toBe(2);
+    now += RANK_CACHE_MS;
+    await fit.rank?.(actor, [ID(1), ID(2)], 5);
+    expect(calls).toBe(3);
+    fail = true;
+    await fit.rank?.(actor, [ID(3)], 5);
+    await fit.rank?.(actor, [ID(3)], 5);
+    expect(calls).toBe(5);
   });
 });

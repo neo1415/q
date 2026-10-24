@@ -97,6 +97,11 @@ export type FitInputSource = {
     readonly investorOrganisationId: string;
     readonly mandateId: string;
     readonly companyIds: readonly string[];
+    /**
+     * RANK: only what the score reads (owner 2026-10-24, egress
+     * incident); no one-liners, no stated evidence. Absent: everything.
+     */
+    readonly purpose?: "RANK" | undefined;
   }) => Promise<ReadonlyMap<string, FitCompanyInputs>>;
 };
 
@@ -279,6 +284,7 @@ export function createFitService(
   const profiles = async (
     actor: ActorContext,
     companyIds: readonly string[],
+    purpose?: "RANK",
   ): Promise<FitProfilesResult> => {
     const subject =
       await dependencies.investorSubject.investorOrganisationFor(actor);
@@ -389,6 +395,7 @@ export function createFitService(
         investorOrganisationId: subject.investorOrganisationId,
         mandateId,
         companyIds: admittedIds.slice(start, start + FIT_INPUTS_BATCH_MAX),
+        ...(purpose === undefined ? {} : { purpose }),
       });
       for (const [companyId, input] of part) inputs.set(companyId, input);
     }
@@ -457,7 +464,7 @@ export function createFitService(
     },
     rank: async (actor, companyIds, limit) => {
       const ids = [...new Set(companyIds)].slice(0, FIT_RANK_CANDIDATES_MAX);
-      const result = await profiles(actor, ids);
+      const result = await profiles(actor, ids, "RANK");
       if (result.kind !== "OK") return result;
       return {
         kind: "OK",

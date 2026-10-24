@@ -71,6 +71,8 @@ type Catalog = {
   readonly raising: { readonly matched: number } | null;
   /** FIT was asked and the fit service failed: the cause, for the log. */
   readonly rankFailed: string | null;
+  /** The investor's precomputed Discover ranking (owner 2026-10-24). */
+  readonly fromSlate: boolean;
 };
 
 /**
@@ -109,6 +111,7 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
       readonly matched?: unknown;
     };
     readonly fitRankFailed?: { readonly cause?: unknown };
+    readonly basis?: unknown;
   } | null;
   if (data === null || !Array.isArray(data.companies)) return null;
   return {
@@ -131,6 +134,7 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
       typeof data.fitRankFailed?.cause === "string"
         ? data.fitRankFailed.cause.slice(0, 80)
         : null,
+    fromSlate: data.basis === "SLATE",
   };
 }
 
@@ -478,8 +482,11 @@ export async function runCompanyDiscovery(input: {
         ask.count !== null && block.cards.length < count && total >= count
           ? ` Only ${counted(block.cards.length)} of them could be scored.`
           : "";
-      const head =
-        total === 1
+      // The slate: Discover's own ranking for them, said as that.
+      const slateHead = `Of the ${counted(total)} ${listKind} you can see on Capital Q, ${block.cards.length === 1 ? "this one leads" : `these ${counted(block.cards.length)} lead`} your Discover ranking against your mandate: ${listed(named)}.`;
+      const head = catalog.fromSlate
+        ? slateHead
+        : total === 1
           ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
           : total < count && ask.count !== null
             ? `Capital Q has only ${counted(total)} ${listKind}${seen}, ranked by fit with your mandate: ${listed(named)}.`

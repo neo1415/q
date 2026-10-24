@@ -259,6 +259,113 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
   });
 });
 
+describe("DISCOVER_COMPANIES unscoped FIT from the slate (owner 2026-10-24, egress incident)", () => {
+  const SLATE = Array.from(
+    { length: 10 },
+    (_, i) => `e0000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+  );
+  const visible = {
+    canDisclose: () => Promise.reject(new Error("not used")),
+    evaluateMany: (requests: readonly { resource: unknown }[]) => {
+      reads.disclosure += requests.length;
+      return Promise.resolve(
+        requests.map((request) => ({
+          outcome: "ALLOW" as const,
+          resource: request.resource,
+          requestedAccess: "view" as const,
+          grantedAccess: "view" as const,
+          reasonCode: "NETWORK_VISIBLE" as const,
+          via: { kind: "INTRINSIC" as const },
+        })),
+      );
+    },
+  };
+  const reads = { slate: 0, catalog: 0, rank: 0, disclosure: 0 };
+  const scan: CompanyCatalogPort = {
+    find: () => {
+      reads.catalog += 1;
+      return Promise.resolve({
+        candidates: [],
+        sectors: [],
+        unknownSectors: [],
+      });
+    },
+  };
+  const ranker = {
+    profiles: () => Promise.reject(new Error("not used")),
+    top: () => Promise.reject(new Error("not used")),
+    compare: () => Promise.reject(new Error("not used")),
+    rank: () => {
+      reads.rank += 1;
+      return Promise.resolve({
+        kind: "OK" as const,
+        comparison: { entries: [] },
+      });
+    },
+  } as never;
+  const feed = (ids: readonly string[]) => ({
+    page: (_actor: unknown, limit: number) => {
+      reads.slate += 1;
+      return Promise.resolve({
+        items: ids.slice(0, limit).map((companyId, i) => ({
+          companyId,
+          name: `Slate ${String(i + 1)}`,
+          stageCode: "seed",
+          headquartersCountry: "NG",
+          shortDescription: null,
+          websiteUrl: null,
+          reasonCodes: [],
+        })),
+        notes: [],
+        discoverableCount: 463,
+      });
+    },
+    decisions: () => Promise.resolve([]),
+  });
+  const ask = (args: Record<string, unknown>, ids: readonly string[]) => {
+    for (const key of Object.keys(reads) as (keyof typeof reads)[])
+      reads[key] = 0;
+    return port({
+      companyCatalog: scan,
+      disclosure: visible as never,
+      fit: ranker,
+      investorFeed: feed(ids),
+    }).execute(
+      { callId: "s1", name: "discover_companies", arguments: args },
+      contextFor(actorA, networkPlan),
+    );
+  };
+
+  it("reads one short slate page, decides each through disclosure, and ranks nothing over the network", async () => {
+    const outcome = await ask({ limit: 24, order: "FIT" }, SLATE);
+    expect(outcome.status).toBe("SUCCEEDED");
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect(data["order"]).toBe("FIT");
+    expect(data["basis"]).toBe("SLATE");
+    expect(data["total"]).toBe(463);
+    expect(
+      (data["companies"] as { companyId: string }[]).map((c) => c.companyId),
+    ).toEqual(SLATE);
+    // The read counts the egress fix is for: one page of ten, ten
+    // disclosure decisions, no catalog scan and no network-wide rank.
+    expect(reads).toEqual({ slate: 1, catalog: 0, rank: 0, disclosure: 10 });
+  });
+
+  it("no servable slate: the whole-network rank answers instead", async () => {
+    const outcome = await ask({ limit: 24, order: "FIT" }, []);
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect(data["basis"]).toBeUndefined();
+    expect(reads.slate).toBe(1);
+    expect(reads.catalog).toBe(1);
+  });
+
+  it("a sector, country, stage or raise asked for is the catalog's, never the slate's", async () => {
+    await ask({ sectors: ["fintech"], limit: 24, order: "FIT" }, SLATE);
+    expect(reads.slate).toBe(0);
+    expect(reads.catalog).toBe(1);
+  });
+});
+
 describe("DISCOVER_COMPANIES raising (F-10): only companies stating a current raise", () => {
   const ids = Array.from(
     { length: 60 },
