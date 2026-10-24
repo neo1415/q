@@ -282,7 +282,9 @@ export function createQToolRegistry(
       // A named tool off this purpose is offered only when it is a declared
       // app action: what is offered is what may execute. (Unfocused, no
       // tool is named, so this is the focused rule only.)
-      if (named.has(name)) return forPurpose || app;
+      if (named.has(name)) {
+        return forPurpose || app || record.definition.offeredWhenNamed === true;
+      }
       // A question to Q: the change-preparing tools are not shown (each
       // schema is paid on every round); use_capability, in the core,
       // loads one the moment the answer needs it.
@@ -392,7 +394,8 @@ export function createQToolRegistry(
     // shown (cost), never what the run is authorised to use. A code read
     // of a fact the model was not shown this turn still runs.
     // A declared app action the turn named may execute on any purpose its
-    // plan's scopes allow; nothing else the focus names widens authority.
+    // plan's scopes allow, as may a tool offered only when named; nothing
+    // else the focus names widens authority.
     offeredByProviderName: (context, providerName) =>
       unfocused(context).find(
         (record) => record.definition.providerName === providerName,
@@ -401,6 +404,14 @@ export function createQToolRegistry(
       inFocusArea(context, providerName)
         ? nameable(context).find(
             (record) => record.definition.providerName === providerName,
+          )
+        : undefined) ??
+      // A tool offered only when named, named by this turn.
+      (context.focus?.tools.includes(providerName) === true
+        ? ranked(context).find(
+            (record) =>
+              record.definition.offeredWhenNamed === true &&
+              record.definition.providerName === providerName,
           )
         : undefined),
     available,

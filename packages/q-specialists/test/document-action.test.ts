@@ -21,6 +21,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { composeAnswerDocument } from "../src/answer-document.js";
 import {
   answerSteps,
+  boardReadOut,
   createSpecialistQAnswer,
   type BoardKeeper,
 } from "../src/answer.js";
@@ -907,6 +908,13 @@ describe("board asks about Q's last answer", () => {
       key: string;
     }[] = [];
     const board: BoardKeeper = {
+      list: () =>
+        Promise.resolve({
+          items: added.map((one) => ({
+            title: one.title,
+            status: "TODO" as const,
+          })),
+        }),
       add: (_actor, request, options) => {
         added.push({ ...request, key: options.idempotencyKey });
         return Promise.resolve({ outcome: "OK", replayed: false });
@@ -1016,6 +1024,105 @@ describe("board asks about Q's last answer", () => {
     await s.run();
     expect(added).toEqual([]);
     expect(s.prepared).toHaveLength(0);
+  });
+});
+
+describe("board asks about Q's last answer, continued", () => {
+  it("SAVE after Q made a document keeps that document, without filing another", async () => {
+    const added: { kind: string; refId?: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const made = "11111111-2222-4333-8444-555555555555";
+    const s = seam({
+      history: [
+        message("USER", "Make me a one-page growth plan."),
+        {
+          ...message("Q", "Here's your one-page growth plan."),
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId: QArtifactIdSchema.parse(made),
+              type: "Q_REPORT",
+              status: "READY",
+              title: "Growth plan",
+            },
+          ],
+        },
+        message("USER", "Save that to my board."),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([
+      expect.objectContaining({
+        kind: "DOCUMENT",
+        refId: made,
+        title: "Growth plan",
+      }),
+    ]);
+  });
+
+  it("an item they dictate ('add \"Prep IC memo\" to my board') is the board tool's, not Q's last answer", async () => {
+    const added: unknown[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const s = seam({
+      history: [
+        message("USER", "Give me a plan."),
+        message("Q", "1. Hire.\n2. Raise."),
+        message("USER", "Add “Prep IC memo” to my board."),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(added).toEqual([]);
+    expect(s.prepared).toHaveLength(0);
+  });
+});
+
+describe("boardReadOut", () => {
+  it("reads the board by column, says how many, and says when it is empty", () => {
+    expect(
+      boardReadOut([
+        { title: "Growth plan", status: "TODO" },
+        { title: "Hire a head of sales", status: "DOING" },
+        { title: "Close the bridge", status: "TODO" },
+      ]),
+    ).toBe(
+      "Here's your board.\n\n**To do** (2): Growth plan; Close the bridge.\n\n**Doing** (1): Hire a head of sales.",
+    );
+    expect(boardReadOut([])).toMatch(/^Your board is empty/u);
   });
 });
 
