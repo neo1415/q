@@ -35,7 +35,9 @@ type Step = OnboardingStepManifest;
 
 export function stepsOf(journey: ProfileJourney): readonly Step[] {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_CURRENT
+    journey === "founder"
+      ? FOUNDER_DEFINITION_CURRENT
+      : INVESTOR_DEFINITION_CURRENT
   ).steps;
 }
 

@@ -268,7 +268,9 @@ function moneyValue(
 
 function stepOf(journey: ProfileJourney, stepKey: string) {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_CURRENT
+    journey === "founder"
+      ? FOUNDER_DEFINITION_CURRENT
+      : INVESTOR_DEFINITION_CURRENT
   ).steps.find((step) => step.stepKey === stepKey);
 }
 

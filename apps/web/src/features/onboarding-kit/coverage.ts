@@ -25,7 +25,9 @@ export function phasesFor(
   journey: CoverageJourney,
 ): readonly { readonly phaseKey: string; readonly label: string }[] {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_CURRENT
+    journey === "founder"
+      ? FOUNDER_DEFINITION_CURRENT
+      : INVESTOR_DEFINITION_CURRENT
   ).schema.phases;
 }
 
