@@ -2385,6 +2385,7 @@ export function createModelGatewayQAnswer(
     if (subjects.length === 0) return outcome;
     const data = outcome.result.data as {
       readonly sources?: readonly Record<string, unknown>[];
+      readonly comparison?: readonly Record<string, unknown>[];
     };
     const sources = data.sources ?? [];
     const kept = sources.filter((source) => {
@@ -2415,9 +2416,15 @@ export function createModelGatewayQAnswer(
       },
       "q public pages not about whom the search was for left out",
     );
+    // Capital Q's notes on a page left out go with it: a note on LEGO's
+    // page is still LEGO's page in front of the answer.
+    const keptIndexes = new Set(kept.map((source) => source["index"]));
+    const comparison = (data.comparison ?? []).filter((note) =>
+      keptIndexes.has(note["sourceIndex"]),
+    );
     return {
       ...outcome,
-      result: { ok: true, data: { ...data, sources: kept } },
+      result: { ok: true, data: { ...data, sources: kept, comparison } },
     };
   };
   const tools: QToolPort = {

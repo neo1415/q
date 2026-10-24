@@ -225,6 +225,42 @@ describe("which pages are about a company Capital Q holds", () => {
     expect(pageAboutThem(source, "Duplo", DUPLO)).toBe(about);
   });
 
+  // Live 2026-10-24: the record's own words name them ("Duplo is a
+  // Lagos-based platform ..."), so LEGO DUPLO's page, which names Duplo and
+  // says "based", passed and was described in the answer.
+  it("their own name and a word like 'based' in the record are no evidence", () => {
+    const held = {
+      country: "NG",
+      city: "Lagos",
+      website: "https://www.duplo.co",
+      about:
+        "Duplo is a Lagos-based platform that helps African businesses collect and make payments to each other.",
+    };
+    expect(
+      pageAboutThem(
+        page(
+          "en.wikipedia.org",
+          "Lego Duplo - Wikipedia",
+          "Lego Duplo is a product line based on large bricks for toddlers.",
+          "MATCH",
+        ),
+        "Duplo",
+        held,
+      ),
+    ).toBe(false);
+    expect(
+      pageAboutThem(
+        page(
+          "tracxn.com",
+          "Duplo - Founders and Board",
+          "Duplo, a Nigerian B2B payments startup, was founded by Yele Oyekola.",
+        ),
+        "Duplo",
+        held,
+      ),
+    ).toBe(true);
+  });
+
   it("their own website on record is always theirs; a namesake's own site never", () => {
     const held = { ...DUPLO, website: "https://tryduplo.com" };
     expect(
