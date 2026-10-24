@@ -67,8 +67,21 @@ export type QWaitingLines = {
   ) => { readonly line: string; readonly actionId: string } | null;
 };
 
-/** One line naming the cards still waiting beside a new one. */
+/**
+ * One short line naming a card still waiting beside a new one: the most
+ * recent, and how many more (coordinator 2026-10-24: at most one short
+ * line, never a list).
+ */
 export function waitingLine(summaries: readonly string[]): string {
+  const latest = summaries.at(-1);
+  if (latest === undefined) return waitingLineOf([]);
+  const more = summaries.length - 1;
+  return more === 0
+    ? waitingLineOf([latest])
+    : waitingLineOf([latest]).replace(/\.$/u, ` (and ${String(more)} more).`);
+}
+
+function waitingLineOf(summaries: readonly string[]): string {
   // A demo record's "(fictional)" marker is never said (QA F-62).
   const names = summaries.map((summary) =>
     summary
@@ -113,6 +126,12 @@ export function createQActionPort(options: {
         }[]
       >)
     | undefined;
+  /**
+   * Whether the other side receives a card of this action type (an
+   * interest, a message, an invite): other waiting cards are named only
+   * beside a new outward card (coordinator 2026-10-24). Absent: never.
+   */
+  readonly outward?: ((actionType: string) => boolean) | undefined;
 }): QActionPort {
   const proposer = options.proposer ?? noQActionProposer;
   const narrator = options.narrator ?? noQActionNarrator;
@@ -121,7 +140,8 @@ export function createQActionPort(options: {
     context: QActionPrepareContext,
   ): Promise<QActionPrepareOutcome> => {
     const covered = new Set<string>();
-    const outcome = await prepare(context, covered);
+    const prepared: { actionType: string | null } = { actionType: null };
+    const outcome = await prepare(context, covered, prepared);
     const deferred = options.waitingLines?.take(context.runId) ?? null;
     const run = {
       runId: context.runId,
@@ -145,9 +165,15 @@ export function createQActionPort(options: {
     // other card of theirs still waiting in this conversation, and not
     // covered by this result, is named once after the new card's line --
     // from the conversation's own cards, never from the decision reader.
+    // Coordinator 2026-10-24 (QA F-89): only beside a new OUTWARD card,
+    // in one short line; a profile edit, a board item or any other own
+    // change says nothing about unrelated cards.
+    const outwardCard =
+      prepared.actionType !== null &&
+      options.outward?.(prepared.actionType) === true;
     if (outcome.kind === "AWAITING_APPROVAL") {
       const others =
-        options.pendingInConversation === undefined
+        !outwardCard || options.pendingInConversation === undefined
           ? null
           : await options
               .pendingInConversation(context)
@@ -160,9 +186,14 @@ export function createQActionPort(options: {
               .catch(() => null);
       if (others === null) {
         if (deferred !== null && !covered.has(deferred.actionId)) {
-          await say(deferred.line, "deferred line, pending cards unread");
+          await say(
+            deferred.line,
+            outwardCard
+              ? "deferred line, pending cards unread"
+              : "deferred line",
+          );
         } else {
-          skip("pending cards unread");
+          skip(outwardCard ? "pending cards unread" : "not an outward card");
         }
       } else if (others.length === 0) {
         skip("no other card waiting");
@@ -185,12 +216,14 @@ export function createQActionPort(options: {
   const prepare = async (
     context: QActionPrepareContext,
     covered: Set<string>,
+    prepared: { actionType: string | null },
   ): Promise<QActionPrepareOutcome> => {
     {
       const proposal = await proposer.propose(context);
       if (proposal === null) {
         return { kind: "NONE" };
       }
+      if (!("refused" in proposal)) prepared.actionType = proposal.actionType;
       const run = {
         runId: context.runId,
         tenantId: context.actor.tenantId,

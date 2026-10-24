@@ -727,6 +727,7 @@ import {
   createPendingDecisionPort,
   createRecentPendingElsewhere,
   plainProposalStatus,
+  OUTWARD_ACTION_TYPES,
 } from "./composition/conversation-approvals.js";
 import {
   APPROVED_ACTION_SWEEP_INTERVAL_MS,
@@ -3889,6 +3890,9 @@ const qActionPort = createQActionPort({
   waitingLines,
   // The conversation's own cards, read as the person: one still waiting
   // is named beside a new card (lead 2026-10-03, run 0d1ffa3f).
+  // Coordinator 2026-10-24: named only beside a new card the other side
+  // receives, in one short line.
+  outward: (actionType) => OUTWARD_ACTION_TYPES.has(actionType),
   pendingInConversation: (context) =>
     conversationApprovals.inConversation({
       actor: context.actor,

@@ -103,7 +103,7 @@ const DECLARED: readonly DeclaredAction[] = [
  * email, an invite, a request): a card still waiting reads "ready to
  * send". Profile and record edits keep "Not saved yet".
  */
-const OUTWARD_ACTION_TYPES: ReadonlySet<string> = new Set([
+export const OUTWARD_ACTION_TYPES: ReadonlySet<string> = new Set([
   "relationship.interest.express",
   "relationship.interest.respond",
   "relationship.connection_request.send",
