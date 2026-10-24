@@ -516,6 +516,9 @@ export function createMyBoardTool(
     // other purpose's offer is already at what one request carries, and
     // the board would push a read out of it.
     supportedPurposes: ["ACTION_PREPARATION", "GENERAL_QUESTION"],
+    // A board ask the turn names (reader boardAsk) reaches it on any
+    // purpose; never offered by area alone.
+    offeredWhenNamed: true,
     providerName: "my_board",
     description:
       "Their own work board: the documents, companies, tasks, notes and Q work they keep, in TODO, DOING and DONE. LIST: what is on it, with itemIds. ADD: put what they ask on it ('put this on my board', 'add a task to call Kestrel'), only what they asked for, in their words; a document or company by its id from its card or a list tool (NEEDS_REF: it needs that id). UPDATE: move an item ('mark it done', 'I'm on the hiring task'), rename it, set its notes or due date, or remove it (CHANGED_SINCE: LIST again). WORK: start Q's own work on items they name ('work on those items'): STARTED -- research and drafts for them began, those items are now in DOING and move to DONE when it finishes, so say which and give firstRead; PREPARED -- the work would reach someone else, so it is a card for their approval and the items stay put; ALREADY_WAITING -- say what waits and ask before calling again with proceed true. Their own board needs no approval: always say back what changed.",
