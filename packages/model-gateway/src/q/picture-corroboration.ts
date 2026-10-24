@@ -15,10 +15,10 @@
  *
  * Another site that looks like a namesake's own (a name in the domain that
  * is not their website on Capital Q) never is, and a listing on a site the
- * search never tied to them is not shown. Where no public search ran this
- * turn at all, a picture whose page names them is shown said to be
- * uncertain (owner: "I'm not sure, but I found this"); where one ran and
- * nothing ties the site to them, none is.
+ * search never tied to them is not shown. When Capital Q holds them (a
+ * company record with its country and city), a page that names them counts
+ * only where it also places them there: LEGO's DUPLO pages name "Duplo" but
+ * not a Lagos startup. No evidence, no picture -- a name alone is none.
  */
 
 export type PictureCandidate = {
@@ -33,7 +33,36 @@ export type SearchEvidence = {
   readonly domain: string;
   /** MATCH, POSSIBLE or NONE from the research service; null when unnamed. */
   readonly subjectMatch: string | null;
+  /** ISO countries the page mentions, as the research service read them. */
+  readonly countries?: readonly string[] | undefined;
+  /** The page's excerpt, for the city it places them in. */
+  readonly text?: string | null | undefined;
 };
+
+/** What Capital Q holds about them, when it holds them. */
+export type HeldIdentity = {
+  readonly website?: string | null | undefined;
+  readonly country?: string | null | undefined;
+  readonly city?: string | null | undefined;
+};
+
+/** Whether Capital Q holds where they are. */
+function holdsPlace(held: HeldIdentity): boolean {
+  return (
+    (held.country?.trim().length ?? 0) === 2 ||
+    (held.city?.trim().length ?? 0) > 2
+  );
+}
+
+/** A page that names them and places them where Capital Q holds them. */
+function placesThem(source: SearchEvidence, held: HeldIdentity): boolean {
+  const country = held.country?.trim().toUpperCase() ?? "";
+  if (country.length === 2 && (source.countries ?? []).includes(country)) {
+    return true;
+  }
+  const city = held.city?.trim().toLowerCase() ?? "";
+  return city.length > 2 && (source.text ?? "").toLowerCase().includes(city);
+}
 
 const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov", "edu"]);
 
@@ -82,12 +111,15 @@ export function corroboratedPictures(
     readonly name: string;
     /** Their website as Capital Q holds it, when it does. */
     readonly website?: string | null | undefined;
+    /**
+     * Capital Q's record of them (country, city), when it holds one: a page
+     * must place them there to count.
+     */
+    readonly held?: HeldIdentity | null | undefined;
     /** Pages this turn's public search read, with its verdicts. */
     readonly sources: readonly SearchEvidence[];
     /** Organisations whose own sites count as theirs (a person's employer). */
     readonly organisations?: readonly string[] | undefined;
-    /** No public search ran this turn: nothing to weigh the picture against. */
-    readonly unsearched?: boolean | undefined;
   },
 ): PictureCandidate[] {
   const ownHost = hostOf(evidence.website);
@@ -97,6 +129,15 @@ export function corroboratedPictures(
     const site = registrableDomain(source.domain);
     // A namesake's own site is no evidence about them.
     if (own !== null && site !== own && looksLikeOwnSite(site, evidence.name)) {
+      continue;
+    }
+    // Held by Capital Q: a page about a namesake elsewhere is not theirs.
+    if (
+      evidence.held !== null &&
+      evidence.held !== undefined &&
+      holdsPlace(evidence.held) &&
+      !placesThem(source, evidence.held)
+    ) {
       continue;
     }
     if (source.subjectMatch === "MATCH") verdicts.set(site, "SURE");
@@ -120,8 +161,7 @@ export function corroboratedPictures(
     ) {
       return [picture];
     }
-    const verdict =
-      verdicts.get(site) ?? (evidence.unsearched === true ? "MAYBE" : null);
+    const verdict = verdicts.get(site);
     if (verdict === "SURE") return [picture];
     if (verdict === "MAYBE") {
       return [
