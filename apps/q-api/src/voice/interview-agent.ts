@@ -371,6 +371,14 @@ export type InterviewAgentDependencies = {
    * saving (lane ob1). Absent: such a failure is reported, not held.
    */
   readonly heldWrites?: HeldWritesStore | undefined;
+  /** One closed question about their words, by meaning (J7; QO-27 lists). */
+  readonly wordsCheck?:
+    | ((
+        actor: ActorContext,
+        question: string,
+        words: string,
+      ) => Promise<"YES" | "NO" | "UNSURE" | null>)
+    | undefined;
   /**
    * Any language: the questions code adds, through Q's shared translation
    * layer (English product copy). Each entry, or null to keep the English.
@@ -1141,7 +1149,14 @@ export function createInterviewAgent(
       Promise.resolve(NO_TURN_AUTHORITY);
     /** The reading code decided exactly (one step stated), if it did. */
     let codeDecided: QTurnAuthority | null = null;
+    const wordsCheck = dependencies.wordsCheck;
     const port = createOnboardingPort({
+      ...(wordsCheck === undefined
+        ? {}
+        : {
+            wordsCheck: (question: string, words: string) =>
+              wordsCheck(actor, question, words),
+          }),
       statedEarlier: (stepKey, quote) =>
         (statedBySession.get(input.onboardingSessionId) ?? []).some(
           (earlier) =>
