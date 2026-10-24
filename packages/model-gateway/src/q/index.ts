@@ -104,6 +104,7 @@ import {
   fenceUntrusted,
   dailyFollowUpKind,
   ModelFindingSchema,
+  textIsEnglish,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -2010,6 +2011,11 @@ export type ModelGatewayQAnswerDependencies = {
           readonly tenantId: string;
           readonly userId: string;
           readonly runId: string;
+          /**
+           * F-96: the turn's own words; with no language chosen, a script
+           * that names its language (Arabic, Hebrew, …) is theirs.
+           */
+          readonly turn?: string | undefined;
         },
         texts: readonly string[],
       ) => Promise<readonly (string | null)[]>)
@@ -5853,6 +5859,49 @@ export function createModelGatewayQAnswer(
        * those cards are not the set just shown, by design.
        */
       let rankedPastShown = false;
+      /**
+       * QA F-96 (24 Oct 2026): an Arabic "best three for my mandate" answer
+       * ended with code's English "They're on screen." Whatever path wrote a
+       * line in English (an on-screen line, a verdict lead, a tie, a status
+       * line), a turn that is not in English gets it in theirs, through the
+       * shared translation layer (names and figures kept). English turns,
+       * and lines already in their language, are left as they are.
+       */
+      const inTheirLanguage = async (text: string): Promise<string> => {
+        const localise = dependencies.localiseWords;
+        if (localise === undefined || textIsEnglish(latest.content)) {
+          return text;
+        }
+        const pieces = text.split(/(\n+|(?<=[.!?])\s+(?=[\p{Lu}"'“‘([]))/u);
+        const english = pieces
+          .map((piece, at) => ({ piece, at }))
+          .filter(
+            ({ piece }) =>
+              !/^\s*$/u.test(piece) &&
+              // Two lower-case words make a line ("They're on screen."),
+              // where names alone ("Anchor, Afyascan") do not.
+              (piece.match(/(?<![\p{L}'])\p{Ll}[\p{Ll}']*/gu) ?? []).length >=
+                2 &&
+              textIsEnglish(piece),
+          );
+        if (english.length === 0) return text;
+        const said = await localise(
+          {
+            tenantId: request.tenantId,
+            userId: request.actorUserId,
+            runId: request.runId,
+            turn: latest.content,
+          },
+          english.map(({ piece }) => piece),
+        ).catch(() => null);
+        if (said === null) return text;
+        const out = [...pieces];
+        english.forEach(({ at }, index) => {
+          const words = said[index];
+          if (words !== null && words !== undefined) out[at] = words;
+        });
+        return out.join("");
+      };
       // The comparison's lead, decided by code (prepare's table, or the
       // model path's own table below when the prepare built none).
       let answerVerdict: ComparisonVerdict | null = compareVerdict;
@@ -5974,6 +6023,8 @@ export function createModelGatewayQAnswer(
             ANSWER_LIMIT_CHARS,
           );
         }
+        // F-96: every line code wrote, in the language of their turn.
+        content = await inTheirLanguage(content);
         // Nothing of a speculative answer is stored until it is adopted.
         if (gate !== null) await gate.ready();
         // The stages and live findings already queued are stored first, so
@@ -6036,6 +6087,7 @@ export function createModelGatewayQAnswer(
             tenantId: request.tenantId,
             userId: request.actorUserId,
             runId: request.runId,
+            turn: latest.content,
           },
           texts,
         ).catch(() => null);
