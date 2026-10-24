@@ -83,7 +83,7 @@ describe("reference taxonomy (§110-120)", () => {
       Object.fromEntries(
         REFERENCE_TAXONOMY.vocabularies.map((v) => [v.code, v.version]),
       ),
-    ).toMatchObject({ geography: 3, industry: 2 });
+    ).toMatchObject({ geography: 4, industry: 2 });
     expect(
       REFERENCE_TAXONOMY.vocabularies
         .filter((v) => v.code !== "geography" && v.code !== "industry")
@@ -92,7 +92,9 @@ describe("reference taxonomy (§110-120)", () => {
     expect(referenceNode("geography", "qatar").metadata).toEqual({
       iso3166Alpha2: "QA",
     });
-    expect(referenceNode("geography", "qatar").parentCode).toBe("middle_east");
+    // v4: the Gulf countries sit under the Gulf (GCC) region, in the Middle East.
+    expect(referenceNode("geography", "qatar").parentCode).toBe("gcc");
+    expect(referenceNode("geography", "gcc").parentCode).toBe("middle_east");
     expect(referenceNode("geography", "cote_divoire").metadata).toEqual({
       iso3166Alpha2: "CI",
     });

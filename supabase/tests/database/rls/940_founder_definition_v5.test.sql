@@ -50,9 +50,12 @@ select is(
      join taxonomy.vocabularies v on v.id = n.vocabulary_id
     where v.code = 'geography'
       and n.canonical_code in ('qatar', 'saudi_arabia', 'kuwait', 'bahrain', 'oman')
-      and n.parent_node_id = (select id from taxonomy.nodes where canonical_code = 'middle_east')
+      -- Since 20261231110000 through the Gulf (GCC) region, still in the Middle East.
+      and n.parent_node_id = (select id from taxonomy.nodes where canonical_code = 'gcc')
+      and (select p.parent_node_id from taxonomy.nodes p where p.canonical_code = 'gcc')
+          = (select id from taxonomy.nodes where canonical_code = 'middle_east')
       and n.metadata ? 'iso3166Alpha2'),
-  5, 'the five Gulf countries sit under the Middle East with ISO codes');
+  5, 'the five Gulf countries sit in the Middle East (through the Gulf region) with ISO codes');
 
 select * from finish();
 rollback;
