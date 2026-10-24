@@ -1474,7 +1474,10 @@ export function createInterviewAgent(
         journey: input.journeyType,
         opening,
         state: current,
-        firstName: firstNameOf(input.signup?.displayName ?? null),
+        firstName: firstNameOf(
+          input.signup?.displayName ?? null,
+          input.signup?.organisationName ?? null,
+        ),
         knownName:
           (input.journeyType === "founder"
             ? textAnswerOf(port.view(), FOUNDER_STEPS.companyName)
