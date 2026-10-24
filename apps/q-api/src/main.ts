@@ -238,6 +238,7 @@ import {
 import {
   houseEtiquetteOf,
   resolveLanguage,
+  scriptLanguageOf,
   spokenLanguageNote,
   stanceDeclines,
   writtenLanguageNote,
@@ -4393,10 +4394,18 @@ const qIntelligence = composeQIntelligence({
       ),
   // Any language: what Q writes by code, through the shared translation
   // layer (names and figures lifted out first; English when not ready).
-  localiseWords: async ({ tenantId, userId }, texts) => {
+  localiseWords: async ({ tenantId, userId, turn }, texts) => {
     const standing = await standingStore.read(userId, tenantId, new Date());
-    if (standing.language === "AUTO") return texts.map(() => null);
-    return answerWords.localise(standing.language, texts, {
+    // F-96: with no language chosen, a turn in a script that names its
+    // language (Arabic, Hebrew, …) is answered in it, code's lines too.
+    const language =
+      standing.language === "AUTO"
+        ? turn === undefined
+          ? null
+          : scriptLanguageOf(turn)
+        : standing.language;
+    if (language === null) return texts.map(() => null);
+    return answerWords.localise(language, texts, {
       tenantId,
       userId,
     });

@@ -25,3 +25,4 @@ export {
   type VoiceListenPlan,
   type VoiceSpeakPlan,
 } from "./capability.js";
+export { scriptLanguageOf, textIsEnglish } from "./text-language.js";
