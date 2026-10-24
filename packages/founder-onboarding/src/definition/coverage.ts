@@ -90,7 +90,7 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
     },
     [FOUNDER_STEPS.categories]: {
       concept: "company.categories",
-      priority: "IMPORTANT",
+      priority: "ESSENTIAL",
       label: "Sector",
       seconds: 20,
     },

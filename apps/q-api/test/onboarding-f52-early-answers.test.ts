@@ -399,3 +399,49 @@ describe("QO-26: a raise amount said before the raise question is saved, not ask
     expect(repository.rows().filter((r) => r.status === "PENDING")).toEqual([]);
   });
 });
+
+describe("QO-28: a never-invest sentence is saved once, as its red flags", () => {
+  it("does not also save the raw sentence as text when a sibling holds the concept", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.hard_exclusions",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+    });
+    const said = "We never invest in crypto, gambling or tobacco.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I7.hard_exclusions",
+                  value: ["Gambling", "Tobacco"],
+                  quote: said,
+                },
+                {
+                  stepKey: "I7.sector_exclusions",
+                  value: "crypto, gambling or tobacco",
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+    }).turn({ ...turn(world, said), actor });
+    expect(world.recordedValue("I7.hard_exclusions")?.type).toBe(
+      "MULTI_SELECT",
+    );
+    expect(world.recordedValue("I7.sector_exclusions")).toBeUndefined();
+  });
+});

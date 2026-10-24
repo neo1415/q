@@ -303,7 +303,7 @@ describe("live AH: a long answer reads back by its opening words", () => {
     });
     expect(reply).not.toMatch(/your what/iu);
     expect(reply).toMatch(
-      /what the company does: We make solar cold rooms for market traders in Accra…/u,
+      /We make solar cold rooms for market traders in Accra… \(what the company does\)/u,
     );
   });
 
@@ -333,7 +333,7 @@ describe("live AH: a long answer reads back by its opening words", () => {
       aside: RESEARCH_STARTED_LINE,
     });
     expect(reply).toBe(
-      `Got it, saved: stage: Seed. ${RESEARCH_STARTED_LINE} Where are you based?`,
+      `Got it, I've saved Seed (stage). ${RESEARCH_STARTED_LINE} Where are you based?`,
     );
   });
 });
