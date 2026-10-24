@@ -7,14 +7,15 @@ Owner direction (23 Oct, relayed by the coordinator): sign up → full onboardin
 Harness: Playwright on `/opt/pw-browsers/chromium` through the agent proxy, typed mode ("Prefer to type?"). Fictional deck: "Tamarind Ledger (fictional)", a 6-slide PDF. Scripts live in the session scratchpad and are not committed. Timings are wall clock from the script.
 
 ## Run 2 — 24 Oct 06:51 UTC, founder `loop-f-r2`, deploy 382e17901
-| Check | Result |
-| --- | --- |
-| Sign-up to /welcome | 3.8 s |
-| First Q words (typed) | 3.6 s ✓ (target < 2 s for voice) |
-| Deck dropped before naming | Kept. Q's reply misread it as "not added": "you can add it with the upload button" (F-68) |
-| "The company is called Tamarind Ledger." | Saved, 1/9. Turn settled in 12.1 s (slow). Reply echo "that's on your record: company name: Tamarind Ledger" (QO-20 key:value) |
-| Held deck after naming | Uploaded at once, processed ~10 s later. Q was told "read back" at that point, but its findings landed at +47 s, so Q said "add it whenever you're ready" (**F-69 root**) |
-| Hosted read | PITCH_DECK COMPLETED 06:51:43; deck read 06:52:16; 14 suggestions 06:52:30 |
+
+| Check                                    | Result                                                                                                                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-up to /welcome                      | 3.8 s                                                                                                                                                                     |
+| First Q words (typed)                    | 3.6 s ✓ (target < 2 s for voice)                                                                                                                                          |
+| Deck dropped before naming               | Kept. Q's reply misread it as "not added": "you can add it with the upload button" (F-68)                                                                                 |
+| "The company is called Tamarind Ledger." | Saved, 1/9. Turn settled in 12.1 s (slow). Reply echo "that's on your record: company name: Tamarind Ledger" (QO-20 key:value)                                            |
+| Held deck after naming                   | Uploaded at once, processed ~10 s later. Q was told "read back" at that point, but its findings landed at +47 s, so Q said "add it whenever you're ready" (**F-69 root**) |
+| Hosted read                              | PITCH_DECK COMPLETED 06:51:43; deck read 06:52:16; 14 suggestions 06:52:30                                                                                                |
 
 Fixed: F-69 and F-68 wording in #403 (wait for findings from this document, honest "reading", late findings handed to Q).
 Open from this run: turn latency 12 s; 45 s from upload to findings (target: seconds); QO-20 echo.
