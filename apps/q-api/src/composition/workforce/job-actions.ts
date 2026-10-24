@@ -271,11 +271,59 @@ const COMMON_CAPITALISED: ReadonlySet<string> = new Set([
   "make",
 ]);
 
+/**
+ * A job plan's shape, for telling whether two plans are the same work by
+ * structure, never by words (S9b's proposal, 2026-10-24): the outward
+ * actions it may take, and the records it is about.
+ */
+export type PlanShape = {
+  /** Its permitted tools that reach someone else (not OWN_ACCOUNT_TOOLS). */
+  readonly outward: readonly string[];
+  /** Subject keys it is about: documents' companies, records the goal names. */
+  readonly targets: readonly string[];
+};
+
+/** A plan's shape (code's, from the payload). */
+export function planShape(
+  payload: Pick<WorkforceJobStartPayload, "permitted" | "steps">,
+  subjects: readonly QSubjectRef[] = [],
+): PlanShape {
+  const targets = new Set(
+    subjects.map((subject) => subjectKey(subject).toLowerCase()),
+  );
+  for (const step of payload.steps) {
+    const document = step.document;
+    if (document !== undefined && "companyId" in document)
+      targets.add(`company:${document.companyId}`.toLowerCase());
+  }
+  return {
+    outward: [
+      ...new Set(
+        payload.permitted.filter((tool) => !OWN_ACCOUNT_TOOLS.has(tool)),
+      ),
+    ],
+    targets: [...targets],
+  };
+}
+
+/**
+ * Same work by structure: both take at least one same outward action, and
+ * they are about the same records (or neither is about any record). Own
+ * work (no outward action) is never the same work as anything.
+ */
+export function sameWork(a: PlanShape, b: PlanShape): boolean {
+  if (!a.outward.some((tool) => b.outward.includes(tool))) return false;
+  if (a.targets.length === 0 && b.targets.length === 0) return true;
+  return a.targets.some((target) => b.targets.includes(target));
+}
+
 /** One approval already waiting for the person, as the Approval Engine lists it. */
 export type WaitingItem = {
   readonly summary: string;
   readonly actionType?: string | undefined;
   readonly targets?: readonly QSubjectRef[] | undefined;
+  /** A waiting job card's plan shape, read by code from its payload. */
+  readonly plan?: PlanShape | undefined;
 };
 
 function subjectKey(subject: QSubjectRef): string {
@@ -313,6 +361,13 @@ export function relatedWaiting(
   waiting: readonly WaitingItem[],
   subjects: readonly QSubjectRef[] = [],
   actionType: string = WORKFORCE_JOB_START,
+  /**
+   * The new plan's shape, once planned. Given: SAME_KIND is decided by
+   * structure (sameWork) against each waiting card's own plan, and a card
+   * whose plan could not be read is not the same work. Absent: nothing is
+   * held as SAME_KIND (it is only checked once a plan exists).
+   */
+  plan?: PlanShape,
 ): {
   readonly about: "SAME_PEOPLE" | "SAME_KIND";
   readonly waiting: readonly string[];
@@ -326,7 +381,17 @@ export function relatedWaiting(
   if (keys.size === 0 && names.size === 0) {
     return {
       about: "SAME_KIND",
-      waiting: pick(waiting.filter((item) => item.actionType === actionType)),
+      waiting:
+        plan === undefined
+          ? []
+          : pick(
+              waiting.filter(
+                (item) =>
+                  item.actionType === actionType &&
+                  item.plan !== undefined &&
+                  sameWork(plan, item.plan),
+              ),
+            ),
     };
   }
   return {
@@ -615,20 +680,18 @@ export function createWorkforceJobBoard(dependencies: {
           options?.proceed === true || dependencies.waiting === undefined
             ? null
             : relatedWaiting(goal, waitingNow, options?.subjects ?? []);
-        const heldBy = (about: "SAME_PEOPLE" | "SAME_KIND") =>
-          related !== null &&
-          related.about === about &&
-          related.waiting.length > 0
-            ? {
-                status: "ALREADY_WAITING" as const,
-                waiting: related.waiting,
-                about,
-              }
-            : null;
         // Work about the same people as something waiting: asked first,
         // before anything is planned.
-        const samePeople = heldBy("SAME_PEOPLE");
-        if (samePeople !== null) return samePeople;
+        if (
+          related !== null &&
+          related.about === "SAME_PEOPLE" &&
+          related.waiting.length > 0
+        )
+          return {
+            status: "ALREADY_WAITING",
+            waiting: related.waiting,
+            about: "SAME_PEOPLE",
+          };
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
         if (dependencies.withinLimit !== undefined) {
           const room = await dependencies.withinLimit(owner).catch(() => null);
@@ -734,9 +797,22 @@ export function createWorkforceJobBoard(dependencies: {
         // never held by it: nothing it does can cross a waiting card. Only
         // a plan that would itself be a card is.
         const ownWork = isOwnAccountWork(parsed.data);
-        if (!ownWork) {
-          const sameKind = heldBy("SAME_KIND");
-          if (sameKind !== null) return sameKind;
+        if (!ownWork && related !== null && related.about === "SAME_KIND") {
+          // Same work by structure (S9b, 2026-10-24): the same outward
+          // action on the same records as a waiting card's own plan.
+          const same = relatedWaiting(
+            goal,
+            waitingNow,
+            options?.subjects ?? [],
+            WORKFORCE_JOB_START,
+            planShape(parsed.data, options?.subjects ?? []),
+          );
+          if (same.waiting.length > 0)
+            return {
+              status: "ALREADY_WAITING",
+              waiting: same.waiting,
+              about: "SAME_KIND",
+            };
         }
         // Owner 2026-10-23: research and a document for themselves is not
         // an outward or consequential action -- it starts now, no card.

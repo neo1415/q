@@ -109,3 +109,14 @@ describe("onboarding flow (owner 2026-10-16)", () => {
     expect(out).toBe("Your description and team are noted.");
   });
 });
+
+describe("QA F-48: Q greets by a given name, or none", () => {
+  it("never greets with the first word of their organisation's name", () => {
+    expect(firstNameOf("Ama Mensah", "Tamarind Ledger")).toBe("Ama");
+    expect(
+      firstNameOf("Audit Ridge Capital", "Audit Ridge Capital"),
+    ).toBeNull();
+    expect(firstNameOf("audit team", "Audit Ridge")).toBeNull();
+    expect(firstNameOf("Ama Mensah")).toBe("Ama");
+  });
+});

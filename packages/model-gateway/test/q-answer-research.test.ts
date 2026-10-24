@@ -2171,6 +2171,108 @@ describe("someone they point at is searched by the name Q showed them (owner 202
   });
 });
 
+describe("a public search that found nothing is not mentioned when the records answer (owner 2026-10-24)", () => {
+  // Live 2026-10-24: "Which is better, Anchor or Afyascan?" was answered
+  // with "The web search added nothing relevant about either company."
+  it("compares from the records; the empty search never reaches the answer", async () => {
+    const ANCHOR = "a0c0a0c0-0000-4000-8000-000000000001";
+    const AFYASCAN = "a0c0a0c0-0000-4000-8000-000000000002";
+    const profile = (companyId: string, canonicalName: string) => ({
+      companyId,
+      canonicalName,
+      legalName: null,
+      websiteUrl: null,
+      foundedDate: null,
+      headquartersCountry: "KE",
+      headquartersCity: "Nairobi",
+      currentStageCode: "SEED",
+      shortDescription: `${canonicalName} builds health software.`,
+      primaryDescription: null,
+      companyStatus: "active",
+      relationToYou: "SHARED",
+      truthClass: "USER_CLAIM",
+    });
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) => {
+        if (proposal.name === "research_public_web") {
+          const found = researchOutcome(proposal, "");
+          return Promise.resolve({
+            ...found,
+            result: {
+              ok: true,
+              data: {
+                status: "OK",
+                query: "anchor afyascan",
+                sources: [],
+                comparison: [],
+                truthClass: "UNKNOWN",
+              },
+            },
+          });
+        }
+        const companyId = String(
+          (proposal.arguments as { companyId?: unknown }).companyId,
+        );
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "company.get",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "INTERNAL",
+          result: {
+            ok: true,
+            data: profile(
+              companyId,
+              companyId === ANCHOR ? "Anchor" : "Afyascan",
+            ),
+          },
+          latencyMs: 1,
+        } as QToolCallOutcome);
+      },
+    };
+    const { seam, request, alpha } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: ANCHOR },
+            },
+            {
+              callId: "g2",
+              name: "get_company",
+              arguments: { companyId: AFYASCAN },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("Anchor is further along.") },
+      ],
+      tools: port,
+      userText: "Which is better, Anchor or Afyascan?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+    });
+    expect(
+      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
+    ).toBe("ANSWERED");
+    const last = JSON.stringify(alpha.calls.at(-1)?.request.messages ?? []);
+    // Neither the empty result nor the note about public sources.
+    expect(last).not.toContain("Capital Q searched the public web");
+    expect(last).not.toContain("ran research_public_web for this question");
+  });
+});
+
 describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
   // QA F-17 (2026-10-23): the search found nothing about them, and
   // pictures from reddit and a token's site were still shown.

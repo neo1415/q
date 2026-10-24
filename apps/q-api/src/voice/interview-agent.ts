@@ -371,6 +371,14 @@ export type InterviewAgentDependencies = {
    * saving (lane ob1). Absent: such a failure is reported, not held.
    */
   readonly heldWrites?: HeldWritesStore | undefined;
+  /** One closed question about their words, by meaning (J7; QO-27 lists). */
+  readonly wordsCheck?:
+    | ((
+        actor: ActorContext,
+        question: string,
+        words: string,
+      ) => Promise<"YES" | "NO" | "UNSURE" | null>)
+    | undefined;
   /**
    * Any language: the questions code adds, through Q's shared translation
    * layer (English product copy). Each entry, or null to keep the English.
@@ -749,6 +757,9 @@ export function turnNotesFor(input: {
   }
   // Every turn: the registry's view of what Q does beyond this loop.
   notes.push(ELSEWHERE_NOTE);
+  // QA QO-30 (23 Oct): "Your exclusions are set aside, and the handoff
+  // still needs an explicit yes": the state's own words, said to them.
+  notes.push(PLAIN_WORDS_NOTE);
   // Fitted to the prompt's budget in order: a note that does not fit is
   // left out whole rather than cut mid-sentence, the first one excepted.
   let fitted = "";
@@ -759,6 +770,10 @@ export function turnNotesFor(input: {
   }
   return fitted;
 }
+
+/** Q speaks in their terms, never in its state's. */
+const PLAIN_WORDS_NOTE =
+  "Say things in their terms: never the state's own words (a status such as set aside, held or open, a step's name such as review or handoff, a step key). Say what it means for them: what is saved, what is skipped, what you need from them next.";
 
 /** The firm the investor named, or the one they typed at sign-up. */
 /** A text answer on the record, or "" when there is none. */
@@ -1141,7 +1156,14 @@ export function createInterviewAgent(
       Promise.resolve(NO_TURN_AUTHORITY);
     /** The reading code decided exactly (one step stated), if it did. */
     let codeDecided: QTurnAuthority | null = null;
+    const wordsCheck = dependencies.wordsCheck;
     const port = createOnboardingPort({
+      ...(wordsCheck === undefined
+        ? {}
+        : {
+            wordsCheck: (question: string, words: string) =>
+              wordsCheck(actor, question, words),
+          }),
       statedEarlier: (stepKey, quote) =>
         (statedBySession.get(input.onboardingSessionId) ?? []).some(
           (earlier) =>
@@ -1459,7 +1481,10 @@ export function createInterviewAgent(
         journey: input.journeyType,
         opening,
         state: current,
-        firstName: firstNameOf(input.signup?.displayName ?? null),
+        firstName: firstNameOf(
+          input.signup?.displayName ?? null,
+          input.signup?.organisationName ?? null,
+        ),
         knownName:
           (input.journeyType === "founder"
             ? textAnswerOf(port.view(), FOUNDER_STEPS.companyName)

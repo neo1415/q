@@ -92,3 +92,48 @@ export async function findOwnFirmWorkspace(
      limit 1`;
   return rows[0]?.organisation_id ?? null;
 }
+
+/**
+ * How a firm name compares: lower case, legal suffixes dropped, letters and
+ * digits only ("Corvo Ventures LLC" and "corvo ventures" are one name). The
+ * founder journey's company rule, for firms.
+ */
+export function firmNameKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .replace(/\b(ltd|limited|inc|llc|llp|lp|plc|corp)\b\.?/gu, "")
+    .replace(/[^a-z0-9]/gu, "");
+}
+
+/**
+ * The name of an investor firm already on Capital Q under this name, one
+ * the network may see and outside the person's own organisations (QA F-52
+ * follow-up, coordinator-approved 24 Oct): 14 people set up 14 "Zino
+ * Aviation" firms. A private firm is never matched, so this cannot reveal
+ * one; nobody joins a firm by typing its name either: they are told how to
+ * ask to join.
+ */
+export async function existingVisibleFirm(
+  sql: TransactionContext["sql"],
+  name: string,
+  userId: string,
+): Promise<string | null> {
+  const key = firmNameKey(name);
+  if (key.length < 2) return null;
+  const rows = await sql<{ display_name: string }[]>`
+    select i.display_name
+      from core.investor_organisations i
+     where i.marketplace_visibility in ('network_visible', 'public_external')
+       and not exists (
+         select 1 from identity.organisation_memberships m
+          where m.organisation_id = i.organisation_id
+            and m.user_id = ${userId}::uuid
+       )
+       and regexp_replace(
+             regexp_replace(lower(i.display_name), '\\m(ltd|limited|inc|llc|llp|lp|plc|corp)\\M\\.?', '', 'g'),
+             '[^a-z0-9]', '', 'g') = ${key}
+     limit 1`;
+  return rows[0]?.display_name ?? null;
+}

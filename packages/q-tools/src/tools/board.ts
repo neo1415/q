@@ -420,6 +420,26 @@ async function updateItem(
   return { action: "UPDATE", status: "UPDATED", item: itemOut(item) };
 }
 
+/**
+ * Q's own work on items of their board, as the my_board tool's WORK does:
+ * exported so the answer seam runs it by code ("work on the first task").
+ */
+export type BoardWorkOutcome = Out<"WORK">;
+
+export function workOnBoardItems(
+  board: QBoardPort,
+  jobs: QJobPort | undefined,
+  itemIds: readonly string[],
+  context: Context,
+): Promise<BoardWorkOutcome> {
+  return workOnItems(
+    board,
+    jobs,
+    { action: "WORK", itemIds: [...itemIds], proceed: false },
+    context,
+  );
+}
+
 async function workOnItems(
   board: QBoardPort,
   jobs: QJobPort | undefined,

@@ -34,7 +34,8 @@ export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
   "I7.sector_exclusions": "Are there sectors to exclude outright?",
   "I8.portfolio": "Could you name a few representative portfolio companies?",
   "I11.additional_context": "Is there anything we missed?",
-  "I11.review": "Here's the mandate you've defined. Does it look right?",
+  "I11.review":
+    "That's your mandate. Shall I make it live, so Discover can match companies to it now?",
   "I12.handoff": "Your mandate is ready. Shall I take you to Discover?",
   "F1.company_name": "What's your company called?",
   "F1.website": "What's your website?",
