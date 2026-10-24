@@ -4286,6 +4286,8 @@ export function createModelGatewayQAnswer(
       withFitIntegrity(given, {
         asked: latest.content,
         previous: previousCardCompanyIds(earlier),
+        // QA U2: a mandate fit is an investor's; none for anyone else.
+        mandate: ownInvestorOrganisationIn(request.plan) !== null,
       }),
       latest.content,
     );
@@ -6115,6 +6117,8 @@ export function createModelGatewayQAnswer(
               // "Them" is held to the set just shown, except where the
               // answer says it is the mandate's ranking instead (below).
               previous: rankedPastShown ? [] : previousCardCompanyIds(earlier),
+              // QA U2: a mandate fit is an investor's; none for anyone else.
+              mandate: ownInvestorOrganisationIn(request.plan) !== null,
             },
           ),
           // A map they asked to see is not replaced by a page they did not.
