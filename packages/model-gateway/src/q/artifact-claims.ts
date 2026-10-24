@@ -83,6 +83,7 @@ export function drawnArtifacts(
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
       case "ARTIFACT_REFERENCE":
+      case "WORK_IN_PROGRESS":
       case "UI_INTENT":
       case "PUBLIC_SOURCE":
       case "ATTENTION":

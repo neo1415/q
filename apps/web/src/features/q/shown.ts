@@ -72,6 +72,7 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
       case "MAP":
       case "TIMELINE":
       case "SUMMARY":
+      case "WORK_IN_PROGRESS":
         return block.title;
       case "COMPARISON_CARDS":
         if (block.title !== null && block.title.length > 0) return block.title;
@@ -289,6 +290,7 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
         for (const series of block.series) name(series.label);
         break;
       case "ARTIFACT_REFERENCE":
+      case "WORK_IN_PROGRESS":
         name(block.title);
         break;
       case "CLARIFICATION_REQUEST":

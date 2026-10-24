@@ -57,6 +57,7 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
       case "ATTENTION":
       case "SUMMARY":
       case "PICTURE":
+      case "WORK_IN_PROGRESS":
         // Laid-out data (E4, G-R4) and COMPARISON_CARDS are the answer
         // itself, rendered in the thread: never tucked behind Sources.
         visible.push(block);

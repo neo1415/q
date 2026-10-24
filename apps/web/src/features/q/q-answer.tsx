@@ -67,6 +67,7 @@ export function replyParts(
       case "COMPARISON":
       case "COMPARISON_CARDS":
       case "CLARIFICATION_REQUEST":
+      case "WORK_IN_PROGRESS":
       case "TABLE":
       case "CHART":
       case "MAP":
