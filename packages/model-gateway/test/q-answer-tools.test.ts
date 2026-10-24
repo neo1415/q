@@ -1109,6 +1109,85 @@ describe("answer seam tool loop", () => {
     },
   );
 
+  // Owner conversation 2026-10-24: asked for three Qatari investors, Q
+  // asked "would you like me to do that?" and promised "I'll look for…"
+  // with no search. A look-up asked for is done, never offered or promised.
+  it("an answer offering to do the look-up it was asked for gets one round to do it", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { canonicalName: "Northwind (synthetic)" }),
+    );
+    const { seam, alpha, request, messages } = build({
+      said: "Find me three Qatari investors for Northwind.",
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult(
+              "I don't have them yet. Want me to find three Qatari investors for Northwind?",
+            ),
+          ),
+        },
+        call("c1"),
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("Here are three: A, B and C.")),
+        },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed).toHaveLength(1);
+    expect(alpha.calls[1]?.request.messages.at(-1)?.content).toContain(
+      "do it now",
+    );
+    expect(messages.at(-1)?.content).toBe("Here are three: A, B and C.");
+  });
+
+  it("a promise of a look-up not done is never said, even after the round", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const promise = analystResult(
+      "I'll look for three Qatar-based investors. I'll identify named investors first.",
+    );
+    const { seam, messages, request } = build({
+      said: "Just find me three Qatari investors.",
+      script: [
+        { kind: "TEXT", text: JSON.stringify(promise) },
+        { kind: "TEXT", text: JSON.stringify(promise) },
+        { kind: "JSON", value: promise },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    const said = messages.at(-1)?.content ?? "";
+    expect(said).not.toMatch(/I['’]ll (?:look|identify)/u);
+    expect(said).toBe(
+      "I haven't run that search yet, so I have nothing to show you on it this turn.",
+    );
+  });
+
+  it("an offer of a new next step, not what was asked, stays", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, messages, request } = build({
+      said: "Tell me about Northwind.",
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult(
+              "Northwind builds ledgers. Want me to draft an intro to them?",
+            ),
+          ),
+        },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    expect(messages.at(-1)?.content).toBe(
+      "Northwind builds ledgers. Want me to draft an intro to them?",
+    );
+  });
+
   it("an answer that asks who 'this person' is, on a company's page, gets one more round naming the screen's company (founder live 2026-10-01)", async () => {
     const tools = toolPort([GET_COMPANY], (p) =>
       succeeded(p, { canonicalName: "Kazikit (synthetic)" }),

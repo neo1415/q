@@ -21,6 +21,7 @@ import { registerProblemHandling } from "../src/http/problem-handler.js";
 import {
   createUiActReceiptLedger,
   navigationFacts,
+  screenMissesSince,
   receiptFacts,
   recentUiActReceipts,
   registerUiActReceiptRoutes,
@@ -268,5 +269,40 @@ describe("UI act receipts reach the Q API as the person (RECOVERY C2)", () => {
       "SELECT_TAB tab.mandate: NOT done: that control is not on their screen (TARGET_MISSING).",
       "SELECT_TAB tab.mandate: done on their screen (DONE).",
     ]);
+  });
+});
+
+// Owner conversation 2026-10-24 (runs 6785ff95, 875e3ba8): one old move
+// was said as "didn't go through" twice, on unrelated turns.
+describe("screen misses since Q's previous reply", () => {
+  it("are only what failed after it, newest last, and a replaced move failed nothing", () => {
+    let now = 1_000;
+    const ledger = createUiActReceiptLedger({ now: () => now });
+    ledger.record(ACTOR, [], undefined, [
+      { status: "FAILED", expected: "/company/old", intentId: "n1" },
+    ]);
+    now = 2_000;
+    ledger.record(ACTOR, [], undefined, [
+      {
+        status: "FAILED",
+        expected: "/company/replaced",
+        intentId: "n2",
+        reason: "SUPERSEDED",
+      },
+    ]);
+    // Said on the turn right after it happened.
+    expect(screenMissesSince(ledger, ACTOR, 500)).toEqual([
+      "NOT done: /company/old never opened on their screen (FAILED).",
+    ]);
+    // Never again once Q has replied since.
+    expect(screenMissesSince(ledger, ACTOR, 1_500)).toEqual([]);
+    now = 3_000;
+    ledger.record(ACTOR, [], undefined, [
+      { status: "FAILED", expected: "/company/new", intentId: "n3" },
+    ]);
+    expect(screenMissesSince(ledger, ACTOR, 1_500)).toEqual([
+      "NOT done: /company/new never opened on their screen (FAILED).",
+    ]);
+    expect(screenMissesSince(ledger, STRANGER, null)).toEqual([]);
   });
 });

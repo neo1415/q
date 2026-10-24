@@ -267,3 +267,35 @@ export function recentUiActReceipts(
     receipt,
   }));
 }
+
+/**
+ * Owner conversation 2026-10-24 (runs 6785ff95, 875e3ba8): "My last step
+ * on your screen didn't go through." was said on unrelated turns, twice,
+ * for one old move -- the facts carried no time, so the newest failure was
+ * whatever came last in the list, and it was said again every other turn.
+ * Here: only what failed AFTER `sinceMs` (Q's previous reply), newest
+ * last by when it happened; a move replaced by a newer one (SUPERSEDED)
+ * failed nothing. Each miss is so said once, on the very next turn.
+ */
+export function screenMissesSince(
+  ledger: UiActReceiptLedger,
+  actor: Pick<ActorContext, "tenantId" | "userId">,
+  sinceMs: number | null,
+): readonly string[] {
+  const after = (at: number) => sinceMs === null || at > sinceMs;
+  const acts = ledger
+    .recent(actor)
+    .filter((one) => after(one.at))
+    .map((one) => ({ at: one.at, fact: receiptFacts([one], 1)[0] }));
+  const moves = ledger
+    .recentNavigations(actor)
+    .filter(
+      (one) =>
+        after(one.at) &&
+        !(one.status !== "DONE" && one.reason === "SUPERSEDED"),
+    )
+    .map((one) => ({ at: one.at, fact: navigationFacts([one], 1)[0] }));
+  return [...acts, ...moves]
+    .sort((a, b) => a.at - b.at)
+    .flatMap((one) => (one.fact === undefined ? [] : [one.fact]));
+}

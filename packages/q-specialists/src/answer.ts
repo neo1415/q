@@ -1355,6 +1355,33 @@ function onlyAMove(text: string): boolean {
 /** Their own Q Card, asked about: read and offered by the answer, never a page move (F-34). */
 const NAMES_Q_CARD = /\bq[\s-]?card\b/iu;
 
+/**
+ * Their words answer a question Q itself just asked ("Want me to find three
+ * investors for Halyard?" -> "Yes. No, not Halyard. Capital Q"), and do
+ * not ask to go anywhere: the question is continued, never a page or a
+ * record opened by name. Code's own "which one do you mean?" about a
+ * record they asked to open is the exception: its answer is that record.
+ */
+export function continuesQsQuestion(
+  history: readonly Pick<QConversationMessage, "role" | "content">[],
+  text: string,
+): boolean {
+  const before = [...history];
+  // The turn itself is the last USER message; Q's question precedes it.
+  if (before.at(-1)?.role === "USER") before.pop();
+  const lastQ = [...before].reverse().find((m) => m.role === "Q");
+  if (lastQ === undefined) return false;
+  const asked = lastQ.content.trim();
+  if (!/\?["”)]?$/u.test(asked)) return false;
+  if (
+    /^(?:Which one do you mean|I can't find)\b/u.test(asked) ||
+    /\bDid you mean [^?]*\?$/u.test(asked)
+  ) {
+    return false;
+  }
+  return !asksToGo(text) && !/\bopen\b/iu.test(text);
+}
+
 /** The person's latest words in this conversation, for varied wording. */
 function askedIn(history: readonly QConversationMessage[]): string {
   return [...history].reverse().find((m) => m.role === "USER")?.content ?? "";
@@ -4585,7 +4612,21 @@ export function createSpecialistQAnswer(
     // "open Shiftwell", "the data room for Shiftwell": the one record the
     // name means, among their own relationships first, opened by code --
     // or one short line naming who it could be. Never "Understood.".
-    const onScreenTab = await screenTabAnswer(request, latest.content, history);
+    // Owner conversation 2026-10-24 (run 80da02af): "Yes. No, not Halyard.
+    // Capital Q", a yes to Q's own question with its subject corrected,
+    // opened Halyard Security. A reply to Q's question continues that
+    // question (the answer path, with the corrected subject); code opens
+    // nothing by name unless the words ask to go somewhere.
+    const continuesQ = continuesQsQuestion(history, latest.content);
+    if (continuesQ) {
+      logger?.info(
+        { qRunId: request.runId },
+        "a reply to Q's own question: nothing opened by name",
+      );
+    }
+    const onScreenTab = continuesQ
+      ? null
+      : await screenTabAnswer(request, latest.content, history);
     if (onScreenTab !== null) {
       logger?.info(
         { qRunId: request.runId, outcome: onScreenTab.log },
@@ -4598,12 +4639,13 @@ export function createSpecialistQAnswer(
         onScreenTab.blocks,
       );
     }
-    const byName = NAMES_Q_CARD.test(latest.content)
-      ? null
-      : await namedRecordAnswer(request, latest.content);
+    const byName =
+      NAMES_Q_CARD.test(latest.content) || continuesQ
+        ? null
+        : await namedRecordAnswer(request, latest.content);
     // W4: none of their relationships, but a researched entity they can
     // reach by name: its identity card in focus.
-    if (byName === null || byName.log === "NOT_FOUND") {
+    if (!continuesQ && (byName === null || byName.log === "NOT_FOUND")) {
       const external = await externalEntityAnswer(
         request,
         latest.content,
@@ -4629,7 +4671,9 @@ export function createSpecialistQAnswer(
       );
       return recordAnswer(request, conversationId, byName.said, byName.blocks);
     }
-    const paged = pageAnswer(latest.content, history, capabilities);
+    const paged = continuesQ
+      ? null
+      : pageAnswer(latest.content, history, capabilities);
     if (paged !== null) {
       logger?.info(
         { qRunId: request.runId, page: paged.log },

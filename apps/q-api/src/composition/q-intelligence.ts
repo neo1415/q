@@ -137,6 +137,13 @@ export type QIntelligenceDependencies = {
   /** RECOVERY (C's request): receipt facts of the person's recent UI acts. */
   readonly uiActReceipts?:
     ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
+  /** Owner 2026-10-24: screen misses since Q's previous reply, said once. */
+  readonly screenMisses?:
+    | ((
+        actor: QAnswerRequest["actor"],
+        sinceMs: number | null,
+      ) => readonly string[])
+    | undefined;
   /**
    * Voice speculation (latency2): a spoken question's answer starts beside
    * the turn reader. `observe` hears whether each was adopted or cancelled
@@ -420,6 +427,9 @@ export function composeQIntelligence(
     ...(dependencies.uiActReceipts === undefined
       ? {}
       : { uiActReceipts: dependencies.uiActReceipts }),
+    ...(dependencies.screenMisses === undefined
+      ? {}
+      : { screenMisses: dependencies.screenMisses }),
     ...(dependencies.arrivalSnapshot === undefined
       ? {}
       : {

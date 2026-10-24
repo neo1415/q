@@ -18,8 +18,8 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { pendingPlaceOf } from "@capital-q/q-core/speech";
 
-import { createSpecialistQAnswer } from "../src/answer.js";
-import { pageRequestOf } from "../src/page-request.js";
+import { continuesQsQuestion, createSpecialistQAnswer } from "../src/answer.js";
+import { pageRequestOf, selfCorrected } from "../src/page-request.js";
 import { openingLine } from "../src/references.js";
 import {
   matchOwnCounterpart,
@@ -264,7 +264,20 @@ function conversation(
       blocks: last?.blocks ?? [],
     };
   };
-  return { say, opened, delegated: () => delegated };
+  /** A line Q said earlier in the conversation. */
+  const qSaid = (content: string) => {
+    lines.push({
+      tenantId: TENANT,
+      conversationId,
+      runId: randomUUID(),
+      contentType: "TEXT",
+      createdAt: new Date().toISOString(),
+      id: randomUUID(),
+      role: "Q",
+      content,
+    } as unknown as QConversationMessage);
+  };
+  return { say, qSaid, opened, delegated: () => delegated };
 }
 
 const intentOf = (blocks: readonly QResultBlock[]) =>
@@ -482,6 +495,60 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     expect(intentOf(answer.blocks)).toEqual([]);
     expect(answer.content).toMatch(/^I can't find "Brightmoor" data room/u);
     expect(answer.content).not.toBe("Understood.");
+  });
+});
+
+// Owner conversation 2026-10-24 (run 80da02af): Q asked "Want me to find
+// three Qatar-based investors whose focus could fit Halyard?", they said
+// "Yes. No, not Halyard. Capital Q", and Halyard Security was opened.
+describe("a yes or a correction to Q's own question never opens a record", () => {
+  const own = ["Shiftwell Health", "Ledgerline", "Nixo"];
+
+  it("never reads the name they said 'not' to as the place", () => {
+    expect(
+      namedRecordRequestOf("Yes. No, not Shiftwell. Capital Q")?.name,
+    ).not.toMatch(/Shiftwell/u);
+    expect(selfCorrected("Yes. No, not Shiftwell. Capital Q")).not.toMatch(
+      /Shiftwell/u,
+    );
+  });
+
+  it("continues Q's question: nothing opened, the answer path answers", async () => {
+    const q = conversation(own);
+    q.qSaid(
+      "Want me to find three Qatar-based investors whose focus could fit Shiftwell Health?",
+    );
+    const answer = await q.say("Yes. No, not Shiftwell. Capital Q");
+    expect(intentOf(answer.blocks)).toEqual([]);
+    expect(q.opened).toEqual([]);
+    expect(q.delegated()).toBe(1);
+  });
+
+  it("still opens what they ask to open after Q's question", async () => {
+    const q = conversation(own);
+    q.qSaid("Want me to compare them?");
+    const answer = await q.say("Open Shiftwell.");
+    expect(intentOf(answer.blocks)).toEqual([
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: SHIFTWELL },
+    ]);
+  });
+
+  it("answers code's own 'which one do you mean?' with that record", () => {
+    const history = [
+      { role: "USER" as const, content: "Open Shiftwell" },
+      {
+        role: "Q" as const,
+        content: "Which one do you mean: Shiftwell Health or Shiftwell Labs?",
+      },
+      { role: "USER" as const, content: "Shiftwell Health" },
+    ];
+    expect(continuesQsQuestion(history, "Shiftwell Health")).toBe(false);
+    expect(
+      continuesQsQuestion(
+        [{ role: "Q", content: "Want me to find three investors?" }],
+        "Yes, Capital Q",
+      ),
+    ).toBe(true);
   });
 });
 

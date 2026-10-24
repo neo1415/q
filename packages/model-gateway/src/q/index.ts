@@ -29,6 +29,12 @@ import {
   type CompaniesMapAnswer,
   type CompaniesMapAsk,
 } from "./companies-map.js";
+import {
+  DO_IT_NOW_NOTE,
+  defersAskedWork,
+  withoutDeferredWork,
+  type Asked,
+} from "./deferred-work.js";
 
 import {
   MODEL_TOOLS_MAX,
@@ -989,6 +995,48 @@ export function withoutLandedClaims(text: string): string {
     .trim();
 }
 
+/**
+ * The facts a "didn't go through" line is said from: with `screenMisses`,
+ * only what failed since Q's previous reply (each miss said once, on the
+ * next turn -- owner runs 6785ff95, 875e3ba8); else the recent receipts.
+ */
+function missFacts(
+  dependencies: {
+    readonly uiActReceipts?:
+      ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
+    readonly screenMisses?:
+      | ((
+          actor: QAnswerRequest["actor"],
+          sinceMs: number | null,
+        ) => readonly string[])
+      | undefined;
+  },
+  actor: QAnswerRequest["actor"],
+  earlier: readonly { readonly role: string; readonly createdAt: string }[],
+  receipts?: readonly string[],
+): readonly string[] {
+  if (dependencies.screenMisses === undefined) {
+    return receipts ?? dependencies.uiActReceipts?.(actor) ?? [];
+  }
+  const lastQ = [...earlier].reverse().find((message) => message.role === "Q");
+  const since = lastQ === undefined ? NaN : Date.parse(lastQ.createdAt);
+  return dependencies.screenMisses(actor, Number.isNaN(since) ? null : since);
+}
+
+/** Their words this turn and their last two before it (deferred-work.ts). */
+function askedOf(
+  latest: string,
+  earlier: readonly { readonly role: string; readonly content: string }[],
+): Asked {
+  return {
+    latest,
+    before: earlier
+      .filter((message) => message.role === "USER")
+      .slice(-2)
+      .map((message) => message.content),
+  };
+}
+
 export function screenActMissLine(
   facts: readonly string[],
   lastQ: string | null,
@@ -1913,6 +1961,17 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly uiActReceipts?:
     ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
+  /**
+   * The screen acts and moves that did not land since `sinceMs` (Q's
+   * previous reply), oldest first: what the "didn't go through" line is
+   * said from, once, on the turn after the miss. Absent: the receipts.
+   */
+  readonly screenMisses?:
+    | ((
+        actor: QAnswerRequest["actor"],
+        sinceMs: number | null,
+      ) => readonly string[])
+    | undefined;
   /**
    * K Part 4 (Tier A): their own mandate read, as `get_investor_mandate`
    * returned it, kept per actor under the context-cache scope and served
@@ -4145,7 +4204,7 @@ export function createModelGatewayQAnswer(
     );
     const blocks = carried.length === 0 ? undefined : carried;
     const missed = screenActMissLine(
-      dependencies.uiActReceipts?.(request.actor) ?? [],
+      missFacts(dependencies, request.actor, earlier),
       [...earlier].reverse().find((message) => message.role === "Q")?.content ??
         null,
     );
@@ -5940,7 +5999,7 @@ export function createModelGatewayQAnswer(
         // C's follow-up: a move or screen act that did not land is said
         // first, plainly, once (never left for the model to smooth over).
         const missed = screenActMissLine(
-          screenReceipts,
+          missFacts(dependencies, request.actor, earlier, screenReceipts),
           [...earlier].reverse().find((message) => message.role === "Q")
             ?.content ?? null,
         );
@@ -7330,6 +7389,23 @@ export function createModelGatewayQAnswer(
           // One more round, once, when the answer described doing
           // something instead of calling the tool that does it.
           let sayDoRounds = 0;
+          /** Q's line before this turn: what a "yes" here says yes to. */
+          const lastQText =
+            [...earlier].reverse().find((message) => message.role === "Q")
+              ?.content ?? null;
+          /** What they asked: this turn and their last few before it. */
+          const askedNow = askedOf(latest.content, earlier);
+          /** Work this turn started or prepared (a non-read tool succeeded). */
+          const startedWork = (): boolean =>
+            toolCalls.some((call) => {
+              const kind = offeredByName.get(call.providerName)?.classification;
+              return (
+                call.status === "SUCCEEDED" &&
+                kind !== undefined &&
+                kind !== "READ_ONLY" &&
+                kind !== "ANALYTICAL"
+              );
+            });
           // One more round, once, after fill_profile_gaps searched: the
           // second call carries the values the sources support.
           let gapsRounds = 0;
@@ -7448,6 +7524,19 @@ export function createModelGatewayQAnswer(
              * prepared this turn (a PREPARE or SIDE_EFFECT tool succeeded)
              * is not a gap.
              */
+            /**
+             * Owner conversation 2026-10-24: asked for (or told yes to) a
+             * look-up, the answer offered to do it or promised it for
+             * later, with nothing started. One round to do it now.
+             */
+            const deferredInsteadOfDone = (
+              value: CompanyAnalystV26Result,
+            ): boolean =>
+              defersAskedWork(value.answer, askedNow, lastQText) &&
+              !startedWork() &&
+              sayDoRounds === 0 &&
+              calls < Q_TOOL_LOOP_MAX_CALLS &&
+              request.signal?.aborted !== true;
             const saidInsteadOfDone = (
               value: CompanyAnalystV26Result,
               dropped: readonly string[] | undefined,
@@ -7502,6 +7591,10 @@ export function createModelGatewayQAnswer(
               ];
             };
             if (result.output.kind === "STRUCTURED") {
+              if (deferredInsteadOfDone(result.output.value)) {
+                askToDoIt(JSON.stringify(result.output.value), DO_IT_NOW_NOTE);
+                continue;
+              }
               if (
                 saidInsteadOfDone(result.output.value, result.output.dropped)
               ) {
@@ -7546,6 +7639,10 @@ export function createModelGatewayQAnswer(
                   unknownRootKeys: "DROP",
                 },
               );
+              if (accepted.ok && deferredInsteadOfDone(accepted.value)) {
+                askToDoIt(result.output.text, DO_IT_NOW_NOTE);
+                continue;
+              }
               if (
                 accepted.ok &&
                 saidInsteadOfDone(accepted.value, accepted.dropped)
@@ -8213,7 +8310,33 @@ export function createModelGatewayQAnswer(
             "sentences claiming an action were removed from a Q answer",
           );
         }
-        const promises = stripEmptyPromises(spoken.text);
+        // Owner conversation 2026-10-24: an offer to do what they asked,
+        // or a promise of a look-up this turn did not start, is not said
+        // (the round above asked for it to be done; what is left stands).
+        const startedThisTurn = toolCalls.some((call) => {
+          const kind = offeredByName.get(call.providerName)?.classification;
+          return (
+            call.status === "SUCCEEDED" &&
+            kind !== undefined &&
+            kind !== "READ_ONLY" &&
+            kind !== "ANALYTICAL"
+          );
+        });
+        const undeferred = startedThisTurn
+          ? { text: spoken.text, removed: 0 }
+          : withoutDeferredWork(
+              spoken.text,
+              askedOf(latest.content, earlier),
+              [...earlier].reverse().find((message) => message.role === "Q")
+                ?.content ?? null,
+            );
+        if (undeferred.removed > 0) {
+          logger?.info(
+            { qRunId: request.runId, removed: undeferred.removed },
+            "an offer or promise to do what was asked was not said",
+          );
+        }
+        const promises = stripEmptyPromises(undeferred.text);
         if (promises.removed.length > 0) {
           logger?.warn(
             {
