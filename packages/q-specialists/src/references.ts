@@ -3,7 +3,7 @@ import type {
   QRecordPage,
   QResultBlock,
 } from "@capital-q/contracts";
-import type { TurnReference } from "@capital-q/q-core";
+import type { TurnReferenceV64 as TurnReference } from "@capital-q/q-core";
 import { movePhaseLine } from "@capital-q/q-core/speech";
 import type {
   QAnswerRequest,
@@ -244,6 +244,10 @@ export function openTarget(
         return ["INVESTOR"];
       case "PITCH":
         return ["COMPANY_PITCH"];
+      // QA F-98: "let us rehearse my call with Savanna Seed Partners" --
+      // a founder rehearses with an investor, an investor with a company.
+      case "REHEARSAL":
+        return pair("COMPANY_REHEARSAL", "INVESTOR_REHEARSAL");
     }
   })();
   // An id shown on a document card opens only as a document.

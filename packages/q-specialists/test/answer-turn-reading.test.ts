@@ -5455,6 +5455,63 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
     waiting,
   });
 
+  // QA F-98 (live 2026-10-24, founder): "Let us rehearse my call with
+  // Savanna Seed Partners" returned the prep brief again. A rehearsal they
+  // ask for (TURN_READER v64 reference open REHEARSAL, by meaning) opens the
+  // rehearsal with that investor -- even if the reading also says
+  // meetingPrep -- and the brief is not prepared again.
+  it("a rehearsal they ask for opens the rehearsal room with that investor, not the prep again", async () => {
+    const asked: string[] = [];
+    const opened: { page: string; name?: string }[] = [];
+    const { answer, stored } = seam({
+      said: "Let us rehearse my call with Savanna Seed Partners",
+      reading: {
+        ...prepReading,
+        teamJob: false,
+        reference: {
+          open: "REHEARSAL",
+          name: "Savanna Seed Partners",
+          shown: null,
+          retryLast: false,
+          sameFor: null,
+        },
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+      callPrep: {
+        prepare: (_request, input) => {
+          asked.push(input.counterpart);
+          return Promise.resolve(prep());
+        },
+      },
+      openRecord: {
+        open: (_request, target) => {
+          opened.push({
+            page: target.page,
+            ...(target.name === undefined ? {} : { name: target.name }),
+          });
+          return Promise.resolve(
+            target.page === "INVESTOR_REHEARSAL"
+              ? {
+                  kind: "OPEN_RECORD_PAGE" as const,
+                  page: "INVESTOR_REHEARSAL" as const,
+                  id: "5a5a5a5a-0000-4000-8000-000000000001",
+                }
+              : null,
+          );
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(asked).toEqual([]);
+    expect(opened[0]).toEqual({
+      page: "INVESTOR_REHEARSAL",
+      name: "Savanna Seed Partners",
+    });
+    const last = stored.at(-1);
+    expect(last?.content ?? "").not.toContain("What they'll likely ask");
+    expect(JSON.stringify(last?.blocks ?? [])).toContain("INVESTOR_REHEARSAL");
+  });
+
   it("prepares it now, ahead of a team job, and offers the rehearsal", async () => {
     const asked: string[] = [];
     const planned: string[] = [];
