@@ -264,6 +264,7 @@ import {
 import { ownProfileFact } from "./own-profile.js";
 import { asksForOwnMandate, ownMandateAnswer } from "./own-mandate-answer.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
+import { asksAboutOwnPitch, ownPitchReviewFact } from "./own-pitch-review.js";
 import { relationshipFact } from "./relationship-fact.js";
 import {
   ownIndexFact,
@@ -3973,6 +3974,28 @@ export function createModelGatewayQAnswer(
         );
         if (outcome.result.ok) {
           pitchMoment = pitchMomentFact(outcome.result.data, null);
+        }
+        return;
+      }
+      // QA F-99: a founder asking about their own pitch video gets a review
+      // from its transcript, read by code (own-pitch-review.ts).
+      if (
+        latest !== undefined &&
+        asksAboutOwnPitch(latest.content) &&
+        prefetchTools.has("read_company_pitches")
+      ) {
+        await ownCompanyRead;
+        if (ownCompanyId === null) return;
+        const outcome = await tools.execute(
+          {
+            callId: "q-own-pitch",
+            name: "read_company_pitches",
+            arguments: { companyId: ownCompanyId },
+          },
+          toolContext,
+        );
+        if (outcome.result.ok) {
+          pitchMoment = ownPitchReviewFact(outcome.result.data);
         }
       }
     })();
