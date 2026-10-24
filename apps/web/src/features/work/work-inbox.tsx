@@ -24,6 +24,7 @@ import { bodyDigest } from "@capital-q/q-core/speech";
 import { cx } from "@capital-q/ui";
 
 import { CountUp } from "@/components/status/count-up";
+import { StatusDot } from "@/components/status/status-dot";
 import { WordSwitch } from "@/features/settings/account-kit";
 import { CalendarDays, Check, Pause, Pencil, Play } from "@capital-q/ui/icons";
 import { Skeleton } from "@capital-q/ui/states";
@@ -352,6 +353,12 @@ export function WorkInbox({
     }
   };
 
+  // A stopped job stays listed for the week so it can be opened, but it
+  // is not moving: it sits under its own line, with the failed dot when it failed.
+  const stoppedJobs = rows.filter(
+    (row): row is Extract<Row, { kind: "JOB" }> =>
+      row.kind === "JOB" && jobLine(row.item.job).stopped,
+  );
   const doneItems = done?.items ?? [];
   // "Done today" leads; the rest of the week is one tap away.
   const doneToday = doneItems.filter(
@@ -547,7 +554,7 @@ export function WorkInbox({
                               </>,
                             ),
                           ]
-                        : row.kind === "JOB"
+                        : row.kind === "JOB" && !jobLine(row.item.job).stopped
                           ? [
                               rowButton(
                                 row,
@@ -565,6 +572,30 @@ export function WorkInbox({
                               ),
                             ]
                           : [],
+                    )}
+                    {stoppedJobs.length === 0 ? null : (
+                      <>
+                        <h3 className="m-0 mt-2 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
+                          {t("Stopped this week")}
+                        </h3>
+                        {stoppedJobs.map((row) =>
+                          rowButton(
+                            row,
+                            <span className="cq-wk-qbody">
+                              <b>{t(row.item.job.goal)}</b>
+                              <StatusDot
+                                tone={
+                                  row.item.job.status === "FAILED" ||
+                                  row.item.job.workState === "FAILED"
+                                    ? "failed"
+                                    : "idle"
+                                }
+                                label={t(jobLine(row.item.job).state)}
+                              />
+                            </span>,
+                          ),
+                        )}
+                      </>
                     )}
                   </QControl>
                 ) : (

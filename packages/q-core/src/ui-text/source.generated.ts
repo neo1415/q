@@ -4296,6 +4296,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Stopped",
   "Stopped by you",
   "Stopped sharing the raise",
+  "Stopped this week",
   "Stopped. No further step starts.",
   "Stopped. Q will do nothing more here.",
   "Stopped: it needs you",

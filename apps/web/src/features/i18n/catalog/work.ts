@@ -378,6 +378,7 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   Concerns: "المخاوف",
   Contradiction: "تعارض",
   "Q suggests": "يقترح Q",
+  "Stopped this week": "توقّف هذا الأسبوع",
   "Q suggests you proceed": "يقترح Q أن تمضي قدماً",
   "Q suggests you pass": "يقترح Q أن تعتذر",
   "Q is unsure": "Q غير متأكد",
