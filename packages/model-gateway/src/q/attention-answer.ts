@@ -42,6 +42,28 @@ const SOURCE_WORDS: Readonly<Record<QAttentionSource, string>> = {
   NOTICE: "your notices",
 };
 
+/**
+ * I1 (QA 2026-10-24): what a typed answer leads with. Voice said a few
+ * and offered the rest; typed listed all 26 flat. The report is already
+ * in consequence order (someone waiting on them first, q-tools
+ * SOURCE_ORDER), and the full list is the ATTENTION block beside it.
+ */
+export const ATTENTION_LEAD_MAX = 5;
+
+/** A group's label, in the report's own order of consequence. */
+const GROUP_LABELS: Readonly<Record<QAttentionSource, string>> = {
+  UNANSWERED_MESSAGE: "Waiting for your reply",
+  APPROVAL: "Waiting for your approval",
+  INTEREST_REQUEST: "Interest and connection requests",
+  MEETING: "Calls to arrange",
+  DOCUMENT_REQUEST: "Document and diligence requests",
+  AGENT_BLOCKED: "Q's agents need you",
+  HELD_DRAFT: "Drafts Q held back",
+  REMINDER: "Reminders due",
+  NOTICE: "Notices",
+  NEW_MATCHES: "New matches",
+};
+
 function listed(words: readonly string[]): string {
   if (words.length <= 1) return words.join("");
   return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1] ?? ""}`;
@@ -63,9 +85,11 @@ function activityLine(activity: QActivitySummary): string | null {
 }
 
 /**
- * Every item, in the report's order, then what could not be checked. It
- * says "nothing is waiting" only when every source was read and none had
- * anything; an unread source is named as unread.
+ * The most consequential items first (at most ATTENTION_LEAD_MAX), grouped
+ * by what they are, then how many more are in the list beside it; then
+ * what could not be checked. It says "nothing is waiting" only when every
+ * source was read and none had anything; an unread source is named as
+ * unread.
  */
 export function attentionAnswerText(report: QAttentionReport): string {
   const everySourceUnread = report.unread.length >= Q_ATTENTION_SOURCES.length;
@@ -79,16 +103,32 @@ export function attentionAnswerText(report: QAttentionReport): string {
           : "I found nothing waiting in the places I could check.",
     );
   } else {
+    const lead = report.items.slice(0, ATTENTION_LEAD_MAX);
+    const more = report.items.length - lead.length;
     lines.push(
       report.items.length === 1
         ? "One thing needs you:"
-        : `${String(report.items.length)} things need you:`,
+        : more > 0
+          ? `${String(report.items.length)} things need you. The most pressing first:`
+          : `${String(report.items.length)} things need you:`,
     );
-    report.items.forEach((item, index) => {
+    let group: QAttentionSource | null = null;
+    for (const item of lead) {
+      if (item.source !== group) {
+        group = item.source;
+        lines.push(`**${GROUP_LABELS[item.source]}**`);
+      }
       lines.push(
-        `${String(index + 1)}. ${item.title}${item.note === undefined ? "" : ` — ${item.note}`}`,
+        `- ${item.title}${item.note === undefined ? "" : ` — ${item.note}`}`,
       );
-    });
+    }
+    if (more > 0) {
+      lines.push(
+        more === 1
+          ? "One more is in the list below."
+          : `${String(more)} more are in the list below.`,
+      );
+    }
   }
   if (everySourceUnread) {
     lines.push(

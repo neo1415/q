@@ -349,10 +349,52 @@ describe("receipts of Q's last screen acts reach the next turn (C's request)", (
 });
 
 describe("what Q says from the report", () => {
-  it("numbers every item", () => {
+  it("a few items: every one, grouped by what it is", () => {
     const text = attentionAnswerText(REPORT);
     expect(text).toMatch(/^2 things need you:/u);
     for (const item of REPORT.items) expect(text).toContain(item.title);
+    expect(text).toContain("**Waiting for your reply**\n- Zino Aviation");
+    expect(text).toContain("**Waiting for your approval**\n- Send the drafted");
+    expect(text).not.toContain("more are in the list");
+  });
+
+  it("I1: 26 items lead with the five most pressing, grouped, then how many more", () => {
+    const item = (
+      n: number,
+      source: QAttentionReport["items"][number]["source"],
+    ) => ({
+      key: `${source}:${String(n)}`,
+      source,
+      title: `${source} item ${String(n)}`,
+      since: "2026-10-08T08:00:00.000Z",
+      decidable: true,
+    });
+    const items = [
+      item(1, "UNANSWERED_MESSAGE"),
+      item(2, "UNANSWERED_MESSAGE"),
+      item(3, "APPROVAL"),
+      item(4, "INTEREST_REQUEST"),
+      item(5, "INTEREST_REQUEST"),
+      ...Array.from({ length: 21 }, (_, i) => item(6 + i, "NOTICE")),
+    ];
+    const text = attentionAnswerText({
+      items,
+      activity: null,
+      unread: [],
+      readAt: NOW,
+    });
+    expect(text.split("\n")).toEqual([
+      "26 things need you. The most pressing first:",
+      "**Waiting for your reply**",
+      "- UNANSWERED_MESSAGE item 1",
+      "- UNANSWERED_MESSAGE item 2",
+      "**Waiting for your approval**",
+      "- APPROVAL item 3",
+      "**Interest and connection requests**",
+      "- INTEREST_REQUEST item 4",
+      "- INTEREST_REQUEST item 5",
+      "21 more are in the list below.",
+    ]);
   });
 
   it("never says nothing is waiting while a source is unread", () => {
