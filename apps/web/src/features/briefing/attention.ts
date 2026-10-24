@@ -247,7 +247,8 @@ export function attentionFromReads(reads: AttentionReads): QAttentionReport {
       items.push({
         key: key("AGENT_BLOCKED", job.id),
         source: "AGENT_BLOCKED",
-        title: clip(`An agent stopped: ${job.goal}`, 200),
+        // Q's work, never an agent (QA 2026-10-24).
+        title: clip(`Q's work on “${job.goal.trim()}” stopped`, 200),
         entity: { kind: "JOB", id: job.id },
         since: job.updatedAt,
         decidable: false,

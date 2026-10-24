@@ -33,7 +33,7 @@ const SOURCE_WORDS: Readonly<Record<QAttentionSource, string>> = {
   UNANSWERED_MESSAGE: "your messages",
   APPROVAL: "your approvals",
   HELD_DRAFT: "drafts Q held back",
-  AGENT_BLOCKED: "Q's agents",
+  AGENT_BLOCKED: "Q's work",
   DOCUMENT_REQUEST: "document and diligence requests",
   INTEREST_REQUEST: "interest and connection requests",
   MEETING: "your calls",
@@ -57,7 +57,7 @@ const GROUP_LABELS: Readonly<Record<QAttentionSource, string>> = {
   INTEREST_REQUEST: "Interest and connection requests",
   MEETING: "Calls to arrange",
   DOCUMENT_REQUEST: "Document and diligence requests",
-  AGENT_BLOCKED: "Q's agents need you",
+  AGENT_BLOCKED: "Q's work needs you",
   HELD_DRAFT: "Drafts Q held back",
   REMINDER: "Reminders due",
   NOTICE: "Notices",
@@ -81,7 +81,8 @@ function activityLine(activity: QActivitySummary): string | null {
   add(activity.jobsCompleted, "job finished", "jobs finished");
   add(activity.draftsHeld, "draft held for you", "drafts held for you");
   if (parts.length === 0) return null;
-  return `Meanwhile, Q and its agents: ${listed(parts)}.`;
+  // Q's work, never "its agents" (QA 2026-10-24): the person sees one Q.
+  return `Meanwhile, Q's work: ${listed(parts)}.`;
 }
 
 /**

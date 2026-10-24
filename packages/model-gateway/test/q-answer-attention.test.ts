@@ -437,7 +437,7 @@ describe("what Q says from the report", () => {
         },
       }),
     ).toContain(
-      "Meanwhile, Q and its agents: 2 replies sent, 1 call booked and 1 draft held for you.",
+      "Meanwhile, Q's work: 2 replies sent, 1 call booked and 1 draft held for you.",
     );
   });
 });
