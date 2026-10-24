@@ -1,5 +1,6 @@
 "use client";
 
+import { captionTail } from "../voice/caption";
 import {
   lazy,
   Suspense,
@@ -535,6 +536,12 @@ export function QConversationPanel({
   // The live line: what is being said right now, one line that grows in
   // place under its id, until the next one starts.
   const live = client.transcript.at(-1);
+  // QA QO-19 (WCAG 1.2.4): what Q is saying, as words, on the voice room.
+  const qSaying = voice.active
+    ? captionTail(
+        client.transcript.findLast((line) => line.role === "q")?.text ?? "",
+      )
+    : "";
   const liveIsPerson =
     voice.active &&
     live !== undefined &&
@@ -1286,9 +1293,22 @@ export function QConversationPanel({
                           // the room up and down); only its way out, in a
                           // place that never moves. The transcript is Chat.
                           <div
-                            className="flex w-full flex-col items-center"
+                            className="flex w-full flex-col items-center gap-3"
                             data-q-voice-room-end
                           >
+                            {/* QO-19: Q's spoken words as captions, in a
+                                slot of fixed height that is there whether
+                                Q speaks or not, so nothing moves (owner
+                                2026-10-20); off with Captions. */}
+                            {captions ? (
+                              <p
+                                className="cq-room-caption cq-body"
+                                aria-live="polite"
+                                data-q-voice-caption
+                              >
+                                {qSaying}
+                              </p>
+                            ) : null}
                             <button
                               type="button"
                               className="cq-room-end"

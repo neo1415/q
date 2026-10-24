@@ -13,6 +13,7 @@ import {
 import { LIVE_TRIAL_SPENT_NOTICE, takeLiveTrialNotice } from "./live/trial";
 import { releaseVoiceAudio, type VoiceAudioOwner } from "./voice-audio";
 import {
+  LIVE_COULD_NOT_CONNECT,
   LIVE_FALLBACK_NOTICE,
   useLiveVoiceSession,
 } from "./provider/live-session";
@@ -130,16 +131,13 @@ export function useVoiceSession(
         const outcome = await liveLine.start(input);
         if (outcome === "LIVE" || !current()) return;
         if (liveOnly) {
-          say(
+          // QO-18: said plainly, with the way on: typing still reaches Q.
+          const notice =
             outcome === "TRIAL_SPENT"
               ? LIVE_TRIAL_SPENT_NOTICE
-              : "Live voice isn't available right now.",
-          );
-          eventsRef.current.onError?.(
-            outcome === "TRIAL_SPENT"
-              ? LIVE_TRIAL_SPENT_NOTICE
-              : "Live voice isn't available right now.",
-          );
+              : LIVE_COULD_NOT_CONNECT;
+          say(notice);
+          eventsRef.current.onError?.(notice);
           return;
         }
         // A spent trial is like a provider out of quota: the duplex line

@@ -70,6 +70,7 @@ const peers: FakePeer[] = [];
 let failRemote = false;
 class FakePeer extends EventTarget {
   iceGatheringState = "complete";
+  iceConnectionState = "checking";
   connectionState = "new";
   localDescription: { sdp: string } | null = null;
   closed = false;
@@ -228,7 +229,8 @@ const ready = () =>
   act(async () => {
     await askLiveAvailability();
   });
-const { startLiveCall } = await import("../src/features/voice/live/live-call");
+const { startLiveCall, LiveCallStalled, LIVE_CONNECT_MS } =
+  await import("../src/features/voice/live/live-call");
 const { voiceAudioOwner } = await import("../src/features/voice/voice-audio");
 const { openVoiceLine, voiceLineHolder } =
   await import("../src/features/voice/voice-line");
@@ -439,25 +441,48 @@ describe("one voice line produces audio in a tab", () => {
     window.history.replaceState(null, "", "/");
   });
 
-  it("a call ended before its data channel opened still tells the provider session to close (closes < peers - 1)", async () => {
+  // QA QO-18 (2026-10-23): ICE stuck at "checking" read as an open call
+  // ("Listening" for minutes). A call is up once its channel opens.
+  it("a call whose channel opens a moment after the answer comes up then (QO-18)", async () => {
     channelsStartConnecting = true;
-    const call = await standalone();
-    const channel = peers[0]?.channel;
-    expect(channel?.readyState).toBe("connecting");
-    // Superseded in the moment after the SDP answer, as in rapid restarts.
-    await call.end("superseded");
-    // The channel opens a moment later: the session is told to close.
-    channel?.open();
+    const starting = standalone();
     await vi.waitFor(() => {
-      expect(channel?.sent.some((e) => e.type === "session.close")).toBe(true);
+      expect(peers[0]?.channel.readyState).toBe("connecting");
+      expect(relayCalls.some((url) => url.endsWith("/open"))).toBe(true);
     });
-    channel?.emit({
+    peers[0]?.channel.open();
+    const call = await starting;
+    expect(peers[0]?.closed).toBe(false);
+    await call.end("superseded");
+    await vi.waitFor(() => {
+      expect(
+        peers[0]?.channel.sent.some((e) => e.type === "session.close"),
+      ).toBe(true);
+    });
+    peers[0]?.channel.emit({
       type: "session.closed",
       reason: "close_requested",
       usage: { seconds: 1 },
     });
     await call.finished;
-    expect(peers[0]?.closed).toBe(true);
+  });
+
+  it("a call whose channel never opens is not up: the provider session is ended and the start fails (QO-18)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      channelsStartConnecting = true;
+      const failed = standalone().then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await vi.advanceTimersByTimeAsync(LIVE_CONNECT_MS + 10);
+      const error = await failed;
+      expect(error).toBeInstanceOf(LiveCallStalled);
+      expect(relayCalls.some((url) => url.includes("/end/"))).toBe(true);
+      expect(peers[0]?.closed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("(c) a slow GPT-Live open that is ended while connecting never plays, and no fallback starts after the end", async () => {

@@ -3762,6 +3762,20 @@
     cursor: pointer;
     transition: background-color var(--cq-motion-fast) var(--cq-ease);
   }
+  /*
+   * QO-19: Q's spoken words on the voice room. Two lines, always this
+   * tall (empty or not), so captions never move the room (owner
+   * 2026-10-20); the newest words are the ones shown.
+   */
+  .cq-room-caption {
+    width: min(100%, 42rem);
+    height: 3em;
+    line-height: 1.5;
+    overflow: hidden;
+    text-align: center;
+    text-wrap: balance;
+    color: var(--cq-stage-text);
+  }
   .cq-room-end:hover,
   .cq-room-end:focus-visible {
     background: var(--cq-stage-surface-strong);

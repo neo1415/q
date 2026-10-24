@@ -468,3 +468,48 @@ describe("live check on AV (conversation eef33ec5, 2026-10-17)", () => {
     );
   });
 });
+
+// QA QO-32 (2026-10-23): "Prep me for a call with Zino" named a company on
+// the cards shown before; the cards stayed up under the prep's last
+// sentence ("I'll play Zino Aviation") and the prep read as the next
+// turn's answer.
+describe("a written answer about a card on screen (QO-32)", () => {
+  const first = FIT.cards[0];
+  if (first === undefined) throw new Error("fixture");
+  const prep = [
+    "**Who they are**",
+    `${first.name} is a seed fund.`,
+    "",
+    "**So far**",
+    "This would be the first contact.",
+    "",
+    "**What they'll likely ask**",
+    "1. Why now?",
+    "2. Who pays?",
+    "3. How big is it?",
+    "",
+    `Want to rehearse it? I'll play ${first.name}.`,
+  ].join("\n");
+
+  it("is its own display: the older cards leave the stage", () => {
+    const turns: readonly QTurn[] = [
+      person("p1", "which fit my mandate?"),
+      answer("p2", said, [FIT]),
+      person("p3", `Prep me for a call with ${first.name}`),
+      answer("p4", prep, []),
+    ];
+    const pick = stageOf(shownItems(turns), turns);
+    expect(pick).toEqual({ item: null, why: "NONE" });
+  });
+
+  it("a short answer about the same card still keeps the set", () => {
+    const turns: readonly QTurn[] = [
+      person("p1", "which fit my mandate?"),
+      answer("p2", said, [FIT]),
+      person("p3", `Why ${first.name}?`),
+      answer("p4", `${first.name} fits on stage and sector.`, []),
+    ];
+    const pick = stageOf(shownItems(turns), turns);
+    expect(pick.why).toBe("KEPT");
+  });
+});

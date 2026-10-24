@@ -101,7 +101,7 @@ const ready = () =>
   act(async () => {
     await askLiveAvailability();
   });
-const { LIVE_FALLBACK_NOTICE } =
+const { LIVE_COULD_NOT_CONNECT, LIVE_FALLBACK_NOTICE } =
   await import("../src/features/voice/provider/live-session");
 const { LIVE_TRIAL_SPENT_NOTICE, liveTrialLeftNotice } =
   await import("../src/features/voice/live/trial");
@@ -226,6 +226,42 @@ describe("GPT-Live as the product voice", () => {
       result.current.sendText("Open Ajopot");
     });
     expect(typed).toEqual(["Open Ajopot"]);
+    // QO-18: and they are their own line on screen at once, never lost.
+    expect(
+      result.current.transcript.map((line) => [line.role, line.text]),
+    ).toContainEqual(["user", "Open Ajopot"]);
+  });
+
+  it("a LIVE-only call that cannot connect says so plainly, and typing still reaches Q (QO-18)", async () => {
+    opens = false;
+    const statuses: (string | null)[] = [];
+    const errors: string[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+        onError: (message) => {
+          errors.push(message);
+        },
+      }),
+    );
+    await ready();
+    await act(async () => {
+      await result.current.start({
+        credential: {
+          ...credential,
+          liveOnly: true,
+          token: "",
+          providerConversationId: "",
+        },
+      });
+    });
+    expect(statuses).toEqual([LIVE_COULD_NOT_CONNECT]);
+    expect(errors).toEqual([LIVE_COULD_NOT_CONNECT]);
+    expect(LIVE_COULD_NOT_CONNECT).toMatch(/Type below/u);
+    // Not "Listening": the line is not up.
+    expect(result.current.connected).toBe(false);
   });
 
   it("falls back to the standard line with one line of notice when GPT-Live cannot open", async () => {

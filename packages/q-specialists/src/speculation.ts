@@ -194,6 +194,8 @@ export function readingMisfit(
     readonly saveToOwnProfile?: boolean | undefined;
     readonly tool?: unknown;
     readonly handOver?: unknown;
+    readonly teamJob?: boolean | undefined;
+    readonly meetingPrep?: unknown;
     readonly appAction?: unknown;
     readonly askedAction?: string | null | undefined;
     readonly reference?:
@@ -210,6 +212,13 @@ export function readingMisfit(
     read.saveToOwnProfile === true ||
     (read.tool ?? null) !== null ||
     (read.handOver ?? null) !== null ||
+    // QA QO-32 (2026-10-23): a call to prepare ("Prep me for a call with
+    // Zino") or a team job is answered by its own branch; left running,
+    // the speculative analyst answer was spoken first ("I'll play Zino
+    // Aviation" over an older list) and the prep landed after the next
+    // turn. Cancelled the moment the reading says so.
+    read.teamJob === true ||
+    (read.meetingPrep ?? null) !== null ||
     (read.appAction ?? null) !== null ||
     (read.askedAction ?? null) !== null ||
     (read.reference?.open ?? null) !== null ||

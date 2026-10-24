@@ -54,6 +54,10 @@ export type LiveVoiceClient = Omit<VoiceSessionClient, "start"> & {
 export const LIVE_FALLBACK_NOTICE =
   "Live voice isn't available right now, so I'm on my standard voice.";
 
+/** QO-18: live voice only, and it could not connect: typing still works. */
+export const LIVE_COULD_NOT_CONNECT =
+  "Voice couldn't connect on this network. Type below and I'll answer here.";
+
 /** How long a status line (time left on the trial) stays up. */
 const STATUS_SHOWN_MS = 6_000;
 
@@ -239,8 +243,23 @@ export function useLiveVoiceSession(
     await call?.end("ended");
   }, []);
 
+  // QO-18: typed words on the call are the person's own line in the
+  // transcript at once, like a spoken one; they never vanish.
   const sendText = useCallback((text: string) => {
-    callRef.current?.typed(text);
+    const call = callRef.current;
+    const words = text.trim();
+    if (call === null || words.length === 0) return;
+    const at = Date.now();
+    const line: VoiceTranscriptLine = {
+      id: `typed-${String(at)}`,
+      role: "user",
+      text: words,
+      partial: false,
+      at,
+    };
+    setTranscript((current) => [...current, line]);
+    eventsRef.current.onLine?.(line);
+    call.typed(words);
   }, []);
   const narrate = useCallback((text: string): boolean => {
     const call = callRef.current;
