@@ -1092,6 +1092,15 @@ function heldOnRecord(read: RunRead, name: string): HeldIdentity | null {
   return null;
 }
 
+/** A public search that ran and found no page (about them). */
+function webFoundNothing(outcome: QToolCallOutcome): boolean {
+  if (!outcome.result.ok) return false;
+  const sources = (
+    outcome.result.data as { readonly sources?: readonly unknown[] }
+  ).sources;
+  return Array.isArray(sources) && sources.length === 0;
+}
+
 /** How long a subject's empty public search stands for its conversation. */
 const SEARCHED_EMPTY_TTL_MS = 30 * 60_000;
 const SEARCHED_EMPTY_MAX = 1_000;
@@ -7107,6 +7116,22 @@ export function createModelGatewayQAnswer(
             latencyMs: outcome.latencyMs,
           });
           collectSources(outcome);
+          // Owner 2026-10-24 ("Which is better, Anchor or Afyascan?" was
+          // answered with "the web search added nothing relevant about
+          // either company"): a search that found nothing about them, on a
+          // turn whose Capital Q records were read, is not put in front of
+          // the answer at all -- the records answer it, and nothing is said
+          // about the web. Recorded above, so it is not asked again.
+          if (
+            webFoundNothing(outcome) &&
+            runCompanies.read(request.runId).profiles.size > 0
+          ) {
+            logger?.info(
+              { qRunId: request.runId },
+              "q public search found nothing; answered from the records alone",
+            );
+            return;
+          }
           messages = [
             ...messages,
             fetchedForYouMessage(call.name, outcome),

@@ -29,6 +29,12 @@ import {
   PROFILES,
   type QToolPortsOverrides,
 } from "./support.js";
+import {
+  AMBIGUOUS_GUIDANCE,
+  GUIDANCE,
+  NOT_FOUND_GUIDANCE,
+  RESEARCH_GUIDANCE_MAX,
+} from "../src/tools/research-public-web.js";
 
 /**
  * The two public-web research tools against fake ports and the fake
@@ -189,6 +195,19 @@ function search(
   );
 }
 
+describe("what the research tool tells the answer", () => {
+  // Production 2026-10-24: the "not sure it's them" guidance pushed the
+  // text past its bound and every ambiguous search failed as
+  // INVALID_TOOL_OUTPUT. Every combination fits.
+  it("fits its bound in every case", () => {
+    for (const extra of ["", AMBIGUOUS_GUIDANCE, NOT_FOUND_GUIDANCE]) {
+      expect(`${GUIDANCE}${extra}`.length).toBeLessThanOrEqual(
+        RESEARCH_GUIDANCE_MAX,
+      );
+    }
+  });
+});
+
 describe("public_web.search", () => {
   // Production 2026-10-23 (founder, after Q listed their investors): "Why
   // might the top one pass on us?" was answered with Wikipedia's "Mountain
@@ -240,6 +259,8 @@ describe("public_web.search", () => {
       "I couldn't find anything about them online",
     );
     expect(String(data["guidance"])).toContain("Never describe pages");
+    // Owner 2026-10-24: when the records answer, nothing about the web.
+    expect(String(data["guidance"])).toContain("do not mention the web at all");
     expect(String(data["guidance"])).not.toContain("ask for their website");
   });
 
