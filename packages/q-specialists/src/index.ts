@@ -105,7 +105,9 @@ export {
 
 export {
   answerSteps,
+  asksWhatIsOnBoard,
   boardItemFromWords,
+  mentionsOwnBoard,
   createSpecialistQAnswer,
   type BoardKeeper,
   type SpecialistQAnswer,

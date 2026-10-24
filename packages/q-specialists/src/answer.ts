@@ -125,6 +125,7 @@ import {
 import {
   ANSWER_DOCUMENT_ARTIFACT_TYPE,
   composeAnswerDocument,
+  workTitle,
 } from "./answer-document.js";
 import {
   composeOwnMandateDocument,
@@ -967,23 +968,152 @@ export type SpecialistQAnswerDependencies = {
 export type BoardKeeper = {
   readonly list: (actor: ActorContext) => Promise<{
     readonly items: readonly {
+      readonly id?: string;
+      readonly kind?: string;
       readonly title: string;
       readonly status: "TODO" | "DOING" | "DONE";
+      readonly createdBy?: "PERSON" | "Q";
+      readonly createdAt?: string;
     }[];
   }>;
   readonly add: (
     actor: ActorContext,
     request: {
-      readonly kind: "DOCUMENT" | "TASK";
+      readonly kind: "DOCUMENT" | "TASK" | "WORK_JOB";
       readonly title: string;
       readonly refId?: string;
     },
     options: { readonly by: "Q"; readonly idempotencyKey: string },
   ) => Promise<
-    | { readonly outcome: "OK"; readonly replayed: boolean }
+    | {
+        readonly outcome: "OK";
+        readonly replayed: boolean;
+        readonly value?: { readonly id: string };
+      }
     | { readonly outcome: "REFUSED"; readonly code: string }
   >;
+  /**
+   * Their most recent Q job still under way (QA 2026-10-24: "save that
+   * plan" after "On it. Starting now" filed only the opening line). Their
+   * own jobs only, read by the server. Absent: such a save says so.
+   */
+  readonly latestRunningJob?: (
+    actor: ActorContext,
+  ) => Promise<{ readonly jobId: string } | null>;
+  /** Links their item to their own Q job: it moves to DOING, then DONE. */
+  readonly linkJob?: (
+    actor: ActorContext,
+    itemId: string,
+    jobId: string,
+    options: { readonly idempotencyKey: string },
+  ) => Promise<{ readonly outcome: "OK" } | { readonly outcome: "REFUSED" }>;
+  /** Q's own work on items they name (the board tool's WORK, by code). */
+  readonly work?: (
+    request: QAnswerRequest,
+    itemIds: readonly string[],
+  ) => Promise<{
+    readonly status: string;
+    readonly working: readonly { readonly title: string }[];
+    readonly firstRead: string | null;
+    readonly waiting: readonly string[];
+  }>;
 };
+
+/**
+ * How each of Q's own board replies opens: a later "break it into tasks"
+ * or "work on those" is about the work before it, never about Q's own
+ * confirmation (QA 2026-10-24: the breakdown split "Q's answer: Save that
+ * plan to my board").
+ */
+const BOARD_REPLY_OPENERS = [
+  "I've filed that",
+  "I filed it as a document",
+  "I've put “",
+  "I've added “",
+  "I've started on “",
+  "Here's your board.",
+  "Your board is ",
+  "I couldn't add",
+  "I couldn't read your board",
+  "That work is still under way",
+] as const;
+
+function isBoardReply(content: string): boolean {
+  const said = content.trimStart();
+  return BOARD_REPLY_OPENERS.some((opener) => said.startsWith(opener));
+}
+
+/** Q's own line when deep work starts (team-job startedLine). */
+function startsTeamJob(content: string): boolean {
+  return /^On it[.,] [Ss]tarting now\b/u.test(content.trimStart());
+}
+
+const ORDINALS: Readonly<Record<string, number>> = {
+  first: 0,
+  "1st": 0,
+  second: 1,
+  "2nd": 1,
+  third: 2,
+  "3rd": 2,
+  fourth: 3,
+  "4th": 3,
+  fifth: 4,
+  "5th": 4,
+};
+
+/**
+ * Which of their board's open items "work on …" means, from the board
+ * itself: "the first task" by its place in To do, a title they say, or
+ * "those" / "them" / "all of them" for the items Q added last. Empty:
+ * not read here; the board tool reads it.
+ */
+export function boardItemsMeant(
+  words: string,
+  items: readonly {
+    readonly id?: string;
+    readonly title: string;
+    readonly status: string;
+    readonly createdBy?: string;
+    readonly createdAt?: string;
+  }[],
+): string[] {
+  const open = items.filter(
+    (item): item is typeof item & { readonly id: string } =>
+      item.id !== undefined && item.status === "TODO",
+  );
+  if (open.length === 0) return [];
+  const said = words.toLowerCase();
+  const ordinal =
+    /\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b/u.exec(
+      said,
+    )?.[1];
+  if (ordinal !== undefined) {
+    const at = ordinal === "last" ? open.length - 1 : (ORDINALS[ordinal] ?? -1);
+    const item = open[at];
+    return item === undefined ? [] : [item.id];
+  }
+  const named = open.filter(
+    (item) => item.title.length >= 4 && said.includes(item.title.toLowerCase()),
+  );
+  if (named.length > 0) return named.slice(0, 5).map((item) => item.id);
+  if (
+    !/\b(those|these|them|all|everything|the tasks|the items)\b/u.test(said)
+  ) {
+    return [];
+  }
+  // The batch Q added last: within two minutes of the newest of its items.
+  const byQ = open.filter(
+    (item) => item.createdBy === "Q" && item.createdAt !== undefined,
+  );
+  const newest = Math.max(
+    ...byQ.map((item) => Date.parse(item.createdAt ?? "")),
+  );
+  if (!Number.isFinite(newest)) return [];
+  return byQ
+    .filter((item) => newest - Date.parse(item.createdAt ?? "") <= 120_000)
+    .slice(0, 5)
+    .map((item) => item.id);
+}
 
 /** At most this many tasks from one answer. */
 const BOARD_TASKS_MAX = 12;
@@ -1064,6 +1194,30 @@ export function boardItemFromWords(words: string): string | null {
     .replace(/[.,;:!?]+$/u, "")
     .trim();
   return title === undefined || title.length < 3 ? null : title;
+}
+
+/**
+ * Their own work board, by its words: "my board", "my work board", "my
+ * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
+ * names the board tool for a turn the reader left without a board ask
+ * (live 91d6361f9: "add 'Prep data room' to my board" read as no board
+ * ask, so my_board was never offered), and it never decides alone.
+ */
+export function mentionsOwnBoard(words: string): boolean {
+  return /\b(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b|\bmon\s+tableau\b|\bmi\s+tablero\b|\bmeu\s+quadro\b/iu.test(
+    words,
+  );
+}
+
+/**
+ * Only asking what is on their own board ("what's on my board?", "show me
+ * my work board"): read from the board by code when the reader carries no
+ * LIST (before v63). Never the readiness checklist.
+ */
+export function asksWhatIsOnBoard(words: string): boolean {
+  return /^\s*(?:(?:so\s+)?what(?:'s|\s+is|\s+are|\s+do\s+i\s+have)?\b.{0,20}\b(?:on|in)\s+(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b|(?:show|open|read)\s+(?:me\s+)?(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?)\b)[^.!]*\??\s*$/iu.test(
+    words,
+  );
 }
 
 /**
@@ -1965,25 +2119,32 @@ export function createSpecialistQAnswer(
   ): Promise<QAnswerOutcome | null> {
     const board = dependencies.board;
     if (board === undefined || artifacts === undefined) return null;
-    const previous = previousAnswer(history);
-    if (previous === null) {
+    const work = substantiveAnswer(history);
+    if (work === null) {
       return recordAnswer(
         request,
         conversationId,
         "I haven't answered anything in this conversation yet, so there's nothing to keep on your board. Ask me for the plan first, then say save it to my board.",
       );
     }
-    // A document Q already made in that answer is the one kept; otherwise
-    // the answer is filed as one, exactly as written.
-    const made = previousDocument(history);
+    // Deep work still under way: its document does not exist yet, so the
+    // board keeps the job itself, linked, and it moves to Done with its
+    // document when the work finishes. Never its opening line as a file.
+    if (startsTeamJob(work.answer)) {
+      return keepRunningJob(request, conversationId, board, work);
+    }
+    // "Break it into tasks" right after "save that plan": the document is
+    // already on their board (Q's own confirmation carries it).
+    const confirmed = boardConfirmedDocument(history);
+    const made = confirmed ?? documentOn(work.message);
     const filed =
       made === null
         ? await fileAnswer(
             request,
             artifacts,
-            previous.answer,
-            previous.question,
-            history,
+            work.answer,
+            work.question,
+            upToAnswer(work),
           )
         : null;
     const document =
@@ -1998,36 +2159,44 @@ export function createSpecialistQAnswer(
         filed?.content ?? "I couldn't file that just now.",
       );
     }
-    const kept = await board
-      .add(
-        request.actor,
-        { kind: "DOCUMENT", title: document.title, refId: document.artifactId },
-        {
-          by: "Q",
-          idempotencyKey: boardKeyOf(
-            request.runId,
-            `doc:${document.artifactId}`,
-          ),
-        },
-      )
-      .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
-    if (kept.outcome !== "OK") {
-      return recordAnswer(
-        request,
-        conversationId,
-        `I filed it as a document, but couldn't put it on your board just now${kept.code === "FULL" ? ": your board is full, so take something off it first" : ""}. The document is here.`,
-        [document],
-      );
+    if (confirmed === null) {
+      const kept = await board
+        .add(
+          request.actor,
+          {
+            kind: "DOCUMENT",
+            title: document.title,
+            refId: document.artifactId,
+          },
+          {
+            by: "Q",
+            idempotencyKey: boardKeyOf(
+              request.runId,
+              `doc:${document.artifactId}`,
+            ),
+          },
+        )
+        .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
+      if (kept.outcome !== "OK") {
+        return recordAnswer(
+          request,
+          conversationId,
+          `I filed it as a document, but couldn't put it on your board just now${kept.code === "FULL" ? ": your board is full, so take something off it first" : ""}. The document is here.`,
+          [document],
+        );
+      }
     }
     if (ask === "SAVE") {
       return recordAnswer(
         request,
         conversationId,
-        `I've filed that as a document and put “${document.title}” on your board, in To do.`,
+        confirmed === null
+          ? `I've filed that as a document and put “${document.title}” on your board, in To do.`
+          : `I've put “${document.title}” on your board already; it's in To do.`,
         [document],
       );
     }
-    const steps = answerSteps(previous.answer);
+    const steps = answerSteps(work.answer);
     if (steps.length === 0) {
       return recordAnswer(
         request,
@@ -2058,10 +2227,170 @@ export function createSpecialistQAnswer(
       request,
       conversationId,
       added === steps.length
-        ? `I've filed that plan as a document and put it on your board, with its steps as ${tasks} in To do.`
-        : `I've filed that plan as a document and put it on your board, with ${tasks} of its ${String(steps.length)} steps in To do; the rest couldn't be added just now.`,
+        ? `I've put “${document.title}” on your board, with its steps as ${tasks} in To do.`
+        : `I've put “${document.title}” on your board, with ${tasks} of its ${String(steps.length)} steps in To do; the rest couldn't be added just now.`,
       [document],
     );
+  }
+
+  /** "Save that plan" while Q's deep work on it is still under way. */
+  async function keepRunningJob(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    board: BoardKeeper,
+    work: NonNullable<ReturnType<typeof substantiveAnswer>>,
+  ): Promise<QAnswerOutcome> {
+    const job =
+      board.latestRunningJob === undefined || board.linkJob === undefined
+        ? null
+        : await board.latestRunningJob(request.actor).catch(() => null);
+    if (job === null || board.linkJob === undefined) {
+      return recordAnswer(
+        request,
+        conversationId,
+        "That work is still under way, so there's no document to keep yet. When it's ready it will be in this conversation and in Documents; ask me then and I'll put it on your board.",
+      );
+    }
+    const title = workTitle({
+      heading: null,
+      question: work.question ?? "",
+      subject: await subjectOfAnswer(
+        request,
+        upToAnswer(work),
+        work.question ?? "",
+      ),
+    });
+    const kept = await board
+      .add(
+        request.actor,
+        { kind: "WORK_JOB", title, refId: job.jobId },
+        {
+          by: "Q",
+          idempotencyKey: boardKeyOf(request.runId, `job:${job.jobId}`),
+        },
+      )
+      .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
+    const itemId = kept.outcome === "OK" ? kept.value?.id : undefined;
+    if (itemId !== undefined) {
+      await board
+        .linkJob(request.actor, itemId, job.jobId, {
+          idempotencyKey: boardKeyOf(request.runId, `link:${job.jobId}`),
+        })
+        .catch(() => ({ outcome: "REFUSED" }) as const);
+    }
+    return recordAnswer(
+      request,
+      conversationId,
+      kept.outcome === "OK"
+        ? `I've put “${title}” on your board. I'm still working on it, so it's in Doing; it moves to Done, with its document, when the work finishes.`
+        : `I couldn't add “${title}” to your board just now. Ask me again in a moment.`,
+    );
+  }
+
+  /** The conversation up to one answer, and the ask after it. */
+  function upToAnswer(work: {
+    readonly message: QConversationMessage;
+    readonly all: readonly QConversationMessage[];
+  }): readonly QConversationMessage[] {
+    return [
+      ...work.all.slice(0, work.all.indexOf(work.message) + 1),
+      ...work.all.slice(-1),
+    ];
+  }
+
+  /**
+   * Q's last answer that is the work itself, with what it answered: never
+   * one of Q's own board replies (QA 2026-10-24).
+   */
+  function substantiveAnswer(history: readonly QConversationMessage[]): {
+    readonly message: QConversationMessage;
+    readonly answer: string;
+    readonly question?: string;
+    readonly all: readonly QConversationMessage[];
+  } | null {
+    const latestUser = history.findLastIndex((m) => m.role === "USER");
+    const before = latestUser < 0 ? history : history.slice(0, latestUser);
+    const at = before.findLastIndex(
+      (m) =>
+        m.role === "Q" &&
+        m.content.trim().length > 0 &&
+        !isBoardReply(m.content),
+    );
+    const message = before[at];
+    if (at < 0 || message === undefined) return null;
+    const asked = before.slice(0, at).findLast((m) => m.role === "USER");
+    return {
+      message,
+      answer: message.content,
+      ...(asked === undefined ? {} : { question: asked.content }),
+      all: history,
+    };
+  }
+
+  /** The document Q's own board confirmation just before this turn carries. */
+  function boardConfirmedDocument(
+    history: readonly QConversationMessage[],
+  ): Extract<QResultBlock, { kind: "ARTIFACT_REFERENCE" }> | null {
+    const latestUser = history.findLastIndex((m) => m.role === "USER");
+    const before = latestUser < 0 ? history : history.slice(0, latestUser);
+    const last = before.findLast((m) => m.role === "Q");
+    return last !== undefined && isBoardReply(last.content)
+      ? documentOn(last)
+      : null;
+  }
+
+  function documentOn(
+    message: QConversationMessage,
+  ): Extract<QResultBlock, { kind: "ARTIFACT_REFERENCE" }> | null {
+    const block = (message.blocks ?? []).findLast(
+      (one) => one.kind === "ARTIFACT_REFERENCE",
+    );
+    return block?.kind === "ARTIFACT_REFERENCE" ? block : null;
+  }
+
+  /**
+   * "Work on the first task" (boardAsk WORK; QA 2026-10-24: declined, with
+   * filler): the items meant, read from their board, and Q's own work on
+   * them started by code. Null: which items is not clear from the board;
+   * the board tool reads it.
+   */
+  async function workOnBoard(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    words: string,
+  ): Promise<QAnswerOutcome | null> {
+    const board = dependencies.board;
+    if (board?.work === undefined) return null;
+    const list = await board.list(request.actor).catch(() => null);
+    if (list === null) return null;
+    const meant = boardItemsMeant(words, list.items);
+    if (meant.length === 0) return null;
+    const outcome = await board.work(request, meant).catch(() => null);
+    const titles = (outcome?.working ?? []).map((item) => `“${item.title}”`);
+    const named =
+      titles.length <= 1
+        ? (titles[0] ?? "")
+        : `${titles.slice(0, -1).join(", ")} and ${titles.at(-1) ?? ""}`;
+    const line = (() => {
+      if (outcome === null) {
+        return "I couldn't start on that just now. Ask me again in a moment.";
+      }
+      switch (outcome.status) {
+        case "STARTED":
+          return titles.length === 0
+            ? "I've started on it. It moves to Done on your board when the work finishes."
+            : `I've started on ${named}: ${titles.length === 1 ? "it's" : "they're"} in Doing, and move${titles.length === 1 ? "s" : ""} to Done when the work finishes.${outcome.firstRead === null ? "" : ` My first read: ${outcome.firstRead}`}`;
+        case "PREPARED":
+          return "That work would reach someone outside your account, so it's waiting for your approval first; the items stay where they are until you approve.";
+        case "ALREADY_WAITING":
+          return `Something like this is already waiting for you${outcome.waiting[0] === undefined ? "" : `: ${outcome.waiting[0]}`}. Say go ahead and I'll start this one too.`;
+        case "LIMIT_REACHED":
+          return "I've reached the limit of work I can take on for you right now. It can start once a running piece of work finishes.";
+        default:
+          return "I couldn't start on that just now. Ask me again in a moment.";
+      }
+    })();
+    return recordAnswer(request, conversationId, line);
   }
 
   /** "What's on my board?" (boardAsk LIST): read from the board, by code. */
@@ -2147,19 +2476,6 @@ export function createSpecialistQAnswer(
           ? "Your board is full, so I couldn't add that. Take something off it first and ask me again."
           : `I couldn't add “${title}” to your board just now. Ask me again in a moment.`,
     );
-  }
-
-  /** The document card on Q's answer before this turn, when it made one. */
-  function previousDocument(
-    history: readonly QConversationMessage[],
-  ): Extract<QResultBlock, { kind: "ARTIFACT_REFERENCE" }> | null {
-    const latestUser = history.findLastIndex((m) => m.role === "USER");
-    const before = latestUser < 0 ? history : history.slice(0, latestUser);
-    const answer = before.findLast((m) => m.role === "Q");
-    const block = (answer?.blocks ?? []).findLast(
-      (one) => one.kind === "ARTIFACT_REFERENCE",
-    );
-    return block?.kind === "ARTIFACT_REFERENCE" ? block : null;
   }
 
   /**
@@ -4967,7 +5283,19 @@ export function createSpecialistQAnswer(
     // about Q's last answer (nobody else named, no item dictated), is done
     // by code, whatever the run's purpose or tool offer.
     const boardAsk: string | null = read?.boardAsk ?? null;
-    if (boardAsk === "LIST" && !writingDocument) {
+    // Before reader v63 carries LIST and ADD, their words decide only when
+    // they are unmistakable: "what's on my board?", or an item they put in
+    // quotes (or between "add" and "to my board") for their own board.
+    const listsBoard =
+      boardAsk === "LIST" ||
+      (boardAsk === null && asksWhatIsOnBoard(latest.content));
+    const addsItem =
+      boardAsk === "ADD" ||
+      (boardAsk === "SAVE" && dictatesItem(latest.content)) ||
+      (boardAsk === null &&
+        mentionsOwnBoard(latest.content) &&
+        boardItemFromWords(latest.content) !== null);
+    if (listsBoard && !writingDocument) {
       const listed = await readBoard(request, conversationId);
       if (listed !== null) {
         remember(
@@ -4979,11 +5307,21 @@ export function createSpecialistQAnswer(
     }
     // A new item in their words (v62 ADD; or SAVE of a title they put in
     // quotes) is a to-do with that title, never Q's last answer (F-72).
-    if (
-      !writingDocument &&
-      (boardAsk === "ADD" ||
-        (boardAsk === "SAVE" && dictatesItem(latest.content)))
-    ) {
+    if (boardAsk === "WORK" && !writingDocument) {
+      const working = await workOnBoard(
+        request,
+        conversationId,
+        latest.content,
+      );
+      if (working !== null) {
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return working;
+      }
+    }
+    if (!writingDocument && addsItem) {
       const added = await addItemToBoard(
         request,
         conversationId,
@@ -5471,7 +5809,9 @@ export function createSpecialistQAnswer(
       ...(routed === null ? [] : [routed]),
       // Reader v61: any board ask (a named item kept, Q's work on items)
       // is the board tool's, on whatever purpose this run has.
-      ...((read?.boardAsk ?? null) === null ? [] : ["my_board"]),
+      ...((read?.boardAsk ?? null) !== null || mentionsOwnBoard(latest.content)
+        ? ["my_board"]
+        : []),
     ].filter((name) => name.length > 0);
     const toolFocus = toolFocusOf({
       reading:
