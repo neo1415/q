@@ -1064,18 +1064,24 @@ export function boardItemsMeant(
   words: string,
   items: readonly {
     readonly id?: string;
+    readonly kind?: string;
     readonly title: string;
     readonly status: string;
     readonly createdBy?: string;
     readonly createdAt?: string;
   }[],
 ): string[] {
+  const said = words.toLowerCase();
+  // Live 18d7884c4: "the first task" took the first open item, a saved
+  // document, which no plan can work on. A task asked for is a task.
+  const wantsTasks = /\btasks?\b|\bto-?dos?\b/u.test(said);
   const open = items.filter(
     (item): item is typeof item & { readonly id: string } =>
-      item.id !== undefined && item.status === "TODO",
+      item.id !== undefined &&
+      item.status === "TODO" &&
+      (!wantsTasks || item.kind === undefined || item.kind === "TASK"),
   );
   if (open.length === 0) return [];
-  const said = words.toLowerCase();
   const ordinal =
     /\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b/u.exec(
       said,
@@ -2364,7 +2370,21 @@ export function createSpecialistQAnswer(
     if (list === null) return null;
     const meant = boardItemsMeant(words, list.items);
     if (meant.length === 0) return null;
-    const outcome = await board.work(request, meant).catch(() => null);
+    const outcome = await board.work(request, meant).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "q work on board items failed",
+      );
+      return null;
+    });
+    logger?.info(
+      {
+        qRunId: request.runId,
+        items: meant.length,
+        outcome: outcome?.status ?? "FAILED",
+      },
+      "q work on board items",
+    );
     const titles = (outcome?.working ?? []).map((item) => `“${item.title}”`);
     const named =
       titles.length <= 1
@@ -2385,6 +2405,10 @@ export function createSpecialistQAnswer(
           return `Something like this is already waiting for you${outcome.waiting[0] === undefined ? "" : `: ${outcome.waiting[0]}`}. Say go ahead and I'll start this one too.`;
         case "LIMIT_REACHED":
           return "I've reached the limit of work I can take on for you right now. It can start once a running piece of work finishes.";
+        case "NOT_PLANNED":
+          return "I couldn't turn that item into work I can carry out for you. Tell me what you want at the end of it (a memo, a list of questions, a short plan) and I'll start.";
+        case "NOT_FOUND":
+          return "That item isn't open on your board any more, so there's nothing to start. Ask me what's on your board to see what is.";
         default:
           return "I couldn't start on that just now. Ask me again in a moment.";
       }

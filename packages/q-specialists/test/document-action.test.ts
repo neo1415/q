@@ -1662,3 +1662,34 @@ describe("a saved call prep about an investor Q referenced", () => {
     expect(nameInAsk("help me prepare for a call with the top one")).toBeNull();
   });
 });
+
+/** Live 18d7884c4: "work on the first task" on a board led by saved documents. */
+describe("the first task is a task", () => {
+  it("skips saved documents when they ask for a task, but not when they ask for an item", () => {
+    const items = [
+      {
+        id: "doc",
+        kind: "DOCUMENT",
+        title: "Call prep: Anchor",
+        status: "TODO",
+      },
+      {
+        id: "t1",
+        kind: "TASK",
+        title: "Review Basketari repeat order data",
+        status: "TODO",
+      },
+      {
+        id: "t2",
+        kind: "TASK",
+        title: "Prep IC memo for Anchor",
+        status: "TODO",
+      },
+    ];
+    expect(
+      boardItemsMeant("Work on the first task on my board", items),
+    ).toEqual(["t1"]);
+    expect(boardItemsMeant("work on the second to-do", items)).toEqual(["t2"]);
+    expect(boardItemsMeant("work on the first item", items)).toEqual(["doc"]);
+  });
+});
