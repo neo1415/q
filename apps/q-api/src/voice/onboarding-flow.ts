@@ -36,9 +36,23 @@ export type OnboardingFlow = {
 
 export function firstNameOf(
   displayName: string | null | undefined,
+  /**
+   * The company or firm they named at sign-up. QA F-48 (23 Oct): a display
+   * name that began with the firm's name greeted them "Audit, you're with
+   * Audit Ridge Capital". A first word that is also the organisation's
+   * first word may not be a given name, so no name is used: no name is
+   * better than a wrong one.
+   */
+  organisationName?: string | null,
 ): string | null {
   const first = displayName?.trim().split(/\s+/)[0] ?? "";
-  return first.length >= 2 && first.length <= 40 ? first : null;
+  if (first.length < 2 || first.length > 40) return null;
+  const organisationFirst =
+    organisationName?.trim().split(/\s+/)[0]?.toLocaleLowerCase() ?? "";
+  return organisationFirst.length > 0 &&
+    organisationFirst === first.toLocaleLowerCase()
+    ? null
+    : first;
 }
 
 const quoted = (text: string) => `"${text.replace(/"/g, "'").slice(0, 200)}"`;
