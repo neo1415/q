@@ -1043,10 +1043,44 @@ function isBoardReply(content: string): boolean {
   return BOARD_REPLY_OPENERS.some((opener) => said.startsWith(opener));
 }
 
+/**
+ * Q's answer that produced nothing to keep: a refusal or failure line
+ * ("I couldn't plan this just now… nothing has started"). F-78b (live
+ * 18d7884c4): saved anyway, it became a "12-month plan" item from
+ * nothing. These are Q's own fixed openings, never the person's words.
+ */
+function producedNothing(content: string): boolean {
+  const said = content.trimStart();
+  // An answer that opens with a caveat and then carries the work (a list,
+  // or a long body) is still the work.
+  if (said.length > 700 || answerSteps(said).length > 0) return false;
+  return (
+    /^(?:I couldn't|I can't|I wasn't able|Sorry, I couldn't|Something failed)\b/u.test(
+      said,
+    ) ||
+    /^(?:Work like this|Something like this) is already waiting\b/u.test(
+      said,
+    ) ||
+    /^Taking on work like this isn't available\b/u.test(said) ||
+    /^I've reached the limit of work\b/u.test(said) ||
+    /\bnothing has started\b/u.test(said.slice(0, 240))
+  );
+}
+
 /** Q's own line when deep work starts (team-job startedLine). */
 function startsTeamJob(content: string): boolean {
   return /^On it[.,] [Ss]tarting now\b/u.test(content.trimStart());
 }
+
+/** Words in "the first open task" that describe nothing. */
+const BOARD_FILLER = new Set([
+  "open",
+  "next",
+  "main",
+  "board",
+  "todo",
+  "to-do",
+]);
 
 const ORDINALS: Readonly<Record<string, number>> = {
   first: 0,
@@ -1089,13 +1123,31 @@ export function boardItemsMeant(
       (!wantsTasks || item.kind === undefined || item.kind === "TASK"),
   );
   if (open.length === 0) return [];
-  const ordinal =
+  const ordered =
+    /\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b((?:\s+[\p{L}\d-]+){0,4}?)\s+(?:task|to-?do|item|one)s?\b/u.exec(
+      said,
+    ) ??
     /\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b/u.exec(
       said,
-    )?.[1];
+    );
+  const ordinal = ordered?.[1];
   if (ordinal !== undefined) {
-    const at = ordinal === "last" ? open.length - 1 : (ORDINALS[ordinal] ?? -1);
-    const item = open[at];
+    // F-79: "the first logistics task" is the first task about logistics,
+    // never simply the first; none about it is not read here.
+    const described = (ordered?.[2] ?? "")
+      .split(/\s+/u)
+      .filter((word) => word.length >= 4 && !BOARD_FILLER.has(word));
+    const pool =
+      described.length === 0
+        ? open
+        : open.filter((item) => {
+            const title = item.title.toLowerCase();
+            return described.every((word) =>
+              title.includes(word.slice(0, Math.max(4, word.length - 2))),
+            );
+          });
+    const at = ordinal === "last" ? pool.length - 1 : (ORDINALS[ordinal] ?? -1);
+    const item = pool[at];
     return item === undefined ? [] : [item.id];
   }
   const named = open.filter(
@@ -2147,6 +2199,13 @@ export function createSpecialistQAnswer(
         "I haven't answered anything in this conversation yet, so there's nothing to keep on your board. Ask me for the plan first, then say save it to my board.",
       );
     }
+    if (producedNothing(work.answer)) {
+      return recordAnswer(
+        request,
+        conversationId,
+        "There's nothing to save yet: my last answer didn't produce the work. Ask me for it again, and once it's written I'll put it on your board.",
+      );
+    }
     // Deep work still under way: its document does not exist yet, so the
     // board keeps the job itself, linked, and it moves to Done with its
     // document when the work finishes. Never its opening line as a file.
@@ -2384,7 +2443,25 @@ export function createSpecialistQAnswer(
     const list = await board.list(request.actor).catch(() => null);
     if (list === null) return null;
     const meant = boardItemsMeant(words, list.items);
-    if (meant.length === 0) return null;
+    if (meant.length === 0) {
+      // A task they described that none on the board fits: ask, naming
+      // what is there, rather than start on something else (F-79).
+      const open = list.items.filter(
+        (item) => item.status === "TODO" && (item.kind ?? "TASK") === "TASK",
+      );
+      if (!/\b(?:task|to-?do)s?\b/iu.test(words) || open.length === 0) {
+        return null;
+      }
+      const names = open
+        .slice(0, 6)
+        .map((item) => `“${item.title}”`)
+        .join("; ");
+      return recordAnswer(
+        request,
+        conversationId,
+        `I couldn't find that task on your board. Which one do you mean? In To do: ${names}.`,
+      );
+    }
     const outcome = await board.work(request, meant).catch((error: unknown) => {
       logger?.warn(
         { err: error, qRunId: request.runId },
