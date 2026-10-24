@@ -1396,6 +1396,48 @@ describe("answer seam tool loop", () => {
     expect(once.alpha.calls).toHaveLength(2);
   });
 
+  // QA F13 (re-score, 24 Oct, run 7fcf63cb): a founder's drafted answer
+  // opened "There isn't a matching open investor question to record this
+  // against." The draft leads; that note comes last.
+  it("puts the draft first when no open question matched the answer", async () => {
+    const ANSWER: QOfferedTool = {
+      ...GET_COMPANY,
+      toolName: "app.answer_investor_question",
+      classification: "SIDE_EFFECT",
+      definition: {
+        ...GET_COMPANY.definition,
+        name: "answer_investor_question",
+      },
+    };
+    const tools = toolPort([ANSWER], (p) => denied(p));
+    const { seam, request, messages } = build({
+      said: "An investor asked how we handle kiosk downtime. Draft my answer.",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "a",
+              name: "answer_investor_question",
+              arguments: { question: "downtime", answer: "We keep spares." },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "There isn't a matching open investor question to record this against. Your answer could say: we keep spare pumps at every kiosk.",
+          ),
+        },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    expect(messages.at(-1)?.content).toBe(
+      "Your answer could say: we keep spare pumps at every kiosk.\n\nThere isn't a matching open investor question to record this against.",
+    );
+  });
+
   describe("a note to founders they are not connected with prepares the first contact (owner 2026-10-23)", () => {
     const tool = (name: string, toolName: string): QOfferedTool => ({
       ...GET_COMPANY,

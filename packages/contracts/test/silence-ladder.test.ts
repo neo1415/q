@@ -137,9 +137,13 @@ describe("the silence ladder", () => {
   });
 
   it("says nothing it cannot ground: no name invented without a focus", () => {
-    const line = silenceStageLine("REVIEWING_COMPANY", null, 3) ?? "";
-    expect(line).toMatch(/profile/);
-    expect(line).not.toMatch(/'s /);
+    // QA F-88: never a line with its name dropped ("Just going through
+    // profile…"); with no one company it is neutral.
+    for (const seed of [0, 1, 2, 3, 4, 5]) {
+      const line = silenceStageLine("REVIEWING_COMPANY", null, seed) ?? "";
+      expect(line).toMatch(/\bthat\b/u);
+      expect(line).not.toMatch(/profile|'s /u);
+    }
   });
 
   it("asks the remembered question as a question", () => {
