@@ -156,6 +156,18 @@ export type PendingTurnReading = {
   readonly kind: string;
   readonly addressedToQ: boolean;
   readonly namesAction: boolean;
+  /**
+   * TURN_READER v65: what the turn answers, by meaning. When given, it
+   * decides whether a waiting card is being decided at all: only
+   * WAITING_CARD is. Absent: code's word hints decide (aboutWaitingCards).
+   */
+  readonly replyTo?:
+    | {
+        readonly kind: "Q_QUESTION" | "WAITING_CARD" | "NEW";
+        readonly card: string | null;
+      }
+    | null
+    | undefined;
 };
 
 /** The turn kinds that answer what Q asked; anything else is its own turn. */
@@ -520,7 +532,14 @@ export function startPendingDecision(
       // "Which one should I approve…?". A reply decides a waiting card
       // only when it is about cards: Q's last line asked about one, the
       // words name one, or they approve or decline in clear words.
-      if (!aboutWaitingCards(input, stage.allPending)) {
+      // The reading decides by meaning (v65); the words are the fallback
+      // when the turn was not read.
+      const reply = turn?.replyTo ?? null;
+      if (
+        reply !== null
+          ? reply.kind !== "WAITING_CARD"
+          : !aboutWaitingCards(input, stage.allPending)
+      ) {
         controller.abort();
         return { kind: "NONE" };
       }

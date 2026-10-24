@@ -1125,3 +1125,71 @@ describe("a yes to another question never decides a waiting card", () => {
     ).toBe(true);
   });
 });
+
+// Coordinator 2026-10-24: with the turn read (v65 replyTo), the reading
+// decides whether a waiting card is decided at all; words are the fallback.
+describe("the reading decides whether a card is decided (v65 replyTo)", () => {
+  it("a yes read as continuing Q's question decides nothing, whatever Q said last", async () => {
+    let approved = 0;
+    const port: PendingDecisionPort = {
+      proposals: () =>
+        Promise.resolve([
+          {
+            proposalId: "a1",
+            summary: "Update your mandate",
+            status: "PENDING",
+          },
+        ]),
+      read: () =>
+        Promise.resolve({
+          decision: "YES",
+          remainder: null,
+          onlyDecision: true,
+        }),
+      approve: () => {
+        approved += 1;
+        return Promise.resolve({ status: "SAVED" });
+      },
+      decline: () => Promise.resolve({ status: "DECLINED" }),
+    };
+    const context = {
+      actor: {} as never,
+      runId: "r",
+      correlationId: "c",
+      tenantId: "t",
+      userId: "u",
+    };
+    const asked = [
+      {
+        role: "Q" as const,
+        text: "Update your mandate. Not saved yet: tap Approve on the card, or tell me to go ahead.",
+      },
+    ];
+    const notCard = await decidePending(port, {
+      context,
+      utterance: "yes",
+      recentTurns: asked,
+      turn: {
+        kind: "ANSWER",
+        addressedToQ: true,
+        namesAction: false,
+        replyTo: { kind: "Q_QUESTION", card: null },
+      },
+    });
+    expect(notCard).toEqual({ kind: "NONE" });
+    expect(approved).toBe(0);
+    const card = await decidePending(port, {
+      context,
+      utterance: "yes",
+      recentTurns: asked,
+      turn: {
+        kind: "ANSWER",
+        addressedToQ: true,
+        namesAction: false,
+        replyTo: { kind: "WAITING_CARD", card: "Update your mandate" },
+      },
+    });
+    expect(card.kind).not.toBe("NONE");
+    expect(approved).toBe(1);
+  });
+});

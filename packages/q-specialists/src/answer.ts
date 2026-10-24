@@ -5452,6 +5452,8 @@ export function createSpecialistQAnswer(
                 appActionOf(read) !== null ||
                 (read.tool ?? null) !== null ||
                 (read.handOver ?? null) !== null,
+              // v65: whether it decides a waiting card at all, by meaning.
+              replyTo: read.replyTo ?? null,
             },
       );
       if (line !== null) return recordAnswer(request, conversationId, line);
@@ -5714,9 +5716,14 @@ export function createSpecialistQAnswer(
       read?.kind === "QUESTION_TO_Q" || read?.kind === "RESEARCH_REQUEST";
     // A rehearsal they ask for ("let us rehearse my call with Savanna", "can
     // we practise it?") is the act itself: it opens (QA F-98).
+    // v65: a reply that continues Q's question opens nothing unless the
+    // words ask to go (coordinator replay 2026-10-24).
+    const continuesByReading =
+      read?.replyTo?.kind === "Q_QUESTION" && !asksToGo(latest.content);
     if (
       reference !== null &&
       reference.open !== null &&
+      !continuesByReading &&
       (reference.open === "REHEARSAL" ||
         (!asksAboutIt && onlyAMove(latest.content)))
     ) {
@@ -5801,6 +5808,12 @@ export function createSpecialistQAnswer(
     const tool =
       read !== null &&
       read.confidence !== "LOW" &&
+      // v65: no screen move for a reply that continues Q's question.
+      !(
+        read.tool?.kind === "NAVIGATE" &&
+        read.replyTo?.kind === "Q_QUESTION" &&
+        !asksToGo(latest.content)
+      ) &&
       (read.kind === "TOOL_REQUEST" ||
         (read.kind === "RESEARCH_REQUEST" &&
           read.tool?.kind === "PREPARE_DOCUMENT") ||
@@ -6393,8 +6406,10 @@ export function createSpecialistQAnswer(
         ? { preparedSubject: read.question.subject }
         : {}),
       // K1: companies of a kind, with the reader's structure.
+      // v65: investors asked for are never a company search.
       ...(read?.kind === "QUESTION_TO_Q" &&
-      read.question?.kind === "DISCOVER_COMPANIES"
+      read.question?.kind === "DISCOVER_COMPANIES" &&
+      read.discoverWhom !== "INVESTORS"
         ? {
             discoverCompanies: {
               text: read.question.text,
