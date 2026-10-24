@@ -1060,6 +1060,30 @@ export function boardItemFromWords(words: string): string | null {
 }
 
 /**
+ * Their own work board, by its words: "my board", "my work board", "my
+ * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
+ * names the board tool for a turn the reader left without a board ask
+ * (live 91d6361f9: "add 'Prep data room' to my board" read as no board
+ * ask, so my_board was never offered), and it never decides alone.
+ */
+export function mentionsOwnBoard(words: string): boolean {
+  return /\b(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b|\bmon\s+tableau\b|\bmi\s+tablero\b|\bmeu\s+quadro\b/iu.test(
+    words,
+  );
+}
+
+/**
+ * Only asking what is on their own board ("what's on my board?", "show me
+ * my work board"): read from the board by code when the reader carries no
+ * LIST (before v63). Never the readiness checklist.
+ */
+export function asksWhatIsOnBoard(words: string): boolean {
+  return /^\s*(?:(?:so\s+)?what(?:'s|\s+is|\s+are|\s+do\s+i\s+have)?\b.{0,20}\b(?:on|in)\s+(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b|(?:show|open|read)\s+(?:me\s+)?(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?)\b)[^.!]*\??\s*$/iu.test(
+    words,
+  );
+}
+
+/**
  * "the top company" in an item they dictated, as the list Q just showed
  * names it (F-72: "Prep IC memo for the top company" is Anchor's).
  */
@@ -4893,7 +4917,19 @@ export function createSpecialistQAnswer(
     // about Q's last answer (nobody else named, no item dictated), is done
     // by code, whatever the run's purpose or tool offer.
     const boardAsk: string | null = read?.boardAsk ?? null;
-    if (boardAsk === "LIST" && !writingDocument) {
+    // Before reader v63 carries LIST and ADD, their words decide only when
+    // they are unmistakable: "what's on my board?", or an item they put in
+    // quotes (or between "add" and "to my board") for their own board.
+    const listsBoard =
+      boardAsk === "LIST" ||
+      (boardAsk === null && asksWhatIsOnBoard(latest.content));
+    const addsItem =
+      boardAsk === "ADD" ||
+      (boardAsk === "SAVE" && dictatesItem(latest.content)) ||
+      (boardAsk === null &&
+        mentionsOwnBoard(latest.content) &&
+        boardItemFromWords(latest.content) !== null);
+    if (listsBoard && !writingDocument) {
       const listed = await readBoard(request, conversationId);
       if (listed !== null) {
         remember(
@@ -4905,11 +4941,7 @@ export function createSpecialistQAnswer(
     }
     // A new item in their words (v62 ADD; or SAVE of a title they put in
     // quotes) is a to-do with that title, never Q's last answer (F-72).
-    if (
-      !writingDocument &&
-      (boardAsk === "ADD" ||
-        (boardAsk === "SAVE" && dictatesItem(latest.content)))
-    ) {
+    if (!writingDocument && addsItem) {
       const added = await addItemToBoard(
         request,
         conversationId,
@@ -5397,7 +5429,9 @@ export function createSpecialistQAnswer(
       ...(routed === null ? [] : [routed]),
       // Reader v61: any board ask (a named item kept, Q's work on items)
       // is the board tool's, on whatever purpose this run has.
-      ...((read?.boardAsk ?? null) === null ? [] : ["my_board"]),
+      ...((read?.boardAsk ?? null) !== null || mentionsOwnBoard(latest.content)
+        ? ["my_board"]
+        : []),
     ].filter((name) => name.length > 0);
     const toolFocus = toolFocusOf({
       reading:

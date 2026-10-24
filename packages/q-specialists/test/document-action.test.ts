@@ -21,7 +21,9 @@ import { ActorContextSchema } from "@capital-q/security";
 import { composeAnswerDocument, workTitle } from "../src/answer-document.js";
 import {
   answerSteps,
+  asksWhatIsOnBoard,
   boardItemFromWords,
+  mentionsOwnBoard,
   boardReadOut,
   createSpecialistQAnswer,
   type BoardKeeper,
@@ -1300,5 +1302,88 @@ describe("workTitle", () => {
     });
     await s.run();
     expect(added.map((one) => one.title)).toEqual(["Call prep: Anchor"]);
+  });
+});
+
+/**
+ * Live 91d6361f9: the deployed reader carried no LIST or ADD, so "What's
+ * on my board?" read the readiness checklist and "Add 'Prep data room for
+ * seed round' to my board" found no tool. With no board ask read, their
+ * unmistakable words still reach the board by code, and the board tool is
+ * named whenever they speak of their own board.
+ */
+describe("board asks the reader left unread", () => {
+  const unread = (): QTurnReading =>
+    ({
+      kind: "QUESTION",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "THEIR_OWN_RECORDS" },
+      aboutNamedOther: false,
+      tool: null,
+      boardAsk: null,
+      namedOther: null,
+    }) as QTurnReading;
+  function keeper(
+    items: { title: string; status: "TODO" | "DOING" | "DONE" }[] = [],
+  ) {
+    const added: { kind: string; title: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    return { board, added };
+  }
+
+  it("'What's on my board?' is read from the work board, never readiness, with no model call", async () => {
+    const { board } = keeper([{ title: "Call prep: Anchor", status: "DOING" }]);
+    const s = seam({
+      history: [message("USER", "What's on my board?")],
+      reading: unread(),
+      board,
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    expect(s.stored[0]?.content).toBe(
+      "Here's your board.\n\n**Doing** (1): Call prep: Anchor.",
+    );
+  });
+
+  it("'Add …' to my board adds the to-do in their words, quoted or not", async () => {
+    for (const words of [
+      "Add 'Prep data room for seed round' to my board",
+      "Add Prep IC memo for Mizan to my board.",
+    ]) {
+      const { board, added } = keeper();
+      const s = seam({
+        history: [message("USER", words)],
+        reading: unread(),
+        board,
+      });
+      await s.run();
+      expect(s.delegated(), words).toBe(0);
+      expect(
+        added.map((one) => one.kind),
+        words,
+      ).toEqual(["TASK"]);
+    }
+  });
+
+  it("knows their own board by its words, and only theirs", () => {
+    expect(mentionsOwnBoard("put this on my work board")).toBe(true);
+    expect(mentionsOwnBoard("ajoute ça à mon tableau")).toBe(true);
+    expect(mentionsOwnBoard("send it to the board of directors")).toBe(false);
+    expect(asksWhatIsOnBoard("What's on my board?")).toBe(true);
+    expect(asksWhatIsOnBoard("what is in my to-dos")).toBe(true);
+    expect(asksWhatIsOnBoard("show me my work board")).toBe(true);
+    expect(
+      asksWhatIsOnBoard("What's on my board? Also draft the memo for Anchor."),
+    ).toBe(false);
+    expect(asksWhatIsOnBoard("What's on the board meeting agenda?")).toBe(
+      false,
+    );
   });
 });
