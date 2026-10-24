@@ -364,6 +364,7 @@ import {
   withoutCompareOffers,
   comparisonTableBlock,
   compareTargets,
+  namesToCompare,
   newestAnswerCards,
 } from "./compare-table.js";
 import {
@@ -3113,12 +3114,19 @@ export function createModelGatewayQAnswer(
       reading: QAnswerRequest["compare"],
     ): Promise<CompareOutcome | null> => {
       if (latest === undefined) return null;
+      // No reader comparison (a warmed prepare, or a reading without one):
+      // the companies its words name, found below by exact name only.
+      const worded =
+        reading === undefined ? namesToCompare(latest.content) : [];
+      const asked =
+        reading ??
+        (worded.length >= 2 ? { count: null, names: worded } : undefined);
       const fromCards = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
-        reading,
+        asked,
       );
-      const named = reading?.names ?? [];
+      const named = asked?.names ?? [];
       if (fromCards.length < 2 && named.length < 2) return null;
       const { names } = await prefetchToolsRead;
       // Coordinator 24 Oct ("which is better, Anchor or Afyascan?"): the
@@ -6079,13 +6087,6 @@ export function createModelGatewayQAnswer(
             ANSWER_LIMIT_CHARS,
           );
         }
-        // Coordinator 24 Oct: code decides who a comparison leads with.
-        if (answerVerdict !== null) {
-          content = ledByVerdict(content, answerVerdict).slice(
-            0,
-            ANSWER_LIMIT_CHARS,
-          );
-        }
         if (compareTable !== null) {
           const done = withoutCompareOffers(content);
           const spoken = tableHere ? comparisonSpokenLine(compareTable) : null;
@@ -6098,6 +6099,15 @@ export function createModelGatewayQAnswer(
                 ? spoken
                 : `${spoken}\n\n${done}`
           ).slice(0, ANSWER_LIMIT_CHARS);
+        }
+        // Coordinator 24 Oct: code decides who a comparison leads with. Last,
+        // so the table's spoken line never goes before the verdict (live on
+        // bbb4b677: the lead was applied, then "Side by side, …" put first).
+        if (answerVerdict !== null) {
+          content = ledByVerdict(content, answerVerdict).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
         }
         const carried = withoutUnaskedMoves(
           withFitIntegrity(
