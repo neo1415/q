@@ -126,6 +126,9 @@ export function entityImageSources(input: {
   return [first];
 }
 
+/** Wider than this, a company picture is a wordmark, not a mark. */
+const WORDMARK_RATIO = 1.8;
+
 export function EntityAvatar({
   kind,
   name,
@@ -228,7 +231,20 @@ export function EntityAvatar({
           height={px}
           loading="lazy"
           decoding="async"
-          onLoad={() => setState({ chain, at: current.at, loaded: true })}
+          onLoad={(event) => {
+            const { naturalWidth, naturalHeight } = event.currentTarget;
+            // A wide wordmark in a round frame reads as a fragment ("lo C",
+            // live 24 Oct): try the next picture, else the initials/mark.
+            if (
+              isLogo &&
+              naturalHeight > 0 &&
+              naturalWidth / naturalHeight > WORDMARK_RATIO
+            ) {
+              setState({ chain, at: current.at + 1, loaded: false });
+              return;
+            }
+            setState({ chain, at: current.at, loaded: true });
+          }}
           onError={() => setState({ chain, at: current.at + 1, loaded: false })}
           className={`absolute inset-0 size-full transition-opacity duration-200 motion-reduce:transition-none ${
             isLogo

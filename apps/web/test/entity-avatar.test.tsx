@@ -97,6 +97,24 @@ describe("EntityAvatar (founder ask 2026-10-04)", () => {
     ).toBe("image");
   });
 
+  it("drops a wide wordmark for the fallback in the round frame", () => {
+    const { container } = render(
+      <EntityAvatar kind="company" name="Silo Credit" src={SIGNED} />,
+    );
+    const img = container.querySelector("img");
+    if (img !== null) {
+      Object.defineProperty(img, "naturalWidth", { value: 400 });
+      Object.defineProperty(img, "naturalHeight", { value: 100 });
+      fireEvent.load(img);
+    }
+    expect(container.querySelector("img")).toBeNull();
+    expect(
+      container
+        .querySelector("[data-entity-avatar]")
+        ?.getAttribute("data-entity-avatar-state"),
+    ).toBe("fallback");
+  });
+
   it("draws a company's own picture whole, as a logo, never cropped", () => {
     // Live 23 Oct: a wordmark cropped to a circle read "lo C".
     const { container } = render(
