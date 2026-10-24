@@ -940,3 +940,30 @@ export const TurnReaderV63ResultSchema = TurnReaderV62ResultSchema.extend({
   boardAsk: z.enum(TURN_BOARD_ASKS_V63).nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV63Result = z.infer<typeof TurnReaderV63ResultSchema>;
+
+export const TURN_READER_V64_SCHEMA_VERSION = 64;
+
+/**
+ * v64 (QA F-98, live 2026-10-24): "Let us rehearse my call with Savanna
+ * Seed Partners" was read as meetingPrep and answered with the prep brief
+ * again. The record a turn asks to open may be a REHEARSAL with someone:
+ * rehearsing, practising or role-playing the meeting, by meaning in any
+ * language. Code opens it through open_page (the investor's rehearsal for
+ * a founder, the company's for an investor).
+ */
+export const TURN_REFERENCE_OPEN_KINDS_V64 = [
+  ...TURN_REFERENCE_OPEN_KINDS,
+  "REHEARSAL",
+] as const;
+export type TurnReferenceOpenKindV64 =
+  (typeof TURN_REFERENCE_OPEN_KINDS_V64)[number];
+
+export const TurnReferenceV64Schema = TurnReferenceSchema.extend({
+  open: z.enum(TURN_REFERENCE_OPEN_KINDS_V64).nullable().default(null),
+}).strict();
+export type TurnReferenceV64 = z.infer<typeof TurnReferenceV64Schema>;
+
+export const TurnReaderV64ResultSchema = TurnReaderV63ResultSchema.extend({
+  reference: TurnReferenceV64Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV64Result = z.infer<typeof TurnReaderV64ResultSchema>;

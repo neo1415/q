@@ -198,6 +198,23 @@ describe.skipIf(!LIVE || GEMINI === undefined)(
             top?.namedOther,
           );
         }
+        // QA F-98 (v64): rehearsing a call opens the rehearsal, not the prep.
+        const rehearse = (await read(
+          "Let us rehearse my call with Savanna Seed Partners",
+        )) as {
+          readonly reference?: { readonly open?: string } | null;
+          readonly meetingPrep?: unknown;
+        } | null;
+        if (
+          rehearse?.reference?.open !== "REHEARSAL" ||
+          (rehearse.meetingPrep ?? null) !== null
+        ) {
+          miss(
+            "Let us rehearse my call with Savanna Seed Partners",
+            "not REHEARSAL",
+            rehearse,
+          );
+        }
         const captain = await read("Who is Captain Zino Mario?");
         if (
           captain?.namedOther?.kind !== "PERSON" ||
