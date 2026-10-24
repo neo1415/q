@@ -1035,8 +1035,14 @@ export type BoardKeeper = {
     readonly working: readonly { readonly title: string }[];
     readonly firstRead: string | null;
     readonly waiting: readonly string[];
+    /** STARTED: the job doing it (the reply's live document card). */
+    readonly jobId?: string | null | undefined;
+    readonly summary?: string | null | undefined;
   }>;
 };
+
+/** A job id the board port returned, checked before it is stored on a block. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 /**
  * How each of Q's own board replies opens: a later "break it into tasks"
@@ -2689,7 +2695,29 @@ export function createSpecialistQAnswer(
           return "I couldn't start on that just now. Ask me again in a moment.";
       }
     })();
-    return recordAnswer(request, conversationId, line);
+    // Owner 2026-10-24: work started from the board is followed by the
+    // same live card as work asked for in words (teamJobBlocks), titled in
+    // the plan's words, or the item's when there is no plan summary.
+    const following =
+      outcome?.status === "STARTED" &&
+      typeof outcome.jobId === "string" &&
+      UUID.test(outcome.jobId)
+        ? teamJobBlocks({
+            status: "STARTED",
+            jobId: outcome.jobId,
+            firstRead: null,
+            plan: {
+              summary:
+                outcome.summary?.trim() ||
+                outcome.working[0]?.title ||
+                "Your document",
+              steps: [],
+              needsYou: [],
+              cannot: [],
+            },
+          })
+        : undefined;
+    return recordAnswer(request, conversationId, line, following);
   }
 
   /** "What's on my board?" (boardAsk LIST): read from the board, by code. */

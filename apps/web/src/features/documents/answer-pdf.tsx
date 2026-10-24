@@ -16,8 +16,34 @@ import { useT } from "@/features/i18n/language";
  * the app's viewer; the viewer and the ready card offer the download.
  */
 
-/** Shorter answers are a line of conversation, not a document. */
-export const ANSWER_PDF_MIN_CHARS = 200;
+/** Owner 2026-10-24: a long analytic answer, without needing structure. */
+export const ANSWER_PDF_LONG_CHARS = 1_200;
+/** Shorter than that, it offers a PDF only when it is laid out as one. */
+export const ANSWER_PDF_STRUCTURED_CHARS = 600;
+
+const STRUCTURED = /^(?:#{1,4}\s|\s*(?:[-*\u2022]|\d+[.)])\s)/mu;
+
+/**
+ * Owner 2026-10-24: "PDF" sat under every reply, a working card's
+ * included. It is offered only under an answer that is a document: never
+ * one that carries a document card (the card has its own PDF) or a card
+ * for a document still being made, and otherwise only a long analytic
+ * answer -- long, or laid out with headings or a list. By code, from the
+ * answer's own shape.
+ */
+export function answerPdfOffered(answer: {
+  readonly text: string;
+  readonly blockKinds: readonly string[];
+}): boolean {
+  if (
+    answer.blockKinds.includes("WORK_IN_PROGRESS") ||
+    answer.blockKinds.includes("ARTIFACT_REFERENCE")
+  )
+    return false;
+  const text = answer.text.trim();
+  if (text.length >= ANSWER_PDF_LONG_CHARS) return true;
+  return text.length >= ANSWER_PDF_STRUCTURED_CHARS && STRUCTURED.test(text);
+}
 
 export function AnswerPdf({
   runId,

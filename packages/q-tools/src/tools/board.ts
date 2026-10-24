@@ -271,6 +271,11 @@ const MyBoardOutputSchema = z.discriminatedUnion("action", [
       ]),
       /** STARTED: the items now in DOING with Q's work linked. */
       working: z.array(ItemOutSchema).max(BOARD_TOOL_BATCH_MAX),
+      /**
+       * STARTED: the job doing it, so the reply can follow it as it is
+       * made (owner 2026-10-24: the live document card). Null otherwise.
+       */
+      jobId: z.string().uuid().nullable(),
       /** Items not worked on: not theirs, already done or gone. */
       skipped: z.array(z.string().max(64)).max(BOARD_TOOL_BATCH_MAX),
       summary: z.string().max(400).nullable(),
@@ -449,6 +454,7 @@ async function workOnItems(
   const empty: Omit<Out<"WORK">, "status" | "skipped"> = {
     action: "WORK",
     working: [],
+    jobId: null,
     summary: null,
     firstRead: null,
     needsYou: [],
@@ -497,6 +503,7 @@ async function workOnItems(
         ...empty,
         status: "STARTED",
         working,
+        jobId: jobId ?? null,
         skipped,
         summary: prepared.plan.summary.slice(0, 400),
         firstRead: prepared.firstRead?.slice(0, 700) ?? null,
