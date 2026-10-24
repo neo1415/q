@@ -97,7 +97,9 @@ const WORK_KINDS: readonly (readonly [RegExp, string])[] = [
     /\b(\d{1,2}[- ](month|year|week)\s+)?(growth|go[- ]to[- ]market|fundraising|hiring|business|action)?\s*plan\b/iu,
     "Plan",
   ],
-  [/\binvestment memo\b|\bic memo\b|\bmemo\b/iu, "Memo"],
+  // F-95 (QA 24 Oct 2026): an IC memo is titled as one ("IC memo: Ledgerfold").
+  [/\binvestment(?:\s+committee)?\s+memo\b|\bic\s+memo\b/iu, "IC memo"],
+  [/\bmemo\b/iu, "Memo"],
   [/\bcompar(e|ison)\b/iu, "Comparison"],
   [/\bquestions?\b/iu, "Questions"],
   [/\b(summary|summari[sz]e)\b/iu, "Summary"],

@@ -534,6 +534,24 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
           }),
         )
         .catch(() => null);
+      // QA F-93 (24 Oct 2026): "add Ghana to my mandate" came here with the
+      // mandate's own words unchanged (geographies are not this tool's), and
+      // the card read "(no change)". A change that changes nothing is never
+      // prepared; Q is told which tool owns what was asked.
+      if (full !== null && full !== undefined) {
+        const before = beforeOf(full, filled);
+        const unchanged = Object.entries(filled).every(
+          ([field, value]) =>
+            field in before &&
+            JSON.stringify(before[field as keyof MandateBefore] ?? null) ===
+              JSON.stringify(value ?? null),
+        );
+        if (unchanged) {
+          return refusal(
+            "Nothing would change: the mandate already says that. If they asked to add or remove a sector, geography, business model, customer type, founder preference, green flag or exclusion, prepare it with propose_profile_answer_change instead.",
+          );
+        }
+      }
       return {
         operation,
         input: {

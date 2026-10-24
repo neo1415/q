@@ -101,6 +101,7 @@ function build(
   said: string,
   data: unknown,
   extra: Partial<Parameters<typeof createModelGatewayQAnswer>[0]> = {},
+  modelAnswer = "model answer",
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -108,7 +109,7 @@ function build(
       {
         kind: "TEXT",
         text: JSON.stringify({
-          answer: "model answer",
+          answer: modelAnswer,
           responseShape: "CONCISE",
           insufficientEvidence: false,
           recommendation: null,
@@ -329,5 +330,72 @@ describe("a code-written answer in the person's language (any language)", () => 
     });
     await seam.answer(request);
     expect(persisted.join("\n")).toContain("Sectors: fintech");
+  });
+});
+
+describe("QA F-96: code's English lines in a turn in another language", () => {
+  const ARABIC = "ما هي أفضل ثلاث شركات تناسب تفويضي؟";
+  // Lines about the screen are checked against what opened, so the code
+  // line here is a closing offer, the same kind of English line.
+  const LINE = "Shall I compare the top two for you?";
+  const answer = `هذه أفضل ثلاث شركات لتفويضك. ${LINE}`;
+
+  it("puts an English line of an Arabic answer in Arabic", async () => {
+    const asked: { turn: string | undefined; texts: string[] }[] = [];
+    const { seam, request, persisted } = build(
+      ARABIC,
+      FULL,
+      {
+        localiseWords: (who, texts) => {
+          asked.push({ turn: who.turn, texts: [...texts] });
+          return Promise.resolve(
+            texts.map((text) =>
+              text === LINE ? "هل أقارن بين أفضل شركتين؟" : null,
+            ),
+          );
+        },
+      },
+      answer,
+    );
+    await seam.answer(request);
+    const text = persisted.join("\n");
+    expect(text).toContain("هل أقارن بين أفضل شركتين؟");
+    expect(text).not.toContain(LINE);
+    expect(asked.some(({ turn }) => turn === ARABIC)).toBe(true);
+    // The Arabic sentence itself is never sent for translation.
+    expect(asked.flatMap(({ texts }) => texts)).not.toContain(
+      "هذه أفضل ثلاث شركات لتفويضك.",
+    );
+  });
+
+  it("leaves an English turn's answer alone", async () => {
+    const asked: string[][] = [];
+    const { seam, request } = build(
+      "Which three fit my mandate best?",
+      FULL,
+      {
+        localiseWords: (_who, texts) => {
+          asked.push([...texts]);
+          return Promise.resolve(texts.map(() => null));
+        },
+      },
+      "These three fit best. They're on screen.",
+    );
+    await seam.answer(request);
+    expect(asked.flat()).not.toContain("They're on screen.");
+    expect(asked).toHaveLength(0);
+  });
+
+  it("keeps the English line when the layer has no translation", async () => {
+    const { seam, request, persisted } = build(
+      ARABIC,
+      FULL,
+      {
+        localiseWords: (_who, texts) => Promise.resolve(texts.map(() => null)),
+      },
+      answer,
+    );
+    await seam.answer(request);
+    expect(persisted.join("\n")).toContain(LINE);
   });
 });

@@ -1,4 +1,4 @@
-import { languageInfo } from "@capital-q/q-core/language";
+import { languageInfo, textIsEnglish } from "@capital-q/q-core/language";
 
 /**
  * The language of Q's onboarding reply (lane ml, ob1 live acceptance on
@@ -21,40 +21,10 @@ export type ReplyLanguage =
   | { readonly kind: "THEIRS" };
 
 /**
- * Small words nearly every English sentence has. Used only to tell
- * whether a turn is English (the one language code writes in), never to
- * name any other language.
+ * Whether a turn is in English, or carries no language of its own (moved
+ * to q-core so the answer path shares it).
  */
-const ENGLISH_WORDS = new Set(
-  `a an the and or but if so of to in on at by for with from about as is are
-  was were be been am do does did have has had i i'm i've we we're our us my
-  me you your it it's its they them their this that these those there here
-  what which who how when where why yes no not yeah yep nope ok okay sure
-  just about around per each one two three four five six seven eight nine
-  ten hundred thousand million billion please thanks thank can will would
-  could should may might must also only still very more most less than then
-  now today currently already`.split(/\s+/u),
-);
-
-/**
- * Whether a turn is in English, or carries no language of its own (a
- * figure, a name, a list of names): then the default stands. A turn in a
- * script other than Latin is not English.
- */
-export function turnIsEnglish(utterance: string): boolean {
-  const letters = utterance.match(/\p{L}/gu) ?? [];
-  if (letters.length === 0) return true;
-  const latin = utterance.match(/\p{Script=Latin}/gu) ?? [];
-  if (latin.length < letters.length * 0.6) return false;
-  // Only lower-case words say anything about the language: capitalised
-  // words are names as often as not ("Rimal Freight, Dubai, seed").
-  const words = (utterance.match(/[\p{L}']+/gu) ?? [])
-    .filter((word) => word === word.toLowerCase())
-    .map((word) => word.replace(/'+$/u, ""));
-  if (words.length <= 2) return true;
-  const english = words.filter((word) => ENGLISH_WORDS.has(word)).length;
-  return english >= 1 && english / words.length >= 0.15;
-}
+export const turnIsEnglish = textIsEnglish;
 
 /** The reply's language for this turn. */
 export function replyLanguageOf(

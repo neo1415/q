@@ -92,6 +92,7 @@ import {
   type QuestionSequence,
   type TurnToolV14,
   quietlyNoted,
+  inTurnLanguage,
 } from "@capital-q/q-core";
 import {
   closestByName,
@@ -688,6 +689,23 @@ export type SpecialistQAnswerDependencies = {
   readonly board?: BoardKeeper | undefined;
   readonly logger?: Logger | undefined;
   /**
+   * QA F-96: the shared translation layer (q-api's localiseWords). A turn
+   * that is not in English gets every English line code wrote here (a
+   * pipeline summary, the board, a move) in its own language. Absent:
+   * English, as before.
+   */
+  readonly localiseWords?:
+    | ((
+        who: {
+          readonly tenantId: string;
+          readonly userId: string;
+          readonly runId: string;
+          readonly turn?: string | undefined;
+        },
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
+  /**
    * Reads each turn into the conversation core's closed vocabulary before
    * it is answered (CQ-QX-005). Absent: no reading, no research forced,
    * and failures carry no notice — the behaviour before the core.
@@ -1272,6 +1290,21 @@ export function nameInAsk(question: string): string | null {
 }
 
 /**
+ * F-95 (live 24 Oct 2026, "Write me an IC memo on Ledgerfold"): who a piece
+ * of work is about, named right after the kind of work in the ask ("memo
+ * on Ledgerfold", "plan for Maji Loop"). Null when the ask names no one.
+ */
+export function workSubjectInAsk(question: string): string | null {
+  const found =
+    /\b(?:memo|plan|analysis|brief|summary|prep|report|questions|deck|one-pager)\s+(?:on|about|for|of)\s+((?:\p{Lu}[\p{L}\d&'.-]*)(?:\s+(?:\p{Lu}[\p{L}\d&'.-]*|of|and|&))*)/u.exec(
+      question,
+    )?.[1];
+  // "…on Ledgerfold I can share": the pronoun is not part of the name.
+  const name = found?.replace(/(?:\s+(?:of|and|&|I))+$/u, "").trim();
+  return name === undefined || name.length < 2 ? null : name;
+}
+
+/**
  * Their own work board, by its words: "my board", "my work board", "my
  * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
  * names the board tool for a turn the reader left without a board ask
@@ -1633,7 +1666,7 @@ export function createSpecialistQAnswer(
 ): SpecialistQAnswer {
   const {
     specialist,
-    delegate,
+    delegate: answerPath,
     repositories,
     sql,
     transactions,
@@ -1642,6 +1675,26 @@ export function createSpecialistQAnswer(
     turns,
   } = dependencies;
   let last: CompanyIntelligenceResult | null = null;
+  /**
+   * U4/F8: a move the words asked for alongside a question, per run; the
+   * answer to the question carries it (QAnswerRequest.leadBlocks).
+   */
+  const movesWithQuestion = new Map<string, readonly QResultBlock[]>();
+  const delegate: typeof answerPath = {
+    ...answerPath,
+    answer: (request) => {
+      const moves = movesWithQuestion.get(request.runId);
+      movesWithQuestion.delete(request.runId);
+      return answerPath.answer(
+        moves === undefined
+          ? request
+          : {
+              ...request,
+              leadBlocks: [...(request.leadBlocks ?? []), ...moves],
+            },
+      );
+    },
+  };
 
   /**
    * The conversation core's state per conversation (CQ-QX-005): what has
@@ -1779,12 +1832,40 @@ export function createSpecialistQAnswer(
   }
 
   /** A Q message and its durable completion event, committed together. */
+  /**
+   * F-96: each run's turn, as answerOnce read it, so recordAnswer can put
+   * code's lines in its language without another read. Bounded.
+   */
+  const turnOfRun = new Map<string, string>();
+  const rememberTurn = (runId: string, turn: string): void => {
+    turnOfRun.set(runId, turn);
+    if (turnOfRun.size > 256) {
+      const [oldest] = turnOfRun.keys();
+      if (oldest !== undefined) turnOfRun.delete(oldest);
+    }
+  };
   async function recordAnswer(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    content: string,
+    written: string,
     blocks?: readonly QResultBlock[],
   ): Promise<QAnswerOutcome> {
+    const turn = turnOfRun.get(request.runId);
+    const localise = dependencies.localiseWords;
+    const content =
+      turn === undefined || localise === undefined
+        ? written
+        : await inTurnLanguage(written, turn, (texts) =>
+            localise(
+              {
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+                runId: request.runId,
+                turn,
+              },
+              texts,
+            ),
+          );
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         tenantId: request.tenantId,
@@ -2649,7 +2730,12 @@ export function createSpecialistQAnswer(
     return (
       own?.company?.names.find(
         (name) => name.length > 1 && said.includes(name.toLowerCase()),
-      ) ?? null
+      ) ??
+      // F-95 (live 24 Oct, "Write me an IC memo on Ledgerfold"): the answer
+      // held no card or reference, and the memo was titled "Memo". The name
+      // as they said it in the ask, after the kind of work, is who it is
+      // about.
+      workSubjectInAsk(question)
     );
   }
 
@@ -2938,6 +3024,17 @@ export function createSpecialistQAnswer(
         logger?.info(
           { qRunId: request.runId, destination },
           "q did not move: the words do not ask for that page",
+        );
+        return null;
+      }
+      // U4/F8: a move with a question after it goes with the answer.
+      if (questionAfterMove(askedIn(history))) {
+        movesWithQuestion.set(request.runId, [
+          { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
+        ]);
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "a screen and a question: the move goes with the answer",
         );
         return null;
       }
@@ -4431,6 +4528,7 @@ export function createSpecialistQAnswer(
     /** K fast lane: whether a change waits on their word; true when unknown. */
     waitingOnThem: () => Promise<boolean> = () => Promise.resolve(false),
   ): Promise<QAnswerOutcome> => {
+    rememberTurn(request.runId, latest.content);
     if (turns === undefined) return answerOnce(request);
     const state =
       conversations.get(conversationId) ?? INITIAL_CONVERSATION_STATE;
@@ -4702,7 +4800,20 @@ export function createSpecialistQAnswer(
       return recordAnswer(request, conversationId, byName.said, byName.blocks);
     }
     const paged = pageAnswer(latest.content, history, capabilities);
-    if (paged !== null) {
+    // U4/F8: "open the data room and tell me what's missing" opened the
+    // page and lost the question. The move goes with the answer instead.
+    if (paged !== null && questionAfterMove(latest.content)) {
+      movesWithQuestion.set(request.runId, paged.blocks);
+      while (movesWithQuestion.size > PREREADS_MAX) {
+        const oldest = movesWithQuestion.keys().next().value;
+        if (oldest === undefined) break;
+        movesWithQuestion.delete(oldest);
+      }
+      logger?.info(
+        { qRunId: request.runId, page: paged.log },
+        "a page and a question: the move goes with the answer",
+      );
+    } else if (paged !== null) {
       logger?.info(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",
@@ -6331,6 +6442,8 @@ export function createSpecialistQAnswer(
         request.runId,
         64,
       ));
+    const turn = history.findLast((m) => m.role === "USER")?.content;
+    if (turn !== undefined) rememberTurn(request.runId, turn);
     // Row 5: the delegate's own prompt takes the same read, not a third one.
     const delegated = (asked: QAnswerRequest): Promise<QAnswerOutcome> =>
       delegate.answer(
@@ -6787,6 +6900,19 @@ function alreadyOnScreen(
     (screen.route === "COMPANY" || screen.route === "PITCH") &&
     screen.companyId === intent.id
   );
+}
+
+/**
+ * U4/F8: the words ask for a move and then a question about it ("open the
+ * data room and tell me what's missing", "go to my pipeline, who's
+ * waiting?"): a later clause is a question.
+ */
+export function questionAfterMove(text: string): boolean {
+  const clauses = text
+    .split(/\s*(?:,|;|\band\b|\bthen\b)\s*/iu)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+  return clauses.slice(1).some((clause) => asksAQuestion(clause));
 }
 
 /** A question, not a command to go somewhere. */

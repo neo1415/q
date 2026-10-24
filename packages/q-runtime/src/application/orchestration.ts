@@ -1,4 +1,4 @@
-import type { QNavigateDestination } from "@capital-q/contracts";
+import type { QNavigateDestination, QResultBlock } from "@capital-q/contracts";
 import type {
   CorrelationId,
   ModelToolDefinition,
@@ -407,6 +407,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * do next?"), said before the model's own words. Absent: none.
    */
   readonly leadLines?: string | undefined;
+  /**
+   * U4/F8 (QA 24 Oct 2026): a screen move their words also asked for ("open
+   * the data room and tell me what's missing"), carried by the answer to
+   * the question so the move is made and the question still answered.
+   */
+  readonly leadBlocks?: readonly QResultBlock[] | undefined;
   /**
    * RECOVERY-2026-10 B6: what the turn's words point at ("the second one",
    * "compare those two", "him"), bound by code to records the person

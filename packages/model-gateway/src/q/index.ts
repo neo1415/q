@@ -104,6 +104,7 @@ import {
   fenceUntrusted,
   dailyFollowUpKind,
   ModelFindingSchema,
+  inTurnLanguage,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -185,6 +186,7 @@ import {
   FIRST_CONTACT_REPLY,
   firstContactMessage,
   firstContactOf,
+  MESSAGE_TOOLS,
 } from "./first-contact.js";
 import {
   Q_CARD_CLAIM_TOOL,
@@ -2038,6 +2040,11 @@ export type ModelGatewayQAnswerDependencies = {
           readonly tenantId: string;
           readonly userId: string;
           readonly runId: string;
+          /**
+           * F-96: the turn's own words; with no language chosen, a script
+           * that names its language (Arabic, Hebrew, …) is theirs.
+           */
+          readonly turn?: string | undefined;
         },
         texts: readonly string[],
       ) => Promise<readonly (string | null)[]>)
@@ -5288,6 +5295,24 @@ export function createModelGatewayQAnswer(
             ].join(" "),
           };
         }
+        // F-91 (QA re-score 24 Oct, run 3a213c7a): "Draft a short note to
+        // Basketari's founders asking about their repeat-order rate" was
+        // offered, not prepared: no message tool was called, so the first
+        // contact (Express Interest carrying the note) never ran. When the
+        // reader read a note or message as the asked action, it is called.
+        if (
+          request.askedAction !== undefined &&
+          (MESSAGE_TOOLS.has(request.askedAction) ||
+            request.askedAction === FIRST_CONTACT_TOOL)
+        ) {
+          noteParts = {
+            ...noteParts,
+            turn: [
+              noteParts.turn,
+              `THEY ASKED FOR A NOTE OR MESSAGE: call ${request.askedAction} now, with the note drafted in their voice as its body, for the company they named. If they are not connected yet, Capital Q prepares it as Express Interest carrying that note, for their one approval; nothing is sent until they approve. Never describe the note or offer to prepare it instead of calling the tool.`,
+            ].join(" "),
+          };
+        }
         if (asksAboutOthersInterest(latest.content)) {
           noteParts = {
             ...noteParts,
@@ -5774,7 +5799,11 @@ export function createModelGatewayQAnswer(
       // What client-action tools allowed this turn (R20/R33): carried as
       // UI_INTENT blocks on the answer, which the screen performs once as
       // it arrives. Only from a tool's own authorised result, never words.
-      const clientActionBlocks: QResultBlock[] = [];
+      // U4/F8: a move their words asked for beside the question goes with
+      // this answer, as a screen act like any other.
+      const clientActionBlocks: QResultBlock[] = [
+        ...(request.leadBlocks ?? []),
+      ];
       // "What are you doing?": their Work page, with the cards waiting for
       // them, opens with the answer (founder 2026-10-06). Code's reading of
       // their own words, and only where this run may open Work.
@@ -5879,6 +5908,29 @@ export function createModelGatewayQAnswer(
        * those cards are not the set just shown, by design.
        */
       let rankedPastShown = false;
+      /**
+       * QA F-96 (24 Oct 2026): an Arabic "best three for my mandate" answer
+       * ended with code's English "They're on screen." Whatever path wrote a
+       * line in English (an on-screen line, a verdict lead, a tie, a status
+       * line), a turn that is not in English gets it in theirs, through the
+       * shared translation layer (names and figures kept). English turns,
+       * and lines already in their language, are left as they are.
+       */
+      const inTheirLanguage = async (text: string): Promise<string> => {
+        const localise = dependencies.localiseWords;
+        if (localise === undefined) return text;
+        return inTurnLanguage(text, latest.content, (texts) =>
+          localise(
+            {
+              tenantId: request.tenantId,
+              userId: request.actorUserId,
+              runId: request.runId,
+              turn: latest.content,
+            },
+            texts,
+          ),
+        );
+      };
       // The comparison's lead, decided by code (prepare's table, or the
       // model path's own table below when the prepare built none).
       let answerVerdict: ComparisonVerdict | null = compareVerdict;
@@ -6000,6 +6052,8 @@ export function createModelGatewayQAnswer(
             ANSWER_LIMIT_CHARS,
           );
         }
+        // F-96: every line code wrote, in the language of their turn.
+        content = await inTheirLanguage(content);
         // Nothing of a speculative answer is stored until it is adopted.
         if (gate !== null) await gate.ready();
         // The stages and live findings already queued are stored first, so
@@ -6062,6 +6116,7 @@ export function createModelGatewayQAnswer(
             tenantId: request.tenantId,
             userId: request.actorUserId,
             runId: request.runId,
+            turn: latest.content,
           },
           texts,
         ).catch(() => null);

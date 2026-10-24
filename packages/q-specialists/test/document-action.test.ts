@@ -1513,6 +1513,7 @@ describe("board turns after other board turns", () => {
       expect.objectContaining({
         kind: "WORK_JOB",
         refId: JOB,
+        // F-95: who it is about, from the ask (F-73's own form).
         title: "12-month growth plan: Maji Loop",
       }),
     ]);

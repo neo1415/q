@@ -524,6 +524,10 @@ export function composeQIntelligence(
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
+    // F-96: code's own lines in the language of a turn not in English.
+    ...(dependencies.localiseWords === undefined
+      ? {}
+      : { localiseWords: dependencies.localiseWords }),
     // S3: the same bus the conversational answer streams on, so the
     // company specialist's answer reaches a person sentence by sentence.
     ...(dependencies.deltas === undefined

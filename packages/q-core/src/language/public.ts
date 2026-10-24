@@ -25,3 +25,8 @@ export {
   type VoiceListenPlan,
   type VoiceSpeakPlan,
 } from "./capability.js";
+export {
+  inTurnLanguage,
+  scriptLanguageOf,
+  textIsEnglish,
+} from "./text-language.js";
