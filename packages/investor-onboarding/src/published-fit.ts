@@ -48,7 +48,7 @@ const STAGE_BY_LABEL = new Map(
   ]),
 );
 
-/** The vocabularies the card's sectors are named from (investor-card-facts). */
+/** The vocabularies the card's sectors are named from (card-facts). */
 const SECTOR_VOCABULARIES = new Set(["industry", "product_category"]);
 
 function wordsIndex(
@@ -90,7 +90,7 @@ const COUNTRY_NODE = new Map(
   }),
 );
 
-/** A card list field's names ("Seed; Series A"), as investor-card-facts joins them. */
+/** A card list field's names ("Seed; Series A"), as card-facts joins them. */
 function cardNames(card: PublicCardDto, key: string): string[] {
   const value = card.fields.find((field) => field.key === key)?.value ?? "";
   return value

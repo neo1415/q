@@ -447,12 +447,18 @@ export function investorProspectsText(
     );
   }
   const interested = picks.filter((pick) => pick.kind === "INTERESTED").length;
-  const likely = picks.length - interested;
-  if (likely > 0) {
+  const others = picks.filter((pick) => pick.kind !== "INTERESTED");
+  if (others.length > 0) {
+    // QA F-77: "likely fit" only where what they publish says so.
+    const allLikely = others.every((pick) => viewOf(pick) === "Likely fit");
     parts.push(
-      interested > 0
-        ? "The others are likely fits from what each publishes, not interest they have shown."
-        : "Each is a likely fit from what they publish, not interest they have shown.",
+      !allLikely
+        ? interested > 0
+          ? "The others are picked from what each publishes, not interest they have shown."
+          : "Each is picked from what they publish, not interest they have shown."
+        : interested > 0
+          ? "The others are likely fits from what each publishes, not interest they have shown."
+          : "Each is a likely fit from what they publish, not interest they have shown.",
     );
   }
   return parts.join(" ");
@@ -478,6 +484,25 @@ function fitMeasures(fit: PublishedFit | undefined): QAnswerCard["measures"] {
   }));
 }
 
+/**
+ * The card's verdict follows its rows (QA F-77): "Likely fit" over Stage,
+ * Sector and Geography all unknown contradicted the card. Interest shown is
+ * their own act and stands on its own.
+ */
+export function viewOf(pick: ProspectPick): string {
+  if (pick.kind === "INTERESTED") return "Has shown interest";
+  const fit = pick.fit;
+  // No rows (their card was not read): the ranking's own reasons stand.
+  if (fit === undefined) return "Likely fit";
+  const met = FIT_PARTS.filter((part) => fit[part] === "MET").length;
+  const missed = FIT_PARTS.filter((part) => fit[part] === "NOT_MET").length;
+  if (met === 0 && missed === 0) {
+    return "Fit not known yet: their Q Card doesn't say how you fit on stage, sector or geography";
+  }
+  if (missed === 0) return "Likely fit";
+  return met === 0 ? "Not a fit on what they publish" : "Partial fit";
+}
+
 export function prospectCardsBlock(
   picks: readonly ProspectPick[],
 ): QAnswerCardsBlock | null {
@@ -490,7 +515,7 @@ export function prospectCardsBlock(
     fit: null,
     reasons: [clip(sentence(pick.why), 160)],
     measures: fitMeasures(pick.fit),
-    view: pick.kind === "INTERESTED" ? "Has shown interest" : "Likely fit",
+    view: viewOf(pick),
     said: null,
     sourceCount: 1,
     subject: {

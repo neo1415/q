@@ -2,13 +2,12 @@ import {
   FOUNDER_PREFERENCE_OPTIONS,
   GREEN_FLAG_OPTIONS,
   STAGE_OPTIONS,
-} from "@capital-q/investor-onboarding/definition";
+} from "./definition/index.js";
 import {
   InvestorOrganisationIdSchema,
   typicalCheque,
   type InvestorMandateQueryPort,
 } from "@capital-q/investors";
-import type { InvestorMandateCardFacts } from "@capital-q/public-identity";
 import { TenantIdSchema } from "@capital-q/security";
 import { REFERENCE_TAXONOMY } from "@capital-q/taxonomy";
 
@@ -19,7 +18,22 @@ import { REFERENCE_TAXONOMY } from "@capital-q/taxonomy";
  * stages, sectors, business models, customer types, geographies and what
  * they look for. Never the narrative, never exclusions or things to avoid.
  * The card shows none of these unless the owner puts it on the card.
+ *
+ * QA F-77 (2026-10-24): one builder for every process that reads a card.
+ * The Q API read cards without it, so Q saw no published stage, sector or
+ * geography on any investor's card and called every fit unknown.
  */
+
+/** The facts, by the card field each fills (public-identity's mandate fields). */
+export type InvestorCardFacts = {
+  readonly mandateTypicalCheque?: string | null;
+  readonly mandateStages?: string | null;
+  readonly mandateSectors?: string | null;
+  readonly mandateBusinessModels?: string | null;
+  readonly mandateCustomerTypes?: string | null;
+  readonly mandateGeographies?: string | null;
+  readonly mandateLookFor?: string | null;
+};
 
 const TAXONOMY = new Map(
   REFERENCE_TAXONOMY.nodes.map((node) => [node.id, node] as const),
@@ -46,9 +60,7 @@ export function createInvestorCardFacts(deps: {
   readonly mandates: InvestorMandateQueryPort;
   readonly tenantOf: (investorOrganisationId: string) => Promise<string | null>;
 }) {
-  return async (
-    investorOrganisationId: string,
-  ): Promise<InvestorMandateCardFacts> => {
+  return async (investorOrganisationId: string): Promise<InvestorCardFacts> => {
     const tenant = await deps.tenantOf(investorOrganisationId);
     const id = InvestorOrganisationIdSchema.safeParse(investorOrganisationId);
     if (tenant === null || !id.success) return {};

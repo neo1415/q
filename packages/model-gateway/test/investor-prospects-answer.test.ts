@@ -322,6 +322,21 @@ describe("which investors a founder should talk to first", () => {
       { label: "Sector", level: "STRONG", value: "Matches what they publish" },
       { label: "Geography", level: "UNKNOWN", value: null },
     ]);
+    // The verdict follows the rows (QA F-77, batch 9): never "Likely fit"
+    // over Stage, Sector and Geography all unknown.
+    expect(climate?.view).toBe("Likely fit");
+    const rift = block?.cards.find(
+      (card) =>
+        card.subject?.kind === "INVESTOR_ORGANISATION" &&
+        card.subject.investorOrganisationId === RIFT,
+    );
+    expect(rift?.view).toBe(
+      "Fit not known yet: their Q Card doesn't say how you fit on stage, sector or geography",
+    );
+    expect(text).toContain(
+      "The others are picked from what each publishes, not interest they have shown.",
+    );
+    expect(text).not.toMatch(/likely fits? from what/iu);
     expect(
       fitWords({ stage: "NOT_MET", sector: "MET", geography: "MET" }),
     ).toBe(
