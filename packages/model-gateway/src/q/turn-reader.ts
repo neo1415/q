@@ -5,6 +5,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
   TurnReaderV62ResultSchema,
+  compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
   type TurnReaderV14Result,
@@ -132,6 +133,8 @@ export type QTurnReading = Omit<
   readonly meetingPrep?: TurnReaderV58Result["meetingPrep"] | undefined;
   /** v61: what they ask of their own work board (work-board lane). */
   readonly boardAsk?: TurnReaderV61Result["boardAsk"] | undefined;
+  /** v62: companies they want put side by side (lane 8); never with fromShown. */
+  readonly compare?: TurnReaderV62Result["compare"] | undefined;
   /** v55: the page control (a listed id) they ask to open or show now. */
   readonly control?: string | null | undefined;
   /** v54: the turn is answered by this earlier turn of Q's (SHOWN). */
@@ -288,6 +291,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "boardAsk",
   // v62: a malformed hand-back costs the hand-back, never the reading.
   "workFromEarlier",
+  // v62: a malformed comparison costs the comparison, never the reading.
+  "compare",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -454,7 +459,8 @@ export function createQTurnReader(dependencies: {
         const parsed = TurnReaderV62ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
-        return parsed.success ? parsed.data : null;
+        // A comparison is never answered from an earlier turn (lane 4).
+        return parsed.success ? compareOverFromShown(parsed.data) : null;
       } catch (error: unknown) {
         if (!(
           isModelGatewayError(error) && error.failureClass === "CANCELLED"

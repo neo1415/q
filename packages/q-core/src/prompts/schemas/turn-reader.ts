@@ -891,7 +891,38 @@ export const TURN_READER_V62_SCHEMA_VERSION = 62;
  * "go ahead", "do that"); then teamJob is whatever that earlier work is.
  * Lenient: a malformed value reads as false and never costs the reading.
  */
+/**
+ * v62 (lane 8, live run d5f01a73 2026-10-23): companies they want put side
+ * by side. "Compare the top two in a table" right after cards was read as
+ * fromShown, so recall answered in prose and no comparison ran. count: how
+ * many from the top of the newest list Q showed when they point without
+ * names; names: the companies they name, in their order. Lenient: a
+ * malformed compare reads as none. Never with fromShown: see
+ * compareOverFromShown, applied where the reading is parsed (a transform
+ * here would not survive the provider's JSON schema).
+ */
+export const TurnCompareSchema = z
+  .object({
+    count: z.number().int().min(2).max(4).nullable(),
+    names: z.array(z.string().trim().min(1).max(80)).max(4),
+  })
+  .strict();
+export type TurnCompare = z.infer<typeof TurnCompareSchema>;
+
 export const TurnReaderV62ResultSchema = TurnReaderV61ResultSchema.extend({
   workFromEarlier: z.boolean().default(false).catch(false),
+  compare: TurnCompareSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV62Result = z.infer<typeof TurnReaderV62ResultSchema>;
+
+/**
+ * A reading that asks for a comparison is never answered from an earlier
+ * turn (lane 4): when compare is set, fromShown is dropped.
+ */
+export function compareOverFromShown<
+  R extends { readonly compare?: unknown; readonly fromShown?: unknown },
+>(reading: R): R {
+  return reading.compare == null || reading.fromShown == null
+    ? reading
+    : { ...reading, fromShown: null };
+}

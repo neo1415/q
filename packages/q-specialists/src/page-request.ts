@@ -136,6 +136,10 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "crm home": d("RELATIONSHIPS"),
   "crm dashboard": d("RELATIONSHIPS"),
   pipeline: d("CRM_PIPELINE"),
+  // Coordinator 2026-10-24: a founder's "fundraising pipeline" is their
+  // investor relationships pipeline, never the Capital page.
+  "fundraising pipeline": d("CRM_PIPELINE"),
+  "investor pipeline": d("CRM_PIPELINE"),
   "crm pipeline": d("CRM_PIPELINE"),
   "deal pipeline": d("CRM_PIPELINE"),
   "pipeline board": d("CRM_PIPELINE"),
