@@ -43,6 +43,12 @@ import {
 } from "../src/company/document-request.js";
 import type { OwnRecordNames } from "../src/company/own-names.js";
 import type { ArtifactPreparation } from "../src/company/prepare-artifact.js";
+import {
+  teamJobLine,
+  teamJobOutcomeOf,
+  type QTeamJobPort,
+  type TeamJobOutcome,
+} from "../src/team-job.js";
 
 /**
  * "Generate a PDF pitch deck for Zino Aviation from what you can find
@@ -211,6 +217,8 @@ function seam(options: {
   readonly onDelegate?: (request: QAnswerRequest) => void;
   /** The person's own work board (reader v61 boardAsk). */
   readonly board?: BoardKeeper;
+  /** Q's team, for deep work. */
+  readonly teamJob?: QTeamJobPort;
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -248,6 +256,7 @@ function seam(options: {
     },
     artifacts,
     ...(options.board === undefined ? {} : { board: options.board }),
+    ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
     ...(options.ownRecords === undefined
       ? {}
       : {
@@ -1879,5 +1888,131 @@ describe("a saved call prep with no blocks", () => {
     expect(s.stored[0]?.content).toBe(
       "I couldn't plan that task: the planning step failed on my side, so nothing has started and the item stays in To do.",
     );
+  });
+});
+
+/** F-90 and F-78b (QA re-score, live 9ff4a1118). */
+describe("saving work that has to start first, or never started", () => {
+  const PLAN = {
+    summary: "A 12-month growth plan",
+    steps: [{ who: "Research", does: "Reads the market" }],
+    cannot: [],
+    needsYou: [],
+  };
+  const reading = (boardAsk: "SAVE" | null, teamJob = false): QTurnReading => ({
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    boardAsk,
+    namedOther: null,
+    teamJob,
+  });
+  function keeper(job: string | null) {
+    const added: { kind: string; title: string; refId?: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, item) => {
+        added.push(item);
+        return Promise.resolve({
+          outcome: "OK",
+          replayed: false,
+          value: { id: "item-1" },
+        });
+      },
+      latestRunningJob: () =>
+        Promise.resolve(job === null ? null : { jobId: job }),
+      linkJob: () => Promise.resolve({ outcome: "OK" }),
+    };
+    return { board, added };
+  }
+  const team = (outcome: TeamJobOutcome): QTeamJobPort => ({
+    propose: () => Promise.resolve(outcome),
+  });
+
+  it("reads back every outcome line the team job writes", () => {
+    const outcomes: TeamJobOutcome[] = [
+      { status: "STARTED", plan: PLAN, firstRead: null },
+      { status: "STARTED", plan: { ...PLAN, summary: "" }, firstRead: null },
+      { status: "ALREADY_WAITING", waiting: [] },
+      { status: "NOT_PLANNED" },
+      { status: "LIMIT_REACHED" },
+      { status: "UNAVAILABLE" },
+      { status: "FAILED" },
+    ];
+    for (const outcome of outcomes) {
+      expect(teamJobOutcomeOf(teamJobLine(outcome)), outcome.status).toBe(
+        outcome.status,
+      );
+    }
+    expect(teamJobOutcomeOf("Here's your 12-month plan.")).toBeNull();
+  });
+
+  it("'Write a 12-month growth plan and save it to my board': the work starts, and its job goes on the board", async () => {
+    const JOB = "99999999-2222-4333-8444-555555555555";
+    const { board, added } = keeper(JOB);
+    const s = seam({
+      history: [
+        message("USER", "Write a 12-month growth plan and save it to my board"),
+      ],
+      reading: reading("SAVE", true),
+      board,
+      teamJob: team({ status: "STARTED", plan: PLAN, firstRead: null }),
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([
+      expect.objectContaining({
+        kind: "WORK_JOB",
+        refId: JOB,
+        title: "12-month growth plan",
+      }),
+    ]);
+    expect(s.stored[0]?.content).toMatch(/^On it\. Starting now/u);
+    expect(s.stored[0]?.content).toMatch(
+      /in Doing; it moves to Done, with its document/u,
+    );
+  });
+
+  it("the same ask when the plan does not start saves nothing", async () => {
+    const { board, added } = keeper(null);
+    const s = seam({
+      history: [
+        message("USER", "Write a 12-month growth plan and save it to my board"),
+      ],
+      reading: reading("SAVE", true),
+      board,
+      teamJob: team({ status: "FAILED" }),
+    });
+    await s.run();
+    expect(added).toEqual([]);
+    expect(s.stored[0]?.content).toMatch(/Nothing has gone on your board/u);
+  });
+
+  it("'save that plan to my board' after the team job's failure line, unread by the reader, saves nothing and starts nothing", async () => {
+    const { board, added } = keeper(null);
+    let proposed = 0;
+    const s = seam({
+      history: [
+        message("USER", "Write me a 12-month plan"),
+        message("Q", teamJobLine({ status: "FAILED" })),
+        message("USER", "save that plan to my board"),
+      ],
+      reading: reading(null),
+      board,
+      teamJob: {
+        propose: () => {
+          proposed += 1;
+          return Promise.resolve({ status: "FAILED" });
+        },
+      },
+    });
+    await s.run();
+    expect(proposed).toBe(0);
+    expect(added).toEqual([]);
+    expect(s.prepared).toHaveLength(0);
+    expect(s.stored[0]?.content).toMatch(/^There's nothing to save yet/u);
   });
 });
