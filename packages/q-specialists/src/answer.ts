@@ -844,6 +844,13 @@ export type SpecialistQAnswerDependencies = {
       ) => Promise<string | null>)
     | undefined;
   /**
+   * QO-15: an investor's own data room requests, as their relationships'
+   * Diligence tabs hold them, in one or two lines with each one's state.
+   * Null when none can be read.
+   */
+  readonly diligenceSummary?:
+    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
+  /**
    * One app action's inputs from the person's words, against the tool's own
    * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
    * action and gave no arguments. Null: their words don't give them.
@@ -1184,6 +1191,14 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   Q_PITCH: "Let me show you Capital Q.",
   BOARD: "Opening your board.",
 };
+
+/**
+ * A founder's own data room: never where an investor is taken (QO-15). The
+ * line said instead is about requests, so only this page is remapped.
+ */
+const FOUNDER_OWN_PAGES: ReadonlySet<QNavigateDestination> = new Set([
+  "OWN_DATA_ROOM",
+]);
 
 /** A real screen, as offered back to someone who named one that isn't. */
 const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
@@ -2404,18 +2419,21 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, destination },
         "q is taking the person to a screen",
       );
-      const blocks: QResultBlock[] = [
-        { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
-      ];
+      const placed = forTheirSide(
+        request,
+        naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
+        [{ kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } }],
+      );
       return recordAnswer(
         request,
         conversationId,
         await withDestinationSummary(
           request,
-          naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
-          blocks,
+          placed.said,
+          placed.blocks,
+          placed.requests,
         ),
-        blocks,
+        placed.blocks,
       );
     }
     if (
@@ -2516,12 +2534,62 @@ export function createSpecialistQAnswer(
    * code from the person's own words (page-request.ts). Null when the
    * words are not such a request, or name a screen this run cannot open.
    */
+  /**
+   * QO-15 (QA 2026-10-23): an investor's "take me to my data room
+   * requests" opened a founder's page (a dead end) and Q said "Opened your
+   * data room". A founder's own pages are never an investor's: their
+   * requests live on each relationship's Diligence tab, so the CRM opens
+   * and Q says so, with the requests it can read.
+   */
+  const forTheirSide = (
+    request: QAnswerRequest,
+    said: string,
+    blocks: readonly QResultBlock[],
+  ): {
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly requests: boolean;
+  } => {
+    if (ownInvestorOrganisationIn(request.plan) === null) {
+      return { said, blocks, requests: false };
+    }
+    const moved = blocks.find(
+      (block) =>
+        block.kind === "UI_INTENT" &&
+        block.intent.kind === "NAVIGATE" &&
+        FOUNDER_OWN_PAGES.has(block.intent.destination),
+    );
+    if (moved === undefined) return { said, blocks, requests: false };
+    return {
+      said: "Your data room requests are on each company's Diligence tab in the CRM, so I've opened the CRM.",
+      blocks: blocks.map((block) =>
+        block === moved
+          ? {
+              kind: "UI_INTENT" as const,
+              intent: {
+                kind: "NAVIGATE" as const,
+                destination: "RELATIONSHIPS",
+              },
+            }
+          : block,
+      ),
+      requests: true,
+    };
+  };
+
   /** One line of what is there, before the move, when Q has it. */
   const withDestinationSummary = async (
     request: QAnswerRequest,
     said: string,
     blocks: readonly QResultBlock[],
+    requests = false,
   ): Promise<string> => {
+    if (requests) {
+      const listed = await (
+        dependencies.diligenceSummary?.(request) ?? Promise.resolve(null)
+      ).catch(() => null);
+      return listed === null ? said : `${listed} ${said}`;
+    }
     const moved = blocks.find(
       (block) => block.kind === "UI_INTENT" && block.intent.kind === "NAVIGATE",
     );
@@ -4113,11 +4181,17 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",
       );
+      const placed = forTheirSide(request, paged.said, paged.blocks);
       return recordAnswer(
         request,
         conversationId,
-        await withDestinationSummary(request, paged.said, paged.blocks),
-        paged.blocks,
+        await withDestinationSummary(
+          request,
+          placed.said,
+          placed.blocks,
+          placed.requests,
+        ),
+        placed.blocks,
       );
     }
     saidInRun.set(request.runId, latest.content);
