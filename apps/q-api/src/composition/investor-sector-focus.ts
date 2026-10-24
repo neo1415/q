@@ -72,6 +72,21 @@ function cardSectors(value: string | undefined): string[] {
   return value === undefined ? [] : value.split(/;\s*/u);
 }
 
+/** Card reads in flight at once (each is its own few queries). */
+const CARD_READS_AT_ONCE = 8;
+
+async function inBatches<T, R>(
+  items: readonly T[],
+  size: number,
+  read: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let at = 0; at < items.length; at += size) {
+    out.push(...(await Promise.all(items.slice(at, at + size).map(read))));
+  }
+  return out;
+}
+
 export function createInvestorSectorFocusPort(dependencies: {
   /** The actor's own company, resolved by the server (never the model). */
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
@@ -93,8 +108,12 @@ export function createInvestorSectorFocusPort(dependencies: {
         .map((one) => nodeById.get(one.nodeId))
         .filter((node): node is ReferenceNode => node !== undefined)
         .map(refOf);
-      const investors = await Promise.all(
-        investorOrganisationIds.map(async (investorOrganisationId) => {
+      // QO-31: up to the whole candidate set is asked about, so the cards
+      // are read a few at a time, never all at once against the pool.
+      const investors = await inBatches(
+        investorOrganisationIds,
+        CARD_READS_AT_ONCE,
+        async (investorOrganisationId) => {
           const card = await dependencies.cards
             .cardForSubject({
               subject: {
@@ -111,7 +130,7 @@ export function createInvestorSectorFocusPort(dependencies: {
             investorOrganisationId,
             sectors: resolveSectors(cardSectors(field?.value)),
           };
-        }),
+        },
       );
       return {
         company,

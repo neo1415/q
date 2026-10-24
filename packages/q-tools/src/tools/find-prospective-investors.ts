@@ -3,7 +3,6 @@ import { z } from "zod";
 import { CompanyIdSchema } from "@capital-q/companies";
 import { UuidSchema, type InvestorGateFitDto } from "@capital-q/contracts";
 import {
-  DISCOVERY_LIMIT_MAX,
   PROSPECT_FIT_VERSION,
   rankProspects,
   type ProspectCompany,
@@ -413,9 +412,12 @@ export function createFindProspectiveInvestorsTool(
       }
       // Network-visible, disclosure-permitted investor organisations: the
       // same candidate set a founder's slate is drawn from.
+      // QO-31: the whole candidate set, so the published-sector order
+      // below sees a newly onboarded investor the profile ranking would
+      // have left off its first page.
       const slate = await discovery.discoverInvestors({
         actor: context.actor,
-        limit: DISCOVERY_LIMIT_MAX,
+        wholeCandidateSet: true,
       });
       const ranked = rankProspects(
         grant.company,

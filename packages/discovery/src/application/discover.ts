@@ -46,6 +46,14 @@ export type DiscoverQuery = {
   readonly limit?: number | undefined;
   /** Keyset: the last id of the previous page. Never an offset. */
   readonly cursor?: string | null | undefined;
+  /**
+   * Investors only (QO-31): every visible candidate, ranked, up to
+   * DISCOVERY_CANDIDATE_MAX, with no next page. For a founder's own
+   * prospect list, which orders by what investors publish (gates, Q Card
+   * sectors): cut to the profile ranking's top page first, a newly
+   * onboarded investor with a sparse profile never reached that order.
+   */
+  readonly wholeCandidateSet?: boolean | undefined;
 };
 
 export type DiscoveryService = {
@@ -205,7 +213,10 @@ export function createDiscoveryService(
     },
 
     discoverInvestors: async (query) => {
-      const limit = boundedLimit(query.limit);
+      const limit =
+        query.wholeCandidateSet === true
+          ? DISCOVERY_CANDIDATE_MAX
+          : boundedLimit(query.limit);
       // Said every time, because it is the honest description of this
       // slate: a founder is not matched against anybody's private mandate.
       const notes: DiscoveryNote[] = ["RANKED_ON_DECLARED_PROFILE_ONLY"];
