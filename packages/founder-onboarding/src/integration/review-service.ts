@@ -130,6 +130,12 @@ export type FounderReviewServiceDependencies = {
     ) => Promise<FounderExtractionOutcome>;
   };
   /**
+   * The name of the person on the account (their own profile). Optional:
+   * without it, no role read from material is offered as theirs (F-74).
+   */
+  readonly accountName?:
+    ((userId: UserId) => Promise<string | null>) | undefined;
+  /**
    * The onboarding runtime's internal question recording (CQ-PRE-REC-001).
    * What the planner decided is worth asking is persisted as journey state
    * so F7 — and the conversational interview — can ask it after a refresh
@@ -241,6 +247,7 @@ export function createFounderDocumentReview(
     utterances,
     createSuggestion,
     extraction,
+    accountName,
     recordQuestions,
     logger,
     pitchSections,
@@ -257,9 +264,11 @@ export function createFounderDocumentReview(
     readonly sourceRef: SourceRef;
     readonly context: Readonly<Record<string, string | number>>;
   }): Promise<FounderReviewResult> {
-    const [current, pending] = await Promise.all([
+    const [current, pending, holder] = await Promise.all([
       responses.listCurrent(sql, input.sessionId as never),
       suggestions.listPending(sql, input.sessionId as never),
+      // Unread is unknown: no role from the material is assumed theirs.
+      accountName?.(input.userId).catch(() => null) ?? null,
     ]);
 
     const facts = sessionFactsFrom({
@@ -283,6 +292,7 @@ export function createFounderDocumentReview(
       // One unit of work per reading, so the model call can be traced back
       // to the document or the turn that caused it.
       correlationId: `cor_${randomUUID()}`,
+      accountName: holder,
     });
 
     return applyPlan(input.sessionId, plan, input.sourceRef, input.context);
