@@ -23,7 +23,7 @@ import {
 describe("tolerant deep-work results", () => {
   it("are the active versions", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(10);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(11);
     expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(2);
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(2);
     expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(3);

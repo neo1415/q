@@ -724,7 +724,7 @@ export const JOB_PLAN_V10: PromptDefinition<
 > = {
   ...JOB_PLAN_V9,
   version: 10,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Live 2026-10-24: v9's template; a tolerant result -- any step key (code normalises it and its references), unused keys stripped at every level, longer text code clips; an unknown role still drops that step for code to replan.",
   effectiveFrom: "2026-10-24",
@@ -734,6 +734,37 @@ export const JOB_PLAN_V10: PromptDefinition<
     schemaVersion: JOB_PLAN_V10_SCHEMA_VERSION,
     schema: JobPlanResultV10Schema,
   },
+};
+
+/**
+ * v11 (coordinator decision (c), 2026-10-24): an investor's "work on the
+ * first task on my board" -- research and an analysis -- came back as a
+ * card, because the plan added founder diligence questions nobody asked
+ * for (live dc1b17c9). Outward steps are planned only when the request
+ * asks for them, by meaning; a possible next move goes in nextActions.
+ */
+export const V11_ONLY_WHAT_THEY_ASKED = `ONLY WHAT THEY ASKED FOR: a step that reaches someone else or files something for them -- founder or diligence questions (diligence.questions.prepare), a message, an email, expressing interest, a connection request, booking a meeting -- is planned only when their request asks for that, by what it means, in any words and any language. A request for research, an analysis, a memo, a plan, a review or a critique is their own work: plan the research and the document only. A question for a founder or a message they might send next is a next action (nextActions), never a step.
+
+`;
+
+if (!JOB_PLAN_V10.template.includes("THINK IN THIS ORDER")) {
+  throw new Error("JOB_PLAN v11 extends v10's template, which changed");
+}
+
+export const JOB_PLAN_V11: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V10,
+  version: 11,
+  status: "ACTIVE",
+  changeDescription:
+    "Coordinator decision (c), 2026-10-24: v10 plus ONLY WHAT THEY ASKED FOR -- an outward step (diligence questions, a message, an email, interest, a connection request, a booking) is planned only when the request asks for it, by meaning in any language; research or a document stays their own work, a possible next move goes in nextActions.",
+  effectiveFrom: "2026-10-24",
+  template: JOB_PLAN_V10.template.replace(
+    "THINK IN THIS ORDER",
+    `${V11_ONLY_WHAT_THEY_ASKED}THINK IN THIS ORDER`,
+  ),
 };
 
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
