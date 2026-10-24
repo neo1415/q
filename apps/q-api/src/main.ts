@@ -661,6 +661,7 @@ import {
   createUiActReceiptLedger,
   navigationFacts,
   receiptFacts,
+  screenMissesSince,
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
 import { createFastNavigation } from "./composition/fast-navigation.js";
@@ -4322,6 +4323,9 @@ const qIntelligence = composeQIntelligence({
     // C: where Q moved them, and whether the page opened.
     ...navigationFacts(uiActReceipts.recentNavigations(actor)),
   ],
+  // Owner conversation 2026-10-24: a miss is said once, on the next turn.
+  screenMisses: (actor, sinceMs) =>
+    screenMissesSince(uiActReceipts, actor, sinceMs),
   // Voice speculation (latency2): each spoken answer's adoption or
   // cancellation lands on its "voice turn timed" line and the metric.
   speculation: { observe: (event) => voiceTimings.speculated(event) },

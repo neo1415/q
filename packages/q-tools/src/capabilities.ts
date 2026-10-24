@@ -281,7 +281,10 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens Explore (/explore): the grid of pitch videos to browse, with search at the top. For 'the explore page' -- never Discover.",
   PEOPLE_SEARCH:
     "Opens the Search page: find a person by name or @handle, or pitch videos, in its People and Videos tabs.",
-  WORK_NEEDS: "Opens Work on its Needs you tab: what waits for their yes.",
+  // QA 2026-10-24 (owner run ed415e8d): "can I see that" about their
+  // approvals opened Notifications settings. The approvals list is here.
+  WORK_NEEDS:
+    "Opens Work on its Needs you tab: their approvals list, every change and card waiting for their yes. For 'show my approvals', 'what's waiting for my approval' or 'can I see them' about those -- never Settings or Notifications.",
   WORK_PROGRESS:
     "Opens Work on its In progress tab: what Q is running for them now.",
   WORK_DONE: "Opens Work on its Done tab: what Q finished for them.",

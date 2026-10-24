@@ -376,7 +376,16 @@ export function selfCorrected(text: string): string {
     }
     tail = not.groups?.["rest"] ?? "";
   }
-  const request = withoutLeadIn(tail.replace(/[.!?\u2026\s]+$/u, "")).trim();
+  // Owner conversation 2026-10-24 (run 80da02af): "Yes. No, not Halyard.
+  // Capital Q" kept "not Halyard" as the place, and Halyard was opened. A
+  // leading "not X" names what they do not want; what follows it is the
+  // correction.
+  const request = withoutLeadIn(
+    withoutLeadIn(tail.replace(/[.!?\u2026\s]+$/u, "")).replace(
+      /^not\s+[^.,;!?]+(?:[.,;!?]+\s*|$)/iu,
+      "",
+    ),
+  ).trim();
   if (request.length === 0) return "";
   // A take-back after the turn ("no, actually never mind") stays one.
   if (TAKEN_BACK.test(request)) return request;
