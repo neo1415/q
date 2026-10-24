@@ -170,6 +170,13 @@ const ComparisonNoteSchema = z
   })
   .strict();
 
+/**
+ * The bound on what the tool tells the answer (production 2026-10-24: the
+ * "not sure it's them" guidance pushed the text past the old 1,200 and
+ * every ambiguous search failed as INVALID_TOOL_OUTPUT).
+ */
+export const RESEARCH_GUIDANCE_MAX = 2_000;
+
 export const ResearchPublicWebOutputSchema = z
   .object({
     status: z.enum(["OK", "NO_PUBLIC_IDENTITY", "PROVIDER_UNAVAILABLE"]),
@@ -204,25 +211,25 @@ export const ResearchPublicWebOutputSchema = z
       .nullable(),
     /** Public web material is unverified until Capital Q's evidence rules say otherwise. */
     truthClass: z.literal("UNKNOWN"),
-    guidance: z.string().max(1_200),
+    guidance: z.string().max(RESEARCH_GUIDANCE_MAX),
   })
   .strict();
 export type ResearchPublicWebOutput = z.infer<
   typeof ResearchPublicWebOutputSchema
 >;
 
-const GUIDANCE =
-  "Answer from what these pages say and nothing else: every claim you take from the web must be supported by one of them, and when they do not answer the question, say so plainly rather than filling in. Never mention or describe a page that is not about whom the question is about (another business, a namesake, a product of the same name). Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when asked where something came from. Compare with authorised facts: say what corroborates, what conflicts, and where dates may explain a difference; ask about a material mismatch instead of resolving it yourself.";
+export const GUIDANCE =
+  "Answer from what these pages say and nothing else: every claim you take from the web must be supported by one of them; never fill in what they do not say. Never mention or describe a page not about whom the question is about (another business, a namesake, a product of the same name). When the pages add nothing and Capital Q's records or the conversation answer the question, answer from those and do not mention the web at all; only when nothing answers it, say once, naturally, that you found nothing more. Public sources are unverified and may be stale. Capital Q attaches each source under Sources: answer first, and name a source only when asked where something came from. Compare with authorised facts: say what corroborates and what conflicts; ask about a material mismatch instead of resolving it yourself.";
 
 /**
  * Said about a name the pages do not settle (web search 2026-10-06), the way
  * a person would say it (owner 2026-10-23: "I'm not sure, but I found this.
  * If this is not it, I wasn't able to find anything else").
  */
-const AMBIGUOUS_GUIDANCE =
-  " NOT SURE IT'S THEM: these pages may be about more than one organisation of that name, or place it somewhere else (see entityResolution.candidates and each source's subjectMatch: POSSIBLE means it may be someone else of that name). Say it as a person would: you're not sure it's them, here is what you found (in a few words, with where), and if that isn't them, it's all you could find. Attribute nothing to them as fact; if one detail would settle it (their website, country or sector), ask for it in one short question.";
-const NOT_FOUND_GUIDANCE =
-  " NOT FOUND: no public page found is about that name (pages that never name them are not shown). Say so once, naturally, as a person would (\"I couldn't find anything about them online\"), then answer from Capital Q's records and the conversation. Never describe pages that were not about them, and never guess.";
+export const AMBIGUOUS_GUIDANCE =
+  " NOT SURE IT'S THEM: these pages may be about another organisation of that name (see each source's subjectMatch; POSSIBLE may be someone else). Say it as a person would: you're not sure it's them, here is what you found, and if that isn't them it's all you could find. Attribute nothing to them as fact; one detail that would settle it (website, country, sector) may be asked for in one short question.";
+export const NOT_FOUND_GUIDANCE =
+  " NOT FOUND: no public page found is about that name. When Capital Q's records or the conversation answer the question, do not mention the web at all; only when nothing answers it, say once, naturally (\"I couldn't find anything about them online\"). Never describe pages not about them; never guess.";
 
 type Grant = {
   readonly subject: ResearchSubject | null;
