@@ -178,6 +178,7 @@ describe("loading strips", () => {
     );
     expect(strip(index.container)).toEqual([
       "Tasks",
+      "Board",
       "Documents",
       "Pitch",
       "Rehearsals*",
@@ -208,6 +209,7 @@ describe("loading strips", () => {
     );
     expect(strip(container)).toEqual([
       "Tasks",
+      "Board",
       "Documents",
       "Rehearsals",
       "The Q Daily*",

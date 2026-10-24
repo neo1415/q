@@ -143,18 +143,24 @@ export type OutwardReview = {
   ) => Promise<void>;
 };
 
+/** Why a draft was held, in the person's words (never the code). */
+export const HELD_REASON_WHY: Readonly<Record<HoldReason, string>> = {
+  BELOW_BAR: "didn't reach your bar",
+  INTEGRITY: "would have said something Capital Q can't stand behind",
+  REVIEW_UNAVAILABLE: "couldn't be checked just now",
+  THREAD_MISMATCH: "still didn't answer what they last asked or offered",
+  WRITER_GAVE_UP: "couldn't be written honestly from what you approved",
+  CODE_CHECK: "broke one of the rules for this conversation when redrafted",
+};
+
 /** The words a held draft carries back to the person. */
 export function heldLine(verdict: OutwardVerdict, counterpart: string): string {
   if (verdict.verdict === "PASSED") return "";
-  const why: Record<HoldReason, string> = {
-    BELOW_BAR: `didn't reach your bar${verdict.score === null ? "" : ` (scored ${String(verdict.score)})`}`,
-    INTEGRITY: "would have said something Capital Q can't stand behind",
-    REVIEW_UNAVAILABLE: "couldn't be checked just now",
-    THREAD_MISMATCH: "still didn't answer what they last asked or offered",
-    WRITER_GAVE_UP: "couldn't be written honestly from what you approved",
-    CODE_CHECK: "broke one of the rules for this conversation when redrafted",
-  };
-  return `Q held a message to ${counterpart.slice(0, 80)}: it ${why[verdict.reason]}. You can read it on your workforce page and send your own.`.slice(
+  const why =
+    verdict.reason === "BELOW_BAR" && verdict.score !== null
+      ? `${HELD_REASON_WHY.BELOW_BAR} (scored ${String(verdict.score)})`
+      : HELD_REASON_WHY[verdict.reason];
+  return `Q held a message to ${counterpart.slice(0, 80)}: it ${why}. You can read it on your workforce page and send your own.`.slice(
     0,
     300,
   );

@@ -222,6 +222,25 @@ export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
   return entries.reverse();
 }
 
+/**
+ * C4: what the Board holds, less the answer still on the stage; it counts
+ * up as an answer flies into it. F-37 (QA 2026-10-23: it stayed 0 after a
+ * report was made): only a Board entry that is itself on the stage is held
+ * back (a table or a map on the stage is not on the Board at all), and a
+ * document Q made is filed at once.
+ */
+export function boardCountOf(
+  entries: readonly Pick<BoardEntry, "id" | "files">[],
+  dismissed: readonly string[],
+  stageObject: string | null,
+): number {
+  return entries.filter(
+    (entry) =>
+      !dismissed.includes(entry.id) &&
+      (entry.id !== stageObject || entry.files.length > 0),
+  ).length;
+}
+
 /** "Today", "Yesterday" or the date, for grouping the timeline. */
 export function dayLabel(
   iso: string | undefined,

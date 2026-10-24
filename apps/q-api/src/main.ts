@@ -33,6 +33,7 @@ import {
   preparedEntityPrewarmLines,
   watchPreparedEntities,
 } from "./composition/prepared-entities.js";
+import { createQApiBoard } from "./composition/board.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import {
   createArrivalSnapshots,
@@ -456,6 +457,7 @@ import {
 import {
   createFitQViewer,
   createRecommendationNarrator,
+  pipelineSummaryLine,
 } from "@capital-q/q-specialists";
 import {
   actorPrincipal,
@@ -2992,6 +2994,11 @@ const qTools = createQTools({
     work: workPort,
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
+    // The work board (owner 2026-10-23): their own items, and Q's work on them.
+    board: createQApiBoard({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
     // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
     // new matches and Q's activity, for "what needs me".
     attention: createAttentionSources({ sql: database.sql }),
@@ -4296,6 +4303,19 @@ const qIntelligence = composeQIntelligence({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
   }),
+  // Coordinator 23 Oct 2026: "show me my pipeline" says what is in it, in
+  // one line from their own relationships, as it opens it.
+  destinationSummary: async (request, destination) => {
+    if (destination !== "CRM_PIPELINE" && destination !== "RELATIONSHIPS") {
+      return null;
+    }
+    const own = await errandRelationships
+      .ownRelationships?.(request.actor)
+      .catch(() => null);
+    return own === null || own === undefined
+      ? null
+      : pipelineSummaryLine(own.side, own.items);
+  },
   // W4: a researched entity reachable by name (prepared seed or their own
   // research): "take me to Shadi Qishta" shows its identity card.
   knownEntities: preparedEntityMatcher(preparedEntities),

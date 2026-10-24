@@ -799,3 +799,13 @@ export {
   type SetPreferenceLearningInput,
   type SetPreferenceLearningOutput,
 } from "./tools/preference-learning.js";
+
+// The work board (owner 2026-10-23).
+export {
+  BOARD_TOOL_BATCH_MAX,
+  boardKey,
+  createBoardTools,
+  createMyBoardTool,
+  MY_BOARD,
+} from "./tools/board.js";
+export type { QBoardOutcome, QBoardPort } from "./ports.js";

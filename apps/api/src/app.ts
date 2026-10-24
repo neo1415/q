@@ -45,6 +45,10 @@ import {
   registerCommitmentRoutes,
   type CommitmentRoutesDependencies,
 } from "./http/commitments.js";
+import {
+  registerBoardRoutes,
+  type BoardRoutesDependencies,
+} from "./http/board.js";
 import { registerDealCloseRoutes } from "./http/deal-close.js";
 import {
   registerCapitalObjectiveRoutes,
@@ -327,6 +331,8 @@ export type ApiModules = {
   readonly founderRequests?: FounderRequestsService | undefined;
   /** Post-meeting outcomes (2026-10-02). Absent: those routes do not register. */
   readonly outcomes?: NetworkInterestRoutesDependencies["outcomes"] | undefined;
+  /** The work board (owner 2026-10-23). Absent: /v1/board does not register. */
+  readonly board?: BoardRoutesDependencies["board"] | undefined;
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
@@ -694,6 +700,7 @@ export function createApp(
       ...(modules.commitments === undefined
         ? {}
         : { commitments: modules.commitments }),
+      ...(modules.board === undefined ? {} : { board: modules.board }),
       ...(modules.capitalRounds === undefined
         ? {}
         : { capitalRounds: modules.capitalRounds }),
@@ -886,6 +893,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       deal: modules.deal,
+    });
+  }
+
+  if (modules.board !== undefined) {
+    registerBoardRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      board: modules.board,
     });
   }
 

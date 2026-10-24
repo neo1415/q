@@ -186,6 +186,29 @@ function withMatch(
   };
 }
 
+/** A matched page about them on the picture's own site (QA QO-09 evidence). */
+function onSite(outcome: QToolCallOutcome, url: string): QToolCallOutcome {
+  const matched = withMatch(outcome, "MATCH");
+  if (!matched.result.ok) return matched;
+  const data = matched.result.data as {
+    readonly sources: readonly Record<string, unknown>[];
+  };
+  return {
+    ...matched,
+    result: {
+      ok: true,
+      data: {
+        ...data,
+        sources: data.sources.map((source) => ({
+          ...source,
+          url,
+          domain: new URL(url).hostname,
+        })),
+      },
+    },
+  };
+}
+
 function toolPort(
   offered: readonly QOfferedTool[],
   script: (proposal: QToolProposal) => QToolCallOutcome,
@@ -2241,10 +2264,69 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
     expect(JSON.stringify(pictures[0])).toContain("Not sure this is them");
   });
 
+  // QA QO-09 (owner's QA ~21:55 UTC): "Duplo" showed a LEGO DUPLO Peppa
+  // Pig listing on eBay while the answer said the results were unrelated.
+  it("Duplo: no picture from a site the turn's search never tied to them", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      onSite(
+        researchOutcome(p, "LEGO DUPLO bricks for toddlers."),
+        "https://www.lego.com/en-gb/themes/duplo",
+      ),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult(
+            "The public results were about LEGO's DUPLO line, not this Duplo.",
+          ),
+        },
+      ],
+      tools: tools.port,
+      userText: "Tell me about Duplo",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://i.ebayimg.com/duplo-peppa.jpg",
+              pageUrl: "https://www.ebay.com/itm/lego-duplo-peppa-pig",
+              domain: "www.ebay.com",
+              title: "LEGO DUPLO Peppa Pig Bike Ride 10964",
+            },
+          ]),
+      },
+    });
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          aboutNamedOther: true,
+          namedOther: { name: "Duplo", kind: "COMPANY" },
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+  });
+
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
-      withMatch(researchOutcome(p, "Zino Aviation flies charter."), "MATCH"),
+      onSite(
+        researchOutcome(p, "Zino Aviation flies charter."),
+        "https://nairametrics.com/2024/05/interview/",
+      ),
     );
     const { seam, request, answerBlocks } = build({
       script: [
@@ -2519,7 +2601,12 @@ describe("pictures whatever the research mode (live 2026-10-23)", () => {
     const port: QToolPort = {
       offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
       execute: (proposal) =>
-        Promise.resolve(researchOutcome(proposal, "Zino Aviation.")),
+        Promise.resolve(
+          onSite(
+            researchOutcome(proposal, "Zino Aviation."),
+            "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
+          ),
+        ),
     };
     const { seam, request, answerBlocks } = build({
       script: [{ kind: "JSON", value: analystResult("From the records.") }],
@@ -2554,6 +2641,9 @@ describe("pictures whatever the research mode (live 2026-10-23)", () => {
     expect(answerBlocks).toContainEqual(
       expect.objectContaining({ kind: "PICTURE", source: "PUBLIC_WEB" }),
     );
+    // Records answered and no public search ran: nothing to weigh it
+    // against, so it is shown said to be uncertain (QA QO-09).
+    expect(JSON.stringify(answerBlocks)).toContain("Not sure this is them");
   });
 });
 

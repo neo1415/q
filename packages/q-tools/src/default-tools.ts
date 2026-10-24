@@ -42,6 +42,7 @@ import {
   createApprovePendingProposalTool,
   createDeclinePendingProposalTool,
 } from "./tools/pending-proposal.js";
+import { createBoardTools } from "./tools/board.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
 import {
   createAttentionReader,
@@ -290,6 +291,8 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
         : [createSetOnboardingRemindersTool(ports.onboardingReminders)]),
     // R33: their approvals inbox, their documents, Save / Unsave / Pass.
     ...createOwnWorkTools(ports),
+    // The work board (owner 2026-10-23): their own items, and Q's work on them.
+    ...createBoardTools(ports),
     // RECOVERY-2026-10 B1: everything waiting on them, every source, with
     // what could not be read said as unread (never as nothing).
     // Composed when any of its sources is; with none, there is nothing it

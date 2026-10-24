@@ -151,6 +151,11 @@ function seam(options: {
   readonly appActions?: QAppActionPort;
   /** Their relationships' counterpart names (lead 2026-10-03). */
   readonly counterpartNames?: readonly string[];
+  /** One line of what a destination holds (coordinator 2026-10-23). */
+  readonly destinationSummary?: (
+    request: QAnswerRequest,
+    destination: string,
+  ) => Promise<string | null>;
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
   /** The quick first read (a model), faked. */
@@ -379,6 +384,9 @@ function seam(options: {
     ...(options.appActionRouter === undefined
       ? {}
       : { appActionRouter: options.appActionRouter }),
+    ...(options.destinationSummary === undefined
+      ? {}
+      : { destinationSummary: options.destinationSummary }),
     ...(options.counterpartNames === undefined
       ? {}
       : {
@@ -634,6 +642,38 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     ]);
     expect(run.events.map((event) => event.type)).toEqual([
       "q.message.completed",
+    ]);
+  });
+
+  // Coordinator 23 Oct 2026: "Show me my fundraising pipeline" said only
+  // "Opening your pipeline…". The move says what is in it, then opens it.
+  it("a move to their pipeline says what is in it first", async () => {
+    const asked: string[] = [];
+    const run = seam({
+      said: "Show me my fundraising pipeline",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "CRM_PIPELINE",
+        visibility: null,
+      }),
+      outcomes: [],
+      destinationSummary: (_request, destination) => {
+        asked.push(destination);
+        return Promise.resolve(
+          "3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply.",
+        );
+      },
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(asked).toEqual(["CRM_PIPELINE"]);
+    expect(run.stored[0]?.content).toMatch(
+      /^3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply\. Opening your pipeline/u,
+    );
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      },
     ]);
   });
 

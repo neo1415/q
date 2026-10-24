@@ -642,6 +642,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   readiness: "RECORDS",
   // CRM saved views (2026-10-15): beside the relationships they show.
   crm: "RELATIONSHIP",
+  // The work board (owner 2026-10-23): their own records, as my_board's.
+  board: "RECORDS",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -858,6 +860,15 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "revise_my_document",
     "DOCUMENT",
     "Edits a document Q prepared for them (a deck, brief, one-pager or mandate) with the changes they ask for, as a new version: the earlier version is kept and the new card has fresh PDF and PowerPoint downloads.",
+    { acts: true },
+  ),
+  // The work board (owner 2026-10-23): their own items, INSTANT; Q's work
+  // on them is own-account, and anything outward is still propose_q_job's
+  // card.
+  tool(
+    "my_board",
+    "RECORDS",
+    "Reads and changes their own work board (documents, companies, tasks, notes, Q's work in TODO, DOING and DONE), and starts Q's own work on the items they name; work that would reach someone else is a card for their approval.",
     { acts: true },
   ),
   // Q room W5 (R8): one typed change by slide.
