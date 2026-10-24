@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createQStreamState,
@@ -8,7 +8,11 @@ import {
   type QStreamState,
   type QStreamTransportStatus,
 } from "@capital-q/api-client";
-import type { QMessage, QViewingMoment } from "@capital-q/contracts";
+import type {
+  QMessage,
+  QPendingApproval,
+  QViewingMoment,
+} from "@capital-q/contracts";
 
 import {
   approveQApprovalAction,
@@ -20,7 +24,11 @@ import {
   type QStartedRun,
   type QSubjectInput,
 } from "./actions";
-import { carriedApproval, type CarriedApproval } from "./carried-approval";
+import {
+  carriedApproval,
+  shownCardsKey,
+  type CarriedApproval,
+} from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import {
   actedHere,
@@ -237,7 +245,13 @@ export function useQConversation(
     options.conversationId ?? null,
   );
   /** A change still waiting in this conversation whose run is not the open one. */
-  const [carried, setCarried] = useState<CarriedApproval | null>(null);
+  // The server's waiting approvals as last read, and for which thread.
+  const [waiting, setWaiting] = useState<{
+    readonly key: string;
+    readonly items: readonly QPendingApproval[];
+    /** How long the thread was when read. */
+    readonly length: number;
+  } | null>(null);
 
   const conversationId = useRef<string | null>(null);
   /** The conversation id last taken from the caller, so a URL the hook itself wrote is not reopened. */
@@ -659,21 +673,49 @@ export function useQConversation(
   // F-106: the run that just finished counts too. "That's ready: … It's
   // waiting for your yes" shows a card an earlier run made; that run never
   // pauses here, so its card is found only through this lookup.
+  // Egress (2026-10-24): the server is asked again only when the cards
+  // this thread shows change, or a card on screen may have been decided
+  // since (a typed "go ahead", Work) and the thread has moved; otherwise
+  // the last read is re-read here.
   const live = runState.approval !== null;
   const finishedMessages = runState.messages;
+  const thread = useMemo(
+    () => [...history, ...finishedMessages],
+    [history, finishedMessages],
+  );
+  const cards = useMemo(() => shownCardsKey(thread), [thread]);
+  const waitingKey =
+    conversationIdState === null ? null : `${conversationIdState}|${cards}`;
+  const carried: CarriedApproval | null = useMemo(
+    () =>
+      live ||
+      conversationIdState === null ||
+      cards === "" ||
+      waiting === null ||
+      !waiting.key.startsWith(`${conversationIdState}|`)
+        ? null
+        : carriedApproval(conversationIdState, thread, waiting.items),
+    [live, conversationIdState, cards, waiting, thread],
+  );
   useEffect(() => {
-    if (streaming || live || conversationIdState === null) return;
+    if (streaming || live || waitingKey === null || cards === "") return;
+    if (
+      waiting !== null &&
+      waiting.key === waitingKey &&
+      (carried === null || waiting.length === thread.length)
+    ) {
+      return;
+    }
     let current = true;
-    const id = conversationIdState;
-    const thread = [...history, ...finishedMessages];
+    const length = thread.length;
     void pendingQApprovalsAction().then((result) => {
       if (!current || !result.ok) return;
-      setCarried(carriedApproval(id, thread, result.value));
+      setWaiting({ key: waitingKey, items: result.value, length });
     });
     return () => {
       current = false;
     };
-  }, [streaming, live, conversationIdState, history, finishedMessages]);
+  }, [streaming, live, waitingKey, cards, waiting, carried, thread.length]);
 
   // A decision on the open run's proposal. The run resumes on the server
   // after a yes and its remaining events are followed again from the
@@ -691,7 +733,17 @@ export function useQConversation(
           setNotice(result.message);
           return;
         }
-        setCarried(null);
+        // Decided: never carried again from the last read.
+        setWaiting((held) =>
+          held === null
+            ? null
+            : {
+                ...held,
+                items: held.items.filter(
+                  (item) => item.approvalId !== carried.approval.approvalId,
+                ),
+              },
+        );
         const id = conversationId.current;
         if (id !== null) {
           for (const wait of [3_000, 10_000]) {
