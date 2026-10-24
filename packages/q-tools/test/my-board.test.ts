@@ -25,8 +25,11 @@ import { actorA, actorB, contextFor, planFor, RUN } from "./support.js";
  * work and links it, while outward work stays a card and links nothing.
  */
 
-function ownPlan(userId = actorA.userId): PermittedContextPlan {
-  const plan = planFor(actorA, "ACTION_PREPARATION", [
+function ownPlan(
+  userId = actorA.userId,
+  purpose: Parameters<typeof planFor>[1] = "ACTION_PREPARATION",
+): PermittedContextPlan {
+  const plan = planFor(actorA, purpose, [
     { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
   ]);
   return {
@@ -332,5 +335,35 @@ describe("my_board", () => {
     );
     expect(asQ.ok).toBe(false);
     expect(port.list).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Live 2026-10-24 (founder.maji-loop, run eb24f299): "save that plan to my
+ * board" was planned as a records question and my_board was never offered.
+ * A turn that names it (a board ask) reaches it on any purpose; a turn
+ * that does not is not shown it outside its own purposes, area or not.
+ */
+describe("my_board on other purposes", () => {
+  const registry = createQToolRegistry([
+    createMyBoardTool(memoryBoard([]).port),
+  ]);
+  const onRecords = (tools: string[], areas: string[] = []) => ({
+    ...contextFor(actorA, ownPlan(actorA.userId, "OWN_COMPANY_QUESTION")),
+    focus: { areas, tools },
+  });
+  const shown = (context: ReturnType<typeof onRecords>) =>
+    registry.eligible(context).map(({ definition }) => definition.providerName);
+
+  it("is offered and executes when the turn names it", () => {
+    const named = onRecords(["my_board"]);
+    expect(shown(named)).toContain("my_board");
+    expect(registry.offeredByProviderName(named, "my_board")).toBeDefined();
+  });
+
+  it("is not offered by area alone, nor executes unnamed", () => {
+    const records = onRecords([], ["RECORDS"]);
+    expect(shown(records)).not.toContain("my_board");
+    expect(registry.offeredByProviderName(records, "my_board")).toBeUndefined();
   });
 });
