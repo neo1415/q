@@ -368,7 +368,7 @@ import {
   namedRecordRequestOf,
   ownCounterpartWithin,
 } from "./named-record-request.js";
-import type { TurnReference } from "@capital-q/q-core";
+import type { TurnReferenceV64 as TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   startPendingDecision,
@@ -5175,8 +5175,13 @@ export function createSpecialistQAnswer(
     // an answer from what Q already showed (live 20:31: after a list of
     // investors, the prep was answered as a generic follow-up). When it
     // cannot be prepared, the turn goes on as before.
+    // A rehearsal they asked for opens the rehearsal, never the prep again
+    // (QA F-98: "Let us rehearse my call with Savanna Seed Partners").
     const prepFor =
-      read === null || read.confidence === "LOW" || read.addressedToQ === false
+      read === null ||
+      read.confidence === "LOW" ||
+      read.addressedToQ === false ||
+      read.reference?.open === "REHEARSAL"
         ? null
         : (read.meetingPrep?.counterpart ?? null);
     if (dependencies.callPrep !== undefined && prepFor !== null) {
@@ -5347,11 +5352,13 @@ export function createSpecialistQAnswer(
     // asks Q to do something or answers Q.
     const asksAboutIt =
       read?.kind === "QUESTION_TO_Q" || read?.kind === "RESEARCH_REQUEST";
+    // A rehearsal they ask for ("let us rehearse my call with Savanna", "can
+    // we practise it?") is the act itself: it opens (QA F-98).
     if (
       reference !== null &&
       reference.open !== null &&
-      !asksAboutIt &&
-      onlyAMove(latest.content)
+      (reference.open === "REHEARSAL" ||
+        (!asksAboutIt && onlyAMove(latest.content)))
     ) {
       const opened = await openReferenced(
         request,

@@ -31,7 +31,7 @@ export const TURN_READER_V63: PromptDefinition<
 > = {
   ...TURN_READER_V62,
   version: 63,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Coordinator and work-board lane (QA live 2026-10-24): v62 plus boardAsk LIST (only asking what is on their own work board) and ADD (a new item in their own words), by meaning in any language; SAVE, BREAKDOWN and WORK win over LIST; keeping something Q said stays SAVE; opening the page stays NAVIGATE BOARD.",
   effectiveFrom: "2026-10-24",

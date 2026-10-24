@@ -4,19 +4,19 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV63ResultSchema,
+  TurnReaderV64ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
-  type TurnReaderV40Result,
   type TurnReaderV54Result,
   type TurnReaderV55Variables,
   type TurnReaderV58Result,
   type TurnReaderV62Result,
   type TurnReaderV63Result,
+  type TurnReaderV64Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -118,7 +118,8 @@ export type QTurnReading = Omit<
   /** v30: the listed action's name that does what they asked, or null. */
   readonly askedAction?: string | null | undefined;
   /** v40: the one record they ask to open, and a repeat of Q's last action. */
-  readonly reference?: TurnReaderV40Result["reference"] | undefined;
+  /** v64: the record may be a REHEARSAL with someone (QA F-98). */
+  readonly reference?: TurnReaderV64Result["reference"] | undefined;
   /** v49: they hand Q's team a piece of work of several steps. */
   readonly teamJob?: boolean | undefined;
   /**
@@ -402,8 +403,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV63Result>> =>
-          gateway.execute<TurnReaderV63Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV64Result>> =>
+          gateway.execute<TurnReaderV64Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -419,7 +420,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV63ResultSchema,
+              schema: TurnReaderV64ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -461,7 +462,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV63ResultSchema.safeParse(
+        const parsed = TurnReaderV64ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         // A comparison is never answered from an earlier turn (lane 4).
