@@ -116,6 +116,7 @@ export {
 } from "./infrastructure/postgres-mandate-preference-repository.js";
 
 export {
+  RED_FLAG_INDUSTRY_CODES,
   REFERENCE_LOCALE,
   REFERENCE_TAXONOMY,
   referenceNode,

@@ -127,13 +127,57 @@ function withAliases(spec: NodeSpec, synonyms: readonly string[]): NodeSpec {
   return { ...spec, aliases: [...(spec.aliases ?? []), ...synonyms] };
 }
 
+/**
+ * Industries an investor can rule out as a red flag ("never show me
+ * gambling"), as industry nodes a company declares like any other sector
+ * (QO-28b, 2026-10-24). Each canonical code is the red-flag option key the
+ * investor journey records, so Discover reads the investor's declared code
+ * against the company's declared industry: a match excludes, and a company
+ * that has declared no industry stays unknown and is never excluded
+ * (ADR 0020). Red flags that are not industries (pre-product, single
+ * founder, hardware-heavy) have no node here.
+ */
+const RED_FLAG_INDUSTRY_NODES: readonly NodeSpec[] = [
+  {
+    code: "gambling",
+    name: "Gambling & Betting",
+    aliases: ["betting", "sports betting", "casino", "igaming"],
+  },
+  {
+    code: "tobacco",
+    name: "Tobacco & Nicotine",
+    aliases: ["vaping", "e-cigarettes", "nicotine products"],
+  },
+  {
+    code: "weapons",
+    name: "Weapons & Firearms",
+    aliases: ["firearms", "munitions"],
+  },
+  {
+    code: "adult_content",
+    name: "Adult Content",
+    aliases: ["adult entertainment"],
+  },
+  {
+    code: "crypto_speculation",
+    name: "Speculative Crypto",
+    description: "Token speculation and trading-led crypto products.",
+    aliases: ["memecoins", "token speculation"],
+  },
+];
+
+/** The red-flag codes that name an industry node (see above). */
+export const RED_FLAG_INDUSTRY_CODES: readonly string[] =
+  RED_FLAG_INDUSTRY_NODES.map((node) => node.code);
+
 const VOCABULARIES: readonly VocabularySpec[] = [
   {
     code: "industry",
     name: "Industry",
     description:
       "The sector a company operates in. Multi-label; primary hierarchy sector → subsector → niche.",
-    version: 1,
+    // v2 (QO-28b, 2026-10-24): the red-flag industries.
+    version: 2,
     nodes: [
       {
         code: "financial_services",
@@ -317,6 +361,7 @@ const VOCABULARIES: readonly VocabularySpec[] = [
         aliases: ["telecoms", "telco"],
       },
       { code: "manufacturing", name: "Manufacturing & Industrial" },
+      ...RED_FLAG_INDUSTRY_NODES,
     ],
   },
   {
