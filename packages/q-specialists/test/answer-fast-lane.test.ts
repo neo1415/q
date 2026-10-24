@@ -246,6 +246,22 @@ describe("the fast lane (K)", () => {
 });
 
 describe("fastLaneOf (K)", () => {
+  // Replay 2026-10-24: "Just find me three Qatari investors." was read as
+  // companies in Qatar and answered "I can't find any companies in Qatar".
+  it("never runs a company search for words that ask for investors", () => {
+    expect(
+      fastLaneOf(SKIM_DISCOVER, "Just find me three Qatari investors."),
+    ).toBeNull();
+    expect(
+      fastLaneOf(SKIM_DISCOVER, "three fintech funds in Lagos"),
+    ).toBeNull();
+    // Companies asked for by name still are, investors beside them or not.
+    expect(
+      fastLaneOf(SKIM_DISCOVER, "three fintech companies investors like")
+        ?.questionKind,
+    ).toBe("DISCOVER_COMPANIES");
+  });
+
   it("takes only a HIGH confidence read-only ask, never one about companies shown", () => {
     expect(fastLaneOf(SKIM_DISCOVER, "three fintech")?.questionKind).toBe(
       "DISCOVER_COMPANIES",

@@ -32,6 +32,13 @@ export type FastLane = Required<Pick<QAnswerRequest, "questionKind">> &
     "discoverCompanies" | "fitQuestion" | "personSearch" | "discoverInvestors"
   >;
 
+/** Investors asked for by name of kind ("investors", "funds", "VCs"). */
+const INVESTORS_ASKED =
+  /\b(?:investors?|funds?|vcs?|venture capitalists?|backers?|angels?|family offices?|lps?)\b/iu;
+/** Companies asked for ("companies", "startups", "businesses"). */
+const COMPANIES_ASKED =
+  /\b(?:compan(?:y|ies)|startups?|businesses|ventures? to back|founders?)\b/iu;
+
 export function fastLaneOf(
   skim: SkimRead | null,
   utterance: string,
@@ -42,6 +49,11 @@ export function fastLaneOf(
   if (skim.kind === "DISCOVER_COMPANIES") {
     const discover = skim.discover;
     if (discover === null || discover.previous) return null;
+    // Replay 2026-10-24: "Just find me three Qatari investors." was read
+    // as companies in Qatar and answered "I can't find any companies in
+    // Qatar". Words that ask for investors and never for companies are not
+    // a company search; the full reading decides.
+    if (INVESTORS_ASKED.test(text) && !COMPANIES_ASKED.test(text)) return null;
     // Companies "of a kind" names a kind; with none it is a fit question.
     if (
       discover.sectors.length === 0 &&

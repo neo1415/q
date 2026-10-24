@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  aboutWaitingCards,
   decidePending,
   startPendingDecision,
   statusLine,
@@ -1069,5 +1070,58 @@ describe("something the other side receives, still waiting (coordinator 2026-10-
     expect(
       statusLine("DECLINED", "Express interest in Silo Credit", true),
     ).toBe(statusLine("DECLINED", "Express interest in Silo Credit"));
+  });
+});
+
+// Replay 2026-10-24 (eight cards waiting): "Yes. No, not Halyard. Capital
+// Q", a yes to Q's question about investors, met "Which one should I
+// approve…?". A reply decides a card only when it is about cards.
+describe("a yes to another question never decides a waiting card", () => {
+  it("is about cards only when Q asked about one, a card is named, or the words decide", () => {
+    const pending = [
+      { summary: "Update your mandate" },
+      { summary: "Express interest in Basketari" },
+    ];
+    const investorsAsked = [
+      {
+        role: "Q" as const,
+        text: "Want me to find three Gulf-based investors whose focus could fit Halyard?",
+      },
+    ];
+    expect(
+      aboutWaitingCards(
+        {
+          utterance: "Yes. No, not Halyard. Capital Q",
+          recentTurns: investorsAsked,
+        },
+        pending,
+      ),
+    ).toBe(false);
+    expect(
+      aboutWaitingCards(
+        {
+          utterance: "yes",
+          recentTurns: [
+            {
+              role: "Q",
+              text: "Update your mandate. Not saved yet: tap Approve on the card, or tell me to go ahead.",
+            },
+          ],
+        },
+        pending,
+      ),
+    ).toBe(true);
+    expect(
+      aboutWaitingCards(
+        { utterance: "approve the Basketari one", recentTurns: investorsAsked },
+        pending,
+      ),
+    ).toBe(true);
+    expect(
+      aboutWaitingCards(
+        { utterance: "yes, go ahead", recentTurns: [] },
+        pending,
+      ),
+    ).toBe(true);
   });
 });

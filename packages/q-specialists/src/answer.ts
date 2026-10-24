@@ -498,6 +498,20 @@ function companyCardsShownIn(
   );
 }
 
+/** Blocks that are words, not something on screen to look at again. */
+const TEXT_ONLY_BLOCKS: ReadonlySet<QResultBlock["kind"]> = new Set([
+  "FINDING",
+  "UNCERTAINTY",
+  "EVIDENCE",
+  "TEXT",
+  "SUMMARY",
+  "COMPANY_REFERENCE",
+  "INVESTOR_REFERENCE",
+  "PUBLIC_SOURCE",
+  "CLARIFICATION_REQUEST",
+  "ATTENTION",
+]);
+
 /** Said when an earlier turn's own blocks are shown again (v54 fromShown). */
 export const RESHOWN_LINE = "Here's what I showed you, back on screen.";
 
@@ -1406,7 +1420,16 @@ export function continuesQsQuestion(
   const lastQ = [...before].reverse().find((m) => m.role === "Q");
   if (lastQ === undefined) return false;
   const asked = lastQ.content.trim();
-  if (!/\?["”)]?$/u.test(asked)) return false;
+  // A question, or an invitation to answer one ("… Tell me which to look
+  // into further." -- coordinator replay 2026-10-24: "Yes. No, not
+  // Halyard. Capital Q" after it opened Capital Q's page).
+  const lastSentence = asked.split(/(?<=[.!?])\s+/u).at(-1) ?? asked;
+  const invites =
+    /\?["”)]?$/u.test(asked) ||
+    /^(?:tell me|let me know|say|just say|pick|choose|which)\b/iu.test(
+      lastSentence.trim(),
+    );
+  if (!invites) return false;
   if (
     /^(?:Which one do you mean|I can't find)\b/u.test(asked) ||
     /\bDid you mean [^?]*\?$/u.test(asked)
@@ -5557,7 +5580,15 @@ export function createSpecialistQAnswer(
         (read.handOver ?? null) !== null ||
         read.teamJob === true;
       const blocks = reshownBlocks(shownTurn);
-      if (fromShown.reshow && !asksToAct && blocks.length > 0) {
+      // Replay 2026-10-24 ("Can I see that" after a list of waiting
+      // approvals): that turn had only findings and references, so
+      // "Here's what I showed you, back on screen." showed nothing. Only
+      // something to look at is shown again; else the turn is answered.
+      if (
+        fromShown.reshow &&
+        !asksToAct &&
+        blocks.some((block) => !TEXT_ONLY_BLOCKS.has(block.kind))
+      ) {
         speculative.current?.cancel("ACTED");
         logger?.info(
           {
