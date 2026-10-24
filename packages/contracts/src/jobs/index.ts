@@ -34,3 +34,13 @@ export {
 } from "./definition.js";
 
 export { createJobRegistry, type JobRegistry } from "./registry.js";
+
+/**
+ * The database notification channel that wakes the workers' polling loops
+ * when new work is written: an outbox event, a document job, a queued
+ * slate refresh. Idle loops back off to save database round trips (the
+ * Supabase egress restriction, 24 Oct 2026); this keeps an upload's first
+ * hop prompt. The payload names the kind of work and nothing else, and a
+ * notification is a wake-up, never truth: the loop re-reads durable state.
+ */
+export const WORKERS_WAKE_CHANNEL = "workers_wake" as const;

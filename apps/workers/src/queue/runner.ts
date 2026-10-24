@@ -1,4 +1,5 @@
 import type { RunnerLogger } from "../outbox-runner.js";
+import { fixedInterval, type IdlePolicy } from "../idle-backoff.js";
 import { abortableSleep } from "../outbox-runner.js";
 import type { QueueClient, QueueMessage } from "./pgmq.js";
 
@@ -46,6 +47,8 @@ export type QueueRunnerOptions = {
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
   /** Injectable so backoff jitter is deterministic in tests. */
   readonly random?: (() => number) | undefined;
+  /** How to wait between empty polls; defaults to `pollIntervalMs` each time. */
+  readonly idle?: IdlePolicy | undefined;
 };
 
 export type QueueRunner = {
@@ -71,7 +74,9 @@ export function backoffSeconds(
 
 export function createQueueRunner(options: QueueRunnerOptions): QueueRunner {
   const { client, logger, queue } = options;
-  const sleep = options.sleep ?? abortableSleep;
+  const idle =
+    options.idle ??
+    fixedInterval(options.pollIntervalMs, options.sleep ?? abortableSleep);
   const random = options.random ?? Math.random;
 
   async function deadLetter(
@@ -184,9 +189,8 @@ export function createQueueRunner(options: QueueRunnerOptions): QueueRunner {
             "queue batch failed",
           );
         }
-        if (handled === 0 && !signal.aborted) {
-          await sleep(options.pollIntervalMs, signal);
-        }
+        if (handled > 0) idle.worked();
+        else if (!signal.aborted) await idle.idle(signal);
       }
       logger.info({ queue }, "queue consumer stopped");
     },

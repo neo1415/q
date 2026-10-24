@@ -3,6 +3,8 @@ import type {
   PublishBatchResult,
 } from "@capital-q/eventing/publisher";
 
+import { fixedInterval, type IdlePolicy } from "./idle-backoff.js";
+
 /**
  * The polling loop that drives the outbox publisher.
  *
@@ -29,6 +31,8 @@ export type OutboxPublisherRunnerOptions = {
   /** Injectable for tests; defaults to an abortable setTimeout. */
   readonly sleep?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
+  /** How to wait between empty polls; defaults to `pollIntervalMs` each time. */
+  readonly idle?: IdlePolicy | undefined;
 };
 
 export type OutboxPublisherRunner = {
@@ -67,7 +71,9 @@ export function createOutboxPublisherRunner(
   options: OutboxPublisherRunnerOptions,
 ): OutboxPublisherRunner {
   const { publisher, batchSize, pollIntervalMs, logger } = options;
-  const sleep = options.sleep ?? abortableSleep;
+  const idlePolicy =
+    options.idle ??
+    fixedInterval(pollIntervalMs, options.sleep ?? abortableSleep);
 
   return {
     run: async (signal) => {
@@ -117,9 +123,8 @@ export function createOutboxPublisherRunner(
           );
         }
 
-        if (idle && !signal.aborted) {
-          await sleep(pollIntervalMs, signal);
-        }
+        if (!idle) idlePolicy.worked();
+        else if (!signal.aborted) await idlePolicy.idle(signal);
       }
 
       logger.info({}, "outbox publisher stopped");

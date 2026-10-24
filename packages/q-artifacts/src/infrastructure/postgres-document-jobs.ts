@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { WORKERS_WAKE_CHANNEL } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import {
@@ -51,6 +52,8 @@ export function createPostgresDocumentJobRepository(options: {
           ${job.tenantId}, ${job.organisationId}, ${job.artifactId},
           ${job.userId}, ${job.runId}, ${job.kind},
           ${tx.sql.json(DocumentJobInputSchema.parse(job.input))}::jsonb)`;
+      // Wakes a backed-off worker when this commits.
+      await tx.sql`select pg_notify(${WORKERS_WAKE_CHANNEL}, 'document_job')`;
     },
 
     progress: async (actor, artifactId) => {

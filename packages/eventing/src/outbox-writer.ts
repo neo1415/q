@@ -6,6 +6,7 @@ import {
   type CapitalQEvent,
   type EventRegistry,
   type UtcTimestamp,
+  WORKERS_WAKE_CHANNEL,
 } from "@capital-q/contracts";
 import type { TransactionContext } from "@capital-q/database";
 
@@ -115,6 +116,9 @@ export function createOutboxWriter(options: OutboxWriterOptions): OutboxWriter {
         inserted.length > 0 &&
         InsertedRowSchema.safeParse(inserted[0]).success
       ) {
+        // Delivered on commit, never for a rolled-back event; repeats in
+        // one transaction collapse into a single notification.
+        await tx.sql`select pg_notify(${WORKERS_WAKE_CHANNEL}, 'outbox')`;
         return { status: "ENQUEUED" };
       }
 
