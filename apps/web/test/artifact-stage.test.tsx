@@ -3,7 +3,11 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { QPageManifestSchema, type QResultBlock } from "@capital-q/contracts";
+import {
+  QArtifactIdSchema,
+  QPageManifestSchema,
+  type QResultBlock,
+} from "@capital-q/contracts";
 
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 import type { QTurn } from "../src/features/q/conversation";
@@ -205,6 +209,37 @@ describe("an artifact shows when Q shows it (FAIL-2)", () => {
         ).not.toBeNull(),
       { timeout: 10_000 },
     );
+  });
+});
+
+describe("QA U2: a document on the stage is drawn once", () => {
+  it("a lone document card has no second frame with its title", async () => {
+    const turns = [
+      person("p1", "Make me a one-page investor brief PDF."),
+      answer("a1", "Here's the brief for Maji Loop.", [
+        {
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: QArtifactIdSchema.parse(
+            "a0000000-0000-4000-8000-000000000002",
+          ),
+          type: "INVESTMENT_BRIEF",
+          title: "Investment brief — Maji Loop",
+          status: "READY",
+        },
+      ]),
+    ];
+    const { container } = render(stage(turns));
+    await waitFor(
+      () =>
+        expect(container.querySelector('[data-q-shown="a1"]')).not.toBeNull(),
+      { timeout: 10_000 },
+    );
+    const heading = container.querySelector('[data-q-shown="a1"] h2');
+    // Named for screen readers; the card shows the title once.
+    expect(heading?.className).toContain("sr-only");
+    expect(
+      container.querySelector('[data-q-shown="a1"] [data-q-shown-dismiss]'),
+    ).not.toBeNull();
   });
 });
 

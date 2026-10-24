@@ -25,6 +25,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/discover" }));
 
 const {
   announceDocument,
+  documentsOnStage,
   expectDocument,
   readyChanges,
   resetReadyDocuments,
@@ -251,5 +252,54 @@ describe("the document-ready card, on any page", () => {
       await vi.advanceTimersByTimeAsync(9_000);
     });
     expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("QA U2: a document on the stage raises no ready toast", () => {
+  beforeEach(() => resetReadyDocuments());
+
+  const brief = {
+    artifactId: BRIEF,
+    type: "INVESTMENT_BRIEF",
+    title: "Investment brief — Maji Loop",
+    version: 1,
+    status: "READY" as const,
+  };
+
+  function Toasts() {
+    const ready = useReadyDocuments();
+    return (
+      <ul>
+        {ready.map((one) => (
+          <li key={one.artifactId}>{one.title}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  it("is not announced while it is on the stage", () => {
+    render(<Toasts />);
+    act(() => {
+      documentsOnStage([BRIEF]);
+      announceDocument(brief);
+    });
+    expect(screen.queryByText("Investment brief — Maji Loop")).toBeNull();
+  });
+
+  it("takes down a toast already up when the stage shows it", () => {
+    render(<Toasts />);
+    act(() => announceDocument(brief));
+    expect(screen.getByText("Investment brief — Maji Loop")).toBeTruthy();
+    act(() => documentsOnStage([BRIEF]));
+    expect(screen.queryByText("Investment brief — Maji Loop")).toBeNull();
+  });
+
+  it("other documents still raise theirs", () => {
+    render(<Toasts />);
+    act(() => {
+      documentsOnStage([BRIEF]);
+      announceDocument({ ...brief, artifactId: DECK, title: "Deck" });
+    });
+    expect(screen.getByText("Deck")).toBeTruthy();
   });
 });

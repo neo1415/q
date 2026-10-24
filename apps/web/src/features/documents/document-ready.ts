@@ -37,10 +37,23 @@ function emit(): void {
 const keyOf = (document: ReadyDocument): string =>
   `${document.artifactId}:${String(document.version)}:${document.status}`;
 
+/**
+ * QA U2 (24 Oct 2026): a brief Q put on the stage was shown again, at the
+ * same moment, as a "Ready" toast. A document on the stage is already in
+ * front of them: it raises no toast, and one already up for it goes.
+ */
+let onStage: ReadonlySet<string> = new Set();
+
+export function documentsOnStage(artifactIds: readonly string[]): void {
+  onStage = new Set(artifactIds);
+  for (const artifactId of artifactIds) dismissDocument(artifactId);
+}
+
 export function announceDocument(document: ReadyDocument): void {
   const key = keyOf(document);
   if (announced.has(key)) return;
   announced.add(key);
+  if (document.status === "READY" && onStage.has(document.artifactId)) return;
   toasts = [
     document,
     ...toasts.filter((shown) => shown.artifactId !== document.artifactId),
@@ -118,6 +131,7 @@ export function useViewingDocument(): string | null {
 export function resetReadyDocuments(): void {
   toasts = [];
   announced.clear();
+  onStage = new Set();
   watchUntil = 0;
   viewing = null;
   setViewerDocument(null);

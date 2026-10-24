@@ -30,6 +30,7 @@ import { whenIdle } from "./room/room-read";
 import { roomStage } from "./room/room-stage";
 import { useWire } from "./use-wire";
 import { RenderedMark } from "./artifact-rendered";
+import { documentsOnStage } from "@/features/documents/document-ready";
 import { useT } from "@/features/i18n/language";
 
 /** W7: how long after the stage mounts its likely next code is fetched. */
@@ -313,6 +314,27 @@ export function QPresenceStage({
     readonly block: QAnswerCardsBlock;
   } | null>(null);
   const canvasId = canvas?.item.id ?? null;
+
+  // QA U2: what the stage shows of documents, so the ready toast stays down
+  // for a document already in front of them, and a lone document card is
+  // drawn without a second frame around it.
+  const stageVisible = shown !== null && canvas === null && !putAway && !inRoom;
+  const stageDocuments = stageVisible
+    ? shown.blocks.flatMap((block) =>
+        block.kind === "ARTIFACT_REFERENCE" ? [block.artifactId] : [],
+      )
+    : [];
+  const stageDocumentsKey = stageDocuments.join(",");
+  useEffect(() => {
+    documentsOnStage(
+      stageDocumentsKey === "" ? [] : stageDocumentsKey.split(","),
+    );
+  }, [stageDocumentsKey]);
+  useEffect(() => () => documentsOnStage([]), []);
+  const soleDocument =
+    stageVisible &&
+    shown.blocks.length === 1 &&
+    shown.blocks[0]?.kind === "ARTIFACT_REFERENCE";
   // The answer whose preview replaced the set on screen: its own cards
   // take the preview's place, and the set it replaced has already gone,
   // so nothing flies to the Board on top of the new cards.
@@ -541,17 +563,31 @@ export function QPresenceStage({
       {shown === null || canvas !== null || putAway || inRoom ? null : (
         <section
           aria-labelledby={`${listId}-shown-title`}
-          className="flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+          className={
+            soleDocument
+              ? "flex max-h-[60dvh] w-full flex-col overflow-hidden"
+              : "flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+          }
           data-q-shown={shown.id}
         >
-          {/* Its title and Dismiss stay in view while the object scrolls. */}
+          {/* Its title and Dismiss stay in view while the object scrolls. A
+              lone document card carries its own title, so the frame's goes
+              to screen readers only (QA U2: a frame inside a frame). */}
           <div
-            className="flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pe-1 ps-4"
+            className={
+              soleDocument
+                ? "flex min-h-11 flex-none items-center justify-end"
+                : "flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pe-1 ps-4"
+            }
             data-q-shown-header
           >
             <h2
               id={`${listId}-shown-title`}
-              className="cq-body min-w-0 truncate font-medium text-(--cq-text-primary)"
+              className={
+                soleDocument
+                  ? "sr-only"
+                  : "cq-body min-w-0 truncate font-medium text-(--cq-text-primary)"
+              }
             >
               {shown.title}
             </h2>
@@ -569,7 +605,14 @@ export function QPresenceStage({
               />
             </button>
           </div>
-          <div className="min-h-0 overflow-y-auto p-4" data-q-shown-body>
+          <div
+            className={
+              soleDocument
+                ? "min-h-0 overflow-y-auto"
+                : "min-h-0 overflow-y-auto p-4"
+            }
+            data-q-shown-body
+          >
             <Suspense fallback={null}>
               <QResultBlocks
                 blocks={shown.blocks}
