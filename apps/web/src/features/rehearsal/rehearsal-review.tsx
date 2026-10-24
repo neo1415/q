@@ -28,7 +28,14 @@ import {
   RATING_WORDS,
   lengthWords,
 } from "./meet";
-import { momentTurn } from "./review-moments";
+import { addBoardItemAction } from "@/features/board/board-actions";
+
+import {
+  boardNotes,
+  endMoments,
+  momentTurn,
+  type EndMoment,
+} from "./review-moments";
 import { outOfTen } from "./rehearsals-home";
 import { ReviewRefresh } from "./review-refresh";
 import { useT } from "@/features/i18n/language";
@@ -157,6 +164,134 @@ function Writing() {
   );
 }
 
+/**
+ * The end card (owner 2026-10-24): how long it ran, the review's three
+ * strongest and three weakest moments with when they were said, and the
+ * notes kept on their board in one step. Each moment opens its line.
+ */
+function EndCard({
+  name,
+  duration,
+  strongest,
+  weakest,
+  onMoment,
+}: {
+  readonly name: string;
+  readonly duration: string;
+  readonly strongest: readonly EndMoment[];
+  readonly weakest: readonly EndMoment[];
+  readonly onMoment: (line: number) => void;
+}) {
+  const t = useT();
+  // One key for this card: saving twice keeps one note.
+  const [key] = useState(() => crypto.randomUUID());
+  const [saved, setSaved] = useState<
+    | { readonly state: "IDLE" | "SAVING" | "SAVED" }
+    | { readonly state: "FAILED"; readonly message: string }
+  >({ state: "IDLE" });
+  const save = async () => {
+    setSaved({ state: "SAVING" });
+    const result = await addBoardItemAction({
+      idempotencyKey: key,
+      request: {
+        kind: "NOTE",
+        title: `Rehearsal with ${name}: notes`.slice(0, 300),
+        notes: boardNotes({ name, duration, strongest, weakest }),
+      },
+    });
+    setSaved(
+      result.ok
+        ? { state: "SAVED" }
+        : { state: "FAILED", message: result.message },
+    );
+  };
+  const list = (title: string, moments: readonly EndMoment[], id: string) =>
+    moments.length === 0 ? null : (
+      <div className="flex flex-col gap-1.5">
+        <h3
+          id={id}
+          className="m-0 text-[13px] font-medium text-(--cq-text-secondary)"
+        >
+          {t(title)}
+        </h3>
+        <ol aria-labelledby={id} className="m-0 flex list-none flex-col p-0">
+          {moments.map((one) => (
+            <li key={one.moment}>
+              <button
+                type="button"
+                disabled={one.line === null}
+                onClick={() => {
+                  if (one.line !== null) onMoment(one.line);
+                }}
+                className="flex min-h-11 w-full items-start gap-3 rounded-(--cq-radius-md) px-2 py-1.5 text-start text-[14.5px] text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:hover:bg-transparent"
+              >
+                <span className="w-11 flex-none pt-px text-[13px] tabular-nums text-(--cq-text-tertiary)">
+                  {one.at ?? "–"}
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span>{one.moment}</span>
+                  {one.why.length === 0 ? null : (
+                    <span className="text-[13px] text-(--cq-text-secondary)">
+                      {one.why}
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  return (
+    <section
+      className={cx(card, "mt-4")}
+      aria-labelledby="end-card"
+      data-end-card
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2
+          id="end-card"
+          className="m-0 text-base font-semibold text-(--cq-text-primary)"
+        >
+          {t("How it went")}
+        </h2>
+        <span className="text-sm text-(--cq-text-secondary)">
+          {t(`${duration} with ${name}`)}
+        </span>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {list("Strongest moments", strongest, "end-strongest")}
+        {list("To work on", weakest, "end-weakest")}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {saved.state === "SAVED" ? (
+          <span role="status" className="text-sm text-(--cq-text-secondary)">
+            <Check size={14} aria-hidden="true" className="me-1 inline" />
+            {t("Saved to your board.")}{" "}
+            <Link href="/board" className="underline underline-offset-2">
+              {t("Open board")}
+            </Link>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saved.state === "SAVING"}
+            className={workButton("secondary", "min-h-11")}
+          >
+            {t("Save notes to my board")}
+          </button>
+        )}
+        {saved.state === "FAILED" ? (
+          <span role="status" className="text-sm text-(--cq-text-secondary)">
+            {saved.message}
+          </span>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function RehearsalReview({
   rehearsal,
   initialNote,
@@ -260,7 +395,24 @@ export function RehearsalReview({
           </p>
         </div>
       ) : (
-        <ScoreBlock review={review} previous={rehearsal.previousScore} />
+        <>
+          <ScoreBlock review={review} previous={rehearsal.previousScore} />
+          {review.wentRight.length + review.wentWrong.length === 0 ? null : (
+            <EndCard
+              name={name}
+              duration={lengthWords(
+                rehearsal.createdAt,
+                rehearsal.endedAt,
+                rehearsal.metrics.minutes,
+              )}
+              {...endMoments(review, rehearsal.turns, rehearsal.createdAt)}
+              onMoment={(line) => {
+                const index = improve.findIndex((item) => item.line === line);
+                pick(index, line);
+              }}
+            />
+          )}
+        </>
       )}
 
       {nothing ? null : (

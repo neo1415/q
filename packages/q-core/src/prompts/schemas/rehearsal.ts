@@ -658,3 +658,21 @@ export const RehearsalTurnV9ResultSchema = RehearsalTurnV8ResultSchema.extend({
   beats: z.array(RehearsalBeatSchema).max(REHEARSAL_BEATS_MAX),
 }).strict();
 export type RehearsalTurnV9Result = z.infer<typeof RehearsalTurnV9ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v14 prompt (owner 2026-10-24, rehearsal room upgrade): the played person's
+// stance in this line -- asking, disagreeing or deciding -- said by the
+// model that wrote the line, so the room's tag is never invented by code.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V10_SCHEMA_VERSION = 10;
+
+export const REHEARSAL_STANCES = ["ASKS", "DISAGREES", "DECIDES"] as const;
+export type RehearsalStance = (typeof REHEARSAL_STANCES)[number];
+
+export const RehearsalTurnV10ResultSchema = RehearsalTurnV9ResultSchema.extend({
+  stance: z.enum(REHEARSAL_STANCES).nullable(),
+}).strict();
+export type RehearsalTurnV10Result = z.infer<
+  typeof RehearsalTurnV10ResultSchema
+>;

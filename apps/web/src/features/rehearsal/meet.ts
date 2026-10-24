@@ -285,3 +285,75 @@ export function readyToLeave(input: {
   if (heard) return input.nowMs - input.lastSoundMs >= GOODBYE_PAUSE_MS;
   return since >= GOODBYE_START_MS + GOODBYE_PAUSE_MS;
 }
+
+/**
+ * The name a caption gives the played person (owner 2026-10-24: "the
+ * speaker's first name"): a person's first name; an organisation has none,
+ * so it keeps its whole name.
+ */
+export function captionName(
+  name: string,
+  entityKind: "PERSON" | "ORGANIZATION" | "GOVERNMENT_AGENCY" | undefined,
+  counterpartKind: string,
+): string {
+  const person =
+    entityKind === "PERSON" ||
+    (entityKind === undefined && counterpartKind === "EXTERNAL_PERSON");
+  if (!person) return name;
+  const first = name
+    .replace(/\([^)]*\)/gu, " ")
+    .trim()
+    .split(/\s+/u)[0];
+  return first === undefined || first.length === 0 ? name : first;
+}
+
+const STANCE_WORDS: Readonly<Record<string, string>> = {
+  ASKS: "Asks",
+  DISAGREES: "Disagrees",
+  DECIDES: "Decides",
+};
+
+/** The small tag for what their line does, as the line itself said. */
+export function stanceTag(stance: string | null | undefined): string | null {
+  return stance === null || stance === undefined
+    ? null
+    : (STANCE_WORDS[stance] ?? null);
+}
+
+const plain = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * Whether the stored line is the one being spoken now: the record catches
+ * up a moment after the voice starts, and a tag from the line before must
+ * never sit on the new one.
+ */
+export function sameLine(stored: string, spoken: string): boolean {
+  const a = plain(stored);
+  const b = plain(spoken);
+  if (a.length === 0 || b.length === 0) return false;
+  const head = b.slice(0, 40);
+  return a.includes(head) || b.includes(a.slice(0, 40));
+}
+
+/**
+ * "They're waiting for your answer" (owner 2026-10-24): their last line
+ * asked them something, nobody has said anything since, and nobody is
+ * speaking or thinking now.
+ */
+export function waitingForAnswer(input: {
+  readonly lastFrom: "THEM" | "YOU" | null;
+  readonly lastStance: string | null | undefined;
+  readonly busy: boolean;
+  readonly ended: boolean;
+}): boolean {
+  return (
+    !input.ended &&
+    !input.busy &&
+    input.lastFrom === "THEM" &&
+    input.lastStance === "ASKS"
+  );
+}

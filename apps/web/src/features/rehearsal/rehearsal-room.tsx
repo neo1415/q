@@ -48,6 +48,7 @@ import {
 import { isLineLive, type VoiceTranscriptLine } from "@/features/voice/session";
 
 import {
+  captionName,
   clockLabel,
   elapsedLabel,
   greySignature,
@@ -58,7 +59,10 @@ import {
   LOOK_WIDTH,
   SEE_YOU_CONSENT,
   readyToLeave,
+  sameLine,
   shouldLook,
+  stanceTag,
+  waitingForAnswer,
 } from "./meet";
 import {
   raiseHandAction,
@@ -714,17 +718,64 @@ export function RehearsalRoom({
     };
   }, [sharing, sendFrame]);
 
-  // Captions: the newest line, from the voice line or the typed turns.
+  // Captions: the newest line, from the voice line or the typed turns,
+  // with the speaker's first name (owner 2026-10-24).
   const spoken = voice.transcript.at(-1);
   const lastTurn = rehearsal.turns.at(-1);
+  const theirName = captionName(
+    name,
+    simulation?.entityKind,
+    rehearsal.counterpart.kind,
+  );
   const caption = lineLive
     ? spoken === undefined
       ? null
-      : { who: spoken.role === "q" ? name : "You", text: spoken.text }
+      : { who: spoken.role === "q" ? theirName : t("You"), text: spoken.text }
     : lastTurn === undefined
       ? null
-      : { who: lastTurn.from === "THEM" ? name : "You", text: lastTurn.text };
+      : {
+          who: lastTurn.from === "THEM" ? theirName : t("You"),
+          text: lastTurn.text,
+        };
   const thinking = voice.state === "THINKING" || sending;
+  // What their line does (Asks, Disagrees, Decides): the played line's own
+  // stance (INVESTOR_TWIN_TURN v14), shown while they say it. On the voice
+  // line the record catches up a moment after they start, so it counts
+  // only once the stored line is the one being spoken.
+  const lastTheirs = [...rehearsal.turns]
+    .reverse()
+    .find((turn) => turn.from === "THEM");
+  const theirLineNow = lineLive
+    ? spoken !== undefined &&
+      spoken.role === "q" &&
+      lastTheirs !== undefined &&
+      sameLine(lastTheirs.text, spoken.text)
+      ? lastTheirs
+      : undefined
+    : lastTurn?.from === "THEM"
+      ? lastTurn
+      : undefined;
+  const stance =
+    theirLineNow === undefined ||
+    (lineLive && voice.state !== "Q_SPEAKING") ||
+    thinking
+      ? null
+      : stanceTag(theirLineNow.stance);
+  const waiting = waitingForAnswer({
+    lastFrom: lineLive
+      ? spoken === undefined
+        ? null
+        : spoken.role === "q"
+          ? "THEM"
+          : "YOU"
+      : (lastTurn?.from ?? null),
+    lastStance: theirLineNow?.stance,
+    busy:
+      thinking ||
+      (lineLive &&
+        (voice.state === "Q_SPEAKING" || voice.state === "USER_SPEAKING")),
+    ended,
+  });
   const mood = moodWord(
     [...rehearsal.turns].reverse().find((turn) => turn.from === "THEM"),
   );
@@ -765,6 +816,14 @@ export function RehearsalRoom({
           <span className="text-(--cq-stage-text-muted)"> · {mood}</span>
         ) : null}
       </span>
+      {stance === null ? null : (
+        <span
+          className="cq-caption absolute top-3 end-3 rounded-(--cq-radius-full) border border-(--cq-stage-border) bg-(--cq-stage-veil) px-2 py-0.5 text-(--cq-stage-text) transition-opacity duration-(--cq-motion-fast) motion-reduce:transition-none"
+          aria-label={`${theirName}: ${stance}`}
+        >
+          {t(stance)}
+        </span>
+      )}
     </div>
   );
 
@@ -872,17 +931,27 @@ export function RehearsalRoom({
             </div>
           )}
 
-          {captionsOn && caption !== null ? (
-            <div
-              aria-live="polite"
-              className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4"
-            >
-              <p className="cq-body max-w-3xl rounded-(--cq-radius-md) bg-(--cq-stage-veil) px-4 py-2 text-(--cq-stage-text)">
-                <span className="font-medium">{caption.who}: </span>
-                {caption.text.length > 280
-                  ? `…${caption.text.slice(-280)}`
-                  : caption.text}
-              </p>
+          {(captionsOn && caption !== null) || waiting ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-2 px-4">
+              {waiting ? (
+                <p
+                  role="status"
+                  className="cq-caption text-(--cq-stage-text-muted)"
+                >
+                  {t("They're waiting for your answer")}
+                </p>
+              ) : null}
+              {captionsOn && caption !== null ? (
+                <p
+                  aria-live="polite"
+                  className="cq-body max-w-3xl rounded-(--cq-radius-md) bg-(--cq-stage-veil) px-4 py-2 text-(--cq-stage-text)"
+                >
+                  <span className="font-medium">{caption.who}: </span>
+                  {caption.text.length > 280
+                    ? `…${caption.text.slice(-280)}`
+                    : caption.text}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </main>

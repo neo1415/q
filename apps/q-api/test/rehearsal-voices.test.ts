@@ -801,7 +801,7 @@ describe("how the person Q plays talks (row 12, INVESTOR_TWIN_TURN v11)", () => 
     expect(
       createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
         .version,
-    ).toBe(13);
+    ).toBe(14);
     expect(template).toContain('"Speaks like" line');
     expect(template).toContain("code-switch");
   });

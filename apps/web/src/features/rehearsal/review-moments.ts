@@ -106,3 +106,81 @@ export function bestMatch(
     })),
   );
 }
+
+/** "4:07": how far into the rehearsal a line was said. */
+export function atLabel(startedAt: string, at: string): string | null {
+  const seconds = Math.round((Date.parse(at) - Date.parse(startedAt)) / 1_000);
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+export type EndMoment = {
+  readonly moment: string;
+  readonly why: string;
+  /** The transcript line it is about; null when none is clear. */
+  readonly line: number | null;
+  /** How far in it was said; null when no line is clear. */
+  readonly at: string | null;
+};
+
+/**
+ * The end card's moments (owner 2026-10-24): the review's own strongest
+ * and weakest, three each, in the review's order, each tied to its line
+ * and time by code. Never ranked or invented here.
+ */
+export function endMoments(
+  review: {
+    readonly wentRight: readonly {
+      readonly moment: string;
+      readonly why: string;
+    }[];
+    readonly wentWrong: readonly {
+      readonly moment: string;
+      readonly why: string;
+    }[];
+  },
+  turns: readonly QRehearsalTurnDto[],
+  startedAt: string,
+): { readonly strongest: EndMoment[]; readonly weakest: EndMoment[] } {
+  const tie = (item: { readonly moment: string; readonly why: string }) => {
+    const line = momentTurn(item.moment, turns);
+    const turn = line === null ? undefined : turns[line];
+    return {
+      moment: item.moment,
+      why: item.why,
+      line,
+      at: turn === undefined ? null : atLabel(startedAt, turn.at),
+    };
+  };
+  return {
+    strongest: review.wentRight.slice(0, 3).map(tie),
+    weakest: review.wentWrong.slice(0, 3).map(tie),
+  };
+}
+
+/** The note the board keeps: what went well and what to work on, with times. */
+export function boardNotes(input: {
+  readonly name: string;
+  readonly duration: string;
+  readonly strongest: readonly EndMoment[];
+  readonly weakest: readonly EndMoment[];
+}): string {
+  const line = (one: EndMoment) =>
+    `- ${one.at === null ? "" : `${one.at} `}${one.moment}: ${one.why}`;
+  return [
+    `Rehearsal with ${input.name}, ${input.duration}.`,
+    "",
+    "Strongest moments",
+    ...(input.strongest.length === 0
+      ? ["- None noted"]
+      : input.strongest.map(line)),
+    "",
+    "To work on",
+    ...(input.weakest.length === 0
+      ? ["- None noted"]
+      : input.weakest.map(line)),
+  ]
+    .join("\n")
+    .slice(0, 8000);
+}

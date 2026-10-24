@@ -374,6 +374,7 @@ function setup(
           onlyNoise: false,
           screenNote: views.screen === null ? null : looks.screenNote,
           beats: [],
+          stance: "DECIDES",
         });
       }
       const reply: NonNullable<Awaited<ReturnType<RehearsalComposer["turn"]>>> =
@@ -401,6 +402,8 @@ function setup(
             variables.cue === "HAND_RAISED" || variables.difficulty === "TOUGH"
               ? []
               : [{ mood: "SKEPTICAL", intensity: "NORMAL" }],
+          // v14: what the line does, as the model says.
+          stance: variables.cue === "HAND_RAISED" ? null : "ASKS",
         };
       // R7: a streaming model hands its raw JSON over as it writes it.
       if (onTextDelta !== undefined) {
@@ -683,6 +686,26 @@ describe("rehearsals", () => {
     expect(
       hand.kind === "OK" ? hand.rehearsal.turns.at(-1)?.beats : "x",
     ).toBeUndefined();
+  });
+
+  // Owner 2026-10-24 (rehearsal room): the line's own stance reaches the
+  // room for the tag and "they're waiting for your answer"; a line code
+  // wrote (a yield to a raised hand) has none.
+  it("keeps the model's stance with their line, and none on a coded yield", async () => {
+    const { service } = setup();
+    const rehearsal = await startWith(service);
+    const said = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "We grow 40% a month.",
+    });
+    const reply = said.kind === "OK" ? said.rehearsal.turns.at(-1) : undefined;
+    expect(reply?.from).toBe("THEM");
+    expect(reply?.stance).toBe("ASKS");
+    const hand = await service.say(actor(FOUNDER), rehearsal.id, {
+      cue: "HAND_RAISED",
+    });
+    expect(
+      hand.kind === "OK" ? hand.rehearsal.turns.at(-1)?.stance : "x",
+    ).toBeNull();
   });
 
   it("hands the first sentence on while the model writes, only when nothing will change it (R7)", async () => {

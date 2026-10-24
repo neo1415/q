@@ -32,13 +32,15 @@ import {
   InvestorPersonaResultSchema,
   REHEARSAL_APPRAISALS_V4,
   REHEARSAL_DIMENSIONS_FOR,
+  REHEARSAL_STANCES,
   RehearsalReviewResultSchema,
   renderPrompt,
   type CounterpartPersonaStored as CounterpartPersonaResult,
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV9Result as RehearsalTurnResult,
+  type RehearsalStance,
+  type RehearsalTurnV10Result as RehearsalTurnResult,
   type RehearsalTurnV8Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -296,6 +298,8 @@ const StoredTurnSchema = z.object({
   warning: z.number().int().min(1).max(2).optional(),
   /** The played person's move for this line; absent on older rows. */
   move: z.string().max(20).optional(),
+  /** v14: what the played line does (ASKS, DISAGREES, DECIDES). */
+  stance: z.enum(REHEARSAL_STANCES).nullish(),
   /** Code's register and reading of the line it answered (the machine). */
   register: z.string().max(20).optional(),
   category: z.string().max(20).optional(),
@@ -323,6 +327,8 @@ export type Turn = {
   readonly warning?: 1 | 2 | undefined;
   /** Their move (QUESTION, FOLLOW_UP, REMARK…): whether a question is open. */
   readonly move?: string | undefined;
+  /** v14: what the played line does, as the model that wrote it said. */
+  readonly stance?: RehearsalStance | null | undefined;
   /** The register code delivered this line in. */
   readonly register?: string | undefined;
   /** Code's category for the person's line this answered (DODGE…). */
@@ -350,6 +356,7 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
         ? { warning: turn.warning }
         : {}),
       ...(turn.move === undefined ? {} : { move: turn.move }),
+      ...(turn.stance === undefined ? {} : { stance: turn.stance }),
       ...(turn.register === undefined ? {} : { register: turn.register }),
       ...(turn.category === undefined ? {} : { category: turn.category }),
     };
@@ -1230,6 +1237,9 @@ function toDto(
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
       ...(turn.beats === undefined ? {} : { beats: [...turn.beats] }),
+      ...(turn.from === "THEM" && turn.stance !== undefined
+        ? { stance: turn.stance }
+        : {}),
     })),
     ...(row.counterpartKind === "EXTERNAL_PERSON"
       ? {
@@ -1302,6 +1312,7 @@ export function yieldTo(previous: readonly Turn[]): {
       appraisal: "NEUTRAL",
       line: YIELD_LINES[theirs.length % YIELD_LINES.length] ?? "Go ahead.",
       beats: [],
+      stance: null,
       move: "YIELD",
       mood: last?.mood ?? "NEUTRAL",
       intensity: last?.intensity === "SOFT" ? "SOFT" : "NORMAL",
@@ -1440,6 +1451,7 @@ function holdingTurn(
       appraisal: "NEUTRAL",
       line: cue === "OPENING" ? HOLDING_LINES.OPENING : HOLDING_LINES.TURN,
       beats: [],
+      stance: null,
       move: "REMARK",
       mood: "NEUTRAL",
       intensity: "NORMAL",
@@ -2459,6 +2471,7 @@ export function createRehearsalService(dependencies: {
             ...result,
             move: "CLOSE",
             conclusion: "DECLINED",
+            stance: "DECIDES",
             // In their own manner: in anger, or a polite, quiet exit.
             line: step.manner === "COOL" ? POLITE_EXIT_LINE : WALK_OUT_LINE,
           }
@@ -2469,6 +2482,8 @@ export function createRehearsalService(dependencies: {
               // A close the machine did not decide is no close.
               move: result.move === "CLOSE" ? "REMARK" : result.move,
               conclusion: null,
+              // A close code did not let stand decides nothing.
+              stance: result.stance === "DECIDES" ? null : result.stance,
               line:
                 step.warning === null
                   ? withoutWarningTalk(result.line) || "Go on."
@@ -2825,6 +2840,7 @@ export function createRehearsalService(dependencies: {
             ...(opening.result.beats.length === 0
               ? {}
               : { beats: opening.result.beats }),
+            stance: opening.result.stance,
             state: opening.state,
           },
         ],
@@ -2948,6 +2964,7 @@ export function createRehearsalService(dependencies: {
             ? {}
             : { warning: warningOf(answered) }),
           move: result.move,
+          stance: result.stance,
           ...machineOf(answered),
         },
       ];

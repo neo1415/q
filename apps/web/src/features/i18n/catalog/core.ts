@@ -18,6 +18,8 @@ export const CORE_AR: Readonly<Record<string, string>> = {
   "Data room & deck": "غرفة البيانات والعرض",
   "Company requests": "طلبات الشركات",
   Rehearsals: "التدريبات",
+  // The rehearsal room, after their question (owner 2026-10-24).
+  "They're waiting for your answer": "ينتظرون إجابتك",
   Documents: "المستندات",
   Work: "المهام",
   Usage: "الاستخدام",
