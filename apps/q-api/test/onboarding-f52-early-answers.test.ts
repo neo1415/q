@@ -448,6 +448,84 @@ describe("QO-28: a never-invest sentence is saved once, as its red flags", () =>
 });
 
 describe("QO-27: stages are the ones they named", () => {
+  it("'seed and Series A' never saves Series B beside them", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+    });
+    const said = "Seed and Series A.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I2.stages",
+                  value: ["Seed", "Series A", "Series B"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+    }).turn({ ...turn(world, said), actor });
+    expect(world.recordedValue("I2.stages")).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["seed", "series_a"],
+    });
+  });
+
+  it("'never crypto, gambling or tobacco' keeps Speculative crypto (live 24 Oct)", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.hard_exclusions",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+    });
+    const said = "We never invest in crypto, gambling or tobacco.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I7.hard_exclusions",
+                  value: ["Speculative crypto", "Gambling", "Tobacco"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+    }).turn({ ...turn(world, said), actor });
+    const saved = world.recordedValue("I7.hard_exclusions");
+    expect(
+      saved?.type === "MULTI_SELECT" ? [...saved.optionKeys].sort() : [],
+    ).toEqual(["crypto_speculation", "gambling", "tobacco"]);
+  });
+
   it("'pre-seed and seed' never saves Series A beside them", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
