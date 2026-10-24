@@ -11,6 +11,7 @@ import {
   gapValue,
   hasFindingsFrom,
   pendingQuestion,
+  redrawnThread,
   progressLines,
   promptFor,
   promptStepOf,
@@ -638,5 +639,25 @@ describe("QA F-69: a deck is read back only once Q's findings from it are in", (
     expect(
       hasFindingsFrom({ pendingSuggestions: [suggestion(DOC)] }, DOC),
     ).toBe(true);
+  });
+});
+
+describe("a reload redraws the thread once (QA F-50)", () => {
+  const turns = [
+    { role: "Q" as const, text: "What's the name of your firm?" },
+    { role: "PERSON" as const, text: "Benali Atlas Capital." },
+    { role: "Q" as const, text: "Got it. Are you deploying capital now?" },
+  ];
+
+  it("leaves out Q's last line while it is the question on the table", () => {
+    expect(
+      redrawnThread(turns, "Got it. Are you deploying capital now?"),
+    ).toEqual(turns.slice(0, 2));
+  });
+
+  it("keeps everything when Q opens again, or the thread ends on them", () => {
+    expect(redrawnThread(turns, null)).toEqual(turns);
+    const theirs = turns.slice(0, 2);
+    expect(redrawnThread(theirs, "anything")).toEqual(theirs);
   });
 });
