@@ -20,6 +20,7 @@ import {
 } from "@capital-q/contracts";
 import {
   FOUNDER_COVERAGE_PROFILE,
+  FOUNDER_STEPS,
   FOUNDER_UTTERANCE_ALIASES,
 } from "@capital-q/founder-onboarding";
 import {
@@ -422,6 +423,13 @@ export function createOnboardingPort(input: {
    */
   let readAt: number | null = null;
   const written: string[] = [];
+  /** QO-25: the steps that hold their role now, and the reading of it. */
+  const ROLE_NOW_STEPS: ReadonlySet<string> = new Set([
+    FOUNDER_STEPS.founderRole,
+    INVESTOR_STEPS.businessTitle,
+  ]);
+  const ROLE_NOW_QUESTION =
+    "Do these words state the person's role today, in their own current company or firm (not a past job)?";
   /** QO-27: whether their words replace a list they gave before; null: unread. */
   const REPLACES_QUESTION =
     "Do these words replace what they said before for this (a correction such as 'not X, Y' or 'only Y'), rather than add to it?";
@@ -1978,6 +1986,22 @@ export function createOnboardingPort(input: {
     const resolvedRaw = await (warmed.get(answer) ?? resolve(answer));
     if (!resolvedRaw.ok) return done(resolvedRaw.result);
     const resolved = namedOnly(resolvedRaw, answer);
+    // QA QO-25 (23 Oct): "I was a product lead at Paystack" saved their
+    // role as Product; they are the CEO. A role is their role now: words
+    // about a past job are read by meaning and not recorded as it.
+    if (
+      ROLE_NOW_STEPS.has(resolved.step.stepKey) &&
+      answer.basis !== "DELEGATED" &&
+      (answer.quote ?? "").trim().length > 0 &&
+      (await input.wordsCheck?.(ROLE_NOW_QUESTION, answer.quote ?? "")) === "NO"
+    ) {
+      return done({
+        stepKey: resolved.step.stepKey,
+        outcome: "REJECTED",
+        reason:
+          "Those words describe a past role, not their role now, so nothing was recorded. Keep it as their background and ask what their role is today.",
+      });
+    }
     const verbatimMatch =
       verbatim !== null &&
       resolved.value.type === "SINGLE_SELECT" &&
