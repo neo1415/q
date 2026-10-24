@@ -235,6 +235,43 @@ const ANSWER_HERE =
   "I can answer it here from what Capital Q holds instead, if that helps.";
 
 /**
+ * Which outcome a line of Q's own came from, when teamJobLine wrote it:
+ * read back from the openings this file writes (a round trip the tests
+ * hold for every status), never from what a person said. The board reads
+ * it (F-78b, live 9ff4a1118): after a plan that failed or never started,
+ * "save that plan to my board" saves nothing.
+ */
+export function teamJobOutcomeOf(
+  content: string,
+): TeamJobOutcome["status"] | null {
+  const said = content.trimStart();
+  if (
+    said.startsWith("On it. Starting now") ||
+    said.startsWith("On it, starting now")
+  ) {
+    return "STARTED";
+  }
+  if (
+    said.startsWith("Work like this is already waiting for your approval") ||
+    (said.startsWith("Something like this is already waiting for you") &&
+      said.includes(PLAN_ANYWAY_QUESTION))
+  ) {
+    return "ALREADY_WAITING";
+  }
+  if (said.startsWith("I couldn't turn that into a plan I can carry out")) {
+    return "NOT_PLANNED";
+  }
+  if (said.startsWith("I've reached the limit of work I can take on")) {
+    return "LIMIT_REACHED";
+  }
+  if (said.startsWith("Taking on work like this isn't available")) {
+    return "UNAVAILABLE";
+  }
+  if (said.startsWith("I couldn't plan this just now")) return "FAILED";
+  return null;
+}
+
+/**
  * What Q says about the job: the plan in plain words and what needs them,
  * or, when nothing was planned, that nothing started and what they can do.
  */
