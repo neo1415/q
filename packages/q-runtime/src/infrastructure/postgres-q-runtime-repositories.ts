@@ -282,6 +282,7 @@ function toEvent(row: unknown): QRunEventRecord {
 }
 
 const IdRow = z.object({ id: z.string().uuid() });
+const RunIdRow = z.object({ run_id: QRunIdSchema });
 
 function selectConversation(executor: DatabaseExecutor) {
   return executor`
@@ -802,6 +803,7 @@ export function createPostgresQRuntimeRepositories(
         options = {},
       ) => {
         const readBack = options.readBack === true;
+        const after = options.afterMessageId ?? null;
         const rows = await executor`
           ${selectMessage(executor)}
            where m.tenant_id = ${tenantId}
@@ -810,9 +812,38 @@ export function createPostgresQRuntimeRepositories(
                select 1 from q_runtime.conversation_message_marks k
                 where k.message_id = m.id and k.tenant_id = m.tenant_id))
              and ${notSupersededRun(executor)}
+             and (${after}::uuid is null or (m.created_at, m.id) > (
+               select a.created_at, a.id
+                 from q_runtime.conversation_messages a
+                where a.id = ${after}::uuid
+                  and a.tenant_id = ${tenantId}
+                  and a.conversation_id = ${conversationId}))
            order by m.created_at desc, m.id desc
            limit ${limit}`;
         return withoutSupersededUtterances(rows.map(toMessage).reverse());
+      },
+      runsOfUtterancesThrough: async (
+        executor,
+        tenantId,
+        conversationId,
+        utteranceRefs,
+        throughMessageId,
+      ) => {
+        if (utteranceRefs.length === 0) return [];
+        const rows = await executor`
+          select distinct u.run_id
+            from q_runtime.conversation_messages u
+           where u.tenant_id = ${tenantId}
+             and u.conversation_id = ${conversationId}
+             and u.role = 'USER'
+             and u.provider_message_ref = any(${[...utteranceRefs]}::text[])
+             and (u.created_at, u.id) <= (
+               select a.created_at, a.id
+                 from q_runtime.conversation_messages a
+                where a.id = ${throughMessageId}::uuid
+                  and a.tenant_id = ${tenantId}
+                  and a.conversation_id = ${conversationId})`;
+        return rows.map((row) => RunIdRow.parse(row).run_id);
       },
       listRecentForConversationOfRun: async (
         executor,

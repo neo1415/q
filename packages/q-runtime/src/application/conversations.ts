@@ -47,6 +47,11 @@ export type GetQConversationQuery = {
   readonly actor: ActorContext;
   readonly conversationId: QConversationId;
   readonly correlationId?: CorrelationId | undefined;
+  /**
+   * Only the messages after this one (egress, 2026-10-24): a read-back
+   * carries the new turns, never the whole thread again.
+   */
+  readonly afterMessageId?: string | undefined;
 };
 
 export type GetQConversationResult = {
@@ -142,12 +147,37 @@ export function createGetQConversation(dependencies: QRuntimeDependencies) {
       query.conversationId,
       query.correlationId,
     );
+    const after = query.afterMessageId;
     const messages = await repositories.messages.listRecentForConversation(
       sql,
       conversation.tenantId,
       conversation.id,
       Q_CONVERSATION_MESSAGES_MAX,
+      after === undefined ? {} : { afterMessageId: after },
     );
+    // A later fragment of a spoken turn replaces the runs of its earlier
+    // ones; a client holding those is told to drop them.
+    const refs = [
+      ...new Set(
+        messages.flatMap((message) =>
+          message.role === "USER" && message.utteranceRef !== undefined
+            ? [message.utteranceRef]
+            : [],
+        ),
+      ),
+    ];
+    const withdrawn =
+      after === undefined ||
+      refs.length === 0 ||
+      repositories.messages.runsOfUtterancesThrough === undefined
+        ? []
+        : await repositories.messages.runsOfUtterancesThrough(
+            sql,
+            conversation.tenantId,
+            conversation.id,
+            refs,
+            after,
+          );
     const latestRun = await repositories.runs.findLatestForConversation(
       sql,
       conversation.tenantId,
@@ -164,6 +194,11 @@ export function createGetQConversation(dependencies: QRuntimeDependencies) {
         conversation: toQConversationSummary(conversation, opening),
         messages: messages.map(toQMessage),
         latestRun: latestRun === null ? null : toQRunHandle(latestRun),
+        ...(after === undefined
+          ? {}
+          : {
+              withdrawnRunIds: withdrawn.slice(0, Q_CONVERSATION_MESSAGES_MAX),
+            }),
       }),
     };
   };

@@ -9,6 +9,7 @@ import {
   Q_CONVERSATION_MESSAGE_HIDE_SUFFIX,
   Q_CONVERSATIONS_PATH,
   QConversationDetailSchema,
+  QConversationReadQuerySchema,
   QConversationIdSchema,
   QMessageIdSchema,
   type CorrelationId,
@@ -101,10 +102,18 @@ export function registerQConversationRoutes(
     conversationPath,
     { onRequest: withContext },
     async (request, reply) => {
+      const query = parseContract(
+        QConversationReadQuerySchema,
+        request.query ?? {},
+        "The conversation query is not valid.",
+      );
       const result = await service.getConversation({
         actor: getActorContext(request),
         conversationId: conversationIdParam(request),
         correlationId: correlation(),
+        ...(query.afterMessageId === undefined
+          ? {}
+          : { afterMessageId: query.afterMessageId }),
       });
       return reply
         .header("Cache-Control", "no-store")

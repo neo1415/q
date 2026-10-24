@@ -299,8 +299,27 @@ export type QConversationMessageRepository = {
      * speech for someone else, lines the person hid -- are left out. The
      * person's own history view keeps them.
      */
-    options?: { readonly readBack?: boolean | undefined },
+    options?: {
+      readonly readBack?: boolean | undefined;
+      /**
+       * Only messages after this one of the same conversation (egress,
+       * 2026-10-24); one not in it reads nothing.
+       */
+      readonly afterMessageId?: string | undefined;
+    },
   ) => Promise<readonly QConversationMessage[]>;
+  /**
+   * Runs of this conversation, up to and including the given message, that
+   * carry a spoken fragment with one of these utterance refs: the runs a
+   * later fragment replaced. Absent: none are reported.
+   */
+  readonly runsOfUtterancesThrough?: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+    utteranceRefs: readonly string[],
+    throughMessageId: string,
+  ) => Promise<readonly QRunId[]>;
   /**
    * Keep lines out of what Q reads back, append-only (20261110030000):
    * the person's lines not meant for Q, and Q's replies to them. Only

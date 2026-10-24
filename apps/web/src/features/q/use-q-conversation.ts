@@ -30,6 +30,7 @@ import {
   type CarriedApproval,
 } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
+import { nextCursor, withDelta } from "./conversation-delta";
 import {
   actedHere,
   contextAsked,
@@ -245,6 +246,8 @@ export function useQConversation(
     options.conversationId ?? null,
   );
   /** A change still waiting in this conversation whose run is not the open one. */
+  /** The last message a read of the thread returned (conversation-delta.ts). */
+  const readCursor = useRef<string | null>(null);
   // The server's waiting approvals as last read, and for which thread.
   const [waiting, setWaiting] = useState<{
     readonly key: string;
@@ -337,6 +340,7 @@ export function useQConversation(
     setRunId(null);
     openRun.current = null;
     finished.current = true;
+    readCursor.current = null;
   }, []);
 
   // Open the conversation the caller named, or start clean when it named
@@ -412,18 +416,19 @@ export function useQConversation(
           // record, so it stays. Dropping it left a conversation opened
           // mid-run (a Home card that started the run, then /home?c=)
           // showing Q's answer to a question nobody asked.
-          setHistory(
-            detail.messages.filter(
-              (message) =>
-                message.runId !== latest.runId || message.role === "USER",
-            ),
+          const recorded = detail.messages.filter(
+            (message) =>
+              message.runId !== latest.runId || message.role === "USER",
           );
+          setHistory(recorded);
+          readCursor.current = nextCursor(null, recorded);
           openRun.current = latest.runId;
           finished.current = false;
           setRunId(latest.runId);
           follow(latest.runId);
         } else {
           setHistory(detail.messages);
+          readCursor.current = nextCursor(null, detail.messages);
           openRun.current = latest?.runId ?? null;
           finished.current = true;
           setRunId(latest?.runId ?? null);
@@ -717,6 +722,43 @@ export function useQConversation(
     };
   }, [streaming, live, waitingKey, cards, waiting, carried, thread.length]);
 
+  const streamedMessages = useRef<readonly QMessage[]>([]);
+  useEffect(() => {
+    streamedMessages.current = runState.messages;
+  }, [runState.messages]);
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const id = conversationId.current;
+    if (id === null || !finished.current) return false;
+    // Egress (2026-10-24): only what came after the last message read.
+    const after = readCursor.current;
+    const result = await readQConversationAction(id, after ?? undefined);
+    // Only if nothing moved while the read was out: same conversation, and
+    // no typed run started in the meantime.
+    if (!result.ok || conversationId.current !== id || !finished.current) {
+      return false;
+    }
+    const read = result.value;
+    if (after === null) {
+      setHistory(read.messages);
+    } else {
+      // The streamed copies of finished runs are folded in, so nothing
+      // they showed is lost when the stream state is cleared below.
+      const streamed = streamedMessages.current;
+      setHistory((current) =>
+        withDelta(
+          [...current, ...streamed],
+          read.messages,
+          read.withdrawnRunIds ?? [],
+        ),
+      );
+    }
+    readCursor.current = nextCursor(after, read.messages);
+    // Every finished run's messages are in the record now; keeping the
+    // streamed copy as well would show them twice.
+    setRunState(createQStreamState());
+    return recordSettled(read.latestRun);
+  }, []);
+
   // A decision on the open run's proposal. The run resumes on the server
   // after a yes and its remaining events are followed again from the
   // cursor, so what the gate did arrives the same way the answer did.
@@ -744,21 +786,13 @@ export function useQConversation(
                 ),
               },
         );
-        const id = conversationId.current;
-        if (id !== null) {
-          for (const wait of [3_000, 10_000]) {
-            setTimeout(() => {
-              void readQConversationAction(id).then((read) => {
-                if (
-                  read.ok &&
-                  conversationId.current === id &&
-                  finished.current
-                ) {
-                  setHistory(read.value.messages);
-                }
-              });
-            }, wait);
-          }
+        // The engine runs the decided change; its line lands in the record
+        // shortly. Two reads of only what came after (never the whole
+        // thread again).
+        for (const wait of [3_000, 10_000]) {
+          setTimeout(() => {
+            void refresh();
+          }, wait);
         }
         return;
       }
@@ -781,7 +815,7 @@ export function useQConversation(
         follow(open);
       }
     },
-    [follow, runState.approval, carried],
+    [follow, refresh, runState.approval, carried],
   );
   const approve = useCallback(() => decide("APPROVE"), [decide]);
   const revised = useCallback(() => {
@@ -793,26 +827,6 @@ export function useQConversation(
   }, [follow]);
   const decline = useCallback(() => decide("REJECT"), [decide]);
 
-  const refresh = useCallback(async (): Promise<boolean> => {
-    const id = conversationId.current;
-    if (id === null || !finished.current) return false;
-    const result = await readQConversationAction(id);
-    // Only if nothing moved while the read was out: same conversation, and
-    // no typed run started in the meantime.
-    if (!result.ok || conversationId.current !== id || !finished.current) {
-      return false;
-    }
-    setHistory(result.value.messages);
-    // Every finished run's messages are in the record now; keeping the
-    // streamed copy as well would show them twice.
-    setRunState(createQStreamState());
-    return recordSettled(result.value.latestRun);
-  }, []);
-
-  const streamedMessages = useRef<readonly QMessage[]>([]);
-  useEffect(() => {
-    streamedMessages.current = runState.messages;
-  }, [runState.messages]);
   const absorb = useCallback((message: QMessage) => {
     if (
       streamedMessages.current.some(
