@@ -104,7 +104,7 @@ import {
   fenceUntrusted,
   dailyFollowUpKind,
   ModelFindingSchema,
-  textIsEnglish,
+  inTurnLanguage,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -5869,38 +5869,18 @@ export function createModelGatewayQAnswer(
        */
       const inTheirLanguage = async (text: string): Promise<string> => {
         const localise = dependencies.localiseWords;
-        if (localise === undefined || textIsEnglish(latest.content)) {
-          return text;
-        }
-        const pieces = text.split(/(\n+|(?<=[.!?])\s+(?=[\p{Lu}"'“‘([]))/u);
-        const english = pieces
-          .map((piece, at) => ({ piece, at }))
-          .filter(
-            ({ piece }) =>
-              !/^\s*$/u.test(piece) &&
-              // Two lower-case words make a line ("They're on screen."),
-              // where names alone ("Anchor, Afyascan") do not.
-              (piece.match(/(?<![\p{L}'])\p{Ll}[\p{Ll}']*/gu) ?? []).length >=
-                2 &&
-              textIsEnglish(piece),
-          );
-        if (english.length === 0) return text;
-        const said = await localise(
-          {
-            tenantId: request.tenantId,
-            userId: request.actorUserId,
-            runId: request.runId,
-            turn: latest.content,
-          },
-          english.map(({ piece }) => piece),
-        ).catch(() => null);
-        if (said === null) return text;
-        const out = [...pieces];
-        english.forEach(({ at }, index) => {
-          const words = said[index];
-          if (words !== null && words !== undefined) out[at] = words;
-        });
-        return out.join("");
+        if (localise === undefined) return text;
+        return inTurnLanguage(text, latest.content, (texts) =>
+          localise(
+            {
+              tenantId: request.tenantId,
+              userId: request.actorUserId,
+              runId: request.runId,
+              turn: latest.content,
+            },
+            texts,
+          ),
+        );
       };
       // The comparison's lead, decided by code (prepare's table, or the
       // model path's own table below when the prepare built none).
