@@ -6405,6 +6405,12 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // QO-27: whether a later answer replaces a list or adds to it, by meaning.
+  wordsCheck: (actor, question, words) =>
+    wordsReaders.check(
+      { tenantId: actor.tenantId, userId: actor.userId },
+      { question, utterance: words },
+    ),
   // Choice labels ("Seed", "CEO", "US dollar") whole, through the same
   // cache: product copy, never a name (live AL: kept English in Arabic).
   localiseLabels: async (actor, language, labels, options) => {
