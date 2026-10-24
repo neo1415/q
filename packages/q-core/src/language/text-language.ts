@@ -72,3 +72,42 @@ export function scriptLanguageOf(text: string): string | null {
   }
   return null;
 }
+
+/**
+ * QA F-96: a reply to a turn that is not in English, with every English
+ * sentence code wrote in it (an on-screen line, a verdict lead, a closing
+ * offer) put in the turn's language by `localise` (the shared translation
+ * layer, which keeps names and figures). A sentence `localise` has no
+ * words for stays as it was; an English turn's reply is returned unchanged
+ * and `localise` is never called.
+ */
+export async function inTurnLanguage(
+  text: string,
+  turn: string,
+  localise: (
+    texts: readonly string[],
+  ) => Promise<readonly (string | null)[] | null>,
+): Promise<string> {
+  if (textIsEnglish(turn)) return text;
+  const pieces = text.split(/(\n+|(?<=[.!?])\s+(?=[\p{Lu}"'“‘([]))/u);
+  const english = pieces
+    .map((piece, at) => ({ piece, at }))
+    .filter(
+      ({ piece }) =>
+        // Two lower-case words make a line ("They're on screen."), where
+        // names alone ("Anchor, Afyascan") do not.
+        (piece.match(/(?<![\p{L}'])\p{Ll}[\p{Ll}']*/gu) ?? []).length >= 2 &&
+        textIsEnglish(piece),
+    );
+  if (english.length === 0) return text;
+  const said = await localise(english.map(({ piece }) => piece)).catch(
+    () => null,
+  );
+  if (said === null) return text;
+  const out = [...pieces];
+  english.forEach(({ at }, index) => {
+    const words = said[index];
+    if (words !== null && words !== undefined) out[at] = words;
+  });
+  return out.join("");
+}
