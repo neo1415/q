@@ -300,6 +300,35 @@ describe("follow-ups answered from the conversation (owner live 2026-10-17)", ()
     expect(JSON.stringify(s.stored)).not.toContain("SAVED_COMPARISON");
   });
 
+  // Replay 2026-10-24: "Can I see that" after a list of waiting approvals
+  // (a turn of findings only) got "Here's what I showed you, back on
+  // screen." and nothing appeared. Only what can be looked at is re-shown.
+  it("never 're-shows' a turn that had nothing to look at; the turn is answered instead", async () => {
+    const conversation = randomUUID();
+    const s = seam({
+      said: "Can I see that",
+      conversationId: conversation,
+      history: [
+        message(conversation, "USER", "What do I have waiting for approval?"),
+        message(
+          conversation,
+          "Q",
+          "You have two items waiting for your approval.",
+          [
+            {
+              kind: "FINDING",
+              finding: { statement: "Two approvals are waiting." },
+            } as unknown as QResultBlock,
+          ],
+        ),
+      ],
+      fromShown: { turn: 1, reshow: true },
+    });
+    await s.answer.answer(request());
+    expect(s.stored.map((m) => m.content)).not.toContain(RESHOWN_LINE);
+    expect(s.delegated).toHaveLength(1);
+  });
+
   it("'so what was the second one?': answered from what Q said, zero tool calls, no ranking", async () => {
     const conversation = randomUUID();
     const s = seam({

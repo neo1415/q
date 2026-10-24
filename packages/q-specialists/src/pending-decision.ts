@@ -515,6 +515,15 @@ export function startPendingDecision(
         if (outcome.kind === "NONE") controller.abort();
         return outcome;
       }
+      // Replay 2026-10-24 (eight cards waiting): "Yes. No, not Halyard.
+      // Capital Q" answered Q's question about investors and was met with
+      // "Which one should I approve…?". A reply decides a waiting card
+      // only when it is about cards: Q's last line asked about one, the
+      // words name one, or they approve or decline in clear words.
+      if (!aboutWaitingCards(input, stage.allPending)) {
+        controller.abort();
+        return { kind: "NONE" };
+      }
       // A decision in plain words is read by code first, with no model
       // call (owner 2026-10-16); anything else is read by meaning below.
       const byWords = await decideByWords(port, input, stage, turn);
@@ -824,6 +833,32 @@ async function decideByWords(
     );
   }
   return { kind: "REPLY", line: lines.join(" ") };
+}
+
+/** Q's line asked about a waiting card (its own approval wording). */
+const CARD_PROMPT =
+  /\b(?:approve|approval|go ahead|ready to send|waiting for your (?:yes|approval)|not saved yet|on the card|shall i (?:send|book|save|prepare))\b/iu;
+/** Words that decide a card in themselves ("approve it", "cancel that"). */
+const CLEAR_DECISION =
+  /\b(?:approve|approved|go ahead|send it|book it|save it|confirm|decline|cancel|reject)\b/iu;
+
+/**
+ * Whether a reply is about the cards waiting at all (replay 2026-10-24):
+ * the conversation was opened to answer one (no turns yet), Q's last line
+ * asked about one, the words name one, or they decide in clear words. A
+ * "yes" to anything else is that question's answer, not an approval.
+ */
+export function aboutWaitingCards(
+  input: Pick<PendingDecisionInput, "utterance" | "recentTurns">,
+  pending: readonly { readonly summary: string }[],
+): boolean {
+  if (input.recentTurns.length === 0) return true;
+  const lastQ = [...input.recentTurns]
+    .reverse()
+    .find((turn) => turn.role === "Q")?.text;
+  if (lastQ !== undefined && CARD_PROMPT.test(lastQ)) return true;
+  if (namedIn(input.utterance, pending) !== null) return true;
+  return CLEAR_DECISION.test(input.utterance);
 }
 
 /** Said when the same change is asked for again: ready, waiting for a yes. */
