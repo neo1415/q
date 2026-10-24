@@ -40,6 +40,8 @@ const FILTER_MAX = 8;
  * F-82: the whole network (463 live), never the first 200 by name.
  */
 export const CATALOG_FIT_SCAN_MAX = 1000;
+/** The Permissions context's own bound per evaluateMany (DISCLOSURE_BATCH_MAX). */
+const DISCLOSURE_BATCH = 200;
 
 export const DiscoverCompaniesInputSchema = z
   .object({
@@ -227,16 +229,29 @@ export function createDiscoverCompaniesTool(
             ? CATALOG_FIT_SCAN_MAX
             : Math.min(input.limit * 3, 60),
       });
-      const decisions =
-        found.candidates.length === 0
-          ? []
-          : await ports.disclosure.evaluateMany(
-              found.candidates.map((candidate) => ({
+      // F-82 (live 2026-10-24): disclosure decides at most
+      // DISCLOSURE_BATCH more per call and throws past it; a scan of the
+      // whole network is decided in batches, in order.
+      const decisions: Awaited<
+        ReturnType<typeof ports.disclosure.evaluateMany>
+      >[number][] = [];
+      for (
+        let start = 0;
+        start < found.candidates.length;
+        start += DISCLOSURE_BATCH
+      ) {
+        decisions.push(
+          ...(await ports.disclosure.evaluateMany(
+            found.candidates
+              .slice(start, start + DISCLOSURE_BATCH)
+              .map((candidate) => ({
                 principal: actorPrincipal(context.actor),
                 resource: { type: "company" as const, id: candidate.companyId },
                 requestedAccess: "view" as const,
               })),
-            );
+          )),
+        );
+      }
       const seen = new Set<string>();
       const visible = found.candidates.filter((candidate, index) => {
         const decision = decisions[index];

@@ -106,24 +106,27 @@ describe("DISCOVER_COMPANIES tool (K1)", () => {
 });
 
 describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by name, then ranked)", () => {
-  // Thirty matches; the investor's best is the last of them by name.
+  // 463 matches, as live (F-82); the investor's best is the last by name.
   const ids = Array.from(
-    { length: 30 },
+    { length: 463 },
     (_, i) => `d0000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
   );
   const everyoneVisible = {
     canDisclose: () => Promise.reject(new Error("not used")),
+    // The real Permissions context throws past 200 per call (F-82 live).
     evaluateMany: (requests: readonly { resource: unknown }[]) =>
-      Promise.resolve(
-        requests.map((request) => ({
-          outcome: "ALLOW" as const,
-          resource: request.resource,
-          requestedAccess: "view" as const,
-          grantedAccess: "view" as const,
-          reasonCode: "NETWORK_VISIBLE" as const,
-          via: { kind: "INTRINSIC" as const },
-        })),
-      ),
+      requests.length > 200
+        ? Promise.reject(new RangeError("disclosure batch exceeds 200"))
+        : Promise.resolve(
+            requests.map((request) => ({
+              outcome: "ALLOW" as const,
+              resource: request.resource,
+              requestedAccess: "view" as const,
+              grantedAccess: "view" as const,
+              reasonCode: "NETWORK_VISIBLE" as const,
+              via: { kind: "INTRINSIC" as const },
+            })),
+          ),
   };
   function many(seen: Seen): CompanyCatalogPort {
     return {
@@ -132,7 +135,7 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
         return Promise.resolve({
           candidates: ids.map((companyId, i) => ({
             companyId,
-            name: `Company ${String(i + 1).padStart(2, "0")}`,
+            name: `Company ${String(i + 1).padStart(3, "0")}`,
             stageCode: "seed",
             headquartersCountry: "NG",
             shortDescription: null,
@@ -181,15 +184,15 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
     expect(outcome.status).toBe("SUCCEEDED");
     const data = (outcome.result as { data: Record<string, unknown> }).data;
     expect(data["order"]).toBe("FIT");
-    expect(data["total"]).toBe(30);
+    expect(data["total"]).toBe(463);
     expect(data["totalAtLeast"]).toBe(false);
     const companies = data["companies"] as { companyId: string }[];
-    // The 30th by name, never cut by a first page, leads.
+    // The 463rd by name, never cut by a first page or a batch, leads.
     expect(companies.map((c) => c.companyId)).toEqual(
       [...ids].reverse().slice(0, 5),
     );
     // Every match was scored, and the catalog was asked for all of them.
-    expect(scored.at(-1)).toHaveLength(30);
+    expect(scored.at(-1)).toHaveLength(463);
     // F-82: the whole network (463 live), never the first 200 by name.
     expect(seen.query?.limit).toBeGreaterThanOrEqual(463);
   });

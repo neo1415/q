@@ -27,7 +27,10 @@ import {
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
-import type { EligibilityReasonCode } from "../eligibility/contracts.js";
+import {
+  ELIGIBILITY_BATCH_MAX,
+  type EligibilityReasonCode,
+} from "../eligibility/contracts.js";
 import type { EligibilityService } from "../eligibility/service.js";
 import type { FitEvidenceLine } from "./stated.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
@@ -281,12 +284,23 @@ export function createFitService(
     const ids = [...new Set(companyIds)];
     if (ids.length === 0) return { kind: "OK", items: [] };
 
-    const evaluation = await dependencies.eligibility.evaluate({
-      actor,
-      purpose: "VIEW",
-      viewpoint: "ACTOR",
-      companyIds: ids,
-    });
+    // F-82 (live 2026-10-24): eligibility takes at most
+    // ELIGIBILITY_BATCH_MAX ids per call and throws past it; a rank over
+    // the whole network (463 live) asks in batches, one after another.
+    const evaluation: {
+      results: Awaited<
+        ReturnType<EligibilityService["evaluate"]>
+      >["results"][number][];
+    } = { results: [] };
+    for (let start = 0; start < ids.length; start += ELIGIBILITY_BATCH_MAX) {
+      const batch = await dependencies.eligibility.evaluate({
+        actor,
+        purpose: "VIEW",
+        viewpoint: "ACTOR",
+        companyIds: ids.slice(start, start + ELIGIBILITY_BATCH_MAX),
+      });
+      evaluation.results.push(...batch.results);
+    }
     // F5: only marketplace participation stood in the way, and the company
     // is an unclaimed public profile: its fit is readable from public facts.
     const onlyNotReady = evaluation.results
