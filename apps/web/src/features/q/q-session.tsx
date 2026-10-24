@@ -32,6 +32,7 @@ import { greetingSeed, warmGreeting } from "@/features/briefing/greeting";
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
 import { bindAttachmentsTo } from "./q-attachments";
+import { Q_WORK_SETTLED_EVENT } from "./work-live";
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
@@ -394,6 +395,13 @@ export function QSessionProvider({
     stopReread.current = rereadUntilSettled({ read: qRefresh });
   }, [qRefresh]);
   useEffect(() => () => stopReread.current?.(), []);
+  // Owner 2026-10-24: a document this page watched being made was filed;
+  // the record now holds Q's message delivering it.
+  useEffect(() => {
+    const settled = () => reread();
+    window.addEventListener(Q_WORK_SETTLED_EVENT, settled);
+    return () => window.removeEventListener(Q_WORK_SETTLED_EVENT, settled);
+  }, [reread]);
   useEffect(() => {
     if (voiceSequence === 0) return;
     reread();

@@ -17,6 +17,7 @@ import {
   TEAM_JOB_KINDS,
   goAheadGoal,
   earlierRequestGoal,
+  teamJobBlocks,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,
@@ -5426,7 +5427,12 @@ export function createSpecialistQAnswer(
         },
         "q work handed to the team: planned",
       );
-      return recordAnswer(request, conversationId, teamJobLine(planned));
+      return recordAnswer(
+        request,
+        conversationId,
+        teamJobLine(planned),
+        teamJobBlocks(planned),
+      );
     }
     // A LOW reading is a guess, and a guess never moves anybody's screen or
     // prepares a change: it is answered like any other turn. A document

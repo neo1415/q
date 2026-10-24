@@ -50,6 +50,7 @@ import {
 import { workStateOf } from "./job-state";
 import { WorkforceDocuments } from "./workforce-documents";
 import { WorkforcePlan } from "./workforce-plan";
+import { WorkLiveLine, isLiveWork } from "./work-live-line";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -377,6 +378,12 @@ function JobCard({
           {t(status.label)}
         </span>
       </div>
+      {/* Owner 2026-10-24: a document being made shows where it stands. */}
+      {isLiveWork(job.job.workState) ? (
+        <div className="border-t border-(--cq-border-subtle) px-4 py-3">
+          <WorkLiveLine jobId={job.job.id} />
+        </div>
+      ) : null}
       <WorkforcePlan plan={job.plan} />
       {lines.length > shown.length ? (
         <button

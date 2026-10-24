@@ -40,6 +40,7 @@ import type {
   WorkforceDiligenceInput,
   WorkforceDiligenceResult,
 } from "./diligence.js";
+import type { LiveReport } from "./live.js";
 import type { WorkforceModels } from "./models.js";
 import { heldLine, type OutwardReview } from "./review.js";
 import type { Owner, WorkforceStore } from "./store.js";
@@ -76,6 +77,8 @@ export type OpenConversation = {
 
 export type WorkforceDocumentInput = {
   readonly canContinue: () => Promise<boolean>;
+  /** Where the work stands, for the person watching (never awaited). */
+  readonly progress?: LiveReport | undefined;
   readonly request: WorkforceDocumentRequest;
   readonly goal: string;
   /** Original approved Q run, never the workforce step run. */
@@ -139,6 +142,8 @@ export type DocumentExecutionContext = {
   readonly organisationId: string;
   /** Checks cancellation AND the current worker's lease before each continuation. */
   readonly canContinue: () => Promise<boolean>;
+  /** Owner 2026-10-24: keeps where document work stands on the job's row. */
+  readonly progress?: LiveReport | undefined;
 };
 
 /** The app's own services an agent may call, each authorized for the owner. */
@@ -207,6 +212,8 @@ export type WorkforcePorts = {
           readonly query: string;
           /** What the step may spend (deep research). */
           readonly budgetUsd?: number | undefined;
+          /** Where the research stands, for the person watching. */
+          readonly progress?: LiveReport | undefined;
         },
       ) => Promise<ResearchFound>)
     | undefined;
@@ -371,6 +378,7 @@ export function createWorkforceExecutors(dependencies: {
             }
             const result = await ports.documents?.(owner, {
               canContinue: authority.canContinue,
+              progress: authority.progress,
               request,
               ...(source === undefined ? {} : { source }),
               ...(principalName === undefined ? {} : { principalName }),
@@ -610,6 +618,7 @@ export function createWorkforceExecutors(dependencies: {
               request: (dependencies.goal ?? step.goal).slice(0, 2_000),
               query: step.goal.slice(0, 400),
               budgetUsd: step.budgetUsd,
+              progress: dependencies.documentContext?.progress,
             })
             .catch(() => null);
           if (found === null || found.status === "UNAVAILABLE") {

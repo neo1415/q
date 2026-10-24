@@ -307,6 +307,8 @@ const ProposeQJobOutputSchema = z
     ]),
     /** STARTED: Q's first read of the question, from what it knows. */
     firstRead: z.string().max(700).nullable().optional(),
+    /** STARTED: the job, so the reply can follow it as it is made. */
+    jobId: z.string().uuid().optional(),
     plan: z
       .object({
         summary: z.string(),
@@ -408,7 +410,12 @@ export function createQJobTools(
         return {
           status: prepared.status,
           ...(prepared.status === "STARTED"
-            ? { firstRead: prepared.firstRead }
+            ? {
+                firstRead: prepared.firstRead,
+                ...(prepared.jobId === undefined
+                  ? {}
+                  : { jobId: prepared.jobId }),
+              }
             : {}),
           plan:
             prepared.status === "PREPARED" ||

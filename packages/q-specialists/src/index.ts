@@ -324,6 +324,7 @@ export {
   createToolTeamJobPort,
   TEAM_JOB_KINDS,
   earlierRequestGoal,
+  teamJobBlocks,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,

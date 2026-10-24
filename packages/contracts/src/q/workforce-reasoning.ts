@@ -159,3 +159,64 @@ export const WorkforcePlanProgressSchema = z
   })
   .strict();
 export type WorkforcePlanProgress = z.infer<typeof WorkforcePlanProgressSchema>;
+
+/**
+ * Owner 2026-10-24: the person sees their document being made. Where a
+ * running job's document work stands, recorded by code as it goes (counts
+ * and the draft's own headings, never prose a model wrote about itself);
+ * the screen words each stage in the person's language.
+ */
+export const WORKFORCE_LIVE_STAGES = [
+  "SEARCHING",
+  "READING",
+  "DRAFTING",
+  "REVIEWING",
+  "REVISING",
+  "FILING",
+] as const;
+export type WorkforceLiveStageName = (typeof WORKFORCE_LIVE_STAGES)[number];
+
+export const WorkforceLiveStageSchema = z
+  .object({
+    stage: z.enum(WORKFORCE_LIVE_STAGES),
+    /** SEARCHING: the questions being searched. */
+    questions: z.number().int().min(0).max(100).nullable(),
+    /** READING onwards: public sources read, facts kept from them. */
+    sources: z.number().int().min(0).max(500).nullable(),
+    facts: z.number().int().min(0).max(500).nullable(),
+    /** REVIEWING / REVISING: which draft, of at most how many. */
+    draft: z.number().int().min(1).max(6).nullable(),
+    drafts: z.number().int().min(1).max(6).nullable(),
+    /** Once drafted: the document's title and section headings. */
+    title: z.string().max(160).nullable(),
+    sections: z.array(z.string().max(120)).max(16),
+    at: UtcTimestampSchema,
+  })
+  .strict();
+export type WorkforceLiveStage = z.infer<typeof WorkforceLiveStageSchema>;
+
+export const WORKFORCE_LIVE_STATES = ["WORKING", "DONE", "STOPPED"] as const;
+
+/** `GET /v1/q/workforce/jobs/:jobId/live`: one job, read as its owner. */
+export const WorkforceLiveSchema = z
+  .object({
+    jobId: z.string().uuid(),
+    state: z.enum(WORKFORCE_LIVE_STATES),
+    /** Plan steps finished of all of them. */
+    done: z.number().int().min(0),
+    total: z.number().int().min(0),
+    stage: WorkforceLiveStageSchema.nullable(),
+    /** The filed document, once the job made one. */
+    document: z
+      .object({
+        artifactId: z.string().uuid(),
+        type: z.string().min(1).max(48),
+        title: z.string().min(1).max(160),
+      })
+      .strict()
+      .nullable(),
+    /** STOPPED: why, in the plain words the Work page shows. */
+    reason: z.string().max(500).nullable(),
+  })
+  .strict();
+export type WorkforceLive = z.infer<typeof WorkforceLiveSchema>;

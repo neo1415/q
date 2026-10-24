@@ -18,6 +18,7 @@ import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
 import type { ResearchFound } from "./jobs.js";
+import { safeReport } from "./live.js";
 import { subjectLines, type OwnResearchSubject } from "./own-subject.js";
 import type { WorkforceModels } from "./models.js";
 import type { WorkforcePortServices } from "./ports.js";
@@ -208,6 +209,7 @@ export function workforceDeepResearch(dependencies: {
     const own = subjectLines(
       (await dependencies.ownSubject?.(input.actor).catch(() => null)) ?? null,
     );
+    const report = safeReport(input.progress);
     let questions: DeepResearchQuestion[] = [];
     const planned = await models.planResearch(who, trace, {
       request,
@@ -239,6 +241,7 @@ export function workforceDeepResearch(dependencies: {
     }
 
     // 2. Round one, side by side.
+    report({ stage: "SEARCHING", questions: questions.length });
     const first = await deep.run({
       actor: input.actor,
       runId: input.runId,
@@ -293,6 +296,7 @@ export function workforceDeepResearch(dependencies: {
           });
         }
       });
+    report({ stage: "READING", sources: first.sources.length });
     const answered = questions.filter((question) =>
       first.lanes.some(
         (lane) => lane.lane === question.lane && lane.status === "OK",
@@ -334,6 +338,7 @@ export function workforceDeepResearch(dependencies: {
       );
       sources = more.sources;
       lanes = [...first.lanes, ...more.lanes];
+      report({ stage: "READING", sources: sources.length });
       await readFacts(
         second.filter((question) =>
           fresh.some((source) => source.lanes.includes(question.lane)),
@@ -354,6 +359,11 @@ export function workforceDeepResearch(dependencies: {
         excerpt: source.excerpt,
       })),
     );
+    report({
+      stage: "READING",
+      sources: sources.length,
+      facts: admitted.admitted.length,
+    });
     logger?.info(
       {
         jobId: input.jobId,

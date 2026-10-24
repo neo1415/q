@@ -111,6 +111,18 @@ export function createWorkforceDelivery(dependencies: {
       status: "READY",
       title: document.delivery.title.slice(0, 160),
     };
+    // Owner 2026-10-24: the same job's card, so the screen turns the card
+    // that followed the work into this document instead of showing two.
+    // The document reference stays first: what reads Q's last answer for
+    // its document (save it, break it into tasks) reads it unchanged.
+    const blocks: readonly QResultBlock[] = [
+      block,
+      {
+        kind: "WORK_IN_PROGRESS",
+        jobId: row.job_id,
+        title: document.delivery.title.slice(0, 160),
+      },
+    ];
     let posted = false;
     const runId = QRunIdSchema.safeParse(row.trace.runId);
     if (runId.success) {
@@ -132,7 +144,7 @@ export function createWorkforceDelivery(dependencies: {
               runId: run.id,
               role: "Q",
               content: text,
-              blocks: [block],
+              blocks,
             });
             await appendRunEvent(
               dependencies.runtime,
@@ -143,7 +155,7 @@ export function createWorkforceDelivery(dependencies: {
                 data: {
                   message: {
                     ...(toQMessage(stored) as QResponseMessage),
-                    blocks: [block],
+                    blocks: [...blocks],
                   },
                 },
               },

@@ -12,6 +12,7 @@ import type {
 } from "@capital-q/q-core";
 
 import type { ResearchDossier, Spend } from "./deep-research.js";
+import { safeReport, type LiveReport } from "./live.js";
 import type { Trace, Who, WorkforceModels } from "./models.js";
 
 /**
@@ -212,11 +213,14 @@ export async function writeAnalysisWithReview(dependencies: {
   readonly spend: Spend;
   readonly canContinue: () => Promise<boolean>;
   readonly inputs: AnalysisInputs;
+  /** Where the writing stands, for the person watching (never awaited). */
+  readonly progress?: LiveReport | undefined;
 }): Promise<{
   readonly draft: AnalysisDocumentResult;
   readonly review: AnalysisReview;
 } | null> {
   const { models, who, trace, spend, inputs } = dependencies;
+  const report = safeReport(dependencies.progress);
   let draft: AnalysisDocumentResult | null = null;
   let revision = "";
   const found: AnalysisIssue[] = [];
@@ -227,6 +231,11 @@ export async function writeAnalysisWithReview(dependencies: {
   while (drafts < ANALYSIS_MAX_DRAFTS) {
     if (!spend.canAfford(WRITE_CEILING_USD) && draft !== null) break;
     if (!(await dependencies.canContinue())) break;
+    report(
+      draft === null
+        ? { stage: "DRAFTING", draft: 1, drafts: ANALYSIS_MAX_DRAFTS }
+        : { stage: "REVISING", draft: drafts + 1, drafts: ANALYSIS_MAX_DRAFTS },
+    );
     const written = await models.writeAnalysis(who, trace, {
       principalName: inputs.principalName.slice(0, 120),
       request: inputs.request.slice(0, 4_000),
@@ -241,6 +250,15 @@ export async function writeAnalysisWithReview(dependencies: {
     if (written === null) break;
     draft = written.output;
     drafts += 1;
+    report({
+      stage: "REVIEWING",
+      draft: drafts,
+      drafts: ANALYSIS_MAX_DRAFTS,
+      title: draft.title.slice(0, 160),
+      sections: draft.sections
+        .slice(0, 16)
+        .map((section) => section.heading.slice(0, 120)),
+    });
     // Code's checks first: they are certain, and cost nothing.
     const coded = basisProblems(draft, inputs.sourceIndices);
     let verdict: AnalysisCritiqueResult | null = null;
