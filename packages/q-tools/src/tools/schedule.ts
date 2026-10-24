@@ -22,6 +22,8 @@ import {
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
 import type { RelationshipIntelligencePort } from "../ports.js";
+import { closestByName } from "./connection-requests.js";
+import { admitted } from "./relationships.js";
 import {
   CHAT_MESSAGE_SEND,
   ChatProposalOutputSchema,
@@ -319,6 +321,75 @@ type RelationshipGrant = {
   readonly connected: boolean;
 };
 
+/**
+ * F-92 (QA 2026-10-24): they asked for a call with someone they have no
+ * relationship with. Live, savanna-seed (no relationships at all) asked to
+ * schedule a call with a founder; the grant was refused as unavailable and
+ * Q said the relationship "isn't available in this conversation's
+ * context". The truth, which is about their own relationships only, is
+ * that they are not connected yet, and the way there is Express Interest.
+ */
+type NotConnected = {
+  readonly relationshipId: null;
+  readonly connected: false;
+  /** A company they named by its record, or a name none of theirs has. */
+  readonly by: "RECORD" | "NAME";
+};
+
+const NOT_CONNECTED_SAYS: Readonly<Record<NotConnected["by"], string>> = {
+  RECORD:
+    "Not connected with them yet, so no call can be booked and nothing was prepared: calls open once interest is expressed and accepted. Say so plainly, and offer to prepare Express Interest with a note asking for a call (propose_express_interest), for their approval.",
+  NAME: "None of their relationships goes by that name, so nothing was prepared. If it is a company they are not connected with yet, calls open once interest is expressed and accepted: offer to prepare Express Interest with a note asking for a call (propose_express_interest), for their approval. Otherwise ask whom they mean.",
+};
+
+/**
+ * Only for a counterparty this run may see (the plan admits the company or
+ * investor, as resolveRelationship requires), or a name matched against
+ * their own relationships; a relationship id never comes here.
+ */
+async function notConnected(
+  input: {
+    readonly relationshipId?: string | undefined;
+    readonly companyId?: string | undefined;
+    readonly investorOrganisationId?: string | undefined;
+    readonly counterpartName?: string | undefined;
+  },
+  actor: ActorContext,
+  plan: PermittedContextPlan,
+  relationships: RelationshipIntelligencePort,
+): Promise<NotConnected | null> {
+  const none = (by: NotConnected["by"]): NotConnected => ({
+    relationshipId: null,
+    connected: false,
+    by,
+  });
+  if (input.counterpartName !== undefined) {
+    if (relationships.ownRelationships === undefined) return null;
+    const own = await relationships.ownRelationships(actor);
+    if (own === null) return null;
+    const found = closestByName(
+      own.items,
+      input.counterpartName,
+      (item) => item.counterpart.name,
+    );
+    return found.length === 0 ? none("NAME") : null;
+  }
+  if (input.companyId !== undefined) {
+    if (!admitted(plan, { kind: "COMPANY", id: input.companyId })) return null;
+    return (await relationships.withCompany(actor, input.companyId)) === null
+      ? none("RECORD")
+      : null;
+  }
+  if (input.investorOrganisationId !== undefined) {
+    const id = input.investorOrganisationId;
+    if (!admitted(plan, { kind: "INVESTOR_ORGANISATION", id })) return null;
+    return (await relationships.withInvestor(actor, id)) === null
+      ? none("RECORD")
+      : null;
+  }
+  return null;
+}
+
 /** The time zone is what is missing: asked for, not refused. */
 class NoTimeZoneError extends QToolArgumentError {}
 
@@ -380,7 +451,7 @@ function createFindMeetingTimesTool(
   return defineQTool<
     z.output<typeof FindMeetingTimesInputSchema>,
     FindMeetingTimesOutput,
-    RelationshipGrant
+    RelationshipGrant | NotConnected
   >({
     id: FIND_MEETING_TIMES,
     version: 1,
@@ -401,13 +472,9 @@ function createFindMeetingTimesTool(
     output: FindMeetingTimesOutputSchema,
     authorize: async (input, { actor, plan }) => {
       try {
-        const grant = await relationshipGrant(
-          input,
-          actor,
-          plan,
-          chat,
-          relationships,
-        );
+        const grant =
+          (await relationshipGrant(input, actor, plan, chat, relationships)) ??
+          (await notConnected(input, actor, plan, relationships));
         return grant === null
           ? deny("NOT_AVAILABLE")
           : allow("CONFIDENTIAL", grant);
@@ -416,6 +483,15 @@ function createFindMeetingTimesTool(
       }
     },
     execute: async (input, context, grant) => {
+      if (grant.relationshipId === null) {
+        return {
+          status: "NOT_CONNECTED" as const,
+          counterpartName: input.counterpartName ?? "",
+          timeZone: null,
+          slots: [],
+          guidance: NOT_CONNECTED_SAYS[grant.by],
+        };
+      }
       const found = await schedule.findSlots(context.actor, {
         relationshipId: grant.relationshipId,
         durationMinutes: input.durationMinutes,
@@ -930,7 +1006,11 @@ export function createScheduleTools(
   return [
     createFindMeetingTimesTool(schedule, chat, relationships),
 
-    defineQTool<ProposeMeetingInput, ChatProposalOutput, RelationshipGrant>({
+    defineQTool<
+      ProposeMeetingInput,
+      ChatProposalOutput,
+      RelationshipGrant | NotConnected
+    >({
       ...proposal,
       id: PROPOSE_MEETING,
       providerName: "propose_meeting",
@@ -941,13 +1021,14 @@ export function createScheduleTools(
       input: ProposeMeetingInputSchema,
       authorize: async (input, { actor, plan }) => {
         try {
-          const grant = await relationshipGrant(
-            input,
-            actor,
-            plan,
-            chat,
-            relationships,
-          );
+          const grant =
+            (await relationshipGrant(
+              input,
+              actor,
+              plan,
+              chat,
+              relationships,
+            )) ?? (await notConnected(input, actor, plan, relationships));
           return grant === null
             ? deny("NOT_AVAILABLE")
             : allow("CONFIDENTIAL", grant);
@@ -956,6 +1037,12 @@ export function createScheduleTools(
         }
       },
       execute: async (input, context, grant) => {
+        if (grant.relationshipId === null) {
+          return {
+            status: "NOT_CONNECTED" as const,
+            awaitingApprovalOf: NOT_CONNECTED_SAYS[grant.by],
+          };
+        }
         if (!grant.connected) {
           return {
             status: "NOT_CONNECTED" as const,
