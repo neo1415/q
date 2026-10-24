@@ -28,6 +28,11 @@ export type QActionProposal = {
   readonly actionType: string;
   readonly payload: unknown;
   /**
+   * Why Q proposes it, as the model that prepared it wrote it ("Why: …"
+   * on the card); the action's own reason wins where it has one.
+   */
+  readonly reason?: string | undefined;
+  /**
    * Told the card's action id once the proposal and its approval request
    * are committed (founder brief J3: a graded draft is tied to its card so
    * the person's decision reaches the agents' learning). Best effort: a
@@ -241,6 +246,9 @@ export function createQActionPort(options: {
             correlationId: context.correlationId,
             actionType: proposal.actionType,
             payload: proposal.payload,
+            ...(proposal.reason === undefined
+              ? {}
+              : { reason: proposal.reason }),
           });
         // What this result covers: the card it is, and the cards it replaced.
         covered.add(action.id);

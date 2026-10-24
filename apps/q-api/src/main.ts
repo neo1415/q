@@ -20,6 +20,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
 import { webOriginFrom } from "./composition/web-origin.js";
+import { namedPictureOf } from "./http/q-approvals.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
 import { createOwnResearchSubject } from "./composition/workforce/own-subject.js";
@@ -3929,6 +3930,9 @@ const qActionPort = createQActionPort({
     logger,
     cardOnly: keepsItsCard,
     relay: decisionRelay,
+    // Approval card upgrade (QA lead 2026-10-24): whom a new card is aimed
+    // at, with their picture, as the pending list names it.
+    named: (targets) => namedPictureOf(namedPhotos, targets),
   }),
   logger,
 });

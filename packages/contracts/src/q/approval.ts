@@ -6,6 +6,7 @@ import {
   Q_ACTION_PREVIEW_MAX_LENGTH,
   Q_ACTION_SUMMARY_MAX_LENGTH,
   QActionClassSchema,
+  QActionReasonSchema,
   QActionStatusSchema,
   QActionTypeSchema,
   QActionVersionSchema,
@@ -53,6 +54,13 @@ export const QApprovalActionViewSchema = z
     summary: z.string().trim().min(1).max(Q_ACTION_SUMMARY_MAX_LENGTH),
     /** The exact material content the approval binds to, for review. */
     preview: z.string().max(Q_ACTION_PREVIEW_MAX_LENGTH).optional(),
+    /** Why Q proposes it ("Why: …"); presentation only, never bound. */
+    reason: QActionReasonSchema.optional(),
+    /**
+     * Whom it is aimed at (its first such target), with their picture
+     * under the viewer's scope, as QPendingApproval.named. Absent: none.
+     */
+    named: NamedPictureSchema.nullable().optional(),
     executedAt: UtcTimestampSchema.optional(),
   })
   .strict();

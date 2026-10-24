@@ -463,7 +463,7 @@ describe("propose_errand honours the time they asked for, or says why not (live 
     const data = (outcome.result as { data: { awaitingApprovalOf: string } })
       .data;
     expect(data.awaitingApprovalOf).toBe(
-      "Q looks after Apex for you; I can't book the call within 5 minutes: Q books a call at least 18 hours ahead, after they accept, so nobody is surprised, and it will take the first free time after that",
+      "Book a call with Apex, then Q looks after the rest; I can't book the call within 5 minutes: Q books a call at least 18 hours ahead, after they accept, so nobody is surprised, and it will take the first free time after that",
     );
     const plan = (
       prepared[0] as {
@@ -493,7 +493,7 @@ describe("propose_errand honours the time they asked for, or says why not (live 
     expect(
       (outcome.result as { data: { awaitingApprovalOf: string } }).data
         .awaitingApprovalOf,
-    ).toBe("Q looks after Apex for you");
+    ).toBe("Book a call with Apex, then Q looks after the rest");
     expect(
       (prepared[0] as { payload: { bookCall: { notBefore?: string } } }).payload
         .bookCall.notBefore,

@@ -18,6 +18,7 @@ import {
 import { boundScopeFor } from "../plan.js";
 import type { RelationshipIntelligencePort } from "../ports.js";
 import { admitted } from "./relationships.js";
+import { CardReasonSchema, reasonOf } from "./card-reason.js";
 
 /**
  * Relationship chat for Q (R34, R33: "by text and by voice").
@@ -177,6 +178,8 @@ export type ChatIntelligencePort = {
     readonly tenantId: string;
     readonly actorUserId: string;
     readonly proposal: ChatProposal;
+    /** Why Q proposes it ("Why: …" on the card); presentation only. */
+    readonly reason?: string | undefined;
   }) => "PREPARED" | "ONE_PER_TURN";
 };
 
@@ -432,6 +435,7 @@ export const ProposeChatMessageInputSchema = z
     documentId: UuidSchema.optional().describe(
       "Only to share one of the person's own documents, by the id they gave.",
     ),
+    reason: CardReasonSchema,
   })
   .strict()
   .refine(exactlyOne, ONE_REF);
@@ -517,6 +521,7 @@ function proposalTool<I extends ProposeChatMessageInput>(
         tenantId: context.actor.tenantId,
         actorUserId: context.actor.userId,
         proposal: spec.proposal(input, grant),
+        reason: reasonOf(input),
       });
       return Promise.resolve({
         status,

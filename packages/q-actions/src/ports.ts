@@ -36,6 +36,8 @@ export type QActionRecord = {
   readonly payloadHash: QActionPayloadHash;
   readonly summary: string;
   readonly preview: string | null;
+  /** Why Q proposed it ("Why: …"); presentation only, never bound. */
+  readonly reason: string | null;
   readonly status: QActionStatus;
   readonly idempotencyKey: string;
   readonly createdAt: UtcTimestamp;
@@ -62,6 +64,8 @@ export type NewQAction = {
   readonly payloadHash: QActionPayloadHash;
   readonly summary: string;
   readonly preview: string | null;
+  /** Absent: none. */
+  readonly reason?: string | null | undefined;
   readonly idempotencyKey: string;
 };
 

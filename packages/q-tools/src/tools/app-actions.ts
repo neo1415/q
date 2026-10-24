@@ -36,6 +36,7 @@ import { actorWideScope } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
 import { nameableRecords } from "./client-actions.js";
 import { actionTarget } from "./relationships.js";
+import { CardReasonSchema, reasonOf } from "./card-reason.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -58,6 +59,8 @@ export type AppApprovalPort = {
     readonly actorUserId: string;
     readonly actionType: string;
     readonly payload: unknown;
+    /** Why Q proposes it ("Why: …" on the card); presentation only. */
+    readonly reason?: string | undefined;
   }) => "PREPARED" | "ONE_PER_TURN";
 };
 
@@ -244,15 +247,20 @@ function toolFor(
     owner: "app-actions",
     visibleStage:
       action.classification === "CONSEQUENTIAL" ? "WAITING_FOR_APPROVAL" : null,
-    input: declared.input,
+    // A change for their approval may say why (the card's "Why: …"); the
+    // reason never enters the payload the approval binds to.
+    input:
+      action.classification === "CONSEQUENTIAL" &&
+      declared.input instanceof z.ZodObject
+        ? declared.input.extend({ reason: CardReasonSchema })
+        : declared.input,
     output: AppToolOutputSchema,
     authorize: async (input, execution) => {
       const { actor, plan } = execution;
       if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
       // Names to ids, by the one coercion; anything unclear is not acted on.
-      const resolved: Record<string, unknown> = {
-        ...(input as Record<string, unknown>),
-      };
+      const { reason: _reason, ...given } = input as Record<string, unknown>;
+      const resolved: Record<string, unknown> = { ...given };
       const names: Record<string, string> = {};
       const references: Readonly<Record<string, ReferenceKind | undefined>> =
         declared.references;
@@ -348,6 +356,7 @@ function toolFor(
           actorUserId: execution.actor.userId,
           actionType: `app.${action.name}`,
           payload: grant.canonical,
+          reason: reasonOf(_input),
         });
         return {
           status,

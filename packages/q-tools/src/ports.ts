@@ -369,6 +369,8 @@ export type RelationshipIntelligencePort = {
       | "relationship.connection_request.respond"
       | "relationship.connection_request.send";
     readonly payload: Readonly<Record<string, string | null>>;
+    /** Why Q proposes it ("Why: …" on the card); presentation only. */
+    readonly reason?: string | undefined;
   }) => "PREPARED" | "ONE_PER_TURN";
 };
 

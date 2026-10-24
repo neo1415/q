@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { NamedPictureSchema } from "../common/named-picture.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import {
   QActionProposalIdSchema,
@@ -221,6 +222,19 @@ export type QApprovalRequirement = z.infer<typeof QApprovalRequirementSchema>;
 
 export const Q_ACTION_SUMMARY_MAX_LENGTH = 1000;
 export const Q_ACTION_PREVIEW_MAX_LENGTH = 4000;
+/** Approval card upgrade (QA lead, 2026-10-24): "Why: …" on the card. */
+export const Q_ACTION_REASON_MAX_LENGTH = 200;
+
+/**
+ * Why Q proposes an action, as shown on its card ("Why: …"): written by
+ * code where the action knows it, otherwise by the model that prepared it.
+ * Presentation only: never part of the approval binding or payload hash.
+ */
+export const QActionReasonSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(Q_ACTION_REASON_MAX_LENGTH);
 
 export const QActionProposalSchema = z
   .object({
@@ -239,6 +253,13 @@ export const QActionProposalSchema = z
      * payload an approval binds to, and its hash, are CQ-Q-008's.
      */
     preview: z.string().max(Q_ACTION_PREVIEW_MAX_LENGTH).optional(),
+    /** Why Q proposes it ("Why: …"); presentation only, never bound. */
+    reason: QActionReasonSchema.optional(),
+    /**
+     * Whom it is aimed at (its first such target), with their picture
+     * under the viewer's scope, as QPendingApproval.named. Absent: none.
+     */
+    named: NamedPictureSchema.nullable().optional(),
     approval: QApprovalRequirementSchema,
     status: QActionProposalStatusSchema,
     createdAt: UtcTimestampSchema,

@@ -276,7 +276,16 @@ export function createErrandTools(
         });
         return {
           status,
-          awaitingApprovalOf: `Q looks after ${grant.counterpartName} for you${windowNote(input.callPurpose === null ? null : input.callWindow)}`,
+          // The card names its first action, as errandSummary does.
+          awaitingApprovalOf: `${
+            plan.expressInterest
+              ? `Express interest in ${grant.counterpartName}`
+              : plan.openingMessage !== null
+                ? `Message ${grant.counterpartName}`
+                : plan.bookCall !== null
+                  ? `Book a call with ${grant.counterpartName}`
+                  : `Answer ${grant.counterpartName}'s questions for you`
+          }, then Q looks after the rest${windowNote(input.callPurpose === null ? null : input.callWindow)}`,
         };
       },
     }),

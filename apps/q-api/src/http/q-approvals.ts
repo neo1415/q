@@ -17,6 +17,7 @@ import {
   RejectQApprovalRequestSchema,
   type CorrelationId,
   type QApprovalId,
+  type NamedPicture,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import {
@@ -125,6 +126,26 @@ export function namedTarget(
   return null;
 }
 
+/**
+ * Approval card upgrade (QA lead 2026-10-24): whom an action is aimed at
+ * (its first such target) with their picture under that name's scope, as
+ * the pending list shows it. Null: no such target; a picture never fails
+ * a card.
+ */
+export async function namedPictureOf(
+  reader: Pick<NamedImageReader, "photos"> | undefined,
+  targets: readonly QSubjectRef[] | undefined,
+): Promise<NamedPicture | null> {
+  const subject = namedTarget(targets);
+  if (subject === null) return null;
+  const photo = await photoLookup(reader, [subject]);
+  return {
+    kind: subject.subjectType,
+    id: subject.subjectId,
+    photoUrl: photo(subject),
+  };
+}
+
 function correlation(): CorrelationId {
   return CorrelationIdSchema.parse(createCorrelationId());
 }
@@ -196,9 +217,17 @@ export function registerQApprovalRoutes(
       approvalId: approvalIdParam(request),
       correlationId: correlation(),
     });
-    return reply
-      .header("Cache-Control", "no-store")
-      .send(QApprovalViewSchema.parse(view));
+    // The card names whom it is aimed at, with their picture (QA lead).
+    const named = await namedPictureOf(
+      dependencies.namedPhotos,
+      view.action.targets,
+    );
+    return reply.header("Cache-Control", "no-store").send(
+      QApprovalViewSchema.parse({
+        ...view,
+        action: { ...view.action, named },
+      }),
+    );
   });
 
   app.post(
