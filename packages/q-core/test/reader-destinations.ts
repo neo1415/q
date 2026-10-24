@@ -33,6 +33,10 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   // Q Pitch v6: not in the destination list; v53 names it in its own
   // rule (Q PITCH), read by meaning.
   "Q_PITCH",
+  // Work-board lane: not in the destination list; v62 names it in its own
+  // rule beside BOARD ASK, read by meaning; "open my board" is also opened
+  // by code (page-request.ts).
+  "BOARD",
 ]);
 
 export const READER_DESTINATIONS = Q_NAVIGATE_DESTINATIONS.filter(

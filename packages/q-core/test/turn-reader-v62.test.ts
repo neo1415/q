@@ -5,7 +5,11 @@ import {
   TURN_READER_V62,
   TurnReaderV62ResultSchema,
   V49_TEAM_JOB,
+  V61_BOARD_ASK,
+  V62_BOARD_SCREEN,
+  V62_COMPARE,
   V62_DEEP_WORK,
+  compareOverFromShown,
   V62_WORK_FROM_EARLIER,
   createDefaultPromptRegistry,
 } from "../src/index.js";
@@ -22,9 +26,16 @@ describe("TURN_READER v62", () => {
     expect(TURN_READER_V61.status).toBe("DEPRECATED");
     const added = `${V62_DEEP_WORK}${V62_WORK_FROM_EARLIER}`;
     expect(TURN_READER_V62.template).toContain(`${V49_TEAM_JOB}${added}`);
-    expect(TURN_READER_V62.template.replace(added, "")).toBe(
-      TURN_READER_V61.template,
+    expect(TURN_READER_V62.template).toContain(
+      `${V61_BOARD_ASK}${V62_BOARD_SCREEN}${V62_COMPARE}`,
     );
+    expect(
+      TURN_READER_V62.template
+        .replace(added, "")
+        .replace(`${V62_BOARD_SCREEN}${V62_COMPARE}`, ""),
+    ).toBe(TURN_READER_V61.template);
+    expect(V62_BOARD_SCREEN).toMatch(/NAVIGATE with destination BOARD/u);
+    expect(V62_BOARD_SCREEN).toContain("open my board");
   });
 
   it("carries the analyst lane's cases, read by meaning", () => {
@@ -62,5 +73,58 @@ describe("TURN_READER v62", () => {
       TurnReaderV62ResultSchema.parse({ ...base, workFromEarlier: true })
         .workFromEarlier,
     ).toBe(true);
+  });
+
+  it("reads 'board' as their work board, never readiness, and a founder's fundraising pipeline as the pipeline (coordinator 2026-10-24)", () => {
+    expect(V62_BOARD_SCREEN).toContain(
+      `"what's on my board?" asks what is on it`,
+    );
+    expect(V62_BOARD_SCREEN).toMatch(/never about their readiness checklist/u);
+    expect(V62_BOARD_SCREEN).toMatch(
+      /fundraising pipeline" is their investor relationships pipeline/u,
+    );
+  });
+
+  it("reads compare with lane 8's cases, and never with fromShown", () => {
+    for (const said of [
+      "compare the top two in a table",
+      "put the first three side by side",
+      "how do they stack up?",
+      "compare-les",
+      "which is better, Mizan or Silo Credit?",
+      "Ledgerline, Duplo and Anchor",
+      "what was the second one's raise?",
+      "compare my raise to the market",
+    ]) {
+      expect(V62_COMPARE, said).toContain(said);
+    }
+    expect(V62_COMPARE).toMatch(/compare is never set with fromShown/u);
+    const base = {
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+    };
+    const parsed = TurnReaderV62ResultSchema.parse({
+      ...base,
+      compare: { count: 2, names: [] },
+    });
+    expect(parsed.compare).toEqual({ count: 2, names: [] });
+    expect(
+      TurnReaderV62ResultSchema.parse({ ...base, compare: { count: 9 } })
+        .compare,
+    ).toBeNull();
+    expect(TurnReaderV62ResultSchema.parse(base).compare).toBeNull();
+    // Both set: the comparison stands, the recall goes.
+    const both = compareOverFromShown({
+      compare: { count: 2, names: [] },
+      fromShown: { turn: 1 },
+    });
+    expect(both.fromShown).toBeNull();
+    expect(both.compare).toEqual({ count: 2, names: [] });
+    const recall = compareOverFromShown({
+      compare: null,
+      fromShown: { turn: 1 },
+    });
+    expect(recall.fromShown).toEqual({ turn: 1 });
   });
 });

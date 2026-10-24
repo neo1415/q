@@ -52,6 +52,9 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   q: d("HOME"),
   "q room": d("HOME"),
   "ask q": d("HOME"),
+  // Work-board lane (2026-10-23): their own work board, a Work tab.
+  board: d("BOARD"),
+  "work board": d("BOARD"),
   // Profile
   profile: d("PROFILE"),
   "q card": d("PROFILE"),
@@ -133,6 +136,10 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "crm home": d("RELATIONSHIPS"),
   "crm dashboard": d("RELATIONSHIPS"),
   pipeline: d("CRM_PIPELINE"),
+  // Coordinator 2026-10-24: a founder's "fundraising pipeline" is their
+  // investor relationships pipeline, never the Capital page.
+  "fundraising pipeline": d("CRM_PIPELINE"),
+  "investor pipeline": d("CRM_PIPELINE"),
   "crm pipeline": d("CRM_PIPELINE"),
   "deal pipeline": d("CRM_PIPELINE"),
   "pipeline board": d("CRM_PIPELINE"),

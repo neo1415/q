@@ -789,6 +789,8 @@ export const Q_VOICE_DESTINATIONS = [
   "CRM_PIPELINE",
   // Q Pitch v6 (owner 2026-10-16): Q presents Capital Q itself.
   "Q_PITCH",
+  // Work-board lane (2026-10-23): their own work board, a Work tab.
+  "BOARD",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",
