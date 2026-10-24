@@ -164,6 +164,7 @@ import { PITCH_SECTION_EXTRACTION_V1 } from "./tasks/pitch-section-extraction.v1
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
 import { CALL_PREP_V1 } from "./tasks/call-prep.v1.js";
+import { CALL_PREP_V2 } from "./tasks/call-prep.v2.js";
 import { CONVERSATION_RECALL_V1 } from "./tasks/conversation-recall.v1.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
@@ -642,6 +643,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     SPOKEN_REPLY_V1,
     SMALL_TALK_V1,
     CALL_PREP_V1,
+    CALL_PREP_V2,
     CONVERSATION_RECALL_V1,
     TURN_SKIM_V1,
     TURN_SKIM_V2,

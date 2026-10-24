@@ -1,11 +1,11 @@
 import type { ModelDataPosture } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
-  CallPrepResultSchema,
+  CallPrepResultV2Schema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type CallPrepResult,
+  type CallPrepResultV2,
   type CallPrepVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -36,7 +36,7 @@ export type CallPrepWriter = (
     | "communicationGuidance"
     | "environmentNotes"
   >,
-) => Promise<CallPrepResult | null>;
+) => Promise<CallPrepResultV2 | null>;
 
 export function createCallPrepWriter(dependencies: {
   readonly gateway: ModelGateway;
@@ -62,7 +62,7 @@ export function createCallPrepWriter(dependencies: {
           said: input.said.trim().slice(0, 1_000),
         },
       });
-      const response = await dependencies.gateway.execute<CallPrepResult>(
+      const response = await dependencies.gateway.execute<CallPrepResultV2>(
         {
           taskClass: "NORMAL_DIALOGUE",
           // Their own record may be founder-private: the run's ceiling.
@@ -84,12 +84,12 @@ export function createCallPrepWriter(dependencies: {
         // a signal in the request body made every live call invalid (live
         // 2026-10-23, run 3ba29d7d: INVALID_REQUEST, no candidate tried).
         {
-          schema: CallPrepResultSchema,
+          schema: CallPrepResultV2Schema,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
       );
       if (response.output.kind !== "STRUCTURED") return null;
-      const read = CallPrepResultSchema.safeParse(response.output.value);
+      const read = CallPrepResultV2Schema.safeParse(response.output.value);
       return read.success ? read.data : null;
     } catch (error: unknown) {
       if (request.signal?.aborted === true) throw error;

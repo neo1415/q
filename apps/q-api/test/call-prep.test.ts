@@ -32,6 +32,7 @@ const RESULT = {
   ],
   weakSpots: [{ spot: "No churn figure.", handle: "Say so." }],
   ask: "A second meeting.",
+  theyWant: null,
 };
 
 function sources(options: {
@@ -158,5 +159,62 @@ describe("call prep from what the founder may see (owner 2026-10-23)", () => {
     expect(prep?.waiting).toEqual([
       "Q's team: Prepare for the Savanna Seed Partners call without booking it.",
     ]);
+  });
+});
+
+describe("an investor's call prep (owner QA O-I12)", () => {
+  it("resolves the company among what they may see, and the prep is from the investor's side", async () => {
+    const written: Parameters<CallPrepWriter>[1][] = [];
+    const looked: string[] = [];
+    const COMPANY = "6c6c6c6c-6c6c-4c6c-8c6c-6c6c6c6c6c6c";
+    const port = createCallPrepPort({
+      material: () => ({
+        viewer: () =>
+          Promise.resolve({
+            role: "INVESTOR",
+            organisationName: "Adedaniel Capital",
+          }),
+        counterpart: (_actor, kind, id) =>
+          Promise.resolve(
+            kind === "COMPANY" && id === COMPANY
+              ? {
+                  name: "Spheros",
+                  profile: "Company: Spheros",
+                  relationshipId: null,
+                }
+              : null,
+          ),
+        theirMessages: () => Promise.resolve(""),
+        theirCalls: () => Promise.resolve(""),
+        counterpartMaterial: () =>
+          Promise.resolve({
+            text: "THEIR DECK: 10 clients, 2 paying.",
+            sources: [],
+          }),
+        ownMaterial: () => Promise.resolve({ text: "", sources: [] }),
+        upcomingMeetings: () => Promise.resolve([]),
+      }),
+      findByName: (_actor, kind, name) => {
+        looked.push(`${kind}:${name}`);
+        return Promise.resolve(COMPANY);
+      },
+      write: (_request, input) => {
+        written.push(input);
+        return Promise.resolve({ ...RESULT, theyWant: "A cheque and intros." });
+      },
+    });
+    const prep = await port.prepare(request, {
+      counterpart: "Spheros",
+      said: "Prep me for my call with Spheros",
+    });
+    expect(looked).toEqual(["COMPANY:Spheros"]);
+    expect(written[0]?.viewerRole).toBe("INVESTOR");
+    // The company's claims are its material, never the investor's own record.
+    expect(written[0]?.counterpartProfile).toContain(
+      "THEIR DECK: 10 clients, 2 paying.",
+    );
+    expect(written[0]?.ownRecord).toBe("");
+    expect(prep?.viewerRole).toBe("INVESTOR");
+    expect(prep?.theyWant).toBe("A cheque and intros.");
   });
 });

@@ -46,7 +46,7 @@ export const CALL_PREP_V1: PromptDefinition<CallPrepVariables, CallPrepResult> =
   {
     id: "CALL_PREP",
     version: 1,
-    status: "ACTIVE",
+    status: "DEPRECATED",
     kind: "TASK",
     taskClass: "NORMAL_DIALOGUE",
     owner: "q-core",
