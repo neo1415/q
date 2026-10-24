@@ -403,7 +403,11 @@ export function newestAnswerCards(
  * The table as a fact the answer is spoken from: the same cells, so the
  * words and the table never disagree. Each cell keeps its source label.
  */
-export function comparisonFactStatement(block: QResultBlock): string | null {
+export function comparisonFactStatement(
+  block: QResultBlock,
+  /** This run's computed fits, for the one verdict (see verdictLine). */
+  fits: readonly RunFit[] = [],
+): string | null {
   if (block.kind !== "TABLE") return null;
   const names = block.columns.map((column) => column.label);
   const lines = block.rows.map(
@@ -415,7 +419,7 @@ export function comparisonFactStatement(block: QResultBlock): string | null {
         )
         .join(" | ")}`,
   );
-  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Say the one or two key figures from the Traction row as numbers (for example each one's monthly revenue), never "self-reported figures" without them. Company figures are company-stated, never verified.\n${lines.join("\n")}`.slice(
+  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Say the one or two key figures from the Traction row as numbers (for example each one's monthly revenue), never "self-reported figures" without them. Company figures are company-stated, never verified.${verdictLine(block, fits)}\n${lines.join("\n")}`.slice(
     0,
     7_900,
   );
@@ -471,4 +475,34 @@ export function comparisonSpokenLine(block: QResultBlock): string | null {
     0,
     1_200,
   );
+}
+
+/**
+ * Coordinator 24 Oct 2026 ("which is better, Anchor or Afyascan?"): the
+ * answer opened "Afyascan is the better-supported choice" and closed "I'd
+ * take Anchor forward first" while Capital Q's fit ranked Anchor 7.6 and
+ * Afyascan 7. Which one leads is decided here, by code, from the computed
+ * mandate fit, and given to the answer as its one verdict; the condition
+ * that would change it is the answer's own reading of the table.
+ */
+function verdictLine(
+  block: Extract<QResultBlock, { kind: "TABLE" }>,
+  fits: readonly RunFit[],
+): string {
+  const scored = block.columns.flatMap((column) => {
+    const id =
+      column.subject?.kind === "COMPANY" ? column.subject.companyId : null;
+    const fit = fits.find((entry) => entry.companyId === id);
+    const score = fit === undefined ? null : fitScoreOutOf10(fit.profile);
+    const value = score === null ? Number.NaN : Number(score);
+    return Number.isFinite(value) ? [{ name: column.label, score, value }] : [];
+  });
+  if (scored.length < 2) return "";
+  const ranked = [...scored].sort((a, b) => b.value - a.value);
+  const [first, second] = ranked;
+  if (first === undefined || second === undefined) return "";
+  if (first.value === second.value) {
+    return ` VERDICT, if they ask which is better or which to take forward: ${first.name} and ${second.name} are level on Capital Q's mandate fit (${String(first.score)} each). Say so once, then the one difference in the table that would separate them; never call either the better one.`;
+  }
+  return ` VERDICT, if they ask which is better or which to take forward: lead with exactly one, ${first.name} (Capital Q mandate fit ${String(first.score)} against ${second.name}'s ${String(second.score)}), then the one condition in the table that would change it. Never name a different company as the better or first choice anywhere in the answer; mandate fit is not a judgement of quality.`;
 }
