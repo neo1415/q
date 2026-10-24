@@ -197,6 +197,34 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
     expect(seen.query?.limit).toBeGreaterThanOrEqual(463);
   });
 
+  it("a fit service that throws: tried twice, then name order and the failure said with its cause (live bbb4b6773)", async () => {
+    let rankCalls = 0;
+    const outcome = await port({
+      companyCatalog: many({}),
+      disclosure: everyoneVisible as never,
+      fit: {
+        ...(fit as object),
+        rank: () => {
+          rankCalls += 1;
+          return Promise.reject(new RangeError("too many"));
+        },
+      } as never,
+    }).execute(
+      {
+        callId: "c3",
+        name: "discover_companies",
+        arguments: { sectors: ["fintech"], limit: 5, order: "FIT" },
+      },
+      contextFor(actorA, networkPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect(data["order"]).toBe("NAME");
+    expect(data["fitRankFailed"]).toEqual({ cause: "RangeError" });
+    // Tried once more before it is said to have failed.
+    expect(rankCalls).toBe(2);
+  });
+
   it("name order stays name order, and a fit service that cannot rank falls back to it", async () => {
     const byName = await port({
       companyCatalog: many({}),

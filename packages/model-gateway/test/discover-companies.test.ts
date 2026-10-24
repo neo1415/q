@@ -100,6 +100,8 @@ function tools(
     rows?: readonly Row[];
     ranks?: boolean;
     raises?: boolean;
+    /** The fit service threw inside the catalog (live bbb4b6773). */
+    rankFails?: boolean;
   } = {},
 ) {
   const rows = options.rows ?? CATALOG;
@@ -157,6 +159,9 @@ function tools(
             unknownSectors: sectors.filter(
               (s) => SECTOR_NAMES[s] === undefined,
             ),
+            ...(options.rankFails === true && args["order"] === "FIT"
+              ? { fitRankFailed: { cause: "RangeError" } }
+              : {}),
             truthClass: "USER_CLAIM",
           }),
         );
@@ -229,7 +234,8 @@ async function discover(
     available: AVAILABLE,
     investor: options.investor ?? true,
   });
-  if (answer === null) throw new Error("no fast-path answer");
+  if (answer === null || "rankUnavailable" in answer)
+    throw new Error("no fast-path answer");
   return { answer, asked: port.asked, ms: Date.now() - started };
 }
 
@@ -486,6 +492,54 @@ describe("an investor's discovery ranks every match, not the first page by name 
     expect(answer.text).toMatch(
       /^37 fintech companies on Capital Q; ranked by fit with your mandate, the top ten: Zenith Pay /u,
     );
+  });
+
+  // Owner 2026-10-24 (live bbb4b6773): the fit service failed inside the
+  // catalog, and the first 24 by name were scored and shown as "the top
+  // five that fit your mandate".
+  it("a fit ranking that failed is said to have failed, never a name-ordered list shown as the top N", async () => {
+    for (const failure of ["RANK_THREW", "CATALOG_FAILED"] as const) {
+      const port = tools({ rows: many, rankFails: failure === "RANK_THREW" });
+      const failing: typeof port.port =
+        failure === "RANK_THREW"
+          ? port.port
+          : {
+              execute: (proposal, context) =>
+                proposal.name === "discover_companies"
+                  ? Promise.resolve({
+                      ...outcome(proposal, "discovery.companies", null),
+                      status: "FAILED",
+                      failureCode: "EXECUTION_FAILED",
+                      result: {
+                        ok: false,
+                        error: {
+                          code: "EXECUTION_FAILED",
+                          safeMessage: "The catalog failed.",
+                        },
+                      },
+                    } satisfies QToolCallOutcome)
+                  : port.port.execute(proposal, context),
+            };
+      const answer = await runCompanyDiscovery({
+        ask: ask({
+          text: "the five that best fit my mandate",
+          count: 5,
+          sectors: [],
+          ranking: "FIT",
+          mandateRelevant: true,
+        }),
+        tools: failing,
+        context: CONTEXT,
+        available: AVAILABLE,
+        investor: true,
+      });
+      expect(answer).toMatchObject({
+        rankUnavailable: true,
+        cause: failure === "RANK_THREW" ? "RangeError" : "EXECUTION_FAILED",
+      });
+      // Nothing was scored by name to stand in for the ranking.
+      expect(fitCalls(port.asked)).toBe(0);
+    }
   });
 
   it("'top three' over thirty-seven: the strongest leads though it is last by name", async () => {

@@ -172,6 +172,7 @@ import {
   runCompanyDiscovery,
   type DiscoverAsk,
   type DiscoveryAnswer,
+  type DiscoveryRankUnavailable,
 } from "./discover-companies.js";
 import {
   capitalQAsCompanyAsked,
@@ -3510,7 +3511,9 @@ export function createModelGatewayQAnswer(
       }).catch(() => null);
     // K1: companies of a kind, from the catalog by code, through the same
     // tools and plan; fit only for an investor and only when asked for.
-    const discoverFor = (ask: DiscoverAsk): Promise<DiscoveryAnswer | null> =>
+    const discoverOnce = (
+      ask: DiscoverAsk,
+    ): Promise<DiscoveryAnswer | DiscoveryRankUnavailable | null> =>
       runCompanyDiscovery({
         ask,
         tools,
@@ -3518,6 +3521,25 @@ export function createModelGatewayQAnswer(
         available: prefetchTools,
         investor: ownInvestor !== null,
       }).catch(() => null);
+    /**
+     * Owner 2026-10-24 (live bbb4b6773): a fit ranking over the network
+     * that failed (the catalog already tried it twice) is never presented
+     * as one. Its cause is logged, `networkRankFailed` holds it, and the
+     * answer comes from their own pipeline, saying so.
+     */
+    let networkRankFailed: string | null = null;
+    const discoverFor = async (
+      ask: DiscoverAsk,
+    ): Promise<DiscoveryAnswer | null> => {
+      const found = await discoverOnce(ask);
+      if (found === null || !("rankUnavailable" in found)) return found;
+      logger?.warn(
+        { qRunId: request.runId, cause: found.cause },
+        "q fit ranking over the network failed",
+      );
+      networkRankFailed = found.cause;
+      return null;
+    };
     // W2: a named person, company or body, identified from public sources
     // by the lookup tool under this run's plan; the card is built by code.
     const personFor = (ask: PersonAsk) =>
@@ -4235,6 +4257,8 @@ export function createModelGatewayQAnswer(
       sweptExcludingShown: (sweepAsk?.exclude?.length ?? 0) > 0,
       shownInConversation,
       discoverFor,
+      /** Why the network's fit ranking failed this run, once it has. */
+      networkRankFailedOf: () => networkRankFailed,
       factFor,
       mapFor,
       shownBefore,
@@ -4597,6 +4621,7 @@ export function createModelGatewayQAnswer(
         sweptExcludingShown,
         shownInConversation,
         discoverFor,
+        networkRankFailedOf,
         factFor,
         mapFor,
         shownBefore,
@@ -6998,10 +7023,21 @@ export function createModelGatewayQAnswer(
             // The count as read, so "the five that best fit" names five.
             requested: sweep.ask.count,
           });
+          const shownCount =
+            sweep.ask.count === null
+              ? sweep.fits.length
+              : Math.min(sweep.ask.count, sweep.fits.length);
+          // The network's ranking failed twice (logged above): what follows
+          // is their own pipeline, and it is said to be.
+          const fromPipeline =
+            networkRankFailedOf() === null || sweep.ask.scope !== "CANDIDATES"
+              ? ""
+              : `I couldn't rank the whole network just now; here ${shownCount === 1 ? "is one" : `are ${String(shownCount)}`} from your own pipeline. `;
           const text =
-            sweep === reRanked
+            fromPipeline +
+            (sweep === reRanked
               ? `None of the companies I just listed has enough on record to score against your mandate yet. Ranked by fit with your mandate, these are the strongest. ${summary}`
-              : summary;
+              : summary);
           rankedPastShown = sweep === reRanked;
           const message = await persistCodeAnswer(text, [block]);
           logger?.info(
