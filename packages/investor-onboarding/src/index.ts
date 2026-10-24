@@ -78,3 +78,6 @@ export {
   INVESTOR_CONCEPT_FAMILIES,
   type ConceptFamily,
 } from "./definition/concept-families.js";
+// QO-42: what an investor publishes on their Q Card against a founder's own
+// company (stage, sector, geography). Shared by the API's slate and Q.
+export { publishedFitOf, type FounderFacts } from "./published-fit.js";

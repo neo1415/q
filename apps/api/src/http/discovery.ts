@@ -44,7 +44,10 @@ import {
 import { namedImageKey, type NamedImages } from "@capital-q/public-identity";
 import type { ActorContext } from "@capital-q/security";
 
-import { publishedFitOf, type FounderFacts } from "../published-fit.js";
+import {
+  publishedFitOf,
+  type FounderFacts,
+} from "@capital-q/investor-onboarding";
 import {
   getActorContext,
   requireActorContextHook,

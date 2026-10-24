@@ -1490,6 +1490,50 @@ describe("answer seam tool loop", () => {
       );
     });
 
+    // QA I11 (batch-7 re-score, run ea1c4c13): the model read Basketari
+    // and answered "it would need to be sent through your connected
+    // Basketari relationship", calling no message tool, though an Express
+    // Interest was already waiting. A note asked for and never tried goes
+    // the way a refused one does: code prepares the first contact for the
+    // one company the words name, and says so in its own words.
+    it("prepares the first contact by code when the model never tried the note", async () => {
+      const BASKETARI = "63dec1b9-0bb5-49e0-8f2d-ae33a74e1263";
+      const tools = toolPort([GET_COMPANY, CHAT, INTEREST], (p) =>
+        p.name === "get_company"
+          ? succeeded(p, { companyId: BASKETARI, canonicalName: "Basketari" })
+          : {
+              ...succeeded(p, {
+                status: "PREPARED",
+                awaitingApprovalOf: "Express interest in Basketari",
+              }),
+              toolName: "relationship.interest.express.propose",
+            },
+      );
+      const { seam, request, messages } = build({
+        said: "Draft a short note to Basketari's founders asking about their repeat-order rate.",
+        script: [
+          call("g", { companyId: BASKETARI }),
+          {
+            kind: "JSON",
+            value: analystResult(
+              "I can draft that note, but it would need to be sent through your connected Basketari relationship.",
+            ),
+          },
+        ],
+        tools,
+      });
+      await seam.answer({ ...request, askedAction: "propose_chat_message" });
+      expect(tools.executed.map((p) => [p.name, p.arguments])).toContainEqual([
+        "propose_express_interest",
+        { companyId: BASKETARI },
+      ]);
+      const reply = messages.at(-1)?.content ?? "";
+      expect(reply).toBe(FIRST_CONTACT_REPLY);
+      expect(reply).not.toMatch(
+        /connected Basketari relationship|didn't prepare/u,
+      );
+    });
+
     it("prepares Express Interest in the same turn, for approval, and tells the model so", async () => {
       const { executed, second } = await run({ chat: "NOT_CONNECTED" });
       expect(executed).toEqual([

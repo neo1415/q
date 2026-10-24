@@ -6,6 +6,7 @@ import type {
 } from "@capital-q/q-runtime";
 
 import {
+  fitWords,
   investorProspectsText,
   pickProspects,
   prospectCardsBlock,
@@ -276,5 +277,56 @@ describe("which investors a founder should talk to first", () => {
       available: new Set(["find_prospective_investors"]),
     });
     expect(found).toBeNull();
+  });
+
+  // QA F-77 (founder: "which investors fit Maji Loop best, and how well?"):
+  // how well, per investor, from what each publishes (QO-42).
+  it("says how well each fits on stage, sector and geography, unknown as unknown", () => {
+    const fitted = prospects.map((one) =>
+      one.investorOrganisationId === CLIMATE
+        ? {
+            ...one,
+            publishedFit: {
+              stage: "MET" as const,
+              sector: "MET" as const,
+              geography: "UNKNOWN" as const,
+            },
+          }
+        : one.investorOrganisationId === RIFT
+          ? {
+              ...one,
+              publishedFit: {
+                stage: "UNKNOWN" as const,
+                sector: "UNKNOWN" as const,
+                geography: "UNKNOWN" as const,
+              },
+            }
+          : one,
+    );
+    const picks = pickProspects(interests, fitted, 3);
+    const text = investorProspectsText(picks, 3);
+    expect(text).toContain(
+      "Pan-African Climate Development Fund: 2 of 3 on what they publish: you fit their published stage and sector; geography not known yet.",
+    );
+    expect(text).toContain(
+      "Rift Valley Seed Fund: Their Q Card does not say yet how you fit on stage, sector or geography.",
+    );
+    const block = prospectCardsBlock(picks);
+    const climate = block?.cards.find(
+      (card) =>
+        card.subject?.kind === "INVESTOR_ORGANISATION" &&
+        card.subject.investorOrganisationId === CLIMATE,
+    );
+    expect(climate?.measures).toEqual([
+      { label: "Stage", level: "STRONG", value: "Matches what they publish" },
+      { label: "Sector", level: "STRONG", value: "Matches what they publish" },
+      { label: "Geography", level: "UNKNOWN", value: null },
+    ]);
+    expect(
+      fitWords({ stage: "NOT_MET", sector: "MET", geography: "MET" }),
+    ).toBe(
+      "2 of 3 on what they publish: you fit their published sector and geography; not their stage",
+    );
+    expect(fitWords(undefined)).toBeNull();
   });
 });

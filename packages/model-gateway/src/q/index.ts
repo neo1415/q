@@ -989,6 +989,29 @@ export const PREPARED_FOR_APPROVAL_LINE =
 const LANDED_CLAIM =
   /\b(?:I(?:'ve|’ve| have)\s+(?:now\s+)?(?:opened|moved|scrolled|switched|selected|taken you)|(?:it|that|the (?:page|tab|section))(?:'s|’s| is)\s+(?:now\s+)?(?:open|up|showing)|done on your screen)\b/iu;
 
+/** A sentence reporting an action Q could not do ("I couldn't prepare the reply…"). */
+const COULD_NOT_ACT =
+  /^\s*(?:sorry,?\s+)?i\s+(?:couldn['’]t|could\s+not|wasn['’]t\s+able\s+to|was\s+unable\s+to|was\s+not\s+able\s+to)\s+(?:prepare|send|draft|book|schedule|make|do|set\s+up|update|change|save|share|reply|message)\b/iu;
+
+/**
+ * The text without sentences reporting an action Q could not do: only
+ * applied on a turn that asked for no action and tried none, where such a
+ * sentence is an earlier turn's, carried over (QA I18). Kept whole when
+ * nothing else would be left.
+ */
+export function withoutStaleFailures(text: string): {
+  readonly text: string;
+  readonly removed: number;
+} {
+  const sentences = text.match(/[^.!?\n]+[.!?]*\s*/gu) ?? [text];
+  const kept = sentences.filter((sentence) => !COULD_NOT_ACT.test(sentence));
+  const removed = sentences.length - kept.length;
+  const joined = kept.join("").trim();
+  return removed === 0 || joined.length === 0
+    ? { text, removed: 0 }
+    : { text: joined, removed };
+}
+
 /** The text without sentences that claim a screen act landed. */
 export function withoutLandedClaims(text: string): string {
   const sentences = text.match(/[^.!?\n]+[.!?]*\s*/gu) ?? [text];
@@ -7208,6 +7231,8 @@ export function createModelGatewayQAnswer(
       let preparedByTool = false;
       /** Code prepared the first contact this run (QO-08): the reply is code's, not the model's. */
       let firstContactPrepared = false;
+      /** Their interest already stands (sent, or connected): its own line. */
+      let firstContactAlready: string | null = null;
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -8373,6 +8398,71 @@ export function createModelGatewayQAnswer(
         ) {
           messages = [...messages, ALREADY_SEARCHED_NOTE];
         }
+        // QA I11 (batch-7 re-score): "Draft a short note to Basketari's
+        // founders…" was answered "it would need to be sent through your
+        // connected Basketari relationship" and then "I didn't prepare
+        // that": they are not connected, and their Express Interest in
+        // Basketari was already waiting. A message asked for (the reader's
+        // askedAction) that the model never tried goes the way a refused
+        // one does: the first contact for the one company their words
+        // name, among those this run read. The engine returns a card
+        // already waiting as that card; an interest already sent is said
+        // as it stands.
+        if (
+          !firstContactPrepared &&
+          request.askedAction !== undefined &&
+          MESSAGE_TOOLS.has(request.askedAction) &&
+          offeredByName.has(FIRST_CONTACT_TOOL) &&
+          !toolCalls.some(
+            (call) =>
+              MESSAGE_TOOLS.has(call.providerName) ||
+              call.providerName === FIRST_CONTACT_TOOL,
+          ) &&
+          request.signal?.aborted !== true
+        ) {
+          // The run's read companies, by lower-cased name to id.
+          const named = [...runCompanies.read(request.runId)].filter(([name]) =>
+            containsCompanyName(latest.content, name),
+          );
+          const only = named.length === 1 ? named[0] : undefined;
+          if (only !== undefined) {
+            const outcome = await callTool(
+              {
+                callId: `first-contact-${request.runId}`,
+                name: FIRST_CONTACT_TOOL,
+                arguments: { companyId: only[1] },
+              },
+              toolContext,
+            ).catch(() => null);
+            if (outcome !== null) {
+              toolCalls.push({
+                toolName: outcome.toolName,
+                providerName: FIRST_CONTACT_TOOL,
+                status: outcome.status,
+                failureCode: outcome.failureCode,
+                latencyMs: outcome.latencyMs,
+              });
+              const data = outcome.result.ok
+                ? (outcome.result.data as {
+                    readonly status?: unknown;
+                    readonly awaitingApprovalOf?: unknown;
+                  } | null)
+                : null;
+              if (data?.status === "PREPARED") {
+                firstContactPrepared = true;
+              } else if (
+                data?.status === "ALREADY_EXPRESSED" &&
+                typeof data.awaitingApprovalOf === "string"
+              ) {
+                firstContactAlready = data.awaitingApprovalOf;
+              }
+              logger?.info(
+                { qRunId: request.runId, status: data?.status ?? null },
+                "a message they asked for, not tried: the first contact by code",
+              );
+            }
+          }
+        }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
           void stageOnce(writingStage);
@@ -8504,7 +8594,28 @@ export function createModelGatewayQAnswer(
             "an offer or promise to do what was asked was not said",
           );
         }
-        const promises = stripEmptyPromises(undeferred.text);
+        // QA I18 (batch-7 re-score): "What happened in my last meeting…?"
+        // opened "I couldn't prepare the Clinicrest reply from this
+        // conversation." A turn that asked for no action and tried none has
+        // no failure of its own to report; an old one is not said.
+        const unfailed =
+          request.turnKind !== "TOOL_REQUEST" &&
+          toolCalls.every(
+            (call) =>
+              offeredByName.get(call.providerName)?.classification ===
+                "READ_ONLY" ||
+              offeredByName.get(call.providerName)?.classification ===
+                "ANALYTICAL",
+          )
+            ? withoutStaleFailures(undeferred.text)
+            : { text: undeferred.text, removed: 0 };
+        if (unfailed.removed > 0) {
+          logger?.info(
+            { qRunId: request.runId, removed: unfailed.removed },
+            "a failure this turn did not have was not said",
+          );
+        }
+        const promises = stripEmptyPromises(unfailed.text);
         if (promises.removed.length > 0) {
           logger?.warn(
             {
@@ -9133,11 +9244,13 @@ export function createModelGatewayQAnswer(
         // card's line (the note in full, "Ready to send") follows it.
         const answerText = firstContactPrepared
           ? FIRST_CONTACT_REPLY
-          : builtCards !== null && hasOrphanListItems(artifactSafe.text)
-            ? fitCardsSummary(builtCards)
-            : request.spoken === true && cardsShown
-              ? spokenBeforeCards(artifactSafe.text)
-              : artifactSafe.text;
+          : firstContactAlready !== null
+            ? firstContactAlready
+            : builtCards !== null && hasOrphanListItems(artifactSafe.text)
+              ? fitCardsSummary(builtCards)
+              : request.spoken === true && cardsShown
+                ? spokenBeforeCards(artifactSafe.text)
+                : artifactSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },

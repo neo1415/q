@@ -1,10 +1,11 @@
 import type { PublicCardDto, PublishedFitDto } from "@capital-q/contracts";
-import { STAGE_OPTIONS } from "@capital-q/investor-onboarding/definition";
 import {
   normalizeTaxonomyAlias,
   REFERENCE_TAXONOMY,
   type ReferenceNode,
 } from "@capital-q/taxonomy";
+
+import { STAGE_OPTIONS } from "./definition/index.js";
 
 /**
  * QO-42 (owner QA 2026-10-23): a founder's Discover card and investor page

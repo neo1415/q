@@ -77,6 +77,15 @@ type Prospect = {
     /** The company's own declared sectors, by name. */
     readonly yours?: readonly string[];
   };
+  /** QO-42 / QA F-77: their published stage, sector and geography. */
+  readonly publishedFit?: PublishedFit;
+};
+
+type Standing = "MET" | "NOT_MET" | "UNKNOWN";
+type PublishedFit = {
+  readonly stage: Standing;
+  readonly sector: Standing;
+  readonly geography: Standing;
 };
 
 /** One investor to approach, with the one line that says why. */
@@ -87,6 +96,8 @@ export type ProspectPick = {
   readonly line: string | null;
   readonly about: string | null;
   readonly why: string;
+  /** How well, by what they publish on their Q Card; absent: not read. */
+  readonly fit?: PublishedFit | undefined;
 };
 
 export type InvestorProspectsAnswer = {
@@ -259,6 +270,30 @@ function sectorClause(sector: Prospect["sector"]): string | null {
   return null;
 }
 
+const FIT_PARTS = ["stage", "sector", "geography"] as const;
+
+/**
+ * QA F-77 (founder: "which investors fit Maji Loop best, and how well?"):
+ * how well, per investor, from what their Q Card publishes against your
+ * company -- each of stage, sector and geography met, not met, or not
+ * known yet. Unknown is said as unknown, never as a no.
+ */
+export function fitWords(fit: PublishedFit | undefined): string | null {
+  if (fit === undefined) return null;
+  const met = FIT_PARTS.filter((part) => fit[part] === "MET");
+  const missed = FIT_PARTS.filter((part) => fit[part] === "NOT_MET");
+  const unknown = FIT_PARTS.filter((part) => fit[part] === "UNKNOWN");
+  if (unknown.length === FIT_PARTS.length) {
+    return "their Q Card does not say yet how you fit on stage, sector or geography";
+  }
+  const parts = [
+    ...(met.length === 0 ? [] : [`you fit their published ${listOf(met)}`]),
+    ...(missed.length === 0 ? [] : [`not their ${listOf(missed)}`]),
+    ...(unknown.length === 0 ? [] : [`${listOf(unknown)} not known yet`]),
+  ];
+  return `${String(met.length)} of 3 on what they publish: ${parts.join("; ")}`;
+}
+
 function prospectWhy(one: Prospect): string {
   const focus = focusOf(one.publicDescription);
   const clauses = one.reasons
@@ -313,6 +348,7 @@ export function pickProspects(
       line: typeWords(profile?.investorType ?? one.investorType),
       about: profile?.publicDescription ?? null,
       why: interestWhy(one, focusOf(profile?.publicDescription)),
+      fit: profile?.publishedFit,
     });
   }
   // A published sector that is not theirs is named only when nothing
@@ -334,6 +370,7 @@ export function pickProspects(
           .join(" · ") || null,
       about: one.publicDescription,
       why,
+      fit: one.publishedFit,
     });
   }
   return picks;
@@ -385,6 +422,7 @@ export function networkInvestorsIn(
           .join(" · ") || null,
       about: one.publicDescription,
       why: prospectWhy(one),
+      fit: one.publishedFit,
     }));
 }
 
@@ -403,7 +441,10 @@ export function investorProspectsText(
       : `Talk to ${listOf(names)} first.`,
   ];
   for (const pick of picks) {
-    parts.push(`${pick.name}: ${sentence(pick.why)}`);
+    const how = fitWords(pick.fit);
+    parts.push(
+      `${pick.name}: ${sentence(how === null ? pick.why : `${how}. ${pick.why}`)}`,
+    );
   }
   const interested = picks.filter((pick) => pick.kind === "INTERESTED").length;
   const likely = picks.length - interested;
@@ -417,6 +458,26 @@ export function investorProspectsText(
   return parts.join(" ");
 }
 
+/** Stage, sector and geography as card rows: met, not met, not known yet. */
+function fitMeasures(fit: PublishedFit | undefined): QAnswerCard["measures"] {
+  if (fit === undefined) return [];
+  return FIT_PARTS.map((part) => ({
+    label: `${part.charAt(0).toUpperCase()}${part.slice(1)}`,
+    level:
+      fit[part] === "MET"
+        ? ("STRONG" as const)
+        : fit[part] === "NOT_MET"
+          ? ("MISMATCH" as const)
+          : ("UNKNOWN" as const),
+    value:
+      fit[part] === "MET"
+        ? "Matches what they publish"
+        : fit[part] === "NOT_MET"
+          ? "Not what they publish"
+          : null,
+  }));
+}
+
 export function prospectCardsBlock(
   picks: readonly ProspectPick[],
 ): QAnswerCardsBlock | null {
@@ -428,7 +489,7 @@ export function prospectCardsBlock(
     hue: (at % 7) + 1,
     fit: null,
     reasons: [clip(sentence(pick.why), 160)],
-    measures: [],
+    measures: fitMeasures(pick.fit),
     view: pick.kind === "INTERESTED" ? "Has shown interest" : "Likely fit",
     said: null,
     sourceCount: 1,
