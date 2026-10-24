@@ -1,3 +1,4 @@
+import type { PublicCardDto } from "@capital-q/contracts";
 import type { CompanyQualificationProjectionPort } from "@capital-q/gateq";
 import {
   publishedFitOf,
@@ -79,6 +80,17 @@ function cardSectors(value: string | undefined): string[] {
 /** Card reads in flight at once (each is its own few queries). */
 const CARD_READS_AT_ONCE = 8;
 
+/**
+ * Egress (Supabase restricted the project, 2026-10-24): each prospects
+ * turn read every candidate investor's card, and since F-77 each card read
+ * also reads the active mandate (three queries more). The published-sector
+ * order (QO-31) needs every candidate, so the reads stay, but a card read
+ * at the participant audience is the same for every reader: it is kept a
+ * few minutes per process, shared by every turn and every founder.
+ */
+const CARD_KEPT_MS = 5 * 60 * 1000;
+const CARDS_KEPT_MAX = 2_000;
+
 async function inBatches<T, R>(
   items: readonly T[],
   size: number,
@@ -96,7 +108,39 @@ export function createInvestorSectorFocusPort(dependencies: {
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
   readonly projection: CompanyQualificationProjectionPort;
   readonly cards: Pick<PublicIdentityService, "cardForSubject">;
+  /** Clock for the kept cards; tests only. */
+  readonly now?: () => number;
 }): InvestorSectorFocusPort {
+  const now = dependencies.now ?? Date.now;
+  const kept = new Map<
+    string,
+    { readonly at: number; readonly card: Promise<PublicCardDto | null> }
+  >();
+  const cardOf = (investorOrganisationId: string) => {
+    const held = kept.get(investorOrganisationId);
+    if (held !== undefined && now() - held.at < CARD_KEPT_MS) return held.card;
+    const card = dependencies.cards
+      .cardForSubject({
+        subject: {
+          subjectType: "INVESTOR_ORGANISATION",
+          subjectId: investorOrganisationId,
+        },
+        audience: "PARTICIPANT",
+      })
+      .catch(() => {
+        // A failed read is not kept: the next turn asks again.
+        kept.delete(investorOrganisationId);
+        return null;
+      });
+    kept.delete(investorOrganisationId);
+    kept.set(investorOrganisationId, { at: now(), card });
+    while (kept.size > CARDS_KEPT_MAX) {
+      const oldest = kept.keys().next().value;
+      if (oldest === undefined) break;
+      kept.delete(oldest);
+    }
+    return card;
+  };
   return {
     resolve: resolveSectors,
     forOwnCompany: async (actor, companyId, investorOrganisationIds) => {
@@ -123,15 +167,7 @@ export function createInvestorSectorFocusPort(dependencies: {
         investorOrganisationIds,
         CARD_READS_AT_ONCE,
         async (investorOrganisationId) => {
-          const card = await dependencies.cards
-            .cardForSubject({
-              subject: {
-                subjectType: "INVESTOR_ORGANISATION",
-                subjectId: investorOrganisationId,
-              },
-              audience: "PARTICIPANT",
-            })
-            .catch(() => null);
+          const card = await cardOf(investorOrganisationId);
           const field = card?.fields.find(
             (one) => one.key === "mandateSectors",
           );
