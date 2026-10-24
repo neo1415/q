@@ -365,7 +365,7 @@ export function comparisonFactStatement(block: QResultBlock): string | null {
         )
         .join(" | ")}`,
   );
-  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Company figures are company-stated, never verified.\n${lines.join("\n")}`.slice(
+  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Say the one or two key figures from the Traction row as numbers (for example each one's monthly revenue), never "self-reported figures" without them. Company figures are company-stated, never verified.\n${lines.join("\n")}`.slice(
     0,
     7_900,
   );

@@ -60,6 +60,7 @@ const offered = (
 });
 
 const OFFERED = [
+  offered("search_companies", "company.search", "REVIEWING_COMPANY"),
   offered("get_company", "company.get", "REVIEWING_COMPANY"),
   offered("read_company_figures", "company.figures.read", "REVIEWING_COMPANY"),
   offered("fit_profile", "fit.profile", "COMPARING_OPPORTUNITIES"),
@@ -94,6 +95,28 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
     sensitivity: "INTERNAL",
     latencyMs: 1,
   } as const;
+  if (proposal.name === "search_companies") {
+    const query = String(
+      Reflect.get(proposal.arguments as object, "query"),
+    ).toLowerCase();
+    return {
+      ...base,
+      toolName: "company.search",
+      result: {
+        ok: true,
+        data: {
+          items: Object.entries(PROFILES)
+            .filter(([, profile]) =>
+              (profile["canonicalName"] ?? "").toLowerCase().includes(query),
+            )
+            .map(([id, profile]) => ({
+              companyId: id,
+              canonicalName: profile["canonicalName"],
+            })),
+        },
+      },
+    } as unknown as Omit<QToolCallOutcome, "callId">;
+  }
   if (proposal.name === "get_company") {
     const profile = PROFILES[companyId] ?? {};
     return {
@@ -287,8 +310,8 @@ function build(
     actor,
     correlationId: `cor_${run}`,
     capability: "ANSWER",
-    ...(reading ?? {}),
     subjects: [],
+    ...(reading ?? {}),
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: {
       runId: run,
@@ -346,6 +369,7 @@ describe("compare the top two, right after a list of five", () => {
     expect(sent).toContain("COMPARED SIDE BY SIDE");
     expect(sent).toContain("Mizan vs Silo Credit");
     expect(sent).toContain("real differences");
+    expect(sent).toContain("key figures from the Traction row");
     const blocks = stored.at(-1)?.blocks ?? [];
     const table = blocks.find(
       (block) => Reflect.get(block as object, "kind") === "TABLE",
@@ -416,6 +440,25 @@ describe("compare the top two, right after a list of five", () => {
       "Silo Credit",
     ]);
     expect(last?.content).not.toMatch(/\bI can compare\b/iu);
+  });
+
+  // QO-36 (live 23 Oct, run 98561658): with a record on screen, companies
+  // the turn names were not read, so a profile was there or not by page.
+  it("reads the companies a turn names even with another record on screen", async () => {
+    // Not a comparison, so only the named reads fetch these two.
+    const { seam, request, executed } = build(
+      "Tell me about Mizan and Silo Credit",
+      {
+        subjects: [{ kind: "COMPANY", companyId: OTHERS[0] }],
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const named = executed
+      .filter((call) => call.callId.startsWith("q-named-visible-get"))
+      .map((call): unknown =>
+        Reflect.get(call.arguments as object, "companyId"),
+      );
+    expect(named).toEqual(expect.arrayContaining([MIZAN, SILO]));
   });
 
   it("an ordinary follow-up reads nothing extra", async () => {
