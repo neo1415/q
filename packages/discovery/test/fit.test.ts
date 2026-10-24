@@ -48,6 +48,7 @@ import {
   createFitInputSource,
   stageLabel,
 } from "../src/infrastructure/fit-inputs.js";
+import { ELIGIBILITY_BATCH_MAX } from "../src/eligibility/contracts.js";
 import type { MandateHardConstraint } from "../src/eligibility/ports.js";
 import {
   FIT_REASON_TEMPLATES,
@@ -678,6 +679,12 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
       },
       eligibility: {
         evaluate: (query) => {
+          // The real service throws past its batch bound (F-82 live).
+          if (query.companyIds.length > ELIGIBILITY_BATCH_MAX) {
+            return Promise.reject(
+              new RangeError("eligibility batch too large"),
+            );
+          }
           evaluated.push([...query.companyIds]);
           expect(query.purpose).toBe("VIEW");
           expect(query.viewpoint).toBe("ACTOR");
@@ -930,7 +937,9 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     const w = world({});
     const result = await w.service.rank?.(actor, ids, 5);
     expect(result?.kind).toBe("OK");
-    expect(w.evaluated).toEqual([ids]);
+    // In batches eligibility accepts, every company once.
+    expect(w.evaluated.map((batch) => batch.length)).toEqual([200, 200, 63]);
+    expect(w.evaluated.flat()).toEqual(ids);
     expect(w.read).toEqual([ids]);
   });
 
