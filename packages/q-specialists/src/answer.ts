@@ -16,6 +16,7 @@ import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
 import {
   TEAM_JOB_KINDS,
   goAheadGoal,
+  earlierRequestGoal,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,
@@ -4422,9 +4423,15 @@ export function createSpecialistQAnswer(
     if (dependencies.teamJob !== undefined && teamJobBy !== null) {
       const startedAt = Date.now();
       const goAhead = goAheadGoal(history, latest.content);
+      // QO-07: "yes" to work asked for or offered just before carries the
+      // person's own earlier words as the goal, never the reader's.
+      const earlier =
+        goAhead === null && read?.workFromEarlier === true
+          ? earlierRequestGoal(history, latest.content)
+          : null;
       const planned = await dependencies.teamJob.propose(
         request,
-        goAhead ?? latest.content,
+        goAhead ?? earlier ?? latest.content,
         ...(goAhead === null ? [] : [{ proceed: true }]),
       );
       logger?.info(

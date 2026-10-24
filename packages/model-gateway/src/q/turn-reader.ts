@@ -120,6 +120,11 @@ export type QTurnReading = Omit<
   readonly reference?: TurnReaderV40Result["reference"] | undefined;
   /** v49: they hand Q's team a piece of work of several steps. */
   readonly teamJob?: boolean | undefined;
+  /**
+   * QO-07: the turn hands over work asked for or offered just before
+   * ("yes, go ahead"). Read from TURN_READER v62; absent before it.
+   */
+  readonly workFromEarlier?: boolean | undefined;
   /** v52: they ask what to do next, what is missing, or how ready they are. */
   readonly nextSteps?: boolean | undefined;
   /**

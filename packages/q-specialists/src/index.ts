@@ -317,6 +317,7 @@ export {
 export {
   createToolTeamJobPort,
   TEAM_JOB_KINDS,
+  earlierRequestGoal,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,

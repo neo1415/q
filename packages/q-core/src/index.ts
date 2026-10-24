@@ -1414,6 +1414,8 @@ export {
 export {
   ANALYSIS_CRITIQUE_V1,
   ANALYSIS_WRITE_V1,
+  ANALYSIS_WRITE_V2,
+  ANALYSIS_CRITIQUE_V2,
   RESEARCH_FACTS_V1,
   RESEARCH_PLAN_V1,
 } from "./prompts/tasks/analyst.v1.js";

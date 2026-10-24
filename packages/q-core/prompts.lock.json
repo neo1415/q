@@ -1,7 +1,9 @@
 {
   "entries": {
     "analysis-critique/v1": "a3f0785d9c33b003887cb7a0b98360495e814b71d7ff88736f3edcf4bc7b359b",
+    "analysis-critique/v2": "5b33b446f53147f4b98ff2a08185795f4fc19af63438669d08734a7f650acdb8",
     "analysis-write/v1": "4fddbfc0abfe4ec7df7b07e7b0aaae1ba7663346e253dc0c195b36a3cfad61ac",
+    "analysis-write/v2": "9dd2f0032dbd7a7dbb22f7f0bb9a4a6f7254078675bb447dc8b69e4318b2bb4f",
     "app-action-arguments/v1": "21532d93daad24dc70a9838e3a6c352b902b0a9f213108d507a27d3193f35ec1",
     "app-action-router/v1": "8137f33d99a8fb454a95b730addca2833ae4bd25ed937d8b5b71b827b341bf95",
     "artifact-revision/v1": "48f95a797cc00afd36c1afd6bb57660786dc57df154778a63f10bf626a1a5f0e",
