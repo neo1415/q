@@ -8,6 +8,7 @@ import {
   CAPABILITIES_NOTE,
   ENVIRONMENT_NOTES_MAX_CHARS,
   NEXT_STEP_NOTE,
+  REMEMBER_FIRST_NOTE,
   VIEWING_NOT_DISCLOSED_NOTE,
   environmentNotesFor,
 } from "../src/q/index.js";
@@ -102,5 +103,14 @@ describe("how a reply ends", () => {
     expect(notes).toContain(NEXT_STEP_NOTE);
     // Viewing is not interest: always said, never keyword-triggered.
     expect(notes).toContain(VIEWING_NOT_DISCLOSED_NOTE);
+    // QA QO-35: a "remember" turn confirms the memory first, no tool, and
+    // never rewrites the declared mandate on its own.
+    expect(notes).toContain(REMEMBER_FIRST_NOTE);
+    expect(REMEMBER_FIRST_NOTE).toMatch(
+      /say first, in one short sentence, that you will remember it/u,
+    );
+    expect(REMEMBER_FIRST_NOTE).toMatch(
+      /declared mandate is separate: change it only when they ask/u,
+    );
   });
 });

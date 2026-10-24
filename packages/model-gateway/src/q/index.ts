@@ -1221,7 +1221,8 @@ const RESEARCH_NOTE_BRIEF =
 // point comes from (~160 characters), about 100 tokens a turn.
 // 9,800 since 2026-10-23 (VIEWING_NOT_DISCLOSED_NOTE, ~340 characters):
 // a production-sized run would otherwise lose what Q can do again.
-export const ENVIRONMENT_NOTES_MAX_CHARS = 9_800;
+// 10,200 since 2026-10-24 (REMEMBER_FIRST_NOTE, ~370 characters).
+export const ENVIRONMENT_NOTES_MAX_CHARS = 10_200;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -1393,6 +1394,17 @@ export const SAVE_NOT_VERIFY_NOTE =
  * founders; what a founder can see is interest and connection requests,
  * from their own relationships.
  */
+/**
+ * QA QO-35 (live 2026-10-24, investor): "Remember: I pass on consumer
+ * lending businesses." took 15 s through the mandate tools and answered
+ * that the mandate has no such category, never that Q will remember it.
+ * Remembering comes first and needs no tool; the declared mandate is
+ * separate and changed only by its own approval (Declared Mandate ≠
+ * Observed Behaviour ≠ Q Inference).
+ */
+export const REMEMBER_FIRST_NOTE =
+  "REMEMBER: when they ask you to remember something about themselves or how they work or invest ('remember: I pass on consumer lending'), say first, in one short sentence, that you will remember it; it is kept from what they say, no tool needed. Their declared mandate is separate: change it only when they ask, and otherwise you may offer that as one short question.";
+
 export const VIEWING_NOT_DISCLOSED_NOTE =
   "VIEWING IS NOT INTEREST: founders never see who viewed or played their pitch or profile, by design. Asked who looked, say so as how Capital Q works (never as a missing record), then give what they can see: investors who expressed interest or asked to connect, counted from list_incoming_interest or list_my_relationships, never estimated.";
 
@@ -1560,6 +1572,7 @@ export function environmentNoteParts(
     LIKELY_INTENT_NOTE,
     SAVE_NOT_VERIFY_NOTE,
     VIEWING_NOT_DISCLOSED_NOTE,
+    REMEMBER_FIRST_NOTE,
     OWN_DAY_NOTE,
     EXPRESSIVE_NOTE,
     statementsNote,
