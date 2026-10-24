@@ -18,6 +18,18 @@ export function asksAboutOwnPitch(text: string): boolean {
   return OWN_PITCH.test(text);
 }
 
+/** "rewrite my deck", "update the script": a change asked for, not a review. */
+const CHANGE_ASKED =
+  /\b(?:revise|rewrite|edit|redo|update|change|fix)\b[^.?!]*\b(?:deck|document|script|brief|file|slides?)\b/iu;
+
+/**
+ * QA F-107: a review of their own pitch, with no change to a document
+ * asked for. Such a turn reads; it never prepares a document revision.
+ */
+export function asksOnlyToReviewOwnPitch(text: string): boolean {
+  return asksAboutOwnPitch(text) && !CHANGE_ASKED.test(text);
+}
+
 type PitchesRead = {
   readonly pitches?: readonly {
     readonly title?: unknown;
@@ -66,6 +78,7 @@ export function ownPitchReviewFact(data: unknown): AuthorisedFact | null {
     "name the exact lines (with the moment, e.g. 0:12) to cut, sharpen or reorder, and what an investor would still be missing (traction, the raise, use of funds); " +
     "a word that looks misheard is a transcription slip, say so rather than fault them for it. " +
     "Views, watch time and who watched are not recorded: if asked, say so in one clause, never as the whole answer. " +
+    "This is a review in words: a pitch video is not a document Q revises, so prepare, revise or offer to revise no document, deck or file for it; for changes, say what to change and offer to help script the next take. " +
     parts.join(" ");
   return {
     scope: "COMPANY_PROFILE",

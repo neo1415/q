@@ -276,7 +276,12 @@ import {
 import { ownProfileFact } from "./own-profile.js";
 import { asksForOwnMandate, ownMandateAnswer } from "./own-mandate-answer.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
-import { asksAboutOwnPitch, ownPitchReviewFact } from "./own-pitch-review.js";
+import {
+  asksAboutOwnPitch,
+  asksOnlyToReviewOwnPitch,
+  ownPitchReviewFact,
+} from "./own-pitch-review.js";
+import { withoutInternalFailureLines } from "./internal-failure-lines.js";
 import { relationshipFact } from "./relationship-fact.js";
 import {
   ownIndexFact,
@@ -2539,6 +2544,19 @@ export function createModelGatewayQAnswer(
       result: { ok: true, data: { ...data, sources: kept, comparison } },
     };
   };
+  /**
+   * QA F-107 (run bad4b716): runs that review a founder's own pitch video
+   * with no change asked. Their answer reads; a document revision is
+   * refused here, whatever the model calls. Bounded.
+   */
+  const reviewOnlyRuns = new Set<string>();
+  const markReviewOnly = (runId: string): void => {
+    reviewOnlyRuns.add(runId);
+    if (reviewOnlyRuns.size > 256) {
+      const [oldest] = reviewOnlyRuns;
+      if (oldest !== undefined) reviewOnlyRuns.delete(oldest);
+    }
+  };
   const tools: QToolPort = {
     offer: async (toolContext) => {
       const offered = await baseTools.offer(toolContext);
@@ -2555,6 +2573,24 @@ export function createModelGatewayQAnswer(
           },
         }),
     execute: async (proposal, toolContext) => {
+      if (
+        proposal.name === "revise_my_document" &&
+        reviewOnlyRuns.has(toolContext.runId)
+      ) {
+        const safeMessage =
+          "They asked for a review of their own pitch video, not a change to a document. Answer with the review from its transcript and change nothing.";
+        return {
+          callId: proposal.callId,
+          toolName: null,
+          toolVersion: null,
+          classification: null,
+          status: "DENIED",
+          failureCode: "NOT_ASKED",
+          sensitivity: null,
+          result: { ok: false, error: { code: "NOT_ASKED", safeMessage } },
+          latencyMs: 0,
+        };
+      }
       const isRead =
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
       // What Q knows, Q knows (read-cache.ts): the same read under the
@@ -4141,6 +4177,9 @@ export function createModelGatewayQAnswer(
           },
           toolContext,
         );
+        if (asksOnlyToReviewOwnPitch(latest.content)) {
+          markReviewOnly(request.runId);
+        }
         if (outcome.result.ok) {
           pitchMoment = ownPitchReviewFact(outcome.result.data);
         }
@@ -6150,6 +6189,8 @@ export function createModelGatewayQAnswer(
               block.kind !== "TABLE" || block.title !== COMPANIES_TABLE_TITLE,
           );
         }
+        // QA F-107: how a tool failed is never said to the person.
+        content = withoutInternalFailureLines(content);
         // QA F-44: other investors' interest is withheld, never denied.
         if (asksAboutOthersInterest(latest.content)) {
           content = withOthersInterestWithheld(content).slice(
