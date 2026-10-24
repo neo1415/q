@@ -69,6 +69,21 @@ type Catalog = {
    * kept, `matched` of them before that; null when not asked or not read.
    */
   readonly raising: { readonly matched: number } | null;
+  /** FIT was asked and the fit service failed: the cause, for the log. */
+  readonly rankFailed: string | null;
+};
+
+/**
+ * An investor's fit ranking over the network could not be made: the
+ * catalog failed, or the fit service did (owner 2026-10-24: never a
+ * name-ordered list presented as "the top N by fit"). The caller logs the
+ * cause and answers from the investor's own pipeline, saying so.
+ */
+export type DiscoveryRankUnavailable = {
+  readonly rankUnavailable: true;
+  /** A class or failure code, never content. */
+  readonly cause: string;
+  readonly calls: readonly QToolCallOutcome[];
 };
 
 export type DiscoveryAnswer = {
@@ -93,6 +108,7 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
       readonly filter?: unknown;
       readonly matched?: unknown;
     };
+    readonly fitRankFailed?: { readonly cause?: unknown };
   } | null;
   if (data === null || !Array.isArray(data.companies)) return null;
   return {
@@ -110,6 +126,10 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
       data.raising?.filter === "APPLIED" &&
       typeof data.raising.matched === "number"
         ? { matched: data.raising.matched }
+        : null,
+    rankFailed:
+      typeof data.fitRankFailed?.cause === "string"
+        ? data.fitRankFailed.cause.slice(0, 80)
         : null,
   };
 }
@@ -279,7 +299,7 @@ export async function runCompanyDiscovery(input: {
   readonly available: ReadonlySet<string>;
   /** The actor is on an investor organisation's side. */
   readonly investor: boolean;
-}): Promise<DiscoveryAnswer | null> {
+}): Promise<DiscoveryAnswer | DiscoveryRankUnavailable | null> {
   const { ask, tools, context, available } = input;
   if (!available.has(DISCOVER_TOOL) || ask.previous) return null;
   const count = Math.min(
@@ -310,22 +330,35 @@ export async function runCompanyDiscovery(input: {
     if (outcome !== null) calls.push(outcome);
     return outcome;
   };
-  const catalog = catalogOf(
-    await execute(
-      DISCOVER_TOOL,
-      {
-        sectors: [...ask.sectors],
-        countries: [...ask.countries],
-        stages: [...ask.stages],
-        // Owner 2026-10-23: the catalog scores every match on the mandate
-        // and returns the best; never the first companies by name.
-        limit: fitWanted ? DISCOVER_FIT_MAX : count,
-        ...(fitWanted ? { order: "FIT" } : {}),
-        ...(ask.raising === true ? { raising: true } : {}),
-      },
-      "q-discover-companies",
-    ),
+  const outcome = await execute(
+    DISCOVER_TOOL,
+    {
+      sectors: [...ask.sectors],
+      countries: [...ask.countries],
+      stages: [...ask.stages],
+      // Owner 2026-10-23: the catalog scores every match on the mandate
+      // and returns the best; never the first companies by name.
+      limit: fitWanted ? DISCOVER_FIT_MAX : count,
+      ...(fitWanted ? { order: "FIT" } : {}),
+      ...(ask.raising === true ? { raising: true } : {}),
+    },
+    "q-discover-companies",
   );
+  const catalog = catalogOf(outcome);
+  // A fit ranking that could not be made is never a name-ordered list
+  // presented as one: the catalog was offered and failed, or it read the
+  // matches and the fit service failed.
+  if (fitWanted && (catalog === null || catalog.rankFailed !== null)) {
+    return {
+      rankUnavailable: true,
+      cause:
+        catalog?.rankFailed ??
+        outcome?.failureCode ??
+        outcome?.status ??
+        "TOOL_THREW",
+      calls,
+    };
+  }
   if (catalog === null) return null;
   const kind = kindWords(ask, catalog);
   // F-10: a list filtered to companies stating a current raise says so, and

@@ -128,6 +128,15 @@ export const DiscoverCompaniesOutputSchema = z
       .array(z.object({ code: z.string(), name: z.string() }).strict())
       .max(FILTER_MAX),
     unknownSectors: z.array(z.string()).max(FILTER_MAX),
+    /**
+     * FIT was asked for and the fit service failed (it threw): the list is
+     * in name order and must never be presented as a ranking. The cause is
+     * the error's class name only, for the log.
+     */
+    fitRankFailed: z
+      .object({ cause: z.string().min(1).max(80) })
+      .strict()
+      .optional(),
     /** Declared profiles, not an assessment and not a recommendation. */
     truthClass: z.literal("USER_CLAIM"),
   })
@@ -296,16 +305,31 @@ export function createDiscoverCompaniesTool(
                 Number(view.money.amount) > 0
               );
             });
+      // Owner 2026-10-24 (live bbb4b6773): a fit service that throws is
+      // tried once more here (the run keeps this tool's result, so a retry
+      // from the answer would read the same failure); a second failure is
+      // said in the output with its cause, never hidden as name order.
+      const rankFailure: { cause: string | null } = { cause: null };
+      const rankOnce = async () => {
+        rankFailure.cause = null;
+        return (
+          (await ports.fit
+            ?.rank?.(
+              context.actor,
+              eligible.map((candidate) => candidate.companyId),
+              input.limit,
+            )
+            .catch((error: unknown) => {
+              rankFailure.cause = (
+                error instanceof Error ? error.name : "UNKNOWN"
+              ).slice(0, 80);
+              return null;
+            })) ?? null
+        );
+      };
+      const first = byFit && eligible.length > 0 ? await rankOnce() : null;
       const ranked =
-        byFit && eligible.length > 0
-          ? await ports.fit
-              ?.rank?.(
-                context.actor,
-                eligible.map((candidate) => candidate.companyId),
-                input.limit,
-              )
-              .catch(() => null)
-          : null;
+        first === null && rankFailure.cause !== null ? await rankOnce() : first;
       const order =
         ranked?.kind === "OK"
           ? ranked.comparison.entries.flatMap((entry) => {
@@ -340,6 +364,9 @@ export function createDiscoverCompaniesTool(
           name: sector.name,
         })),
         unknownSectors: found.unknownSectors.slice(0, FILTER_MAX),
+        ...(rankFailure.cause === null
+          ? {}
+          : { fitRankFailed: { cause: rankFailure.cause } }),
         truthClass: "USER_CLAIM" as const,
       };
     },
