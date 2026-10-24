@@ -77,7 +77,7 @@ type Company = {
   ready: boolean;
   stage: string | null;
   country: string | null;
-  nodes: { nodeId: string; vocabularyCode: string }[];
+  nodes: { nodeId: string; vocabularyCode: string; canonicalCode: string }[];
   permitted: boolean;
   // Never read by retrieval or eligibility.
   founderMemory: string[];
@@ -192,7 +192,13 @@ function world(overrides: Partial<World> = {}): World {
       company(1, {
         stage: "seed",
         country: "NG",
-        nodes: [{ nodeId: PAYMENTS, vocabularyCode: "industry" }],
+        nodes: [
+          {
+            nodeId: PAYMENTS,
+            vocabularyCode: "industry",
+            canonicalCode: "payments",
+          },
+        ],
       }),
       // B: geography only
       company(2, { stage: "series_b", country: "NG" }),
@@ -200,7 +206,13 @@ function world(overrides: Partial<World> = {}): World {
       company(3, {
         stage: "series_a",
         country: "DE",
-        nodes: [{ nodeId: FINTECH, vocabularyCode: "industry" }],
+        nodes: [
+          {
+            nodeId: FINTECH,
+            vocabularyCode: "industry",
+            canonicalCode: "fintech",
+          },
+        ],
       }),
       // D: stage only, unknown taxonomy
       company(4, { stage: "seed", country: "GB" }),
@@ -208,13 +220,25 @@ function world(overrides: Partial<World> = {}): World {
       company(5, {
         stage: "series_c_plus",
         country: "FR",
-        nodes: [{ nodeId: HARDWARE, vocabularyCode: "industry" }],
+        nodes: [
+          {
+            nodeId: HARDWARE,
+            vocabularyCode: "industry",
+            canonicalCode: "hardware",
+          },
+        ],
       }),
       // F: hard-excluded (gambling) but seed → found by stage, removed by REC-001
       company(6, {
         stage: "seed",
         country: "NG",
-        nodes: [{ nodeId: GAMBLING, vocabularyCode: "industry" }],
+        nodes: [
+          {
+            nodeId: GAMBLING,
+            vocabularyCode: "industry",
+            canonicalCode: "gambling",
+          },
+        ],
       }),
       // G: not marketplace ready → found, never rankable
       company(7, { stage: "seed", country: "NG", ready: false }),
@@ -232,7 +256,13 @@ function world(overrides: Partial<World> = {}): World {
       company(10, {
         stage: "series_a",
         country: "GH",
-        nodes: [{ nodeId: WEST_AFRICA, vocabularyCode: "geography" }],
+        nodes: [
+          {
+            nodeId: WEST_AFRICA,
+            vocabularyCode: "geography",
+            canonicalCode: "west_africa",
+          },
+        ],
       }),
     ],
     mandates: [
@@ -456,7 +486,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v4",
+          eligibilityPolicyVersion: "eligibility.v5",
         },
         results,
       });
@@ -779,7 +809,11 @@ describe("structured candidate service", () => {
     expect(ids(r)).not.toContain(companyId(5));
     // Company 1 also carries the avoided node; it stays.
     const one = w.companies.find((c) => c.id === companyId(1));
-    one?.nodes.push({ nodeId: HARDWARE, vocabularyCode: "industry" });
+    one?.nodes.push({
+      nodeId: HARDWARE,
+      vocabularyCode: "industry",
+      canonicalCode: "hardware",
+    });
     expect(ids(await generated(w))).toContain(companyId(1));
   });
 
@@ -1105,7 +1139,7 @@ describe("structured candidate service", () => {
       expect("rank" in c).toBe(false);
     }
     expect(r.generatorVersion).toBe("structured-mandate.v6");
-    expect(r.eligibilityPolicyVersion).toBe("eligibility.v4");
+    expect(r.eligibilityPolicyVersion).toBe("eligibility.v5");
   });
 });
 

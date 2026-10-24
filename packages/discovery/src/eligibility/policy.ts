@@ -1,4 +1,5 @@
 import { reapproachAfterPass } from "@capital-q/network";
+import { RED_FLAG_INDUSTRY_CODES } from "@capital-q/taxonomy/reference-data";
 
 import {
   ELIGIBILITY_CRITERIA,
@@ -21,7 +22,7 @@ import type {
 } from "./ports.js";
 
 /**
- * Eligibility policy v3. Pure: snapshots in, decision out. Nothing here
+ * Eligibility policy v5. Pure: snapshots in, decision out. Nothing here
  * reads a database, calls a model, looks at a clock or knows what anybody
  * browsed, said to Q, uploaded or was found about on the public web.
  *
@@ -68,6 +69,54 @@ export const DECLARED_TAXONOMY_SOURCES = [
 /** Constraint dimensions with a canonical company counterpart this policy can read. */
 const STAGE_DIMENSION = "stage";
 const GEOGRAPHY_DIMENSION = "geography.country";
+/** Red flags; the ones naming an industry are read against declared industry (v5). */
+const RED_FLAG_DIMENSION = "red_flag";
+const INDUSTRY_VOCABULARY = "industry";
+
+function isActiveHardExclusion(c: MandateHardConstraint): boolean {
+  return (
+    c.isHardExclusion &&
+    c.importance === "HARD_EXCLUSION" &&
+    c.automatedUse === "ELIGIBLE"
+  );
+}
+
+/** "Never show gambling": the listed red-flag codes, when listed as excluded. */
+function listedRedFlags(c: MandateHardConstraint): readonly string[] {
+  return c.dimension === RED_FLAG_DIMENSION &&
+    c.value.kind === "codes" &&
+    (c.operator === "EQ" || c.operator === "IN")
+    ? c.value.values
+    : [];
+}
+
+const namesIndustry = (code: string) => RED_FLAG_INDUSTRY_CODES.includes(code);
+
+/** The declared red flags a company's declared industry can answer. */
+function industryRedFlags(mandate: MandateSnapshotForEligibility): string[] {
+  return [
+    ...new Set(
+      mandate.constraints
+        .filter(isActiveHardExclusion)
+        .flatMap(listedRedFlags)
+        .filter(namesIndustry),
+    ),
+  ];
+}
+
+/**
+ * A declared hard exclusion no canonical company field answers: anything
+ * but stage and country, except a red-flag rule whose every code names an
+ * industry. A rule listing "gambling" and "pre-product" is still partly
+ * unanswerable, so it is still reported.
+ */
+function notEvaluable(c: MandateHardConstraint): boolean {
+  if (c.dimension === STAGE_DIMENSION || c.dimension === GEOGRAPHY_DIMENSION) {
+    return false;
+  }
+  const flags = listedRedFlags(c);
+  return !(flags.length > 0 && flags.every(namesIndustry));
+}
 
 /**
  * Relationship states the Network context defines as removing the pair
@@ -220,14 +269,20 @@ function taxonomyCriterion(
   classifications: readonly CompanyClassification[],
 ): CriterionResult {
   const exclusions = declaredExclusions(mandate);
-  if (exclusions.length === 0) {
+  const redFlags = industryRedFlags(mandate);
+  if (exclusions.length === 0 && redFlags.length === 0) {
     return result("HARD_EXCLUSION_TAXONOMY", "NOT_APPLICABLE");
   }
   const declared = classifications.filter((c) =>
     (DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(c.source),
   );
   const carried = new Set(declared.map((c) => c.nodeId));
-  if (exclusions.some((e) => carried.has(e.nodeId))) {
+  const declaredRedFlag = declared.some(
+    (c) =>
+      c.vocabularyCode === INDUSTRY_VOCABULARY &&
+      redFlags.includes(c.canonicalCode),
+  );
+  if (exclusions.some((e) => carried.has(e.nodeId)) || declaredRedFlag) {
     return result("HARD_EXCLUSION_TAXONOMY", "FAIL", "EXPLICIT_HARD_EXCLUSION");
   }
   // A company classified in the excluded node's vocabulary, under another
@@ -235,9 +290,9 @@ function taxonomyCriterion(
   // vocabulary has not, and silence is not "not gambling" — nor is Q's
   // guess, either way.
   const vocabulariesKnown = new Set(declared.map((c) => c.vocabularyCode));
-  const unanswered = exclusions.some(
-    (e) => !vocabulariesKnown.has(e.vocabularyCode),
-  );
+  const unanswered =
+    exclusions.some((e) => !vocabulariesKnown.has(e.vocabularyCode)) ||
+    (redFlags.length > 0 && !vocabulariesKnown.has(INDUSTRY_VOCABULARY));
   return unanswered
     ? result("HARD_EXCLUSION_TAXONOMY", "UNKNOWN", "COMPANY_TAXONOMY_UNKNOWN")
     : result("HARD_EXCLUSION_TAXONOMY", "PASS");
@@ -245,7 +300,7 @@ function taxonomyCriterion(
 
 /**
  * Hard exclusions declared on dimensions that no canonical company field
- * answers in V1 (red flags, business attributes, founder attributes,
+ * answers in V1 (red flags other than industries, business attributes, founder attributes,
  * declared sector codes, investment role). The rule is real and the fact is
  * missing, so the honest outcome is UNKNOWN — not a silent pass, not an
  * exclusion (ADR 0020), and never a fill-in from a document, a memory or a
@@ -377,14 +432,7 @@ export function unverifiableHardExclusions(
   return [
     ...new Set(
       mandate.constraints
-        .filter(
-          (c) =>
-            c.isHardExclusion &&
-            c.importance === "HARD_EXCLUSION" &&
-            c.automatedUse === "ELIGIBLE" &&
-            c.dimension !== STAGE_DIMENSION &&
-            c.dimension !== GEOGRAPHY_DIMENSION,
-        )
+        .filter((c) => isActiveHardExclusion(c) && notEvaluable(c))
         .map((c) => c.dimension),
     ),
   ].sort();

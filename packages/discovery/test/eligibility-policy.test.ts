@@ -109,7 +109,12 @@ function input(
     mandate: mandate(),
     company: company(),
     classifications: [
-      { nodeId: PAYMENTS, vocabularyCode: "industry", source: "user_selected" },
+      {
+        nodeId: PAYMENTS,
+        vocabularyCode: "industry",
+        canonicalCode: "payments",
+        source: "user_selected",
+      },
     ],
     permittedToView: true,
     relationship: { kind: "NONE" },
@@ -188,6 +193,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
           {
             nodeId: GAMBLING,
             vocabularyCode: "industry",
+            canonicalCode: "gambling",
             source: "user_selected",
           },
         ],
@@ -205,7 +211,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
     ] as const;
 
     it("pins the policy version this behaviour belongs to", () => {
-      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v4");
+      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v5");
     });
 
     it("an undeclared classification on the excluded node, alone in the vocabulary → UNKNOWN, kept (v3), never FAIL", () => {
@@ -214,7 +220,12 @@ describe("eligibility policy v1 — golden scenarios", () => {
           input({
             mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
             classifications: [
-              { nodeId: GAMBLING, vocabularyCode: "industry", source },
+              {
+                nodeId: GAMBLING,
+                vocabularyCode: "industry",
+                canonicalCode: "gambling",
+                source,
+              },
             ],
           }),
         );
@@ -235,7 +246,12 @@ describe("eligibility policy v1 — golden scenarios", () => {
           input({
             mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
             classifications: [
-              { nodeId: GAMBLING, vocabularyCode: "industry", source },
+              {
+                nodeId: GAMBLING,
+                vocabularyCode: "industry",
+                canonicalCode: "gambling",
+                source,
+              },
             ],
           }),
         );
@@ -255,6 +271,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
             {
               nodeId: PAYMENTS,
               vocabularyCode: "industry",
+              canonicalCode: "payments",
               source: "q_inferred",
             },
           ],
@@ -273,11 +290,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
             {
               nodeId: PAYMENTS,
               vocabularyCode: "industry",
+              canonicalCode: "payments",
               source: "user_selected",
             },
             {
               nodeId: GAMBLING,
               vocabularyCode: "industry",
+              canonicalCode: "gambling",
               source: "q_inferred",
             },
           ],
@@ -295,6 +314,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
             {
               nodeId: GAMBLING,
               vocabularyCode: "industry",
+              canonicalCode: "gambling",
               source: "q_inferred",
             },
           ],
@@ -307,6 +327,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
             {
               nodeId: GAMBLING,
               vocabularyCode: "industry",
+              canonicalCode: "gambling",
               source: "user_selected",
             },
           ],
@@ -350,6 +371,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
           {
             nodeId: HARDWARE,
             vocabularyCode: "industry",
+            canonicalCode: "hardware",
             source: "user_selected",
           },
         ],
@@ -490,6 +512,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
           {
             nodeId: PAYMENTS,
             vocabularyCode: "product_category",
+            canonicalCode: "payments",
             source: "user_selected",
           },
         ],
@@ -507,6 +530,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
           {
             nodeId: PAYMENTS,
             vocabularyCode: "industry",
+            canonicalCode: "payments",
             source: "user_selected",
           },
         ],
@@ -575,6 +599,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
           {
             nodeId: GAMBLING,
             vocabularyCode: "industry",
+            canonicalCode: "gambling",
             source: "user_selected",
           },
         ],
@@ -612,6 +637,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
             {
               nodeId: GAMBLING,
               vocabularyCode: "industry",
+              canonicalCode: "gambling",
               source: "user_selected",
             },
           ],
@@ -886,5 +912,105 @@ describe("ADR 0020: a hard exclusion excludes only on positive evidence", () => 
   it("UNKNOWN on a gate that is not an exclusion still withholds: no ACTIVE mandate is UNDETERMINED", () => {
     const r = evaluateHardEligibility(input({ mandate: { kind: "NONE" } }));
     expect(r.decision).toBe("UNDETERMINED");
+  });
+});
+
+describe("v5 (QO-28b): a red flag that names an industry is read against declared industry", () => {
+  const neverGambling = constraint({
+    dimension: "red_flag",
+    value: { kind: "codes", values: ["gambling"] },
+  });
+  const declared = (canonicalCode: string, source = "user_selected") => ({
+    nodeId: canonicalCode === "gambling" ? GAMBLING : PAYMENTS,
+    vocabularyCode: "industry",
+    canonicalCode,
+    source,
+  });
+
+  it("a company that declared the industry → FAIL, INELIGIBLE", () => {
+    const r = evaluateHardEligibility(
+      input({
+        mandate: mandate({ constraints: [neverGambling] }),
+        classifications: [declared("gambling")],
+      }),
+    );
+    expect(r.decision).toBe("INELIGIBLE");
+    expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")).toMatchObject({
+      outcome: "FAIL",
+      reasonCode: "EXPLICIT_HARD_EXCLUSION",
+    });
+    // Checkable now: no longer reported as unverifiable.
+    expect(outcomeOf(r, "HARD_EXCLUSION_OTHER")?.outcome).toBe(
+      "NOT_APPLICABLE",
+    );
+  });
+
+  it("a company that declared another industry → PASS, kept", () => {
+    const r = evaluateHardEligibility(
+      input({
+        mandate: mandate({ constraints: [neverGambling] }),
+        classifications: [declared("payments")],
+      }),
+    );
+    expect(r.decision).toBe("ELIGIBLE");
+    expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")?.outcome).toBe("PASS");
+  });
+
+  it("negative: no declared industry stays UNKNOWN and is never excluded (ADR 0020)", () => {
+    for (const classifications of [
+      [],
+      // Q's guess is not what the company is.
+      [declared("gambling", "q_inferred")],
+      [declared("gambling", "document_extracted")],
+    ]) {
+      const r = evaluateHardEligibility(
+        input({
+          mandate: mandate({ constraints: [neverGambling] }),
+          classifications,
+        }),
+      );
+      expect(r.decision).toBe("ELIGIBLE");
+      expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")).toMatchObject({
+        outcome: "UNKNOWN",
+        reasonCode: "COMPANY_TAXONOMY_UNKNOWN",
+      });
+      expect(r.reasonCodes).not.toContain("EXPLICIT_HARD_EXCLUSION");
+    }
+  });
+
+  it("a soft AVOID red flag is never a hard rule", () => {
+    const r = evaluateHardEligibility(
+      input({
+        mandate: mandate({
+          constraints: [
+            constraint({
+              dimension: "red_flag",
+              importance: "AVOID",
+              isHardExclusion: false,
+              value: { kind: "codes", values: ["gambling"] },
+            }),
+          ],
+        }),
+        classifications: [declared("gambling")],
+      }),
+    );
+    expect(r.decision).toBe("ELIGIBLE");
+  });
+
+  it("a rule that also lists a non-industry red flag still excludes the industry, and the rest stays reported", () => {
+    const mixed = constraint({
+      dimension: "red_flag",
+      value: { kind: "codes", values: ["gambling", "pre_product"] },
+    });
+    const m = mandate({ constraints: [mixed] });
+    const r = evaluateHardEligibility(
+      input({ mandate: m, classifications: [declared("gambling")] }),
+    );
+    expect(r.decision).toBe("INELIGIBLE");
+    if (m.kind !== "FOUND") throw new Error("fixture");
+    expect(unverifiableHardExclusions(m.mandate)).toEqual(["red_flag"]);
+    const onlyIndustry = mandate({ constraints: [neverGambling] });
+    if (onlyIndustry.kind !== "FOUND") throw new Error("fixture");
+    expect(unverifiableHardExclusions(onlyIndustry.mandate)).toEqual([]);
   });
 });

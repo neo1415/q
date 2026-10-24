@@ -31,6 +31,7 @@ import {
 } from "../src/events/index.js";
 import * as taxonomy from "../src/index.js";
 import {
+  RED_FLAG_INDUSTRY_CODES,
   REFERENCE_TAXONOMY,
   referenceNode,
 } from "../src/reference-data/index.js";
@@ -76,15 +77,16 @@ describe("reference taxonomy (§110-120)", () => {
       "regulatory_profile",
     ]);
     // Every vocabulary is at its first version except geography, which grew
-    // in v2 (CQ-ACCEPT-001: more African markets, a Central Africa region).
+    // in v2 (CQ-ACCEPT-001: more African markets, a Central Africa region),
+    // and industry, which grew in v2 (QO-28b: the red-flag industries).
     expect(
       Object.fromEntries(
         REFERENCE_TAXONOMY.vocabularies.map((v) => [v.code, v.version]),
       ),
-    ).toMatchObject({ geography: 3, industry: 1 });
+    ).toMatchObject({ geography: 3, industry: 2 });
     expect(
       REFERENCE_TAXONOMY.vocabularies
-        .filter((v) => v.code !== "geography")
+        .filter((v) => v.code !== "geography" && v.code !== "industry")
         .every((v) => v.version === 1),
     ).toBe(true);
     expect(referenceNode("geography", "qatar").metadata).toEqual({
@@ -97,6 +99,10 @@ describe("reference taxonomy (§110-120)", () => {
     expect(referenceNode("geography", "cote_divoire").parentCode).toBe(
       "west_africa",
     );
+    // A red flag an investor can rule out names an industry by its own code.
+    for (const code of RED_FLAG_INDUSTRY_CODES) {
+      expect(referenceNode("industry", code).parentCode, code).toBeNull();
+    }
     expect(REFERENCE_TAXONOMY.nodes.length).toBeGreaterThan(100);
     expect(REFERENCE_TAXONOMY.nodes.length).toBeLessThan(400);
     expect(REFERENCE_TAXONOMY.aliases.length).toBeGreaterThanOrEqual(40);
