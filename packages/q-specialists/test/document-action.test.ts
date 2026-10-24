@@ -26,6 +26,7 @@ import {
   boardItemFromWords,
   mentionsOwnBoard,
   nameInAsk,
+  withoutBoardSave,
   boardReadOut,
   createSpecialistQAnswer,
   type BoardKeeper,
@@ -2165,5 +2166,78 @@ describe("saving deep work by its job", () => {
     expect(s.stored[0]?.blocks).toEqual([
       expect.objectContaining({ kind: "WORK_IN_PROGRESS", jobId: JOB }),
     ]);
+  });
+});
+
+/** Batch 9 (c8d45c628): the planner said saving to the board was not available. */
+describe("the planner gets the work, the board gets the save", () => {
+  it("drops the save clause and keeps the work in their words", () => {
+    expect(
+      withoutBoardSave(
+        "Write me a short 12-month growth plan and save it to my board",
+      ),
+    ).toBe("Write me a short 12-month growth plan");
+    expect(
+      withoutBoardSave("Draft an IC memo on Mizan, then put it on my board."),
+    ).toBe("Draft an IC memo on Mizan");
+    expect(
+      withoutBoardSave(
+        "Prepare questions for Anchor and keep the questions on my to-dos",
+      ),
+    ).toBe("Prepare questions for Anchor");
+    expect(withoutBoardSave("save it to my board")).toBe("save it to my board");
+  });
+
+  it("the team job is asked for the plan alone", async () => {
+    const goals: string[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: () =>
+        Promise.resolve({
+          outcome: "OK",
+          replayed: false,
+          value: { id: "item-1" },
+        }),
+      latestRunningJob: () => Promise.resolve(null),
+      linkJob: () => Promise.resolve({ outcome: "OK" }),
+    };
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "Write me a short 12-month growth plan and save it to my board",
+        ),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+        teamJob: true,
+      },
+      board,
+      teamJob: {
+        propose: (_request, goal) => {
+          goals.push(goal);
+          return Promise.resolve({
+            status: "STARTED",
+            plan: {
+              summary: "A growth plan",
+              steps: [],
+              cannot: [],
+              needsYou: [],
+            },
+            firstRead: null,
+            jobId: "77777777-2222-4333-8444-555555555555",
+          });
+        },
+      },
+    });
+    await s.run();
+    expect(goals).toEqual(["Write me a short 12-month growth plan"]);
   });
 });

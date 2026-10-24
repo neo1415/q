@@ -1325,6 +1325,20 @@ export function workSubjectInAsk(question: string): string | null {
 }
 
 /**
+ * Their ask without its "…and save it to my board" clause: the work alone,
+ * for the planner. The board keeps the job itself (F11).
+ */
+export function withoutBoardSave(words: string): string {
+  const work = words
+    .replace(
+      /[\s,;]*(?:\band\s+|\bthen\s+|\band\s+then\s+)*(?:please\s+)?(?:save|keep|pin|put|add|file|store)\s+(?:it|that|this|them|the\s+\w+(?:\s+\w+)?)?\s*(?:to|on|onto|in|into)\s+(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b[.!?]*/giu,
+      "",
+    )
+    .trim();
+  return work.length === 0 ? words : work;
+}
+
+/**
  * Their own work board, by its words: "my board", "my work board", "my
  * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
  * names the board tool for a turn the reader left without a board ask
@@ -2475,7 +2489,10 @@ export function createSpecialistQAnswer(
     teamJob: QTeamJobPort,
     board: BoardKeeper,
   ): Promise<QAnswerOutcome> {
-    const planned = await teamJob.propose(request, words);
+    // Batch 9 (c8d45c628): the planner saw "and save it to my board" and
+    // said saving was not available in the job. The save is the board's
+    // part; the planner gets only the work.
+    const planned = await teamJob.propose(request, withoutBoardSave(words));
     const line = teamJobLine(planned);
     const blocks = teamJobBlocks(planned);
     if (planned.status !== "STARTED") {
