@@ -2961,15 +2961,32 @@ export function createModelGatewayQAnswer(
     let compareTable: QResultBlock | null = null;
     /** Who leads on Capital Q's fit, decided here by code (see ledByVerdict). */
     let compareVerdict: ComparisonVerdict | null = null;
-    const compareRead = (async (): Promise<void> => {
-      if (latest === undefined) return;
+    /**
+     * Root cause, coordinator 24 Oct (third live miss, run 8605b721): the
+     * prepare is warmed while the turn is still being read, so the request
+     * it sees carries no reader `compare`; "which is better, Anchor or
+     * Afyascan?" matched no words, nothing was read, and the answer that
+     * took the warmed prepare had no comparison fact, no fits and no
+     * verdict. The same reads run again for the turn's own reading
+     * (`compareLate`, below) when the warmed prepare built none.
+     */
+    type CompareOutcome = {
+      readonly facts: readonly AuthorisedFact[];
+      readonly ids: readonly string[];
+      readonly table: QResultBlock | null;
+      readonly verdict: ComparisonVerdict | null;
+    };
+    const compareFor = async (
+      reading: QAnswerRequest["compare"],
+    ): Promise<CompareOutcome | null> => {
+      if (latest === undefined) return null;
       const fromCards = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
-        request.compare,
+        reading,
       );
-      const named = request.compare?.names ?? [];
-      if (fromCards.length < 2 && named.length < 2) return;
+      const named = reading?.names ?? [];
+      if (fromCards.length < 2 && named.length < 2) return null;
       const { names } = await prefetchToolsRead;
       // Coordinator 24 Oct ("which is better, Anchor or Afyascan?"): the
       // companies the reader heard named but Q did not show are found by
@@ -3004,7 +3021,7 @@ export function createModelGatewayQAnswer(
               (id, index, all): id is string =>
                 id !== null && all.indexOf(id) === index,
             );
-      if (targets.length < 2) return;
+      if (targets.length < 2) return null;
       const reads = targets.flatMap((companyId, index) =>
         [
           { name: "get_company", key: "profile" },
@@ -3025,7 +3042,7 @@ export function createModelGatewayQAnswer(
               .catch(() => null),
           ),
       );
-      if (reads.length === 0) return;
+      if (reads.length === 0) return null;
       stepStarts(request, "COMPARING_OPPORTUNITIES");
       await Promise.all(reads);
       const table = comparisonTableBlock({
@@ -3039,22 +3056,29 @@ export function createModelGatewayQAnswer(
         table === null
           ? null
           : comparisonFactStatement(table, runFits.read(request.runId));
-      if (statement === null) return;
-      compareIds = targets;
-      compareTable = table;
-      compareVerdict =
-        table === null
-          ? null
-          : comparisonVerdict(table, runFits.read(request.runId));
-      compareFacts = [
-        {
-          scope: "NETWORK_VISIBLE_DATA",
-          statement,
-          truthClass: "USER_CLAIM",
-          evidenceStatus: "SELF_REPORTED",
-          source: "Capital Q profiles, published figures and computed fit",
-        },
-      ];
+      if (statement === null || table === null) return null;
+      return {
+        ids: targets,
+        table,
+        verdict: comparisonVerdict(table, runFits.read(request.runId)),
+        facts: [
+          {
+            scope: "NETWORK_VISIBLE_DATA",
+            statement,
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "SELF_REPORTED",
+            source: "Capital Q profiles, published figures and computed fit",
+          },
+        ],
+      };
+    };
+    const compareRead = (async (): Promise<void> => {
+      const outcome = await compareFor(request.compare);
+      if (outcome === null) return;
+      compareFacts = outcome.facts;
+      compareIds = outcome.ids;
+      compareTable = outcome.table;
+      compareVerdict = outcome.verdict;
     })();
     compareRead.catch(() => undefined);
     // QA F-28: "who can see my data room?" is read by code, as the asker,
@@ -4010,6 +4034,7 @@ export function createModelGatewayQAnswer(
       dataRoomFacts,
       compareTable,
       compareVerdict,
+      compareLate: compareFor,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4375,11 +4400,12 @@ export function createModelGatewayQAnswer(
         onScreenDocument,
         attachedDocuments,
         attachedTitles,
-        compareFacts,
-        compareIds,
+        compareFacts: preparedCompareFacts,
+        compareIds: preparedCompareIds,
         dataRoomFacts,
-        compareTable,
-        compareVerdict,
+        compareTable: preparedCompareTable,
+        compareVerdict: preparedCompareVerdict,
+        compareLate,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4403,6 +4429,16 @@ export function createModelGatewayQAnswer(
         attention,
         counterparty,
       } = prepared;
+      // The turn's own reading decides a comparison: a prepare warmed before
+      // the reading built none, so its reads run now (see compareFor).
+      const lateCompare =
+        preparedCompareTable === null && request.compare !== undefined
+          ? await compareLate(request.compare).catch(() => null)
+          : null;
+      const compareFacts = lateCompare?.facts ?? preparedCompareFacts;
+      const compareIds = lateCompare?.ids ?? preparedCompareIds;
+      const compareTable = lateCompare?.table ?? preparedCompareTable;
+      const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
       /** The selected company, for who "they" is in a research follow-up. */
       const selectedForResearch = (): SelectedCompany | null => {
         const subject = request.subjects.find(
