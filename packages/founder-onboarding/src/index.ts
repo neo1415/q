@@ -93,3 +93,8 @@ export {
   type FounderFinancialCheckDependencies,
 } from "./integration/financial-check.js";
 export { FOUNDER_INTERVIEW_CUES } from "./definition/interview-cues.js";
+// QA QO-38/44: what a founder told Q, for readers that show it as such.
+export {
+  founderStatedFacts,
+  type FounderStatedFacts,
+} from "./integration/stated-facts.js";

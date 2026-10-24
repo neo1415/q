@@ -13,7 +13,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import { assess, type ReadinessAssessment } from "../domain/assess.js";
 import { buildBlueprint } from "../domain/blueprint.js";
-import type { ReadinessInputs } from "../domain/inputs.js";
+import type { ReadinessClaimInput, ReadinessInputs } from "../domain/inputs.js";
 import { FACT_PILLAR } from "../domain/signals.js";
 import type { ReadinessStore } from "../infrastructure/postgres.js";
 import { READINESS_RULES_V1, type ReadinessRules } from "../rules/v1.js";
@@ -80,6 +80,21 @@ export type ReadinessPorts = {
       ) => Promise<ReadinessInputs["raise"]>)
     | undefined;
   readonly followUps?: ReadinessFollowUpPort | undefined;
+  /**
+   * QA QO-38: what the founder told Q in setup, as their own statements:
+   * a raise not yet confirmed as the company's (used only when none is
+   * recorded) and claims (USER_CLAIM, SELF_REPORTED) for facts with no
+   * canonical field, such as customers. Absent: none read.
+   */
+  readonly stated?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<{
+        readonly raise: ReadinessInputs["raise"];
+        readonly claims: readonly ReadinessClaimInput[];
+      } | null>)
+    | undefined;
   readonly rules?: ReadinessRules | undefined;
   readonly now?: (() => Date) | undefined;
 };
@@ -134,41 +149,59 @@ export function createReadinessService(ports: ReadinessPorts) {
     if (facts === null) return null;
     // A source that cannot be read is unknown for this read (never zero):
     // the deck and raise read null, the data room null, follow-ups none.
-    const [deck, dataRoom, raise, followUps, marks] = await Promise.all([
-      ports.deck === undefined
-        ? Promise.resolve(null)
-        : safe(
-            () => ports.deck?.(actor, companyId) ?? Promise.resolve(null),
-            null,
-          ),
-      ports.dataRoom === undefined
-        ? Promise.resolve(null)
-        : safe(
-            () => ports.dataRoom?.(actor, companyId) ?? Promise.resolve(null),
-            null,
-          ),
-      ports.raise === undefined
-        ? Promise.resolve(null)
-        : safe(
-            () => ports.raise?.(actor, companyId) ?? Promise.resolve(null),
-            null,
-          ),
-      ports.followUps === undefined
-        ? Promise.resolve([] as readonly ReadinessFollowUpSource[])
-        : safe(
-            () =>
-              ports.followUps?.list(actor) ??
-              Promise.resolve([] as readonly ReadinessFollowUpSource[]),
-            [] as readonly ReadinessFollowUpSource[],
-          ),
-      ports.store.marks(companyId),
-    ]);
+    const [deck, dataRoom, recorded, followUps, marks, stated] =
+      await Promise.all([
+        ports.deck === undefined
+          ? Promise.resolve(null)
+          : safe(
+              () => ports.deck?.(actor, companyId) ?? Promise.resolve(null),
+              null,
+            ),
+        ports.dataRoom === undefined
+          ? Promise.resolve(null)
+          : safe(
+              () => ports.dataRoom?.(actor, companyId) ?? Promise.resolve(null),
+              null,
+            ),
+        ports.raise === undefined
+          ? Promise.resolve(null)
+          : safe(
+              () => ports.raise?.(actor, companyId) ?? Promise.resolve(null),
+              null,
+            ),
+        ports.followUps === undefined
+          ? Promise.resolve([] as readonly ReadinessFollowUpSource[])
+          : safe(
+              () =>
+                ports.followUps?.list(actor) ??
+                Promise.resolve([] as readonly ReadinessFollowUpSource[]),
+              [] as readonly ReadinessFollowUpSource[],
+            ),
+        ports.store.marks(companyId),
+        ports.stated === undefined
+          ? Promise.resolve(null)
+          : safe(
+              () => ports.stated?.(actor, companyId) ?? Promise.resolve(null),
+              null,
+            ),
+      ]);
+    // A recorded raise always wins; a stated one is shown as stated.
+    const raise =
+      recorded ??
+      (stated?.raise == null
+        ? null
+        : { ...stated.raise, stated: true as const });
+    // A stated fact only where nothing on the record speaks to it.
+    const recordedKeys = new Set(facts.claims.map((claim) => claim.claimKey));
+    const statedClaims = (stated?.claims ?? []).filter(
+      (claim) => !recordedKeys.has(claim.claimKey),
+    );
     const inputs: ReadinessInputs = {
       stageCode: facts.stageCode,
       profile: facts.profile,
       team: facts.team,
       verification: facts.verification,
-      claims: facts.claims,
+      claims: [...facts.claims, ...statedClaims],
       deck,
       dataRoom,
       raise,

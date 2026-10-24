@@ -329,6 +329,8 @@ export {
   failureCode,
   isTransientOnboardingFailure,
   waitsForContext,
+  waitsForStep,
+  WAITING_ATTEMPTS_MAX,
   pendingReplayKey,
   sameResponseValue,
   type DrainPorts,

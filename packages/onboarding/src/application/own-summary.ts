@@ -67,6 +67,14 @@ export type OwnOnboardingSummary = {
   readonly remainingTopics: readonly string[];
   /** When they last worked on this setup. */
   readonly lastActivityAt: string;
+  /** The company or firm their session is bound to; null before it exists. */
+  readonly subjectId?: string | null | undefined;
+  /**
+   * What they answered, by step key: their own statements (USER_CLAIM,
+   * SELF_REPORTED), confirmed or not. Readers that show one show where it
+   * came from (QA QO-38: a stated $1.5m raise read as "no raise target").
+   */
+  readonly values?: Readonly<Record<string, unknown>> | undefined;
 };
 
 export type OwnOnboardingCompletion = "SESSION" | "ACTIVE_MANDATE" | null;
@@ -328,6 +336,17 @@ export function createOwnOnboardingSummaryReader(options: {
           requiredDoneCount: requiredDone.length,
           remainingTopics: remainingTopics.slice(0, LIST_MAX),
           lastActivityAt: session.lastActivityAt,
+          subjectId: session.subject?.subjectId ?? null,
+          values: Object.fromEntries(
+            progress.eligibleSteps
+              .filter((step) => step.status === "COMPLETED")
+              .flatMap((step) => {
+                const value = aggregate.currentResponses.get(
+                  step.stepKey,
+                )?.value;
+                return value === undefined ? [] : [[step.stepKey, value]];
+              }),
+          ),
         });
       }
       return summaries;

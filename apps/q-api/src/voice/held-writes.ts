@@ -4,6 +4,7 @@ import {
   failureCode,
   isTransientOnboardingFailure,
   waitsForContext,
+  waitsForStep,
   type DrainResult,
   type PendingWrite,
   type PendingWriteRepository,
@@ -72,7 +73,7 @@ export function createHeldWritesStore(dependencies: {
             : { answeredAt: ports.answeredAt }),
           submit: ports.submit,
           classify: (error) =>
-            waitsForContext(error)
+            waitsForContext(error) || waitsForStep(error)
               ? { kind: "WAITING", code: failureCode(error) }
               : isTransientOnboardingFailure(error)
                 ? { kind: "TRANSIENT", code: failureCode(error) }
