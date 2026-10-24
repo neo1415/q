@@ -212,7 +212,7 @@ export type ResearchPublicWebOutput = z.infer<
 >;
 
 const GUIDANCE =
-  "Answer from what these pages say and nothing else: every claim you take from the web must be supported by one of them, and when they do not answer the question, say so plainly rather than filling in. Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when asked where something came from. Compare with authorised facts: say what corroborates, what conflicts, and where dates may explain a difference; ask about a material mismatch instead of resolving it yourself.";
+  "Answer from what these pages say and nothing else: every claim you take from the web must be supported by one of them, and when they do not answer the question, say so plainly rather than filling in. Never mention or describe a page that is not about whom the question is about (another business, a namesake, a product of the same name). Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when asked where something came from. Compare with authorised facts: say what corroborates, what conflicts, and where dates may explain a difference; ask about a material mismatch instead of resolving it yourself.";
 
 /**
  * Said about a name the pages do not settle (web search 2026-10-06), the way

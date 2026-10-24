@@ -174,3 +174,25 @@ export function corroboratedPictures(
     return [];
   });
 }
+
+/**
+ * Whether a page a public search read is about them, by what Capital Q
+ * holds (owner 2026-10-24: "Q must never narrate irrelevant results"; a
+ * Duplo answer described LEGO DUPLO's pages): their own website is; a
+ * namesake's own site is not; and where Capital Q holds where they are, a
+ * page that names them must also place them there. Without a held place,
+ * the research's own verdict stands.
+ */
+export function pageAboutThem(
+  source: SearchEvidence,
+  name: string,
+  held: HeldIdentity | null,
+): boolean {
+  if (held === null) return true;
+  const ownHost = hostOf(held.website);
+  const own = ownHost === null ? null : registrableDomain(ownHost);
+  const site = registrableDomain(source.domain);
+  if (own !== null && site === own) return true;
+  if (own !== null && looksLikeOwnSite(site, name)) return false;
+  return !holdsPlace(held) || placesThem(source, held);
+}
