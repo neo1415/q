@@ -170,6 +170,7 @@ import {
   companyFactAskOf,
   companyNameCandidates,
   isCapitalQCompanyRead,
+  itemsOf,
   lowercaseNameCandidates,
   namesOnlyCompany,
   profileOf,
@@ -2943,13 +2944,48 @@ export function createModelGatewayQAnswer(
     let compareTable: QResultBlock | null = null;
     const compareRead = (async (): Promise<void> => {
       if (latest === undefined) return;
-      const targets = compareTargets(
+      const fromCards = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
         request.compare,
       );
-      if (targets.length < 2) return;
+      const named = request.compare?.names ?? [];
+      if (fromCards.length < 2 && named.length < 2) return;
       const { names } = await prefetchToolsRead;
+      // Coordinator 24 Oct ("which is better, Anchor or Afyascan?"): the
+      // companies the reader heard named but Q did not show are found by
+      // their exact name, so they too are read and compared.
+      const targets =
+        fromCards.length >= 2 || !names.has("search_companies")
+          ? fromCards
+          : (
+              await Promise.all(
+                named.slice(0, 4).map(async (name, index) => {
+                  const found = await tools
+                    .execute(
+                      {
+                        callId: `q-compare-search-${String(index)}`,
+                        name: "search_companies",
+                        arguments: { query: name, limit: 5 },
+                      },
+                      toolContext,
+                    )
+                    .catch(() => null);
+                  const exact = (itemsOf(found) ?? []).filter(
+                    (item) =>
+                      item.canonicalName.trim().toLowerCase() ===
+                      name.trim().toLowerCase(),
+                  );
+                  return exact.length === 1
+                    ? (exact[0]?.companyId ?? null)
+                    : null;
+                }),
+              )
+            ).filter(
+              (id, index, all): id is string =>
+                id !== null && all.indexOf(id) === index,
+            );
+      if (targets.length < 2) return;
       const reads = targets.flatMap((companyId, index) =>
         [
           { name: "get_company", key: "profile" },
@@ -2980,7 +3016,10 @@ export function createModelGatewayQAnswer(
         only: targets,
         compareAsked: true,
       });
-      const statement = table === null ? null : comparisonFactStatement(table);
+      const statement =
+        table === null
+          ? null
+          : comparisonFactStatement(table, runFits.read(request.runId));
       if (statement === null) return;
       compareIds = targets;
       compareTable = table;
