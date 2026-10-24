@@ -40,6 +40,7 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
     investorType: z.string().min(1),
     organisationName: z.string().min(1).max(120),
     businessTitle: z.string().max(120).optional(),
+    website: z.string().max(200).optional(),
   }),
   z.object({ kind: z.literal("mandate_select"), mandateId: z.string().uuid() }),
   z.object({
@@ -108,6 +109,8 @@ export type StepView =
   | (Base<"investor_role"> & {
       readonly typeOptions: readonly ChoiceOption[];
       readonly personalWorkspaceName: string;
+      /** The session's journey has the firm's website (v2 onward). */
+      readonly offersWebsite: boolean;
       readonly response?:
         Extract<StepResponse, { kind: "investor_role" }> | undefined;
     })

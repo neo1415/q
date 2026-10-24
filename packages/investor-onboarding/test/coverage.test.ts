@@ -8,7 +8,7 @@ import {
 import { viewOf } from "../../onboarding/test/support/coverage-view.js";
 import {
   INVESTOR_COVERAGE_PROFILE,
-  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_CURRENT,
   INVESTOR_DOCUMENT_FIELDS,
   INVESTOR_UPLOAD_DOCUMENT_TYPES,
   INVESTOR_STEPS,
@@ -20,8 +20,8 @@ describe("investor coverage", () => {
   it("is a mandate interview: no founder or fundraising concept appears", () => {
     const c = deriveOnboardingCoverage({
       profile: INVESTOR_COVERAGE_PROFILE,
-      definition: INVESTOR_DEFINITION_V1,
-      view: viewOf(INVESTOR_DEFINITION_V1, {}),
+      definition: INVESTOR_DEFINITION_CURRENT,
+      view: viewOf(INVESTOR_DEFINITION_CURRENT, {}),
       now: NOW,
     });
     expect(c.journeyType).toBe("investor");
@@ -30,7 +30,9 @@ describe("investor coverage", () => {
         /^(capital|traction|financials|company)\./,
       );
     }
-    const keys = new Set(INVESTOR_DEFINITION_V1.steps.map((s) => s.stepKey));
+    const keys = new Set(
+      INVESTOR_DEFINITION_CURRENT.steps.map((s) => s.stepKey),
+    );
     for (const key of Object.keys(INVESTOR_COVERAGE_PROFILE.fields)) {
       expect(keys.has(key), key).toBe(true);
     }
@@ -39,8 +41,8 @@ describe("investor coverage", () => {
   it("the firm named at registration is KNOWN, and stages come before nuance", () => {
     const c = deriveOnboardingCoverage({
       profile: INVESTOR_COVERAGE_PROFILE,
-      definition: INVESTOR_DEFINITION_V1,
-      view: viewOf(INVESTOR_DEFINITION_V1, {
+      definition: INVESTOR_DEFINITION_CURRENT,
+      view: viewOf(INVESTOR_DEFINITION_CURRENT, {
         [INVESTOR_STEPS.investorType]: {
           type: "SINGLE_SELECT",
           optionKey: "vc",
@@ -68,8 +70,8 @@ describe("investor coverage", () => {
   it("the optional investor upload settles its own coverage key, never a required one", () => {
     const without = deriveOnboardingCoverage({
       profile: INVESTOR_COVERAGE_PROFILE,
-      definition: INVESTOR_DEFINITION_V1,
-      view: viewOf(INVESTOR_DEFINITION_V1, {}),
+      definition: INVESTOR_DEFINITION_CURRENT,
+      view: viewOf(INVESTOR_DEFINITION_CURRENT, {}),
       now: NOW,
     });
     const field = (c: typeof without) =>
@@ -80,8 +82,8 @@ describe("investor coverage", () => {
     });
     const withDeck = deriveOnboardingCoverage({
       profile: INVESTOR_COVERAGE_PROFILE,
-      definition: INVESTOR_DEFINITION_V1,
-      view: viewOf(INVESTOR_DEFINITION_V1, {}),
+      definition: INVESTOR_DEFINITION_CURRENT,
+      view: viewOf(INVESTOR_DEFINITION_CURRENT, {}),
       documents: [{ documentType: INVESTOR_UPLOAD_DOCUMENT_TYPES.FUND_DECK }],
       now: NOW,
     });
@@ -98,8 +100,8 @@ describe("investor coverage", () => {
         field(
           deriveOnboardingCoverage({
             profile: INVESTOR_COVERAGE_PROFILE,
-            definition: INVESTOR_DEFINITION_V1,
-            view: viewOf(INVESTOR_DEFINITION_V1, {}),
+            definition: INVESTOR_DEFINITION_CURRENT,
+            view: viewOf(INVESTOR_DEFINITION_CURRENT, {}),
             documents: [{ documentType }],
             now: NOW,
           }),
@@ -113,7 +115,7 @@ describe("investor coverage", () => {
       ]?.informs ?? [];
     for (const key of informs) {
       expect(
-        INVESTOR_DEFINITION_V1.steps.some((s) => s.stepKey === key),
+        INVESTOR_DEFINITION_CURRENT.steps.some((s) => s.stepKey === key),
         key,
       ).toBe(true);
     }
@@ -142,8 +144,8 @@ describe("investor coverage", () => {
     ) =>
       deriveOnboardingCoverage({
         profile: INVESTOR_COVERAGE_PROFILE,
-        definition: INVESTOR_DEFINITION_V1,
-        view: viewOf(INVESTOR_DEFINITION_V1, geography, {
+        definition: INVESTOR_DEFINITION_CURRENT,
+        view: viewOf(INVESTOR_DEFINITION_CURRENT, geography, {
           modalities: { [INVESTOR_STEPS.geography]: modality },
         }),
         ...(accepted === undefined
@@ -178,9 +180,9 @@ describe("investor coverage", () => {
     it("a pending proposal carries its note (names not matched)", () => {
       const c = deriveOnboardingCoverage({
         profile: INVESTOR_COVERAGE_PROFILE,
-        definition: INVESTOR_DEFINITION_V1,
+        definition: INVESTOR_DEFINITION_CURRENT,
         view: viewOf(
-          INVESTOR_DEFINITION_V1,
+          INVESTOR_DEFINITION_CURRENT,
           {},
           {
             suggestions: [

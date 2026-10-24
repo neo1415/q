@@ -42,6 +42,7 @@ export {
   type OnboardingWriteTargetKey,
 } from "./definitions/schema.js";
 export { validateOnboardingManifest } from "./definitions/validate.js";
+export { normaliseWebsite } from "./application/website.js";
 export {
   onboardingDefinitionIds,
   renderOnboardingDefinitionMigration,

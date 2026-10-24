@@ -8,8 +8,10 @@ import {
   CURRENCY_OPTIONS,
   CUSTOMER_TYPE_VOCABULARIES,
   GEOGRAPHY_VOCABULARIES,
-  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V2_VERSION,
   INVESTOR_DEFINITION_VERSION,
+  INVESTOR_WEBSITE_STEP,
   INVESTOR_STEPS,
   InvestorHandoffContextSchema,
   InvestorMandatesContextSchema,
@@ -43,7 +45,8 @@ import type {
  * eligibility and answers from the runtime's session view. Pure; shared by
  * the API adapter and the development fixture.
  *
- * This build presents definition version 1 only.
+ * Version 2 adds only the firm's website to the role screen; a session
+ * pinned to version 1 renders the same screens without it.
  */
 
 export type GroupId =
@@ -86,7 +89,12 @@ export const GROUPS: readonly Group[] = [
     kind: "investor_role",
     section: "context",
     title: "How you invest",
-    stepKeys: [S.investorType, S.organisationName, S.businessTitle],
+    stepKeys: [
+      S.investorType,
+      S.organisationName,
+      INVESTOR_WEBSITE_STEP,
+      S.businessTitle,
+    ],
   },
   {
     id: "deployment",
@@ -214,7 +222,7 @@ const GROUP_BY_STEP = new Map<string, Group>(
 );
 const GROUP_BY_ID = new Map(GROUPS.map((group) => [group.id, group]));
 const STEP_CONFIG = new Map(
-  INVESTOR_DEFINITION_V1.steps.map((step) => [step.stepKey, step]),
+  INVESTOR_DEFINITION_CURRENT.steps.map((step) => [step.stepKey, step]),
 );
 
 export function groupById(id: string): Group | undefined {
@@ -267,7 +275,20 @@ function runtimeState(view: OnboardingSessionView): RuntimeState {
 }
 
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  return view.session.definitionVersion === INVESTOR_DEFINITION_VERSION;
+  // v1, and v2 (the firm's website on the role screen). A later version
+  // may add a step this build has no screen for, so it is refused honestly.
+  const version = view.session.definitionVersion;
+  return (
+    version >= INVESTOR_DEFINITION_VERSION &&
+    version <= INVESTOR_DEFINITION_V2_VERSION
+  );
+}
+
+/** Whether the session's own journey has the step (v2 added the website). */
+function hasStep(view: OnboardingSessionView | undefined, key: string) {
+  return (
+    view?.progress.eligibleSteps.some((step) => step.stepKey === key) ?? false
+  );
 }
 
 const single = (s: RuntimeState, key: string) => {
@@ -592,10 +613,12 @@ function buildStep(
       const investorType = single(state, S.investorType);
       const organisationName = text(state, S.organisationName);
       const businessTitle = text(state, S.businessTitle);
+      const website = text(state, INVESTOR_WEBSITE_STEP);
       return {
         ...base(group, "investor_role", state),
         typeOptions: optionsOf(S.investorType),
         personalWorkspaceName: PERSONAL_INVESTING_WORKSPACE,
+        offersWebsite: hasStep(state.view, INVESTOR_WEBSITE_STEP),
         response:
           investorType === undefined
             ? undefined
@@ -604,6 +627,7 @@ function buildStep(
                 investorType,
                 organisationName: organisationName ?? "",
                 ...(businessTitle === undefined ? {} : { businessTitle }),
+                ...(website === undefined ? {} : { website }),
               },
       };
     }
@@ -954,6 +978,10 @@ export function planSubmissions(
           type: "TEXT",
           text: response.organisationName.trim(),
         }),
+        // Only a journey that has the step (v2 onward) is sent it.
+        ...(hasStep(view, INVESTOR_WEBSITE_STEP)
+          ? [textOrSkip(INVESTOR_WEBSITE_STEP, response.website)]
+          : []),
         textOrSkip(S.businessTitle, response.businessTitle),
       ];
     case "mandate_select":
