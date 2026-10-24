@@ -262,3 +262,32 @@ describe("a comparison asked for is done, never offered", () => {
     expect(line).not.toContain("company-stated)");
   });
 });
+
+// Owner QA O-I6 (23 Oct 2026): "Compare Ledgerline, Duplo and Anchor"
+// showed Ledgerline vs Ledgerfold, a company the run read for another
+// reason. The companies the question names are the table.
+describe("the table is the companies the question names", () => {
+  it("leaves out a company the run read but the question did not name", () => {
+    const { read, fits } = run();
+    const LEDGERFOLD = "84b9641f-b618-4fa3-8b35-1d19b1c71d82";
+    read.companyNames.set(LEDGERFOLD, "Ledgerfold");
+    read.companyFacts.set(LEDGERFOLD, {
+      about: "Working-capital loans for Lagos market traders.",
+      stageCode: "SEED",
+      city: "Lagos",
+      country: "NG",
+      founded: null,
+      website: null,
+    });
+    const block = comparisonTableBlock({
+      question: "Compare Silo Credit and Mizan",
+      read,
+      fits,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    expect(block.columns.map((column) => column.label)).toEqual([
+      "Silo Credit",
+      "Mizan",
+    ]);
+  });
+});

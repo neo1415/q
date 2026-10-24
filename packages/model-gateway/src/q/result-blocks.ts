@@ -682,6 +682,9 @@ function stageWords(code: string | null): string {
  * from a complete profile read. An unread fact is an empty cell ("not
  * known"), never a guess, and a row nobody has anything for is left out.
  */
+/** Its title: a comparison table built from fit takes its place (QO-05). */
+export const COMPANIES_TABLE_TITLE = "Side by side, as each company states it";
+
 export function companiesTableBlock(read: RunRead): QResultBlock | null {
   const ids = [
     ...read.companyFacts.keys(),
@@ -721,7 +724,7 @@ export function companiesTableBlock(read: RunRead): QResultBlock | null {
   if (rows.length === 0) return null;
   return {
     kind: "TABLE",
-    title: "Side by side, as each company states it",
+    title: COMPANIES_TABLE_TITLE,
     columns: ids.map((companyId) => ({
       label: (read.companyNames.get(companyId) ?? "Company").slice(0, 80),
       subject: { kind: "COMPANY", companyId },
