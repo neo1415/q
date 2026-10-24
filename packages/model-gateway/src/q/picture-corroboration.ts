@@ -56,6 +56,7 @@ const PLAIN_WORDS = new Set([
   "across",
   "africa",
   "african",
+  "based",
   "build",
   "builds",
   "business",
@@ -95,21 +96,30 @@ const PLAIN_WORDS = new Set([
   "people",
 ]);
 
-/** The words of what they do that set them apart ("payments", "invoices"). */
-function aboutTerms(held: HeldIdentity): readonly string[] {
+/**
+ * The words of what they do that set them apart ("payments", "invoices").
+ * Never their own name (live 2026-10-24: Duplo's record says "Duplo is a
+ * Lagos-based platform", so LEGO DUPLO's Wikipedia page "said what they
+ * do" by naming them, reached the answer's Sources, and the answer
+ * described LEGO's pages): every page searched by name names them.
+ */
+function aboutTerms(held: HeldIdentity, name: string): readonly string[] {
+  const own = new Set(name.toLowerCase().split(/[^\p{L}\p{N}]+/u));
   return (held.about ?? "")
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length >= 5 && !PLAIN_WORDS.has(word));
+    .filter(
+      (word) => word.length >= 5 && !PLAIN_WORDS.has(word) && !own.has(word),
+    );
 }
 
 /** Whether Capital Q holds anything to tell them from a namesake by. */
-function holdsIdentity(held: HeldIdentity): boolean {
+function holdsIdentity(held: HeldIdentity, name: string): boolean {
   return (
     (held.country?.trim().length ?? 0) === 2 ||
     (held.city?.trim().length ?? 0) > 2 ||
     hostOf(held.website) !== null ||
-    aboutTerms(held).length > 0
+    aboutTerms(held, name).length > 0
   );
 }
 
@@ -120,15 +130,20 @@ function holdsIdentity(held: HeldIdentity): boolean {
  * website, or says what they do in the record's own distinctive words
  * ("payments" for Duplo; LEGO's pages say "bricks").
  */
-function corroboratesThem(source: SearchEvidence, held: HeldIdentity): boolean {
+function corroboratesThem(
+  source: SearchEvidence,
+  held: HeldIdentity,
+  name: string,
+): boolean {
   if (placesThem(source, held)) return true;
   const page = `${source.title ?? ""} ${source.text ?? ""}`.toLowerCase();
   const ownHost = hostOf(held.website);
-  const label =
-    ownHost === null ? "" : (registrableDomain(ownHost).split(".")[0] ?? "");
-  if (label.length >= 4 && page.includes(label)) return true;
+  // Their site as an address ("duplo.co"), not its first label: "duplo"
+  // alone is only their name, which every page searched by it says.
+  const site = ownHost === null ? "" : registrableDomain(ownHost);
+  if (site.includes(".") && page.includes(site)) return true;
   const words = new Set(page.split(/[^\p{L}\p{N}]+/u));
-  return aboutTerms(held).some((term) => words.has(term));
+  return aboutTerms(held, name).some((term) => words.has(term));
 }
 
 /** A page that names them in its title or text (as a word). */
@@ -221,8 +236,8 @@ export function corroboratedPictures(
     if (
       evidence.held !== null &&
       evidence.held !== undefined &&
-      holdsIdentity(evidence.held) &&
-      !corroboratesThem(source, evidence.held)
+      holdsIdentity(evidence.held, evidence.name) &&
+      !corroboratesThem(source, evidence.held, evidence.name)
     ) {
       continue;
     }
@@ -283,5 +298,5 @@ export function pageAboutThem(
   // A search the model made with no name to check pages against: a page
   // must at least name them ("Diplo Run Club" never did).
   if (source.subjectMatch === null && !namesThem(source, name)) return false;
-  return !holdsIdentity(held) || corroboratesThem(source, held);
+  return !holdsIdentity(held, name) || corroboratesThem(source, held, name);
 }

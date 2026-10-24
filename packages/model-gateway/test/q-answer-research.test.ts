@@ -2402,6 +2402,151 @@ describe("pages about whom they asked reach the answer; namesakes never (live 20
     expect(sources).toContain("startupintros.com");
     expect(sources).not.toContain("Lego_Duplo");
   });
+
+  // Production 2026-10-24: the record's own words name Duplo ("Duplo is a
+  // Lagos-based platform ...") and its site is duplo.co, so LEGO's page
+  // "agreed with" the record by naming Duplo, and Capital Q's note on it
+  // stayed in front of the answer.
+  it("with the record's description naming Duplo, LEGO's page and its note still never reach the answer", async () => {
+    const DUPLO = "d0d0d0d0-0000-4000-8000-000000000002";
+    const page = (
+      index: number,
+      url: string,
+      title: string,
+      excerpt: string,
+    ) => ({
+      index,
+      url,
+      domain: new URL(url).hostname,
+      title,
+      publishedAt: null,
+      retrievedAt: "2026-10-24T10:00:00.000Z",
+      excerpt,
+      instructionRiskSignals: 0,
+      subjectMatch: null,
+      mentionedCountries: [],
+    });
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) => {
+        if (proposal.name === "research_public_web") {
+          const found = researchOutcome(proposal, "");
+          return Promise.resolve({
+            ...found,
+            result: {
+              ok: true,
+              data: {
+                status: "OK",
+                query: "duplo founders",
+                sources: [
+                  page(
+                    1,
+                    "https://startupintros.com/orgs/duplo",
+                    "Duplo - Founders",
+                    "Duplo, a fintech for B2B payments, was founded by Yele Oyekola and Tunde Akinnuwa.",
+                  ),
+                  page(
+                    2,
+                    "https://en.wikipedia.org/wiki/Lego_Duplo",
+                    "Lego Duplo - Wikipedia",
+                    "Lego Duplo is a product line based on large bricks for toddlers.",
+                  ),
+                  page(
+                    3,
+                    "https://wwd.com/footwear-news/diplo-run-club",
+                    "Diplo Run Club",
+                    "Diplo's run club and children's footwear.",
+                  ),
+                ],
+                comparison: [
+                  {
+                    sourceIndex: 2,
+                    basis: "NAME_MENTION",
+                    relationship: "CONTRADICTS",
+                    note: "Describes construction toys for toddlers.",
+                  },
+                ],
+                truthClass: "UNKNOWN",
+              },
+            },
+          });
+        }
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "company.get",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "INTERNAL",
+          result: {
+            ok: true,
+            data: {
+              companyId: DUPLO,
+              canonicalName: "Duplo",
+              legalName: null,
+              websiteUrl: "https://www.duplo.co",
+              foundedDate: null,
+              headquartersCountry: "NG",
+              headquartersCity: "Lagos",
+              currentStageCode: "SEED",
+              shortDescription:
+                "Duplo is a Lagos-based platform that helps African businesses collect and make payments to each other.",
+              primaryDescription: null,
+              companyStatus: "active",
+              relationToYou: "SHARED",
+              truthClass: "USER_CLAIM",
+            },
+          },
+          latencyMs: 5,
+        } as QToolCallOutcome);
+      },
+    };
+    const { seam, request, alpha, answerBlocks } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "w1",
+              name: "research_public_web",
+              arguments: { query: "Duplo founders" },
+            },
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: DUPLO },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "Duplo was founded by Yele Oyekola and Tunde Akinnuwa.",
+          ),
+        },
+      ],
+      tools: port,
+      userText: "Who founded Duplo?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "OFFERED",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const seen = JSON.stringify(alpha.calls.at(-1)?.request.messages ?? []);
+    expect(seen).toContain("startupintros.com");
+    expect(seen).not.toContain("Lego_Duplo");
+    expect(seen).not.toContain("diplo-run-club");
+    expect(seen).not.toContain("construction toys");
+    const sources = JSON.stringify(answerBlocks);
+    expect(sources).toContain("startupintros.com");
+    expect(sources).not.toContain("Lego_Duplo");
+  });
 });
 
 describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
