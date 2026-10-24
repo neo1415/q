@@ -149,7 +149,7 @@ import {
   type QToolFocus,
 } from "@capital-q/q-runtime";
 
-import type { TenantId } from "@capital-q/security";
+import type { ActorContext, TenantId } from "@capital-q/security";
 import type {
   QSpecialist,
   QSpecialistProbe,
@@ -277,7 +277,7 @@ function pointedAt(
     : { ask, resolved: null, note: control.note, control };
 }
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 /** The act on the page's own control, with a fresh act id for its receipt. */
 function controlActBlock(control: ControlBinding): QResultBlock {
@@ -678,6 +678,12 @@ export type SpecialistQAnswerDependencies = {
    * for a brief is answered without one rather than told a lie about why.
    */
   readonly artifacts?: ArtifactPreparation | undefined;
+  /**
+   * The person's own work board (owner 2026-10-23): "save that plan to my
+   * board" files Q's answer and keeps it there. Absent: board asks are
+   * left to the my_board tool.
+   */
+  readonly board?: BoardKeeper | undefined;
   readonly logger?: Logger | undefined;
   /**
    * Reads each turn into the conversation core's closed vocabulary before
@@ -950,6 +956,57 @@ export type SpecialistQAnswerDependencies = {
 };
 
 /** What one requested document came to: a line, and its card when made. */
+/** What the answer seam needs of the work board: adding, as Q for them. */
+export type BoardKeeper = {
+  readonly add: (
+    actor: ActorContext,
+    request: {
+      readonly kind: "DOCUMENT" | "TASK";
+      readonly title: string;
+      readonly refId?: string;
+    },
+    options: { readonly by: "Q"; readonly idempotencyKey: string },
+  ) => Promise<
+    | { readonly outcome: "OK"; readonly replayed: boolean }
+    | { readonly outcome: "REFUSED"; readonly code: string }
+  >;
+};
+
+/** At most this many tasks from one answer. */
+const BOARD_TASKS_MAX = 12;
+
+/**
+ * The steps an answer itself lists, in its words: its numbered or bulleted
+ * lines, without their markers or emphasis. Nothing is invented: an answer
+ * with no list has no steps (owner 2026-10-23, "break it into tasks").
+ */
+export function answerSteps(answer: string): string[] {
+  const steps: string[] = [];
+  for (const line of answer.split(/\r?\n/u)) {
+    const item = /^\s{0,6}(?:[-*\u2022]|\d{1,2}[.)])\s+(.+)$/u.exec(line);
+    const text = (item?.[1] ?? "")
+      .replace(/\*\*|__|`/gu, "")
+      .replace(/\s+/gu, " ")
+      .trim();
+    if (text.length < 3) continue;
+    steps.push(text.length > 300 ? `${text.slice(0, 297)}...` : text);
+    if (steps.length === BOARD_TASKS_MAX) break;
+  }
+  return steps;
+}
+
+/** A UUID (version 5 layout) for one change Q makes, stable on a retry. */
+function boardKeyOf(runId: string, what: string): string {
+  const hex = createHash("sha1").update(`${runId}|board|${what}`).digest("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${((Number.parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
+}
+
 type DocumentReply = {
   readonly content: string;
   readonly blocks?: readonly QResultBlock[] | undefined;
@@ -1790,6 +1847,109 @@ export function createSpecialistQAnswer(
           "I couldn't make the document just now. Ask me again in a moment and I'll make it.",
       };
     }
+  }
+
+  /**
+   * "Save that plan to my board" / "break it into tasks" (owner 2026-10-23,
+   * reader v61 boardAsk): Q's previous answer is filed as their private
+   * document, exactly as written (the ANSWER_EXPORT path), and kept on
+   * their own board as a DOCUMENT item; for BREAKDOWN, each step the
+   * answer itself lists becomes a TASK item, in its words, and Q invents
+   * none. Their own board, so no card; the answer says what it did.
+   * Null: not this seam's to do (no board or documents here).
+   */
+  async function saveAnswerToBoard(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    ask: "SAVE" | "BREAKDOWN",
+    history: readonly QConversationMessage[],
+  ): Promise<QAnswerOutcome | null> {
+    const board = dependencies.board;
+    if (board === undefined || artifacts === undefined) return null;
+    const previous = previousAnswer(history);
+    if (previous === null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        "I haven't answered anything in this conversation yet, so there's nothing to keep on your board. Ask me for the plan first, then say save it to my board.",
+      );
+    }
+    const filed = await fileAnswer(
+      request,
+      artifacts,
+      previous.answer,
+      previous.question,
+    );
+    const document = (filed.blocks ?? []).find(
+      (block) => block.kind === "ARTIFACT_REFERENCE",
+    );
+    if (document?.kind !== "ARTIFACT_REFERENCE") {
+      return recordAnswer(request, conversationId, filed.content);
+    }
+    const kept = await board
+      .add(
+        request.actor,
+        { kind: "DOCUMENT", title: document.title, refId: document.artifactId },
+        {
+          by: "Q",
+          idempotencyKey: boardKeyOf(
+            request.runId,
+            `doc:${document.artifactId}`,
+          ),
+        },
+      )
+      .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
+    if (kept.outcome !== "OK") {
+      return recordAnswer(
+        request,
+        conversationId,
+        `I filed it as a document, but couldn't put it on your board just now${kept.code === "FULL" ? ": your board is full, so take something off it first" : ""}. The document is here.`,
+        [document],
+      );
+    }
+    if (ask === "SAVE") {
+      return recordAnswer(
+        request,
+        conversationId,
+        `I've filed that as a document and put “${document.title}” on your board, in To do.`,
+        [document],
+      );
+    }
+    const steps = answerSteps(previous.answer);
+    if (steps.length === 0) {
+      return recordAnswer(
+        request,
+        conversationId,
+        `I've put “${document.title}” on your board. That answer doesn't list separate steps, so I kept it as one item rather than make up tasks; tell me the steps you want and I'll add them.`,
+        [document],
+      );
+    }
+    let added = 0;
+    for (const [at, step] of steps.entries()) {
+      const one = await board
+        .add(
+          request.actor,
+          { kind: "TASK", title: step },
+          {
+            by: "Q",
+            idempotencyKey: boardKeyOf(
+              request.runId,
+              `task:${document.artifactId}:${String(at)}`,
+            ),
+          },
+        )
+        .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
+      if (one.outcome === "OK") added += 1;
+    }
+    const tasks = added === 1 ? "1 task" : `${String(added)} tasks`;
+    return recordAnswer(
+      request,
+      conversationId,
+      added === steps.length
+        ? `I've filed that plan as a document and put it on your board, with its steps as ${tasks} in To do.`
+        : `I've filed that plan as a document and put it on your board, with ${tasks} of its ${String(steps.length)} steps in To do; the rest couldn't be added just now.`,
+      [document],
+    );
   }
 
   /**
@@ -4528,6 +4688,27 @@ export function createSpecialistQAnswer(
       (dependencies.appActions?.tools.has(audienceTool) ?? false)
         ? audienceTool
         : null;
+    // Reader v61: "save that plan to my board" / "break it into tasks",
+    // about Q's last answer (nobody else named), is done by code.
+    if (
+      (read?.boardAsk === "SAVE" || read?.boardAsk === "BREAKDOWN") &&
+      !writingDocument &&
+      (read.namedOther ?? null) === null
+    ) {
+      const saved = await saveAnswerToBoard(
+        request,
+        conversationId,
+        read.boardAsk,
+        history,
+      );
+      if (saved !== null) {
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return saved;
+      }
+    }
     if (
       tool !== null &&
       !writingDocument &&
@@ -4979,6 +5160,9 @@ export function createSpecialistQAnswer(
       ...(appActionOf(read) === null ? [] : [appActionOf(read)?.tool ?? ""]),
       // What the router named, so a code-run miss still offers it.
       ...(routed === null ? [] : [routed]),
+      // Reader v61: any board ask (a named item kept, Q's work on items)
+      // is the board tool's, on whatever purpose this run has.
+      ...((read?.boardAsk ?? null) === null ? [] : ["my_board"]),
     ].filter((name) => name.length > 0);
     const toolFocus = toolFocusOf({
       reading:

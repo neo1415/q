@@ -69,6 +69,7 @@ import {
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
   type ArtifactPreparation,
+  type BoardKeeper,
   type PendingDecisionPort,
   type QVisibilityNotebook,
   type SpecialistQAnswerDependencies,
@@ -265,6 +266,8 @@ export type QIntelligenceDependencies = {
    * Preparing a document, when the artifact context is composed
    * (ADR 0013). Absent leaves the answer seam exactly as it was.
    */
+  /** The work board: board asks keep Q's answer on their board. */
+  readonly board?: BoardKeeper | undefined;
   readonly artifacts?: ArtifactPreparation | undefined;
   /**
    * Changing a document from the conversational path (QX-003F): "make the
@@ -671,6 +674,7 @@ export function composeQIntelligence(
     ...(dependencies.artifacts === undefined
       ? {}
       : { artifacts: dependencies.artifacts }),
+    ...(dependencies.board === undefined ? {} : { board: dependencies.board }),
     ...(dependencies.visibility === undefined
       ? {}
       : { visibility: dependencies.visibility }),
