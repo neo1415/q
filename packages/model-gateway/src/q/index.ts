@@ -6669,12 +6669,10 @@ export function createModelGatewayQAnswer(
           prepared.ownCompanyId,
         );
         if (found !== null) {
-          const message = await persistCodeAnswer(found.text, [
-            ...(found.networkBlock === null || found.networkBlock === undefined
-              ? []
-              : [found.networkBlock]),
-            ...(found.block === null ? [] : [found.block]),
-          ]);
+          const message = await persistCodeAnswer(
+            found.text,
+            found.block === null ? [] : [found.block],
+          );
           logger?.info(
             {
               qRunId: request.runId,
