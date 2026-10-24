@@ -561,6 +561,20 @@ describe("compare the top two, right after a list of five", () => {
     );
   });
 
+  // U4/F8: a move their words asked for beside a question goes with the
+  // answer (QAnswerRequest.leadBlocks).
+  it("carries a move the words asked for beside the question", async () => {
+    const move = {
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "OWN_DATA_ROOM" },
+    };
+    const { seam, request, stored } = build("Tell me more about Mizan", {
+      leadBlocks: [move],
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(stored.at(-1)?.blocks ?? []).toContainEqual(move);
+  });
+
   it("an ordinary follow-up reads nothing extra", async () => {
     const { seam, request, executed } = build("Tell me more about Mizan");
     expect((await seam.answer(request)).kind).toBe("ANSWERED");

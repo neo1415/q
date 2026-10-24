@@ -1391,6 +1391,26 @@ describe("answer seam tool loop", () => {
       };
     };
 
+    // F-91 (QA re-score 24 Oct, run 3a213c7a): the model offered the note
+    // instead of calling a message tool, so no first contact was prepared.
+    // When the reader read a note as the asked action, the model is told to
+    // call it (and the first contact follows the refusal, as below).
+    it("tells the model to call the message tool the reader read as asked", async () => {
+      const tools = toolPort([CHAT, INTEREST], (p) => ({
+        ...succeeded(p, { status: "PREPARED" }),
+        toolName: "relationship.chat.propose",
+      }));
+      const { seam, alpha, request } = build({
+        said: "Draft a short note to Basketari's founders asking about their repeat-order rate.",
+        script: [{ kind: "JSON", value: analystResult("drafted") }],
+        tools,
+      });
+      await seam.answer({ ...request, askedAction: "propose_chat_message" });
+      expect(JSON.stringify(alpha.calls[0]?.request.messages ?? [])).toContain(
+        "THEY ASKED FOR A NOTE OR MESSAGE: call propose_chat_message now",
+      );
+    });
+
     it("prepares Express Interest in the same turn, for approval, and tells the model so", async () => {
       const { executed, second } = await run({ chat: "NOT_CONNECTED" });
       expect(executed).toEqual([
