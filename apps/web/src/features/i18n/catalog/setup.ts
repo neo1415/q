@@ -281,6 +281,9 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   "Your rehearsals are listed on the Rehearsals page.":
     "تدريباتك مدرجة في صفحة التدريبات.",
   "Your role there": "دورك هناك",
+  "Your firm's website": "الموقع الإلكتروني لشركتك",
+  "Optional. Founders can see who you are before they reply.":
+    "اختياري. يمكن للمؤسسين معرفة من أنت قبل أن يردّوا.",
   "a live rehearsal": "تدريب مباشر",
   "a month": "شهرياً",
   "a rehearsal for a meeting": "تدريب لاجتماع",

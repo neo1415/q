@@ -1,6 +1,7 @@
 import type { OnboardingCoverageProfile } from "@capital-q/onboarding";
 
 import { INVESTOR_STEPS } from "./investor-v1.js";
+import { INVESTOR_WEBSITE_STEP } from "./investor-v2.js";
 
 /**
  * Investor coverage profile (lane ob1, 2026-10-16): the mandate interview's
@@ -79,6 +80,14 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       concept: "organisation.name",
       priority: "ESSENTIAL",
       label: "Firm",
+      seconds: 10,
+    },
+    [INVESTOR_WEBSITE_STEP]: {
+      // Saved when the investor gives it; never asked for ahead of the
+      // mandate, which is what Discover needs.
+      concept: "investor.website",
+      priority: "OPTIONAL",
+      label: "Firm website",
       seconds: 10,
     },
     [INVESTOR_STEPS.businessTitle]: {

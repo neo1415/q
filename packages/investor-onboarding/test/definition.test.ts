@@ -39,6 +39,7 @@ import {
   INVESTOR_STEP_CONTEXTS,
   INVESTOR_STEPS,
   INVESTOR_TYPE_OPTIONS,
+  INVESTOR_WEBSITE_WRITE_TARGET,
   INVESTOR_WRITE_TARGETS,
   organisationTypeFor,
   portfolioNames,
@@ -115,7 +116,10 @@ describe("Investor Definition v1", () => {
       createInvestorStepContextProviders(noDomain).map((p) => p.key),
     );
     expect([...handlers].sort()).toEqual(
-      Object.values(INVESTOR_WRITE_TARGETS).sort(),
+      [
+        ...Object.values(INVESTOR_WRITE_TARGETS),
+        INVESTOR_WEBSITE_WRITE_TARGET,
+      ].sort(),
     );
     expect([...providers].sort()).toEqual(
       Object.values(INVESTOR_STEP_CONTEXTS).sort(),

@@ -1,6 +1,7 @@
 import {
-  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_CURRENT,
   INVESTOR_STEPS,
+  INVESTOR_WEBSITE_STEP,
   type InvestorHandoffContext,
   type InvestorMandatesContext,
   type InvestorReviewContext,
@@ -136,7 +137,7 @@ const SYNTHETIC_NODES: readonly SyntheticNode[] = [
   },
 ];
 
-const D = INVESTOR_DEFINITION_V1;
+const D = INVESTOR_DEFINITION_CURRENT;
 const S = INVESTOR_STEPS;
 
 type Mandate = {
@@ -391,6 +392,7 @@ function seedState(seed: FixtureSeed): FixtureState {
     answered.push(
       [S.investorType, single_("vc")],
       [S.organisationName, text_("Northbank Capital")],
+      [INVESTOR_WEBSITE_STEP, text_("northbank.example")],
       [S.businessTitle, text_("Partner")],
       [S.deploymentStatus, single_("actively_investing")],
       [S.mandateContext, refs_("INVESTOR_MANDATE", [DRAFT_MANDATE_ID])],

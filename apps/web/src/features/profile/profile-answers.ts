@@ -9,7 +9,7 @@ import {
   STAGE_OPTIONS,
 } from "@capital-q/founder-onboarding";
 import {
-  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_CURRENT,
   INVESTOR_STEPS,
 } from "@capital-q/investor-onboarding";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
@@ -268,7 +268,7 @@ function moneyValue(
 
 function stepOf(journey: ProfileJourney, stepKey: string) {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_V1
+    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_CURRENT
   ).steps.find((step) => step.stepKey === stepKey);
 }
 

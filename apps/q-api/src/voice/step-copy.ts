@@ -15,6 +15,7 @@
 export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
   "I0.organisation_name": "What's the name of your firm?",
   "I0.business_title": "What's your role there?",
+  "I0.website": "What's your firm's website?",
   "I1.mandate_context":
     "Are we setting up your main investment strategy, or a different one?",
   "I2.currency": "Which currency do you write cheques in?",
@@ -54,6 +55,7 @@ export const STEP_NOUNS: Readonly<Record<string, string>> = {
   "I0.investor_type": "way of investing",
   "I0.organisation_name": "firm name",
   "I0.business_title": "role",
+  "I0.website": "firm's website",
   "I1.deployment_status": "deployment status",
   "I1.mandate_context": "mandate",
   "I2.stages": "stages",
