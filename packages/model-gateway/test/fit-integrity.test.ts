@@ -8,6 +8,7 @@ import {
   mandateFitProvenance,
   namedCardCompanyIds,
   previousCardCompanyIds,
+  tieIsAsked,
   tieLine,
   withFitIntegrity,
 } from "../src/q/fit-integrity.js";
@@ -328,6 +329,14 @@ describe("score integrity (INC-1)", () => {
     expect(tieLine(out)).toBe(
       `${names[0] ?? ""}, ${names[1] ?? ""} and ${names[2] ?? ""} are tied on mandate fit at 8.8: 5 of 7 measures known for each, and no source documents yet. That's how well they match your mandate, not a judgement of quality.`,
     );
+  });
+
+  it("says a tie only where the turn asked for a ranking (QA F-71: 'Show my pipeline')", () => {
+    expect(tieIsAsked({ questionKind: "FIT" })).toBe(true);
+    expect(tieIsAsked({ questionKind: "DISCOVER_COMPANIES" })).toBe(true);
+    expect(tieIsAsked({ turnKind: "QUESTION_TO_Q" })).toBe(true);
+    expect(tieIsAsked({ turnKind: "TOOL_REQUEST" })).toBe(false);
+    expect(tieIsAsked({ questionKind: "THEIR_OWN_RECORDS" })).toBe(false);
   });
 
   it("has nothing to say for a card without a score", () => {

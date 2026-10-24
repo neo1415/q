@@ -430,6 +430,10 @@ export {
   TurnReaderV62ResultSchema,
   type TurnReaderV62Result,
   TurnCompareSchema,
+  TURN_READER_V63_SCHEMA_VERSION,
+  TURN_BOARD_ASKS_V63,
+  TurnReaderV63ResultSchema,
+  type TurnReaderV63Result,
   type TurnCompare,
   compareOverFromShown,
   QUESTION_KINDS_V58,
@@ -1773,6 +1777,10 @@ export {
   V62_DEEP_WORK,
   V62_WORK_FROM_EARLIER,
 } from "./prompts/tasks/turn-reader.v62.js";
+export {
+  TURN_READER_V63,
+  V63_BOARD_LIST_ADD,
+} from "./prompts/tasks/turn-reader.v63.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";

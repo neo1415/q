@@ -251,6 +251,23 @@ export function asComparison(
 }
 
 /** Cards on one score, said as level, with why the scores are what they are. */
+/**
+ * Whether the turn asked for a ranking, so a tie on its cards is said
+ * (QA F-71: "Show my pipeline" carried ranked cards it did not ask for and
+ * ended on "… are tied on mandate fit at 7"). A question about fit or about
+ * companies does; a request to do or show something else does not.
+ */
+export function tieIsAsked(turn: {
+  readonly questionKind?: string | undefined;
+  readonly turnKind?: string | undefined;
+}): boolean {
+  return (
+    turn.questionKind === "FIT" ||
+    turn.questionKind === "DISCOVER_COMPANIES" ||
+    (turn.questionKind === undefined && turn.turnKind !== "TOOL_REQUEST")
+  );
+}
+
 export function tieLine(block: QAnswerCardsBlock): string | null {
   const scored = block.cards.filter((card) => card.fit !== null);
   const byScore = new Map<number, QAnswerCard[]>();

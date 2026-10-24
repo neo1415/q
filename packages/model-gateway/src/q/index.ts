@@ -369,6 +369,7 @@ import {
   namedCardCompanyIds,
   previousCardCompanyIds,
   shownCardCompanyIds,
+  tieIsAsked,
   tieLine,
   withFitIntegrity,
 } from "./fit-integrity.js";
@@ -5736,7 +5737,12 @@ export function createModelGatewayQAnswer(
           (block): block is QAnswerCardsBlock =>
             block.kind === "ANSWER_CARDS" && block.shape === "RANKED",
         );
-        const tie = ranked === undefined ? null : tieLine(ranked);
+        // Only where they asked for fit or for companies (QA F-71, live
+        // 2026-10-24: "Show my pipeline" ended with "Ajopot and Maji Loop
+        // are tied on mandate fit at 7", about cards they had not asked to
+        // rank). Any other turn says the tie on its cards only.
+        const tie =
+          ranked === undefined || !tieIsAsked(request) ? null : tieLine(ranked);
         content =
           tie === null || /\btied\b/iu.test(content)
             ? content
@@ -8243,7 +8249,14 @@ export function createModelGatewayQAnswer(
           // الاكتشاف"). The checks above read English words only, so a
           // reply in another script is taken as its own account of what
           // happened, in the person's language.
-          !repliedInOtherScript(statusTalk?.text ?? guarded.text)
+          !repliedInOtherScript(statusTalk?.text ?? guarded.text) &&
+          // No action named and the turn answered with what was asked for
+          // (QA F-71: "Show my pipeline" answered with findings and cards,
+          // then "I didn't get that done…"): an answer, not a miss.
+          !(
+            parityGap === "NOT_IN_REGISTRY" &&
+            (analyst.findings.length > 0 || analyst.answerCards !== null)
+          )
             ? couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
