@@ -160,6 +160,10 @@ function seam(options: {
     request: QAnswerRequest,
     destination: string,
   ) => Promise<string | null>;
+  /** The shared translation layer, faked (QA F-96). */
+  readonly localiseWords?: Parameters<
+    typeof createSpecialistQAnswer
+  >[0]["localiseWords"];
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
   /** The quick first read (a model), faked. */
@@ -392,6 +396,9 @@ function seam(options: {
     ...(options.appActionRouter === undefined
       ? {}
       : { appActionRouter: options.appActionRouter }),
+    ...(options.localiseWords === undefined
+      ? {}
+      : { localiseWords: options.localiseWords }),
     ...(options.destinationSummary === undefined
       ? {}
       : { destinationSummary: options.destinationSummary }),
@@ -688,6 +695,54 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
         intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
       },
     ]);
+  });
+
+  // QA F-96 (24 Oct 2026): code's English lines ("Opening your pipeline…",
+  // the summary before it) reached a turn in Arabic in English. They go
+  // through the shared translation layer, with the turn; English turns
+  // never call it.
+  it("a move asked in Arabic is said in Arabic", async () => {
+    const asked: { turn: string | undefined; texts: string[] }[] = [];
+    const run = seam({
+      said: "اعرض لي مسار جمع التمويل",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "CRM_PIPELINE",
+        visibility: null,
+      }),
+      outcomes: [],
+      destinationSummary: () =>
+        Promise.resolve("3 investors: Savanna Seed Partners connected."),
+      localiseWords: (who, texts) => {
+        asked.push({ turn: who.turn, texts: [...texts] });
+        return Promise.resolve(texts.map(() => "[ar]"));
+      },
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.turn).toBe("اعرض لي مسار جمع التمويل");
+    expect(run.stored[0]?.content).not.toMatch(/Opening your pipeline/u);
+    expect(run.stored[0]?.content).toContain("[ar]");
+  });
+
+  it("a move asked in English never calls the translation layer", async () => {
+    const asked: string[][] = [];
+    const run = seam({
+      said: "Show me my fundraising pipeline",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "CRM_PIPELINE",
+        visibility: null,
+      }),
+      outcomes: [],
+      localiseWords: (_who, texts) => {
+        asked.push([...texts]);
+        return Promise.resolve(texts.map(() => null));
+      },
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(asked).toHaveLength(0);
+    expect(run.stored[0]?.content).toMatch(/Opening your pipeline/u);
   });
 
   // QA 2026-10-24: an investor's "Show my pipeline" (no "me") was left to

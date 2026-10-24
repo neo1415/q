@@ -91,6 +91,7 @@ import {
   type QuestionSequence,
   type TurnToolV14,
   quietlyNoted,
+  inTurnLanguage,
 } from "@capital-q/q-core";
 import {
   closestByName,
@@ -686,6 +687,23 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly board?: BoardKeeper | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * QA F-96: the shared translation layer (q-api's localiseWords). A turn
+   * that is not in English gets every English line code wrote here (a
+   * pipeline summary, the board, a move) in its own language. Absent:
+   * English, as before.
+   */
+  readonly localiseWords?:
+    | ((
+        who: {
+          readonly tenantId: string;
+          readonly userId: string;
+          readonly runId: string;
+          readonly turn?: string | undefined;
+        },
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
   /**
    * Reads each turn into the conversation core's closed vocabulary before
    * it is answered (CQ-QX-005). Absent: no reading, no research forced,
@@ -1811,12 +1829,40 @@ export function createSpecialistQAnswer(
   }
 
   /** A Q message and its durable completion event, committed together. */
+  /**
+   * F-96: each run's turn, as answerOnce read it, so recordAnswer can put
+   * code's lines in its language without another read. Bounded.
+   */
+  const turnOfRun = new Map<string, string>();
+  const rememberTurn = (runId: string, turn: string): void => {
+    turnOfRun.set(runId, turn);
+    if (turnOfRun.size > 256) {
+      const [oldest] = turnOfRun.keys();
+      if (oldest !== undefined) turnOfRun.delete(oldest);
+    }
+  };
   async function recordAnswer(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    content: string,
+    written: string,
     blocks?: readonly QResultBlock[],
   ): Promise<QAnswerOutcome> {
+    const turn = turnOfRun.get(request.runId);
+    const localise = dependencies.localiseWords;
+    const content =
+      turn === undefined || localise === undefined
+        ? written
+        : await inTurnLanguage(written, turn, (texts) =>
+            localise(
+              {
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+                runId: request.runId,
+                turn,
+              },
+              texts,
+            ),
+          );
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         tenantId: request.tenantId,
@@ -4403,6 +4449,7 @@ export function createSpecialistQAnswer(
     /** K fast lane: whether a change waits on their word; true when unknown. */
     waitingOnThem: () => Promise<boolean> = () => Promise.resolve(false),
   ): Promise<QAnswerOutcome> => {
+    rememberTurn(request.runId, latest.content);
     if (turns === undefined) return answerOnce(request);
     const state =
       conversations.get(conversationId) ?? INITIAL_CONVERSATION_STATE;
@@ -6271,6 +6318,8 @@ export function createSpecialistQAnswer(
         request.runId,
         64,
       ));
+    const turn = history.findLast((m) => m.role === "USER")?.content;
+    if (turn !== undefined) rememberTurn(request.runId, turn);
     // Row 5: the delegate's own prompt takes the same read, not a third one.
     const delegated = (asked: QAnswerRequest): Promise<QAnswerOutcome> =>
       delegate.answer(
