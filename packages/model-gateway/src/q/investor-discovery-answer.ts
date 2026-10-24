@@ -51,9 +51,9 @@ export type InvestorDiscoveryAnswer = {
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five"] as const;
 
-function listOf(names: readonly string[]): string {
+function listOf(names: readonly string[], joiner = "and"): string {
   if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
+  return `${names.slice(0, -1).join(", ")} ${joiner} ${names[names.length - 1] ?? ""}`;
 }
 
 /** The region as the member said it, for the sentence ("Arab", "Gulf"). */
@@ -86,14 +86,34 @@ export function investorDiscoveryText(
     readonly asked: number;
     readonly outcome: "FOUND" | "NONE" | "UNAVAILABLE";
     readonly aboutMyCompany: boolean;
+    /** The kinds as they said them ("family offices"); none is investors. */
+    readonly kinds?: readonly string[] | undefined;
+    readonly sector?: string | null | undefined;
   },
 ): string {
   const label = regionLabel(context.regionWords);
   const where = label === null ? "" : `${label} `;
   if (found.length === 0) {
-    return context.outcome === "UNAVAILABLE"
-      ? "Public search isn't answering right now, so I can't say either way. Try again in a moment."
-      : `I looked through the investors I know and a public search and found none ${label === null ? "I could name" : `from the ${label} region`} yet. A sector or a country would help me narrow it.`;
+    if (context.outcome === "UNAVAILABLE") {
+      return "Public search isn't answering right now, so I can't say either way. Try again in a moment.";
+    }
+    // Live 2026-10-24: "three Saudi family offices that back fintech" was
+    // told "a sector or a country would help" -- both were said. Say what
+    // was looked for in their words, and ask only for what they left out.
+    const kinds = context.kinds ?? [];
+    const what = kinds.length === 0 ? "investors" : listOf(kinds, "or");
+    const sector = context.sector?.trim() ?? "";
+    const backing = sector.length === 0 ? "" : ` backing ${sector}`;
+    const place = label === null ? "" : ` from the ${label} region`;
+    const next =
+      label === null && sector.length === 0
+        ? " A sector or a country would help me narrow it."
+        : label === null
+          ? " A country or region would help me look in the right place."
+          : sector.length === 0 && kinds.length === 0
+            ? " A sector would help me narrow it."
+            : " I can look more widely, say the wider region or a neighbouring sector, if you'd like.";
+    return `I'm not sure there are none, but I couldn't name any ${what}${backing}${place} yet, from the investors I know or a public search.${next}`;
   }
   const investors = found.filter((one) => one.role === "INVESTOR");
   const openers = found.filter((one) => one.role === "DOOR_OPENER");
@@ -258,6 +278,8 @@ export async function runInvestorDiscovery(input: {
     asked,
     outcome: status,
     aboutMyCompany: ask.aboutMyCompany,
+    kinds: ask.kinds,
+    sector: ask.sector,
   });
   const text =
     onCapitalQ.length === 0

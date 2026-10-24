@@ -444,6 +444,32 @@ describe("discovery by kind, place and sector", () => {
     expect(names(found)).toEqual(["Olayan Family Office"]);
   });
 
+  it("a page that says only 'family offices' (plural) is one", async () => {
+    const web = createFakeResearchProvider({
+      pages: [
+        {
+          url: "https://www.linkedin.com/company/al-faisaliah-holding",
+          title: "Al Faisaliah Holding | LinkedIn",
+          snippet:
+            "One of the Riyadh family offices backing fintech in Saudi Arabia.",
+          text: "One of the Riyadh family offices backing fintech in Saudi Arabia.",
+        },
+      ],
+    });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Saudi"],
+      kinds: ["family offices"],
+      sector: "fintech",
+      count: 3,
+    });
+    expect(names(found)).toEqual(["Al Faisaliah Holding"]);
+  });
+
   it("five Kenyan angel networks: searched as angel networks in Kenya", async () => {
     const web = createFakeResearchProvider({ pages: [] });
     const discovery = createCounterpartDiscovery({

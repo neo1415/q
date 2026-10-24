@@ -130,7 +130,7 @@ export function publicTerm(text: string | null | undefined): string | null {
 }
 
 const INVESTOR_TEXT =
-  /\b(?:invest(?:or|ors|ment|ments|ing)?|venture capital|vc|funds?|private equity|angels?|asset management|family office)\b/iu;
+  /\b(?:invest(?:or|ors|ment|ments|ing)?|venture capital|vc|funds?|private equity|angels?|asset management|family offices?)\b/iu;
 
 function textOf(record: KnownEntityRecord): string {
   const line = record.profile["oneLine"];
