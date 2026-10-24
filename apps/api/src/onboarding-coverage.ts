@@ -10,7 +10,7 @@ import {
 } from "@capital-q/founder-onboarding";
 import {
   INVESTOR_COVERAGE_PROFILE,
-  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_CURRENT,
 } from "@capital-q/investor-onboarding";
 import {
   createPostgresPendingWriteRepository,
@@ -139,7 +139,7 @@ export function createOnboardingCoverageReader(dependencies: {
         : journey === "investor"
           ? {
               profile: INVESTOR_COVERAGE_PROFILE,
-              definition: INVESTOR_DEFINITION_V1,
+              definition: INVESTOR_DEFINITION_CURRENT,
             }
           : null;
     if (setup === null) return null;

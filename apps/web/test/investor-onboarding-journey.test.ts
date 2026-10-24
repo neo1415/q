@@ -86,7 +86,7 @@ describe("investor journey over the runtime contract", () => {
     });
     const view = await port.start("00000000-0000-4000-8000-000000000001");
     expect(() => OnboardingSessionViewSchema.parse(view)).not.toThrow();
-    expect(view.session.definitionVersion).toBe(1);
+    expect(view.session.definitionVersion).toBe(2);
     expect(view.session.currentStepKey).toBe(INVESTOR_STEPS.investorType);
     const presented = toPresentation(view, SOURCE);
     expect(presented.sections.map((s) => s.id)).toEqual([
@@ -365,6 +365,8 @@ describe("investor journey over the runtime contract", () => {
       investorType: "vc",
       organisationName: "Northbank Capital",
       businessTitle: "Partner",
+      // v2: the firm's website comes back with the rest of the screen.
+      website: "northbank.example",
     });
   });
 
@@ -545,22 +547,55 @@ describe("investor journey over the runtime contract", () => {
     ]);
   });
 
+  it("a session pinned to v1 has no website: the role screen neither shows nor sends it", async () => {
+    const port = createInvestorFixtureRuntimePort({
+      storage: null,
+      seed: "reset",
+    });
+    const v2 = await port.start("00000000-0000-4000-8000-000000000009");
+    const v1: OnboardingSessionView = {
+      ...v2,
+      session: { ...v2.session, definitionVersion: 1 },
+      progress: {
+        ...v2.progress,
+        eligibleSteps: v2.progress.eligibleSteps.filter(
+          (step) => step.stepKey !== "I0.website",
+        ),
+      },
+    };
+    const role = {
+      kind: "investor_role" as const,
+      investorType: "vc",
+      organisationName: "Northbank Capital",
+      website: "northbank.example",
+    };
+    const offered = (view: OnboardingSessionView) =>
+      expectKind(toPresentation(view, SOURCE).step, "investor_role")
+        .offersWebsite;
+    const sent = (view: OnboardingSessionView) =>
+      planSubmissions(requireGroup("role"), role, view).map((s) => s.stepKey);
+    expect(offered(v1)).toBe(false);
+    expect(sent(v1)).not.toContain("I0.website");
+    expect(offered(v2)).toBe(true);
+    expect(sent(v2)).toContain("I0.website");
+  });
+
   it("refuses a session pinned to a definition version this build cannot present", async () => {
     const port = createInvestorFixtureRuntimePort({
       storage: null,
       seed: "reset",
     });
-    const v2: RuntimePort = {
+    const v3: RuntimePort = {
       ...port,
       current: async () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 2 } };
+          : { ...view, session: { ...view.session, definitionVersion: 3 } };
       },
     };
     await expect(
-      createRuntimeInvestorClient(v2, SOURCE).getSession(),
+      createRuntimeInvestorClient(v3, SOURCE).getSession(),
     ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
   });
 });

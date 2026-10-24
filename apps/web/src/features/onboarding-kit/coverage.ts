@@ -4,7 +4,7 @@ import type {
   OnboardingCoverageSource,
 } from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding/definition";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding/definition";
+import { INVESTOR_DEFINITION_CURRENT } from "@capital-q/investor-onboarding/definition";
 
 /**
  * The form's view of onboarding coverage (owner directive 2026-10-16, "Form
@@ -25,7 +25,9 @@ export function phasesFor(
   journey: CoverageJourney,
 ): readonly { readonly phaseKey: string; readonly label: string }[] {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_V1
+    journey === "founder"
+      ? FOUNDER_DEFINITION_CURRENT
+      : INVESTOR_DEFINITION_CURRENT
   ).schema.phases;
 }
 

@@ -33,6 +33,7 @@ import {
   OnboardingContextRequiredError,
   multiSelect,
   decimal,
+  normaliseWebsite,
   resourceIds,
   responseValues,
   singleSelect,
@@ -70,6 +71,10 @@ import {
   SECTOR_VOCABULARIES,
   STAGE_ORDER,
 } from "../definition/investor-v1.js";
+import {
+  INVESTOR_WEBSITE_STEP,
+  INVESTOR_WEBSITE_WRITE_TARGET,
+} from "../definition/investor-v2.js";
 import {
   createInvestorDomainServices,
   type InvestorDomainDependencies,
@@ -1015,6 +1020,31 @@ export function createInvestorWriteTargets(
           UpsertMyInvestorRepresentativeRequestSchema,
           { businessTitle: text(values, INVESTOR_STEPS.businessTitle) },
           "The role is not valid.",
+        ),
+        correlationId: context.correlationId,
+      });
+    },
+
+    // The address the investor gave for their firm. It is what they told
+    // Q, never a verified domain: verification state is not touched.
+    [INVESTOR_WEBSITE_WRITE_TARGET]: async (services, context, values) => {
+      const bound = await boundOrBootstrapped(services, context, values);
+      const raw = text(values, INVESTOR_WEBSITE_STEP);
+      const websiteUrl = raw === null ? null : normaliseWebsite(raw);
+      const investor = await services.investors.getInvestorOrganisation({
+        actor: bound.context,
+        investorOrganisationId: bound.investorOrganisationId,
+      });
+      if (investor.websiteUrl === websiteUrl) {
+        return;
+      }
+      await services.investors.updateInvestorOrganisation({
+        actor: bound.context,
+        investorOrganisationId: bound.investorOrganisationId,
+        input: parseContract(
+          UpdateInvestorOrganisationRequestSchema,
+          { expectedVersion: investor.version, websiteUrl },
+          "That isn't a web address.",
         ),
         correlationId: context.correlationId,
       });

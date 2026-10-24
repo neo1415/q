@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import type { OnboardingResponseValue } from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding/definition";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding/definition";
+import { INVESTOR_DEFINITION_CURRENT } from "@capital-q/investor-onboarding/definition";
 import { Button } from "@capital-q/ui/button";
 import { ChoiceChip } from "@capital-q/ui/chip";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
@@ -35,7 +35,9 @@ type Step = OnboardingStepManifest;
 
 export function stepsOf(journey: ProfileJourney): readonly Step[] {
   return (
-    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_V1
+    journey === "founder"
+      ? FOUNDER_DEFINITION_CURRENT
+      : INVESTOR_DEFINITION_CURRENT
   ).steps;
 }
 

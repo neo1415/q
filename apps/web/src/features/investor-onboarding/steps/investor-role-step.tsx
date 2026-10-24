@@ -11,7 +11,8 @@ import { useT } from "@/features/i18n/language";
 
 /**
  * I0. Investor type describes the organisation; the firm name creates or
- * names its workspace; the title is descriptive only. A solo angel keeps
+ * names its workspace; the website (v2) is what they say it is, never a
+ * verified domain; the title is descriptive only. A solo angel keeps
  * the personal workspace name. Nobody joins a firm by typing its name.
  */
 export function InvestorRoleStep({
@@ -42,6 +43,7 @@ export function InvestorRoleStep({
   const [businessTitle, setBusinessTitle] = useState(
     saved?.businessTitle ?? "",
   );
+  const [website, setWebsite] = useState(saved?.website ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
 
@@ -65,11 +67,13 @@ export function InvestorRoleStep({
       return;
     }
     const title = businessTitle.trim();
+    const site = website.trim();
     void actions.submit({
       kind: "investor_role",
       investorType,
       organisationName: name,
       ...(title.length > 0 ? { businessTitle: title } : {}),
+      ...(step.offersWebsite && site.length > 0 ? { website: site } : {}),
     });
   }
 
@@ -104,6 +108,26 @@ export function InvestorRoleStep({
           setNameError(undefined);
         }}
       />
+      {step.offersWebsite ? (
+        <Input
+          id="investor-website"
+          label={t("Your firm's website")}
+          description={t(
+            "Optional. Founders can see who you are before they reply.",
+          )}
+          placeholder="example.com"
+          // A text field with the URL keyboard, not type="url": the browser
+          // refuses "example.com", which the write path reads as https.
+          type="text"
+          inputMode="url"
+          autoCapitalize="none"
+          spellCheck={false}
+          autoComplete="url"
+          value={website}
+          disabled={busy}
+          onChange={(event) => setWebsite(event.target.value)}
+        />
+      ) : null}
       <Input
         id="investor-title"
         label={t("Your role there")}
