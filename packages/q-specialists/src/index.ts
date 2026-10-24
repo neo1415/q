@@ -108,6 +108,7 @@ export {
   asksWhatIsOnBoard,
   boardItemFromWords,
   mentionsOwnBoard,
+  nameInAsk,
   createSpecialistQAnswer,
   type BoardKeeper,
   type SpecialistQAnswer,
