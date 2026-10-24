@@ -158,6 +158,51 @@ describe("an artifact stays while it is the subject (FAIL-1)", () => {
   });
 });
 
+describe("QA F-105: a stale card leaves for unrelated answers", () => {
+  it("'it' in an unrelated question does not keep the cards", () => {
+    // FAILED BEFORE: "how can I make it better?" pointed back at the cards.
+    const turns = [
+      ...TOP3,
+      person(
+        "p2",
+        "How is my pitch video doing, and how can I make it better?",
+      ),
+      answer("a2", "Your opening is strong; lead with the litre price."),
+    ];
+    expect(onStageNow(turns)).toBeNull();
+  });
+
+  it("Q's own words naming a card that has left do not bring it back", () => {
+    // FAILED BEFORE: an answer mentioning a company on an old set put the
+    // whole set back over an unrelated turn.
+    const turns = [
+      ...TOP3,
+      person("p2", "What's on tomorrow?"),
+      answer("a2", "Two meetings tomorrow."),
+      person("p3", "Who looked at my pitch?"),
+      answer("a3", "Views aren't recorded; Norrland Grid expressed interest."),
+    ];
+    expect(onStageNow(turns)).toBeNull();
+  });
+
+  it("the person naming it still brings it back, and 'them' still keeps it", () => {
+    const named = [
+      ...TOP3,
+      person("p2", "What's on tomorrow?"),
+      answer("a2", "Two meetings tomorrow."),
+      person("p3", "And Norrland Grid?"),
+      answer("a3", "Norrland Grid reports £38k a month."),
+    ];
+    expect(onStageNow(named)).toBe("a1");
+    const them = [
+      ...TOP3,
+      person("p2", "Which of them is raising?"),
+      answer("a2", "Two of the three are raising."),
+    ];
+    expect(onStageNow(them)).toBe("a1");
+  });
+});
+
 describe("an artifact shows when Q shows it (FAIL-2)", () => {
   it("puts a table on the stage, drawn, and reports it drawn", async () => {
     // FAILED BEFORE: TABLE, MAP, CHART and TIMELINE were not stage
