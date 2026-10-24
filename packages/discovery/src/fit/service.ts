@@ -229,6 +229,8 @@ export const FIT_TOP_CANDIDATES_MAX = 200;
  * by name. Eligibility, inputs and scores are each one set-based read.
  */
 export const FIT_RANK_CANDIDATES_MAX = 1000;
+/** Companies per inputs read; under every per-call bound it reaches. */
+export const FIT_INPUTS_BATCH_MAX = 100;
 
 export function createFitService(
   dependencies: FitServiceDependencies,
@@ -371,12 +373,25 @@ export function createFitService(
       );
     }
 
-    const inputs = await dependencies.inputs.read({
-      actor,
-      investorOrganisationId: subject.investorOrganisationId,
-      mandateId,
-      companyIds: admitted.map((r) => r.companyId),
-    });
+    // F-82 (live bbb4b6773): the inputs read fans out per company (feature
+    // snapshots, identities, raises), and its raise disclosure is bounded
+    // per call. Over the whole network it is read in batches, one after
+    // another, so a rank never fails for the size of the network.
+    const admittedIds = admitted.map((r) => r.companyId);
+    const inputs = new Map<string, FitCompanyInputs>();
+    for (
+      let start = 0;
+      start < admittedIds.length;
+      start += FIT_INPUTS_BATCH_MAX
+    ) {
+      const part = await dependencies.inputs.read({
+        actor,
+        investorOrganisationId: subject.investorOrganisationId,
+        mandateId,
+        companyIds: admittedIds.slice(start, start + FIT_INPUTS_BATCH_MAX),
+      });
+      for (const [companyId, input] of part) inputs.set(companyId, input);
+    }
     const now = clock();
     const computedAt = now.toISOString();
     const items: FitProfileItem[] = [];

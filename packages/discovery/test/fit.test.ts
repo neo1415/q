@@ -940,7 +940,11 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     // In batches eligibility accepts, every company once.
     expect(w.evaluated.map((batch) => batch.length)).toEqual([200, 200, 63]);
     expect(w.evaluated.flat()).toEqual(ids);
-    expect(w.read).toEqual([ids]);
+    // Inputs fan out per company: read in bounded batches too, each once.
+    expect(w.read.map((batch) => batch.length)).toEqual([
+      100, 100, 100, 100, 63,
+    ]);
+    expect(w.read.flat()).toEqual(ids);
   });
 
   it("rank refuses a non-investor before reading anything", async () => {

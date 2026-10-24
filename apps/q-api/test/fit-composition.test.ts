@@ -53,9 +53,19 @@ function cardSql(published: ReadonlyMap<string, unknown>) {
   }) as never;
 }
 
+/** The real services' per-call bounds (eligibility and disclosure). */
+const BATCH_MAX = 200;
+const bounded = <T>(size: number, value: () => Promise<T>): Promise<T> =>
+  size > BATCH_MAX
+    ? Promise.reject(new RangeError(`batch of ${String(size)} exceeds 200`))
+    : value();
+
 function compose(
   viewCalls: { n: number },
   published: ReadonlyMap<string, unknown> = new Map(),
+  raiseShared: (companyId: string) => boolean = (id) => id === SHARED,
+  names: (companyId: string) => string = (id) =>
+    id === SHARED ? "Sunline" : "Kora",
 ) {
   const eligibilityPorts = {
     investorSubject: {
@@ -92,14 +102,16 @@ function compose(
     eligibilityPorts,
     eligibility: {
       evaluate: (q) =>
-        Promise.resolve({
-          context: {} as never,
-          results: q.companyIds.map((companyId) => ({
-            companyId,
-            mandateId: ID(200),
-            reasonCodes: [],
-          })) as never,
-        }),
+        bounded(q.companyIds.length, () =>
+          Promise.resolve({
+            context: {} as never,
+            results: q.companyIds.map((companyId) => ({
+              companyId,
+              mandateId: ID(200),
+              reasonCodes: [],
+            })) as never,
+          }),
+        ),
     },
     companies: {
       findCanonicalCompany: (id) =>
@@ -107,7 +119,7 @@ function compose(
           id,
           tenantId: ID(5),
           organisationId: ID(6),
-          canonicalName: id === SHARED ? "Sunline" : "Kora",
+          canonicalName: names(id),
           companyStatus: "active",
         } as never),
     },
@@ -122,10 +134,14 @@ function compose(
     },
     disclosure: {
       evaluateMany: (requests) =>
-        Promise.resolve(
-          requests.map((r) => ({
-            outcome: r.resource.id === `obj-${SHARED}` ? "ALLOW" : "DENY",
-          })) as never,
+        bounded(requests.length, () =>
+          Promise.resolve(
+            requests.map((r) => ({
+              outcome: raiseShared(r.resource.id.replace(/^obj-/u, ""))
+                ? "ALLOW"
+                : "DENY",
+            })) as never,
+          ),
         ),
     },
     relationships: () => Promise.resolve([SHARED]),
@@ -207,6 +223,25 @@ describe("fit composition", () => {
         (p) => p.parameter === "CHEQUE_SIZE",
       )?.outcome,
     ).toBe("UNKNOWN");
+  });
+
+  // F-82 (live bbb4b6773, 2026-10-24): over the whole network the raise
+  // read sent every company's raise to disclosure in one call, which
+  // throws past 200; rank failed and the answer fell to name order.
+  it("rank over the live network's 463 companies: every one scored, the best (last by name) first", async () => {
+    const ids = Array.from({ length: 463 }, (_, i) => ID(1000 + i));
+    const SILO = ids[462] ?? "";
+    const { fit } = compose(
+      { n: 0 },
+      new Map(),
+      (id) => id === SILO,
+      (id) => (id === SILO ? "Silo Credit" : `A company ${id.slice(-4)}`),
+    );
+    const result = await fit.rank?.(actor, ids, 5);
+    expect(result?.kind).toBe("OK");
+    if (result?.kind !== "OK") return;
+    expect(result.comparison.considered).toBe(463);
+    expect(result.comparison.entries[0]?.companyId).toBe(SILO);
   });
 
   it("top N reads the reader's own lists, and one list failing does not fail it", async () => {
