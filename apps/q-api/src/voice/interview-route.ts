@@ -247,6 +247,9 @@ export function wantsStream(accept: string | undefined): boolean {
  * route's ordinary problem reply and status. A closed connection stops the
  * writing, never the turn -- what the person said is still saved.
  */
+/** How often an open turn stream says it is still alive. */
+const HEARTBEAT_MS = 5_000;
+
 export function openSentenceStream(reply: FastifyReply): {
   readonly sentence: (text: string) => void;
   readonly stage: (stage: QInterviewStage) => void;
@@ -255,6 +258,7 @@ export function openSentenceStream(reply: FastifyReply): {
 } {
   let open = false;
   let ended = false;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   const start = () => {
     if (open) return;
     open = true;
@@ -265,6 +269,18 @@ export function openSentenceStream(reply: FastifyReply): {
       connection: "keep-alive",
       "x-accel-buffering": "no",
     });
+    // QA F-67 (24 Oct): a first answer that saved nine facts went quiet
+    // between stages long enough for the connection to be cut; the screen
+    // said "I lost the connection" while the turn finished and saved. A
+    // comment line every few seconds keeps it open (clients skip it).
+    heartbeat = setInterval(() => {
+      if (reply.raw.destroyed) {
+        clearInterval(heartbeat);
+        return;
+      }
+      reply.raw.write(": ping\n\n");
+    }, HEARTBEAT_MS);
+    heartbeat.unref();
   };
   const write = (event: string, data: unknown) => {
     if (reply.raw.destroyed) return;
@@ -291,6 +307,7 @@ export function openSentenceStream(reply: FastifyReply): {
       if (ended) return;
       ended = true;
       start();
+      clearInterval(heartbeat);
       write(event, data);
       reply.raw.end();
     },
