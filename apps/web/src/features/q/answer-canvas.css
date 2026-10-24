@@ -811,6 +811,13 @@
   box-shadow: var(--cq-shadow-overlay);
   color: var(--cq-text-primary);
 }
+/* QO-16 (QA 2026-10-24, 390px): one notice at a time at the foot of the
+   screen. While Q's arrival card is up, the chip waits behind it instead
+   of covering it; it comes back once the card is closed. */
+body:has([data-arrival-dock]:not([data-tucked]) > div:not(:empty))
+  .cq-answer-chip {
+  display: none;
+}
 .cq-answer-chip .mark {
   width: 44px;
   height: 44px;

@@ -162,8 +162,10 @@ export function comparisonTableBlock(input: {
    * other companies a fit sweep in the same run read.
    */
   readonly only?: readonly string[] | undefined;
+  /** TURN_READER v62: the reader read a comparison; decides over the words. */
+  readonly compareAsked?: boolean | undefined;
 }): QResultBlock | null {
-  if (!asksToCompare(input.question)) return null;
+  if (!(input.compareAsked ?? asksToCompare(input.question))) return null;
   const fitById = new Map(input.fits.map((fit) => [fit.companyId, fit]));
   const ids = [
     ...input.fits.map((fit) => fit.companyId),
@@ -314,8 +316,36 @@ const COUNT_WORDS: Readonly<Record<string, number>> = {
 export function compareTargets(
   question: string,
   cards: readonly { readonly companyId: string; readonly name: string }[],
+  /**
+   * TURN_READER v62: the comparison as the reader understood it, in any
+   * words and any language. When given it decides, never the words; absent
+   * (an older reader, a code path with no reading), the words do.
+   */
+  reading?: {
+    readonly count: number | null;
+    readonly names: readonly string[];
+  },
 ): readonly string[] {
-  if (!asksToCompare(question) || cards.length < 2) return [];
+  if (cards.length < 2) return [];
+  if (reading !== undefined) {
+    const byName = reading.names.flatMap((name) => {
+      const card = cards.find(
+        (entry) =>
+          entry.name.trim().length > 0 &&
+          entry.name.toLowerCase() === name.trim().toLowerCase(),
+      );
+      return card === undefined ? [] : [card.companyId];
+    });
+    if (byName.length >= 2) return [...new Set(byName)].slice(0, 4);
+    // Names the cards do not hold are read by name elsewhere (the named
+    // reads); only a count over the cards is resolved here.
+    if (reading.names.length > 0) return [];
+    return cards
+      .map((card) => card.companyId)
+      .filter((id, index, all) => all.indexOf(id) === index)
+      .slice(0, Math.min(Math.max(reading.count ?? 2, 2), 4));
+  }
+  if (!asksToCompare(question)) return [];
   const lower = question.toLowerCase();
   const named = cards
     .map((card) => ({ card, at: lower.indexOf(card.name.toLowerCase()) }))

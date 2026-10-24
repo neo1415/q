@@ -110,12 +110,51 @@ const primaryOf = (language: UiLanguage): string =>
   (language.split("-")[0] ?? language).toLowerCase();
 
 /** The language the interface uses: the saved choice when the registry offers it, else English. */
+/**
+ * The interface language. A saved language is that language; Automatic
+ * (or none saved) follows the device (QO-45, QA 2026-10-23: Automatic on
+ * an ar-EG browser rendered English): the first of the device's languages
+ * the interface has, by exact tag and then by its primary language,
+ * else English.
+ */
 export function uiLanguageOf(
   preference: QLanguagePreference | null | undefined,
+  device: string | readonly string[] | null = null,
 ): UiLanguage {
   if (preference === null || preference === undefined || preference === "AUTO")
-    return "en";
+    return deviceLanguageOf(device);
   return languageInfo(preference)?.tag ?? "en";
+}
+
+/** "ar-EG,ar;q=0.9,en;q=0.8" or navigator.languages, to a language we have. */
+export function deviceLanguageOf(
+  device: string | readonly string[] | null,
+): UiLanguage {
+  if (device === null) return "en";
+  const tags =
+    typeof device === "string"
+      ? device
+          .split(",")
+          .map((part) => {
+            const [tag = "", ...params] = part.trim().split(";");
+            const q = params
+              .map((param) => /^\s*q=([\d.]+)\s*$/u.exec(param)?.[1])
+              .find((value) => value !== undefined);
+            return { tag: tag.trim(), q: q === undefined ? 1 : Number(q) };
+          })
+          .filter((entry) => entry.tag.length > 0 && entry.q > 0)
+          .sort((a, b) => b.q - a.q)
+          .map((entry) => entry.tag)
+      : device;
+  for (const tag of tags.slice(0, 12)) {
+    // English in any region is the interface's own text, never a translation.
+    if (/^en(?:-|$)/iu.test(tag)) return "en";
+    const exact = languageInfo(tag)?.tag;
+    if (exact !== undefined) return exact;
+    const primary = languageInfo(tag.split("-")[0] ?? "")?.tag;
+    if (primary !== undefined) return primary;
+  }
+  return "en";
 }
 
 export function directionOf(language: UiLanguage): "ltr" | "rtl" {

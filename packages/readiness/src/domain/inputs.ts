@@ -23,6 +23,11 @@ export type ReadinessClaimInput = {
     | "DISPUTED"
     | "CONTRADICTORY"
     | "STALE";
+  /**
+   * QA QO-38: the founder's own answer in setup, not a stored claim: no
+   * claim record to link to, and shown as "you told Q".
+   */
+  readonly stated?: true | undefined;
 };
 
 export type ReadinessDeckSection = {
@@ -93,6 +98,12 @@ export type ReadinessInputs = {
     readonly instrument: boolean;
     readonly valuation: boolean;
     readonly targetCloseDate: boolean;
+    /**
+     * QA QO-38: what they told Q in setup, not yet confirmed as the
+     * company's raise. Shown as stated, never as recorded. Absent: the
+     * recorded capital objective.
+     */
+    readonly stated?: true | undefined;
   } | null;
   /** Pending follow-up questions (a CONTRADICTION one marks its fact). */
   readonly followUps: readonly ReadinessFollowUpInput[];

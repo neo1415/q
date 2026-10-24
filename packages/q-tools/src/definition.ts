@@ -109,6 +109,16 @@ export type QToolDefinition<I, O, G> = {
    * Its authorize step still decides. Absent: false.
    */
   readonly eligibleWhenNamed?: boolean | undefined;
+  /**
+   * Offered, and may execute, on any purpose whose plan holds its scope
+   * kinds, but only when the turn names it -- never by area alone (the
+   * work board, owner 2026-10-24: "save that plan to my board" planned as
+   * a records question never saw my_board; offered by area it would push
+   * a read out of every records turn). Named tools lead the offer, so the
+   * tool bound never cuts it. Its authorize step still decides. Absent:
+   * false.
+   */
+  readonly offeredWhenNamed?: boolean | undefined;
   /** Offered only when the plan holds at least one of these scope kinds; empty = always. */
   readonly requiredScopeKinds: readonly QKnowledgeScopeKind[];
   readonly approval: "NONE";

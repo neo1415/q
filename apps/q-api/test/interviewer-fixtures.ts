@@ -95,6 +95,12 @@ export type WorldOptions = {
    * service does (409 STEP_NOT_ELIGIBLE), as revenue for a pre-seed company.
    */
   readonly ineligible?: readonly string[] | undefined;
+  /**
+   * Steps that open on their path only once another is answered (the raise
+   * amount after "are you raising?"): refused as STEP_NOT_ELIGIBLE until
+   * then, as the journey's branching does.
+   */
+  readonly opensAfter?: Readonly<Record<string, string>> | undefined;
   readonly mandates?:
     | {
         readonly candidates: readonly string[];
@@ -483,7 +489,11 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       response: { value: OnboardingResponseValue; note?: string };
     }): Promise<Response> => {
       tried.push(body.stepKey);
-      if (options.ineligible?.includes(body.stepKey) === true) {
+      const opensAfter = options.opensAfter?.[body.stepKey];
+      if (
+        options.ineligible?.includes(body.stepKey) === true ||
+        (opensAfter !== undefined && !held.has(opensAfter))
+      ) {
         return Promise.resolve(
           new Response(
             JSON.stringify({

@@ -956,8 +956,14 @@ export type SpecialistQAnswerDependencies = {
 };
 
 /** What one requested document came to: a line, and its card when made. */
-/** What the answer seam needs of the work board: adding, as Q for them. */
+/** What the answer seam needs of the work board: reading it, and adding as Q for them. */
 export type BoardKeeper = {
+  readonly list: (actor: ActorContext) => Promise<{
+    readonly items: readonly {
+      readonly title: string;
+      readonly status: "TODO" | "DOING" | "DONE";
+    }[];
+  }>;
   readonly add: (
     actor: ActorContext,
     request: {
@@ -993,6 +999,45 @@ export function answerSteps(answer: string): string[] {
     if (steps.length === BOARD_TASKS_MAX) break;
   }
   return steps;
+}
+
+/** At most this many items of a column are read out. */
+const BOARD_READ_MAX = 8;
+
+const BOARD_COLUMNS = [
+  ["TODO", "To do"],
+  ["DOING", "Doing"],
+  ["DONE", "Done"],
+] as const;
+
+/** "What's on my board?", answered from the board itself, by column. */
+export function boardReadOut(
+  items: readonly { readonly title: string; readonly status: string }[],
+): string {
+  if (items.length === 0) {
+    return "Your board is empty. Ask me to save a plan or an answer to it, or to add a task, and it'll be there.";
+  }
+  const lines = BOARD_COLUMNS.flatMap(([status, label]) => {
+    const column = items.filter((item) => item.status === status);
+    if (column.length === 0) return [];
+    const shown = column.slice(0, BOARD_READ_MAX).map((item) => item.title);
+    const more =
+      column.length > shown.length
+        ? `; and ${String(column.length - shown.length)} more`
+        : "";
+    return [
+      `**${label}** (${String(column.length)}): ${shown.join("; ")}${more}.`,
+    ];
+  });
+  return `Here's your board.\n\n${lines.join("\n\n")}`;
+}
+
+/**
+ * A title they dictated ('add "Prep IC memo for Mizan" to my board'): a
+ * new item in their words, the board tool's to add, never Q's last answer.
+ */
+function dictatesItem(words: string): boolean {
+  return /["“”'‘’«»][^"“”'‘’«»]{3,}["“”'‘’«»]/u.test(words);
 }
 
 /** A UUID (version 5 layout) for one change Q makes, stable on a retry. */
@@ -1874,17 +1919,29 @@ export function createSpecialistQAnswer(
         "I haven't answered anything in this conversation yet, so there's nothing to keep on your board. Ask me for the plan first, then say save it to my board.",
       );
     }
-    const filed = await fileAnswer(
-      request,
-      artifacts,
-      previous.answer,
-      previous.question,
-    );
-    const document = (filed.blocks ?? []).find(
-      (block) => block.kind === "ARTIFACT_REFERENCE",
-    );
+    // A document Q already made in that answer is the one kept; otherwise
+    // the answer is filed as one, exactly as written.
+    const made = previousDocument(history);
+    const filed =
+      made === null
+        ? await fileAnswer(
+            request,
+            artifacts,
+            previous.answer,
+            previous.question,
+          )
+        : null;
+    const document =
+      made ??
+      (filed?.blocks ?? []).find(
+        (block) => block.kind === "ARTIFACT_REFERENCE",
+      );
     if (document?.kind !== "ARTIFACT_REFERENCE") {
-      return recordAnswer(request, conversationId, filed.content);
+      return recordAnswer(
+        request,
+        conversationId,
+        filed?.content ?? "I couldn't file that just now.",
+      );
     }
     const kept = await board
       .add(
@@ -1950,6 +2007,37 @@ export function createSpecialistQAnswer(
         : `I've filed that plan as a document and put it on your board, with ${tasks} of its ${String(steps.length)} steps in To do; the rest couldn't be added just now.`,
       [document],
     );
+  }
+
+  /** "What's on my board?" (boardAsk LIST): read from the board, by code. */
+  async function readBoard(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+  ): Promise<QAnswerOutcome | null> {
+    const board = dependencies.board;
+    if (board === undefined) return null;
+    const list = await board.list(request.actor).catch(() => null);
+    if (list === null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        "I couldn't read your board just now. Ask me again in a moment.",
+      );
+    }
+    return recordAnswer(request, conversationId, boardReadOut(list.items));
+  }
+
+  /** The document card on Q's answer before this turn, when it made one. */
+  function previousDocument(
+    history: readonly QConversationMessage[],
+  ): Extract<QResultBlock, { kind: "ARTIFACT_REFERENCE" }> | null {
+    const latestUser = history.findLastIndex((m) => m.role === "USER");
+    const before = latestUser < 0 ? history : history.slice(0, latestUser);
+    const answer = before.findLast((m) => m.role === "Q");
+    const block = (answer?.blocks ?? []).findLast(
+      (one) => one.kind === "ARTIFACT_REFERENCE",
+    );
+    return block?.kind === "ARTIFACT_REFERENCE" ? block : null;
   }
 
   /**
@@ -4689,11 +4777,24 @@ export function createSpecialistQAnswer(
         ? audienceTool
         : null;
     // Reader v61: "save that plan to my board" / "break it into tasks",
-    // about Q's last answer (nobody else named), is done by code.
+    // about Q's last answer (nobody else named, no item dictated), is done
+    // by code, whatever the run's purpose or tool offer.
+    const boardAsk: string | null = read?.boardAsk ?? null;
+    if (boardAsk === "LIST" && !writingDocument) {
+      const listed = await readBoard(request, conversationId);
+      if (listed !== null) {
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return listed;
+      }
+    }
     if (
       (read?.boardAsk === "SAVE" || read?.boardAsk === "BREAKDOWN") &&
       !writingDocument &&
-      (read.namedOther ?? null) === null
+      (read.namedOther ?? null) === null &&
+      !dictatesItem(latest.content)
     ) {
       const saved = await saveAnswerToBoard(
         request,
@@ -5246,6 +5347,17 @@ export function createSpecialistQAnswer(
             },
           }
         : {}),
+      // v62: a comparison as the reader understood it (never recall: the
+      // reader drops fromShown when compare is set), so the answer builds
+      // the comparison table whatever words asked for it.
+      ...(read?.compare === undefined || read.compare === null
+        ? {}
+        : {
+            compare: {
+              count: read.compare.count,
+              names: [...read.compare.names],
+            },
+          }),
       ...(read?.kind === "QUESTION_TO_Q" && read.question?.kind === "FIT"
         ? {
             fitQuestion: {

@@ -1273,6 +1273,23 @@ export function createOnboardingPort(input: {
   const offPath = (error: unknown): boolean =>
     readRefusal(error).because?.includes("(STEP_NOT_ELIGIBLE)") === true;
 
+  /**
+   * QA QO-26: an answer for a step not on their path YET ("$1.5m on a
+   * SAFE" before they said they are raising) is kept in their notes AND
+   * held, so it lands in its own field the turn the step opens, and Q
+   * neither loses it nor asks for it again. Quietly: the notes are what
+   * Q says; a step that never opens stops being tried.
+   */
+  const holdUntilOpen = async (
+    stepKey: string,
+    value: OnboardingResponseValue,
+    note: string | undefined,
+  ): Promise<void> => {
+    await input.held
+      ?.hold(stepKey, { value, ...(note === undefined ? {} : { note }) })
+      .catch(() => undefined);
+  };
+
   const write = async (
     step: OnboardingStepManifest,
     resolvedValue: OnboardingResponseValue,
@@ -1302,6 +1319,7 @@ export function createOnboardingPort(input: {
       };
     } catch (error: unknown) {
       if (offPath(error)) {
+        await holdUntilOpen(step.stepKey, value, note);
         const reading = await spoken(step, value, await current());
         const kept = await keepOffPath(
           step,
@@ -2118,6 +2136,7 @@ export function createOnboardingPort(input: {
               }
             }
             if (offPath({ problem })) {
+              await holdUntilOpen(stepKey, item.value, item.plan.note);
               const kept = await keepOffPath(
                 item.plan.step,
                 fieldWordsOf(

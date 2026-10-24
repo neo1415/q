@@ -209,6 +209,7 @@ import {
 } from "./parallel-extras.js";
 import {
   corroboratedPictures,
+  pageAboutThem,
   type HeldIdentity,
   type SearchEvidence,
 } from "./picture-corroboration.js";
@@ -1061,7 +1062,7 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
 const WEB_BESIDE_RECORDS_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    'Capital Q searched the public web for this question, beside its own records; the result is above. Compose from whatever was found. When Capital Q\'s records hold something about them and the public sources do too, give the records first ("In Capital Q: …") and then the public sources ("Public sources also say: …"), naming the site and date for each public fact; keep the two apart and never present a public source as verified. When only one of them holds something, answer from that one. When neither does, say so plainly in one sentence. Never say you cannot search, browse or access the internet: the search ran. If it failed, say so in one sentence, then give what was found.',
+    'Capital Q searched the public web for this question, beside its own records; the result is above. Compose from whatever was found. When Capital Q\'s records hold something about them and the public sources do too, give the records first ("In Capital Q: …") and then the public sources ("Public sources also say: …"), naming the site and date for each public fact; keep the two apart and never present a public source as verified. When only one of them holds something, answer from that one. Never mention, list or describe public results that are not about them (other businesses, a namesake, a product of the same name): they are not part of the answer. When public sources add nothing about them and Capital Q\'s records answer the question, say nothing about the web; when neither has anything, say so once, naturally ("I didn\'t find anything more about them online"). Never say you cannot search, browse or access the internet: the search ran. If it failed, say so in one sentence, then give what was found.',
 };
 
 /**
@@ -2295,6 +2296,64 @@ export function createModelGatewayQAnswer(
       if (oldest !== undefined) readOnlyByRun.delete(oldest);
     }
   };
+  /**
+   * A public search about someone Capital Q holds keeps only the pages
+   * about them (owner 2026-10-24: "Q must never narrate irrelevant
+   * results"): LEGO DUPLO's pages name "Duplo" but are not about the Lagos
+   * company the record holds, so the answer never sees them, nor do its
+   * Sources or its pictures. By the run's own reads of their record.
+   */
+  const aboutThemOnly = (
+    proposal: Parameters<QToolPort["execute"]>[0],
+    runId: string,
+    outcome: QToolCallOutcome,
+  ): QToolCallOutcome => {
+    if (proposal.name !== PUBLIC_WEB_TOOL || !outcome.result.ok) {
+      return outcome;
+    }
+    const name = (proposal.arguments as { readonly entityName?: unknown })
+      .entityName;
+    if (typeof name !== "string" || name.trim().length === 0) return outcome;
+    const held = heldOnRecord(runCompanies.read(runId), name);
+    if (held === null) return outcome;
+    const data = outcome.result.data as {
+      readonly sources?: readonly Record<string, unknown>[];
+    };
+    const sources = data.sources ?? [];
+    const kept = sources.filter((source) =>
+      pageAboutThem(
+        {
+          domain: typeof source["domain"] === "string" ? source["domain"] : "",
+          subjectMatch:
+            typeof source["subjectMatch"] === "string"
+              ? source["subjectMatch"]
+              : null,
+          countries: Array.isArray(source["mentionedCountries"])
+            ? source["mentionedCountries"].filter(
+                (country): country is string => typeof country === "string",
+              )
+            : [],
+          text:
+            typeof source["excerpt"] === "string" ? source["excerpt"] : null,
+        },
+        name,
+        held,
+      ),
+    );
+    if (kept.length === sources.length) return outcome;
+    logger?.info(
+      {
+        qRunId: runId,
+        kept: kept.length,
+        dropped: sources.length - kept.length,
+      },
+      "q public pages not about whom the search was for left out",
+    );
+    return {
+      ...outcome,
+      result: { ok: true, data: { ...data, sources: kept } },
+    };
+  };
   const tools: QToolPort = {
     offer: async (toolContext) => {
       const offered = await baseTools.offer(toolContext);
@@ -2323,7 +2382,7 @@ export function createModelGatewayQAnswer(
         );
         runCompanies.note(toolContext.runId, kept);
         runFits.note(toolContext.runId, kept);
-        return kept;
+        return aboutThemOnly(proposal, toolContext.runId, kept);
       }
       const outcome = await singleFlight.execute(
         toolContext.runId,
@@ -2347,7 +2406,7 @@ export function createModelGatewayQAnswer(
         // Something of theirs changed: what was read for them is not kept.
         readCache.forget(toolContext);
       }
-      return outcome;
+      return aboutThemOnly(proposal, toolContext.runId, outcome);
     },
   };
   const sensitivityPolicy = dependencies.sensitivity ?? { kind: "FROM_PLAN" };
@@ -2888,6 +2947,7 @@ export function createModelGatewayQAnswer(
       const targets = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
+        request.compare,
       );
       if (targets.length < 2) return;
       const { names } = await prefetchToolsRead;
@@ -2919,6 +2979,7 @@ export function createModelGatewayQAnswer(
         read: runCompanies.read(request.runId),
         fits: runFits.read(request.runId),
         only: targets,
+        compareAsked: true,
       });
       const statement = table === null ? null : comparisonFactStatement(table);
       if (statement === null) return;
@@ -3465,12 +3526,22 @@ export function createModelGatewayQAnswer(
       });
       const names = [
         ...(capitalQAsked ? ["Capital Q"] : []),
+        // v62: the companies the reader heard them name for a comparison,
+        // as said, in any language (the words' own candidates follow).
+        ...(request.compare?.names ?? []),
         ...companyNameCandidates(
           latest.content,
-          asksToCompare(latest.content) ? 4 : 2,
+          request.compare !== undefined || asksToCompare(latest.content)
+            ? 4
+            : 2,
         ),
         ...lowercaseNameCandidates(latest.content),
-      ];
+      ].filter(
+        (name, index, all) =>
+          all.findIndex(
+            (other) => other.toLowerCase() === name.toLowerCase(),
+          ) === index,
+      );
       if (names.length === 0) return;
       const found = await Promise.all(
         names.map((name, index) =>
@@ -7020,9 +7091,20 @@ export function createModelGatewayQAnswer(
         };
         /** A public-web result code fetched, put in front of the model. */
         const landResearch = (
-          call: { readonly name: string },
-          outcome: QToolCallOutcome,
+          call: { readonly name: string; readonly arguments?: unknown },
+          landed: QToolCallOutcome,
         ): void => {
+          // Again as it reaches the answer: their record may have been read
+          // only after the search returned.
+          const outcome = aboutThemOnly(
+            {
+              callId: "q-research",
+              name: call.name,
+              arguments: call.arguments,
+            },
+            request.runId,
+            landed,
+          );
           toolCalls.push({
             toolName: outcome.toolName,
             providerName: call.name,
@@ -7071,8 +7153,9 @@ export function createModelGatewayQAnswer(
               !earlyWeb.claimed
             ) {
               earlyWeb.claimed = true;
+              const early = earlyWeb.call;
               return earlyWeb.outcome.then((outcome) => ({
-                ...outcome,
+                ...aboutThemOnly(early, request.runId, outcome),
                 callId: call.callId,
               }));
             }
@@ -8529,6 +8612,7 @@ export function createModelGatewayQAnswer(
               read: companiesRead,
               fits: fitsRead,
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
+              ...(request.compare === undefined ? {} : { compareAsked: true }),
             });
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),

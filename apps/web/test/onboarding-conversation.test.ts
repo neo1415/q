@@ -9,6 +9,7 @@ import type {
 import {
   acknowledgeValue,
   gapValue,
+  hasFindingsFrom,
   pendingQuestion,
   progressLines,
   promptFor,
@@ -612,5 +613,30 @@ describe("publicSourceOf", () => {
         ]),
       ),
     ).toBeNull();
+  });
+});
+
+describe("QA F-69: a deck is read back only once Q's findings from it are in", () => {
+  const DOC = "d1000000-0000-4000-8000-000000000001";
+  const suggestion = (sourceId: string) =>
+    ({
+      sourceRefs: [{ sourceType: "EVIDENCE_DOCUMENT", sourceId }],
+    }) as unknown as OnboardingSessionView["pendingSuggestions"][number];
+  it("sees findings from this document only", () => {
+    expect(hasFindingsFrom(undefined, DOC)).toBe(false);
+    expect(hasFindingsFrom({ pendingSuggestions: [] }, DOC)).toBe(false);
+    expect(
+      hasFindingsFrom(
+        {
+          pendingSuggestions: [
+            suggestion("d2000000-0000-4000-8000-000000000002"),
+          ],
+        },
+        DOC,
+      ),
+    ).toBe(false);
+    expect(
+      hasFindingsFrom({ pendingSuggestions: [suggestion(DOC)] }, DOC),
+    ).toBe(true);
   });
 });

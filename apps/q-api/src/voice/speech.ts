@@ -298,9 +298,16 @@ function spokenItem(marker: string | undefined, body: string): string {
 }
 
 /** Markdown and machine punctuation → plain sentences. */
+/**
+ * F-62 (QA 2026-10-23, owner decision): a data label on a name -- "Savanna
+ * Seed Partners (fictional)" -- is for the screen, never said aloud. The
+ * display text keeps it until the owner decides on a badge.
+ */
+export const SPOKEN_DATA_LABEL = /\s*\((?:fictional|demo|demo account)\)/giu;
+
 export function speakable(text: string): string {
   return (
-    spokenFigures(withoutStageDirections(text))
+    spokenFigures(withoutStageDirections(text.replace(SPOKEN_DATA_LABEL, "")))
       // A table (a header row, a rule and rows) is one sentence pointing
       // at the screen: dropped whole, a table-only answer became silence
       // (audit C3).

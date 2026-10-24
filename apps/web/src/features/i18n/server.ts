@@ -1,5 +1,7 @@
 import "server-only";
 
+import { headers } from "next/headers";
+
 import { resolveQStanding } from "@/features/q/context";
 
 import { machineUiText } from "./machine";
@@ -12,7 +14,7 @@ export async function serverUiLanguage(): Promise<UiLanguage> {
   let language: UiLanguage;
   try {
     const standing = await resolveQStanding();
-    language = uiLanguageOf(standing?.language);
+    language = uiLanguageOf(standing?.language, await deviceLanguages());
   } catch {
     language = "en";
   }
@@ -21,6 +23,18 @@ export async function serverUiLanguage(): Promise<UiLanguage> {
   // Synchronous server components below read it (serverTNow).
   rememberServerLanguage(language);
   return language;
+}
+
+/**
+ * The browser's languages, for Automatic (QO-45). Read from the request;
+ * none (a prerender, a missing header) is English.
+ */
+export async function deviceLanguages(): Promise<string | null> {
+  try {
+    return (await headers()).get("accept-language");
+  } catch {
+    return null;
+  }
 }
 
 /** A translator for a server component. */

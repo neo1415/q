@@ -175,7 +175,14 @@ export async function drainPendingWrites(
             .recordAttempt(write.id, failure.code)
             .catch(() => undefined);
           if (failure.kind === "WAITING") {
-            waiting.push(write);
+            if (write.attempts + 1 >= WAITING_ATTEMPTS_MAX) {
+              // Never opened: no longer tried, and nothing to tell them.
+              await ports
+                .settle(write.id, "REFUSED", failure.code)
+                .catch(() => undefined);
+            } else {
+              waiting.push(write);
+            }
           } else {
             stillPending.push(write.stepKey);
             down = true;
@@ -256,3 +263,23 @@ export function waitsForContext(error: unknown): boolean {
     )
   );
 }
+
+/**
+ * QA QO-26 (23 Oct 2026): the refusal says the step is not on their path
+ * YET (the raise amount, said before they said they are raising). Held
+ * and saved once the step opens, so Q neither loses nor re-asks it.
+ */
+export function waitsForStep(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const problem: unknown = Reflect.get(error, "problem") ?? error;
+  if (typeof problem !== "object" || problem === null) return false;
+  const detail: unknown = Reflect.get(problem, "detail");
+  return typeof detail === "string" && detail.includes("(STEP_NOT_ELIGIBLE)");
+}
+
+/**
+ * A change waiting on another step is retried at most this many times: a
+ * step that never opens on their path (revenue, for a pre-seed company)
+ * stops being tried, quietly; the fact stays in their own notes.
+ */
+export const WAITING_ATTEMPTS_MAX = 30;

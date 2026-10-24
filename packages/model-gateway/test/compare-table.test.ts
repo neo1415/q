@@ -291,3 +291,31 @@ describe("the table is the companies the question names", () => {
     ]);
   });
 });
+
+describe("the reader's comparison decides, never the words", () => {
+  const cards = [
+    { companyId: MIZAN, name: "Mizan" },
+    { companyId: SILO, name: "Silo Credit" },
+    { companyId: "c3", name: "Kora" },
+  ];
+  it("a count over the cards, in words no pattern knows", () => {
+    expect(asksToCompare("Lequel des trois est le meilleur ?")).toBe(false);
+    expect(
+      compareTargets("Lequel des trois est le meilleur ?", cards, {
+        count: 3,
+        names: [],
+      }),
+    ).toEqual([MIZAN, SILO, "c3"]);
+  });
+  it("the names it heard, in their order", () => {
+    expect(
+      compareTargets("which is better?", cards, {
+        count: null,
+        names: ["Kora", "Mizan"],
+      }),
+    ).toEqual(["c3", MIZAN]);
+  });
+  it("no comparison read: nothing, whatever the words", () => {
+    expect(compareTargets("tell me about Kora", cards)).toEqual([]);
+  });
+});

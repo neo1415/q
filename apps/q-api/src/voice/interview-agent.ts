@@ -645,7 +645,7 @@ export function turnNotesFor(input: {
     }
     if ((held.waiting ?? []).length > 0) {
       notes.push(
-        `Kept from what they told you, NOT saved yet because their firm or company is not set up yet: ${list(held.waiting ?? [])}. They save by themselves once it is. Never say these are saved, never ask them again, and ask only for what setting it up still needs.`,
+        `Kept from what they told you, NOT saved yet because another answer comes first (their firm or company being set up, or a question it depends on): ${list(held.waiting ?? [])}. They save by themselves once it is answered. Never say these are saved and never ask them again; ask only for what comes first.`,
       );
     }
   }

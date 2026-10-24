@@ -283,6 +283,59 @@ describe("readiness service", () => {
     };
   }
 
+  it("QO-38: a raise and customers told in setup read as stated, never absent, and a recorded raise wins", async () => {
+    const stated = () =>
+      Promise.resolve({
+        raise: {
+          target: "1500000 USD",
+          useOfFunds: false,
+          instrument: true,
+          valuation: false,
+          targetCloseDate: false,
+        },
+        claims: [
+          {
+            id: "stated:traction.customer_count",
+            claimType: "customers",
+            claimKey: "traction.customer_count",
+            statement: "320 paying customers",
+            truthClass: "USER_CLAIM" as const,
+            evidenceStatus: "SELF_REPORTED" as const,
+            lifecycleStatus: "CURRENT" as const,
+            stated: true as const,
+          },
+        ],
+      });
+    const told = await createReadinessService({
+      store: memoryStore(),
+      ownCompanyId: () => Promise.resolve(COMPANY),
+      stated,
+    }).read(actor);
+    expect(ReadinessDtoSchema.parse(told)).toBeTruthy();
+    const text = JSON.stringify(told);
+    expect(text).toContain("Target 1500000 USD");
+    expect(text).toContain("320 paying customers");
+    expect(text).toContain("You told Q this; not yet confirmed");
+    expect(text).not.toContain("stated:traction");
+
+    const recorded = await createReadinessService({
+      store: memoryStore(),
+      ownCompanyId: () => Promise.resolve(COMPANY),
+      raise: () =>
+        Promise.resolve({
+          target: "2000000 USD",
+          useOfFunds: true,
+          instrument: true,
+          valuation: false,
+          targetCloseDate: false,
+        }),
+      stated,
+    }).read(actor);
+    const recordedText = JSON.stringify(recorded);
+    expect(recordedText).toContain("Target 2000000 USD");
+    expect(recordedText).not.toContain("Target 1500000 USD");
+  });
+
   it("is null for anyone without their own company (investors included)", async () => {
     const service = createReadinessService({
       store: memoryStore(),

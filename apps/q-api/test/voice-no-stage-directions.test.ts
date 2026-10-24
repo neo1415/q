@@ -88,3 +88,13 @@ describe("stage directions and written laughs are never spoken", () => {
     expect(BACKCHANNEL_INSTRUCTIONS).toMatch(/never the word "ha"/u);
   });
 });
+
+describe("a data label on a name is not said aloud (F-62)", () => {
+  it("drops '(fictional)' and '(demo)' from spoken text, and keeps every other parenthesis", () => {
+    expect(
+      speakable("Savanna Seed Partners (fictional) has seven relationships."),
+    ).toBe("Savanna Seed Partners has seven relationships.");
+    expect(speakable("Kora (Demo) leads.")).toBe("Kora leads.");
+    expect(speakable("Revenue (unaudited) is up.")).toContain("(unaudited)");
+  });
+});
