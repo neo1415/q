@@ -415,6 +415,46 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
   });
 });
 
+describe("Moving holds only what is moving (QA F-104)", () => {
+  it("lists a failed job under Stopped this week with the failed dot, not as running", async () => {
+    const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
+    const fixtures = workforceFixtures(Date.now());
+    const running = fixtures.jobs.find(
+      (one) => one.job.goal === "Intro to Kestrel Heat",
+    );
+    if (running === undefined) throw new Error("fixture missing");
+    const failed = {
+      ...running,
+      job: {
+        ...running.job,
+        id: "f0000000-0000-4000-8000-0000000000f1",
+        goal: "Make me a 12-month plan",
+        status: "FAILED" as const,
+      },
+    };
+    render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={null}
+        workforce={{ overview: fixtures.overview, jobs: [running, failed] }}
+      />,
+    );
+    const moving = document.querySelector("[data-work-running]");
+    if (!(moving instanceof HTMLElement)) throw new Error("no Moving");
+    expect(within(moving).getByText("Stopped this week")).toBeTruthy();
+    const dot = within(moving)
+      .getByText("Make me a 12-month plan")
+      .closest("button")
+      ?.querySelector("[data-status]");
+    expect(dot?.getAttribute("data-status")).toBe("failed");
+    expect(dot?.textContent).toBe("Failed");
+    // The running job keeps its place above the line.
+    expect(within(moving).getByText("Intro to Kestrel Heat")).toBeTruthy();
+  });
+});
+
 describe("How Q is handling it and Cost (options 2 and 3, 2026-10-21)", () => {
   it("shows each piece of Q's work as its plan, and the month day by day", async () => {
     const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
