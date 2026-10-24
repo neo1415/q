@@ -101,7 +101,8 @@ export const DiscoveredCounterpartSchema = z
 export const DiscoverCounterpartsOutputSchema = z
   .object({
     outcome: z.enum(["FOUND", "NONE", "UNAVAILABLE"]),
-    candidates: z.array(DiscoveredCounterpartSchema).max(5),
+    // Up to five asked for, and two public finds beside known firms.
+    candidates: z.array(DiscoveredCounterpartSchema).max(7),
     countries: z.array(z.string().length(2)).max(40),
     regionWords: z.array(z.string().max(40)).max(4),
     webSearched: z.boolean(),

@@ -43,6 +43,9 @@ import { externalPersonIdFor } from "./person-search.js";
 export const DISCOVERY_WEB_BUDGET_MS = 3_000;
 export const DISCOVERY_COUNT = { default: 3, max: 5 } as const;
 
+/** Public finds named beside known firms that already fill the count. */
+export const PUBLIC_BESIDE = 2;
+
 export type CounterpartAsk = {
   readonly tenantId: string;
   readonly userId: string;
@@ -574,7 +577,12 @@ export function createCounterpartDiscovery(dependencies: {
       let webQuery: string | null = null;
       let webFailed = false;
       const missing = count - picked.length;
-      if (missing > 0 && web !== null) {
+      // Coordinator 2026-10-24 ("Find me three venture capital firms based in
+      // Qatar" named only the prepared three): the public search runs even
+      // when the known firms fill the count, and adds up to two found beside
+      // them, said to be public and unconfirmed.
+      const webWanted = Math.max(missing, Math.min(PUBLIC_BESIDE, count));
+      if (web !== null) {
         webSearched = true;
         // Owner's own conversation (2026-10-24): a discovery is searched as
         // a discovery -- the kind asked for, the place and the sector, in a
@@ -686,7 +694,7 @@ export function createCounterpartDiscovery(dependencies: {
           }
           const retrievedAt = new Date(now()).toISOString();
           const made = await Promise.all(
-            finds.slice(0, missing).map(async (find) => {
+            finds.slice(0, webWanted).map(async (find) => {
               const sources = [sourceOf(find, retrievedAt)];
               const subject = {
                 entityKind: find.kind,
@@ -769,7 +777,7 @@ export function createCounterpartDiscovery(dependencies: {
         picked.push(opener.candidate);
       }
 
-      const final = picked.slice(0, count);
+      const final = picked.slice(0, count + PUBLIC_BESIDE);
       return {
         outcome:
           final.length > 0 ? "FOUND" : webFailed ? "UNAVAILABLE" : "NONE",
