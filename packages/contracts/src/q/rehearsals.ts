@@ -175,6 +175,9 @@ export const REHEARSAL_OUTCOMES = [
   "FOUNDER_ENDED",
 ] as const;
 export const RehearsalOutcomeSchema = z.enum(REHEARSAL_OUTCOMES);
+/** What a played line does in the meeting (reference values). */
+export const REHEARSAL_STANCES = ["ASKS", "DISAGREES", "DECIDES"] as const;
+export type RehearsalStance = (typeof REHEARSAL_STANCES)[number];
 export type RehearsalOutcome = z.infer<typeof RehearsalOutcomeSchema>;
 
 export const QRehearsalTurnDtoSchema = z
@@ -204,6 +207,12 @@ export const QRehearsalTurnDtoSchema = z
       )
       .max(6)
       .optional(),
+    /**
+     * Owner 2026-10-24 (rehearsal room): what the played person's line does
+     * -- asks, disagrees or decides -- as the model that wrote it said;
+     * null when it does none. Absent on their own lines and older rows.
+     */
+    stance: z.enum(REHEARSAL_STANCES).nullable().optional(),
   })
   .strict();
 export type QRehearsalTurnDto = z.infer<typeof QRehearsalTurnDtoSchema>;

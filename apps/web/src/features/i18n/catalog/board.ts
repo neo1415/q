@@ -23,6 +23,9 @@ export const BOARD_AR: Readonly<Record<string, string>> = {
   "Take off your board": "إزالة من لوحتك",
   due: "الاستحقاق",
   "added by Q": "أضافه Q",
+  // Rehearsal end card (owner 2026-10-24).
+  "Save notes to my board": "احفظ الملاحظات في لوحتي",
+  "Saved to your board.": "حُفظت في لوحتك.",
   "Q is working on it": "Q يعمل عليه",
   "Q finished this": "أنهى Q هذا",
   "moved to": "نُقل إلى",

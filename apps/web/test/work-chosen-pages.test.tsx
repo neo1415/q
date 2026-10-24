@@ -233,19 +233,48 @@ describe("the rehearsal review", () => {
     endedAt: "2026-10-01T10:14:00.000Z",
   };
 
+  const part = (selector: string): HTMLElement => {
+    const found = document.querySelector<HTMLElement>(selector);
+    if (found === null) throw new Error(`nothing matches ${selector}`);
+    return found;
+  };
+
   it("ties a note to the line it is about, and says when it is about the whole", () => {
     render(<RehearsalReview rehearsal={rehearsal} />);
     expect(screen.getByText("7.2")).toBeTruthy();
     expect(screen.getByText("Up 0.8 since last time (6.4)")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /The ask was vague/u }));
+    // The feedback list (the end card names the same moments above it).
+    const feedback = within(part("[data-review-feedback]"));
+    fireEvent.click(
+      feedback.getByRole("button", { name: /The ask was vague/u }),
+    );
     expect(
       document.querySelector("[data-lit]")?.getAttribute("data-line"),
     ).toBe("1");
-    fireEvent.click(screen.getByRole("button", { name: /Overall pacing/u }));
+    fireEvent.click(feedback.getByRole("button", { name: /Overall pacing/u }));
     expect(document.querySelector("[data-lit]")).toBeNull();
     expect(
       screen.getByText("About the rehearsal as a whole, not one line."),
     ).toBeTruthy();
+  });
+
+  // Owner 2026-10-24: the end card -- how long, the strongest and weakest
+  // moments with when they were said, and the notes kept on the board.
+  it("ends with a card of its moments and a way to keep them", () => {
+    render(<RehearsalReview rehearsal={rehearsal} />);
+    const end = within(part("[data-end-card]"));
+    expect(end.getByText("How it went")).toBeTruthy();
+    expect(end.getByText("Strongest moments")).toBeTruthy();
+    expect(end.getByText("To work on")).toBeTruthy();
+    expect(end.getByText("Owned the lack of a lead.")).toBeTruthy();
+    expect(
+      end.getByRole("button", { name: "Save notes to my board" }),
+    ).toBeTruthy();
+    // A moment about no one line has no time and opens nothing.
+    expect(end.getByRole("button", { name: /Overall pacing/u })).toHaveProperty(
+      "disabled",
+      true,
+    );
   });
 
   it("has nothing to review when they left before answering", () => {

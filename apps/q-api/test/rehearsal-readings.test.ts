@@ -4,7 +4,7 @@ import {
   CounterpartPersonaStoredSchema,
   PresenceReadingSchema,
   RehearsalReviewResultSchema,
-  RehearsalTurnV9ResultSchema,
+  RehearsalTurnV10ResultSchema,
 } from "@capital-q/q-core";
 
 import {
@@ -67,6 +67,7 @@ const TURN = {
   wantsToEnd: false,
   onlyNoise: false,
   beats: [{ mood: "SKEPTICAL", intensity: "NORMAL" }],
+  stance: "ASKS",
 };
 
 const REVIEW = {
@@ -169,8 +170,17 @@ describe("rehearsal readings never refuse whole for one field", () => {
         "an empty list",
       ].includes(how);
     expect(
-      fuzz(TURN, readTurn, RehearsalTurnV9ResultSchema, words),
+      fuzz(TURN, readTurn, RehearsalTurnV10ResultSchema, words),
     ).toBeGreaterThan(100);
+  });
+
+  // Owner 2026-10-24 (rehearsal room): the line's own stance travels; an
+  // unknown or absent one is none, never guessed.
+  it("turn: the stance is read as said, and none when unreadable", () => {
+    expect(readTurn(TURN)?.stance).toBe("ASKS");
+    expect(readTurn({ ...TURN, stance: "AGREES" })?.stance).toBeNull();
+    const { stance: _dropped, ...without } = TURN;
+    expect(readTurn(without)?.stance).toBeNull();
   });
 
   it("presence: every field perturbed alone is still a reading", () => {

@@ -14,10 +14,11 @@ import {
   REHEARSAL_LINE_MOODS_V4,
   REHEARSAL_MOVES,
   REHEARSAL_RATINGS,
+  REHEARSAL_STANCES,
   type CounterpartPersonaStored,
   type PresenceReading,
   type RehearsalReviewResult,
-  type RehearsalTurnV9Result,
+  type RehearsalTurnV10Result,
 } from "@capital-q/q-core";
 
 /**
@@ -225,7 +226,7 @@ export function readPresence(raw: unknown): PresenceReading | null {
 }
 
 /** A played line: null only when there are no words to say. */
-export function readTurn(raw: unknown): RehearsalTurnV9Result | null {
+export function readTurn(raw: unknown): RehearsalTurnV10Result | null {
   if (!isRecord(raw)) return null;
   const onlyNoise = flag(raw["onlyNoise"], false);
   const line = text(raw["line"], 700, "");
@@ -257,13 +258,15 @@ export function readTurn(raw: unknown): RehearsalTurnV9Result | null {
     onlyNoise,
     screenNote: readScreenNote(raw["screenNote"]),
     beats: readBeats(raw["beats"]),
+    // v14: what the line does (asks, disagrees, decides); null when unsaid.
+    stance: labelOrNull(raw["stance"], REHEARSAL_STANCES),
   };
 }
 
 /** v13: per-sentence delivery; anything unreadable is left out, never guessed. */
-function readBeats(raw: unknown): RehearsalTurnV9Result["beats"] {
+function readBeats(raw: unknown): RehearsalTurnV10Result["beats"] {
   if (!Array.isArray(raw)) return [];
-  const beats: RehearsalTurnV9Result["beats"][number][] = [];
+  const beats: RehearsalTurnV10Result["beats"][number][] = [];
   for (const entry of raw.slice(0, REHEARSAL_BEATS_MAX)) {
     if (!isRecord(entry)) return [];
     const mood = labelOrNull(entry["mood"], REHEARSAL_LINE_MOODS_V4);
