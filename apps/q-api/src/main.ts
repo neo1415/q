@@ -21,6 +21,7 @@ import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
+import { createOwnResearchSubject } from "./composition/workforce/own-subject.js";
 import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
 import { createOwnContextReader } from "./composition/workforce/own-context.js";
 import { withWaitingPlans } from "./composition/workforce/waiting-plans.js";
@@ -1826,6 +1827,8 @@ const workforcePortsFor = createWorkforcePorts(
     research: workforceDeepResearch({
       service: researchComposition.research,
       models: workforceModels,
+      // "My company": its name, country and declared sectors, as theirs.
+      ownSubject: createOwnResearchSubject(database.sql),
       logger,
     }),
     writeReply: async (input) =>

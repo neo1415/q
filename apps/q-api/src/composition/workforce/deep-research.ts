@@ -14,9 +14,11 @@ import {
   type ProposedFact,
   type PublicWebResearchService,
 } from "@capital-q/q-research";
+import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
 import type { ResearchFound } from "./jobs.js";
+import { subjectLines, type OwnResearchSubject } from "./own-subject.js";
 import type { WorkforceModels } from "./models.js";
 import type { WorkforcePortServices } from "./ports.js";
 
@@ -170,6 +172,13 @@ export function workforceDeepResearch(dependencies: {
   readonly now?: (() => number) | undefined;
   readonly deadlineMs?: number | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * Live 2026-10-24: their own company's name, country and declared
+   * sectors (own-subject.ts), for a request about "my company". Null or
+   * absent: the request alone.
+   */
+  readonly ownSubject?:
+    ((actor: ActorContext) => Promise<OwnResearchSubject | null>) | undefined;
 }): WorkforcePortServices["research"] {
   const service = dependencies.service;
   if (service === undefined) return undefined;
@@ -194,12 +203,16 @@ export function workforceDeepResearch(dependencies: {
     const today = new Date(started).toISOString().slice(0, 10);
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
 
-    // 1. The questions, planned by meaning from their request only.
+    // 1. The questions, planned by meaning from their request and, for
+    // their own company, its name, country and declared sectors only.
+    const own = subjectLines(
+      (await dependencies.ownSubject?.(input.actor).catch(() => null)) ?? null,
+    );
     let questions: DeepResearchQuestion[] = [];
     const planned = await models.planResearch(who, trace, {
       request,
       purpose: input.query.slice(0, 600),
-      subject: "Only what the request itself says.",
+      subject: own.text.slice(0, 1_200),
       today,
     });
     spend.charge(planned?.costUsd ?? null, 0.04);
@@ -232,6 +245,8 @@ export function workforceDeepResearch(dependencies: {
       correlationId,
       request,
       questions,
+      // Their own company's identity may travel (their own facts).
+      ...(own.terms.length === 0 ? {} : { publicTerms: own.terms }),
       deadlineAt: started + deadlineMs * 0.55,
       pagesPerQuestion: PAGES_PER_LANE,
     });
@@ -308,7 +323,7 @@ export function workforceDeepResearch(dependencies: {
         correlationId,
         request,
         questions: second,
-        publicTerms: publicTermsOf(first.sources),
+        publicTerms: [...own.terms, ...publicTermsOf(first.sources)],
         known: first.sources,
         deadlineAt: started + deadlineMs * 0.8,
         pagesPerQuestion: 3,

@@ -37,8 +37,12 @@ export const ResearchPlanVariablesSchema = z
     request: z.string().min(1).max(4_000),
     /** The plan step's goal. UNTRUSTED. */
     purpose: z.string().max(600),
-    /** What is publicly known about the subject (its public name). UNTRUSTED. */
-    subject: z.string().max(400),
+    /**
+     * The subject as they may search for it: for their own company, its
+     * name, country, declared sectors and own description. UNTRUSTED.
+     * (1,200 since 2026-10-24: 400 cut the description off.)
+     */
+    subject: z.string().max(1_200),
     today: z.string().min(1).max(40),
   })
   .strict();

@@ -1216,3 +1216,66 @@ describe("waiting cards' own plans (waiting-plans.ts)", () => {
     );
   });
 });
+
+describe("live 2026-10-24: research for 'my company' knows which company", () => {
+  it("plans with their own company's identity and lets its words travel, never figures", async () => {
+    const searched: string[] = [];
+    const provider = topicalProvider();
+    const service = createPublicWebResearchService({
+      provider: {
+        ...provider,
+        search: (request, context) => {
+          searched.push(request.query);
+          return provider.search(request, context);
+        },
+      },
+    });
+    const planInputs: { subject: string }[] = [];
+    const research = workforceDeepResearch({
+      service,
+      ownSubject: () =>
+        Promise.resolve({
+          name: "Maji Loop",
+          country: "KE",
+          sectors: ["Clean Energy"],
+          description:
+            "Kiosks with solar pumping and filtration sell clean water in Nairobi's informal settlements; 96 kiosks today.",
+        }),
+      models: {
+        planResearch: (_who, _trace, input) => {
+          planInputs.push({ subject: input.subject });
+          return Promise.resolve({
+            costUsd: 0.01,
+            output: {
+              questions: [
+                {
+                  lane: "MARKET_SIZE",
+                  query: "Kenya water kiosks market size 96",
+                  alsoQuery: null,
+                  recent: false,
+                },
+              ],
+            },
+          });
+        },
+        researchFacts: () =>
+          Promise.resolve({
+            costUsd: 0.01,
+            output: { facts: [], followUps: [] },
+          }),
+      },
+    });
+    const found = await research?.({
+      actor,
+      runId: randomUUID(),
+      request: "Write me a short 12-month growth plan for my company",
+      query: "Their market, competitors and context",
+    });
+    expect(found?.status).toBe("OK");
+    expect(planInputs[0]?.subject).toContain("Maji Loop (Kenya)");
+    expect(planInputs[0]?.subject).toContain("solar pumping");
+    // The company's own words travel; its figure never does.
+    expect(searched).toContain("kenya water kiosks market size");
+    expect(searched.join(" ")).not.toContain("96");
+  });
+});
