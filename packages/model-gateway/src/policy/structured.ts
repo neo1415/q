@@ -94,6 +94,30 @@ function valueAt(root: unknown, path: readonly PropertyKey[]): unknown {
   return node;
 }
 
+/**
+ * A prose field: a string bound this long or longer is text for a person
+ * to read (an answer, a section body), not an id or a code, and an
+ * over-long one is clipped rather than refused.
+ */
+const PROSE_MIN_BOUND = 200;
+
+/**
+ * Prose cut to its bound at the last paragraph or sentence end in its
+ * second half, else at the last space with an ellipsis: never mid-word.
+ */
+export function clipProse(text: string, max: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+  const room = trimmed.slice(0, max);
+  let end = -1;
+  for (const match of room.matchAll(/[.!?…)\]"'’”](?=\s)|\n\n/gu)) {
+    end = match.index + (match[0] === "\n\n" ? 0 : match[0].length);
+  }
+  if (end >= max / 2) return room.slice(0, end).trimEnd();
+  const space = room.slice(0, max - 1).lastIndexOf(" ");
+  return `${room.slice(0, space > max / 2 ? space : max - 1).trimEnd()}…`;
+}
+
 // Which field names were unexpected, when that is the refusal: a field
 // name, bounded, never a value the model wrote (live 2026-09-30: every
 // ASSESS answer refused as "(root):unrecognized_keys", with no way to see
@@ -163,6 +187,12 @@ export function acceptStructuredOutput<T>(
      * paid two more full model rounds (~31 s) to say the same thing.
      */
     readonly unknownRootKeys?: "REFUSE" | "DROP" | undefined;
+    /**
+     * Prose (a string bound at PROSE_MIN_BOUND characters or more) longer
+     * than its bound: CLIP (the default) cuts it at a sentence end and
+     * keeps the object; REFUSE refuses it.
+     */
+    readonly overlongProse?: "CLIP" | "REFUSE" | undefined;
   } = {},
 ): StructuredOutcome<T> {
   const fenced = FENCE.exec(text);
@@ -194,6 +224,55 @@ export function acceptStructuredOutput<T>(
         decoded = record;
         lenientDropped.push(`(root):unrecognized_keys:${unknown.size}`);
       }
+    }
+  }
+  // QA 2026-10-24 (run 4c314618): a long, correct answer was refused as
+  // "answer:too_big", then "sections.0.body:too_big", and thrown away for
+  // its length. Prose over its bound is clipped and kept; ids, codes and
+  // list lengths are still refused.
+  if (
+    options.overlongProse !== "REFUSE" &&
+    decoded !== null &&
+    typeof decoded === "object"
+  ) {
+    let probe = schema.safeParse(decoded);
+    let clipped: unknown = null;
+    for (let pass = 0; pass < DROP_PASSES_MAX && !probe.success; pass += 1) {
+      let changed = false;
+      for (const issue of probe.error.issues as readonly (Issue & {
+        readonly origin?: string;
+        readonly maximum?: unknown;
+      })[]) {
+        if (
+          issue.code !== "too_big" ||
+          issue.origin !== "string" ||
+          typeof issue.maximum !== "number" ||
+          issue.maximum < PROSE_MIN_BOUND
+        ) {
+          continue;
+        }
+        clipped ??= structuredClone(decoded);
+        const parent = valueAt(clipped, issue.path.slice(0, -1));
+        const key = issue.path.at(-1);
+        if (
+          parent === null ||
+          typeof parent !== "object" ||
+          key === undefined
+        ) {
+          continue;
+        }
+        const value = (parent as Record<PropertyKey, unknown>)[key];
+        if (typeof value !== "string") continue;
+        (parent as Record<PropertyKey, unknown>)[key] = clipProse(
+          value,
+          issue.maximum,
+        );
+        lenientDropped.push(`${describe(issue)}:clipped`);
+        changed = true;
+      }
+      if (!changed || clipped === null) break;
+      decoded = clipped;
+      probe = schema.safeParse(decoded);
     }
   }
   const lenient = options.lenientFields ?? [];
