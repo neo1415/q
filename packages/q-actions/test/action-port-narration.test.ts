@@ -388,6 +388,7 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
   const build = (
     cards: readonly { proposalId: string; summary: string; status: string }[],
     result: Record<string, unknown> = {},
+    actionType = "app.diligence.document.share",
   ) => {
     const said: string[] = [];
     const logged: unknown[] = [];
@@ -405,7 +406,10 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
           ...result,
         } as never),
       ),
-      proposer: proposer({ actionType: "app.diligence.change", payload: {} }),
+      proposer: proposer({ actionType, payload: {} }),
+      // Coordinator 2026-10-24: other cards are named only beside a new
+      // card the other side receives.
+      outward: (type) => type === "app.diligence.document.share",
       narrator: {
         proposed: (_run, action) => {
           said.push(proposedLine(action.summary));
@@ -456,6 +460,47 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
         reason: "other card waiting",
       }),
     ]);
+  });
+
+  it("beside a new card of their own (not outward), no other card is named", async () => {
+    const { port, said, logged } = build(
+      [
+        {
+          proposalId: RAISE,
+          summary: "Share your raise with Savanna Seed Partners (fictional)",
+          status: "PENDING",
+        },
+      ],
+      {},
+      "app.diligence.change",
+    );
+    expect((await port.prepare(context)).kind).toBe("AWAITING_APPROVAL");
+    expect(said).toHaveLength(1);
+    expect(logged).toEqual([
+      expect.objectContaining({
+        outcome: "skipped",
+        reason: "not an outward card",
+      }),
+    ]);
+  });
+
+  it("several waiting: one short line, the latest and how many more", async () => {
+    const { port, said } = build([
+      {
+        proposalId: "a1",
+        summary: "Express interest in Mizan",
+        status: "PENDING",
+      },
+      {
+        proposalId: RAISE,
+        summary: "Share your raise with Savanna Seed Partners (fictional)",
+        status: "PENDING",
+      },
+    ]);
+    await port.prepare(context);
+    expect(said.at(-1)).toBe(
+      "Still waiting for your approval: Share your raise with Savanna Seed Partners (and 1 more).",
+    );
   });
 
   it("a card this result superseded, or one already decided, is not named", async () => {
