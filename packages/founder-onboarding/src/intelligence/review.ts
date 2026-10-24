@@ -18,6 +18,7 @@ import {
   factKeyForStep,
   stepForFactKey,
 } from "./mapping.js";
+import { isAccountHoldersOwn } from "./account-holder.js";
 import { planFollowUpQuestions } from "./planner.js";
 import { draftSuggestions } from "./suggestions.js";
 
@@ -222,6 +223,11 @@ export type FounderReviewCommand = {
   /** The unit of work, carried through to the model call's attribution. */
   readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * The name of the person on the account, when known. A role the material
+   * gives someone is offered as theirs only when it names them (F-74).
+   */
+  readonly accountName?: string | null | undefined;
 };
 
 export function createFounderReview(dependencies: FounderReviewDependencies): {
@@ -267,7 +273,8 @@ export function createFounderReview(dependencies: FounderReviewDependencies): {
       const fresh = outcome.candidates.filter(
         (candidate) =>
           !facts.answered.has(candidate.key) &&
-          !facts.suggested.has(candidate.key),
+          !facts.suggested.has(candidate.key) &&
+          isAccountHoldersOwn(candidate, command.accountName ?? null),
       );
 
       const suggestions = draftSuggestions(fresh);
