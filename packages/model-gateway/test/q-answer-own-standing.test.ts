@@ -882,6 +882,30 @@ describe("what exists, and the parity gap", () => {
     }
   });
 
+  // QA I18 (batch-7 re-score, run de5e799d): "What happened in my last
+  // meeting…?" opened "I couldn't prepare the Clinicrest reply from this
+  // conversation." A turn that asked for and tried no action has no failure
+  // of its own to report.
+  it("never opens a question's answer with an earlier turn's failure", async () => {
+    const asked = async (turnKind: "QUESTION_TO_Q" | "TOOL_REQUEST") => {
+      const { seam, request, persisted } = build(
+        { status: "SUCCEEDED", data: CONNECTED },
+        undefined,
+        {},
+        {
+          said: "What happened in my last meeting, and what are my action items?",
+          answer:
+            "I couldn't prepare the Clinicrest reply from this conversation. No meeting is recorded yet.",
+        },
+      );
+      await seam.answer({ ...request, turnKind });
+      return persisted.join("\n");
+    };
+    const question = await asked("QUESTION_TO_Q");
+    expect(question).not.toContain("couldn't prepare");
+    expect(question).toContain("No meeting is recorded yet.");
+  });
+
   it("never says a change was made beside the line that says nothing was (Zino run 50159909)", async () => {
     const { seam, request, persisted } = build(
       { status: "SUCCEEDED", data: CONNECTED },

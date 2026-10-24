@@ -1,4 +1,8 @@
 import type { CompanyQualificationProjectionPort } from "@capital-q/gateq";
+import {
+  publishedFitOf,
+  type FounderFacts,
+} from "@capital-q/investor-onboarding";
 import type { PublicIdentityService } from "@capital-q/public-identity";
 import type { InvestorSectorFocusPort, SectorRef } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -103,6 +107,11 @@ export function createInvestorSectorFocusPort(dependencies: {
       const projection = await dependencies.projection
         .projectionFor({ tenantId: actor.tenantId, companyId: own })
         .catch(() => null);
+      const founder: FounderFacts = {
+        stageCode: projection?.currentStageCode ?? null,
+        headquartersCountry: projection?.headquartersCountry ?? null,
+        classifications: projection?.classifications ?? [],
+      };
       const company = (projection?.classifications ?? [])
         .filter((one) => one.vocabularyCode === INDUSTRY)
         .map((one) => nodeById.get(one.nodeId))
@@ -129,13 +138,14 @@ export function createInvestorSectorFocusPort(dependencies: {
           return {
             investorOrganisationId,
             sectors: resolveSectors(cardSectors(field?.value)),
+            // QA F-77: how well, by what they publish (QO-42's own rule).
+            publishedFit: publishedFitOf(card ?? null, founder),
           };
         },
       );
-      return {
-        company,
-        investors: investors.filter((one) => one.sectors.length > 0),
-      };
+      // Every investor read carries its published fit; one publishing no
+      // sector is still told on stage and geography.
+      return { company, investors };
     },
   };
 }

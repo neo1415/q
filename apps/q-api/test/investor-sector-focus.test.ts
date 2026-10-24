@@ -80,6 +80,13 @@ describe("investor sector focus", () => {
       {
         investorOrganisationId: INVESTOR,
         sectors: resolveSectors(["Fintech", "Renewables", "Water"]),
+        // QA F-77: how well, by what the card publishes (QO-42's rule);
+        // this card publishes no stage or geography, and none of its
+        // sectors is the company's: unknown stays unknown, never a no.
+        publishedFit: expect.objectContaining({
+          stage: "UNKNOWN",
+          geography: "UNKNOWN",
+        }),
       },
     ]);
     expect(cardForSubject).toHaveBeenCalledWith({

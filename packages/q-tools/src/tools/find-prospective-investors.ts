@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { CompanyIdSchema } from "@capital-q/companies";
-import { UuidSchema, type InvestorGateFitDto } from "@capital-q/contracts";
+import {
+  PublishedFitDtoSchema,
+  UuidSchema,
+  type InvestorGateFitDto,
+} from "@capital-q/contracts";
 import {
   PROSPECT_FIT_VERSION,
   rankProspects,
@@ -134,6 +138,12 @@ const ProspectSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * QA F-77 (QO-42): how well they fit this company by what they
+     * publish on their Q Card -- stage, sector and geography each MET,
+     * NOT_MET or UNKNOWN (unknown is never a no). Their own company only.
+     */
+    publishedFit: PublishedFitDtoSchema.optional(),
   })
   .strict();
 
@@ -471,6 +481,13 @@ export function createFindProspectiveInvestorsTool(
           one.sectors,
         ]),
       );
+      const published = new Map(
+        (focus?.investors ?? []).flatMap((one) =>
+          one.publishedFit === undefined
+            ? []
+            : [[one.investorOrganisationId, one.publishedFit] as const],
+        ),
+      );
       const resolve = ports.investorSectorFocus?.resolve ?? (() => [] as const);
       // A published sector the company is in comes first, then those
       // that publish none, then those whose sector it is not (owner
@@ -494,21 +511,25 @@ export function createFindProspectiveInvestorsTool(
         fitVersion: PROSPECT_FIT_VERSION,
         companySource: grant.source,
         compared,
-        prospects: ordered.map(({ prospect, sector }) => ({
-          investorOrganisationId: prospect.investorOrganisationId,
-          name: prospect.displayName,
-          investorType: prospect.investorType,
-          hqCountry: prospect.hqCountry,
-          publicDescription: prospect.publicDescription,
-          websiteUrl: prospect.websiteUrl,
-          deploymentState: prospect.deploymentState,
-          reasons: prospect.reasons.map((reason) => ({ ...reason })),
-          label: "likely fit, not evidence of interest" as const,
-          gate: gateWords(gates.get(prospect.investorOrganisationId)),
-          ...(sector.fit === "UNKNOWN" && sector.focus === null
-            ? {}
-            : { sector: sectorOut(sector) }),
-        })),
+        prospects: ordered.map(({ prospect, sector }) => {
+          const fit = published.get(prospect.investorOrganisationId);
+          return {
+            investorOrganisationId: prospect.investorOrganisationId,
+            name: prospect.displayName,
+            investorType: prospect.investorType,
+            hqCountry: prospect.hqCountry,
+            publicDescription: prospect.publicDescription,
+            websiteUrl: prospect.websiteUrl,
+            deploymentState: prospect.deploymentState,
+            reasons: prospect.reasons.map((reason) => ({ ...reason })),
+            label: "likely fit, not evidence of interest" as const,
+            gate: gateWords(gates.get(prospect.investorOrganisationId)),
+            ...(sector.fit === "UNKNOWN" && sector.focus === null
+              ? {}
+              : { sector: sectorOut(sector) }),
+            ...(fit === undefined ? {} : { publishedFit: fit }),
+          };
+        }),
         notes:
           slate.items.length === 0
             ? [

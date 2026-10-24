@@ -17,7 +17,10 @@ import {
 } from "@capital-q/security";
 
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
-import { publishedFitOf, type FounderFacts } from "../src/published-fit.js";
+import {
+  publishedFitOf,
+  type FounderFacts,
+} from "@capital-q/investor-onboarding";
 
 /**
  * QO-42 (owner QA 2026-10-23): a founder saw "not known yet" for stage,

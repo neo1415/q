@@ -47,6 +47,12 @@ export type InvestorSectorFocusPort = {
     readonly investors: readonly {
       readonly investorOrganisationId: string;
       readonly sectors: readonly SectorRef[];
+      /**
+       * QO-42 / QA F-77: their published card's stage, sector and
+       * geography against this company (met, not met, unknown). Absent:
+       * not read.
+       */
+      readonly publishedFit?: PublishedFitDto | undefined;
     }[];
   }>;
   readonly resolve: (names: readonly string[]) => readonly SectorRef[];
@@ -72,6 +78,7 @@ import type {
   RelationshipSummaryDto,
   VisibilityStateDto,
   QDocumentEdit,
+  PublishedFitDto,
 } from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
