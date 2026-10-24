@@ -199,6 +199,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL_INVESTORS: "Capital (Investors)",
   CRM_PIPELINE: "CRM (Pipeline)",
   Q_PITCH: "Q Pitch",
+  BOARD: "Work (Board)",
 };
 
 /** Where the person is, in their terms (R21). */

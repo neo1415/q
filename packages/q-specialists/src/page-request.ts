@@ -52,6 +52,9 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   q: d("HOME"),
   "q room": d("HOME"),
   "ask q": d("HOME"),
+  // Work-board lane (2026-10-23): their own work board, a Work tab.
+  board: d("BOARD"),
+  "work board": d("BOARD"),
   // Profile
   profile: d("PROFILE"),
   "q card": d("PROFILE"),

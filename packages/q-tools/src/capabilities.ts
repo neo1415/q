@@ -322,6 +322,9 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // Q Pitch v6 (owner 2026-10-16).
   Q_PITCH:
     "Starts Q Pitch: Q presents Capital Q itself as a guided, step-by-step tour of the app, for the person's side (investor or founder).",
+  // Work-board lane (2026-10-23): their own work board, a Work tab.
+  BOARD:
+    "Opens their own work board (a Work tab): what they and Q keep and work on.",
 };
 
 /** Screens that belong to a company's own people. */

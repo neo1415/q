@@ -5,6 +5,8 @@ import {
   TURN_READER_V62,
   TurnReaderV62ResultSchema,
   V49_TEAM_JOB,
+  V61_BOARD_ASK,
+  V62_BOARD_SCREEN,
   V62_DEEP_WORK,
   V62_WORK_FROM_EARLIER,
   createDefaultPromptRegistry,
@@ -22,9 +24,14 @@ describe("TURN_READER v62", () => {
     expect(TURN_READER_V61.status).toBe("DEPRECATED");
     const added = `${V62_DEEP_WORK}${V62_WORK_FROM_EARLIER}`;
     expect(TURN_READER_V62.template).toContain(`${V49_TEAM_JOB}${added}`);
-    expect(TURN_READER_V62.template.replace(added, "")).toBe(
-      TURN_READER_V61.template,
+    expect(TURN_READER_V62.template).toContain(
+      `${V61_BOARD_ASK}${V62_BOARD_SCREEN}`,
     );
+    expect(
+      TURN_READER_V62.template.replace(added, "").replace(V62_BOARD_SCREEN, ""),
+    ).toBe(TURN_READER_V61.template);
+    expect(V62_BOARD_SCREEN).toMatch(/NAVIGATE with destination BOARD/u);
+    expect(V62_BOARD_SCREEN).toContain("open my board");
   });
 
   it("carries the analyst lane's cases, read by meaning", () => {

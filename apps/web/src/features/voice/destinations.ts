@@ -61,6 +61,8 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   // Q Pitch v6: the entry picks the track by the person's side and starts
   // it (a full load into the layout-mounted host).
   Q_PITCH: "/q-pitch?start=1",
+  // Work-board lane: their own work board, a Work tab.
+  BOARD: "/board",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

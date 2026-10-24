@@ -323,6 +323,7 @@ const DESTINATION_LABELS: Readonly<
   CAPITAL_INVESTORS: "Open your investors on Capital",
   CRM_PIPELINE: "Open your pipeline",
   Q_PITCH: "Start Q Pitch",
+  BOARD: "Open your board",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

@@ -180,6 +180,9 @@ export const Q_NAVIGATE_DESTINATIONS = [
   // Q Pitch v6 (owner 2026-10-16): Q presents Capital Q itself, a guided
   // tour on the person's own workspace (track by their side).
   "Q_PITCH",
+  // Work-board lane (2026-10-23): their own work board (/board), a Work
+  // tab ("open my board").
+  "BOARD",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

@@ -1390,6 +1390,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "CAPITAL_INVESTORS",
           "CRM_PIPELINE",
           "Q_PITCH",
+          "BOARD",
         ],
         documents: [],
         visibilityChange: false,
