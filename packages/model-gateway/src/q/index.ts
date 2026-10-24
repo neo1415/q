@@ -2946,6 +2946,7 @@ export function createModelGatewayQAnswer(
       const targets = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
+        request.compare,
       );
       if (targets.length < 2) return;
       const { names } = await prefetchToolsRead;
@@ -2977,6 +2978,7 @@ export function createModelGatewayQAnswer(
         read: runCompanies.read(request.runId),
         fits: runFits.read(request.runId),
         only: targets,
+        compareAsked: true,
       });
       const statement = table === null ? null : comparisonFactStatement(table);
       if (statement === null) return;
@@ -3523,12 +3525,22 @@ export function createModelGatewayQAnswer(
       });
       const names = [
         ...(capitalQAsked ? ["Capital Q"] : []),
+        // v62: the companies the reader heard them name for a comparison,
+        // as said, in any language (the words' own candidates follow).
+        ...(request.compare?.names ?? []),
         ...companyNameCandidates(
           latest.content,
-          asksToCompare(latest.content) ? 4 : 2,
+          request.compare !== undefined || asksToCompare(latest.content)
+            ? 4
+            : 2,
         ),
         ...lowercaseNameCandidates(latest.content),
-      ];
+      ].filter(
+        (name, index, all) =>
+          all.findIndex(
+            (other) => other.toLowerCase() === name.toLowerCase(),
+          ) === index,
+      );
       if (names.length === 0) return;
       const found = await Promise.all(
         names.map((name, index) =>
@@ -8587,6 +8599,7 @@ export function createModelGatewayQAnswer(
               read: companiesRead,
               fits: fitsRead,
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
+              ...(request.compare === undefined ? {} : { compareAsked: true }),
             });
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),

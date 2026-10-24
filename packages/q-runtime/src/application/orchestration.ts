@@ -370,6 +370,18 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * ("still waiting") -- and how many companies it asks for, null when
    * no number. Answered from the computed fit, never the public web.
    */
+  /**
+   * TURN_READER v62 (lane 8, 23 Oct 2026): they want two or more companies
+   * put side by side, as the reader understood it in any words and any
+   * language: `count` of the companies Q just showed, from the top, or the
+   * `names` they gave. Absent: not a comparison as the reader read it.
+   */
+  readonly compare?:
+    | {
+        readonly count: number | null;
+        readonly names: readonly string[];
+      }
+    | undefined;
   readonly fitQuestion?:
     | {
         readonly text: string;

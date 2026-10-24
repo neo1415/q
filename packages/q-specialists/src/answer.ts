@@ -5347,6 +5347,17 @@ export function createSpecialistQAnswer(
             },
           }
         : {}),
+      // v62: a comparison as the reader understood it (never recall: the
+      // reader drops fromShown when compare is set), so the answer builds
+      // the comparison table whatever words asked for it.
+      ...(read?.compare === undefined || read.compare === null
+        ? {}
+        : {
+            compare: {
+              count: read.compare.count,
+              names: [...read.compare.names],
+            },
+          }),
       ...(read?.kind === "QUESTION_TO_Q" && read.question?.kind === "FIT"
         ? {
             fitQuestion: {
