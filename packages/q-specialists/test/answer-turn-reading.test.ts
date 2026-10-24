@@ -245,6 +245,7 @@ function seam(options: {
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
+  const compares: unknown[] = [];
   const leads: (string | undefined)[] = [];
   let warmed = 0;
   let investigated = 0;
@@ -276,6 +277,7 @@ function seam(options: {
         leads.push(req.leadLines);
         focuses.push(req.toolFocus);
         namedOthers.push(req.aboutNamedOther);
+        compares.push(req.compare);
         capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
@@ -408,6 +410,7 @@ function seam(options: {
     stored,
     events,
     delegated: () => delegated,
+    compares,
     warmed: () => warmed,
     marked,
     message,
@@ -969,6 +972,24 @@ const advice: TurnReaderResult = {
   aboutNamedOther: false,
   tool: null,
 };
+
+// TURN_READER v62 (lane 8, 23 Oct 2026): "compare the top two in a table"
+// was answered from what Q had shown, in prose, with no table. A comparison
+// the reader read goes the full way, carrying the reading, in any words.
+describe("a comparison the reader read", () => {
+  it("is answered in full with the reading, never from what was shown", async () => {
+    // A reading carrying v62's compare (the harness takes the v1 shape).
+    const comparing = { ...advice, compare: { count: 2, names: [] } };
+    const run = seam({
+      said: "Lequel des deux est le meilleur ?",
+      reading: comparing,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.compares).toEqual([{ count: 2, names: [] }]);
+  });
+});
 
 describe("a general turn is read before it is answered", () => {
   it("researches an advice question outside an interview (founder direction 2026-09-29)", async () => {
