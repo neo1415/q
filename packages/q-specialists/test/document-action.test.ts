@@ -44,6 +44,7 @@ import {
 import type { OwnRecordNames } from "../src/company/own-names.js";
 import type { ArtifactPreparation } from "../src/company/prepare-artifact.js";
 import {
+  createToolTeamJobPort,
   teamJobLine,
   teamJobOutcomeOf,
   type QTeamJobPort,
@@ -318,6 +319,8 @@ function seam(options: {
 const ASK =
   "Generate a PDF pitch deck for Zino Aviation from what you can find publicly.";
 
+const PLAN_SENTENCE =
+  "Your Launch plan includes 30 pieces of work Q does for you a month and you've used 30. It resets on 1 November. See Plans in Settings.";
 const BOARD_JOB = "4b1c2d3e-5f60-4a7b-8c9d-0e1f2a3b4c5d";
 
 describe("a document request is done, not described (CQ-QACT-002)", () => {
@@ -1583,6 +1586,40 @@ describe("board turns after other board turns", () => {
     ]);
   });
 
+  it("F-108: work started from the board says the plan's allowance plainly, and the item stays in To do", async () => {
+    const items: Item[] = [
+      {
+        id: "a",
+        title: "Research Silo Credit's market",
+        status: "TODO",
+        createdBy: "Q",
+        createdAt: "2026-10-24T08:00:00Z",
+      },
+    ];
+    const { board } = keeper(items);
+    const s = seam({
+      history: [message("USER", "Work on the first task.")],
+      reading: reading("WORK"),
+      board: {
+        ...board,
+        work: () =>
+          Promise.resolve({
+            status: "PLAN_LIMIT",
+            working: [],
+            firstRead: null,
+            waiting: [],
+            jobId: null,
+            message: PLAN_SENTENCE,
+          }),
+      },
+    });
+    await s.run();
+    expect(s.stored[0]?.content).toBe(
+      `Your plan's allowance for Q's work this month is used, so I haven't started it and the item stays in To do. ${PLAN_SENTENCE}`,
+    );
+    expect(s.stored[0]?.blocks ?? []).toEqual([]);
+  });
+
   it("knows which open items 'work on …' means, from the board", () => {
     const at = (minute: number) =>
       `2026-10-24T08:${String(minute).padStart(2, "0")}:00Z`;
@@ -1945,6 +1982,46 @@ describe("saving work that has to start first, or never started", () => {
     propose: () => Promise.resolve(outcome),
   });
 
+  // F-108, live c8d45c628: the plan's allowance used read as "Taking on work
+  // like this isn't available on your account" or "I've reached the limit
+  // of work I can take on", which reads as Q's limit.
+  it("F-108: says whose limit it is, in the plan's own words", async () => {
+    const denied = createToolTeamJobPort({
+      tools: {
+        execute: () =>
+          Promise.resolve({
+            callId: "q-team-job",
+            toolName: "propose_q_job",
+            toolVersion: 1,
+            classification: "SIDE_EFFECT",
+            status: "DENIED",
+            failureCode: "ENTITLEMENT_REQUIRED",
+            sensitivity: null,
+            result: {
+              ok: false,
+              error: {
+                code: "ENTITLEMENT_REQUIRED",
+                safeMessage: PLAN_SENTENCE,
+              },
+            },
+            latencyMs: 3,
+          }),
+      } as never,
+    });
+    const outcome = await denied.propose(
+      { actor, runId: randomUUID() } as never,
+      "Research the market and competitors for Silo Credit's space",
+    );
+    expect(outcome).toEqual({ status: "PLAN_LIMIT", message: PLAN_SENTENCE });
+    const line = teamJobLine(outcome);
+    expect(line).toContain(PLAN_SENTENCE);
+    expect(line).not.toContain("isn't available");
+    expect(line).not.toContain("limit of work I can take on");
+    expect(teamJobLine({ status: "LIMIT_REACHED" })).toMatch(
+      /^Your monthly limit for Q's work is reached/u,
+    );
+  });
+
   it("reads back every outcome line the team job writes", () => {
     const outcomes: TeamJobOutcome[] = [
       { status: "STARTED", plan: PLAN, firstRead: null },
@@ -1952,6 +2029,8 @@ describe("saving work that has to start first, or never started", () => {
       { status: "ALREADY_WAITING", waiting: [] },
       { status: "NOT_PLANNED" },
       { status: "LIMIT_REACHED" },
+      { status: "PLAN_LIMIT", message: null },
+      { status: "PLAN_LIMIT", message: PLAN_SENTENCE },
       { status: "UNAVAILABLE" },
       { status: "FAILED" },
     ];

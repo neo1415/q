@@ -1037,6 +1037,8 @@ export type BoardKeeper = {
     readonly waiting: readonly string[];
     /** STARTED: the job doing it (the reply's live document card). */
     readonly jobId?: string | null | undefined;
+    /** PLAN_LIMIT: the plan's own sentence (counts and reset). */
+    readonly message?: string | null | undefined;
     readonly summary?: string | null | undefined;
   }>;
 };
@@ -2683,8 +2685,11 @@ export function createSpecialistQAnswer(
           return "That work would reach someone outside your account, so it's waiting for your approval first; the items stay where they are until you approve.";
         case "ALREADY_WAITING":
           return `Something like this is already waiting for you${outcome.waiting[0] === undefined ? "" : `: ${outcome.waiting[0]}`}. Say go ahead and I'll start this one too.`;
+        // F-108: whose limit it is, plainly; the item stays in To do.
         case "LIMIT_REACHED":
-          return "I've reached the limit of work I can take on for you right now. It can start once a running piece of work finishes.";
+          return "Your monthly limit for Q's work is reached, so I haven't started it and the item stays in To do. You can raise the limit in Settings.";
+        case "PLAN_LIMIT":
+          return `Your plan's allowance for Q's work this month is used, so I haven't started it and the item stays in To do.${outcome.message == null ? "" : ` ${outcome.message.trim()}`}`;
         case "NOT_PLANNED":
           return "I couldn't turn that item into work I can carry out for you. Tell me what you want at the end of it (a memo, a list of questions, a short plan) and I'll start.";
         case "NOT_FOUND":

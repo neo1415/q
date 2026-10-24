@@ -1904,16 +1904,26 @@ const workforceJobBoard = createWorkforceJobBoard({
         logger.warn({ err: error }, "workforce job runner pass failed");
       });
     },
-    allowed: async (actor, idempotencyKey) =>
-      (
-        await entitlements.consume({
-          account: billingAccountOf(actor),
-          feature: FEATURE_DELEGATIONS,
-          idempotencyKey,
-          actorUserId: actor.userId,
-          surface: "Q_ACTION",
-        })
-      ).allowed,
+    allowed: async (actor, idempotencyKey) => {
+      const decision = await entitlements.consume({
+        account: billingAccountOf(actor),
+        feature: FEATURE_DELEGATIONS,
+        idempotencyKey,
+        actorUserId: actor.userId,
+        surface: "Q_ACTION",
+      });
+      return decision.allowed
+        ? { allowed: true }
+        : { allowed: false, message: decision.refusal.message };
+    },
+    release: async (actor, idempotencyKey) => {
+      await entitlements.release({
+        account: billingAccountOf(actor),
+        feature: FEATURE_DELEGATIONS,
+        idempotencyKey,
+        reason: "own-account work could not be filed",
+      });
+    },
     logger,
   }),
   // Q room R5: what already waits for them, and whether their calendar is

@@ -266,6 +266,7 @@ const MyBoardOutputSchema = z.discriminatedUnion("action", [
         "ALREADY_WAITING",
         "NOT_PLANNED",
         "LIMIT_REACHED",
+        "PLAN_LIMIT",
         "NOT_FOUND",
         "FAILED",
       ]),
@@ -276,6 +277,8 @@ const MyBoardOutputSchema = z.discriminatedUnion("action", [
        * made (owner 2026-10-24: the live document card). Null otherwise.
        */
       jobId: z.string().uuid().nullable(),
+      /** PLAN_LIMIT: the plan's own sentence (counts and reset). */
+      message: z.string().max(400).nullable(),
       /** Items not worked on: not theirs, already done or gone. */
       skipped: z.array(z.string().max(64)).max(BOARD_TOOL_BATCH_MAX),
       summary: z.string().max(400).nullable(),
@@ -455,6 +458,7 @@ async function workOnItems(
     action: "WORK",
     working: [],
     jobId: null,
+    message: null,
     summary: null,
     firstRead: null,
     needsYou: [],
@@ -524,6 +528,13 @@ async function workOnItems(
         status: "ALREADY_WAITING",
         skipped,
         waiting: prepared.waiting.slice(0, 5),
+      };
+    case "PLAN_LIMIT":
+      return {
+        ...empty,
+        status: "PLAN_LIMIT",
+        skipped,
+        message: prepared.message?.slice(0, 400) ?? null,
       };
     case "NOT_PLANNED":
     case "LIMIT_REACHED":

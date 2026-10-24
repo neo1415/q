@@ -40,6 +40,7 @@ import {
   isOwnAccountWork,
   planShape,
   sameWork,
+  type OwnWorkAllowance,
   type WaitingItem,
 } from "../src/composition/workforce/job-actions.js";
 import {
@@ -220,6 +221,8 @@ function world(
     readonly outward?: boolean;
     /** What already waits for their approval (the Approval Engine's list). */
     readonly waiting?: readonly WaitingItem[];
+    /** The plan's allowance for Q's work (billing's verdict). */
+    readonly allowed?: () => Promise<OwnWorkAllowance>;
   } = {},
 ) {
   const store = createInMemoryWorkforceStore();
@@ -326,6 +329,7 @@ function world(
     startOwnWork: createOwnWorkStarter({
       jobsFor,
       queue: () => queue,
+      ...(options.allowed === undefined ? {} : { allowed: options.allowed }),
     }),
   });
   return {
@@ -639,6 +643,69 @@ describe("own-account deep work starts with no approval card", () => {
       "Write a growth plan and send it to my co-founder",
     );
     expect(free.status).toBe("PREPARED");
+  });
+
+  // F-108, live c8d45c628: savanna-seed's plan allowance (30 a month) was
+  // used, and the reply said "I've reached the limit of work I can take on".
+  it("F-108: when the plan's allowance is used, says so in the plan's own words and starts nothing", async () => {
+    const sentence =
+      "Your Launch plan includes 30 pieces of work Q does for you a month and you've used 30.";
+    const { board, store } = world({
+      allowed: () => Promise.resolve({ allowed: false, message: sentence }),
+    });
+    const prepared = await board.port.prepare(
+      actor,
+      randomUUID(),
+      MAJI_LOOP_REQUEST,
+    );
+    expect(prepared).toEqual({ status: "PLAN_LIMIT", message: sentence });
+    // Nothing was filed or queued.
+    expect(
+      await store.listJobs(
+        { tenantId: actor.tenantId, userId: actor.userId },
+        { limit: 5, before: null },
+      ),
+    ).toEqual([]);
+  });
+
+  it("F-108: a start that could not be filed gives its unit back", async () => {
+    const released: string[] = [];
+    const start = createOwnWorkStarter({
+      jobsFor: () =>
+        ({
+          file: () => Promise.reject(new Error("store down")),
+        }) as never,
+      queue: () => createInMemoryAgentWorkQueue(),
+      allowed: () => Promise.resolve({ allowed: true }),
+      release: (_actor, key) => {
+        released.push(key);
+        return Promise.resolve();
+      },
+    });
+    const runId = randomUUID();
+    await expect(
+      start(actor, runId, {
+        ownerUserId: actor.userId,
+        goal: MAJI_LOOP_REQUEST,
+        summary: "Research your market and write your plan",
+        steps: [
+          {
+            key: "research",
+            role: "RESEARCH",
+            agentName: "Research",
+            goal: "Learn the market",
+            tools: ["public_web.search"],
+            dependsOn: [],
+            budgetUsd: "0.6",
+            spawned: false,
+          },
+        ],
+        permitted: ["public_web.search"],
+        budgetUsd: "2.5",
+        cannot: [],
+      } as never),
+    ).rejects.toThrow("store down");
+    expect(released).toEqual([`q.workforce.job.start:own:${runId}`]);
   });
 
   it("keeps the card for work that reaches anyone else", async () => {
