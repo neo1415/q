@@ -132,6 +132,7 @@ function handler(
   text: string,
   read: QAttentionReport | (() => never),
   blocks?: readonly unknown[],
+  holding?: string,
 ) {
   const qRuntime = {
     createRun: () =>
@@ -145,6 +146,15 @@ function handler(
       Promise.resolve({ run: RUN, changed: true, summary: {} as never }),
   } as unknown as QRuntimeService;
   const events = [
+    ...(holding === undefined
+      ? []
+      : [
+          event("q.message.delta", {
+            messageId: "m0",
+            text: holding,
+            holding: true,
+          }),
+        ]),
     event("q.message.completed", {
       message: {
         messageId: "m1",
@@ -187,7 +197,11 @@ async function say(
   text: string,
   read: QAttentionReport | (() => never),
   withFacts = false,
-  options: { blocks?: readonly unknown[]; asked?: string } = {},
+  options: {
+    blocks?: readonly unknown[];
+    asked?: string;
+    holding?: string;
+  } = {},
 ) {
   const spoken: string[] = [];
   let facts: SpokenFacts | null = null;
@@ -210,7 +224,7 @@ async function say(
         }
       : {}),
   };
-  await handler(text, read, options.blocks)(
+  await handler(text, read, options.blocks, options.holding)(
     binding(),
     [{ role: "user", content: options.asked ?? ASKED }],
     new AbortController().signal,
@@ -220,6 +234,15 @@ async function say(
 }
 
 describe("'what needs my attention', said from the attention report", () => {
+  it("a holding line said first is not the answer: the items are still said as facts, never the list (F-59)", async () => {
+    const { said } = await say(writtenAnswer(TWO), TWO, false, {
+      holding: "Looking into that now.",
+    });
+    expect(said).toMatch(/^Looking into that now\./u);
+    expect(said).toContain("Zino Aviation is waiting for your reply");
+    expect(said).not.toMatch(/\b1\. /u);
+  });
+
   it("names the real items, in order, on the standard line", async () => {
     const { said } = await say(writtenAnswer(TWO), TWO);
     expect(said).toContain("Zino Aviation is waiting for your reply");

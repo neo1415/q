@@ -1374,6 +1374,12 @@ export function createVoiceTurnHandler(
             if (event.data.holding === true) {
               if (holding.said) break;
               holding.said = true;
+              // F-59: a holding line is not the answer. Counted as streamed,
+              // it made a code answer (what needs them, a ranked list) be
+              // read out as its written list instead of said as facts.
+              const line = speakable(event.data.text);
+              if (line.length > 0) yield `${line} `;
+              break;
             }
             // A delta is a whole sentence that has already been through
             // the answer's guards, so `speakable` can do its work on it:
