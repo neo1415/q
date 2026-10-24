@@ -569,11 +569,39 @@ describe("Q as a colleague on work (Q room R5)", () => {
     });
   });
 
-  it("a request naming nobody reports waiting jobs of the same kind (W4b)", () => {
-    expect(relatedWaiting("follow up with everyone who wrote", byIds)).toEqual({
+  it("a request naming nobody reports waiting jobs of the same kind, by structure (W4b; 2026-10-24)", () => {
+    const followUp = { outward: ["chat.message.send"], targets: [] };
+    const withPlans = byIds.map((item) =>
+      item.actionType === "q.workforce.job.start"
+        ? { ...item, plan: followUp }
+        : item,
+    );
+    // Same outward action, neither about a record: the same work.
+    expect(
+      relatedWaiting(
+        "follow up with everyone who wrote",
+        withPlans,
+        [],
+        "q.workforce.job.start",
+        { outward: ["chat.message.send"], targets: [] },
+      ),
+    ).toEqual({
       about: "SAME_KIND",
       waiting: ["Q's team: Follow up with three investors"],
     });
+    // A different outward action, or no plan yet: nothing is held.
+    expect(
+      relatedWaiting(
+        "follow up with everyone who wrote",
+        withPlans,
+        [],
+        "q.workforce.job.start",
+        { outward: ["schedule.meeting.book"], targets: [] },
+      ).waiting,
+    ).toEqual([]);
+    expect(
+      relatedWaiting("follow up with everyone who wrote", byIds).waiting,
+    ).toEqual([]);
   });
 
   it("asks before starting when work is already waiting, and plans once told to go ahead", async () => {

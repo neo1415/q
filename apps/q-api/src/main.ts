@@ -23,6 +23,7 @@ import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
 import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
 import { createOwnContextReader } from "./composition/workforce/own-context.js";
+import { withWaitingPlans } from "./composition/workforce/waiting-plans.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
@@ -1906,8 +1907,14 @@ const workforceJobBoard = createWorkforceJobBoard({
   }),
   // Q room R5: what already waits for them, and whether their calendar is
   // there, read as them when a job is asked for (composed further down).
+  // Each waiting job card with its own plan's shape, so "already waiting"
+  // is decided by structure (waiting-plans.ts).
   waiting: async (actor) =>
-    await qActions.listPendingApprovals({ actor, limit: 20 }),
+    await withWaitingPlans(
+      database.sql,
+      actor,
+      await qActions.listPendingApprovals({ actor, limit: 20 }),
+    ),
   calendarConnected: async (actor) =>
     (await schedule.calendarStatus(actor.userId)) === "CONNECTED",
 });
