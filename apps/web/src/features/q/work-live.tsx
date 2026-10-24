@@ -3,26 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  QArtifactIdSchema,
-  QArtifactTypeSchema,
   WorkforceLiveSchema,
   type WorkforceLive,
   type WorkforceLiveStage,
   type WorkforceLiveStageName,
 } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
-import {
-  CircleAlert,
-  FileText,
-  ICON_SIZE,
-  ICON_STROKE,
-} from "@capital-q/ui/icons";
 
 import { expectDocument } from "@/features/documents/document-ready";
 import { useT } from "@/features/i18n/language";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
-import { ArtifactCard, RETRY_PROMPT } from "./artifact-card";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -48,6 +38,7 @@ export const WORK_LIVE_PATH = "/api/q-work-live";
 /** The job finished while this page watched: the conversation reads its record again. */
 export const Q_WORK_SETTLED_EVENT = "cq:q-work-settled";
 export const WORK_LIVE_CHECK_MS = 2_500;
+export const WORK_LIVE_WAITING_CHECK_MS = 15_000;
 /** A card stops asking after this long; a reload asks again. */
 export const WORK_LIVE_WATCH_MS = 20 * 60_000;
 
@@ -153,7 +144,7 @@ export function useWorkLive(jobId: string): {
       if (next !== null) {
         setLive(next);
         if (next.state === "WORKING") seenWorking.current = true;
-        if (next.state !== "WORKING") {
+        if (next.state !== "WORKING" && next.state !== "WAITING") {
           if (seenWorking.current) {
             if (next.state === "DONE") expectDocument();
             window.dispatchEvent(
@@ -164,7 +155,13 @@ export function useWorkLive(jobId: string): {
         }
       }
       if (Date.now() - started > WORK_LIVE_WATCH_MS) return;
-      timer = window.setTimeout(() => void check(), WORK_LIVE_CHECK_MS);
+      // Waiting on the person: it moves when they do, so it is asked less.
+      timer = window.setTimeout(
+        () => void check(),
+        next?.state === "WAITING"
+          ? WORK_LIVE_WAITING_CHECK_MS
+          : WORK_LIVE_CHECK_MS,
+      );
     };
     void check();
     return () => {
@@ -260,107 +257,5 @@ export function WorkLiveProgress({
         </div>
       ) : null}
     </div>
-  );
-}
-
-/**
- * The card on the reply that started the work. Done: the finished
- * document's own card, in the same place. Stopped: why, and a way on.
- */
-export function WorkInProgressCard({
-  block,
-  onOpen,
-  onAsk,
-}: {
-  readonly block: WorkInProgress;
-  readonly onOpen?: ((artifactId: string) => void) | undefined;
-  readonly onAsk?: ((question: string) => void) | undefined;
-}) {
-  const t = useT();
-  const { live, missing } = useWorkLive(block.jobId);
-
-  if (live?.state === "DONE" && live.document !== null) {
-    const type = QArtifactTypeSchema.safeParse(live.document.type);
-    const artifactId = QArtifactIdSchema.safeParse(live.document.artifactId);
-    if (type.success && artifactId.success) {
-      return (
-        <ArtifactCard
-          block={{
-            kind: "ARTIFACT_REFERENCE",
-            artifactId: artifactId.data,
-            type: type.data,
-            status: "READY",
-            title: live.document.title,
-          }}
-          onOpen={onOpen}
-          onAsk={onAsk}
-        />
-      );
-    }
-  }
-  // Someone else's job, or one that no longer exists: nothing to follow.
-  if (missing) return null;
-
-  const stopped =
-    live !== null && (live.state === "STOPPED" || live.state === "DONE");
-  const title = live?.stage?.title ?? block.title;
-  return (
-    <section
-      className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
-      aria-label={`${t("Document")}: ${title}`}
-      data-q-result-card
-      data-q-work-card={live?.state ?? "WORKING"}
-    >
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
-        >
-          <FileText size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
-        </span>
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="cq-caption text-(--cq-text-tertiary)">
-            {stopped ? t("Document") : t("Document · being written")}
-          </p>
-          <p className="cq-body line-clamp-2 font-medium text-(--cq-text-primary)">
-            {title}
-          </p>
-        </div>
-      </div>
-
-      {stopped ? (
-        <div className="flex flex-col gap-2" data-q-work-stopped>
-          <p className="cq-body-sm flex items-start gap-2 text-(--cq-text-secondary)">
-            <CircleAlert
-              aria-hidden="true"
-              className="mt-0.5 shrink-0"
-              size={ICON_SIZE.compact}
-              strokeWidth={ICON_STROKE}
-            />
-            <span>
-              {live?.reason == null
-                ? t("This work stopped before the document was filed.")
-                : t(live.reason)}
-            </span>
-          </p>
-          {onAsk === undefined ? null : (
-            <div>
-              <button
-                type="button"
-                className={buttonClassName("secondary", "regular")}
-                onClick={() => {
-                  onAsk(RETRY_PROMPT);
-                }}
-                data-q-work-retry
-              >
-                {t("Ask Q to try again")}
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <WorkLiveProgress live={live} />
-      )}
-    </section>
   );
 }

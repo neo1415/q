@@ -38,7 +38,7 @@ import {
 import { subjectHref } from "./blocks/data-block-logic";
 import { useSubjectNames } from "./blocks/use-subject-names";
 import { useWire } from "./use-wire";
-import { WorkInProgressCard } from "./work-live";
+import { WorkInProgressCard } from "./work-canvas";
 import { wireNow } from "./wire";
 import { useT } from "@/features/i18n/language";
 

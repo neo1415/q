@@ -381,6 +381,28 @@
     animation: cq-step-in var(--cq-motion-emphasis) var(--cq-ease) both;
   }
 
+  /* Owner 2026-10-24: the work canvas's status dot breathes only while the
+     work runs; with reduced motion it is still. */
+  @keyframes cq-work-dot-breathe {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.8);
+    }
+  }
+  .cq-work-dot-breathe {
+    animation: cq-work-dot-breathe 1.8s var(--cq-ease) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-work-dot-breathe {
+      animation: none;
+    }
+  }
+
   /* Owner 2026-10-24: a drafted section joins the document being made with
      a short rise; with reduced motion it is simply there. */
   @keyframes cq-live-section-in {

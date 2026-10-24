@@ -339,7 +339,11 @@ export function createWorkforcePage(dependencies: {
           ? "WORKING"
           : work.state === "COMPLETED"
             ? "DONE"
-            : "STOPPED",
+            : work.state === "NEEDS_DECISION" || work.state === "BLOCKED"
+              ? "WAITING"
+              : work.state === "CANCELLED"
+                ? "STOPPED"
+                : "FAILED",
         done: plan?.done ?? 0,
         total: plan?.total ?? 0,
         stage: liveStageOf(work),
