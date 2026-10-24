@@ -208,6 +208,35 @@ describe("an artifact shows when Q shows it (FAIL-2)", () => {
   });
 });
 
+describe("QA U2: a document on the stage is drawn once", () => {
+  it("a lone document card has no second frame with its title", async () => {
+    const turns = [
+      person("p1", "Make me a one-page investor brief PDF."),
+      answer("a1", "Here's the brief for Maji Loop.", [
+        {
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: "a0000000-0000-4000-8000-000000000002",
+          type: "INVESTMENT_BRIEF",
+          title: "Investment brief — Maji Loop",
+          status: "READY",
+        },
+      ]),
+    ];
+    const { container } = render(stage(turns));
+    await waitFor(
+      () =>
+        expect(container.querySelector('[data-q-shown="a1"]')).not.toBeNull(),
+      { timeout: 10_000 },
+    );
+    const heading = container.querySelector('[data-q-shown="a1"] h2');
+    // Named for screen readers; the card shows the title once.
+    expect(heading?.className).toContain("sr-only");
+    expect(
+      container.querySelector('[data-q-shown="a1"] [data-q-shown-dismiss]'),
+    ).not.toBeNull();
+  });
+});
+
 describe("replaced explicitly, never silently (FAIL-3)", () => {
   it("says what it replaced, and what it put away", async () => {
     const replaced = [
