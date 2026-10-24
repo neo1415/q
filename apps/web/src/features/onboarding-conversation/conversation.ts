@@ -777,3 +777,20 @@ export function reviewLines(
     }))
     .filter((group) => group.items.length > 0);
 }
+
+/**
+ * Whether Q's findings from one uploaded document are in the session yet
+ * (QA F-69): a processed file is not a read one, and Q is told to read a
+ * document back only once its own suggestions from it have arrived.
+ */
+export function hasFindingsFrom(
+  view: Pick<OnboardingSessionView, "pendingSuggestions"> | undefined,
+  documentId: string,
+): boolean {
+  return (view?.pendingSuggestions ?? []).some((suggestion) =>
+    (suggestion.sourceRefs ?? []).some(
+      (ref) =>
+        ref.sourceType === "EVIDENCE_DOCUMENT" && ref.sourceId === documentId,
+    ),
+  );
+}
