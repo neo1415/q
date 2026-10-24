@@ -75,6 +75,27 @@ export function fastLaneOf(
     // investors nobody asked for. The region words stay as they were said.
     const investors = skim.investors;
     if (investors === null || investors === undefined) return null;
+    // F-57 (live 2026-10-23, maji-loop in Nairobi): the skim reads the last
+    // two turns, so a region from an earlier rehearsal ("Qatar") came back
+    // as if said, and "which investors should I talk to first?" was
+    // answered with Gulf funds "matched on place". A search of public
+    // investors takes only region words said in this turn; and an ask
+    // naming no region, sector or stage is not a search of a kind at all
+    // -- it is which investors their own company should approach, which
+    // the full reading answers from their own record (INVESTOR_PROSPECTS).
+    const said = text.toLowerCase();
+    if (
+      investors.regions.some((region) => !said.includes(region.toLowerCase()))
+    ) {
+      return null;
+    }
+    if (
+      investors.regions.length === 0 &&
+      investors.sector === null &&
+      investors.stage === null
+    ) {
+      return null;
+    }
     // A question about something else, with the investors only in what
     // they told Q, is not a search (any language: the region words are
     // the first read's own, as said).
