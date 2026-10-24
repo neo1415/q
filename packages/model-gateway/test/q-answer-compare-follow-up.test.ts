@@ -561,6 +561,42 @@ describe("compare the top two, right after a list of five", () => {
     );
   });
 
+  // Coordinator 24 Oct (live on bbb4b677, savanna-seed ~20:40): with no
+  // reader comparison, "Which is better, Anchor or Afyascan?" compared
+  // nothing, and a web namesake answered for Anchor. The names in the words
+  // are found by exact name in Capital Q and compared, with the verdict.
+  it("with no reader comparison, the companies named in the words are compared", async () => {
+    const { seam, request, alpha, executed, stored } = build(
+      "Which is better, Silo Credit or Mizan?",
+      {},
+      undefined,
+      true,
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(
+      executed
+        .filter((call) => call.callId.startsWith("q-compare-search-"))
+        .map(
+          (call) => Reflect.get(call.arguments as object, "query") as unknown,
+        ),
+    ).toEqual(["Silo Credit", "Mizan"]);
+    const sent = alpha.calls
+      .flatMap((call) => call.request.messages.map((m) => m.content))
+      .join("\n");
+    expect(sent).toMatch(/VERDICT[^\n]*lead with exactly one, Mizan/u);
+    expect(sent).toContain("a public web page about another company");
+    const table = (stored.at(-1)?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Silo Credit",
+      "Mizan",
+    ]);
+    expect(stored.at(-1)?.content ?? "").toMatch(
+      /^On Capital Q's mandate fit, Mizan leads/u,
+    );
+  });
+
   // U4/F8: a move their words asked for beside a question goes with the
   // answer (QAnswerRequest.leadBlocks).
   it("carries a move the words asked for beside the question", async () => {

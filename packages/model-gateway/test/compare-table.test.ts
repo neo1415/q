@@ -12,6 +12,7 @@ import {
   comparisonSpokenLine,
   newestAnswerCards,
   withoutCompareOffers,
+  namesToCompare,
 } from "../src/q/compare-table.js";
 import { fitsInOutcome } from "../src/q/fit-cards.js";
 
@@ -429,5 +430,22 @@ describe("the verdict keeps the model's numbers whole", () => {
     ).toBe(
       "On Capital Q's mandate fit, Anchor leads: 7.6 against Afyascan's 7. Afyascan's $1.8 million round fits your $250,000–$1 million range; Anchor's round size is still unknown.",
     );
+  });
+});
+
+describe("namesToCompare (no reader comparison)", () => {
+  it("reads the companies a choice names", () => {
+    expect(namesToCompare("Which is better, Anchor or Afyascan?")).toEqual([
+      "Anchor",
+      "Afyascan",
+    ]);
+    expect(namesToCompare("Compare Ledgerline and Duplo")).toEqual([
+      "Ledgerline",
+      "Duplo",
+    ]);
+  });
+  it("names none for a question that is not a choice between companies", () => {
+    expect(namesToCompare("Tell me about Anchor")).toEqual([]);
+    expect(namesToCompare("Which is better for me?")).toEqual([]);
   });
 });
