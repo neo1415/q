@@ -314,7 +314,7 @@ describe("investor discovery by meaning", () => {
       count: 5,
     });
     expect(found.webSearched).toBe(true);
-    expect(web.searches.length).toBeLessThanOrEqual(3);
+    expect(web.searches.length).toBeLessThanOrEqual(4);
     expect(web.searches[0]?.query).toBe("seed venture capital investors Arab");
     const everything = web.egressed().toLowerCase();
     for (const secret of [
@@ -407,6 +407,96 @@ describe("public terms", () => {
  * place and the sector, in a few phrasings side by side -- and only that
  * kind is offered.
  */
+// Coordinator 2026-10-24, live on bbb4b6773: "From a public web search,
+// not confirmed: Qatari Investors Group and Qatari Investors Group" (a listed
+// company, named twice) and "DVC and Home" (a page title named as a firm).
+describe("public finds are firms that invest, each named once by its name", () => {
+  const page = (url: string, title: string, snippet: string) => ({
+    url,
+    title,
+    snippet,
+    text: snippet,
+  });
+
+  it("a listed company named like an investor is not one; a firm found twice is one; a title's 'Home' is never a name", async () => {
+    const web = createFakeResearchProvider({
+      pages: [
+        page(
+          "https://www.linkedin.com/company/qatari-investors-group",
+          "Qatari Investors Group | LinkedIn",
+          "Qatari Investors Group Q.P.S.C. is a public shareholding company listed on the Qatar Stock Exchange, with interests in cement and Qatar real estate.",
+        ),
+        page(
+          "https://www.qig.com.qa/",
+          "Home - Qatari Investors Group",
+          "Qatari Investors Group, a Qatar public shareholding company in cement and real estate.",
+        ),
+        page(
+          "https://www.linkedin.com/company/doha-venture-partners",
+          "Doha Venture Partners | LinkedIn",
+          "Doha Venture Partners invests in early-stage startups in Qatar.",
+        ),
+        page(
+          "https://dohaventurepartners.qa/",
+          "Home - Doha Venture Partners",
+          "Doha Venture Partners backs early-stage founders across Qatar.",
+        ),
+        page(
+          "https://dvc.qa/",
+          "Home - DVC",
+          "DVC invests in seed-stage startups in Qatar.",
+        ),
+      ],
+    });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Qatari"],
+      count: 5,
+    });
+    const publicNames = found.candidates
+      .filter((one) => one.source === "WEB")
+      .map((one) => one.card.subject.displayName);
+    expect(publicNames).not.toContain("Qatari Investors Group");
+    expect(publicNames).not.toContain("Home");
+    expect(
+      publicNames.filter((name) => name === "Doha Venture Partners"),
+    ).toHaveLength(1);
+    expect(publicNames).toContain("DVC");
+  });
+
+  it("short of the count, one more phrasing is searched before answering", async () => {
+    const web = createFakeResearchProvider({
+      pages: [
+        page(
+          "https://www.linkedin.com/company/alajlan-family-office",
+          "Alajlan Family Office | LinkedIn",
+          "A Riyadh family office backing fintech in Saudi Arabia.",
+        ),
+      ],
+    });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Saudi"],
+      kinds: ["family offices"],
+      sector: "fintech",
+      count: 3,
+    });
+    const queries = web.searches.map((search) => search.query.toLowerCase());
+    expect(queries.at(-1)).toBe(
+      "list of family offices in saudi arabia fintech",
+    );
+    expect(names(found)).toEqual(["Alajlan Family Office"]);
+  });
+});
+
 describe("discovery by kind, place and sector", () => {
   it("three Qatari VCs: the known three, and public firms named beside them", async () => {
     const web = createFakeResearchProvider({
