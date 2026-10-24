@@ -1,3 +1,4 @@
+import { classifyStoryTrigger } from "@capital-q/q-pitch";
 import type { InterviewAgent } from "./interview-agent.js";
 import { dispatchTurn, nextUnansweredStep } from "./onboarding-conductor.js";
 import { randomUUID } from "node:crypto";
@@ -251,6 +252,9 @@ export type VoiceTurnHandler = (
 ) => Promise<VoiceTurnOutcome>;
 
 const VOICE_TURN_MAX_CHARS = 2_000;
+
+/** What Q says as the story opens on the screen (F-61). */
+export const STORY_LINE = "Here's my story.";
 
 /** "Keep these" / "yes" / "looks right" on a category step with a proposal (B §19 aloud). */
 /**
@@ -2206,6 +2210,30 @@ export function createVoiceTurnHandler(
         );
       });
       if (signal.aborted) return { kind: "NOTHING" };
+    }
+    // F-61 (live 2026-10-23, maji-loop on a spoken line): "Hey Q, pitch
+    // yourself" reached Q, which introduced itself; the story never began.
+    // The browser's interceptors take it where a browser hears the words
+    // first, but a line whose words reach only this server (the think
+    // endpoint) is answered here, by the same code, with no model call:
+    // one short line, and the screen opens the story (Q_PITCH).
+    if (!resuming && classifyStoryTrigger(text)?.kind === "STORY") {
+      dependencies.board?.record(binding.voiceSessionId, {
+        ...dependencies.board.read(binding.voiceSessionId),
+        asking: null,
+        navigate: "Q_PITCH",
+        clientAction: null,
+        clientActions: [],
+        handoff: null,
+        degraded: false,
+      });
+      logger.info(
+        { qVoiceSessionId: binding.voiceSessionId },
+        "spoken story ask: the screen opens Q Pitch",
+      );
+      return (await speakLine(speaker, STORY_LINE, signal, binding))
+        ? { kind: "SPOKEN", path: "MOVE" }
+        : { kind: "INTERRUPTED", path: "MOVE" };
     }
     /**
      * "Yes, and change the website too": the decision is taken, and the

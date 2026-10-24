@@ -159,7 +159,12 @@ export default async function ApplicationLayout({
           accounts stills of fictional pages, never their own; the v6
           tracks still admit only fictional demo accounts. Its subject read
           streams after the page and never holds the first byte. */}
-          {qPitch && unfinished === null ? (
+          {/* QO-37 (live 2026-10-23, a new founder): with setup unfinished
+            the host was not mounted, so "Hey Q, pitch yourself" got Q's
+            self-introduction. The app is usable with setup unfinished
+            (owner, 2026-10-16) and the story only ever starts when asked,
+            so it is held for every account. */}
+          {qPitch ? (
             <Suspense fallback={null}>
               <QPitchEntrySlot
                 account={user.email ?? ""}
