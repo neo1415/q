@@ -5,6 +5,7 @@ import type {
   QAnswerRequest,
   QToolPort,
 } from "@capital-q/q-runtime";
+import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 import { closestByName } from "@capital-q/q-tools";
 
 /**
@@ -340,6 +341,25 @@ export async function actOnHandOver(
     named.length === 0
   ) {
     return { kind: "STANDING" };
+  }
+  // F-92 (QA 2026-10-24): a meeting with a name that is none of their
+  // relationships, matched against all of them, is said so: "Schedule a
+  // call with Mizan's founders" was answered with a list of their other
+  // relationships that left Mizan out. Calls open only once connected; an
+  // investor's way there is Express Interest, offered for approval.
+  if (
+    handOver.kind === "MEETING" &&
+    handOver.counterpartName !== null &&
+    named.length === 0
+  ) {
+    const name = handOver.counterpartName;
+    return {
+      kind: "ASK",
+      line:
+        ownInvestorOrganisationIn(request.plan) === null
+          ? `None of your relationships is ${name}, so there's no call with them to book yet: calls open once you're connected.`
+          : `None of your relationships is ${name}, so there's no call with them to book yet: calls open once they accept your interest. Want me to prepare Express Interest in ${name} with a note asking for a call, for your approval?`,
+    };
   }
   subject ??= onScreen;
   if (subject === null) {

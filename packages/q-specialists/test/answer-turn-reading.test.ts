@@ -2672,6 +2672,7 @@ describe("live 2026-10-02 (Zino): a named, misheard company among ALL their rela
       awaitingApprovalOf: "Q looks after them for you",
     },
     meeting?: QHandOverPort["proposeMeeting"],
+    asInvestor = false,
   ) => {
     const errands: unknown[] = [];
     const handOver: QHandOverPort = {
@@ -2694,7 +2695,40 @@ describe("live 2026-10-02 (Zino): a named, misheard company among ALL their rela
       outcomes: [],
       handOver,
     });
-    await answer.answer(request());
+    const base = request();
+    const ORG = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
+    await answer.answer(
+      asInvestor
+        ? {
+            ...base,
+            plan: PermittedContextPlanSchema.parse({
+              ...base.plan,
+              scopes: [
+                {
+                  kind: "INVESTOR_MANDATE",
+                  subject: {
+                    kind: "INVESTOR_ORGANISATION",
+                    investorOrganisationId: ORG,
+                  },
+                  contextLabel: "investor_private",
+                  sensitivity: "CONFIDENTIAL",
+                  layer: "STRUCTURED_STATE",
+                  factCategories: ["INVESTOR_THESIS"],
+                  projection: "FULL",
+                  rights: {
+                    canUseForReasoning: true,
+                    canDiscloseExistence: true,
+                    canQuote: true,
+                    canProvideLink: false,
+                  },
+                  filter: { tenantId: TENANT, investorOrganisationId: ORG },
+                  isEvidence: true,
+                },
+              ],
+            }),
+          }
+        : base,
+    );
     return {
       line: stored.at(-1)?.content ?? "",
       errands,
@@ -2849,11 +2883,29 @@ describe("live 2026-10-02 (Zino): a named, misheard company among ALL their rela
     expect(errands).toEqual([{ kind: "RELATIONSHIP", relationshipId: rel(1) }]);
   });
 
-  it("a name that is none of them: the question names every one", async () => {
+  // F-92 (QA 2026-10-24): "Schedule a call with Mizan's founders" was
+  // answered "Who should I set this up with: Harbourline, Brightkloof…?",
+  // a list that left out the one they named.
+  it("a name that is none of them: said so plainly, never a list that leaves it out", async () => {
     const { line, errands } = await run("set it up with Zorblax", "Zorblax");
     expect(errands).toEqual([]);
     expect(line).toBe(
-      "Who should I set this up with: Nixo, Kazikit, Yamfield Agro or Tallyloom?",
+      "None of your relationships is Zorblax, so there's no call with them to book yet: calls open once you're connected.",
+    );
+    expect(line).not.toMatch(/Who should I|Nixo|Kazikit/u);
+  });
+
+  it("an investor naming a company they are not connected with: the honest reply, and Express Interest with a note offered", async () => {
+    const { line, errands } = await run(
+      "Schedule a call with Mizan's founders next week",
+      "Mizan",
+      undefined,
+      undefined,
+      true,
+    );
+    expect(errands).toEqual([]);
+    expect(line).toBe(
+      "None of your relationships is Mizan, so there's no call with them to book yet: calls open once they accept your interest. Want me to prepare Express Interest in Mizan with a note asking for a call, for your approval?",
     );
   });
 });
