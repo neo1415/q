@@ -29,7 +29,7 @@ export const TURN_SKIM_V7: PromptDefinition<
 > = {
   ...TURN_SKIM_V6,
   version: 7,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA F-23 2026-10-23 (16 s to first words on 'draft a note to the founders'): v6 plus writes (every kind) -- true when the turn asks Q to write, draft or send a note, message, email or reply to someone, read by meaning in any language; Q's holding line says it is drafting, to the subject when one is understood. Decides nothing else.",
   effectiveFrom: "2026-10-23",

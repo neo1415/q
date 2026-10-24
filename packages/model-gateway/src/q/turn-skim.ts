@@ -4,9 +4,9 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnSkimV7ResultSchema,
+  TurnSkimV8ResultSchema,
   type PromptRegistry,
-  type TurnSkimV7Result,
+  type TurnSkimV8Result,
   type TurnSkimV3Variables,
 } from "@capital-q/q-core";
 
@@ -66,10 +66,20 @@ export type QTurnSkimInput = {
  * One skim. `subject` (v6) is optional here so a skim without it still
  * fits; absent is none.
  */
-export type QTurnSkim = Omit<TurnSkimV7Result, "subject" | "writes"> & {
-  readonly subject?: TurnSkimV7Result["subject"] | undefined;
+export type QTurnSkim = Omit<
+  TurnSkimV8Result,
+  "subject" | "writes" | "investors"
+> & {
+  readonly subject?: TurnSkimV8Result["subject"] | undefined;
   /** v7: they ask Q to write or send something to someone; absent is false. */
   readonly writes?: boolean | undefined;
+  /** v8 adds `kinds` (family offices, angel networks); absent is none. */
+  readonly investors?:
+    | (Omit<NonNullable<TurnSkimV8Result["investors"]>, "kinds"> & {
+        readonly kinds?: readonly string[] | undefined;
+      })
+    | null
+    | undefined;
 };
 
 export type QTurnSkimmer = {
@@ -112,7 +122,7 @@ export function createTurnSkimmer(dependencies: {
             ).slice(0, 1_500),
           },
         });
-        const response = await dependencies.gateway.execute<TurnSkimV7Result>(
+        const response = await dependencies.gateway.execute<TurnSkimV8Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -134,12 +144,12 @@ export function createTurnSkimmer(dependencies: {
             },
           },
           {
-            schema: TurnSkimV7ResultSchema,
+            schema: TurnSkimV8ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const read = TurnSkimV7ResultSchema.safeParse(
+        const read = TurnSkimV8ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return read.success ? read.data : null;

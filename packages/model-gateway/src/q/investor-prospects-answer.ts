@@ -339,6 +339,55 @@ export function pickProspects(
   return picks;
 }
 
+/**
+ * Capital Q's own investors among those asked for in a discovery (owner's
+ * own conversation, 2026-10-24: "three Qatari investors"): the ones based
+ * in the countries the ask names, of the kind it names, read beside the
+ * public search. Each is a likely fit from what it publishes, never
+ * interest.
+ */
+export function networkInvestorsIn(
+  data: unknown,
+  wanted: {
+    readonly countries: readonly string[];
+    readonly kinds: readonly string[];
+    readonly count: number;
+  },
+): ProspectPick[] {
+  const prospects = (data as { prospects?: unknown } | null)?.prospects;
+  if (!Array.isArray(prospects)) return [];
+  const stems = wanted.kinds.map((kind) =>
+    kind.toLowerCase().replace(/s\b/gu, "").replace(/\s+/gu, "_"),
+  );
+  const places = new Set(wanted.countries.map((code) => code.toUpperCase()));
+  return (prospects as Prospect[])
+    .filter(
+      (one) =>
+        (places.size === 0 ||
+          (one.hqCountry !== null &&
+            places.has(one.hqCountry.toUpperCase()))) &&
+        (stems.length === 0 ||
+          stems.some((stem) =>
+            `${one.investorType ?? ""} ${one.publicDescription ?? ""}`
+              .toLowerCase()
+              .replace(/\s+/gu, "_")
+              .includes(stem === "vc" ? "vc" : stem),
+          )),
+    )
+    .slice(0, wanted.count)
+    .map((one) => ({
+      investorOrganisationId: one.investorOrganisationId,
+      name: one.name,
+      kind: "LIKELY_FIT" as const,
+      line:
+        [typeWords(one.investorType), countryName(one.hqCountry)]
+          .filter((part): part is string => part !== null && part.length > 0)
+          .join(" · ") || null,
+      about: one.publicDescription,
+      why: prospectWhy(one),
+    }));
+}
+
 export function investorProspectsText(
   picks: readonly ProspectPick[],
   asked: number,

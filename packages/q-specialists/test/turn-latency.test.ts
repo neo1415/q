@@ -137,6 +137,10 @@ function seam(input: {
   readonly history: readonly QConversationMessage[];
   readonly spoken?: boolean;
   readonly speculation?: boolean;
+  /** What the full reading says, when not a FIT question. */
+  readonly reading?: Record<string, unknown>;
+  /** What the quick first read says, when not OTHER. */
+  readonly skimmed?: Record<string, unknown>;
 }) {
   const conversationId = input.history[0]?.conversationId ?? randomUUID();
   const latest = message(
@@ -152,19 +156,23 @@ function seam(input: {
   const turns: QTurnReader = {
     read: () => {
       calls.reader += 1;
-      return Promise.resolve({
-        kind: "QUESTION_TO_Q",
-        confidence: "HIGH",
-        transcript: "CLEAR",
-        question: { kind: "FIT", text: input.said },
-        fromShown: null,
-      } as never);
+      return Promise.resolve(
+        (input.reading ?? {
+          kind: "QUESTION_TO_Q",
+          confidence: "HIGH",
+          transcript: "CLEAR",
+          question: { kind: "FIT", text: input.said },
+          fromShown: null,
+        }) as never,
+      );
     },
   };
   const turnSkim: QTurnSkimmer = {
     skim: () => {
       calls.skim += 1;
-      return Promise.resolve({ kind: "OTHER", confidence: "HIGH" } as never);
+      return Promise.resolve(
+        (input.skimmed ?? { kind: "OTHER", confidence: "HIGH" }) as never,
+      );
     },
   };
   const answer = createSpecialistQAnswer({
@@ -327,6 +335,82 @@ describe("the early skim is not paid for once it cannot decide", () => {
     });
     const { calls } = await s.run();
     expect(calls.skim).toBe(1);
+  });
+});
+
+// Owner's own conversation (2026-10-24): "just find me three Qatari
+// investors, doesn't matter what they are", after other talk and cards,
+// was answered as a lookup of their own company. Read as which investors
+// (or public facts), it is asked of the quick first read and answered as a
+// discovery; an ordinary follow-up still pays for no skim (above).
+describe("a discovery of investors after cards is answered as one", () => {
+  const said =
+    "just find me three Qatari investors, doesn't matter what they are";
+  const qatari = {
+    kind: "DISCOVER_INVESTORS",
+    confidence: "HIGH",
+    count: 3,
+    discover: null,
+    person: null,
+    investors: {
+      regions: ["Qatari"],
+      sector: null,
+      stage: null,
+      aboutMyCompany: false,
+      kinds: [],
+    },
+  };
+
+  it.each([
+    ["INVESTOR_PROSPECTS", "QUESTION_TO_Q"],
+    ["PUBLIC_FACTS", "QUESTION_TO_Q"],
+    [null, "RESEARCH_REQUEST"],
+  ])("read as %s: discovered, by place", async (question, kind) => {
+    const s = seam({
+      said,
+      history: afterTopThree(randomUUID()),
+      reading: {
+        kind,
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: question === null ? null : { kind: question, text: said },
+        tool: null,
+        fromShown: null,
+      },
+      skimmed: qatari,
+    });
+    const { calls, delegated } = await s.run();
+    expect(calls.skim).toBe(1);
+    expect(delegated[0]?.discoverInvestors?.regions).toEqual(["Qatari"]);
+    expect(delegated[0]?.investorProspects).toBeUndefined();
+  });
+
+  it("three Saudi family offices that back fintech: the kind travels", async () => {
+    const s = seam({
+      said: "three Saudi family offices that back fintech",
+      history: afterTopThree(randomUUID()),
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: { kind: "INVESTOR_PROSPECTS", text: "x" },
+        tool: null,
+        fromShown: null,
+      },
+      skimmed: {
+        ...qatari,
+        investors: {
+          regions: ["Saudi"],
+          sector: "fintech",
+          stage: null,
+          aboutMyCompany: false,
+          kinds: ["family offices"],
+        },
+      },
+    });
+    const { delegated } = await s.run();
+    expect(delegated[0]?.discoverInvestors?.kinds).toEqual(["family offices"]);
+    expect(delegated[0]?.discoverInvestors?.sector).toBe("fintech");
   });
 });
 

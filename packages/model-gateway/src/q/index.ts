@@ -3382,12 +3382,13 @@ export function createModelGatewayQAnswer(
         available: prefetchTools,
       }).catch(() => null);
     // D1: investors of a region or kind, found by meaning; cards by code.
-    const investorsFor = (ask: InvestorAsk) =>
+    const investorsFor = (ask: InvestorAsk, companyId: string | null) =>
       runInvestorDiscovery({
         ask,
         tools,
         context: toolContext,
         available: prefetchTools,
+        companyId,
       }).catch(() => null);
     // v58: which investors their own company should approach; cards by code.
     const prospectsFor = (ask: InvestorProspectsAsk, companyId: string) =>
@@ -4657,7 +4658,16 @@ export function createModelGatewayQAnswer(
         // them, their public profiles looked for), and attached to no record
         // of theirs. Never a name guessed from the words' capital letters
         // (production 2026-10-23: "Yes" was searched as a company).
-        const named = namedOther?.name ?? null;
+        // Investors for a company are what is searched for, never the
+        // company itself (owner's own conversation, 2026-10-24: "three
+        // Qatari investors interested in Capital Q" was searched as a
+        // lookup of Capital Q, and every page about an investor was
+        // dropped for not naming it).
+        const named =
+          request.investorProspects !== undefined ||
+          request.discoverInvestors !== undefined
+            ? null
+            : (namedOther?.name ?? null);
         const query = latest.content.trim().slice(0, 200);
         return {
           callId: "q-research",
@@ -6407,12 +6417,17 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const investorsStarted = Date.now();
-        const found = await investorsFor(request.discoverInvestors);
+        const found = await investorsFor(
+          request.discoverInvestors,
+          prepared.ownCompanyId,
+        );
         if (found !== null) {
-          const message = await persistCodeAnswer(
-            found.text,
-            found.block === null ? [] : [found.block],
-          );
+          const message = await persistCodeAnswer(found.text, [
+            ...(found.networkBlock === null || found.networkBlock === undefined
+              ? []
+              : [found.networkBlock]),
+            ...(found.block === null ? [] : [found.block]),
+          ]);
           logger?.info(
             {
               qRunId: request.runId,

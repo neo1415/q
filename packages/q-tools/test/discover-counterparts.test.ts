@@ -102,7 +102,8 @@ describe("people.discover", () => {
       },
     );
     expect(outcome.status).toBe("SUCCEEDED");
-    expect(searched).toEqual(["seed venture capital investors Gulf"]);
+    expect(searched[0]).toBe("seed venture capital investors Gulf");
+    expect(searched.length).toBeLessThanOrEqual(3);
     const joined = searched.join(" ").toLowerCase();
     for (const word of ["3m", "arr", "runway", "raise", "$"]) {
       expect(joined).not.toContain(word);

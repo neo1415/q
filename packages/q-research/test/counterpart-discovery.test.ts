@@ -246,7 +246,9 @@ describe("investor discovery by meaning", () => {
       sector: "fintech",
       count: 4,
     });
-    expect(web.searches).toHaveLength(1);
+    // A few phrasings side by side (owner's own conversation, 2026-10-24).
+    expect(web.searches.length).toBeGreaterThanOrEqual(1);
+    expect(web.searches.length).toBeLessThanOrEqual(3);
     expect(found.webSearched).toBe(true);
     // Three prepared, one new from the web: QInvest is not repeated, the
     // list article and the London firm are not investors in the region.
@@ -308,7 +310,7 @@ describe("investor discovery by meaning", () => {
       count: 5,
     });
     expect(found.webSearched).toBe(true);
-    expect(web.searches).toHaveLength(1);
+    expect(web.searches.length).toBeLessThanOrEqual(3);
     expect(web.searches[0]?.query).toBe("seed venture capital investors Arab");
     const everything = web.egressed().toLowerCase();
     for (const secret of [
@@ -338,7 +340,7 @@ describe("investor discovery by meaning", () => {
     });
     expect(found.candidates).toHaveLength(0);
     expect(found.outcome).toBe("NONE");
-    expect(web.searches).toHaveLength(1);
+    expect(web.searches.length).toBeGreaterThanOrEqual(1);
   });
 
   it("says unavailable, not none, when the search fails and nothing is known", async () => {
@@ -392,5 +394,89 @@ describe("public terms", () => {
     expect(publicTerm("runway of 8 months")).toBeNull();
     expect(publicTerm("x".repeat(60))).toBeNull();
     expect(publicTerm(null)).toBeNull();
+  });
+});
+
+/**
+ * Owner's own conversation (2026-10-24): discovery asks name a kind of
+ * investor and a place; they are searched as discoveries -- the kind, the
+ * place and the sector, in a few phrasings side by side -- and only that
+ * kind is offered.
+ */
+describe("discovery by kind, place and sector", () => {
+  it("three Saudi family offices that back fintech: searched as family offices in Saudi Arabia, never a VC instead", async () => {
+    const web = createFakeResearchProvider({
+      pages: [
+        {
+          url: "https://www.linkedin.com/company/olayan-family-office",
+          title: "Olayan Family Office | LinkedIn",
+          snippet:
+            "Riyadh family office backing fintech and growth companies in Saudi Arabia.",
+          text: "Riyadh family office backing fintech and growth companies in Saudi Arabia.",
+        },
+        {
+          url: "https://www.linkedin.com/company/stv-vc",
+          title: "STV | LinkedIn",
+          snippet: "Riyadh venture capital firm investing in Saudi startups.",
+          text: "Riyadh venture capital firm investing in Saudi startups.",
+        },
+      ],
+    });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Saudi"],
+      kinds: ["family offices"],
+      sector: "fintech",
+      count: 3,
+    });
+    const queries = web.searches.map((search) => search.query.toLowerCase());
+    expect(queries.length).toBeGreaterThan(1);
+    expect(queries.every((query) => query.includes("family offices"))).toBe(
+      true,
+    );
+    expect(queries.some((query) => query.includes("saudi arabia"))).toBe(true);
+    expect(queries.some((query) => query.includes("fintech"))).toBe(true);
+    // The Qatar VCs prepared are not family offices; STV is a VC.
+    expect(names(found)).toEqual(["Olayan Family Office"]);
+  });
+
+  it("five Kenyan angel networks: searched as angel networks in Kenya", async () => {
+    const web = createFakeResearchProvider({ pages: [] });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    await discovery.discover({
+      ...SCOPE,
+      regions: ["Kenyan"],
+      kinds: ["angel networks"],
+      count: 5,
+    });
+    const queries = web.searches.map((search) => search.query.toLowerCase());
+    expect(queries.some((query) => query.includes("angel networks"))).toBe(
+      true,
+    );
+    expect(queries.some((query) => query.includes("kenya"))).toBe(true);
+    // A discovery, never a lookup of anyone's company.
+    expect(queries.join(" ")).not.toContain("capital q");
+  });
+
+  it("three Qatari investors, any kind: the prepared Qatar investors, searched as a discovery", async () => {
+    const web = createFakeResearchProvider({ pages: [] });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Qatari"],
+      count: 3,
+    });
+    expect(found.countries).toContain("QA");
+    expect(found.candidates.length).toBe(3);
   });
 });

@@ -52,6 +52,11 @@ export type CounterpartAsk = {
   readonly sector?: string | null | undefined;
   readonly stage?: string | null | undefined;
   readonly count?: number | undefined;
+  /**
+   * The kinds of investor asked for, as said ("family offices", "angel
+   * networks", "VCs"); empty: any kind. Public words, checked like regions.
+   */
+  readonly kinds?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -268,6 +273,40 @@ type Draft = {
   readonly key: string;
 };
 
+/**
+ * The words that say a kind of investor ("family offices" -> "family
+ * office", "VCs" -> "vc", "angel networks" -> "angel network"), singular,
+ * for matching what a page or a prepared record says it is.
+ */
+function kindStems(kinds: readonly string[]): readonly string[] {
+  return kinds
+    .map((kind) =>
+      kind
+        .toLowerCase()
+        .replace(/\s+/gu, " ")
+        .trim()
+        .split(" ")
+        .map((word) =>
+          word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
+            ? word.slice(0, -1)
+            : word,
+        )
+        .join(" "),
+    )
+    .filter((stem) => stem.length >= 2);
+}
+
+/** Whether a text says it is one of the kinds asked for (any, when none). */
+function isKind(text: string, stems: readonly string[]): boolean {
+  if (stems.length === 0) return true;
+  const said = text.toLowerCase();
+  return stems.some((stem) =>
+    stem === "vc"
+      ? /\b(?:vc|venture capital)\b/u.test(said)
+      : said.includes(stem),
+  );
+}
+
 function knownDrafts(input: {
   readonly index: KnownEntityIndex;
   readonly countries: readonly string[];
@@ -275,11 +314,14 @@ function knownDrafts(input: {
   readonly filter: boolean;
   readonly sector: string | null;
   readonly stage: string | null;
+  readonly kinds: readonly string[];
 }): readonly Draft[] {
   const drafts: Draft[] = [];
   for (const record of input.index.list()) {
     const role = tierOf(record);
     if (role === null) continue;
+    // A kind they asked for ("family offices") is one the record says.
+    if (role === "INVESTOR" && !isKind(textOf(record), input.kinds)) continue;
     const found = recordCountries(record);
     const inSet = found.filter((code) => input.countries.includes(code));
     // Unknown stays unknown: a prepared entity with no detectable place is
@@ -505,6 +547,11 @@ export function createCounterpartDiscovery(dependencies: {
       const sector = publicTerm(ask.sector);
       const stage = publicTerm(ask.stage);
       const regionAsked = regionWords.length > 0;
+      const kindWords = (ask.kinds ?? [])
+        .map((word) => publicTerm(word))
+        .filter((word): word is string => word !== null)
+        .slice(0, 3);
+      const stems = kindStems(kindWords);
 
       const drafts = unresolved
         ? []
@@ -515,6 +562,7 @@ export function createCounterpartDiscovery(dependencies: {
             filter,
             sector,
             stage,
+            kinds: stems,
           });
       const investors = drafts.filter((d) => d.candidate.role === "INVESTOR");
       const openers = drafts.filter((d) => d.candidate.role === "DOOR_OPENER");
@@ -528,26 +576,80 @@ export function createCounterpartDiscovery(dependencies: {
       const missing = count - picked.length;
       if (missing > 0 && web !== null) {
         webSearched = true;
-        // The whole query: public taxonomy words and the member's region words.
-        webQuery = [
-          sector,
-          stage?.replace(/_/gu, " "),
-          "venture capital investors",
-          ...regionWords,
+        // Owner's own conversation (2026-10-24): a discovery is searched as
+        // a discovery -- the kind asked for, the place and the sector, in a
+        // few phrasings side by side -- never as a lookup of anyone. Only
+        // public words: the member's region and kind words and taxonomy
+        // terms, each checked by publicTerm.
+        const kindPhrase =
+          kindWords.length > 0
+            ? kindWords.join(" ")
+            : "venture capital investors";
+        const placeNames = countries
+          .slice(0, 2)
+          .map((code) => countryName(code))
+          .filter((name): name is string => name !== null);
+        const place = placeNames.length > 0 ? placeNames : regionWords;
+        const phrasings = [
+          [sector, stage?.replace(/_/gu, " "), kindPhrase, ...regionWords],
+          [
+            kindPhrase,
+            place.length > 0 ? "in" : null,
+            ...place,
+            sector === null ? "startups" : `investing in ${sector}`,
+          ],
+          [
+            ...regionWords,
+            kindWords.length > 0 ? kindPhrase : "venture capital firms",
+            "startup investments",
+          ],
         ]
-          .filter((part): part is string => part !== null && part !== undefined)
-          .join(" ");
+          .map((parts) =>
+            parts
+              .filter(
+                (part): part is string =>
+                  typeof part === "string" && part.length > 0,
+              )
+              .join(" ")
+              .replace(/\s+/gu, " ")
+              .trim(),
+          )
+          .filter(
+            (query, at, all) => query.length > 0 && all.indexOf(query) === at,
+          );
+        webQuery = phrasings[0] ?? null;
         const result = await bounded(
-          (signal) =>
-            web.search(
-              {
-                query: webQuery ?? "",
-                maxResults: 6,
-                freshness: "ANY",
-                includeDomains: [],
-              },
-              { signal },
-            ),
+          async (signal) => {
+            const lists = await Promise.all(
+              phrasings.map((query) =>
+                web
+                  .search(
+                    {
+                      query,
+                      maxResults: 6,
+                      freshness: "ANY",
+                      includeDomains: [],
+                    },
+                    { signal },
+                  )
+                  .catch(() => null),
+              ),
+            );
+            const answered = lists.filter(
+              (list): list is NonNullable<typeof list> => list !== null,
+            );
+            if (answered.length === 0) throw new Error("no index answered");
+            const seenUrls = new Set<string>();
+            return {
+              hits: answered
+                .flatMap((list) => list.hits)
+                .filter((hit) => {
+                  if (seenUrls.has(hit.url)) return false;
+                  seenUrls.add(hit.url);
+                  return true;
+                }),
+            };
+          },
           dependencies.webBudgetMs ?? DISCOVERY_WEB_BUDGET_MS,
           ask.signal,
         );
@@ -571,6 +673,8 @@ export function createCounterpartDiscovery(dependencies: {
           for (const hit of result.hits) {
             const find = webFindOf(hit, web.code, countries, filter);
             if (find === null || seen.has(find.profileKey)) continue;
+            // A kind they asked for is one the page says it is.
+            if (!isKind(`${hit.title ?? ""} ${hit.snippet}`, stems)) continue;
             if (
               knownKeys.has(aliasKeyOf(find.name)) ||
               knownUrls.has(hit.url.replace(/\/+$/u, "").toLowerCase())
