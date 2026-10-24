@@ -1526,13 +1526,17 @@ export {
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
 export { CALL_PREP_V1 } from "./prompts/tasks/call-prep.v1.js";
+export { CALL_PREP_V2 } from "./prompts/tasks/call-prep.v2.js";
 export {
   CALL_PREP_SCHEMA_NAME,
   CALL_PREP_SCHEMA_VERSION,
   CALL_PREP_UNTRUSTED,
+  CALL_PREP_V2_SCHEMA_VERSION,
   CallPrepResultSchema,
+  CallPrepResultV2Schema,
   CallPrepVariablesSchema,
   type CallPrepResult,
+  type CallPrepResultV2,
   type CallPrepVariables,
 } from "./prompts/schemas/call-prep.js";
 export { CONVERSATION_RECALL_V1 } from "./prompts/tasks/conversation-recall.v1.js";

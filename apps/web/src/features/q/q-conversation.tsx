@@ -1,5 +1,6 @@
 "use client";
 
+import { captionTail } from "../voice/caption";
 import {
   lazy,
   Suspense,
@@ -98,7 +99,6 @@ import { useFollowNewest } from "./follow-newest";
 import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
-import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
 
@@ -220,7 +220,6 @@ export function welcomeNow(input: {
 const COMPOSER_ID = "home-q";
 /** How long their spoken words rest before they are read as an answer. */
 const OPENER_SETTLE_MS = 1_200;
-const ENDED_KEY = "cq.q.voice-ended";
 
 /** The conversation as plain text, for saving. */
 function transcriptText(
@@ -234,35 +233,6 @@ function transcriptText(
     lines.push(`${line.role === "user" ? "You" : "Q"}: ${line.text}`);
   }
   return lines.join("\n\n");
-}
-
-function endedThisTab(): boolean {
-  try {
-    return window.sessionStorage.getItem(ENDED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function rememberEnded(ended: boolean): void {
-  try {
-    if (ended) window.sessionStorage.setItem(ENDED_KEY, "1");
-    else window.sessionStorage.removeItem(ENDED_KEY);
-  } catch {
-    // Not remembered: the next visit simply offers the line again.
-  }
-}
-
-/** Whether the microphone is already granted, without ever prompting. */
-async function microphoneGranted(): Promise<boolean> {
-  try {
-    const status = await navigator.permissions.query({
-      name: "microphone",
-    });
-    return status.state === "granted";
-  } catch {
-    return false;
-  }
 }
 
 function words(text: string): string {
@@ -414,7 +384,6 @@ export function QConversationPanel({
 
   const sessionTalk = session.talk;
   const talk = useCallback(async () => {
-    rememberEnded(false);
     // Over a welcome still on screen, Q says that welcome and nothing
     // before it: one greeting, not the page's and then the call's. E-05:
     // the line opens at once with what is ready now; a call is the person
@@ -430,43 +399,14 @@ export function QConversationPanel({
 
   const endVoice = voice.end;
   const end = useCallback(() => {
-    rememberEnded(true);
     void endVoice();
   }, [endVoice]);
 
-  // Q speaks first: on arrival the line opens by itself where the
-  // microphone is already this site's, and the person has not ended it in
-  // this tab. Anywhere else the stage offers Talk, one press away.
-  // Once per visit to the page: a ref, not state, so trying does not
-  // re-run (and cancel) the attempt it is part of.
-  const autoTried = useRef(false);
-  const talkRef = useRef(talk);
-  useEffect(() => {
-    talkRef.current = talk;
-  }, [talk]);
+  // QA QO-46 (privacy, owner 2026-10-23): the microphone opens only on
+  // the person's own action -- Speak, or the wake word they turned on --
+  // never by itself on arrival (it used to open a live line on load
+  // wherever the site already had microphone permission).
   const voiceActive = voice.active;
-  useEffect(() => {
-    if (autoTried.current || !connected || voiceActive) return;
-    let left = false;
-    // A task later, so an effect React runs twice in development (and
-    // cleans up in between) tries once, not never.
-    const timer = window.setTimeout(() => {
-      autoTried.current = true;
-      void (async () => {
-        if (endedThisTab()) return;
-        // A Q Pitch tour holds the voice: its own Start opens the line,
-        // never this arrival (a paid line before Start, 15 Oct).
-        if (qPitchHoldsVoice()) return;
-        if (!(await microphoneGranted()) || left) return;
-        await talkRef.current();
-      })();
-    }, 0);
-    return () => {
-      // Left the page before the permission answer: no line opens.
-      left = true;
-      window.clearTimeout(timer);
-    };
-  }, [connected, voiceActive]);
 
   // An answer that arrived while the line was closed is read aloud all the
   // same (one-way speech, no microphone): answers on this page are heard.
@@ -535,6 +475,12 @@ export function QConversationPanel({
   // The live line: what is being said right now, one line that grows in
   // place under its id, until the next one starts.
   const live = client.transcript.at(-1);
+  // QA QO-19 (WCAG 1.2.4): what Q is saying, as words, on the voice room.
+  const qSaying = voice.active
+    ? captionTail(
+        client.transcript.findLast((line) => line.role === "q")?.text ?? "",
+      )
+    : "";
   const liveIsPerson =
     voice.active &&
     live !== undefined &&
@@ -1286,9 +1232,22 @@ export function QConversationPanel({
                           // the room up and down); only its way out, in a
                           // place that never moves. The transcript is Chat.
                           <div
-                            className="flex w-full flex-col items-center"
+                            className="flex w-full flex-col items-center gap-3"
                             data-q-voice-room-end
                           >
+                            {/* QO-19: Q's spoken words as captions, in a
+                                slot of fixed height that is there whether
+                                Q speaks or not, so nothing moves (owner
+                                2026-10-20); off with Captions. */}
+                            {captions ? (
+                              <p
+                                className="cq-room-caption cq-body"
+                                aria-live="polite"
+                                data-q-voice-caption
+                              >
+                                {qSaying}
+                              </p>
+                            ) : null}
                             <button
                               type="button"
                               className="cq-room-end"

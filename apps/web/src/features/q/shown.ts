@@ -355,6 +355,23 @@ type SettledAnswer = {
   readonly question: string | undefined;
 };
 
+/**
+ * An answer laid out as a piece of writing: two or more section headings
+ * (a heading line or a line in bold on its own) or a list of three or
+ * more items. Layout, read from the answer's own markdown.
+ */
+export function writtenOut(turn: QTurn): boolean {
+  if (turn.kind !== "Q") return false;
+  const lines = turn.text.split("\n").map((line) => line.trim());
+  const headings = lines.filter(
+    (line) => /^#{1,6}\s+\S/u.test(line) || /^\*\*[^*]+\*\*:?$/u.test(line),
+  ).length;
+  const items = lines.filter((line) =>
+    /^(?:[-*+]|\d+[.)])\s+\S/u.test(line),
+  ).length;
+  return headings >= 2 || items >= 3;
+}
+
 function settledAnswers(turns: readonly QTurn[]): readonly SettledAnswer[] {
   const out: SettledAnswer[] = [];
   let question: string | undefined;
@@ -486,6 +503,13 @@ export function stageOf(
     if (roomShowOf(one.turn, one.question ?? null) !== undefined) {
       return { item: null, why: "NONE" };
     }
+    // QA QO-32 (2026-10-23): "Prep me for a call with Zino" named a
+    // company on the cards shown before, so those cards stayed up, under
+    // the prep's last sentence ("I'll play Zino Aviation") as their line;
+    // the prep itself read as if it belonged to the next turn. An answer
+    // written out in sections or a list is its own display: older cards
+    // leave the stage rather than sit over it.
+    if (writtenOut(one.turn)) return { item: null, why: "NONE" };
     // The one the person reopened first, then newest first: the most
     // recent object the conversation is on.
     const ordered = [...items].reverse();

@@ -152,6 +152,7 @@ export function createCallPrepPort(
               ];
         const related = relatedWaiting(input.said, waitingNow, subjects);
         return {
+          viewerRole: viewer.role,
           counterpartName: name,
           ...prep,
           waiting: related.about === "SAME_PEOPLE" ? related.waiting : [],

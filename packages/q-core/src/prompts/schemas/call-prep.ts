@@ -78,3 +78,19 @@ export const CallPrepResultSchema = z
   })
   .strict();
 export type CallPrepResult = z.infer<typeof CallPrepResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v2 (owner QA O-I12, 2026-10-24): an investor's prep for a founder was
+// written from the founder's side ("You have secured 10 clients"). The
+// same sections are read by the asker's side: for an investor, the
+// questions are theirs to ask (with what to listen for), the weak spots are
+// red flags (with how to test them), and theyWant says what the founder
+// will want from them (cheque, timeline, value-add). Null for a founder.
+// ---------------------------------------------------------------------------
+
+export const CALL_PREP_V2_SCHEMA_VERSION = 2;
+
+export const CallPrepResultV2Schema = CallPrepResultSchema.extend({
+  theyWant: z.string().trim().min(1).max(500).nullable().default(null),
+}).strict();
+export type CallPrepResultV2 = z.infer<typeof CallPrepResultV2Schema>;

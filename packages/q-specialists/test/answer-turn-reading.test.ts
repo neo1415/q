@@ -5201,6 +5201,7 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
     meetingPrep: { counterpart: "Savanna Seed Partners" },
   } as unknown as TurnReaderResult;
   const prep = (waiting: readonly string[] = []): CallPrep => ({
+    viewerRole: "FOUNDER",
     counterpartName: "Savanna Seed Partners",
     whoTheyAre: "A seed fund based in Nairobi",
     soFar: "This would be the first contact",

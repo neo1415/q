@@ -16,6 +16,11 @@ import { waitingWork } from "./team-job.js";
  */
 
 export type CallPrep = {
+  /**
+   * Whose side the prep is from (owner QA O-I12): a founder meeting an
+   * investor, or an investor meeting a founder. It decides the headings.
+   */
+  readonly viewerRole: "FOUNDER" | "INVESTOR";
   /** The counterpart as Capital Q holds the name. */
   readonly counterpartName: string;
   readonly whoTheyAre: string;
@@ -29,6 +34,8 @@ export type CallPrep = {
     readonly handle: string;
   }[];
   readonly ask: string;
+  /** An investor's prep: what the founder will want from them. */
+  readonly theyWant?: string | null | undefined;
   /** Summaries of related work already waiting for their approval. */
   readonly waiting: readonly string[];
 };
@@ -51,19 +58,24 @@ export function callPrepLine(prep: CallPrep): string {
     const trimmed = text.trim();
     return /[.!?…:]$/u.test(trimmed) ? trimmed : `${trimmed}.`;
   };
+  const investor = prep.viewerRole === "INVESTOR";
   const first = prep.waiting[0];
+  const theyWant = prep.theyWant?.trim() ?? "";
   return [
     `**Who they are**\n${sentence(prep.whoTheyAre)}`,
     `**So far**\n${sentence(prep.soFar)}`,
-    `**What they'll likely ask**\n${prep.questions
+    `**${investor ? "What to ask them" : "What they'll likely ask"}**\n${prep.questions
       .map(
         (item, index) =>
-          `${index + 1}. ${item.question.trim()}\n   ${sentence(item.answer)}`,
+          `${index + 1}. ${item.question.trim()}\n   ${investor ? "Listen for: " : ""}${sentence(item.answer)}`,
       )
       .join("\n")}`,
-    `**Weak spots**\n${prep.weakSpots
+    `**${investor ? "Red flags to test" : "Weak spots"}**\n${prep.weakSpots
       .map((item) => `- ${sentence(item.spot)} ${sentence(item.handle)}`)
       .join("\n")}`,
+    ...(investor && theyWant.length > 0
+      ? [`**What they'll want from you**\n${sentence(theyWant)}`]
+      : []),
     `**Your ask**\n${sentence(prep.ask)}`,
     ...(first === undefined || waitingWork(first).length === 0
       ? []

@@ -170,6 +170,24 @@ const ICE_TIMEOUT_MS = 10_000;
 const CLOSE_WAIT_MS = 15_000;
 /** How long an end waits for a just-negotiated channel to open, to close it. */
 const CHANNEL_OPEN_WAIT_MS = 5_000;
+/**
+ * QA QO-18 (2026-10-23): a network that never lets the call through (ICE
+ * stuck at "checking") showed "Listening" for over two minutes, because the
+ * call was taken as up once the answer was set. It is up when its event
+ * channel opens; past this, it did not come up, and the next line (duplex,
+ * the standard voice, or typing) takes over.
+ */
+export const LIVE_CONNECT_MS = 6_000;
+
+/** The call was negotiated but its network path never opened. */
+export class LiveCallStalled extends Error {
+  readonly iceState: string;
+  constructor(iceState: string) {
+    super(`The live call did not connect (ICE ${iceState})`);
+    this.name = "LiveCallStalled";
+    this.iceState = iceState;
+  }
+}
 
 /** Its state once it opens, closes, or the wait is over. */
 function channelOpened(
@@ -920,6 +938,18 @@ export async function startLiveCall(
       if (connection !== mine || ended) return;
       if (pc.connectionState === "failed") void renew("network");
     });
+    // Up only once its channel is open (QO-18): a call whose path never
+    // opened is ended on the server and reported as not connected.
+    const state = await channelOpened(channel, LIVE_CONNECT_MS);
+    if (state !== "open") {
+      await post(
+        doFetch,
+        `end/${opened.voiceSessionId}`,
+        { reason: "connect_failed" },
+        token,
+      ).catch(() => undefined);
+      throw new LiveCallStalled(pc.iceConnectionState);
+    }
     return mine;
   };
 
