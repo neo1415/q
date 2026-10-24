@@ -489,6 +489,7 @@ import {
   readOwnThesis,
   type DocumentStudioPort,
   type InvestorGatesPort,
+  workOnBoardItems,
 } from "@capital-q/q-tools";
 // BILLING block (ADR 0034)
 import {
@@ -4552,8 +4553,31 @@ const qIntelligence = composeQIntelligence({
   deltas: liveDeltas,
   artifacts: qArtifacts.preparation,
   // Board asks (reader v61 boardAsk): Q's answer filed and kept on their
-  // own board, its steps as tasks when they ask for that.
-  board: qBoard,
+  // own board, its steps as tasks when they ask for that; a save while Q's
+  // deep work is still under way keeps the job, linked; "work on the
+  // first task" runs the board tool's own WORK by code.
+  board: {
+    list: qBoard.list,
+    add: qBoard.add,
+    linkJob: qBoard.linkJob,
+    latestRunningJob: async (actor) => {
+      // Their own jobs only, by the server-resolved actor.
+      const rows = await database.sql<{ id: string }[]>`
+        select id from q_runtime.workforce_jobs
+         where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
+           and status in ('PLANNING', 'RUNNING')
+           and created_at > now() - interval '2 hours'
+         order by created_at desc
+         limit 1`;
+      const id = rows[0]?.id;
+      return id === undefined ? null : { jobId: id };
+    },
+    work: (request, itemIds) =>
+      workOnBoardItems(qBoard, workforceJobBoard.port, itemIds, {
+        actor: request.actor,
+        runId: request.runId,
+      }),
+  },
   artifactReviser: qArtifacts.reviser,
   receipts: qReceipts,
   visibility: profileBoard,

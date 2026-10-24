@@ -807,5 +807,7 @@ export {
   createBoardTools,
   createMyBoardTool,
   MY_BOARD,
+  workOnBoardItems,
+  type BoardWorkOutcome,
 } from "./tools/board.js";
 export type { QBoardOutcome, QBoardPort } from "./ports.js";
