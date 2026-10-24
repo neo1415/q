@@ -37,6 +37,8 @@ export type SearchEvidence = {
   readonly countries?: readonly string[] | undefined;
   /** The page's excerpt, for the city it places them in. */
   readonly text?: string | null | undefined;
+  /** The page's title. */
+  readonly title?: string | null | undefined;
 };
 
 /** What Capital Q holds about them, when it holds them. */
@@ -44,14 +46,98 @@ export type HeldIdentity = {
   readonly website?: string | null | undefined;
   readonly country?: string | null | undefined;
   readonly city?: string | null | undefined;
+  /** What the record says they do (its short description). */
+  readonly about?: string | null | undefined;
 };
 
-/** Whether Capital Q holds where they are. */
-function holdsPlace(held: HeldIdentity): boolean {
+/** Words of a description too common to tell one company from another. */
+const PLAIN_WORDS = new Set([
+  "about",
+  "across",
+  "africa",
+  "african",
+  "build",
+  "builds",
+  "business",
+  "businesses",
+  "company",
+  "companies",
+  "customers",
+  "digital",
+  "helps",
+  "global",
+  "their",
+  "these",
+  "those",
+  "local",
+  "makes",
+  "small",
+  "large",
+  "online",
+  "platform",
+  "products",
+  "provides",
+  "services",
+  "solution",
+  "solutions",
+  "startup",
+  "startups",
+  "teams",
+  "technology",
+  "through",
+  "which",
+  "while",
+  "world",
+  "where",
+  "using",
+  "users",
+  "other",
+  "people",
+]);
+
+/** The words of what they do that set them apart ("payments", "invoices"). */
+function aboutTerms(held: HeldIdentity): readonly string[] {
+  return (held.about ?? "")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 5 && !PLAIN_WORDS.has(word));
+}
+
+/** Whether Capital Q holds anything to tell them from a namesake by. */
+function holdsIdentity(held: HeldIdentity): boolean {
   return (
     (held.country?.trim().length ?? 0) === 2 ||
-    (held.city?.trim().length ?? 0) > 2
+    (held.city?.trim().length ?? 0) > 2 ||
+    hostOf(held.website) !== null ||
+    aboutTerms(held).length > 0
   );
+}
+
+/**
+ * A page that names them and agrees with what Capital Q holds (live
+ * 2026-10-24: requiring the place alone dropped a founders page that never
+ * says "Lagos"): it places them where the record does, names their own
+ * website, or says what they do in the record's own distinctive words
+ * ("payments" for Duplo; LEGO's pages say "bricks").
+ */
+function corroboratesThem(source: SearchEvidence, held: HeldIdentity): boolean {
+  if (placesThem(source, held)) return true;
+  const page = `${source.title ?? ""} ${source.text ?? ""}`.toLowerCase();
+  const ownHost = hostOf(held.website);
+  const label =
+    ownHost === null ? "" : (registrableDomain(ownHost).split(".")[0] ?? "");
+  if (label.length >= 4 && page.includes(label)) return true;
+  const words = new Set(page.split(/[^\p{L}\p{N}]+/u));
+  return aboutTerms(held).some((term) => words.has(term));
+}
+
+/** A page that names them in its title or text (as a word). */
+function namesThem(source: SearchEvidence, name: string): boolean {
+  const named = name.trim().toLowerCase();
+  if (named.length < 2) return false;
+  const page = ` ${`${source.title ?? ""} ${source.text ?? ""}`.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ")} `;
+  const wanted = ` ${named.replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
+  return page.includes(wanted);
 }
 
 /** A page that names them and places them where Capital Q holds them. */
@@ -131,12 +217,12 @@ export function corroboratedPictures(
     if (own !== null && site !== own && looksLikeOwnSite(site, evidence.name)) {
       continue;
     }
-    // Held by Capital Q: a page about a namesake elsewhere is not theirs.
+    // Held by Capital Q: a page about a namesake is not theirs.
     if (
       evidence.held !== null &&
       evidence.held !== undefined &&
-      holdsPlace(evidence.held) &&
-      !placesThem(source, evidence.held)
+      holdsIdentity(evidence.held) &&
+      !corroboratesThem(source, evidence.held)
     ) {
       continue;
     }
@@ -194,5 +280,8 @@ export function pageAboutThem(
   const site = registrableDomain(source.domain);
   if (own !== null && site === own) return true;
   if (own !== null && looksLikeOwnSite(site, name)) return false;
-  return !holdsPlace(held) || placesThem(source, held);
+  // A search the model made with no name to check pages against: a page
+  // must at least name them ("Diplo Run Club" never did).
+  if (source.subjectMatch === null && !namesThem(source, name)) return false;
+  return !holdsIdentity(held) || corroboratesThem(source, held);
 }

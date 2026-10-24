@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   corroboratedPictures,
   looksLikeOwnSite,
+  pageAboutThem,
   registrableDomain,
 } from "../src/q/picture-corroboration.js";
 
@@ -150,5 +151,91 @@ describe("pictures only where evidence ties the site to them", () => {
     );
     expect(looksLikeOwnSite("www.spheros-transfrig.com", "Spheros")).toBe(true);
     expect(looksLikeOwnSite("techcabal.com", "Spheros")).toBe(false);
+  });
+});
+
+/**
+ * Live 2026-10-24 (investor.savanna-seed, "Who founded Duplo?"): the
+ * answer's Sources held LEGO DUPLO on Wikipedia, a chocolate bar and
+ * "Diplo Run Club" beside Duplo's own site and a page naming its founders.
+ * Pages about them pass -- their own site, press that says what they do --
+ * and namesakes do not, though they never say "Lagos".
+ */
+describe("which pages are about a company Capital Q holds", () => {
+  const DUPLO = {
+    country: "NG",
+    city: "Lagos",
+    about: "B2B payments and invoicing for African businesses.",
+  };
+  const page = (
+    domain: string,
+    title: string,
+    text: string,
+    subjectMatch: string | null = null,
+  ) => ({ domain, title, text, subjectMatch, countries: [] });
+
+  it.each([
+    [
+      "Duplo's own site",
+      page(
+        "tryduplo.com",
+        "About us | Duplo",
+        "Duplo helps businesses collect payments and send invoices.",
+      ),
+      true,
+    ],
+    [
+      "press naming its founders",
+      page(
+        "startupintros.com",
+        "Duplo - Founders",
+        "Duplo, a fintech for B2B payments, was founded by Yele Oyekola and Tunde Akinnuwa.",
+      ),
+      true,
+    ],
+    [
+      "LEGO DUPLO on Wikipedia",
+      page(
+        "en.wikipedia.org",
+        "Lego Duplo - Wikipedia",
+        "Lego Duplo is a product line of construction toys: large bricks for toddlers.",
+        "MATCH",
+      ),
+      false,
+    ],
+    [
+      "a chocolate bar",
+      page(
+        "www.eatbetter.app",
+        "Duplo chocolate bar",
+        "Duplo is a chocolate bar made by Ferrero, wafer and hazelnut.",
+      ),
+      false,
+    ],
+    [
+      "a page that never names them",
+      page(
+        "wwd.com",
+        "Diplo Run Club",
+        "Diplo's run club and children's footwear.",
+      ),
+      false,
+    ],
+  ])("%s", (_case, source, about) => {
+    expect(pageAboutThem(source, "Duplo", DUPLO)).toBe(about);
+  });
+
+  it("their own website on record is always theirs; a namesake's own site never", () => {
+    const held = { ...DUPLO, website: "https://tryduplo.com" };
+    expect(
+      pageAboutThem(page("tryduplo.com", "Home", "Welcome."), "Duplo", held),
+    ).toBe(true);
+    expect(
+      pageAboutThem(
+        page("duplo-usa.com", "Duplo USA", "Duplo payments"),
+        "Duplo",
+        held,
+      ),
+    ).toBe(false);
   });
 });
