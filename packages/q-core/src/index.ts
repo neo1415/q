@@ -190,6 +190,7 @@ export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export { DECISION_READER_V2 } from "./prompts/tasks/decision-reader.v2.js";
 // Founder brief J7: people's words read by meaning.
 export {
+  DOCUMENT_KIND_READER_V1,
   MEETING_OUTCOME_READER_V1,
   ONBOARDING_MOVE_READER_V1,
   PREFERENCE_POLARITY_V1,

@@ -22,6 +22,7 @@ import type { ParserResult, ParserSandbox } from "../src/parser/sandbox.js";
 import type { QueueMessage } from "../src/queue/pgmq.js";
 import {
   createFakeEvidence,
+  makeDocument,
   createRecordingLogger,
   makeVersion,
   TENANT_A,
@@ -747,6 +748,93 @@ describe("document processing pipeline", () => {
 });
 
 /** ADR 0042: the whole verdict × policy matrix, and CLEAN only from CLEAN. */
+describe("an unclassified upload is filed by what it says (QA QO-23)", () => {
+  const deckParse: ParserResult = {
+    ...successfulParse,
+    output: {
+      ...successfulParse.output,
+      blocks: [
+        {
+          kind: "slide",
+          slideNumber: 1,
+          title: "Kiln Payroll (fictional)",
+          text: "Payroll for Nigerian SMEs. Raising $1.5m on a SAFE.",
+          locator: { index: 0 },
+        },
+      ],
+    },
+  };
+  const run = async (
+    document: Partial<Parameters<typeof makeDocument>[1]>,
+    documentKind: NonNullable<DocumentPipelineOptions["documentKind"]>,
+  ) => {
+    const version = makeVersion();
+    const evidence = createFakeEvidence({
+      version,
+      document: makeDocument(version, document),
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      sandbox: sandboxStub(deckParse),
+      documentKind,
+    });
+    const outcome = await handle(jobMessage({ documentVersionId: version.id }));
+    return { outcome, names: evidence.calls.map((c) => c.name), evidence };
+  };
+
+  it("reads the opening pages, never only the name, and files it before it is announced ready", async () => {
+    const asked: { filename: string; opening: string }[] = [];
+    const { outcome, names, evidence } = await run(
+      { documentType: "UNCLASSIFIED" },
+      (input) => {
+        asked.push({ filename: input.filename, opening: input.opening });
+        return Promise.resolve("PITCH_DECK");
+      },
+    );
+    expect(outcome).toEqual({ kind: "DONE" });
+    expect(asked[0]?.opening).toContain("Payroll for Nigerian SMEs");
+    expect(names.indexOf("classifyDocumentContent")).toBeLessThan(
+      names.indexOf("completeDocumentProcessing"),
+    );
+    expect(
+      evidence.calls.find((c) => c.name === "classifyDocumentContent")?.input,
+    ).toMatchObject({ documentType: "PITCH_DECK" });
+  });
+
+  it("never re-files a type a person chose, nor reads what they marked highly confidential", async () => {
+    let asked = 0;
+    const count = () => {
+      asked += 1;
+      return Promise.resolve("MANAGEMENT_ACCOUNTS");
+    };
+    const chosen = await run({ documentType: "PITCH_DECK" }, count);
+    const secret = await run(
+      { documentType: "UNCLASSIFIED", sensitivityClass: "HIGHLY_CONFIDENTIAL" },
+      count,
+    );
+    expect(asked).toBe(0);
+    expect(chosen.names).not.toContain("classifyDocumentContent");
+    expect(secret.names).not.toContain("classifyDocumentContent");
+  });
+
+  it("an unsure or failed reading leaves it unclassified and still completes", async () => {
+    const unsure = await run({ documentType: "UNCLASSIFIED" }, () =>
+      Promise.resolve("UNSURE"),
+    );
+    const failed = await run({ documentType: "UNCLASSIFIED" }, () =>
+      Promise.reject(new Error("provider down")),
+    );
+    for (const result of [unsure, failed]) {
+      expect(result.outcome).toEqual({ kind: "DONE" });
+      expect(result.names).not.toContain("classifyDocumentContent");
+      expect(result.names).toContain("completeDocumentProcessing");
+    }
+  });
+});
+
 describe("the malware policy matrix", () => {
   const expected = {
     REQUIRE_CLEAN: {

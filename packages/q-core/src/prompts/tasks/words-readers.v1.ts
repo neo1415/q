@@ -1,5 +1,12 @@
 import type { PromptDefinition } from "../definition.js";
 import {
+  DOCUMENT_KIND_READER_SCHEMA_NAME,
+  DOCUMENT_KIND_READER_SCHEMA_VERSION,
+  DOCUMENT_KIND_READER_UNTRUSTED,
+  DocumentKindReaderResultSchema,
+  DocumentKindReaderVariablesSchema,
+  type DocumentKindReaderResult,
+  type DocumentKindReaderVariables,
   MEETING_OUTCOME_READER_SCHEMA_NAME,
   MEETING_OUTCOME_READER_SCHEMA_VERSION,
   MEETING_OUTCOME_READER_UNTRUSTED,
@@ -219,4 +226,62 @@ export const UTTERANCE_CHECK_V1: PromptDefinition<
     schema: UtteranceCheckResultSchema,
   },
   template: CHECK_TEMPLATE,
+};
+
+const DOCUMENT_KIND_TEMPLATE = `TASK: DOCUMENT_KIND_READER
+Say what kind of document this is, from what its opening pages say. The file name is only a hint: a deck named "payroll-deck" is a pitch deck about a payroll company, not payroll records.
+
+KINDS
+- PITCH_DECK: a company's investor presentation (problem, product, market, traction, team, the raise).
+- COMPANY_PROFILE: an overview, one-pager or brochure about a company.
+- PRODUCT: product specification, roadmap or demo material.
+- FINANCIAL_MODEL: forecasts, projections, a budget or a model.
+- MANAGEMENT_ACCOUNTS: actual accounts: P&L, balance sheet, cash flow, payroll records, bank statements, tax returns.
+- FINANCIAL: other financial records.
+- LEGAL: contracts, agreements, NDAs, licences, IP assignments.
+- CORPORATE: cap table, incorporation, articles, shareholder agreements, term sheets.
+- GOVERNANCE: board minutes, policies.
+- COMMERCIAL: proposals, pricing, partnerships.
+- CUSTOMER: customer lists, pipeline or CRM exports.
+- OPERATIONAL: operating procedures and internal operations.
+- FUND_DECK: an investment fund's own presentation.
+- INVESTMENT_THESIS: an investor's written thesis or strategy.
+- LP_LETTER: a letter or report from a fund to its limited partners.
+- OTHER: clearly none of these.
+- UNSURE: you cannot tell. When in doubt, UNSURE.
+
+${DATA_RULE}
+
+FILE NAME
+{{filename}}
+
+OPENING PAGES
+{{opening}}
+
+Respond with a single JSON object matching the DocumentKindReaderResult schema.`;
+
+export const DOCUMENT_KIND_READER_V1: PromptDefinition<
+  DocumentKindReaderVariables,
+  DocumentKindReaderResult
+> = {
+  id: "DOCUMENT_KIND_READER",
+  version: 1,
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "FAST_CLASSIFICATION",
+  owner: "q-core",
+  changeDescription:
+    "QA QO-23 (2026-10-23): an upload's kind read from its opening pages, replacing the file-name keyword list that filed a pitch deck as management accounts.",
+  effectiveFrom: "2026-10-24",
+  variables: {
+    schema: DocumentKindReaderVariablesSchema,
+    untrusted: [...DOCUMENT_KIND_READER_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: DOCUMENT_KIND_READER_SCHEMA_NAME,
+    schemaVersion: DOCUMENT_KIND_READER_SCHEMA_VERSION,
+    schema: DocumentKindReaderResultSchema,
+  },
+  template: DOCUMENT_KIND_TEMPLATE,
 };

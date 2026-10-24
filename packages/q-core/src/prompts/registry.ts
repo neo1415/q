@@ -67,6 +67,7 @@ import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
 import { DECISION_READER_V2 } from "./tasks/decision-reader.v2.js";
 import {
+  DOCUMENT_KIND_READER_V1,
   MEETING_OUTCOME_READER_V1,
   ONBOARDING_MOVE_READER_V1,
   PREFERENCE_POLARITY_V1,
@@ -577,6 +578,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,
     UTTERANCE_CHECK_V1,
+    DOCUMENT_KIND_READER_V1,
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,
     REHEARSAL_SCORE_V1,

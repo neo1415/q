@@ -267,6 +267,13 @@ export function createFakeEvidence(options: {
   const readOwnDocumentText: DocumentProcessingService["readOwnDocumentText"] =
     () => Promise.resolve("");
 
+  // QA QO-23: filing an unclassified document by its content, recorded.
+  const classifyDocumentContent: DocumentProcessingService["classifyDocumentContent"] =
+    (input) => {
+      record("classifyDocumentContent", input);
+      return Promise.resolve({ filed: true });
+    };
+
   return {
     service: {
       resolveProcessingTarget,
@@ -278,6 +285,7 @@ export function createFakeEvidence(options: {
       findDocumentExtraction,
       backfillDocumentPages,
       readOwnDocumentText,
+      classifyDocumentContent,
     },
     calls,
     status: () => requireRun().status,
