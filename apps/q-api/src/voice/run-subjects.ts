@@ -33,8 +33,8 @@ type RunEntry = {
   readonly userId: string;
   /** Distinct companies the run's tools returned, id → name, in order. */
   readonly companies: Map<string, string>;
-  /** The company a profile read was for, most recent. */
-  profiled: string | null;
+  /** The companies whose profile this run read, in order. */
+  readonly profiled: Set<string>;
   /** Company id → what of theirs was read (a deck, a document). */
   readonly things: Map<string, QSilenceThing>;
 };
@@ -73,7 +73,7 @@ export function createRunSubjects(limit = 500): RunSubjects {
       tenantId: actor.tenantId,
       userId: actor.userId,
       companies: new Map(),
-      profiled: null,
+      profiled: new Set(),
       things: new Map(),
     };
     runs.set(runId, created);
@@ -135,7 +135,7 @@ export function createRunSubjects(limit = 500): RunSubjects {
       if (!run.companies.has(companyId)) run.companies.set(companyId, name);
     }
     if (tool === GET_COMPANY && found.length === 1 && found[0] !== undefined) {
-      run.profiled = found[0].companyId;
+      run.profiled.add(found[0].companyId);
     }
   };
 
@@ -148,15 +148,19 @@ export function createRunSubjects(limit = 500): RunSubjects {
     ) {
       return null;
     }
-    // The company the run read the profile of; else the only one it met.
-    // Several, none profiled: no name (a list is not a subject).
-    const companyId =
-      run.profiled ??
-      (run.companies.size === 1
-        ? (run.companies.keys().next().value ?? null)
-        : null);
+    // QA F-88 (I19): only the one company whose profile this run read. A
+    // company merely met in a list, a pipeline or a search was named as
+    // the subject ("Looking at <someone else>"); several profiled (a
+    // comparison) is not one subject either. No name: generic wording.
+    if (run.profiled.size !== 1) return null;
+    const companyId = run.profiled.values().next().value ?? null;
     if (companyId === null) return null;
-    const name = run.companies.get(companyId)?.trim().slice(0, 80);
+    // As Q says a record's name: never its "(fictional)" marker (F-62).
+    const name = run.companies
+      .get(companyId)
+      ?.replace(/\s*\([^)]*\)\s*$/u, "")
+      .trim()
+      .slice(0, 80);
     if (name === undefined || name.length === 0) return null;
     const thing = run.things.get(companyId);
     return thing === undefined ? { name } : { name, thing };

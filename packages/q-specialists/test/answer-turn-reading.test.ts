@@ -1766,7 +1766,11 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     await answer.answer(request());
     expect(approved).toEqual([]);
     expect(declined).toEqual([]);
-    expect(stored.at(-1)?.content).toMatch(/^That's ready: Reminder/);
+    // QA F-89: the request is its own turn; the unrelated card waits and
+    // does not take the answer.
+    expect(stored.map((m) => m.content).join("\n")).not.toMatch(
+      /That's ready: Reminder|Still waiting for your approval/u,
+    );
   });
 
   /**
@@ -1826,7 +1830,10 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     expect(delegated()).toBe(0);
   });
 
-  it("with the engine's step composed, the waiting line is deferred to it, with the card's id", async () => {
+  // QA F-89 (U10) replaces "one short waiting line" (lead 2026-10-03): a
+  // waiting card takes only a turn about it, so an unrelated request is
+  // answered as any other, with no line about the card, which still waits.
+  it("with the engine's step composed, an unrelated request defers no waiting line", async () => {
     const deferred: unknown[] = [];
     const { answer, stored } = seam({
       said: "Save Ajopot for later.",
@@ -1842,15 +1849,10 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     });
     await answer.answer(request());
     expect(stored.map((m) => m.content)).toEqual(["Saved Ajopot."]);
-    expect(deferred).toEqual([
-      {
-        line: `Still waiting for your approval: ${OUTCOME_CARD}.`,
-        actionId: "o1",
-      },
-    ]);
+    expect(deferred).toEqual([]);
   });
 
-  it("a different request with a card pending: one short waiting line, after the answer", async () => {
+  it("a different request with a card pending: answered alone, the card still waiting (QA F-89)", async () => {
     const declined: string[] = [];
     const { answer, stored } = seam({
       said: "Save Ajopot for later.",
@@ -1865,10 +1867,7 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     });
     await answer.answer(request());
     expect(declined).toEqual([]);
-    expect(stored.map((m) => m.content)).toEqual([
-      "Saved Ajopot.",
-      `Still waiting for your approval: ${OUTCOME_CARD}.`,
-    ]);
+    expect(stored.map((m) => m.content)).toEqual(["Saved Ajopot."]);
   });
 
   it("a no with more said is declined first, then the rest is answered", async () => {

@@ -447,7 +447,8 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     expect((await port.prepare(context)).kind).toBe("AWAITING_APPROVAL");
     expect(said).toEqual([
       "Share this document with them. Not saved yet: tap Approve on the card, or tell me to go ahead.",
-      "Still waiting for your approval: Share your raise with Savanna Seed Partners (fictional).",
+      // QA F-62: the demo record's "(fictional)" marker is not said.
+      "Still waiting for your approval: Share your raise with Savanna Seed Partners.",
     ]);
     expect(logged).toEqual([
       expect.objectContaining({

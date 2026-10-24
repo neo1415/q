@@ -56,8 +56,11 @@ export const GetQCardOutputSchema = z
     /** SAVED: the card exists. NOT_MADE: none has been made yet. */
     status: z.enum(["SAVED", "NOT_MADE"]),
     handle: HandleSchema.nullable(),
-    /** Where the card is shared from, when it has a handle. */
-    publicPath: z.string().max(80).nullable(),
+    /**
+     * The card's whole public address when it has a handle
+     * ("https://…/@handle"): quoted exactly, never another domain.
+     */
+    publicUrl: z.string().url().max(300).nullable(),
     findableBySearchEngines: z.boolean().nullable(),
     updatedAt: UtcTimestampSchema.nullable(),
     /**
@@ -173,7 +176,7 @@ export function createGetQCardTool(
     status: "ACTIVE",
     providerName: "get_q_card",
     description:
-      "Reads their own Q Card: whether it has been made and saved, its handle, where it is shared from, and whether search engines may find it. Call it when they ask about their card or handle. NOT_MADE means no card yet: offer to make it now (claim_q_card_handle with suggestedHandle, or the handle they want), never only say it has not been made; a handle waiting for their approval is not saved until they approve it.",
+      "Reads their own Q Card: whether it has been made and saved, its handle, its whole public address (publicUrl: quote it exactly when sharing their card, never write a link or domain of your own), and whether search engines may find it. Call it when they ask about their card or handle. NOT_MADE means no card yet: offer to make it now (claim_q_card_handle with suggestedHandle, or the handle they want), never only say it has not been made; a handle waiting for their approval is not saved until they approve it.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     // card.view on their own organisation, checked by the service.
@@ -200,7 +203,7 @@ export function createGetQCardTool(
         return {
           status: "NOT_MADE",
           handle: null,
-          publicPath: null,
+          publicUrl: null,
           findableBySearchEngines: null,
           updatedAt: null,
           ...(suggested === null ? {} : { suggestedHandle: suggested }),
@@ -209,7 +212,8 @@ export function createGetQCardTool(
       return {
         status: "SAVED",
         handle: card.handle,
-        publicPath: card.handle === null ? null : `/u/${card.handle}`,
+        publicUrl:
+          card.handle === null ? null : `${cards.webOrigin}/@${card.handle}`,
         findableBySearchEngines: card.indexable,
         updatedAt: card.updatedAt,
       };

@@ -3156,7 +3156,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
             ...succeeded(p, {
               status: "NOT_MADE",
               handle: null,
-              publicPath: null,
+              publicUrl: null,
               findableBySearchEngines: null,
               updatedAt: null,
               suggestedHandle: "maji-loop",

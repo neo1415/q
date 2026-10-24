@@ -245,6 +245,7 @@ describe("get_q_card", () => {
   function cardExecutor(card: Awaited<ReturnType<QCardReadPort["getCard"]>>) {
     const asked: Parameters<QCardReadPort["getCard"]>[1][] = [];
     const port: QCardReadPort = {
+      webOrigin: "https://app.capitalq.test",
       getCard: (_actor, subject) => {
         asked.push(subject);
         return Promise.resolve(card);
@@ -274,7 +275,7 @@ describe("get_q_card", () => {
     expect(outcome.result.ok ? outcome.result.data : null).toMatchObject({
       status: "SAVED",
       handle: "alpha-robotics",
-      publicPath: "/u/alpha-robotics",
+      publicUrl: "https://app.capitalq.test/@alpha-robotics",
     });
     expect(asked).toEqual([
       { subjectType: "COMPANY", subjectId: PROFILES[0]?.id },
