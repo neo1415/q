@@ -622,3 +622,51 @@ describe("QO-25: a role is their role now", () => {
     ).toEqual({ type: "SINGLE_SELECT", optionKey: "cpo" });
   });
 });
+
+describe("categories saved with their other words beside them (live 24 Oct)", () => {
+  it("the receipt names the categories saved, and their words as theirs", async () => {
+    const EGYPT = "c1000000-0000-4000-8000-0000000000e1";
+    const MOROCCO = "c1000000-0000-4000-8000-0000000000e2";
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+      // "the Gulf" names no single node: it is kept in their words.
+      taxonomy: { egypt: EGYPT, morocco: MOROCCO },
+    });
+    const said = "We invest in Egypt, Morocco and the Gulf.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I3.geography",
+                  value: ["Egypt", "Morocco", "the Gulf"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    const saved = world.recordedValue("I3.geography");
+    expect(
+      saved?.type === "RESOURCE_REFERENCE" ? saved.resourceIds : [],
+    ).toEqual([EGYPT, MOROCCO]);
+    expect(outcome.reply).toMatch(/Egypt, Morocco/u);
+    expect(outcome.reply).not.toMatch(/(?<!“)the Gulf \(geography\)/u);
+  });
+});

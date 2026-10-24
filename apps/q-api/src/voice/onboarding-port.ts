@@ -575,6 +575,27 @@ export function createOnboardingPort(input: {
     return describeValue(step, value, recordedCurrency(view, steps)).trim();
   };
 
+  /**
+   * What was recorded, in words. Categories that matched with their other
+   * words kept beside them say both (live 24 Oct: "Egypt, Morocco and the
+   * Gulf" saved Egypt and Morocco with "the Gulf" in their words, and the
+   * receipt said "the Gulf (geography)", naming the words as the saved
+   * categories and the saved ones not at all).
+   */
+  const recordedLine = async (
+    step: OnboardingStepManifest,
+    value: OnboardingResponseValue,
+    note: string | undefined,
+    view: OnboardingSessionView,
+  ): Promise<string> => {
+    if (note === undefined) return spoken(step, value, view);
+    if (value.type === "RESOURCE_REFERENCE" && value.resourceIds.length > 0) {
+      const names = await spoken(step, value, view);
+      if (names.length > 0) return `${names}, and “${note}” as you said it`;
+    }
+    return `${note} (in their words)`;
+  };
+
   /** The note that settles a check: prose, with the code's own check id. */
   const settledNote = (checkId: string) =>
     `They confirmed this is right as it stands when asked (check ${checkId}).`;
@@ -1443,10 +1464,7 @@ export function createOnboardingPort(input: {
         question: (
           SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
         ).slice(0, 400),
-        recorded: (note === undefined
-          ? await spoken(step, value, after)
-          : `${note} (in their words)`
-        ).slice(0, 600),
+        recorded: (await recordedLine(step, value, note, after)).slice(0, 600),
         ...(prepared.movedFrom === undefined
           ? {}
           : { movedFrom: prepared.movedFrom }),
@@ -2305,9 +2323,13 @@ export function createOnboardingPort(input: {
             stepKey,
             outcome: "COMMITTED",
             question: questionOf(item.plan.step),
-            recorded: (item.plan.note === undefined
-              ? await spoken(item.plan.step, item.value, after)
-              : `${item.plan.note} (in their words)`
+            recorded: (
+              await recordedLine(
+                item.plan.step,
+                item.value,
+                item.plan.note,
+                after,
+              )
             ).slice(0, 600),
             ...(item.movedFrom === undefined
               ? {}
