@@ -807,8 +807,9 @@
   grid-template-columns: 44px minmax(0, 1fr) auto 44px;
   align-items: center;
   gap: 8px;
-  width: min(420px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
   padding: 6px 4px 6px 6px;
+  transition: translate var(--cq-motion-fast) var(--cq-ease);
   border-radius: 20px;
   background: var(--cq-surface-raised);
   border: 1px solid var(--cq-border);
@@ -841,9 +842,17 @@ body:has([data-arrival-dock]:not([data-tucked]) > div:not(:empty))
   border-radius: 50%;
   background: var(--hue);
 }
+/* F-101: one line each. The actions take their width first, so the
+   heading and names truncate instead of wrapping word by word. */
+.cq-answer-chip strong,
+.cq-answer-chip .sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cq-answer-chip strong {
   font-weight: 500;
-  display: block;
   font-size: 14.5px;
 }
 .cq-answer-chip .sub {
@@ -887,6 +896,7 @@ body:has([data-arrival-dock]:not([data-tucked]) > div:not(:empty))
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cq-answer-chip,
   .cq-ac-card,
   .cq-ac-body,
   .cq-ac-body > .inner {
