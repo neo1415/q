@@ -149,13 +149,28 @@ export function investorDiscoveryText(
   return parts.join(" ");
 }
 
-/** One block of the cards, each with its fit reasons and a Rehearse action. */
+/**
+ * One block of the cards, each with its fit reasons. A founder may rehearse
+ * a call with any of them; an investor looking for investors (co-investors)
+ * has no pitch to rehearse with them (coordinator 2026-10-24), so their
+ * cards offer to look into each one further instead.
+ */
 export function investorCardsBlock(
   found: readonly Found[],
   title: string,
+  founder = true,
 ): QAnswerCardsBlock | null {
+  const shown = founder
+    ? found
+    : found.map((one) => ({
+        ...one,
+        card: {
+          ...one.card,
+          actions: one.card.actions.filter((action) => action !== "REHEARSE"),
+        },
+      }));
   const cards: QAnswerCard[] = [];
-  found.forEach((one, at) => {
+  shown.forEach((one, at) => {
     const single = identityCardBlock(one.card);
     const card = single?.cards[0];
     if (card === undefined) return;
@@ -176,15 +191,22 @@ export function investorCardsBlock(
     shape: "RESEARCH",
     title: title.slice(0, 120),
     cards,
-    followUps: found
-      .filter((one) => one.card.actions.includes("REHEARSE"))
-      .slice(0, 3)
-      .map((one) =>
-        `Rehearse with ${one.card.subject.displayName.split(/\s+/u)[0] ?? one.card.subject.displayName}`.slice(
-          0,
-          120,
-        ),
-      ),
+    followUps: founder
+      ? shown
+          .filter((one) => one.card.actions.includes("REHEARSE"))
+          .slice(0, 3)
+          .map((one) =>
+            `Rehearse with ${one.card.subject.displayName.split(/\s+/u)[0] ?? one.card.subject.displayName}`.slice(
+              0,
+              120,
+            ),
+          )
+      : shown
+          .filter((one) => one.card.actions.includes("RESEARCH_FURTHER"))
+          .slice(0, 3)
+          .map((one) =>
+            `Look into ${one.card.subject.displayName} further`.slice(0, 120),
+          ),
   });
   return parsed.success ? parsed.data : null;
 }
@@ -301,6 +323,8 @@ export async function runInvestorDiscovery(input: {
       label === null
         ? "Investors who could fit"
         : `${label} investors who could fit`,
+      // A founder is asking when they have a company of their own.
+      input.companyId !== null && input.companyId !== undefined,
     ),
     networkBlock:
       onCapitalQ.length === 0 ? null : prospectCardsBlock(onCapitalQ),

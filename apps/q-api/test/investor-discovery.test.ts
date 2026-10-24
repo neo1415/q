@@ -105,6 +105,8 @@ const ASKS = [
   },
 ] as const;
 
+const FOUNDER_COMPANY = "c0c0c0c0-0000-4000-8000-000000000001";
+
 describe("investor discovery on the prepared Qatar five", () => {
   it.each(ASKS)(
     "answers %o with three investors and cards, the public search alongside (owner: web runs in parallel)",
@@ -115,6 +117,8 @@ describe("investor discovery on the prepared Qatar five", () => {
         tools,
         context,
         available: new Set(["discover_investors"]),
+        // A founder asking for their own company: they may rehearse.
+        companyId: FOUNDER_COMPANY,
       });
       expect(answer).not.toBeNull();
       expect(answer?.shown).toBe(3);
@@ -142,6 +146,28 @@ describe("investor discovery on the prepared Qatar five", () => {
       ).toBe(true);
     },
   );
+
+  // Coordinator 2026-10-24: an investor asking for investors (co-investors)
+  // has no pitch to rehearse with them; each card offers to look further.
+  it("an investor asking is offered to look into each further, never a rehearsal", async () => {
+    const { tools, context } = await world();
+    const answer = await runInvestorDiscovery({
+      ask: { ...ASKS[0], aboutMyCompany: false },
+      tools,
+      context,
+      available: new Set(["discover_investors"]),
+    });
+    const block = QAnswerCardsBlockSchema.parse(answer?.block);
+    expect(block.cards).toHaveLength(3);
+    for (const card of block.cards) {
+      expect(card.external?.rehearse).toBe(false);
+    }
+    expect(block.followUps.length).toBeGreaterThan(0);
+    expect(block.followUps.every((line) => line.startsWith("Look into"))).toBe(
+      true,
+    );
+    expect(answer?.text ?? "").not.toMatch(/rehears/iu);
+  });
 
   it("names the agency honestly when asked for five", async () => {
     const { tools, context } = await world();
