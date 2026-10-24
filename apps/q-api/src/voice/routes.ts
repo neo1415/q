@@ -50,7 +50,7 @@ import {
 } from "./session-token.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
 import type { TurnTaking } from "./persona-voices/persona-voice.js";
-import { bounded, speakable } from "./speech.js";
+import { bounded, speakable, SPOKEN_DATA_LABEL } from "./speech.js";
 
 /**
  * The most the speak relay voices in one request: a whole spoken answer
@@ -469,7 +469,8 @@ export function registerQVoiceRoutes(
         : "FEMALE";
       try {
         const spoken = await speech.synthesise({
-          text: input.text,
+          // F-62: a data label on a name is never said aloud.
+          text: input.text.replace(SPOKEN_DATA_LABEL, ""),
           voice,
           presenter: input.presenter,
         });

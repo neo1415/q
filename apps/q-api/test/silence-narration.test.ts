@@ -76,6 +76,51 @@ describe("the silence ladder on a voice turn (ADR 0062)", () => {
     expect(heard).toHaveLength(3);
   });
 
+  it("one holding line per turn: the ladder's, or none when the answer's own was said (F-58, F-62)", async () => {
+    const answer = slowAnswer(["Done."]);
+    const heard: string[] = [];
+    const holding = { said: false };
+    const done = collect(
+      withSilenceLadder(answer.source, {
+        live: { stage: "PREPARING_ANALYSIS", approvalWaiting: false },
+        seed: 7,
+        now: () => Date.now(),
+        // As the voice turn runs it: "where I am" lines only.
+        only: new Set(["STAGE_LINE", "PROGRESS_LINE"] as const),
+        holding,
+      }),
+      heard,
+    );
+    // A long wait: the stage line at 1.5 s, then no further line.
+    await vi.advanceTimersByTimeAsync(16_000);
+    expect(heard).toHaveLength(1);
+    expect(holding.said).toBe(true);
+    answer.release();
+    await vi.advanceTimersByTimeAsync(10);
+    await done;
+    expect(heard).toEqual([heard[0], "Done."]);
+
+    // The answer's holding line came first: the ladder says no line.
+    const second = slowAnswer(["Ready."]);
+    const quiet: string[] = [];
+    const after = collect(
+      withSilenceLadder(second.source, {
+        live: { stage: "PREPARING_ANALYSIS", approvalWaiting: false },
+        seed: 7,
+        now: () => Date.now(),
+        only: new Set(["STAGE_LINE", "PROGRESS_LINE"] as const),
+        holding: { said: true },
+      }),
+      quiet,
+    );
+    await vi.advanceTimersByTimeAsync(16_000);
+    expect(quiet).toEqual([]);
+    second.release();
+    await vi.advanceTimersByTimeAsync(10);
+    await after;
+    expect(quiet).toEqual(["Ready."]);
+  });
+
   it("brings back one remembered thread past 8 s, once, and hands duplex beats out of band", async () => {
     const answer = slowAnswer(["Ready."]);
     const heard: string[] = [];

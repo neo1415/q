@@ -44,7 +44,11 @@ import {
 import type { VoiceSessionBinding } from "../bindings.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import { withoutWrittenLaugh } from "../providers/speech-markup.js";
-import { sentences, withoutStageDirections } from "../speech.js";
+import {
+  sentences,
+  SPOKEN_DATA_LABEL,
+  withoutStageDirections,
+} from "../speech.js";
 import {
   APPROVAL_QUESTION,
   settledTurn,
@@ -121,7 +125,9 @@ export function forRealtime(said: string): {
   readonly amused: boolean;
 } {
   let amused = false;
-  const parts = sentences(withoutStageDirections(said)).flatMap((sentence) => {
+  // F-62: a data label on a name is never said aloud.
+  const plain = said.replace(SPOKEN_DATA_LABEL, "");
+  const parts = sentences(withoutStageDirections(plain)).flatMap((sentence) => {
     const rest = withoutWrittenLaugh(sentence);
     if (rest !== sentence) amused = true;
     return rest.length === 0 ? [] : [rest];

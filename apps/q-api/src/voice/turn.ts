@@ -1340,6 +1340,8 @@ export function createVoiceTurnHandler(
         }
       })();
     };
+    // One holding line per turn, shared by the ladder and the answer.
+    const holding = { said: false };
     async function* answer(): AsyncGenerator<string> {
       for await (const item of qStream.open({
         run: record,
@@ -1366,6 +1368,13 @@ export function createVoiceTurnHandler(
             break;
           }
           case "q.message.delta": {
+            // F-58: the answer's own holding line ("Looking into that
+            // now.") is the turn's one holding line, or nothing when the
+            // ladder already said one.
+            if (event.data.holding === true) {
+              if (holding.said) break;
+              holding.said = true;
+            }
             // A delta is a whole sentence that has already been through
             // the answer's guards, so `speakable` can do its work on it:
             // several of its rules are anchored to a line or need a
@@ -1669,6 +1678,7 @@ export function createVoiceTurnHandler(
               signal,
               enabled: SPOKEN_SILENCE_LADDER,
               only: SPOKEN_WHILE_WORKING_BEATS,
+              holding,
             },
           ),
         );

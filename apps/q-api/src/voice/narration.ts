@@ -57,6 +57,13 @@ export type SilenceLadderOptions = {
    * the ladder runs until the source ends, not until its first part.
    */
   readonly untilDone?: boolean | undefined;
+  /**
+   * F-58 / F-62 (QA 2026-10-23): one holding line per turn, then the
+   * answer ("Pulling together your answer… Still on it… Looking into that
+   * now." had stacked). Shared with the answer's own holding line: once
+   * either has been said, the ladder says no other line.
+   */
+  readonly holding?: { said: boolean } | undefined;
 };
 
 const TIMEOUT = Symbol("timeout");
@@ -132,11 +139,18 @@ export async function* withSilenceLadder(
     });
     state = step.state;
     const beat = step.beat;
+    const spokenLine =
+      beat !== null &&
+      (beat.kind === "STAGE_LINE" || beat.kind === "PROGRESS_LINE");
     if (
       beat !== null &&
       beat.kind !== "TONE" &&
-      (options.only === undefined || options.only.has(beat.kind))
+      (options.only === undefined || options.only.has(beat.kind)) &&
+      !(spokenLine && options.holding?.said === true)
     ) {
+      if (spokenLine && options.holding !== undefined) {
+        options.holding.said = true;
+      }
       if (beat.kind === "THREAD") options.onThread?.(beat.memoryItemId);
       if (options.narrate !== undefined) options.narrate(beat);
       else yield beat.text;
