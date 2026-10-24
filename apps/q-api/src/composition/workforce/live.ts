@@ -27,6 +27,8 @@ const EMPTY: Omit<WorkforceLiveStage, "stage" | "at"> = {
   drafts: null,
   title: null,
   sections: [],
+  read: [],
+  openPoints: null,
 };
 
 export function mergeLive(

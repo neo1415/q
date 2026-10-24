@@ -234,7 +234,12 @@ export async function writeAnalysisWithReview(dependencies: {
     report(
       draft === null
         ? { stage: "DRAFTING", draft: 1, drafts: ANALYSIS_MAX_DRAFTS }
-        : { stage: "REVISING", draft: drafts + 1, drafts: ANALYSIS_MAX_DRAFTS },
+        : {
+            stage: "REVISING",
+            draft: drafts + 1,
+            drafts: ANALYSIS_MAX_DRAFTS,
+            openPoints: open.length,
+          },
     );
     const written = await models.writeAnalysis(who, trace, {
       principalName: inputs.principalName.slice(0, 120),
@@ -254,6 +259,7 @@ export async function writeAnalysisWithReview(dependencies: {
       stage: "REVIEWING",
       draft: drafts,
       drafts: ANALYSIS_MAX_DRAFTS,
+      openPoints: null,
       title: draft.title.slice(0, 160),
       sections: draft.sections
         .slice(0, 16)
@@ -295,6 +301,7 @@ export async function writeAnalysisWithReview(dependencies: {
     ].join("\n");
   }
   if (draft === null) return null;
+  report({ stage: "FILING", openPoints: passes ? 0 : open.length });
   return {
     draft,
     review: { passes, score, drafts, found, open: passes ? [] : open },

@@ -24,6 +24,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { basisProblems } from "../src/composition/workforce/analysis.js";
 import {
+  readOf,
   workforceDeepResearch,
   type ResearchDossier,
 } from "../src/composition/workforce/deep-research.js";
@@ -412,13 +413,48 @@ describe("the person sees their document being made (owner 2026-10-24)", () => {
       "REVISING",
       "REVIEWING",
       "FILING",
+      "FILING",
     ]);
+    // The revision says how many review points it is closing; the filing,
+    // how many are left (none: the second draft passed).
+    expect(stages[2]?.openPoints).toBeGreaterThan(0);
+    expect(stages[4]).toMatchObject({ stage: "FILING", openPoints: 0 });
     expect(stages[1]).toMatchObject({
       draft: 1,
       title: MAJI_DRAFT_ONE.title,
       sections: MAJI_DRAFT_ONE.sections.map((section) => section.heading),
     });
     expect(stages[2]).toMatchObject({ draft: 2, drafts: 3 });
+  });
+
+  it("names the sources read as their site and title only, as plain text", () => {
+    const read = readOf([
+      {
+        index: 1,
+        url: "https://techcabal.com/2026/paystack-security",
+        domain: "techcabal.com",
+        title: "Paystack's\u0007 security\n posture",
+        publishedAt: null,
+        retrievedAt: "2026-10-24T17:00:00.000Z",
+        excerpt: "",
+        extracted: true,
+      } as never,
+      {
+        index: 2,
+        url: "https://cbn.gov.ng/x",
+        domain: "cbn.gov.ng",
+        title: null,
+        publishedAt: null,
+        retrievedAt: "2026-10-24T17:00:00.000Z",
+        excerpt: "",
+        extracted: false,
+      } as never,
+    ]);
+    expect(read).toEqual([
+      { domain: "techcabal.com", title: "Paystack's security posture" },
+      { domain: "cbn.gov.ng", title: null },
+    ]);
+    expect(JSON.stringify(read)).not.toContain("https://");
   });
 
   it("a report that throws never stops the work", async () => {

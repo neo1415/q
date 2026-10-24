@@ -190,12 +190,39 @@ export const WorkforceLiveStageSchema = z
     /** Once drafted: the document's title and section headings. */
     title: z.string().max(160).nullable(),
     sections: z.array(z.string().max(120)).max(16),
+    /**
+     * READING onwards: the public sources read, as their site and page
+     * title only (shown as text, never a link). Additive.
+     */
+    read: z
+      .array(
+        z
+          .object({
+            domain: z.string().min(1).max(120),
+            title: z.string().max(160).nullable(),
+          })
+          .strict(),
+      )
+      .max(12)
+      .optional(),
+    /** The reviewer's points still open on the latest draft. Additive. */
+    openPoints: z.number().int().min(0).max(50).nullable().optional(),
     at: UtcTimestampSchema,
   })
   .strict();
 export type WorkforceLiveStage = z.infer<typeof WorkforceLiveStageSchema>;
 
-export const WORKFORCE_LIVE_STATES = ["WORKING", "DONE", "STOPPED"] as const;
+/**
+ * WORKING while it runs; WAITING when what is left is the person's (a
+ * decision, or something it needs); DONE; FAILED; STOPPED by the person.
+ */
+export const WORKFORCE_LIVE_STATES = [
+  "WORKING",
+  "WAITING",
+  "DONE",
+  "FAILED",
+  "STOPPED",
+] as const;
 
 /** `GET /v1/q/workforce/jobs/:jobId/live`: one job, read as its owner. */
 export const WorkforceLiveSchema = z
@@ -215,7 +242,7 @@ export const WorkforceLiveSchema = z
       })
       .strict()
       .nullable(),
-    /** STOPPED: why, in the plain words the Work page shows. */
+    /** WAITING, FAILED, STOPPED: why, in the plain words the Work page shows. */
     reason: z.string().max(500).nullable(),
   })
   .strict();

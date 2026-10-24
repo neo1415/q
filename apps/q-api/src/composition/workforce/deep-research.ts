@@ -163,6 +163,28 @@ function pagesFor(
     .slice(0, PAGES_PER_LANE);
 }
 
+/**
+ * Owner 2026-10-24: the sources being read, for the person watching: each
+ * public page's site and title as text (never its address, never a link),
+ * the first twelve in the order read.
+ */
+export function readOf(
+  sources: readonly DeepResearchSource[],
+): { readonly domain: string; readonly title: string | null }[] {
+  const plain = (text: string) =>
+    text
+      .replace(/\p{Cc}+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim();
+  return sources.slice(0, 12).map((source) => {
+    const title = source.title === null ? "" : plain(source.title);
+    return {
+      domain: plain(source.domain).slice(0, 120) || "source",
+      title: title.length === 0 ? null : title.slice(0, 160),
+    };
+  });
+}
+
 export type DeepResearchInput = Parameters<
   NonNullable<WorkforcePortServices["research"]>
 >[0];
@@ -296,7 +318,11 @@ export function workforceDeepResearch(dependencies: {
           });
         }
       });
-    report({ stage: "READING", sources: first.sources.length });
+    report({
+      stage: "READING",
+      sources: first.sources.length,
+      read: readOf(first.sources),
+    });
     const answered = questions.filter((question) =>
       first.lanes.some(
         (lane) => lane.lane === question.lane && lane.status === "OK",
@@ -338,7 +364,11 @@ export function workforceDeepResearch(dependencies: {
       );
       sources = more.sources;
       lanes = [...first.lanes, ...more.lanes];
-      report({ stage: "READING", sources: sources.length });
+      report({
+        stage: "READING",
+        sources: sources.length,
+        read: readOf(sources),
+      });
       await readFacts(
         second.filter((question) =>
           fresh.some((source) => source.lanes.includes(question.lane)),
