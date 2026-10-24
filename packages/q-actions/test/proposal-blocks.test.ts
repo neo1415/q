@@ -92,7 +92,7 @@ describe("the card says why, and whom it is for", () => {
  * named with where it waits.
  */
 describe("ready is never said without its card (F-106)", () => {
-  function narrator() {
+  function narrator(registry: unknown = { get: () => undefined }) {
     const said: { content: string; blocks: unknown }[] = [];
     const n = createQActionNarrator({
       sql: {} as never,
@@ -116,7 +116,7 @@ describe("ready is never said without its card (F-106)", () => {
         runEvents: {},
       } as never,
       actions: {} as never,
-      registry: { get: () => undefined } as never,
+      registry: registry as never,
     });
     return { said, n };
   }
@@ -134,6 +134,36 @@ describe("ready is never said without its card (F-106)", () => {
     const { said, n } = narrator();
     await n.proposed(run, action, approval, { alreadyWaiting: true });
     expect(said[0]?.content).toMatch(/^That's ready: /u);
+    expect(said[0]?.blocks).toMatchObject([{ kind: "ACTION_PROPOSAL" }]);
+  });
+
+  // Batch 9: "Draft a short reply… then send it" met the card already
+  // waiting. Approval stays required (Prepare → Approve); the reply says
+  // so plainly, with the words that would go.
+  it("says a waiting message is ready to send, with its text", async () => {
+    const { said, n } = narrator({
+      get: () => ({
+        payload: {
+          safeParse: (value: unknown) => ({ success: true, data: value }),
+        },
+        proposed: (input: { body: string }, summary: string) =>
+          `${summary}: "${input.body}". Ready to send: approve on the card, or tell me what to change.`,
+      }),
+    });
+    await n.proposed(
+      run,
+      {
+        ...(action as object),
+        actionType: "app.chat.message.send",
+        summary: "Message Savanna Seed Partners",
+        payload: { body: "We'll share it once we've reconciled September." },
+      },
+      approval,
+      { alreadyWaiting: true },
+    );
+    expect(said[0]?.content).toBe(
+      `Message Savanna Seed Partners: "We'll share it once we've reconciled September.". Ready to send: approve on the card, or tell me what to change.`,
+    );
     expect(said[0]?.blocks).toMatchObject([{ kind: "ACTION_PROPOSAL" }]);
   });
 

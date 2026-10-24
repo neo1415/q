@@ -3382,6 +3382,92 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
     expect(second).toContain("Do not ask what to take on");
   });
 
+  // Batch 9 (founder.maji-loop, run b2c09f50): "Show me my Q Card and the
+  // share link" was answered "Understood." -- the model's words were all
+  // approval talk and went. Unclaimed: say so, with the would-be address.
+  const notMade = {
+    status: "NOT_MADE",
+    handle: null,
+    publicUrl: null,
+    findableBySearchEngines: null,
+    updatedAt: null,
+    suggestedHandle: "maji-loop",
+    suggestedUrl: "https://capitalq.example/@maji-loop",
+  };
+  it("says there is no card yet, with the address it would have, never just 'Understood.'", async () => {
+    const tools = toolPort([READ, CLAIM], (p) =>
+      p.name === "get_q_card"
+        ? { ...succeeded(p, notMade), toolName: "q_card.get" }
+        : {
+            ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
+            toolName: "app.q_card.handle.claim",
+          },
+    );
+    const { seam, messages, request } = build({
+      said: "Show me my Q Card and the share link.",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "q",
+              name: "get_q_card",
+              arguments: { subject: "COMPANY" },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "I've prepared a Q Card claim for @maji-loop. It's waiting for your approval.",
+          ),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(messages.at(-1)?.content).toBe(
+      "You don't have a Q Card yet, so there is no link to share. Claiming @maji-loop makes it at https://capitalq.example/@maji-loop: approve the claim on the card, or ask for another handle.",
+    );
+  });
+
+  it("gives a saved card's whole link when the words left it out (F-85)", async () => {
+    const tools = toolPort([READ], (p) => ({
+      ...succeeded(p, {
+        status: "SAVED",
+        handle: "maji-loop",
+        publicUrl: "https://capitalq.example/@maji-loop",
+        findableBySearchEngines: false,
+        updatedAt: "2026-10-24T07:51:00.000Z",
+      }),
+      toolName: "q_card.get",
+    }));
+    const { seam, messages, request } = build({
+      said: "Show me my Q Card and the share link.",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "q",
+              name: "get_q_card",
+              arguments: { subject: "COMPANY" },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult("Your Q Card is saved under @maji-loop."),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(messages.at(-1)?.content).toBe(
+      "Your Q Card is saved under @maji-loop.\n\nShare this link: https://capitalq.example/@maji-loop",
+    );
+  });
+
   it("offers nothing for a card already made", () => {
     const saved = succeeded(
       { callId: "q", name: "get_q_card", arguments: {} },

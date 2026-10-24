@@ -69,6 +69,11 @@ export const GetQCardOutputSchema = z
      * the claim is prepared. Absent when no usable name.
      */
     suggestedHandle: HandleSchema.nullable().optional(),
+    /**
+     * NOT_MADE with a suggested handle (QA, batch 9): the whole address the
+     * card would have once that handle is claimed and approved. Not live.
+     */
+    suggestedUrl: z.string().url().max(300).nullable().optional(),
   })
   .strict();
 export type GetQCardOutput = z.infer<typeof GetQCardOutputSchema>;
@@ -206,7 +211,12 @@ export function createGetQCardTool(
           publicUrl: null,
           findableBySearchEngines: null,
           updatedAt: null,
-          ...(suggested === null ? {} : { suggestedHandle: suggested }),
+          ...(suggested === null
+            ? {}
+            : {
+                suggestedHandle: suggested,
+                suggestedUrl: `${cards.webOrigin}/@${suggested}`,
+              }),
         };
       }
       return {

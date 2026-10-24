@@ -198,6 +198,9 @@ import {
   Q_CARD_CLAIM_TOOL,
   qCardOfferMessage,
   qCardOfferOf,
+  qCardReadOf,
+  withQCardLink,
+  type QCardRead,
 } from "./q-card-offer.js";
 import {
   CHAT_INSTEAD_TOOL,
@@ -7260,6 +7263,8 @@ export function createModelGatewayQAnswer(
       let firstContactPrepared = false;
       /** Their interest already stands (sent, or connected): its own line. */
       let firstContactAlready: string | null = null;
+      /** Their own Q Card as get_q_card read it this turn (batch 9). */
+      let qCardRead: QCardRead | null = null;
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -8059,6 +8064,7 @@ export function createModelGatewayQAnswer(
               // A message or email to a company they are not connected with:
               // the first contact, Express Interest, prepared now for their
               // approval, through its own authorize step (first-contact.ts).
+              qCardRead = qCardReadOf(call, outcome) ?? qCardRead;
               const offer = qCardOfferOf(call, outcome);
               if (
                 offer !== null &&
@@ -9288,7 +9294,9 @@ export function createModelGatewayQAnswer(
               ? fitCardsSummary(builtCards)
               : request.spoken === true && cardsShown
                 ? spokenBeforeCards(artifactSafe.text)
-                : artifactSafe.text;
+                : qCardRead !== null
+                  ? withQCardLink(artifactSafe.text, qCardRead)
+                  : artifactSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },

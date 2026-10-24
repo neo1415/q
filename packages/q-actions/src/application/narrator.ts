@@ -352,13 +352,16 @@ export function createQActionNarrator(dependencies: {
       if (blocks === undefined) {
         return say(run, noCardLine(action.summary));
       }
-      const line =
-        definedProposedLine(action) ??
-        proposedLine(action.summary, keepsCard(action));
+      const defined = definedProposedLine(action);
+      const line = defined ?? proposedLine(action.summary, keepsCard(action));
       return say(
         run,
         options?.alreadyWaiting === true
-          ? alreadyWaitingLine(action.summary)
+          ? // Batch 9 ("draft a reply… then send it"): something the other
+            // side receives says plainly that it waits on their approval,
+            // with its text -- "Ready to send: approve on the card" -- the
+            // same card or not. Saying "send it" grants no delegation.
+            (defined ?? alreadyWaitingLine(action.summary))
           : options?.replaces !== undefined && options.replaces.length > 0
             ? `${line} ${replacesLine(options.replaces)}`
             : line,
