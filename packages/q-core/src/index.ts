@@ -429,6 +429,7 @@ export {
   TurnReaderV62ResultSchema,
   type TurnReaderV62Result,
   TurnCompareSchema,
+  TURN_BOARD_ASKS_V62,
   type TurnCompare,
   compareOverFromShown,
   QUESTION_KINDS_V58,
@@ -1761,6 +1762,7 @@ export {
 } from "./prompts/tasks/turn-reader.v61.js";
 export {
   TURN_READER_V62,
+  V62_BOARD_LIST_ADD,
   V62_BOARD_SCREEN,
   V62_COMPARE,
   V62_DEEP_WORK,

@@ -15,7 +15,6 @@ import {
   type TurnReaderV54Result,
   type TurnReaderV55Variables,
   type TurnReaderV58Result,
-  type TurnReaderV61Result,
   type TurnReaderV62Result,
 } from "@capital-q/q-core";
 
@@ -131,8 +130,8 @@ export type QTurnReading = Omit<
   readonly namedOther?: TurnReaderV58Result["namedOther"] | undefined;
   /** v58: they want to be made ready for a call with one named counterpart. */
   readonly meetingPrep?: TurnReaderV58Result["meetingPrep"] | undefined;
-  /** v61: what they ask of their own work board (work-board lane). */
-  readonly boardAsk?: TurnReaderV61Result["boardAsk"] | undefined;
+  /** v61/v62: what they ask of their own work board (work-board lane). */
+  readonly boardAsk?: TurnReaderV62Result["boardAsk"] | undefined;
   /** v62: companies they want put side by side (lane 8); never with fromShown. */
   readonly compare?: TurnReaderV62Result["compare"] | undefined;
   /** v55: the page control (a listed id) they ask to open or show now. */

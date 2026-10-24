@@ -6,6 +6,7 @@ import {
   TurnReaderV62ResultSchema,
   V49_TEAM_JOB,
   V61_BOARD_ASK,
+  V62_BOARD_LIST_ADD,
   V62_BOARD_SCREEN,
   V62_COMPARE,
   V62_DEEP_WORK,
@@ -27,12 +28,12 @@ describe("TURN_READER v62", () => {
     const added = `${V62_DEEP_WORK}${V62_WORK_FROM_EARLIER}`;
     expect(TURN_READER_V62.template).toContain(`${V49_TEAM_JOB}${added}`);
     expect(TURN_READER_V62.template).toContain(
-      `${V61_BOARD_ASK}${V62_BOARD_SCREEN}${V62_COMPARE}`,
+      `${V61_BOARD_ASK}${V62_BOARD_LIST_ADD}${V62_BOARD_SCREEN}${V62_COMPARE}`,
     );
     expect(
       TURN_READER_V62.template
         .replace(added, "")
-        .replace(`${V62_BOARD_SCREEN}${V62_COMPARE}`, ""),
+        .replace(`${V62_BOARD_LIST_ADD}${V62_BOARD_SCREEN}${V62_COMPARE}`, ""),
     ).toBe(TURN_READER_V61.template);
     expect(V62_BOARD_SCREEN).toMatch(/NAVIGATE with destination BOARD/u);
     expect(V62_BOARD_SCREEN).toContain("open my board");
@@ -126,5 +127,34 @@ describe("TURN_READER v62", () => {
       fromShown: { turn: 1 },
     });
     expect(recall.fromShown).toEqual({ turn: 1 });
+  });
+
+  it("reads boardAsk LIST and ADD, by meaning, with SAVE/BREAKDOWN/WORK first (coordinator, work-board lane 2026-10-24)", () => {
+    for (const said of [
+      "what's on my board?",
+      "show my work board",
+      "what's in my to-dos",
+      "qu'y a-t-il sur mon tableau ?",
+      "add 'Prep IC memo for Mizan' to my board",
+      "put 'call Kestrel on Friday' on my to-dos",
+    ]) {
+      expect(V62_BOARD_LIST_ADD, said).toContain(said);
+    }
+    expect(V62_BOARD_LIST_ADD).toMatch(
+      /SAVE, BREAKDOWN and WORK win over LIST/u,
+    );
+    const base = {
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+    };
+    for (const ask of ["LIST", "ADD", "SAVE", "BREAKDOWN", "WORK"]) {
+      expect(
+        TurnReaderV62ResultSchema.parse({ ...base, boardAsk: ask }).boardAsk,
+      ).toBe(ask);
+    }
+    expect(
+      TurnReaderV62ResultSchema.parse({ ...base, boardAsk: "PIN" }).boardAsk,
+    ).toBeNull();
   });
 });
