@@ -70,7 +70,30 @@ describe("pictures only where evidence ties the site to them", () => {
     expect(kept.map((one) => one.domain)).toEqual(["techcabal.com"]);
   });
 
-  it("no evidence, no picture", () => {
+  it("Duplo held by Capital Q in Lagos: LEGO's pages name Duplo but do not place it there, so LEGO's picture is not theirs", () => {
+    const kept = corroboratedPictures(
+      [
+        picture("www.lego.com", "LEGO DUPLO Peppa Pig Bike Ride"),
+        picture("techcabal.com", "Duplo raises seed round"),
+      ],
+      {
+        name: "Duplo",
+        held: { country: "NG", city: "Lagos" },
+        sources: [
+          { domain: "www.lego.com", subjectMatch: "MATCH", countries: ["DK"] },
+          {
+            domain: "techcabal.com",
+            subjectMatch: "MATCH",
+            countries: [],
+            text: "Lagos-based Duplo, a B2B payments startup, raised a seed round.",
+          },
+        ],
+      },
+    );
+    expect(kept.map((one) => one.domain)).toEqual(["techcabal.com"]);
+  });
+
+  it("no evidence, no picture -- a name alone is none, even when no search ran", () => {
     expect(
       corroboratedPictures([picture("www.reddit.com", "Duplo thread")], {
         name: "Duplo",

@@ -208,6 +208,7 @@ import {
 } from "./parallel-extras.js";
 import {
   corroboratedPictures,
+  type HeldIdentity,
   type SearchEvidence,
 } from "./picture-corroboration.js";
 import { asksForFresh, createReadCache, type ReadCache } from "./read-cache.js";
@@ -1071,16 +1072,17 @@ const ALREADY_SEARCHED_NOTE: ModelMessage = {
 };
 
 /**
- * The website Capital Q holds for a company of this name that the run read
- * (get_company's own output), when it holds one: their own site, against
- * which a namesake's site is told apart (QA QO-09).
+ * What Capital Q holds about a company of this name that the run read
+ * (get_company's own output): its website, country and city, against which
+ * a namesake's pages and pictures are told apart (QA QO-09).
  */
-function websiteOnRecord(read: RunRead, name: string): string | null {
+function heldOnRecord(read: RunRead, name: string): HeldIdentity | null {
   const wanted = name.trim().toLowerCase();
   for (const [companyId, companyName] of read.companyNames) {
     if (companyName.trim().toLowerCase() !== wanted) continue;
-    const website = read.companyFacts.get(companyId)?.website ?? null;
-    if (website !== null && website.trim().length > 0) return website;
+    const facts = read.companyFacts.get(companyId);
+    if (facts === undefined) continue;
+    return { website: facts.website, country: facts.country, city: facts.city };
   }
   return null;
 }
@@ -5581,8 +5583,6 @@ export function createModelGatewayQAnswer(
        * picture of them must stand on (QA QO-09).
        */
       const webEvidence: SearchEvidence[] = [];
-      /** Whether any public search ran this turn (found anything or not). */
-      let webSearched = false;
       // C's receipts (UI acts and moves), read once for the whole turn.
       const screenReceipts: readonly string[] =
         dependencies.uiActReceipts?.(request.actor) ?? [];
@@ -6586,10 +6586,11 @@ export function createModelGatewayQAnswer(
         ) {
           return;
         }
-        if (outcome.toolName === "public_web.search") webSearched = true;
         const data = outcome.result.data as {
           sources?: readonly (PublicSourceLike & {
             readonly subjectMatch?: unknown;
+            readonly mentionedCountries?: unknown;
+            readonly excerpt?: unknown;
           })[];
         };
         for (const source of data.sources ?? []) {
@@ -6600,6 +6601,12 @@ export function createModelGatewayQAnswer(
                 typeof source.subjectMatch === "string"
                   ? source.subjectMatch
                   : null,
+              countries: Array.isArray(source.mentionedCountries)
+                ? source.mentionedCountries.filter(
+                    (country): country is string => typeof country === "string",
+                  )
+                : [],
+              text: typeof source.excerpt === "string" ? source.excerpt : null,
             });
           }
           // Only a well-formed public source is presentable; anything else
@@ -8299,6 +8306,10 @@ export function createModelGatewayQAnswer(
         // "Spheros") never; and never a stock illustration in its place.
         const namedSubject =
           typeof namedForPictures === "string" ? namedForPictures : null;
+        const held =
+          namedSubject === null
+            ? null
+            : heldOnRecord(companiesRead, namedSubject);
         const fromPages =
           webPictures === null || namedSubject === null
             ? []
@@ -8307,9 +8318,9 @@ export function createModelGatewayQAnswer(
                   (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
                   {
                     name: namedSubject,
-                    website: websiteOnRecord(companiesRead, namedSubject),
+                    website: held?.website ?? null,
+                    held,
                     sources: webEvidence,
-                    unsearched: !webSearched,
                   },
                 ),
                 new Date().toISOString(),

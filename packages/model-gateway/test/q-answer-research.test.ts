@@ -2320,6 +2320,129 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
     ).toEqual([]);
   });
 
+  // QA QO-09, persisting (owner's QA, 2026-10-23): "Tell me about Duplo",
+  // Duplo being a company Capital Q holds, showed LEGO DUPLO Peppa Pig. The
+  // search matched LEGO's pages by name; Capital Q's record places Duplo in
+  // Lagos, and LEGO's pages do not.
+  it("Duplo on Capital Q: LEGO's pages name Duplo but do not place it where its record does, so LEGO's picture is not shown", async () => {
+    const DUPLO = "d0d0d0d0-0000-4000-8000-000000000001";
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) => {
+        if (proposal.name === "research_public_web") {
+          const lego = onSite(
+            researchOutcome(proposal, "LEGO DUPLO bricks for toddlers."),
+            "https://www.lego.com/en-gb/themes/duplo",
+          );
+          return Promise.resolve(
+            lego.result.ok
+              ? {
+                  ...lego,
+                  result: {
+                    ok: true,
+                    data: {
+                      ...(lego.result.data as object),
+                      sources: (
+                        lego.result.data as {
+                          readonly sources: readonly object[];
+                        }
+                      ).sources.map((source) => ({
+                        ...source,
+                        mentionedCountries: ["DK"],
+                      })),
+                    },
+                  },
+                }
+              : lego,
+          );
+        }
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "company.get",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "INTERNAL",
+          result: {
+            ok: true,
+            data: {
+              companyId: DUPLO,
+              canonicalName: "Duplo",
+              legalName: null,
+              websiteUrl: null,
+              foundedDate: null,
+              headquartersCountry: "NG",
+              headquartersCity: "Lagos",
+              currentStageCode: "SEED",
+              shortDescription: "B2B payments for African businesses.",
+              primaryDescription: null,
+              companyStatus: "active",
+              relationToYou: "SHARED",
+              truthClass: "USER_CLAIM",
+            },
+          },
+          latencyMs: 1,
+        } as QToolCallOutcome);
+      },
+    };
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: DUPLO },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "Duplo is a Lagos B2B payments company; the public results were about LEGO's DUPLO.",
+          ),
+        },
+      ],
+      tools: port,
+      userText: "Tell me about Duplo",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://www.lego.com/cdn/duplo-peppa.jpg",
+              pageUrl: "https://www.lego.com/en-gb/product/peppa-pig-bike-ride",
+              domain: "www.lego.com",
+              title: "LEGO DUPLO Peppa Pig Bike Ride 10964",
+            },
+          ]),
+      },
+    });
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          aboutNamedOther: true,
+          namedOther: { name: "Duplo", kind: "COMPANY" },
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+  });
+
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
@@ -2596,7 +2719,9 @@ describe("the web lane lands within its budget or is dropped (owner 2026-10-23)"
 });
 
 describe("pictures whatever the research mode (live 2026-10-23)", () => {
-  it("looks for the named company's pictures on a turn read as their own records", async () => {
+  // QA QO-09: a picture search by name alone is no evidence; with no public
+  // page found about them this turn, none is shown.
+  it("looks for the named company's pictures on a turn read as their own records, and shows one only with evidence", async () => {
     const asked: string[] = [];
     const port: QToolPort = {
       offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
@@ -2638,12 +2763,12 @@ describe("pictures whatever the research mode (live 2026-10-23)", () => {
       "ANSWERED",
     );
     expect(asked).toEqual(["Zino Aviation"]);
-    expect(answerBlocks).toContainEqual(
-      expect.objectContaining({ kind: "PICTURE", source: "PUBLIC_WEB" }),
-    );
-    // Records answered and no public search ran: nothing to weigh it
-    // against, so it is shown said to be uncertain (QA QO-09).
-    expect(JSON.stringify(answerBlocks)).toContain("Not sure this is them");
+    // Records answered; no public search found a page about them.
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
   });
 });
 
