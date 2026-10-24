@@ -1418,6 +1418,8 @@ export {
   JOB_PLAN_V8,
   JOB_PLAN_V9,
   JOB_PLAN_V10,
+  JOB_PLAN_V11,
+  V11_ONLY_WHAT_THEY_ASKED,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 // Owner 2026-10-23: Q as an analyst doing deep work.
