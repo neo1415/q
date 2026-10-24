@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createPublicPictureSearch,
+  subjectRank,
   type PublicImageHit,
   type PublicImageSearchProvider,
 } from "../src/application/public-pictures.js";
@@ -150,6 +151,54 @@ describe("public pictures of who a turn names", () => {
       userText: "Tell me about Zino Aviation",
     });
     expect(pictures).toHaveLength(1);
+  });
+
+  // Owner 2026-10-24 (QO-33): Zino Aviation's own site gave a cabin-crew
+  // marketing shot. Their logo, then their people, then their product;
+  // generic marketing imagery last.
+  it("shows a site's best picture of them: logo, then people, then product, marketing last", async () => {
+    const own = (path: string, title: string) => ({
+      imageUrl: `https://jet.zinoaviation.com/assets/img/${path}`,
+      thumbnailUrl: null,
+      pageUrl: "https://jet.zinoaviation.com/",
+      title,
+    });
+    const pick = async (hits: PublicImageHit[]) => {
+      const found = index(hits);
+      const search = createPublicPictureSearch({ provider: found.provider });
+      return (
+        await search.find({
+          name: "Zino Aviation",
+          userText: "Tell me about Zino Aviation",
+        })
+      ).map((p) => p.imageUrl.split("/").at(-1));
+    };
+    expect(
+      await pick([
+        own("crew-cabin-welcome.jpeg", "Zino Aviation cabin crew member"),
+        own("zino-logo.png", "Zino Aviation"),
+      ]),
+    ).toEqual(["zino-logo.png"]);
+    expect(
+      await pick([
+        own("hero-banner.jpg", "Zino Aviation"),
+        own("ceo-portrait.jpg", "Zino Aviation CEO"),
+      ]),
+    ).toEqual(["ceo-portrait.jpg"]);
+    // Nothing better: the one they have still shows.
+    expect(
+      await pick([own("crew-cabin-welcome.jpeg", "Zino Aviation cabin crew")]),
+    ).toEqual(["crew-cabin-welcome.jpeg"]);
+  });
+
+  it("orders by what a picture shows, never whether it is shown", () => {
+    const rank = (imageUrl: string, title: string) =>
+      subjectRank({ imageUrl, title });
+    expect(rank("https://a.example/x/logo.png", "Acme")).toBe(0);
+    expect(rank("https://a.example/x/1.jpg", "Acme founders")).toBe(1);
+    expect(rank("https://a.example/x/app-screenshot.png", "Acme")).toBe(2);
+    expect(rank("https://a.example/x/1.jpg", "Acme")).toBe(3);
+    expect(rank("https://a.example/x/hero-banner.jpg", "Acme app")).toBe(4);
   });
 
   it("prefers their own site, then Wikipedia and LinkedIn, then the rest", async () => {

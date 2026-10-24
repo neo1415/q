@@ -104,24 +104,28 @@ export function entityImageSource(input: {
 /**
  * Every picture to try, in order, before the fallback (artifacts live):
  * the given URL; or, for a company known by id, its photo and then, where
- * asked for, its website's logo; or an investor organisation's photo.
+ * asked for, its website's logo -- or the logo first, for a card (owner
+ * 2026-10-24: "always prefer the company's logo for a company card"); or
+ * an investor organisation's photo.
  */
 export function entityImageSources(input: {
   readonly kind: EntityKind;
   readonly src?: string | null | undefined;
   readonly companyId?: string | undefined;
   readonly investorOrganisationId?: string | undefined;
-  readonly siteLogo?: boolean | undefined;
+  readonly siteLogo?: boolean | "first" | undefined;
 }): readonly string[] {
   const first = entityImageSource(input);
   if (first === null) return [];
   if (
     input.src === undefined &&
-    input.siteLogo === true &&
+    input.siteLogo !== undefined &&
+    input.siteLogo !== false &&
     input.kind === "company" &&
     input.companyId !== undefined
   ) {
-    return [first, companyLogoPath(input.companyId)];
+    const logo = companyLogoPath(input.companyId);
+    return input.siteLogo === "first" ? [logo, first] : [first, logo];
   }
   return [first];
 }
@@ -157,8 +161,11 @@ export function EntityAvatar({
    * row of identical marks tells them apart by nothing).
    */
   readonly fallback?: "mark" | "initials" | undefined;
-  /** Try the company's website logo after its photo (Q's artifacts). */
-  readonly siteLogo?: boolean | undefined;
+  /**
+   * Try the company's website logo after its photo (Q's artifacts), or
+   * before it ("first": a company card shows its logo).
+   */
+  readonly siteLogo?: boolean | "first" | undefined;
 }) {
   const px = typeof size === "number" ? size : ENTITY_AVATAR_SIZES[size];
   const sources = entityImageSources({

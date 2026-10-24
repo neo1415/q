@@ -334,6 +334,17 @@ describe("pictures: a real logo or photo, else initials, never broken or blank",
     ]);
   });
 
+  // Owner 2026-10-24: "always prefer the company's logo for a company card".
+  it("tries the website's logo first, then the photo, for a company card", () => {
+    expect(
+      entityImageSources({
+        kind: "company",
+        companyId: BARIDI,
+        siteLogo: "first",
+      }),
+    ).toEqual([companyLogoPath(BARIDI), companyPhotoPath(BARIDI)]);
+  });
+
   it("falls through a failed photo to the logo, and a failed logo to initials", () => {
     const { container } = render(
       <EntityAvatar
