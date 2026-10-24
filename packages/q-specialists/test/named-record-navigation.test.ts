@@ -549,6 +549,19 @@ describe("a yes or a correction to Q's own question never opens a record", () =>
         "Yes, Capital Q",
       ),
     ).toBe(true);
+    // Coordinator replay 2026-10-24: a list that ends inviting a choice.
+    expect(
+      continuesQsQuestion(
+        [
+          {
+            role: "Q",
+            content:
+              "Here are three: Kestrel, Savanna and Rift Valley. Tell me which to look into further.",
+          },
+        ],
+        "Yes. No, not Halyard. Capital Q",
+      ),
+    ).toBe(true);
   });
 });
 
