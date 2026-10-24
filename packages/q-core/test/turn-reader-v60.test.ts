@@ -16,9 +16,9 @@ import {
  * investor's interest is answered, never handed over.
  */
 describe("TURN_READER v60", () => {
-  it("v59 kept whole plus three readings (v61 is active)", () => {
+  it("v59 kept whole plus three readings (v62 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(61);
+    expect(active.definition.version).toBe(62);
     expect(TURN_READER_V59.status).toBe("DEPRECATED");
     const added = `${V60_SCREENS_ANY_LANGUAGE}${V60_ASKING_IS_NOT_OPEN}${V60_ANSWERING_INTEREST}`;
     expect(TURN_READER_V60.template).toContain(

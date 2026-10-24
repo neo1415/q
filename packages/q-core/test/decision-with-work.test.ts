@@ -17,7 +17,7 @@ describe("a decision stated with work attached", () => {
   it("is a team job for the active turn reader, and a decision alone is not", () => {
     const registry = createDefaultPromptRegistry();
     // v52 (lane ml nextSteps) is built on v51 and keeps this rule.
-    expect(registry.getActive("TURN_READER").definition.version).toBe(61);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(62);
     expect(registry.getActive("TURN_READER").definition.template).toContain(
       V51_DECISION_WITH_WORK,
     );
