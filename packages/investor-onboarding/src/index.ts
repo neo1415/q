@@ -81,3 +81,7 @@ export {
 // QO-42: what an investor publishes on their Q Card against a founder's own
 // company (stage, sector, geography). Shared by the API's slate and Q.
 export { publishedFitOf, type FounderFacts } from "./published-fit.js";
+export {
+  createInvestorCardFacts,
+  type InvestorCardFacts,
+} from "./card-facts.js";

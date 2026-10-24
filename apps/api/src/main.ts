@@ -90,6 +90,7 @@ import {
   FOUNDER_UTTERANCE_ALIASES,
 } from "@capital-q/founder-onboarding";
 import {
+  createInvestorCardFacts,
   createInvestorOnboardingIntegration,
   INVESTOR_INTERVIEW_CUES,
   INVESTOR_REVISABLE_STEPS,
@@ -371,7 +372,6 @@ import {
   createWorkforceJobPort,
 } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
-import { createInvestorCardFacts } from "./investor-card-facts.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import {
   withSuspendedIdentity,

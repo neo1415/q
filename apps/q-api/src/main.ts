@@ -119,6 +119,7 @@ import {
   FOUNDER_REVISABLE_STEPS,
 } from "@capital-q/founder-onboarding";
 import {
+  createInvestorCardFacts,
   createInvestorOnboardingIntegration,
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
@@ -2057,6 +2058,18 @@ const cardSubjects = createSubjectDirectory({
   },
   findInvestor: (investorOrganisationId) =>
     cardInvestorFacts.findCanonicalInvestorProfile(investorOrganisationId),
+  // QA F-77: the same mandate facts the application API's cards carry, so
+  // Q reads what an investor's card publishes (each still off until its
+  // owner turns it on).
+  findInvestorMandateFacts: createInvestorCardFacts({
+    mandates,
+    tenantOf: async (investorOrganisationId) =>
+      (
+        await cardInvestorFacts.findCanonicalInvestorProfile(
+          investorOrganisationId,
+        )
+      )?.tenantId ?? null,
+  }),
   companyVerification: async (subject) => {
     const standings = await cardVerification.companyStandings({
       tenantId: TenantIdSchema.parse(subject.tenantId),
