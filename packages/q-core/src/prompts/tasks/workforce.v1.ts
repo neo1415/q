@@ -34,6 +34,9 @@ import {
   JobPlanResultV8Schema,
   JOB_PLAN_V8_SCHEMA_VERSION,
   type JobPlanResultV8,
+  JobPlanResultV9Schema,
+  JOB_PLAN_V9_SCHEMA_VERSION,
+  type JobPlanResultV9,
   JobPlanVariablesV5Schema,
   type JobPlanResultV5,
   type JobPlanVariablesV5,
@@ -654,7 +657,7 @@ export const JOB_PLAN_V8: PromptDefinition<
 > = {
   ...JOB_PLAN_V7,
   version: 8,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Owner 2026-10-23: open ANALYSIS documents (growth plans, market studies, strategy) with scope OWN_COMPANY, GENERAL or NAMED_COMPANY; a RESEARCH step's goal says what must be learned (it plans its own focused searches); the lead writes a short first read for the person.",
   effectiveFrom: "2026-10-23",
@@ -677,6 +680,34 @@ export const JOB_PLAN_V8: PromptDefinition<
       "6. Next actions:",
       "6. First read: firstRead is what you would tell the person straight away, from what you already know, while the work runs: two or three plain sentences, clearly a first view to be tested by the research, with no figures and nothing about their records that the situation does not show. Null when there is nothing useful to say yet.\n7. Next actions:",
     ),
+};
+
+/**
+ * v9 (2026-10-24): the summary is said to them -- the start line read "On
+ * it. Starting now: prepare a ... plan for the person's own company" -- and
+ * the result is lenient where a slip need not lose the plan (F-78; see
+ * JobPlanResultV9Schema).
+ */
+export const JOB_PLAN_V9: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV9
+> = {
+  ...JOB_PLAN_V8,
+  version: 9,
+  status: "ACTIVE",
+  changeDescription:
+    "QA 2026-10-24: summary written to the person in the second person ('Research your market and write your 12-month growth plan'), never 'the person' or 'their'; F-78: a malformed first read, document request, prerequisites or next actions costs that part, not the whole plan.",
+  effectiveFrom: "2026-10-24",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: JOB_PLAN_SCHEMA_NAME,
+    schemaVersion: JOB_PLAN_V9_SCHEMA_VERSION,
+    schema: JobPlanResultV9Schema,
+  },
+  template: JOB_PLAN_V8.template.replace(
+    "THINK IN THIS ORDER",
+    'SPEAKING TO THEM: summary is one line said to them, in the second person, saying what you will do ("Research your market and write your 12-month growth plan"); never "the person", "the user" or "their" for them, and never a list of steps.\n\nTHINK IN THIS ORDER',
+  ),
 };
 
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE

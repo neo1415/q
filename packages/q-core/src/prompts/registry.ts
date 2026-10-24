@@ -163,6 +163,7 @@ import {
   DILIGENCE_QUESTIONS_V2,
   DILIGENCE_QUESTIONS_SHORTEN_V1,
   JOB_PLAN_V8,
+  JOB_PLAN_V9,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
@@ -570,6 +571,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DILIGENCE_QUESTIONS_V2,
     DILIGENCE_QUESTIONS_SHORTEN_V1,
     JOB_PLAN_V8,
+    JOB_PLAN_V9,
     RESEARCH_PLAN_V1,
     RESEARCH_FACTS_V1,
     ANALYSIS_WRITE_V1,

@@ -1416,6 +1416,7 @@ export {
   JOB_PLAN_V6,
   JOB_PLAN_V7,
   JOB_PLAN_V8,
+  JOB_PLAN_V9,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 // Owner 2026-10-23: Q as an analyst doing deep work.
@@ -1451,6 +1452,9 @@ export {
   JobPlanResultV8Schema,
   PlannedAnalysisDocumentSchema,
   type JobPlanResultV8,
+  JOB_PLAN_V9_SCHEMA_VERSION,
+  JobPlanResultV9Schema,
+  type JobPlanResultV9,
   JOB_PLAN_V5_UNTRUSTED,
   JobPlanResultV5Schema,
   JobPlanVariablesV5Schema,

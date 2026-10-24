@@ -595,6 +595,44 @@ export const JobPlanResultV8Schema = JobPlanResultV6Schema.extend({
 }).strict();
 export type JobPlanResultV8 = z.infer<typeof JobPlanResultV8Schema>;
 
+/**
+ * v9 (QA F-78, 2026-10-24, investor savanna-seed): "Make me a short
+ * 12-month plan ... West Africa logistics" failed planning outright -- the
+ * one planner answer was refused as INVALID_MODEL_OUTPUT and the person was
+ * told something failed on Q's side. A plan is now lost only for its core
+ * (summary, outcome, steps): a malformed first read, document request,
+ * prerequisite list or next-action list costs that part alone. A step whose
+ * document is dropped is then refused by code and replanned with the
+ * reason, never run without one.
+ */
+export const JOB_PLAN_V9_SCHEMA_VERSION = 9;
+export const JobPlanResultV9Schema = JobPlanResultV8Schema.extend({
+  steps: z
+    .array(
+      JobPlanResultV8Schema.shape.steps.element
+        .extend({
+          document:
+            JobPlanResultV8Schema.shape.steps.element.shape.document.catch(
+              undefined,
+            ),
+          why: z.string().trim().min(1).max(600),
+        })
+        .strict(),
+    )
+    .max(12),
+  prerequisites: JobPlanResultV8Schema.shape.prerequisites.catch([]),
+  nextActions: JobPlanResultV8Schema.shape.nextActions.catch([]),
+  firstRead: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_200)
+    .nullable()
+    .default(null)
+    .catch(null),
+}).strict();
+export type JobPlanResultV9 = z.infer<typeof JobPlanResultV9Schema>;
+
 // SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
 // prepared document, against the evidence it was built from.
 export const SUBSTANCE_CRITIQUE_SCHEMA_NAME = "SubstanceCritiqueResult";

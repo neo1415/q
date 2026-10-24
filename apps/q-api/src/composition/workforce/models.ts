@@ -17,7 +17,7 @@ import {
   DraftReviewResultV2Schema,
   AnalysisCritiqueResultSchema,
   AnalysisDocumentResultSchema,
-  JobPlanResultV8Schema,
+  JobPlanResultV9Schema,
   ResearchFactsResultSchema,
   ResearchPlanResultSchema,
   renderPrompt,
@@ -44,7 +44,7 @@ import {
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResultV8,
+  type JobPlanResultV9,
   type JobPlanVariablesV5,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -146,7 +146,9 @@ type DeepBudget =
 
 /** v5 also writes the outcome, prerequisites, reasons and next actions. */
 const PLAN = {
-  maxAttempts: 1,
+  // F-78: one refused answer lost the whole plan; a second attempt (the
+  // gateway's next route) is cheap beside telling them Q failed.
+  maxAttempts: 2,
   maxEstimatedCostUsd: 0.08,
   maxOutputTokens: 2_800,
   attemptTimeoutMs: 60_000,
@@ -173,7 +175,7 @@ export type WorkforceModels = {
     trace: Trace,
     variables: PlanVariables,
     // The input shape: firstRead may be absent (an older plan, a fake).
-  ) => Promise<z.input<typeof JobPlanResultV8Schema> | null>;
+  ) => Promise<z.input<typeof JobPlanResultV9Schema> | null>;
   readonly critique: (
     who: Who,
     trace: Trace,
@@ -370,13 +372,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResultV8>({
+      call<PlanVariables, JobPlanResultV9>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultV8Schema,
+        schema: JobPlanResultV9Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
