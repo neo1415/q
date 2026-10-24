@@ -967,3 +967,27 @@ export const TurnReaderV64ResultSchema = TurnReaderV63ResultSchema.extend({
   reference: TurnReferenceV64Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV64Result = z.infer<typeof TurnReaderV64ResultSchema>;
+
+/**
+ * v65 (coordinator 2026-10-24): what a turn answers, read by meaning, so
+ * code's word lists are only hints that wait for this reading. Q_QUESTION:
+ * it answers or continues Q's last question or invitation; WAITING_CARD:
+ * it approves, declines or edits a change waiting for their approval
+ * (card: that change as Q named it, null for all or unsaid); NEW: a
+ * request or question of its own.
+ */
+export const TURN_READER_V65_SCHEMA_VERSION = 65;
+export const TURN_REPLY_KINDS = ["Q_QUESTION", "WAITING_CARD", "NEW"] as const;
+export const TurnReplyToSchema = z
+  .object({
+    kind: z.enum(TURN_REPLY_KINDS),
+    card: z.string().trim().min(1).max(200).nullable().default(null),
+  })
+  .strict();
+/** v65: whom a discovery ask is about. */
+export const TURN_DISCOVER_WHOM = ["INVESTORS", "COMPANIES"] as const;
+export const TurnReaderV65ResultSchema = TurnReaderV64ResultSchema.extend({
+  replyTo: TurnReplyToSchema.nullable().default(null),
+  discoverWhom: z.enum(TURN_DISCOVER_WHOM).nullable().default(null),
+}).strict();
+export type TurnReaderV65Result = z.infer<typeof TurnReaderV65ResultSchema>;
