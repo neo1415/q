@@ -203,7 +203,13 @@ describe("the lead's plan for the Maji Loop request", () => {
   });
 });
 
-function world(options: { readonly outward?: boolean } = {}) {
+function world(
+  options: {
+    readonly outward?: boolean;
+    /** What already waits for their approval (the Approval Engine's list). */
+    readonly waiting?: readonly { summary: string; actionType: string }[];
+  } = {},
+) {
   const store = createInMemoryWorkforceStore();
   const queue = createInMemoryAgentWorkQueue();
   const documentInputs: WorkforceDocumentInput[] = [];
@@ -292,6 +298,9 @@ function world(options: { readonly outward?: boolean } = {}) {
   const board = createWorkforceJobBoard({
     jobsFor,
     budgetUsd: 2.5,
+    ...(options.waiting === undefined
+      ? {}
+      : { waiting: () => Promise.resolve(options.waiting ?? []) }),
     startOwnWork: createOwnWorkStarter({
       jobsFor,
       queue: () => queue,
@@ -335,6 +344,29 @@ describe("own-account deep work starts with no approval card", () => {
     expect(delivered[0]).toMatchObject({
       artifactId: "11111111-1111-4111-8111-111111111111",
     });
+  });
+
+  it("is never held by an unrelated card waiting for approval (live 2026-10-24)", async () => {
+    const savanna = {
+      summary: "Prepare for the first call with Savanna Seed Partners",
+      actionType: "q.workforce.job.start",
+    };
+    const own = world({ waiting: [savanna] });
+    const started = await own.board.port.prepare(
+      actor,
+      randomUUID(),
+      "Write me a short 12-month growth plan for my company",
+    );
+    expect(started.status).toBe("STARTED");
+
+    // Work that would itself be a card is still checked against them.
+    const outward = world({ outward: true, waiting: [savanna] });
+    const held = await outward.board.port.prepare(
+      actor,
+      randomUUID(),
+      "Write me a short 12-month growth plan for my company",
+    );
+    expect(held.status).toBe("ALREADY_WAITING");
   });
 
   it("keeps the card for work that reaches anyone else", async () => {

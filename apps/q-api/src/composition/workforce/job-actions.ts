@@ -611,20 +611,24 @@ export function createWorkforceJobBoard(dependencies: {
           dependencies.waiting === undefined
             ? []
             : await dependencies.waiting(actor).catch(() => []);
-        if (options?.proceed !== true && dependencies.waiting !== undefined) {
-          const related = relatedWaiting(
-            goal,
-            waitingNow,
-            options?.subjects ?? [],
-          );
-          if (related.waiting.length > 0) {
-            return {
-              status: "ALREADY_WAITING",
-              waiting: related.waiting,
-              about: related.about,
-            };
-          }
-        }
+        const related =
+          options?.proceed === true || dependencies.waiting === undefined
+            ? null
+            : relatedWaiting(goal, waitingNow, options?.subjects ?? []);
+        const heldBy = (about: "SAME_PEOPLE" | "SAME_KIND") =>
+          related !== null &&
+          related.about === about &&
+          related.waiting.length > 0
+            ? {
+                status: "ALREADY_WAITING" as const,
+                waiting: related.waiting,
+                about,
+              }
+            : null;
+        // Work about the same people as something waiting: asked first,
+        // before anything is planned.
+        const samePeople = heldBy("SAME_PEOPLE");
+        if (samePeople !== null) return samePeople;
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
         if (dependencies.withinLimit !== undefined) {
           const room = await dependencies.withinLimit(owner).catch(() => null);
@@ -720,12 +724,23 @@ export function createWorkforceJobBoard(dependencies: {
             : { reasoning: planned.reasoning }),
         });
         if (!parsed.success) return { status: "NOT_PLANNED" };
+        // Their own work (research, a document for them) is never held by
+        // what waits for approval: nothing it does can cross a waiting card.
+        // Only a plan that would itself be a card is checked against them.
+        // A goal naming nobody matched every waiting job of this kind (live
+        // 2026-10-24: "Write me a short 12-month growth plan for my company"
+        // was held by "Prepare for the first call with Savanna Seed
+        // Partners"). Their own work (research, a document for them) is
+        // never held by it: nothing it does can cross a waiting card. Only
+        // a plan that would itself be a card is.
+        const ownWork = isOwnAccountWork(parsed.data);
+        if (!ownWork) {
+          const sameKind = heldBy("SAME_KIND");
+          if (sameKind !== null) return sameKind;
+        }
         // Owner 2026-10-23: research and a document for themselves is not
         // an outward or consequential action -- it starts now, no card.
-        if (
-          dependencies.startOwnWork !== undefined &&
-          isOwnAccountWork(parsed.data)
-        ) {
+        if (dependencies.startOwnWork !== undefined && ownWork) {
           const started = await dependencies
             .startOwnWork(actor, runId, parsed.data)
             .catch(() => null);
