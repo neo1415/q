@@ -51,3 +51,39 @@ describe("nothing found: what was asked, in their words", () => {
     expect(text).not.toMatch(/country/iu);
   });
 });
+
+// Coordinator 2026-10-24: the known firms, then public firms named apart
+// as unconfirmed, and no rehearsal offered for a list.
+describe("known firms and public finds", () => {
+  const one = (name: string, source: "KNOWN_ENTITY" | "WEB") =>
+    ({
+      card: { subject: { displayName: name } },
+      role: "INVESTOR",
+      fit: [],
+      source,
+    }) as unknown as Parameters<typeof investorDiscoveryText>[0][number];
+
+  it("names the public ones apart, unconfirmed", () => {
+    const text = investorDiscoveryText(
+      [
+        one("AlRayan Investment LLC", "KNOWN_ENTITY"),
+        one("Doha Tech Angels", "KNOWN_ENTITY"),
+        one("Qatar Development Bank", "KNOWN_ENTITY"),
+        one("Qatar Investment Authority", "WEB"),
+      ],
+      {
+        regionWords: ["qatar"],
+        asked: 3,
+        outcome: "FOUND",
+        aboutMyCompany: false,
+      },
+    );
+    expect(text).toContain(
+      "Here are three Qatar investors who could fit: AlRayan Investment LLC, Doha Tech Angels and Qatar Development Bank.",
+    );
+    expect(text).toContain(
+      "From a public web search, not confirmed: Qatar Investment Authority.",
+    );
+    expect(text).not.toMatch(/rehearsal/iu);
+  });
+});

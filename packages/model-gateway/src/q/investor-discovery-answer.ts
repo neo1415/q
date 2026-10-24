@@ -117,25 +117,34 @@ export function investorDiscoveryText(
   }
   const investors = found.filter((one) => one.role === "INVESTOR");
   const openers = found.filter((one) => one.role === "DOOR_OPENER");
-  const names = investors.map((one) => one.card.subject.displayName);
-  const count = NUMBER_WORDS[Math.min(investors.length, 5)] ?? "some";
+  // Coordinator 2026-10-24: firms a public search found are named beside the
+  // ones Capital Q knows, apart and said to be unconfirmed.
+  const known = investors.filter((one) => one.source !== "WEB");
+  const publicFinds = investors.filter((one) => one.source === "WEB");
+  const names = known.map((one) => one.card.subject.displayName);
+  const count = NUMBER_WORDS[Math.min(known.length, 5)] ?? "some";
+  const fit = context.aboutMyCompany ? " this" : "";
   const lead =
     investors.length === 0
       ? "I found no investor for that, only a body that can open doors."
-      : investors.length < context.asked
-        ? `I found only ${count} ${where}investor${investors.length === 1 ? "" : "s"} who could fit${context.aboutMyCompany ? " this" : ""}: ${listOf(names)}.`
-        : `Here ${investors.length === 1 ? "is" : "are"} ${count} ${where}investor${investors.length === 1 ? "" : "s"} who could fit${context.aboutMyCompany ? " this" : ""}: ${listOf(names)}.`;
+      : known.length === 0
+        ? `From a public web search, not confirmed: ${listOf(publicFinds.map((one) => one.card.subject.displayName))} could fit${fit} as ${where}investors.`
+        : known.length < context.asked && publicFinds.length === 0
+          ? `I found only ${count} ${where}investor${known.length === 1 ? "" : "s"} who could fit${fit}: ${listOf(names)}.`
+          : `Here ${known.length === 1 ? "is" : "are"} ${count} ${where}investor${known.length === 1 ? "" : "s"} who could fit${fit}: ${listOf(names)}.`;
   const parts = [lead];
+  if (known.length > 0 && publicFinds.length > 0) {
+    parts.push(
+      `From a public web search, not confirmed: ${listOf(publicFinds.map((one) => one.card.subject.displayName))}.`,
+    );
+  }
   for (const opener of openers) {
     parts.push(
       `${opener.card.subject.displayName} is not a fund, but it can open doors.`,
     );
   }
-  if (found.some((one) => one.source === "WEB")) {
-    parts.push("Some came from a public web search and are not confirmed.");
-  }
   parts.push(
-    "This is matched on place and what each is described as; none has said it is interested. I can set up a rehearsal with any of them.",
+    "This is matched on place and what each is described as; none has said it is interested. Tell me which to look into further.",
   );
   return parts.join(" ");
 }

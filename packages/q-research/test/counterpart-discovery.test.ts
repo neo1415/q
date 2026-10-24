@@ -128,22 +128,26 @@ describe("investor discovery by meaning", () => {
     ["GCC"],
     ["Qatar"],
     ["from the region", "Arab world"],
-  ])("maps %s to the Qatar investors with no web call", async (...regions) => {
-    const web = createFakeResearchProvider({ pages: [] });
-    const discovery = createCounterpartDiscovery({
-      known: await index(),
-      providers: [web],
-    });
-    const found = await discovery.discover({ ...SCOPE, regions, count: 3 });
-    expect(found.outcome).toBe("FOUND");
-    expect(names(found).sort()).toEqual(TOP_THREE);
-    // Prepared entities suffice: not a single web search, and the agency
-    // and the finance executive (not an investor) are not in the three.
-    expect(found.webSearched).toBe(false);
-    expect(web.searches).toHaveLength(0);
-    expect(names(found)).not.toContain("Invest Qatar");
-    expect(names(found)).not.toContain("Shadi Qishta");
-  });
+  ])(
+    "maps %s to the Qatar investors, the public search beside",
+    async (...regions) => {
+      const web = createFakeResearchProvider({ pages: [] });
+      const discovery = createCounterpartDiscovery({
+        known: await index(),
+        providers: [web],
+      });
+      const found = await discovery.discover({ ...SCOPE, regions, count: 3 });
+      expect(found.outcome).toBe("FOUND");
+      expect(names(found).sort()).toEqual(TOP_THREE);
+      // Prepared entities fill the three; the public search still runs
+      // beside them (it found nothing here). The agency and the finance
+      // executive (not an investor) are not in the three.
+      expect(found.webSearched).toBe(true);
+      expect(web.searches.length).toBeGreaterThan(0);
+      expect(names(found)).not.toContain("Invest Qatar");
+      expect(names(found)).not.toContain("Shadi Qishta");
+    },
+  );
 
   it("ranks funds above the person, and every card can be rehearsed", async () => {
     const discovery = createCounterpartDiscovery({
@@ -404,6 +408,32 @@ describe("public terms", () => {
  * kind is offered.
  */
 describe("discovery by kind, place and sector", () => {
+  it("three Qatari VCs: the known three, and public firms named beside them", async () => {
+    const web = createFakeResearchProvider({
+      pages: [
+        {
+          url: "https://www.linkedin.com/company/qatar-investment-authority",
+          title: "Qatar Investment Authority | LinkedIn",
+          snippet:
+            "Doha sovereign fund; its venture capital programme invests in startups in Qatar.",
+          text: "Doha sovereign fund; its venture capital programme invests in startups in Qatar.",
+        },
+      ],
+    });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Qatar"],
+      count: 3,
+    });
+    expect(names(found).slice(0, 3).sort()).toEqual(TOP_THREE);
+    expect(names(found)).toContain("Qatar Investment Authority");
+    expect(found.candidates.at(-1)?.source).toBe("WEB");
+  });
+
   it("three Saudi family offices that back fintech: searched as family offices in Saudi Arabia, never a VC instead", async () => {
     const web = createFakeResearchProvider({
       pages: [
