@@ -68,7 +68,14 @@ export type QActionNarrator = {
   /** The person asked for something that could not be prepared; `reason` is theirs to read. */
   readonly refused: (run: QRunRef, reason: string) => Promise<void>;
   /** A line of code's own about a waiting card, said in the run (no blocks). */
-  readonly note?: ((run: QRunRef, line: string) => Promise<void>) | undefined;
+  readonly note?:
+    | ((
+        run: QRunRef,
+        line: string,
+        /** The card the line is about, shown with it. */
+        blocks?: readonly QResultBlock[],
+      ) => Promise<void>)
+    | undefined;
   /** What the execution gate recorded, after an approval. */
   readonly settled: (
     context: QActionExecuteContext,
@@ -369,7 +376,7 @@ export function createQActionNarrator(dependencies: {
       );
     },
     refused: (run, reason) => say(run, refusedLine(reason)),
-    note: (run, line) => say(run, line),
+    note: (run, line, blocks) => say(run, line, blocks),
     settled: async (context, outcome) => {
       const run: QRunRef = {
         runId: context.runId,

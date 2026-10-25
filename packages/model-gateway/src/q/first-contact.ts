@@ -43,6 +43,18 @@ export const MESSAGE_TOOLS: ReadonlySet<string> = new Set([
   "propose_email",
 ]);
 
+/**
+ * A message they asked for, answered with its words but not prepared (guard
+ * run 1, 2026-10-25): the words go on the card, through the tool the
+ * reading named, for their approval. Nothing is sent until they approve.
+ */
+export function prepareMessageNote(tool: string): ModelMessage {
+  return {
+    role: "SYSTEM",
+    content: `They asked for this message to be written for someone. Prepare it now: call ${tool} through the function-calling interface, with the full text you would send as its body and the counterpart named as they named them. Do not write the message out in your answer instead: the card shows its words for their approval, and nothing is sent until they approve. If it cannot be prepared, say plainly why.`,
+  };
+}
+
 type FirstContactArguments = (
   { readonly companyId: string } | { readonly company: string }
 ) & { readonly note?: string };

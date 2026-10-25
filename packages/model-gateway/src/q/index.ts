@@ -194,12 +194,15 @@ import {
   firstContactMessage,
   firstContactOf,
   MESSAGE_TOOLS,
+  prepareMessageNote,
 } from "./first-contact.js";
 import {
   Q_CARD_CLAIM_TOOL,
   qCardOfferMessage,
   qCardOfferOf,
   qCardReadOf,
+  asksAboutOwnQCard,
+  Q_CARD_READ_TOOL,
   withQCardLink,
   type QCardRead,
 } from "./q-card-offer.js";
@@ -7865,6 +7868,30 @@ export function createModelGatewayQAnswer(
               sayDoRounds === 0 &&
               calls < Q_TOOL_LOOP_MAX_CALLS &&
               request.signal?.aborted !== true;
+            /**
+             * Guard run 1 (2026-10-25, run b6f9236c): "Draft a short update
+             * email to Savanna Seed Partners…" was answered with the whole
+             * email written out, then "I didn't prepare that". The reading
+             * named the message tool (askedAction), it was offered, and
+             * nothing was prepared: one more round to put those words on
+             * the card for their approval. Never sent without it.
+             */
+            const draftedNotPrepared = (): boolean => {
+              const asked = request.askedAction;
+              return (
+                asked !== undefined &&
+                MESSAGE_TOOLS.has(asked) &&
+                offeredByName.has(asked) &&
+                !toolCalls.some(
+                  (call) =>
+                    MESSAGE_TOOLS.has(call.providerName) ||
+                    call.providerName === FIRST_CONTACT_TOOL,
+                ) &&
+                sayDoRounds === 0 &&
+                calls < Q_TOOL_LOOP_MAX_CALLS &&
+                request.signal?.aborted !== true
+              );
+            };
             const askToDoIt = (
               said: string,
               note: ModelMessage = SAY_DO_NOTE,
@@ -7878,6 +7905,13 @@ export function createModelGatewayQAnswer(
               ];
             };
             if (result.output.kind === "STRUCTURED") {
+              if (draftedNotPrepared()) {
+                askToDoIt(
+                  JSON.stringify(result.output.value),
+                  prepareMessageNote(request.askedAction ?? ""),
+                );
+                continue;
+              }
               if (deferredInsteadOfDone(result.output.value)) {
                 askToDoIt(JSON.stringify(result.output.value), DO_IT_NOW_NOTE);
                 continue;
@@ -7926,6 +7960,13 @@ export function createModelGatewayQAnswer(
                   unknownRootKeys: "DROP",
                 },
               );
+              if (accepted.ok && draftedNotPrepared()) {
+                askToDoIt(
+                  result.output.text,
+                  prepareMessageNote(request.askedAction ?? ""),
+                );
+                continue;
+              }
               if (accepted.ok && deferredInsteadOfDone(accepted.value)) {
                 askToDoIt(result.output.text, DO_IT_NOW_NOTE);
                 continue;
@@ -8568,6 +8609,65 @@ export function createModelGatewayQAnswer(
                 { qRunId: request.runId, status: data?.status ?? null },
                 "a message they asked for, not tried: the first contact by code",
               );
+            }
+          }
+        }
+        // Guard run 1 (2026-10-25, run 88075f4a): "Show me my Q Card and the
+        // share link" was answered "I don't have the saved share link yet.
+        // Want me to claim @maji-loop?" with the card never read. Asked
+        // about their own card and not read this turn: code reads it, and
+        // with none made prepares the claim (its card already waiting is
+        // that card), so the answer says how it stands from the read.
+        if (
+          qCardRead === null &&
+          offeredByName.has(Q_CARD_READ_TOOL) &&
+          asksAboutOwnQCard(latest.content) &&
+          toolCalls.length + 2 <= Q_TOOL_LOOP_MAX_CALLS &&
+          request.signal?.aborted !== true
+        ) {
+          const readCall = {
+            callId: `q-card-read-${request.runId}`,
+            name: Q_CARD_READ_TOOL,
+            arguments: {
+              subject:
+                ownInvestorOrganisationIn(plan) === null
+                  ? "COMPANY"
+                  : "INVESTOR_ORGANISATION",
+            },
+          };
+          const read = await callTool(readCall, toolContext).catch(() => null);
+          if (read !== null) {
+            toolCalls.push({
+              toolName: read.toolName,
+              providerName: Q_CARD_READ_TOOL,
+              status: read.status,
+              failureCode: read.failureCode,
+              latencyMs: read.latencyMs,
+            });
+            qCardRead = qCardReadOf(readCall, read);
+            const offer = qCardOfferOf(readCall, read);
+            if (
+              offer !== null &&
+              offeredByName.has(Q_CARD_CLAIM_TOOL) &&
+              !toolCalls.some((call) => call.providerName === Q_CARD_CLAIM_TOOL)
+            ) {
+              const claimed = await callTool(
+                {
+                  callId: `q-card-claim-${request.runId}`,
+                  name: Q_CARD_CLAIM_TOOL,
+                  arguments: offer,
+                },
+                toolContext,
+              ).catch(() => null);
+              if (claimed !== null) {
+                toolCalls.push({
+                  toolName: claimed.toolName,
+                  providerName: Q_CARD_CLAIM_TOOL,
+                  status: claimed.status,
+                  failureCode: claimed.failureCode,
+                  latencyMs: claimed.latencyMs,
+                });
+              }
             }
           }
         }

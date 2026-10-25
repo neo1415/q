@@ -12,7 +12,19 @@ import type { QToolCallOutcome } from "@capital-q/q-runtime";
  * handle, nothing made until they approve.
  */
 export const Q_CARD_CLAIM_TOOL = "claim_q_card_handle";
-const READ_TOOL = "get_q_card";
+export const Q_CARD_READ_TOOL = "get_q_card";
+const READ_TOOL = Q_CARD_READ_TOOL;
+
+/**
+ * The turn is about their own Q Card (guard run 1, 2026-10-25): its words
+ * name it, or its share link. A hint for one read-only read of their own
+ * card, never a decision: what is said comes from that read.
+ */
+export function asksAboutOwnQCard(said: string): boolean {
+  return /\b(?:my|our)\s+q[\s-]*card\b|\bq[\s-]*card\b[^.?!]*\b(?:link|url|address|handle)\b|\bshare\s+link\b/iu.test(
+    said,
+  );
+}
 
 /** The claim's arguments for a card not made yet; null otherwise. */
 export function qCardOfferOf(
