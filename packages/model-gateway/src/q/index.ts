@@ -389,6 +389,7 @@ import {
   comparisonSpokenLine,
   withoutCompareOffers,
   comparisonTableBlock,
+  verdictSentence,
   compareTargets,
   namesToCompare,
   newestAnswerCards,
@@ -5462,6 +5463,11 @@ export function createModelGatewayQAnswer(
        * with no company of their own gets nothing here.
        */
       const composeEarlyLead = async (): Promise<string | null> => {
+        // Coordinator 2026-10-25 (I21): a comparison code resolved opens
+        // with code's verdict, said with its table before Q's reasoning.
+        if (compareTable !== null && compareVerdict !== null) {
+          return verdictSentence(compareVerdict);
+        }
         if (asksForPipelineSummary(latest.content)) {
           const outcome = await (standingOf() ?? Promise.resolve(null));
           return outcome !== null && outcome.result.ok
@@ -5934,8 +5940,31 @@ export function createModelGatewayQAnswer(
         read: () => runCompanies.read(request.runId),
         question: latest.content,
       });
+      /**
+       * Coordinator 2026-10-25 (I21: "how do the top two stack up?" showed
+       * nothing for 8.5 s): a comparison code resolved is on screen first.
+       * Its table, built from this run's authorised reads, goes up the
+       * moment the answer can speak, and every later preview keeps it, so
+       * Q's words stream in under it. Nothing in it is a model's.
+       */
+      const tableFirst =
+        compareTable?.kind === "TABLE"
+          ? {
+              layout: "TABLE" as const,
+              table: compareTable,
+              subjects: compareTable.columns.flatMap((column) =>
+                column.subject === null
+                  ? []
+                  : [{ subject: column.subject, name: column.label }],
+              ),
+            }
+          : null;
       const sendSaid = (text: string): void => {
-        const preview = announcer.sentence(text);
+        const named = announcer.sentence(text);
+        const preview =
+          tableFirst === null || named === null
+            ? named
+            : { ...named, layout: tableFirst.layout, table: tableFirst.table };
         send({
           runId: request.runId,
           tenantId: request.tenantId,
@@ -5960,6 +5989,30 @@ export function createModelGatewayQAnswer(
           sendSaid(`${said} `);
         }
       };
+      // The table, then code's verdict as its opening line (the model is
+      // told that line was said and continues after it).
+      if (tableFirst !== null) {
+        send({
+          runId: request.runId,
+          tenantId: request.tenantId,
+          messageId,
+          text: "",
+          preview: tableFirst,
+        });
+        if (earlyLead !== null && leadLines === undefined) {
+          leadLines = earlyLead;
+          leadListOpen = true;
+          sayLeadLines();
+        }
+        logger?.info(
+          {
+            qRunId: request.runId,
+            tableMs: Date.now() - startedAt,
+            verdict: earlyLead !== null,
+          },
+          "q comparison table went up first",
+        );
+      }
       /**
        * Owner 2026-10-21 (time to the first word): a public-web search
        * takes seconds, so when nothing has been said yet, what Q is doing

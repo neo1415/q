@@ -6,6 +6,8 @@ import type { PermittedContextPlan } from "@capital-q/contracts";
 import type {
   QAnswerRequest,
   QConversationMessage,
+  QLiveDelta,
+  QLiveDeltaBus,
   QOfferedTool,
   QRuntimeRepositories,
   QToolCallOutcome,
@@ -181,8 +183,9 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
   };
 }
 
-const analyst = (answer: string): FakeBehaviour => ({
+const analyst = (answer: string, delayMs?: number): FakeBehaviour => ({
   kind: "JSON",
+  ...(delayMs === undefined ? {} : { delayMs }),
   value: {
     answer,
     responseShape: "CONCISE",
@@ -204,10 +207,12 @@ function build(
   noCards = false,
   /** Typed answers' findings and cards written beside them (q-api default). */
   parallelExtras = false,
+  /** How long the analyst takes to write, and who hears it as it goes. */
+  live?: { readonly delayMs: number; readonly deltas: QLiveDeltaBus },
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
-    script: [analyst(answer)],
+    script: [analyst(answer, live?.delayMs)],
   });
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(
@@ -307,6 +312,7 @@ function build(
     transactions: { run: (work) => work({} as never) },
     tools,
     parallelExtras,
+    ...(live === undefined ? {} : { deltas: live.deltas }),
   });
   const request = {
     runId: run,
@@ -416,6 +422,53 @@ describe("compare the top two, right after a list of five", () => {
         (block) => Reflect.get(block as object, "kind") === "TABLE",
       ),
     ).toBe(true);
+  });
+
+  // Coordinator 2026-10-25 (I21): it feels instant. Code's table and
+  // verdict are on screen first; the analyst's words stream in under them.
+  it("puts the code-built table and verdict up first, then the analyst's words", async () => {
+    const heard: { at: number; delta: QLiveDelta }[] = [];
+    const deltas: QLiveDeltaBus = {
+      publish: (delta) => heard.push({ at: Date.now(), delta }),
+      subscribe: () => () => undefined,
+      subscriberCount: () => 1,
+    };
+    const { seam, request, stored } = build(
+      "Which is better, Mizan or Silo Credit?",
+      { compare: { count: null, names: ["Mizan", "Silo Credit"] } },
+      "Mizan is in Cairo doing merchant payments at $42,000 MRR; Silo Credit is in Kano lending to agri-dealers at $9,000.",
+      false,
+      true,
+      { delayMs: 400, deltas },
+    );
+    const started = Date.now();
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const settled = Date.now() - started;
+    const first = heard[0];
+    expect(first?.delta.text).toBe("");
+    expect(first?.delta.preview?.layout).toBe("TABLE");
+    expect(first?.delta.preview?.table?.columns.map((c) => c.label)).toEqual([
+      "Mizan",
+      "Silo Credit",
+    ]);
+    // Code's verdict is the first words, before the analyst has written.
+    const words = heard.filter((one) => one.delta.text.trim().length > 0);
+    expect(words[0]?.delta.text).toMatch(
+      /^On Capital Q's mandate fit, Mizan leads/u,
+    );
+    const tableMs = (first?.at ?? Infinity) - started;
+    expect(tableMs).toBeLessThan(settled - 300);
+    expect((words[0]?.at ?? Infinity) - started).toBeLessThan(settled - 300);
+    // Every later preview keeps the table, so it never drops while Q talks.
+    for (const one of heard) {
+      if (one.delta.preview !== undefined)
+        expect(one.delta.preview.table).toBeDefined();
+    }
+    // The stored answer leads with the verdict once.
+    const said = stored.at(-1)?.content ?? "";
+    expect(
+      said.match(/On Capital Q's mandate fit, Mizan leads/gu),
+    ).toHaveLength(1);
   });
 
   it("the same, when the turn was read as a fit question (live 23 Oct, run f5415b0c)", async () => {
