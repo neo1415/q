@@ -37,7 +37,7 @@ Score % = sum ÷ (2 × items).
 
 **Re-test of rows below 2, 25 Oct 10:30–10:50 UTC on 07a748ac8:** 10 live text turns (owner budget ≤20), English only, no voice. Investor 39/44 = **89%**, founder 28/30 = **93%**, UI 18/18 = **100%** (U8 deferred), onboarding 3/4 = **75%**; overall English **88/96 = 92%**.
 
-**O1 and F1 scored from the onboarding lane's run 6 (docs PR #488), not re-run here (spend rule).** Founder 30/30 = **100%**, onboarding 4/4 = **100%**; overall English **90/96 = 94%** (93.75%).
+**O1 and F1 scored from the onboarding lane's run 6 (docs PR #488), not re-run here (spend rule).** Founder 29/30 = **97%**, onboarding 4/4 = **100%**; overall English **90/96 = 94%** (93.75%).
 
 ## Investor: the day-to-day and what bites
 
