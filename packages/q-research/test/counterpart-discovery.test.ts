@@ -646,3 +646,37 @@ describe("discovery by kind, place and sector", () => {
     expect(found.candidates.length).toBe(3);
   });
 });
+
+// F-133 (QA, a Ghana logistics founder): "which investors fit me", with no
+// place, kind or sector to go on, named the prepared Qatar set in name
+// order as fits. With nothing to match on, a prepared investor is not a
+// fit; one whose public material matches the stage asked still is.
+describe("nothing to match on is never a fit (F-133)", () => {
+  it("names no prepared investor when no place, kind, sector or stage was asked", async () => {
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: [],
+      count: 3,
+    });
+    expect(names(found)).toEqual([]);
+  });
+
+  it("keeps a prepared investor whose public material matches the stage asked", async () => {
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: [],
+      stage: "seed",
+      count: 3,
+    });
+    // "backing early-stage tech startups" is the only seed-stage match.
+    expect(names(found)).toEqual(["Muhannad Taslaq"]);
+  });
+});

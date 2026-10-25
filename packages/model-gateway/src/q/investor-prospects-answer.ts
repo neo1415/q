@@ -79,6 +79,8 @@ type Prospect = {
   };
   /** QO-42 / QA F-77: their published stage, sector and geography. */
   readonly publishedFit?: PublishedFit;
+  /** F-133: anything they publish known to fit (false: nothing says so). */
+  readonly fitKnown?: boolean;
 };
 
 type Standing = "MET" | "NOT_MET" | "UNKNOWN";
@@ -98,6 +100,8 @@ export type ProspectPick = {
   readonly why: string;
   /** How well, by what they publish on their Q Card; absent: not read. */
   readonly fit?: PublishedFit | undefined;
+  /** F-133: false when nothing they publish is known to fit. */
+  readonly fitKnown?: boolean | undefined;
 };
 
 export type InvestorProspectsAnswer = {
@@ -371,6 +375,7 @@ export function pickProspects(
       about: one.publicDescription,
       why,
       fit: one.publishedFit,
+      fitKnown: one.fitKnown,
     });
   }
   return picks;
@@ -423,6 +428,7 @@ export function networkInvestorsIn(
       about: one.publicDescription,
       why: prospectWhy(one),
       fit: one.publishedFit,
+      fitKnown: one.fitKnown,
     }));
 }
 
@@ -435,10 +441,17 @@ export function investorProspectsText(
   }
   const names = picks.map((pick) => pick.name);
   const count = NUMBER_WORDS[Math.min(picks.length, 5)] ?? "some";
+  // F-133: when nothing any of them publishes is known to fit, they are
+  // not said to fit; unknown stays unknown.
+  const noneKnown = picks.every(
+    (pick) => pick.kind !== "INTERESTED" && pick.fitKnown === false,
+  );
   const parts = [
-    picks.length < asked
-      ? `I found ${count} worth talking to first: ${listOf(names)}.`
-      : `Talk to ${listOf(names)} first.`,
+    noneKnown
+      ? `None of the investors on Capital Q publishes a sector or geography I can check your company against yet, so I can't say which fit. The nearest by what they do publish: ${listOf(names)}.`
+      : picks.length < asked
+        ? `I found ${count} worth talking to first: ${listOf(names)}.`
+        : `Talk to ${listOf(names)} first.`,
   ];
   for (const pick of picks) {
     const how = fitWords(pick.fit);
@@ -489,9 +502,14 @@ function fitMeasures(fit: PublishedFit | undefined): QAnswerCard["measures"] {
  * Sector and Geography all unknown contradicted the card. Interest shown is
  * their own act and stands on its own.
  */
+const NOT_KNOWN_VIEW =
+  "Fit not known yet: they don't publish a sector or geography to check yours against";
+
 export function viewOf(pick: ProspectPick): string {
   if (pick.kind === "INTERESTED") return "Has shown interest";
   const fit = pick.fit;
+  // F-133: nothing they publish is known to fit; unknown is never a fit.
+  if (pick.fitKnown === false && fit === undefined) return NOT_KNOWN_VIEW;
   // No rows (their card was not read): the ranking's own reasons stand.
   if (fit === undefined) return "Likely fit";
   const met = FIT_PARTS.filter((part) => fit[part] === "MET").length;

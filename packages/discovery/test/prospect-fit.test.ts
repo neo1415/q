@@ -27,7 +27,7 @@ describe("prospect fit", () => {
       "DEPLOYING",
     ]);
     expect(fit.score).toBe(75);
-    expect(PROSPECT_FIT_VERSION).toBe("prospect-fit.v1");
+    expect(PROSPECT_FIT_VERSION).toBe("prospect-fit.v2");
   });
 
   it("counts nothing for what is unknown, on either side", () => {

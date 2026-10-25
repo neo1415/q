@@ -284,6 +284,60 @@ export function investorCardsBlock(
   return parsed.success ? parsed.data : null;
 }
 
+/** Their company's country and stage, for an ask that named neither. */
+async function ownPlace(input: {
+  readonly ask: InvestorAsk;
+  readonly tools: Pick<QToolPort, "execute">;
+  readonly context: QToolExecutionContext;
+  readonly available: ReadonlySet<string>;
+  readonly companyId?: string | null | undefined;
+}): Promise<{
+  readonly country: string;
+  readonly stage: string | null;
+} | null> {
+  const { ask, companyId } = input;
+  if (
+    !ask.aboutMyCompany ||
+    ask.regions.length > 0 ||
+    ask.sector !== null ||
+    (ask.kinds ?? []).length > 0 ||
+    companyId === null ||
+    companyId === undefined ||
+    !input.available.has("get_company")
+  ) {
+    return null;
+  }
+  const read = await input.tools
+    .execute(
+      {
+        callId: "q-discover-own-place",
+        name: "get_company",
+        arguments: { companyId },
+      },
+      input.context,
+    )
+    .catch(() => null);
+  if (read?.result.ok !== true) return null;
+  const data = read.result.data as {
+    readonly headquartersCountry?: unknown;
+    readonly currentStageCode?: unknown;
+  } | null;
+  const code = data?.headquartersCountry;
+  if (typeof code !== "string" || !/^[A-Za-z]{2}$/u.test(code)) return null;
+  let country = code.toUpperCase();
+  try {
+    country =
+      new Intl.DisplayNames(["en"], { type: "region" }).of(country) ?? country;
+  } catch {
+    // The code itself is still a place the discovery can read.
+  }
+  const stage = data?.currentStageCode;
+  return {
+    country,
+    stage: typeof stage === "string" && stage.length > 0 ? stage : null,
+  };
+}
+
 export async function runInvestorDiscovery(input: {
   readonly ask: InvestorAsk;
   readonly tools: Pick<QToolPort, "execute">;
@@ -292,8 +346,21 @@ export async function runInvestorDiscovery(input: {
   /** Their own company, when they have one: the network ranks against it. */
   readonly companyId?: string | null | undefined;
 }): Promise<InvestorDiscoveryAnswer | null> {
-  const { ask, tools, context, available } = input;
+  const { tools, context, available } = input;
   if (!available.has(DISCOVER_TOOL)) return null;
+  // F-133 (QA, a Ghana logistics founder: "which investors fit me" named
+  // Gulf and US networks, the prepared set in name order): an ask about
+  // their own company that names no place, sector or kind is matched on
+  // where their company is and its stage, as its public profile says.
+  const own = await ownPlace(input);
+  const ask: InvestorAsk =
+    own === null
+      ? input.ask
+      : {
+          ...input.ask,
+          regions: [own.country],
+          stage: input.ask.stage ?? own.stage,
+        };
   // Owner's own conversation (2026-10-24): investors on Capital Q in that
   // place are read beside the public search, never after it.
   const network = available.has(NETWORK_TOOL)
@@ -405,7 +472,7 @@ export async function runInvestorDiscovery(input: {
   const text =
     onCapitalQ.length === 0
       ? publicText
-      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${outside.length === 0 ? `${webUnavailable ? "Public search isn't answering right now, so I couldn't look beyond Capital Q." : "Outside Capital Q, the public search found nobody else I could name."}${short}` : `Outside Capital Q: ${investorDiscoveryText(outside, { regionWords, asked: Math.max(1, outside.filter((one) => one.role === "INVESTOR").length), outcome: status, aboutMyCompany: ask.aboutMyCompany, kinds: ask.kinds, sector: ask.sector, webUnavailable })}${short}`}`;
+      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : own !== null ? `based in ${own.country}, where your company is,` : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${outside.length === 0 ? `${webUnavailable ? "Public search isn't answering right now, so I couldn't look beyond Capital Q." : "Outside Capital Q, the public search found nobody else I could name."}${short}` : `Outside Capital Q: ${investorDiscoveryText(outside, { regionWords, asked: Math.max(1, outside.filter((one) => one.role === "INVESTOR").length), outcome: status, aboutMyCompany: ask.aboutMyCompany, kinds: ask.kinds, sector: ask.sector, webUnavailable })}${short}`}`;
   return {
     text,
     block: oneList(

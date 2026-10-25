@@ -37,7 +37,7 @@ const outcome = (data: unknown): Pick<QToolCallOutcome, "result"> => ({
 
 /** The shape find_prospective_investors returns (public profiles only). */
 const PROSPECTS = {
-  fitVersion: "prospect-fit.v1",
+  fitVersion: "prospect-fit.v2",
   companySource: "CAPITAL_Q_RECORD",
   compared: { countryCode: "NG", stageCode: "SEED" },
   prospects: [

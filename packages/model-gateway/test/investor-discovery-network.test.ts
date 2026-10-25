@@ -234,3 +234,95 @@ describe("a discovery of investors reads Capital Q's own beside the public searc
     expect(answer?.shown).toBe(2);
   });
 });
+
+// F-133 (QA, a Ghana logistics seed founder): "which investors fit me"
+// named no place, kind or sector, and the prepared Gulf and US set came
+// back in name order. Their own company's place and stage are the match.
+describe("an ask about their own company matches on where it is (F-133)", () => {
+  const COMPANY = "c1111111-0000-4000-8000-000000000001";
+  function withCompany() {
+    const calls: QToolProposal[] = [];
+    return {
+      calls,
+      port: {
+        execute: (proposal: QToolProposal) => {
+          calls.push(proposal);
+          if (proposal.name === "get_company") {
+            return Promise.resolve(
+              ok(proposal, "company.get", {
+                headquartersCountry: "GH",
+                currentStageCode: "seed",
+              }),
+            );
+          }
+          if (proposal.name === "find_prospective_investors") {
+            return Promise.resolve(
+              ok(proposal, "investor.prospects", { prospects: [] }),
+            );
+          }
+          return Promise.resolve(
+            ok(proposal, "people.discover", {
+              outcome: "NONE",
+              candidates: [],
+              countries: ["GH"],
+              regionWords: ["Ghana"],
+              webSearched: true,
+              aboutMyCompany: true,
+              truthClass: "UNKNOWN",
+              guidance: "",
+            }),
+          );
+        },
+      },
+    };
+  }
+  const available = new Set([
+    "discover_investors",
+    "find_prospective_investors",
+    "get_company",
+  ]);
+
+  it("asks for investors where the company is, at its stage", async () => {
+    const t = withCompany();
+    await runInvestorDiscovery({
+      ask: {
+        regions: [],
+        sector: null,
+        stage: null,
+        count: 3,
+        aboutMyCompany: true,
+      },
+      tools: t.port,
+      context,
+      available,
+      companyId: COMPANY,
+    });
+    const discover = t.calls.find((call) => call.name === "discover_investors");
+    expect(discover?.arguments).toMatchObject({
+      regions: ["Ghana"],
+      stage: "seed",
+      aboutMyCompany: true,
+    });
+  });
+
+  it("keeps the place they named, and reads nothing extra", async () => {
+    const t = withCompany();
+    await runInvestorDiscovery({
+      ask: {
+        regions: ["Gulf"],
+        sector: null,
+        stage: null,
+        count: 3,
+        aboutMyCompany: true,
+      },
+      tools: t.port,
+      context,
+      available,
+      companyId: COMPANY,
+    });
+    expect(t.calls.map((call) => call.name)).not.toContain("get_company");
+    expect(
+      t.calls.find((call) => call.name === "discover_investors")?.arguments,
+    ).toMatchObject({ regions: ["Gulf"] });
+  });
+});

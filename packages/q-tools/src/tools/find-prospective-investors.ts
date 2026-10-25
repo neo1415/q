@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
   PublishedFitDtoSchema,
+  type PublishedFitDto,
   UuidSchema,
   type InvestorGateFitDto,
 } from "@capital-q/contracts";
@@ -144,6 +145,12 @@ const ProspectSchema = z
      * NOT_MET or UNKNOWN (unknown is never a no). Their own company only.
      */
     publishedFit: PublishedFitDtoSchema.optional(),
+    /**
+     * F-133: whether anything they publish is known to fit this company
+     * (a sector, geography or stage that matches). False: they may well
+     * fit, but nothing says so yet; never presented as a fit.
+     */
+    fitKnown: z.boolean().optional(),
   })
   .strict();
 
@@ -306,6 +313,29 @@ function sectorRank(sector: SectorJudgement): number {
   return sector.fit === "UNKNOWN" ? 2 : 3;
 }
 
+/**
+ * F-133 (QA, a Ghana logistics founder: "which investors fit me" named
+ * Qatari and US networks with sector unknown first). Hard eligibility
+ * first: a stage or geography the investor publishes that this company is
+ * not in leaves them out. Then what is KNOWN to fit: a matching sector,
+ * geography (published, or the same country) or stage, each counted once.
+ * Unknown adds nothing and takes nothing away; it is never a fit.
+ */
+export function publishedEvidence(input: {
+  readonly sector: Pick<SectorJudgement, "fit">;
+  readonly fit: PublishedFitDto | undefined;
+  readonly sameCountry: boolean;
+}): { readonly met: number; readonly ruledOut: boolean } {
+  const sector = input.sector.fit === "MATCH" || input.fit?.sector === "MET";
+  const geography = input.sameCountry || input.fit?.geography === "MET";
+  const stage = input.fit?.stage === "MET";
+  return {
+    met: [sector, geography, stage].filter(Boolean).length,
+    ruledOut:
+      input.fit?.geography === "NOT_MET" || input.fit?.stage === "NOT_MET",
+  };
+}
+
 export function createFindProspectiveInvestorsTool(
   ports: QToolPorts,
 ): AnyQToolDefinition {
@@ -429,6 +459,8 @@ export function createFindProspectiveInvestorsTool(
         actor: context.actor,
         wholeCandidateSet: true,
       });
+      // Every candidate: what an investor publishes is read before anyone
+      // is left out for having no profile reason (F-133).
       const ranked = rankProspects(
         grant.company,
         slate.items.map((item) => ({
@@ -440,6 +472,7 @@ export function createFindProspectiveInvestorsTool(
           publicDescription: item.publicDescription,
           websiteUrl: item.websiteUrl,
         })),
+        { everyCandidate: true },
       );
       // Q.05: published gates, only for the person's own company (the
       // grant proved ownership); a described company is never checked.
@@ -491,27 +524,51 @@ export function createFindProspectiveInvestorsTool(
       const resolve = ports.investorSectorFocus?.resolve ?? (() => [] as const);
       // A published sector the company is in comes first, then those
       // that publish none, then those whose sector it is not (owner
-      // 2026-10-23); the profile ranking orders each group.
-      const ordered = ranked
-        .map((prospect, at) => ({
+      // 2026-10-23). Within each, what is known to fit, then the profile
+      // ranking (F-133). A published stage or geography the company is not
+      // in is not a fit, and is left out.
+      const judged = ranked.map((prospect, at) => {
+        const sector = judgeSector({
+          gate: gates.get(prospect.investorOrganisationId),
+          card: cards.get(prospect.investorOrganisationId) ?? [],
+          company: focus?.company ?? [],
+          resolve,
+        });
+        return {
           prospect,
           at,
-          sector: judgeSector({
-            gate: gates.get(prospect.investorOrganisationId),
-            card: cards.get(prospect.investorOrganisationId) ?? [],
-            company: focus?.company ?? [],
-            resolve,
+          sector,
+          evidence: publishedEvidence({
+            sector,
+            fit: published.get(prospect.investorOrganisationId),
+            sameCountry: prospect.reasons.some(
+              (reason) => reason.kind === "SAME_COUNTRY",
+            ),
           }),
-        }))
+        };
+      });
+      const ruledOut = judged.filter((one) => one.evidence.ruledOut).length;
+      const ordered = judged
+        .filter(
+          (one) =>
+            !one.evidence.ruledOut &&
+            // Nothing known and no profile reason: nothing to say for them.
+            (one.evidence.met > 0 ||
+              one.sector.fit !== "UNKNOWN" ||
+              one.prospect.reasons.length > 0),
+        )
         .sort(
-          (a, b) => sectorRank(a.sector) - sectorRank(b.sector) || a.at - b.at,
+          (a, b) =>
+            sectorRank(a.sector) - sectorRank(b.sector) ||
+            b.evidence.met - a.evidence.met ||
+            a.at - b.at,
         )
         .slice(0, input.limit ?? LIMIT_DEFAULT);
       return {
         fitVersion: PROSPECT_FIT_VERSION,
         companySource: grant.source,
         compared,
-        prospects: ordered.map(({ prospect, sector }) => {
+        prospects: ordered.map(({ prospect, sector, evidence }) => {
           const fit = published.get(prospect.investorOrganisationId);
           return {
             investorOrganisationId: prospect.investorOrganisationId,
@@ -528,15 +585,22 @@ export function createFindProspectiveInvestorsTool(
               ? {}
               : { sector: sectorOut(sector) }),
             ...(fit === undefined ? {} : { publishedFit: fit }),
+            fitKnown: evidence.met > 0,
           };
         }),
-        notes:
-          slate.items.length === 0
+        notes: [
+          ...NOTES,
+          ...(slate.items.length === 0
             ? [
-                ...NOTES,
                 "No investor on Capital Q has made its profile visible to the network yet.",
               ]
-            : [...NOTES],
+            : []),
+          ...(ruledOut === 0
+            ? []
+            : [
+                `${String(ruledOut)} left out: the stage or geography they publish does not include this company's.`,
+              ]),
+        ],
       };
     },
   });

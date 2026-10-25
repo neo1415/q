@@ -16,7 +16,10 @@
  * is not a prospect and is left out rather than ranked low.
  */
 
-export const PROSPECT_FIT_VERSION = "prospect-fit.v1" as const;
+// v2 (F-133): what an investor publishes about stage, sector and geography
+// orders the list before the profile's reasons, and a published stage or
+// geography the company is not in leaves the investor out.
+export const PROSPECT_FIT_VERSION = "prospect-fit.v2" as const;
 
 /**
  * Stages each declared investor type typically writes cheques into.
@@ -127,6 +130,10 @@ export function prospectFit(
 /**
  * The prospects among candidates: those with at least one reason, best
  * first, ties by name then id so the list is reproducible from the rows.
+ * `everyCandidate` keeps those with no profile reason too, for a caller
+ * that also reads what each investor publishes (F-133: an investor whose
+ * card names the company's region was dropped here, before its card was
+ * ever read).
  */
 export function rankProspects<
   T extends ProspectInvestor & {
@@ -136,10 +143,14 @@ export function rankProspects<
 >(
   company: ProspectCompany,
   candidates: readonly T[],
+  options: { readonly everyCandidate?: boolean } = {},
 ): readonly (T & ProspectFit)[] {
   return candidates
     .map((candidate) => ({ ...candidate, ...prospectFit(company, candidate) }))
-    .filter((candidate) => candidate.reasons.length > 0)
+    .filter(
+      (candidate) =>
+        options.everyCandidate === true || candidate.reasons.length > 0,
+    )
     .sort(
       (a, b) =>
         b.score - a.score ||
