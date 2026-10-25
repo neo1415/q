@@ -465,6 +465,15 @@ export function createFitService(
       });
     }
     lap("inputs");
+    // Owner 2026-10-25 (live 152f09980: a premium reader's rank spent
+    // 11.9 s here, reading Unicorn Potential history for all 463): the fit
+    // order never reads Investability or Unicorn Potential, so a ranking
+    // reads neither; the companies it shows read them through their
+    // profile.
+    if (purpose === "RANK") {
+      lap("scores");
+      return { kind: "OK", items };
+    }
     // Request order, as eligibility returned it. Scores are read only for
     // the companies eligibility admitted for this reader.
     const scored = await withScores(actor, items);

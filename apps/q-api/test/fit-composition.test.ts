@@ -38,6 +38,7 @@ const queries = {
   identities: 0,
   objectives: 0,
   oneByOne: 0,
+  unicorn: 0,
 };
 
 function cardSql(published: ReadonlyMap<string, unknown>) {
@@ -116,6 +117,13 @@ function compose(
     companies: { findMany: () => Promise.resolve([]) },
   } as unknown as EligibilityPorts;
   return createFitComposition({
+    // A premium reader's Unicorn Potential (live, savanna-seed): history
+    // for every company is slow, so it must only be read for what is shown.
+    unicornPotential: async () => {
+      queries.unicorn += 1;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return new Map();
+    },
     sql: cardSql(published),
     eligibilityPorts,
     eligibility: {
@@ -307,6 +315,11 @@ describe("fit composition", () => {
     // each for identities (names and raises), objectives and Q Cards;
     // never one query per company.
     expect(queries.oneByOne).toBe(0);
+    // Owner 2026-10-25 (live 152f09980, savanna-seed: rank.scores 11,941
+    // ms): the order never reads Investability or Unicorn Potential, so a
+    // rank reads neither; the cards shown read them through fit_profile.
+    expect(queries.unicorn).toBe(0);
+    expect(result.phasesMs?.["scores"] ?? 0).toBeLessThan(300);
     // Where its time went, by phase (owner 2026-10-25), for the log.
     expect(Object.keys(result.phasesMs ?? {}).sort()).toEqual([
       "eligibility",
