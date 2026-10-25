@@ -48,6 +48,7 @@ import { announceQGestures } from "../q-swarm/q-gestures";
 import {
   onboardingThreadAction,
   onboardingThreadKeepAction,
+  onboardingThreadKeepTapAction,
 } from "./thread-actions";
 import { upsertLine } from "../voice/session";
 import { useVoiceInterview } from "../voice/use-voice-interview";
@@ -436,6 +437,16 @@ export function QOnboardingWorkspace({
     setQQuestion(questionAfterTap());
     setQAskedStep(null);
     setQAsking(null);
+  }, []);
+  /**
+   * A tapped exchange, kept in the thread the server holds (QA F-129): a
+   * reload redraws it, as it does what they typed or said.
+   */
+  const keepTapped = useCallback((said: string, acknowledged: string) => {
+    const sessionId = viewRef.current?.session.id;
+    if (sessionId !== undefined) {
+      void onboardingThreadKeepTapAction(sessionId, said, acknowledged);
+    }
   }, []);
 
   /**
@@ -1187,7 +1198,9 @@ export function QOnboardingWorkspace({
         const ok = await actions.submitValue({ stepKey, value: tapped });
         if (ok) {
           answeredByTap();
-          push("Q", acknowledgeValue(stepKey, tapped, vocabulary));
+          const acknowledged = acknowledgeValue(stepKey, tapped, vocabulary);
+          push("Q", acknowledged);
+          keepTapped(spoken ?? chip.label, acknowledged);
         } else {
           // A refused or conflicted tap used to leave their choice looking
           // made (onboarding speed 2026-10-20).
@@ -1217,6 +1230,7 @@ export function QOnboardingWorkspace({
       voiceActive,
       voiceSendText,
       answeredByTap,
+      keepTapped,
     ],
   );
 
@@ -1246,7 +1260,9 @@ export function QOnboardingWorkspace({
       const ok = await actions.submitValue({ stepKey, value });
       if (ok) {
         answeredByTap();
-        push("Q", acknowledgeValue(stepKey, value, vocabulary));
+        const acknowledged = acknowledgeValue(stepKey, value, vocabulary);
+        push("Q", acknowledged);
+        keepTapped(chosen.map((chip) => chip.label).join(", "), acknowledged);
       } else {
         markUnsent(personLine, () => {
           setTurns((current) =>
@@ -1273,6 +1289,7 @@ export function QOnboardingWorkspace({
     voiceActive,
     voiceSendText,
     answeredByTap,
+    keepTapped,
   ]);
 
   const togglePick = (chip: QuickChip) => {
@@ -1340,7 +1357,9 @@ export function QOnboardingWorkspace({
     }
     if (ok) {
       answeredByTap();
-      push("Q", `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`);
+      const acknowledged = `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`;
+      push("Q", acknowledged);
+      keepTapped(spoken, acknowledged);
     }
     if (ok && voiceActive) {
       voiceSendText("Let's continue.");
@@ -1357,6 +1376,7 @@ export function QOnboardingWorkspace({
     voiceActive,
     voiceSendText,
     answeredByTap,
+    keepTapped,
   ]);
 
   const toggleTaxonomy = (node: {

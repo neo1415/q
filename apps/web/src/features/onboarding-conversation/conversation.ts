@@ -659,7 +659,9 @@ export function pendingQuestion(
     return null;
   }
   const text = last.text.trim();
-  return text.length === 0 ? null : text;
+  // "Stage: Seed. Noted.", kept after a tap (QA F-129), acknowledges an
+  // answer: nothing is asked, and Q opens afresh.
+  return text.length === 0 || isTapAcknowledgement(text) ? null : text;
 }
 
 /**
@@ -749,13 +751,21 @@ function joinNames(names: readonly string[]): string {
  */
 
 /** Q's short acknowledgement of a tapped option (§17-§18). */
+/** The receipt `acknowledgeValue` writes ends so; nothing Q asks does. */
+const TAP_ACKNOWLEDGEMENT_END = ". Noted.";
+
+/** Whether a line of Q's is the receipt code wrote for a tapped answer. */
+export function isTapAcknowledgement(text: string): boolean {
+  return text.trim().endsWith(TAP_ACKNOWLEDGEMENT_END);
+}
+
 export function acknowledgeValue(
   stepKey: string,
   value: OnboardingResponseValue,
   vocabulary: JourneyVocabulary,
   labels?: Readonly<Record<string, string>>,
 ): string {
-  return `${vocabulary.stepTitle(stepKey)}: ${trimSentenceEnd(vocabulary.describe(stepKey, value, labels))}. Noted.`;
+  return `${vocabulary.stepTitle(stepKey)}: ${trimSentenceEnd(vocabulary.describe(stepKey, value, labels))}${TAP_ACKNOWLEDGEMENT_END}`;
 }
 
 /** Q's own sentence on screen, and the step it was said about. */
