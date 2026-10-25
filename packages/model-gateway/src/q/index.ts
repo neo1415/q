@@ -264,7 +264,9 @@ import {
 import { createSingleFlight } from "./single-flight.js";
 import { stableToolOrder } from "./tool-order.js";
 import {
+  askedToOpen,
   createScreenClaimGuard,
+  DRAWN_BLOCK_KINDS,
   withoutUnbackedScreenClaims,
 } from "./screen-claims.js";
 import {
@@ -5846,10 +5848,13 @@ export function createModelGatewayQAnswer(
       );
       const screenClaims = createScreenClaimGuard(
         () =>
-          clientActionBlocks.some((block) => block.kind === "UI_INTENT") ||
+          clientActionBlocks.some((block) =>
+            DRAWN_BLOCK_KINDS.has(block.kind),
+          ) ||
           seenText.includes('"answerCards":{') ||
           extrasSeen.includes('"answerCards":{') ||
           runFits.read(request.runId).length >= 2,
+        askedToOpen(latest.content),
       );
       /** One whole sentence through the guards and out; see the note above. */
       const takeSentence = (sentence: string): void => {
@@ -7340,6 +7345,8 @@ export function createModelGatewayQAnswer(
       let firstContactAlready: string | null = null;
       /** Their own Q Card as get_q_card read it this turn (batch 9). */
       let qCardRead: QCardRead | null = null;
+      /** QA F10: the claim really was prepared, so a card is on screen. */
+      let qCardClaimPrepared = false;
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -8141,10 +8148,14 @@ export function createModelGatewayQAnswer(
               // approval, through its own authorize step (first-contact.ts).
               qCardRead = qCardReadOf(call, outcome) ?? qCardRead;
               const offer = qCardOfferOf(call, outcome);
+              // QA F10 (25 Oct, a7b99c46): "Show me my Q Card" is a
+              // question, so the claim tool was not in its offer and nothing
+              // was prepared, while the reply said "approve the claim on the
+              // card". The claim is prepared whatever the turn's focus; the
+              // executor still refuses it where the purpose does not allow it.
               if (
                 offer !== null &&
                 cardOffer === null &&
-                offeredByName.has(Q_CARD_CLAIM_TOOL) &&
                 !proposals.some((other) => other.name === Q_CARD_CLAIM_TOOL) &&
                 calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
               ) {
@@ -8356,7 +8367,10 @@ export function createModelGatewayQAnswer(
                   latencyMs: outcome.latencyMs,
                 });
                 const told = qCardOfferMessage(outcome, handle);
-                if (told !== null) chainedResults.push(told);
+                if (told !== null) {
+                  qCardClaimPrepared = true;
+                  chainedResults.push(told);
+                }
               }
             }
             if (chatInstead !== null) {
@@ -9329,12 +9343,11 @@ export function createModelGatewayQAnswer(
           content,
           openedOnScreen ||
             [...(analystBlocks ?? []), ...clientActionBlocks].some(
-              // Cards are on their screen as the answer arrives.
-              (block) =>
-                block.kind === "UI_INTENT" ||
-                block.kind === "ANSWER_CARDS" ||
-                block.kind === "COMPARISON_CARDS",
+              // Cards, tables, pictures and documents are on their screen
+              // as the answer arrives (QA F-111).
+              (block) => DRAWN_BLOCK_KINDS.has(block.kind),
             ),
+          askedToOpen(latest.content),
         );
         // Lane A: "here's the table" / "see the map" stands only when the
         // answer carries that kind of object (artifact-claims.ts).
@@ -9370,7 +9383,11 @@ export function createModelGatewayQAnswer(
               : request.spoken === true && cardsShown
                 ? spokenBeforeCards(artifactSafe.text)
                 : qCardRead !== null
-                  ? withQCardLink(artifactSafe.text, qCardRead)
+                  ? withQCardLink(
+                      artifactSafe.text,
+                      qCardRead,
+                      qCardClaimPrepared,
+                    )
                   : artifactSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
