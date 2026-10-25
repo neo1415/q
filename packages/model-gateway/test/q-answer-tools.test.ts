@@ -1580,6 +1580,46 @@ describe("answer seam tool loop", () => {
       expect(messages.at(-1)?.content ?? "").not.toMatch(/didn't prepare/u);
     });
 
+    // Guard run (2026-10-25, run 0527cfb8): the draft came back as plain
+    // text outside the task's shape, and the round to prepare it never ran.
+    it("puts a draft written as plain text on its card too", async () => {
+      const tools = toolPort([CHAT, INTEREST], (p) => ({
+        ...succeeded(p, {
+          status: "PREPARED",
+          awaitingApprovalOf: "Message Savanna Seed Partners",
+        }),
+        toolName: "relationship.chat.propose",
+      }));
+      const { seam, request, messages } = build({
+        said: "Draft a short reply to Savanna Seed, then send it.",
+        script: [
+          { kind: "TEXT", text: "Hi Savanna team, we'll share it in October." },
+          {
+            kind: "TOOL_CALLS",
+            calls: [
+              {
+                callId: "m",
+                name: "propose_chat_message",
+                arguments: {
+                  counterpartName: "Savanna Seed Partners",
+                  body: "Hi Savanna team, we'll share it in October.",
+                },
+              },
+            ],
+          },
+          { kind: "JSON", value: analystResult("prepared") },
+        ],
+        tools,
+      });
+      await seam.answer({ ...request, askedAction: "propose_chat_message" });
+      expect(tools.executed.map((p) => p.name)).toContain(
+        "propose_chat_message",
+      );
+      expect(messages.at(-1)?.content ?? "").not.toMatch(
+        /didn't prepare|isn't on a card/u,
+      );
+    });
+
     // QA I11 (batch-7 re-score, run ea1c4c13): the model read Basketari
     // and answered "it would need to be sent through your connected
     // Basketari relationship", calling no message tool, though an Express

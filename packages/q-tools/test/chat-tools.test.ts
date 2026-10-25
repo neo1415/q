@@ -220,6 +220,42 @@ describe("list_messages", () => {
 });
 
 describe("chat proposals", () => {
+  // Guard run (2026-10-25, run 7eebd402): the founder's own relationship id
+  // (read from their list) was refused because this run's plan bound no
+  // relationship, and Q said it "needs its existing connection reference".
+  it("takes an id from their own relationships, from any page; never another's", async () => {
+    const { executor, prepared } = world();
+    const ownId = await executor.execute(
+      {
+        callId: "own",
+        name: "propose_chat_message",
+        arguments: { relationshipId: RELATIONSHIP, body: "We'll share it." },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(ownId.status).toBe("SUCCEEDED");
+    expect(prepared).toHaveLength(1);
+    const notTheirs = await executor.execute(
+      {
+        callId: "other",
+        name: "propose_chat_message",
+        arguments: { relationshipId: OTHER, body: "Hi." },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(notTheirs.status).toBe("DENIED");
+    const notAParty = await executor.execute(
+      {
+        callId: "a",
+        name: "propose_chat_message",
+        arguments: { relationshipId: RELATIONSHIP, body: "Hi." },
+      },
+      contextFor(actorA, base(actorA)),
+    );
+    expect(notAParty.status).toBe("DENIED");
+    expect(prepared).toHaveLength(1);
+  });
+
   it("prepares a message for approval and posts nothing", async () => {
     const { executor, prepared } = world();
     const outcome = await executor.execute(
