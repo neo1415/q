@@ -11,6 +11,7 @@ import {
 
 import { expectDocument } from "@/features/documents/document-ready";
 import { useT } from "@/features/i18n/language";
+import { startPacedPoll } from "@/features/polling/paced-poll";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import type { QTurnObjectBlock } from "./conversation";
@@ -37,8 +38,8 @@ export type WorkInProgress = Extract<
 export const WORK_LIVE_PATH = "/api/q-work-live";
 /** The job finished while this page watched: the conversation reads its record again. */
 export const Q_WORK_SETTLED_EVENT = "cq:q-work-settled";
-export const WORK_LIVE_CHECK_MS = 2_500;
-export const WORK_LIVE_WAITING_CHECK_MS = 15_000;
+/** Every 2.5 s while the job moves; up to 15 s while it doesn't (or waits on the person). */
+export const WORK_LIVE_PACE = { firstMs: 2_500, maxMs: 15_000 } as const;
 /** A card stops asking after this long; a reload asks again. */
 export const WORK_LIVE_WATCH_MS = 20 * 60_000;
 
@@ -106,8 +107,9 @@ function parseLive(body: unknown): WorkforceLive | null {
 
 /**
  * The job, read while it works: at once, then every few seconds while the
- * tab is visible, until it is done or stopped. A job that was already done
- * when the card first read it is not news.
+ * tab is visible and something moves (slower while nothing does), until it
+ * is done or stopped. A job that was already done when the card first read
+ * it is not news.
  */
 export function useWorkLive(jobId: string): {
   readonly live: WorkforceLive | null;
@@ -118,30 +120,27 @@ export function useWorkLive(jobId: string): {
   const seenWorking = useRef(false);
   useEffect(() => {
     let alive = true;
-    let timer: number | undefined;
     const started = Date.now();
-    const check = async () => {
-      if (!alive) return;
-      if (typeof document !== "undefined" && document.hidden) {
-        timer = window.setTimeout(() => void check(), WORK_LIVE_CHECK_MS);
-        return;
-      }
-      let next: WorkforceLive | null = null;
-      try {
-        const response = await fetch(
-          `${WORK_LIVE_PATH}/${encodeURIComponent(jobId)}`,
-          { cache: "no-store" },
-        );
-        if (response.status === 404) {
-          if (alive) setMissing(true);
-          return;
+    let shown = "";
+    const poll = startPacedPoll(
+      async () => {
+        let next: WorkforceLive | null = null;
+        try {
+          const response = await fetch(
+            `${WORK_LIVE_PATH}/${encodeURIComponent(jobId)}`,
+            { cache: "no-store" },
+          );
+          if (response.status === 404) {
+            if (alive) setMissing(true);
+            return "done";
+          }
+          if (response.ok) next = parseLive(await response.json());
+        } catch {
+          // A failed read is tried again; the card keeps what it showed.
         }
-        if (response.ok) next = parseLive(await response.json());
-      } catch {
-        // A failed read is tried again; the card keeps what it showed.
-      }
-      if (!alive) return;
-      if (next !== null) {
+        if (!alive) return "done";
+        if (Date.now() - started > WORK_LIVE_WATCH_MS) return "done";
+        if (next === null) return "same";
         setLive(next);
         if (next.state === "WORKING") seenWorking.current = true;
         if (next.state !== "WORKING" && next.state !== "WAITING") {
@@ -151,22 +150,20 @@ export function useWorkLive(jobId: string): {
               new CustomEvent(Q_WORK_SETTLED_EVENT, { detail: { jobId } }),
             );
           }
-          return;
+          return "done";
         }
-      }
-      if (Date.now() - started > WORK_LIVE_WATCH_MS) return;
-      // Waiting on the person: it moves when they do, so it is asked less.
-      timer = window.setTimeout(
-        () => void check(),
-        next?.state === "WAITING"
-          ? WORK_LIVE_WAITING_CHECK_MS
-          : WORK_LIVE_CHECK_MS,
-      );
-    };
-    void check();
+        // Waiting on the person: it moves when they do, so it slows.
+        const key = next.state === "WAITING" ? "WAITING" : JSON.stringify(next);
+        const outcome = key === shown ? "same" : "changed";
+        shown = key;
+        return outcome;
+      },
+      WORK_LIVE_PACE,
+      { immediate: true },
+    );
     return () => {
       alive = false;
-      if (timer !== undefined) window.clearTimeout(timer);
+      poll.stop();
     };
   }, [jobId]);
   return { live, missing };

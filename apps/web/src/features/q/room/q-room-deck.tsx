@@ -44,6 +44,7 @@ import {
   useRetryWhenOnline,
   type UploadDrop,
 } from "./room-read";
+import { startPacedPoll } from "@/features/polling/paced-poll";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -145,6 +146,7 @@ export const DEFAULT_DECK_LOADERS: DeckLoaders = {
 };
 
 const POLL_MS = 2_500;
+const PREPARING_PACE = { firstMs: POLL_MS, maxMs: 15_000 } as const;
 const FILL_TRIES = 8;
 
 export function QRoomDeck({
@@ -210,11 +212,18 @@ export function QRoomDeck({
       live = false;
     };
   }, [artifactId, loaders, revision, reads]);
+  // While the deck is being made: a read every few seconds, slower while
+  // it doesn't change, none while the tab is hidden (egress review). A
+  // change restarts the pace.
+  const stateKey = useMemo(() => JSON.stringify(state), [state]);
   useEffect(() => {
     if (status !== "PREPARING") return;
-    const timer = window.setTimeout(() => setReads((n) => n + 1), POLL_MS);
-    return () => window.clearTimeout(timer);
-  }, [status, state]);
+    const poll = startPacedPoll(() => {
+      setReads((n) => n + 1);
+      return Promise.resolve("same");
+    }, PREPARING_PACE);
+    return poll.stop;
+  }, [status, stateKey]);
   useEffect(() => {
     if (version === null) return;
     let live = true;

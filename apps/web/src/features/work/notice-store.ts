@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 
 import type { NotificationDto } from "@capital-q/contracts";
 
+import { startPacedPoll, type PacedPoll } from "@/features/polling/paced-poll";
 import { retryWithBackoff } from "@/pwa/resilient";
 
 import { listNoticesAction } from "./work-actions";
@@ -20,7 +21,12 @@ import { listNoticesAction } from "./work-actions";
  * in flight at most, and none again within FRESH_MS.
  */
 
-const POLL_MS = 60_000;
+/**
+ * Once a minute while notices arrive; a quiet bell slows to every five
+ * minutes, and reads nothing while the tab is hidden (egress review
+ * 2026-10-24). Focus and coming back online still read at once.
+ */
+const NOTICE_PACE = { firstMs: 60_000, maxMs: 300_000 } as const;
 const FRESH_MS = 5_000;
 /**
  * P9: the first read waits for the page to settle. Server actions queue
@@ -43,7 +49,7 @@ let inFlight: Promise<void> | null = null;
 /** A design review page's fixed list: never read again while it is shown. */
 let seeded = false;
 const listeners = new Set<() => void>();
-let timer: number | undefined;
+let poll: PacedPoll | null = null;
 
 function emit(next: NoticeState): void {
   state = next;
@@ -109,6 +115,11 @@ export function noticesRead(count: number): void {
   emit({ ...state, unread: Math.max(0, state.unread - count) });
 }
 
+/** What a new notice changes: the count unread and the newest one. */
+function noticeKey(current: NoticeState): string {
+  return `${String(current.unread)}:${current.items?.[0]?.id ?? ""}`;
+}
+
 const onVisible = () => {
   if (document.visibilityState === "visible" && navigator.onLine !== false) {
     void refreshNotices();
@@ -129,19 +140,23 @@ function subscribe(listener: () => void): () => void {
         void refreshNotices();
       }
     }, FIRST_READ_DELAY_MS);
-    timer = window.setInterval(onVisible, POLL_MS);
+    poll = startPacedPoll(async () => {
+      if (navigator.onLine === false) return "same";
+      const before = noticeKey(state);
+      await refreshNotices();
+      return noticeKey(state) === before ? "same" : "changed";
+    }, NOTICE_PACE);
     window.addEventListener("focus", onVisible);
     window.addEventListener("online", onOnline);
-    document.addEventListener("visibilitychange", onVisible);
   }
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
       window.clearTimeout(firstRead);
-      window.clearInterval(timer);
+      poll?.stop();
+      poll = null;
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("online", onOnline);
-      document.removeEventListener("visibilitychange", onVisible);
     }
   };
 }

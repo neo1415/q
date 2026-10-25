@@ -5,13 +5,26 @@ import { useEffect, useState } from "react";
 
 import type { AdminQErrorsDto } from "@capital-q/contracts";
 
+import { startPacedPoll } from "@/features/polling/paced-poll";
+
 import { qErrorsAction } from "./console-actions";
 import { when, words } from "./words";
 import { useT } from "@/features/i18n/language";
 
+/** Every 10 s while failures arrive; a quiet stream slows to once a minute. */
+const ERROR_STREAM_PACE = { firstMs: 10_000, maxMs: 60_000 } as const;
+
+/** The newest failure names the list: a new one changes it. */
+function streamKey(rows: AdminQErrorsDto["rows"]): string {
+  const top = rows[0];
+  return top === undefined
+    ? ""
+    : `${String(rows.length)}:${top.kind}:${top.at}:${top.runId ?? top.correlationId ?? ""}`;
+}
+
 /**
- * The live error stream: the latest failed model calls and runs, refreshed
- * every 10 seconds while the tab is visible (no polling in the background).
+ * The live error stream: the latest failed model calls and runs, read
+ * only while the tab is visible and less often while nothing new fails.
  */
 export function ErrorStream({
   initial,
@@ -25,19 +38,22 @@ export function ErrorStream({
   const [rows, setRows] = useState(initial);
   const [stale, setStale] = useState(false);
   useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState !== "visible") return;
-      void qErrorsAction().then((next) => {
-        if (next === null) setStale(true);
-        else {
-          setStale(false);
-          setRows(next);
-        }
-      });
-    };
-    const timer = setInterval(tick, 10_000);
-    return () => clearInterval(timer);
-  }, []);
+    let shown = streamKey(initial);
+    const poll = startPacedPoll(async () => {
+      const next = await qErrorsAction();
+      if (next === null) {
+        setStale(true);
+        return "same";
+      }
+      setStale(false);
+      setRows(next);
+      const key = streamKey(next);
+      const outcome = key === shown ? "same" : "changed";
+      shown = key;
+      return outcome;
+    }, ERROR_STREAM_PACE);
+    return poll.stop;
+  }, [initial]);
   if (rows.length === 0) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
