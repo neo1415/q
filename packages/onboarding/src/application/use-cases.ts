@@ -109,6 +109,7 @@ import {
 import { getOnboardingMetrics } from "./metrics.js";
 import type {
   OnboardingDefinitionRepository,
+  OnboardingDocumentReviewRepository,
   OnboardingIdempotencyRepository,
   OnboardingInterviewQuestionRepository,
   OnboardingInterviewTurnRepository,
@@ -185,6 +186,8 @@ export type OnboardingRuntimeDependencies = {
   readonly utterances?: OnboardingUtteranceRepository | undefined;
   /** Optional; absent means the interview thread cannot be appended or read. */
   readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
+  /** Optional; absent means the view names no reviewed documents. */
+  readonly documentReviews?: OnboardingDocumentReviewRepository | undefined;
   /** Journey-supplied plain-language names for options (CQ-PRE-REC-001 §19). */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
   /**
@@ -884,11 +887,18 @@ export function createOnboardingUseCases(
     // The step Q asked, with its options, when it is another eligible step
     // still open (owner 2026-10-21: its options show under Q's words).
     const askedOpen = openAskedStep(aggregate, askedStepKey);
-    const [context, askedContext] = await Promise.all([
+    const [context, askedContext, reviewed] = await Promise.all([
       contextFor(current),
       contextFor(askedOpen),
+      runtime.documentReviews === undefined
+        ? Promise.resolve([] as readonly string[])
+        : runtime.documentReviews.listReviewedDocumentIds(executor, session.id),
     ]);
-    const sessionView = toSessionView(aggregate, changes, context);
+    const sessionView = {
+      ...toSessionView(aggregate, changes, context),
+      // Only when there is one: most reads carry nothing extra.
+      ...(reviewed.length === 0 ? {} : { reviewedDocumentIds: [...reviewed] }),
+    };
     if (askedOpen === undefined) return sessionView;
     return {
       ...sessionView,

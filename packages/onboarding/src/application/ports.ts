@@ -582,3 +582,27 @@ export type OnboardingTaxonomyResolver = {
     readonly limit: number;
   }) => Promise<readonly TaxonomyPhraseCandidate[]>;
 };
+
+/**
+ * That Q's review of a founder's document version finished for a session
+ * (live e2e 25 Oct): a deck that adds nothing new is then said so, never
+ * left as a silent wait. Append-only and idempotent per session and version.
+ */
+export type OnboardingDocumentReviewRepository = {
+  /** True when recorded; false when this version was already recorded. */
+  readonly record: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly tenantId: string;
+      readonly sessionId: string;
+      readonly documentId: string;
+      readonly documentVersionId: string;
+      readonly suggestionsCreated: number;
+    },
+  ) => Promise<boolean>;
+  /** The documents whose review finished for this session, newest first. */
+  readonly listReviewedDocumentIds: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+  ) => Promise<readonly string[]>;
+};

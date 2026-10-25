@@ -136,6 +136,21 @@ export type FounderReviewServiceDependencies = {
   readonly accountName?:
     ((userId: UserId) => Promise<string | null>) | undefined;
   /**
+   * Records that a document version's review finished for the session, with
+   * how many new offers it made (live e2e 25 Oct: a deck that added nothing
+   * new left no trace, and the screen waited on it in silence). Optional:
+   * without it, nothing is recorded and the screen waits as before.
+   */
+  readonly recordReview?:
+    | ((review: {
+        readonly tenantId: string;
+        readonly sessionId: string;
+        readonly documentId: string;
+        readonly documentVersionId: string;
+        readonly suggestionsCreated: number;
+      }) => Promise<void>)
+    | undefined;
+  /**
    * The onboarding runtime's internal question recording (CQ-PRE-REC-001).
    * What the planner decided is worth asking is persisted as journey state
    * so F7 — and the conversational interview — can ask it after a refresh
@@ -248,6 +263,7 @@ export function createFounderDocumentReview(
     createSuggestion,
     extraction,
     accountName,
+    recordReview,
     recordQuestions,
     logger,
     pitchSections,
@@ -440,7 +456,7 @@ export function createFounderDocumentReview(
         PASSAGES_PER_DOCUMENT,
       );
 
-      return read({
+      const result = await read({
         tenantId: event.tenantId,
         userId: document.createdByUserId,
         sessionId: session.id,
@@ -452,6 +468,24 @@ export function createFounderDocumentReview(
         },
         context: { documentId: event.documentId, passages: sources.length },
       });
+      // Only a review that read the document: a model that could not read
+      // it is not "nothing new" (§46), and is not recorded as reviewed.
+      if (result.kind === "PREPARED" && result.blocked === null) {
+        await recordReview?.({
+          tenantId: event.tenantId,
+          sessionId: session.id,
+          documentId: event.documentId,
+          documentVersionId: event.documentVersionId,
+          suggestionsCreated: result.suggestionsCreated,
+        }).catch((error: unknown) => {
+          // The offers are made; only the "nothing new" signal is lost.
+          logger?.warn(
+            { err: error, sessionId: session.id },
+            "document review not recorded",
+          );
+        });
+      }
+      return result;
     },
 
     onResponseCommitted: async (event): Promise<FounderReviewResult> => {

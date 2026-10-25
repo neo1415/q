@@ -77,7 +77,8 @@ import {
   gapValue,
   isTaxonomySuggestion,
   pickedUp,
-  hasFindingsFrom,
+  documentReading,
+  nothingNewLine,
   publicSourceOf,
   progressLines,
   promptFor,
@@ -1629,19 +1630,38 @@ export function QOnboardingWorkspace({
       // THIS document are in the session (bounded); until then it says it
       // is reading, and the findings are handed to it when they land.
       const documentId = done.value.documentId;
-      const foundIn = (): boolean =>
-        hasFindingsFrom(viewRef.current, documentId);
-      const waitForFindings = async (forMs: number): Promise<boolean> => {
+      // Live e2e 25 Oct: a deck that adds nothing new left no trace, and Q
+      // promised its findings, then waited 180 s in silence. The session
+      // now names the documents whose review finished: one that brought
+      // nothing new is said so, by code, as soon as that is known.
+      const readingOf = () => documentReading(viewRef.current, documentId);
+      const waitForFindings = async (
+        forMs: number,
+      ): Promise<ReturnType<typeof documentReading>> => {
         const waitStarted = Date.now();
         while (Date.now() - waitStarted < forMs) {
-          if (foundIn()) return true;
+          if (readingOf() !== "READING") return readingOf();
           await new Promise((resolve) => setTimeout(resolve, 2_000));
           await actions.refresh();
         }
-        return foundIn();
+        return readingOf();
       };
-      const found = ready && readable && (await waitForFindings(60_000));
+      const nothingNew = () => {
+        const line = nothingNewLine(file.name);
+        push("Q", line);
+        const sessionId = viewRef.current?.session.id;
+        if (sessionId !== undefined) {
+          void onboardingThreadKeepAction(sessionId, line);
+        }
+      };
+      const first =
+        ready && readable ? await waitForFindings(60_000) : "READING";
       setUploadNote(null);
+      if (first === "NOTHING_NEW") {
+        nothingNew();
+        return;
+      }
+      const found = first === "FOUND";
       const toldRead = `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`;
       const told = !ready
         ? `I've just uploaded ${file.name}; it's still being read. Say you're reading it now and will show what you found in a minute, then carry on.`
@@ -1672,8 +1692,13 @@ export function QOnboardingWorkspace({
       } else {
         await sayNow.current(told);
       }
-      // The findings, when they land after Q moved on: handed to Q then.
-      if (ready && readable && !found && (await waitForFindings(180_000))) {
+      // The findings, when they land after Q moved on: handed to Q then; a
+      // review that brought nothing new is said so instead.
+      const later =
+        ready && readable && !found ? await waitForFindings(180_000) : null;
+      if (later === "NOTHING_NEW") {
+        nothingNew();
+      } else if (later === "FOUND") {
         const landed = `I've finished reading ${file.name}. Read back what you found in it and check it with me.`;
         if (voiceActive) {
           setUploadNote(`${file.name} is read.`);
@@ -1683,7 +1708,7 @@ export function QOnboardingWorkspace({
         }
       }
     },
-    [companyIdForUpload, qSubject, actions, voiceActive],
+    [companyIdForUpload, qSubject, actions, voiceActive, push],
   );
   // F-49: the waiting file goes up once there is somewhere to file it.
   useEffect(() => {

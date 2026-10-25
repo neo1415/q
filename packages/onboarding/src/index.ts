@@ -115,6 +115,7 @@ export type {
   NewOnboardingInterviewQuestion,
   NewOnboardingUtterance,
   NewOnboardingInterviewTurn,
+  OnboardingDocumentReviewRepository,
   OnboardingInterviewTurnRepository,
   OnboardingInterviewQuestionRepository,
   OnboardingUtteranceRepository,
@@ -209,6 +210,7 @@ export {
 export { createPostgresOnboardingDefinitionRepository } from "./infrastructure/postgres-definition-repository.js";
 export { createPostgresOnboardingInterviewQuestionRepository } from "./infrastructure/postgres-question-repository.js";
 export { createPostgresOnboardingUtteranceRepository } from "./infrastructure/postgres-utterance-repository.js";
+export { createPostgresOnboardingDocumentReviewRepository } from "./infrastructure/postgres-document-review-repository.js";
 export { createPostgresOnboardingInterviewTurnRepository } from "./infrastructure/postgres-interview-turn-repository.js";
 export {
   interpretUtterance,

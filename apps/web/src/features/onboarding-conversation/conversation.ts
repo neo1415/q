@@ -867,3 +867,25 @@ export function keptAllLine(outcomes: readonly boolean[]): string | null {
     ? `Kept ${String(kept)}; one didn't go through. It's still waiting below.`
     : `Kept ${String(kept)}; ${String(failed)} didn't go through. They're still waiting below.`;
 }
+
+/**
+ * Where Q's reading of one uploaded document stands (live e2e 25 Oct):
+ * findings from it are waiting; or its review finished with nothing new;
+ * or it is still being read.
+ */
+export function documentReading(
+  view:
+    | Pick<OnboardingSessionView, "pendingSuggestions" | "reviewedDocumentIds">
+    | undefined,
+  documentId: string,
+): "FOUND" | "NOTHING_NEW" | "READING" {
+  if (hasFindingsFrom(view, documentId)) return "FOUND";
+  return (view?.reviewedDocumentIds ?? []).includes(documentId)
+    ? "NOTHING_NEW"
+    : "READING";
+}
+
+/** Q's line, said by code, for a document that added nothing new. */
+export function nothingNewLine(filename: string): string {
+  return `I've read ${filename}. It adds nothing new beyond what's already recorded.`;
+}

@@ -5,6 +5,7 @@ import type { Logger } from "@capital-q/observability";
 
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
 import { createPostgresOnboardingInterviewQuestionRepository } from "../infrastructure/postgres-question-repository.js";
+import { createPostgresOnboardingDocumentReviewRepository } from "../infrastructure/postgres-document-review-repository.js";
 import { createPostgresOnboardingInterviewTurnRepository } from "../infrastructure/postgres-interview-turn-repository.js";
 import { createPostgresOnboardingUtteranceRepository } from "../infrastructure/postgres-utterance-repository.js";
 import type { OnboardingUtteranceAliases } from "../domain/interpretation.js";
@@ -19,6 +20,7 @@ import type {
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingInterviewQuestionRepository,
+  OnboardingDocumentReviewRepository,
   OnboardingInterviewTurnRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
@@ -105,6 +107,8 @@ export type OnboardingServiceOptions = {
         readonly questions?: OnboardingInterviewQuestionRepository | undefined;
         readonly utterances?: OnboardingUtteranceRepository | undefined;
         readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
+        readonly documentReviews?:
+          OnboardingDocumentReviewRepository | undefined;
         readonly idempotency?: OnboardingIdempotencyRepository | undefined;
       }
     | undefined;
@@ -158,6 +162,9 @@ export function createOnboardingService(
     interviewTurns:
       options.repositories?.interviewTurns ??
       createPostgresOnboardingInterviewTurnRepository(),
+    documentReviews:
+      options.repositories?.documentReviews ??
+      createPostgresOnboardingDocumentReviewRepository(),
     utteranceAliases: options.utteranceAliases,
     moveReader: options.moveReader,
     interviewCues: options.interviewCues,

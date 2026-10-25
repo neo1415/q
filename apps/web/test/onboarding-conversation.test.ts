@@ -11,6 +11,8 @@ import {
   gapValue,
   hasFindingsFrom,
   composerHint,
+  documentReading,
+  nothingNewLine,
   keptAllLine,
   stillWaiting,
   pendingQuestion,
@@ -726,5 +728,46 @@ describe("Keep all (live 25 Oct e2e)", () => {
     expect(stillWaiting(view, "s-2")).toBe(false);
     expect(stillWaiting(view, "s-3")).toBe(false);
     expect(stillWaiting(undefined, "s-1")).toBe(false);
+  });
+});
+
+describe("a re-uploaded deck that adds nothing new (live e2e 25 Oct)", () => {
+  const offer = (documentId: string) => ({
+    sourceRefs: [{ sourceType: "EVIDENCE_DOCUMENT", sourceId: documentId }],
+  });
+  it("is still being read until its review finishes", () => {
+    expect(documentReading({ pendingSuggestions: [] }, "doc-1")).toBe(
+      "READING",
+    );
+    expect(documentReading(undefined, "doc-1")).toBe("READING");
+  });
+  it("is said to add nothing new once reviewed with nothing from it waiting", () => {
+    expect(
+      documentReading(
+        { pendingSuggestions: [], reviewedDocumentIds: ["doc-1"] },
+        "doc-1",
+      ),
+    ).toBe("NOTHING_NEW");
+    expect(nothingNewLine("deck.pdf")).toBe(
+      "I've read deck.pdf. It adds nothing new beyond what's already recorded.",
+    );
+  });
+  it("reads its findings back when any came from it, reviewed or not", () => {
+    expect(
+      documentReading(
+        {
+          pendingSuggestions: [offer("doc-1")],
+          reviewedDocumentIds: ["doc-1"],
+        } as never,
+        "doc-1",
+      ),
+    ).toBe("FOUND");
+    // Another document's review says nothing about this one.
+    expect(
+      documentReading(
+        { pendingSuggestions: [], reviewedDocumentIds: ["doc-2"] },
+        "doc-1",
+      ),
+    ).toBe("READING");
   });
 });

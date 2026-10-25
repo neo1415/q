@@ -135,6 +135,7 @@ import {
   createPostgresOnboardingInterviewQuestionRepository,
   createPostgresOnboardingResponseRepository,
   createPostgresOnboardingSessionRepository,
+  createPostgresOnboardingDocumentReviewRepository,
   createPostgresOnboardingSuggestionRepository,
   createPostgresOnboardingUtteranceRepository,
 } from "@capital-q/onboarding";
@@ -380,6 +381,13 @@ const founderReview =
           onboarding.internal.recordInterviewQuestions(command as never),
         // Lane ob1: lane ov's pitch readings, proposed as the sections.
         pitchSections: createPitchSectionsPort(database.sql),
+        // Live e2e 25 Oct: a deck that adds nothing new is said so.
+        recordReview: async (review) => {
+          await createPostgresOnboardingDocumentReviewRepository().record(
+            database.sql,
+            review,
+          );
+        },
         // F-74: the account holder's own name, so a role the deck gives
         // someone else is never offered as theirs.
         accountName: async (userId) => {

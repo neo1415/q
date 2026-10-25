@@ -903,6 +903,11 @@ export const OnboardingSessionViewSchema = z.object({
    * not the form cursor's. Present only on a reply to a turn with Q.
    */
   askedStep: OnboardingStepViewSchema.optional(),
+  /**
+   * Documents whose review by Q finished for this session (live e2e 25 Oct):
+   * one that brought nothing new is said so, never waited on in silence.
+   */
+  reviewedDocumentIds: z.array(z.string().uuid()).max(50).optional(),
 });
 export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
 
