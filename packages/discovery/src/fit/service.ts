@@ -212,10 +212,13 @@ export type FitService = {
    * Q.10: the companies the investor picked (2-4, from Saved), side by
    * side on the same fit as the top three. Each is re-checked for VIEW
    * eligibility first; one they may not see is absent, never named.
+   * `source` says where the companies came from (Saved by default; a
+   * network discovery's cards are FEED, as its rank labels them).
    */
   readonly compare: (
     actor: ActorContext,
     companyIds: readonly string[],
+    source?: FitCandidateSource,
   ) => Promise<FitTopResult>;
 };
 
@@ -483,14 +486,14 @@ export function createFitService(
 
   return {
     profiles,
-    compare: async (actor, companyIds) => {
+    compare: async (actor, companyIds, source = "SAVED") => {
       const ids = [...new Set(companyIds)].slice(0, FIT_COMPARISON_MAX);
       const result = await profiles(actor, ids);
       if (result.kind !== "OK") return result;
       const sources = new Map<string, ReadonlySet<FitCandidateSource>>(
         result.items.map((item) => [
           item.assessment.profile.companyId,
-          new Set<FitCandidateSource>(["SAVED"]),
+          new Set<FitCandidateSource>([source]),
         ]),
       );
       return {

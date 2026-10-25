@@ -165,7 +165,13 @@ function tools(options: {
     offer: () => Promise.resolve(list),
     available: () => Promise.resolve(list),
     execute: (proposal: QToolProposal) => {
-      executed.push(proposal.name);
+      // A named set (discovery's cards) is not the candidate sweep.
+      executed.push(
+        proposal.name === "fit_top_candidates" &&
+          "companyIds" in (proposal.arguments as object)
+          ? "fit_top_candidates:named"
+          : proposal.name,
+      );
       const ok = (toolName: string, data: unknown): QToolCallOutcome => ({
         callId: proposal.callId,
         toolName,
@@ -213,8 +219,22 @@ function tools(options: {
         );
       }
       if (proposal.name === "fit_top_candidates") {
+        // Named companies (discovery's cards) are the same fits, as a set.
+        const named = (proposal.arguments as { companyIds?: string[] })
+          .companyIds;
         return Promise.resolve(
-          ok("fit.top_candidates", { status: "OK", comparison: null }),
+          ok("fit.top_candidates", {
+            status: "OK",
+            comparison:
+              named === undefined
+                ? null
+                : {
+                    entries: named.flatMap((id) => {
+                      const fit = FITS[id];
+                      return fit?.ok === true ? [fit.data] : [];
+                    }),
+                  },
+          }),
         );
       }
       const id = (proposal.arguments as { companyId?: string }).companyId ?? "";
@@ -856,6 +876,9 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
     // words did not turn it into the candidate sweep.
     expect(executed).toContain("discover_companies");
     expect(executed).not.toContain("fit_top_candidates");
+    // Its cards are read as one set, not one fit read per company.
+    expect(executed).toContain("fit_top_candidates:named");
+    expect(executed).not.toContain("fit_profile");
     expect(text).not.toMatch(/listed by name/u);
   });
 });

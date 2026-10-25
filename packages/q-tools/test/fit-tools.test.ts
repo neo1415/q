@@ -344,6 +344,26 @@ describe("fit tools", () => {
     expect(data.text).toBe(fitComparisonText(data.comparison));
   });
 
+  it("named companies are read as one set, each re-checked, labelled as discovered", async () => {
+    const { port, read } = tools({
+      // Not the candidates: named ids never read the candidate list.
+      candidates: [{ companyId: COMPANY_B_NETWORK, source: "RELATIONSHIP" }],
+    });
+    const outcome = await port.execute(
+      call("fit_top_candidates", {
+        companyIds: [COMPANY_A, COMPANY_B_PRIVATE],
+      }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!outcome.result.ok) throw new Error("expected a result");
+    const data = FitTopCandidatesOutputSchema.parse(outcome.result.data);
+    expect(data.comparison?.entries.map((e) => e.name)).toEqual([
+      "Sunline Energy",
+    ]);
+    expect(data.comparison?.entries[0]?.sources).toEqual(["FEED"]);
+    expect(read).toEqual([COMPANY_A]);
+  });
+
   it("a founder, or anyone without an investor side, gets nothing", async () => {
     const plan = planFor(actorA, "COMPARISON", [
       { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },

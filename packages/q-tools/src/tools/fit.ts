@@ -118,6 +118,14 @@ export const FitTopCandidatesInputSchema = z
       .max(FIT_COMPARISON_MAX)
       .optional()
       .describe("How many to put side by side. Default 3, up to 10."),
+    companyIds: z
+      .array(UuidSchema)
+      .min(1)
+      .max(FIT_COMPARISON_MAX)
+      .optional()
+      .describe(
+        "Put exactly these companies side by side instead of the top candidates; ids from discover_companies, never invented. limit is then ignored.",
+      ),
   })
   .strict();
 export type FitTopCandidatesInput = z.infer<typeof FitTopCandidatesInputSchema>;
@@ -304,7 +312,7 @@ export function createFitTopCandidatesTool(
     id: FIT_TOP_CANDIDATES,
     providerName: "fit_top_candidates",
     description:
-      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document. Capital Q draws the side-by-side table itself (call read_company_figures for each company too, so its traction row has their numbers): in words, say the two or three differences that matter most, never the whole table.",
+      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side (or, given companyIds, exactly those companies): each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document. Capital Q draws the side-by-side table itself (call read_company_figures for each company too, so its traction row has their numbers): in words, say the two or three differences that matter most, never the whole table.",
     input: FitTopCandidatesInputSchema,
     output: FitTopCandidatesOutputSchema,
     authorize,
@@ -319,7 +327,13 @@ export function createFitTopCandidatesTool(
         guidance: GUIDANCE,
       });
       if (fit === undefined) return none("NOT_AVAILABLE");
-      const result = await fit.top(context.actor, input.limit ?? 3);
+      // Owner 2026-10-25 (savanna cold miss: five fit_profile calls for the
+      // five cards, 1.16 s): named companies are read in one profiles call,
+      // each still authorised for VIEW under this reader before it is read.
+      const result =
+        input.companyIds === undefined
+          ? await fit.top(context.actor, input.limit ?? 3)
+          : await fit.compare(context.actor, input.companyIds, "FEED");
       if (result.kind !== "OK") return none(result.kind);
       const views = await raiseViewsFor(
         ports,

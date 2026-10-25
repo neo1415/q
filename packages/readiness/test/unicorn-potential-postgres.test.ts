@@ -164,6 +164,14 @@ describe("persisted Unicorn source reauthorization", () => {
       ),
     ).toBe(true);
   });
+  it("reads only the current and the immediately previous revision per company", async () => {
+    const f = fixture([2, 1], [2, 1], {}, true);
+    await f.store.current([company], view.methodVersion);
+    const read = f.query.mock.calls
+      .map(([parts]) => parts.join("?"))
+      .find((text) => text.includes("company_unicorn_potential_assessments"));
+    expect(read).toMatch(/order by revision desc limit 2\) a$/);
+  });
   it("does no source query for an empty requested page", async () => {
     const f = fixture([]);
     expect((await f.store.current([], "unicorn-potential.v1.0.0")).size).toBe(

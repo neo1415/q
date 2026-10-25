@@ -102,9 +102,27 @@ function tools(
     raises?: boolean;
     /** The fit service threw inside the catalog (live bbb4b6773). */
     rankFails?: boolean;
+    /** A named fit set could not be read (e.g. past the result bound). */
+    setFails?: boolean;
   } = {},
 ) {
   const rows = options.rows ?? CATALOG;
+  const profileOf = (id: string): Record<string, unknown> => {
+    if (options.mandate === false) return { status: "NO_MANDATE" };
+    const row = rows.find((r) => ID(r.n) === id);
+    if (row === undefined) return { status: "NOT_FOUND" };
+    return fitFixture(
+      id,
+      row.name,
+      Object.fromEntries(
+        OUTCOMES.map((key, index) => [
+          key,
+          index < row.strong ? "STRONG" : "PARTIAL",
+        ]),
+      ),
+      row.strong >= 4 ? "STRONG_FIT" : "GOOD_FIT",
+    ).result.data as Record<string, unknown>;
+  };
   const asked: { name: string; args: Record<string, unknown> }[] = [];
   const port: Pick<QToolPort, "execute"> = {
     execute: (proposal) => {
@@ -167,31 +185,37 @@ function tools(
         );
       }
       if (proposal.name === "fit_profile") {
-        if (options.mandate === false) {
-          return Promise.resolve(
-            outcome(proposal, "fit.profile", { status: "NO_MANDATE" }),
-          );
-        }
-        const id = String(args["companyId"]);
-        const row = rows.find((r) => ID(r.n) === id);
-        if (row === undefined) {
-          return Promise.resolve(
-            outcome(proposal, "fit.profile", { status: "NOT_FOUND" }),
-          );
-        }
-        const fixture = fitFixture(
-          id,
-          row.name,
-          Object.fromEntries(
-            OUTCOMES.map((key, index) => [
-              key,
-              index < row.strong ? "STRONG" : "PARTIAL",
-            ]),
-          ),
-          row.strong >= 4 ? "STRONG_FIT" : "GOOD_FIT",
-        );
         return Promise.resolve(
-          outcome(proposal, "fit.profile", fixture.result.data),
+          outcome(
+            proposal,
+            "fit.profile",
+            profileOf(String(args["companyId"])),
+          ),
+        );
+      }
+      if (proposal.name === "fit_top_candidates") {
+        if (options.setFails === true)
+          return Promise.resolve({
+            ...outcome(proposal, "fit.top_candidates", null),
+            status: "FAILED",
+            failureCode: "RESULT_TOO_LARGE",
+            result: {
+              ok: false,
+              error: { code: "RESULT_TOO_LARGE", safeMessage: "Too large." },
+            },
+          });
+        if (options.mandate === false)
+          return Promise.resolve(
+            outcome(proposal, "fit.top_candidates", { status: "NO_MANDATE" }),
+          );
+        const entries = ((args["companyIds"] as string[] | undefined) ?? [])
+          .map(profileOf)
+          .filter((data) => data["status"] === "OK");
+        return Promise.resolve(
+          outcome(proposal, "fit.top_candidates", {
+            status: "OK",
+            comparison: { entries },
+          }),
         );
       }
       return Promise.reject(new Error(`not offered: ${proposal.name}`));
@@ -223,6 +247,8 @@ async function discover(
     rows?: readonly Row[];
     ranks?: boolean;
     raises?: boolean;
+    setFails?: boolean;
+    available?: ReadonlySet<string>;
   } = {},
 ) {
   const port = tools(options);
@@ -231,7 +257,7 @@ async function discover(
     ask: request,
     tools: port.port,
     context: CONTEXT,
-    available: AVAILABLE,
+    available: options.available ?? AVAILABLE,
     investor: options.investor ?? true,
   });
   if (answer === null || "rankUnavailable" in answer)
@@ -492,6 +518,56 @@ describe("an investor's discovery ranks every match, not the first page by name 
     expect(answer.text).toMatch(
       /^37 fintech companies on Capital Q; ranked by fit with your mandate, the top ten: Zenith Pay /u,
     );
+  });
+
+  // Owner 2026-10-25 (savanna cold miss: one fit_profile per card, 1.16 s
+  // for five): the cards shown are read as one set.
+  const SETS = new Set([...AVAILABLE, "fit_top_candidates"]);
+  const best = ask({
+    text: "Which fintech companies suit my mandate",
+    count: null,
+    ranking: "FIT",
+    mandateRelevant: true,
+  });
+
+  it("reads the cards shown as sets of five, never one fit read per card", async () => {
+    const { answer, asked } = await discover(best, {
+      rows: many,
+      ranks: true,
+      available: SETS,
+    });
+    const sets = asked.filter((call) => call.name === "fit_top_candidates");
+    expect(fitCalls(asked)).toBe(0);
+    expect(
+      sets.map((call) => (call.args["companyIds"] as string[]).length),
+    ).toEqual([5, 5]);
+    expect(names(answer.block)[0]).toBe("Zenith Pay");
+    expect(answer.block?.cards).toHaveLength(10);
+  });
+
+  it("a set that could not be read falls back to one read per card, the same cards", async () => {
+    const batched = await discover(best, {
+      rows: many,
+      ranks: true,
+      available: SETS,
+    });
+    const fallback = await discover(best, {
+      rows: many,
+      ranks: true,
+      available: SETS,
+      setFails: true,
+    });
+    expect(fitCalls(fallback.asked)).toBe(10);
+    expect(names(fallback.answer.block)).toEqual(names(batched.answer.block));
+    expect(fallback.answer.text).toBe(batched.answer.text);
+  });
+
+  it("no mandate read through a set is said as no mandate", async () => {
+    const { answer } = await discover(ask({ count: 3 }), {
+      mandate: false,
+      available: SETS,
+    });
+    expect(answer.text).toMatch(/don't have a mandate/u);
   });
 
   // Owner 2026-10-24 (live bbb4b6773): the fit service failed inside the
