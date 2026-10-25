@@ -112,7 +112,9 @@ export function acknowledgementParts(
   if (results.length === 0 || next === null) return null;
   if (results.some((result) => result.outcome !== "COMMITTED")) return null;
   const items: AcknowledgedItem[] = [];
-  for (const result of results) {
+  // What was already on the record was said when it was saved: never
+  // again (live 25 Oct e2e: one note restated on every turn).
+  for (const result of results.filter((r) => r.alreadyRecorded !== true)) {
     // A fact kept with their notes (not a question on their path) reads as
     // its own line ("revenue: first revenue only"), never "anything else".
     const kept = /^(.*?) \(kept with their notes/u.exec(result.recorded ?? "");
@@ -184,8 +186,9 @@ function spokenList(lines: readonly string[]): string {
   return `${lines.slice(0, -1).join(", ")} and ${lines.at(-1) ?? ""}`;
 }
 
-/** The English receipt sentence: the lead, then what was saved. */
+/** The English receipt sentence: the lead, then what was saved; nothing when nothing new was. */
 function receiptSentence(parts: AcknowledgementParts): string {
+  if (parts.items.length === 0) return "";
   const said = spokenList(parts.items.map(acknowledgedLine));
   return `${parts.lead} ${said}${endOf(said)}`;
 }
@@ -195,8 +198,24 @@ export function quickAcknowledgement(
 ): string | null {
   const parts = acknowledgementParts(input);
   if (parts === null) return null;
+  const receipt = receiptSentence(parts);
   const aside = parts.aside === undefined ? "" : `${parts.aside} `;
-  return `${receiptSentence(parts)} ${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
+  return `${receipt === "" ? "" : `${receipt} `}${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
+}
+
+/**
+ * What one result reads back as in a receipt: a note kept with their notes
+ * by its words ("the 210 customers is right"), anything else as recorded.
+ * What a reply that repeats the receipt is matched against.
+ */
+export function receiptValueOf(result: OnboardingRecordResult): string {
+  const recorded = (result.recorded ?? "").replace(
+    /\s*\(in their words\)$/u,
+    "",
+  );
+  const kept = /^(.*?) \(kept with their notes/u.exec(recorded)?.[1];
+  if (kept === undefined) return recorded;
+  return keptParts(kept)?.words ?? kept;
 }
 
 /**
@@ -216,7 +235,7 @@ export function quickReceipt(
     results: committed,
     next: { question: "-", optional: false },
   });
-  if (parts === null) return null;
+  if (parts === null || parts.items.length === 0) return null;
   return receiptSentence(parts);
 }
 
@@ -317,7 +336,9 @@ export function acknowledgementIn(
   if (aside === null) return null;
   const opening = lead.replace(/[.!:;,\s]+$/u, "");
   const joined = said.join(separators.items);
-  return `${opening}: ${joined}${endOf(joined)} ${aside === "" ? "" : `${aside} `}${question}${tail === "" ? "" : ` ${tail}`}`;
+  const receipt =
+    said.length === 0 ? "" : `${opening}: ${joined}${endOf(joined)} `;
+  return `${receipt}${aside === "" ? "" : `${aside} `}${question}${tail === "" ? "" : ` ${tail}`}`;
 }
 
 /** Latin-script words only: the code-written reply is English (lane ml owns others). */

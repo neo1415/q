@@ -242,6 +242,12 @@ export const OnboardingRecordResultSchema = z
     ]),
     /** COMMITTED: what is now on the record, as a person would say it. */
     recorded: z.string().max(600).optional(),
+    /**
+     * COMMITTED: nothing changed, it was already on the record (and said
+     * when it was saved). Never say it is saved again, never offer it again
+     * (live 25 Oct e2e: one note restated on every turn).
+     */
+    alreadyRecorded: z.literal(true).optional(),
     /** The step's question, so a reply names the right one. */
     question: z.string().max(400).optional(),
     /**
