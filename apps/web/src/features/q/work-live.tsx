@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import {
   WorkforceLiveSchema,
@@ -11,7 +11,7 @@ import {
 
 import { expectDocument } from "@/features/documents/document-ready";
 import { useT } from "@/features/i18n/language";
-import { startPacedPoll } from "@/features/polling/paced-poll";
+import { startPacedPoll, type PacedPoll } from "@/features/polling/paced-poll";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import type { QTurnObjectBlock } from "./conversation";
@@ -106,67 +106,165 @@ function parseLive(body: unknown): WorkforceLive | null {
 }
 
 /**
- * The job, read while it works: at once, then every few seconds while the
- * tab is visible and something moves (slower while nothing does), until it
- * is done or stopped. A job that was already done when the card first read
- * it is not news.
+ * What counts as movement, for the poll's pace (egress, 25 Oct 2026): the
+ * job's state, its stage, which draft it is on and how many sections it
+ * has. A new source or fact inside a stage is shown when read, but does
+ * not keep the poll at its fastest pace.
  */
-export function useWorkLive(jobId: string): {
+export function liveKey(live: WorkforceLive): string {
+  if (live.state === "WAITING") return "WAITING";
+  const stage = live.stage;
+  return [
+    live.state,
+    stage?.stage ?? "",
+    String(stage?.draft ?? ""),
+    String(stage?.sections.length ?? 0),
+  ].join("|");
+}
+
+type LiveSnapshot = {
   readonly live: WorkforceLive | null;
   readonly missing: boolean;
-} {
-  const [live, setLive] = useState<WorkforceLive | null>(null);
-  const [missing, setMissing] = useState(false);
-  const seenWorking = useRef(false);
-  useEffect(() => {
-    let alive = true;
-    const started = Date.now();
-    let shown = "";
-    const poll = startPacedPoll(
-      async () => {
-        let next: WorkforceLive | null = null;
-        try {
-          const response = await fetch(
-            `${WORK_LIVE_PATH}/${encodeURIComponent(jobId)}`,
-            { cache: "no-store" },
-          );
-          if (response.status === 404) {
-            if (alive) setMissing(true);
-            return "done";
-          }
-          if (response.ok) next = parseLive(await response.json());
-        } catch {
-          // A failed read is tried again; the card keeps what it showed.
-        }
-        if (!alive) return "done";
-        if (Date.now() - started > WORK_LIVE_WATCH_MS) return "done";
-        if (next === null) return "same";
-        setLive(next);
-        if (next.state === "WORKING") seenWorking.current = true;
-        if (next.state !== "WORKING" && next.state !== "WAITING") {
-          if (seenWorking.current) {
-            if (next.state === "DONE") expectDocument();
-            window.dispatchEvent(
-              new CustomEvent(Q_WORK_SETTLED_EVENT, { detail: { jobId } }),
-            );
-          }
+};
+
+/**
+ * One job's reads, shared by every card and line that shows it (coordinator
+ * 25 Oct 2026: the conversation, the pinned line and the Work page never
+ * poll the same job twice). Held while anything shows the job; let go when
+ * nothing does.
+ */
+type LiveEntry = {
+  snapshot: LiveSnapshot;
+  readonly listeners: Set<() => void>;
+  poll: PacedPoll | null;
+  /** The watch window ran out: the next focus or visible tab reads again. */
+  expired: boolean;
+  settled: boolean;
+  seenWorking: boolean;
+  shown: string;
+  readonly wake: () => void;
+};
+
+const EMPTY_LIVE: LiveSnapshot = { live: null, missing: false };
+const liveEntries = new Map<string, LiveEntry>();
+
+function emitLive(entry: LiveEntry, next: Partial<LiveSnapshot>): void {
+  entry.snapshot = { ...entry.snapshot, ...next };
+  for (const listener of entry.listeners) listener();
+}
+
+function watchLive(jobId: string, entry: LiveEntry): void {
+  const started = Date.now();
+  entry.expired = false;
+  entry.poll = startPacedPoll(
+    async () => {
+      let next: WorkforceLive | null = null;
+      try {
+        const response = await fetch(
+          `${WORK_LIVE_PATH}/${encodeURIComponent(jobId)}`,
+          { cache: "no-store" },
+        );
+        if (response.status === 404) {
+          entry.settled = true;
+          emitLive(entry, { missing: true });
           return "done";
         }
-        // Waiting on the person: it moves when they do, so it slows.
-        const key = next.state === "WAITING" ? "WAITING" : JSON.stringify(next);
-        const outcome = key === shown ? "same" : "changed";
-        shown = key;
-        return outcome;
+        if (response.ok) next = parseLive(await response.json());
+      } catch {
+        // A failed read is tried again; the card keeps what it showed.
+      }
+      if (liveEntries.get(jobId) !== entry) return "done";
+      if (next !== null) emitLive(entry, { live: next });
+      if (Date.now() - started > WORK_LIVE_WATCH_MS) {
+        // Not settled: a focus or a visible tab picks it up again.
+        entry.expired = true;
+        entry.poll = null;
+        return "done";
+      }
+      if (next === null) return "same";
+      if (next.state === "WORKING") entry.seenWorking = true;
+      if (next.state !== "WORKING" && next.state !== "WAITING") {
+        entry.settled = true;
+        if (entry.seenWorking) {
+          if (next.state === "DONE") expectDocument();
+          window.dispatchEvent(
+            new CustomEvent(Q_WORK_SETTLED_EVENT, { detail: { jobId } }),
+          );
+        }
+        return "done";
+      }
+      const key = liveKey(next);
+      const outcome = key === entry.shown ? "same" : "changed";
+      entry.shown = key;
+      return outcome;
+    },
+    WORK_LIVE_PACE,
+    { immediate: true },
+  );
+}
+
+function subscribeLive(jobId: string, listener: () => void): () => void {
+  let entry = liveEntries.get(jobId);
+  if (entry === undefined) {
+    const created: LiveEntry = {
+      snapshot: EMPTY_LIVE,
+      listeners: new Set(),
+      poll: null,
+      expired: false,
+      settled: false,
+      seenWorking: false,
+      shown: "",
+      wake: () => {
+        if (
+          created.expired &&
+          !created.settled &&
+          document.visibilityState !== "hidden"
+        ) {
+          watchLive(jobId, created);
+        }
       },
-      WORK_LIVE_PACE,
-      { immediate: true },
-    );
-    return () => {
-      alive = false;
-      poll.stop();
     };
-  }, [jobId]);
-  return { live, missing };
+    entry = created;
+    liveEntries.set(jobId, entry);
+    window.addEventListener("focus", entry.wake);
+    document.addEventListener("visibilitychange", entry.wake);
+    watchLive(jobId, entry);
+  }
+  entry.listeners.add(listener);
+  const held = entry;
+  return () => {
+    held.listeners.delete(listener);
+    if (held.listeners.size > 0) return;
+    held.poll?.stop();
+    window.removeEventListener("focus", held.wake);
+    document.removeEventListener("visibilitychange", held.wake);
+    if (liveEntries.get(jobId) === held) liveEntries.delete(jobId);
+  };
+}
+
+/** Tests only: no job is held. */
+export function resetWorkLive(): void {
+  for (const entry of liveEntries.values()) entry.poll?.stop();
+  liveEntries.clear();
+}
+
+/**
+ * The job, read while it works: at once, then every few seconds while the
+ * tab is visible and something moves (slower while nothing does), until it
+ * is done or stopped. One read per job, however many places show it. After
+ * the watch window, a focus or a visible tab reads again. A job that was
+ * already done when the card first read it is not news.
+ */
+export function useWorkLive(jobId: string): LiveSnapshot {
+  const subscribe = useCallback(
+    (listener: () => void) => subscribeLive(jobId, listener),
+    [jobId],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => liveEntries.get(jobId)?.snapshot ?? EMPTY_LIVE,
+    () => EMPTY_LIVE,
+  );
 }
 
 /** Where the work stands: the line, the bar, and the draft's sections. */
