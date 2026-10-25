@@ -151,6 +151,7 @@ import {
   createRunFits,
   fitAnswerCardsBlock,
   withPlatformFit,
+  isPlatformFitCard,
   fitCardsSummary,
   fitSweepCardsBlock,
   fitSweepSummary,
@@ -245,6 +246,7 @@ import {
 } from "./investor-discovery-answer.js";
 import {
   runInvestorProspects,
+  withCodeFitMeasures,
   type InvestorProspectsAsk,
 } from "./investor-prospects-answer.js";
 export { identityCardBlock } from "./person-search-answer.js";
@@ -9668,9 +9670,19 @@ export function createModelGatewayQAnswer(
         })?.map((block) =>
           block.kind === "ANSWER_CARDS"
             ? // QO-06: one fit scale, the platform's, where it computed one.
-              withPlatformFit(
-                withCardSubjects(block, companiesRead),
-                runFits.read(request.runId),
+              // F-133: every card's levels are code's, never the model's.
+              withCodeFitMeasures(
+                withPlatformFit(
+                  withCardSubjects(block, companiesRead),
+                  runFits.read(request.runId),
+                ),
+                {
+                  investorFit: (id) =>
+                    [...companiesRead.investors.values()].find(
+                      (investor) => investor.investorOrganisationId === id,
+                    )?.fit,
+                  isPlatform: isPlatformFitCard,
+                },
               )
             : block,
         );

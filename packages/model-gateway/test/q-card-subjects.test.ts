@@ -264,3 +264,66 @@ describe("artifacts live: researched identities in the run's reads", () => {
     ]);
   });
 });
+
+// F-133: an investor's stage, sector and geography as the prospects tool
+// judged them, kept on the run's read so a card shows code's levels. A
+// related sector (ADJACENT) is not a stated match.
+describe("an investor's judged fit on the run's read (F-133)", () => {
+  const ids = [
+    "51000000-0000-4000-8000-000000000001",
+    "52000000-0000-4000-8000-000000000002",
+    "53000000-0000-4000-8000-000000000003",
+  ];
+  it("keeps published stage and geography, and a sector only when it is theirs", () => {
+    const companies = createRunCompanies();
+    companies.note("run-1", {
+      toolName: "investor.prospects",
+      status: "SUCCEEDED",
+      classification: "READ_ONLY",
+      result: {
+        ok: true,
+        data: {
+          prospects: [
+            {
+              investorOrganisationId: ids[0],
+              name: "Zino Aviation",
+              hqCountry: "NG",
+              sector: { fit: "MATCH", focus: "fintech", closeness: "ADJACENT" },
+              publishedFit: {
+                stage: "MET",
+                sector: "UNKNOWN",
+                geography: "MET",
+              },
+            },
+            {
+              investorOrganisationId: ids[1],
+              name: "Savanna Seed Partners",
+              hqCountry: null,
+              sector: { fit: "MATCH", focus: "logistics", closeness: "EXACT" },
+            },
+            {
+              investorOrganisationId: ids[2],
+              name: "Baobab Ridge Capital",
+              hqCountry: null,
+            },
+          ],
+        },
+      },
+    });
+    const fitOf = (id: string | undefined) =>
+      [...companies.read("run-1").investors.values()].find(
+        (one) => one.investorOrganisationId === id,
+      )?.fit;
+    expect(fitOf(ids[0])).toEqual({
+      stage: "MET",
+      sector: "UNKNOWN",
+      geography: "MET",
+    });
+    expect(fitOf(ids[1])).toEqual({
+      stage: "UNKNOWN",
+      sector: "MET",
+      geography: "UNKNOWN",
+    });
+    expect(fitOf(ids[2])).toBeUndefined();
+  });
+});
