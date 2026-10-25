@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { QAnswerCardsBlockSchema } from "@capital-q/contracts";
+
 import type {
   QToolCallOutcome,
   QToolExecutionContext,
@@ -11,6 +13,7 @@ import {
   pickProspects,
   prospectCardsBlock,
   runInvestorProspects,
+  withCodeFitMeasures,
 } from "../src/q/investor-prospects-answer.js";
 
 /**
@@ -371,5 +374,71 @@ describe("unknown is never said to fit (F-133)", () => {
     for (const card of block?.cards ?? []) {
       expect(card.view).toMatch(/^Fit not known yet/u);
     }
+  });
+});
+
+// F-133 (live bf1dcaa8): the analyst's card rated a fintech fund's sector
+// "Partial" for a logistics company. Levels on a card are code's.
+describe("a card's levels are code's, never the model's (F-133)", () => {
+  const ZINO = "41000000-0000-4000-8000-000000000001";
+  const QUIET = "42000000-0000-4000-8000-000000000002";
+  const model = (name: string, investorOrganisationId: string | null) => ({
+    key: name.toLowerCase().replace(/\s+/gu, "-"),
+    name,
+    line: null,
+    hue: 1,
+    fit: { score: 7.5, measured: 2, of: 2 },
+    reasons: ["Q's own reading."],
+    measures: [
+      { label: "Sector", level: "PARTIAL" as const, value: "adjacent" },
+      { label: "Stage", level: "STRONG" as const, value: null },
+    ],
+    view: "Likely fit",
+    said: null,
+    sourceCount: 1,
+    subject:
+      investorOrganisationId === null
+        ? null
+        : { kind: "INVESTOR_ORGANISATION", investorOrganisationId },
+  });
+  const block = QAnswerCardsBlockSchema.parse({
+    kind: "ANSWER_CARDS",
+    shape: "RANKED",
+    title: "Investors who fit",
+    cards: [
+      model("Zino Aviation", ZINO),
+      model("Quiet Fund", QUIET),
+      model("Somewhere Ltd", null),
+    ],
+    followUps: [],
+  });
+
+  it("draws an investor's levels from what it publishes, and none where code has no fit", () => {
+    const out = withCodeFitMeasures(block, {
+      investorFit: (id) =>
+        id === ZINO
+          ? { stage: "MET", sector: "NOT_MET", geography: "MET" }
+          : undefined,
+      isPlatform: () => false,
+    });
+    const [zino, quiet, loose] = out.cards;
+    expect(zino?.measures).toEqual([
+      { label: "Stage", level: "STRONG", value: "Matches what they publish" },
+      { label: "Sector", level: "MISMATCH", value: "Not a stated match" },
+      {
+        label: "Geography",
+        level: "STRONG",
+        value: "Matches what they publish",
+      },
+    ]);
+    expect(zino?.fit).toBeNull();
+    expect(zino?.view).toBe("Partial fit");
+    // No fit code computed: the model's words stay, its levels do not.
+    for (const card of [quiet, loose]) {
+      expect(card?.measures).toEqual([]);
+      expect(card?.fit).toBeNull();
+      expect(card?.reasons).toEqual(["Q's own reading."]);
+    }
+    expect(JSON.stringify(out)).not.toContain("PARTIAL");
   });
 });

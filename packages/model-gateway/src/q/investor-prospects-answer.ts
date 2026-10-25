@@ -492,9 +492,62 @@ function fitMeasures(fit: PublishedFit | undefined): QAnswerCard["measures"] {
       fit[part] === "MET"
         ? "Matches what they publish"
         : fit[part] === "NOT_MET"
-          ? "Not what they publish"
+          ? // F-133: a published focus that is not theirs is not a match,
+            // and never a partial one by adjacency.
+            part === "sector"
+            ? "Not a stated match"
+            : "Not what they publish"
           : null,
   }));
+}
+
+/**
+ * F-133 (live bf1dcaa8: the analyst's card rated a fintech fund's sector
+ * "Partial" for a logistics company, by adjacency). How each card's
+ * stage, sector and geography stand is code's, never a model's: an
+ * investor's from what they publish, as the prospects tool judged it; a
+ * company's from the platform's fit (already set, `isPlatform`). A card
+ * code has no fit for keeps the model's words but no levels and no score.
+ */
+export function withCodeFitMeasures(
+  block: QAnswerCardsBlock,
+  input: {
+    readonly investorFit: (
+      investorOrganisationId: string,
+    ) => PublishedFit | undefined;
+    readonly isPlatform: (card: QAnswerCard) => boolean;
+  },
+): QAnswerCardsBlock {
+  if (block.shape === "RESEARCH") return block;
+  const cards = block.cards.map((card): QAnswerCard => {
+    if (input.isPlatform(card)) return card;
+    const fit =
+      card.subject?.kind === "INVESTOR_ORGANISATION"
+        ? input.investorFit(card.subject.investorOrganisationId)
+        : undefined;
+    if (fit === undefined) return { ...card, measures: [], fit: null };
+    const known = FIT_PARTS.some((part) => fit[part] === "MET");
+    return {
+      ...card,
+      measures: fitMeasures(fit),
+      fit: null,
+      view: viewOf({
+        investorOrganisationId:
+          card.subject?.kind === "INVESTOR_ORGANISATION"
+            ? card.subject.investorOrganisationId
+            : "",
+        name: card.name,
+        kind: "LIKELY_FIT",
+        line: card.line,
+        about: null,
+        why: "",
+        fit,
+        fitKnown: known,
+      }),
+    };
+  });
+  const parsed = QAnswerCardsBlockSchema.safeParse({ ...block, cards });
+  return parsed.success ? parsed.data : { ...block, cards };
 }
 
 /**

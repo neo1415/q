@@ -151,6 +151,7 @@ import {
   createRunFits,
   fitAnswerCardsBlock,
   withPlatformFit,
+  isPlatformFitCard,
   fitCardsSummary,
   fitSweepCardsBlock,
   fitSweepSummary,
@@ -245,6 +246,7 @@ import {
 } from "./investor-discovery-answer.js";
 import {
   runInvestorProspects,
+  withCodeFitMeasures,
   type InvestorProspectsAsk,
 } from "./investor-prospects-answer.js";
 export { identityCardBlock } from "./person-search-answer.js";
@@ -7037,18 +7039,32 @@ export function createModelGatewayQAnswer(
       // approach -- investors already interested, then likely fits from
       // what investors publish -- found by code, never from the company
       // record alone and never from an investor's private mandate.
+      // F-133 (live bf1dcaa8, "Which investors fit me?" from a founder,
+      // read as FIT): a fit question is fit with one's own mandate, and only
+      // an investor has one. Asked by a founder with a company and no
+      // investor side, it can only be which investors fit that company, so
+      // it is that question, decided by who is asking, never by the words.
+      // About one named investor, the full path answers it.
+      const prospectsAsk =
+        request.investorProspects ??
+        (request.fitQuestion !== undefined &&
+        // How they fit one named investor is not a list of investors.
+        request.aboutNamedOther !== true &&
+        ownInvestorOrganisationIn(request.plan) === null
+          ? {
+              text: request.fitQuestion.text,
+              count: request.fitQuestion.count,
+            }
+          : undefined);
       if (
-        request.investorProspects !== undefined &&
+        prospectsAsk !== undefined &&
         prepared.ownCompanyId !== null &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const prospectsStarted = Date.now();
-        const found = await prospectsFor(
-          request.investorProspects,
-          prepared.ownCompanyId,
-        );
+        const found = await prospectsFor(prospectsAsk, prepared.ownCompanyId);
         if (found !== null) {
           const message = await persistCodeAnswer(
             found.text,
@@ -9687,9 +9703,19 @@ export function createModelGatewayQAnswer(
         })?.map((block) =>
           block.kind === "ANSWER_CARDS"
             ? // QO-06: one fit scale, the platform's, where it computed one.
-              withPlatformFit(
-                withCardSubjects(block, companiesRead),
-                runFits.read(request.runId),
+              // F-133: every card's levels are code's, never the model's.
+              withCodeFitMeasures(
+                withPlatformFit(
+                  withCardSubjects(block, companiesRead),
+                  runFits.read(request.runId),
+                ),
+                {
+                  investorFit: (id) =>
+                    [...companiesRead.investors.values()].find(
+                      (investor) => investor.investorOrganisationId === id,
+                    )?.fit,
+                  isPlatform: isPlatformFitCard,
+                },
               )
             : block,
         );

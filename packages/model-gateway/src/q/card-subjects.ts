@@ -62,7 +62,54 @@ export type ReadInvestor = {
   readonly country: string | null;
   /** Their published fit reasons and gate standing, in words; empty: none read. */
   readonly basis: readonly string[];
+  /**
+   * Stage, sector and geography as code judged them against the asking
+   * company, from what the investor publishes (the prospects tool's
+   * published fit and sector judgement); absent: none read. A card shows
+   * these, never a model's own levels.
+   */
+  readonly fit?: ReadInvestorFit | undefined;
 };
+
+type FitStanding = "MET" | "NOT_MET" | "UNKNOWN";
+export type ReadInvestorFit = {
+  readonly stage: FitStanding;
+  readonly sector: FitStanding;
+  readonly geography: FitStanding;
+};
+
+const standingOf = (value: unknown): FitStanding =>
+  value === "MET" || value === "NOT_MET" ? value : "UNKNOWN";
+
+/**
+ * The investor's fit as the prospects tool judged it. A sector counts as
+ * met only when they publish the company's own sector; a related one (a
+ * sibling or a parent by taxonomy, ADJACENT) is not a stated match.
+ */
+function investorFitOf(
+  record: Record<string, unknown>,
+): ReadInvestorFit | undefined {
+  const published = record.publishedFit as Record<string, unknown> | undefined;
+  const sector = record.sector as Record<string, unknown> | undefined;
+  if (
+    (published === undefined || typeof published !== "object") &&
+    (sector === undefined || typeof sector !== "object")
+  ) {
+    return undefined;
+  }
+  const fromCard = standingOf(published?.sector);
+  const fromJudgement: FitStanding =
+    sector?.fit === "MATCH" && sector.closeness === "EXACT"
+      ? "MET"
+      : sector?.fit === "MISMATCH"
+        ? "NOT_MET"
+        : "UNKNOWN";
+  return {
+    stage: standingOf(published?.stage),
+    sector: fromCard === "UNKNOWN" ? fromJudgement : fromCard,
+    geography: standingOf(published?.geography),
+  };
+}
 
 type ReadCompany = {
   readonly companyId: string;
@@ -179,6 +226,9 @@ function readOutcome(outcome: Pick<QToolCallOutcome, "result">): {
         name: investorName,
         country: countryOf(record.hqCountry ?? record.headquartersCountry),
         basis: basisOf(record),
+        ...(investorFitOf(record) === undefined
+          ? {}
+          : { fit: investorFitOf(record) }),
       });
     }
     for (const child of Object.values(record)) visit(child, depth + 1);
@@ -429,7 +479,14 @@ export function createRunCompanies(limit = 200) {
           before === undefined ||
           before.basis.length < investor.basis.length
         ) {
-          known.investors.set(key, investor);
+          // The judged fit is kept whichever read says more in words.
+          const fit = investor.fit ?? before?.fit;
+          known.investors.set(
+            key,
+            fit === undefined ? investor : { ...investor, fit },
+          );
+        } else if (before.fit === undefined && investor.fit !== undefined) {
+          known.investors.set(key, { ...before, fit: investor.fit });
         }
         if (
           investor.country !== null &&
