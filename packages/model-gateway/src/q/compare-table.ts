@@ -574,10 +574,14 @@ export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
   // Live 24 Oct (9ff4a1118): "$1.8 million" was cut at its decimal point.
   // A sentence ends at . ! or ? followed by space and a capital (or a
   // quote or bracket), never inside a number or an abbreviation's tail.
+  const lead = verdictSentence(verdict);
+  // I21: the verdict may already have been said first, as code's opening
+  // line; it leads once, never twice, and the model's own first sentence
+  // is the one checked for a competing lead.
   const sentences = text
     .trim()
     .split(/(?<=[.!?])\s+(?=[\p{Lu}"'“‘([])/u)
-    .filter((sentence) => sentence.length > 0);
+    .filter((sentence) => sentence.length > 0 && sentence !== lead);
   const [first, ...rest] = sentences;
   const names = (sentence: string, name: string) =>
     containsCompanyName(sentence, name);
@@ -586,6 +590,5 @@ export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
     names(first, verdict.other) &&
     !names(first, verdict.leader);
   const body = (competing ? rest : sentences).join(" ").trim();
-  const lead = verdictSentence(verdict);
-  return body.startsWith(lead) ? body : `${lead} ${body}`.trim();
+  return `${lead} ${body}`.trim();
 }

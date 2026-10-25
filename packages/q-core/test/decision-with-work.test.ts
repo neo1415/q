@@ -23,7 +23,7 @@ describe("a decision stated with work attached", () => {
       V51_DECISION_WITH_WORK,
     );
     // v9 (2026-10-24) is built on v8 (ANALYSIS, first read), on v7.
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(12);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(13);
     expect(TURN_READER_V51.template).toContain(V51_DECISION_WITH_WORK);
     expect(V51_DECISION_WITH_WORK).toMatch(/teamJob is true/u);
     expect(V51_DECISION_WITH_WORK).toMatch(

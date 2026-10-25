@@ -221,6 +221,7 @@ import {
 import { outputSplitOf } from "./output-split.js";
 import {
   EXTRAS_ELSEWHERE_NOTE,
+  TABLE_IS_THE_COMPARISON,
   extrasMessages,
   joinExtras,
 } from "./parallel-extras.js";
@@ -388,6 +389,7 @@ import {
   comparisonSpokenLine,
   withoutCompareOffers,
   comparisonTableBlock,
+  verdictSentence,
   compareTargets,
   namesToCompare,
   newestAnswerCards,
@@ -5033,6 +5035,7 @@ export function createModelGatewayQAnswer(
           focusDossier: onScreenDossier,
           qWork: true,
           ownCompany: ownCompany !== null,
+          comparison: compareTable !== null,
         },
       });
       // A named person, company or body is answered by code from the
@@ -5376,6 +5379,7 @@ export function createModelGatewayQAnswer(
           focusDossier: onScreenDossier,
           qWork: wideReads.ownDay !== null,
           ownCompany: ownCompany !== null,
+          comparison: compareTable !== null,
         },
       });
       if (route.path === "PREPARED_CONTEXT") offered = [];
@@ -5459,6 +5463,11 @@ export function createModelGatewayQAnswer(
        * with no company of their own gets nothing here.
        */
       const composeEarlyLead = async (): Promise<string | null> => {
+        // Coordinator 2026-10-25 (I21): a comparison code resolved opens
+        // with code's verdict, said with its table before Q's reasoning.
+        if (compareTable !== null && compareVerdict !== null) {
+          return verdictSentence(compareVerdict);
+        }
         if (asksForPipelineSummary(latest.content)) {
           const outcome = await (standingOf() ?? Promise.resolve(null));
           return outcome !== null && outcome.result.ok
@@ -5931,8 +5940,31 @@ export function createModelGatewayQAnswer(
         read: () => runCompanies.read(request.runId),
         question: latest.content,
       });
+      /**
+       * Coordinator 2026-10-25 (I21: "how do the top two stack up?" showed
+       * nothing for 8.5 s): a comparison code resolved is on screen first.
+       * Its table, built from this run's authorised reads, goes up the
+       * moment the answer can speak, and every later preview keeps it, so
+       * Q's words stream in under it. Nothing in it is a model's.
+       */
+      const tableFirst =
+        compareTable?.kind === "TABLE"
+          ? {
+              layout: "TABLE" as const,
+              table: compareTable,
+              subjects: compareTable.columns.flatMap((column) =>
+                column.subject === null
+                  ? []
+                  : [{ subject: column.subject, name: column.label }],
+              ),
+            }
+          : null;
       const sendSaid = (text: string): void => {
-        const preview = announcer.sentence(text);
+        const named = announcer.sentence(text);
+        const preview =
+          tableFirst === null || named === null
+            ? named
+            : { ...named, layout: tableFirst.layout, table: tableFirst.table };
         send({
           runId: request.runId,
           tenantId: request.tenantId,
@@ -5957,6 +5989,33 @@ export function createModelGatewayQAnswer(
           sendSaid(`${said} `);
         }
       };
+      // The table, then code's verdict as its opening line (the model is
+      // told that line was said and continues after it).
+      /** I21: when the comparison's table went up, from the seam's start. */
+      let tableFirstMs: number | null = null;
+      if (tableFirst !== null) {
+        tableFirstMs = Date.now() - startedAt;
+        send({
+          runId: request.runId,
+          tenantId: request.tenantId,
+          messageId,
+          text: "",
+          preview: tableFirst,
+        });
+        if (earlyLead !== null && leadLines === undefined) {
+          leadLines = earlyLead;
+          leadListOpen = true;
+          sayLeadLines();
+        }
+        logger?.info(
+          {
+            qRunId: request.runId,
+            tableMs: tableFirstMs,
+            verdict: earlyLead !== null,
+          },
+          "q comparison table went up first",
+        );
+      }
       /**
        * Owner 2026-10-21 (time to the first word): a public-web search
        * takes seconds, so when nothing has been said yet, what Q is doing
@@ -7602,19 +7661,29 @@ export function createModelGatewayQAnswer(
       // Owner 2026-10-22: typed answers have their findings and cards
       // written beside them (parallel-extras.ts). Not spoken (three
       // findings at most, and the speculation gate), not a document.
+      // Coordinator 2026-10-25 (I21): a comparison code resolved has no
+      // second writer. Its table and verdict are the comparison; the
+      // extras' cards and findings restated it (849 tokens, and the settle
+      // waited 8.75 s for them), so the one writer leaves them out.
       const splitExtras =
         dependencies.parallelExtras === true &&
         request.spoken !== true &&
         request.writingDocument !== true &&
-        request.turnUnread !== true;
+        request.turnUnread !== true &&
+        compareTable === null;
       // Before the tools-first note, which stays last where there is one.
-      if (splitExtras) {
+      const whoWritesExtras = splitExtras
+        ? EXTRAS_ELSEWHERE_NOTE
+        : compareTable !== null
+          ? TABLE_IS_THE_COMPARISON
+          : null;
+      if (whoWritesExtras !== null) {
         messages =
           offered.length === 0
-            ? [...messages, EXTRAS_ELSEWHERE_NOTE]
+            ? [...messages, whoWritesExtras]
             : [
                 ...messages.slice(0, -1),
-                EXTRAS_ELSEWHERE_NOTE,
+                whoWritesExtras,
                 ...messages.slice(-1),
               ];
       }
@@ -9836,6 +9905,9 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             sharedReads: singleFlight.takeShared(request.runId),
             prepareMs: prepared.prepareMs,
             totalMs: Date.now() - startedAt,
+            // I21: time to the comparison's table beside time to settle
+            // (totalMs); null when none went up first.
+            tableMs: tableFirstMs,
             phases,
             // How much of the answer the person already had before the
             // turn finished. Zero means nobody was listening, or the

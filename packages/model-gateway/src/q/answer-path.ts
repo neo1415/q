@@ -52,6 +52,11 @@ export type AnswerPathInput = {
      * dossier was read for this turn, through the gateway's own authority.
      */
     readonly focusDossier?: boolean | undefined;
+    /**
+     * A comparison code resolved for this turn: each company's profile,
+     * figures and fit read, and the table and verdict built from them.
+     */
+    readonly comparison?: boolean | undefined;
   };
 };
 
@@ -71,6 +76,17 @@ export function answerPathOf(input: AnswerPathInput): AnswerPathChoice {
   }
   if (input.turnKind !== undefined && input.turnKind !== "QUESTION_TO_Q") {
     return { path: "DEEP_ANALYSIS", because: "NOT_A_QUESTION" };
+  }
+  /**
+   * Coordinator 2026-10-25 (I21, live 5a3490b6: "how do the top two stack
+   * up?" settled at 16.4 s): a comparison code had already read and built
+   * its table for still went the full path, and the model's tool round
+   * re-read both companies (2.6 s, 47k input) before it wrote a word. Its
+   * subject is the table, so it is answered over it, with no tool round.
+   * One that asks for the web keeps the full path.
+   */
+  if (input.prepared.comparison === true && input.researchMode !== "EXPLICIT") {
+    return { path: "PREPARED_CONTEXT", because: "COMPARISON" };
   }
   if (input.discover || input.fit || input.attention) {
     return {

@@ -326,6 +326,7 @@ export {
   TEAM_JOB_KINDS,
   earlierRequestGoal,
   teamJobBlocks,
+  ownWorkSummary,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,

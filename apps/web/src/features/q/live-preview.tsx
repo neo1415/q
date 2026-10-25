@@ -8,7 +8,9 @@ import type {
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { useT } from "@/features/i18n/language";
 
+import { TableBody } from "./blocks/data-blocks";
 import { cardPagePath, openCardPage } from "./client-actions";
+import { QResultCard } from "./q-result-blocks";
 
 /**
  * Artifacts live (owner 2026-10-20): the card for what Q is saying, up the
@@ -275,6 +277,7 @@ export function LivePreview({
   readonly settled?: boolean | undefined;
 }) {
   const { subjects } = preview;
+  const t = useT();
   const names =
     subjects.length === 0
       ? "Summary"
@@ -288,7 +291,13 @@ export function LivePreview({
       data-q-preview={preview.messageId}
       data-q-preview-layout={preview.layout ?? "CARD"}
     >
-      {preview.layout === "SUMMARY" ? (
+      {preview.table !== undefined ? (
+        // I21: a comparison's table code already built, the real one, in
+        // the place the answer's table lands; Q's words stream under it.
+        <QResultCard label={t("Side by side")} title={preview.table.title}>
+          <TableBody block={preview.table} />
+        </QResultCard>
+      ) : preview.layout === "SUMMARY" ? (
         <PreviewSummary subjects={subjects} />
       ) : preview.layout === "TABLE" && subjects.length >= 2 ? (
         <PreviewTable subjects={subjects} />

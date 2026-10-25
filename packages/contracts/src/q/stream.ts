@@ -14,7 +14,10 @@ import {
   QStreamEventIdSchema,
 } from "./ids.js";
 import { QResponseMessageSchema } from "./message.js";
-import { QClarificationRequestBlockSchema } from "./result-block.js";
+import {
+  QClarificationRequestBlockSchema,
+  QTableBlockSchema,
+} from "./result-block.js";
 import { QRunStatusSchema } from "./run.js";
 import { QStageAboutSchema, QVisibleStageSchema } from "./stage.js";
 import { QSubjectRefSchema } from "./subject.js";
@@ -224,6 +227,14 @@ export const QArtifactPreviewSchema = z
       .array(QArtifactPreviewSubjectSchema)
       .max(Q_ARTIFACT_PREVIEW_SUBJECTS_MAX),
     layout: QArtifactPreviewLayoutSchema.nullable(),
+    /**
+     * Coordinator 2026-10-25 (I21): a comparison's table, when code has
+     * already built it from the run's authorised reads (profile, figures,
+     * fit), so it is on screen in seconds while Q's words are still being
+     * written (additive). The same block the message carries; never a
+     * model's. The persisted message's blocks still win.
+     */
+    table: QTableBlockSchema.optional(),
   })
   .strict();
 export type QArtifactPreview = z.infer<typeof QArtifactPreviewSchema>;

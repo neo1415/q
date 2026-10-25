@@ -118,7 +118,8 @@ export type QLiveDelta = {
    * `q.artifact.preview` frame ahead of this delta's text (which may then
    * be empty). Never merged with another delta.
    */
-  readonly preview?: Pick<QArtifactPreview, "subjects" | "layout"> | undefined;
+  readonly preview?:
+    Pick<QArtifactPreview, "subjects" | "layout" | "table"> | undefined;
   /** A holding line said before the turn is read (QMessageDeltaEvent). */
   readonly holding?: true | undefined;
 };
@@ -350,6 +351,9 @@ export function createQRunStreamService(
           messageId: delta.messageId,
           subjects: delta.preview.subjects,
           layout: delta.preview.layout,
+          ...(delta.preview.table === undefined
+            ? {}
+            : { table: delta.preview.table }),
         },
       });
       if (parsed.success) events.push(parsed.data);

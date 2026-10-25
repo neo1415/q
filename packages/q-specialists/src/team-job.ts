@@ -358,7 +358,8 @@ export function teamJobBlocks(
 ): readonly QResultBlock[] | undefined {
   if (outcome.status !== "STARTED" || outcome.jobId === undefined)
     return undefined;
-  const title = outcome.plan.summary.trim().replace(/[.\s]+$/u, "");
+  const own = ownWorkSummary(outcome.plan.summary);
+  const title = `${own.charAt(0).toUpperCase()}${own.slice(1)}`;
   return [
     {
       kind: "WORK_IN_PROGRESS",
@@ -373,8 +374,21 @@ export function teamJobBlocks(
  * the plan's own words, that the result comes back here, and its first
  * read meanwhile. No card, no internal names: one Q.
  */
+/**
+ * QA F-123 (2026-10-25, run d5bcb2eb): a summary written "You will research
+ * Silo Credit's market…" became "Starting now: you will research…", the
+ * person named as the one doing Q's work. The line is Q's: a leading
+ * "you will", "you'll", "I will", "I'll" or "we will" is not part of it.
+ */
+export function ownWorkSummary(summary: string): string {
+  return summary
+    .trim()
+    .replace(/^(?:you|i|we)(?:\s+will|['’]ll)\s+/iu, "")
+    .replace(/[.\s]+$/u, "");
+}
+
 function startedLine(plan: TeamJobPlan, firstRead: string | null): string {
-  const doing = plan.summary.trim().replace(/[.\s]+$/u, "");
+  const doing = ownWorkSummary(plan.summary);
   const lead =
     doing.length === 0
       ? "On it, starting now."

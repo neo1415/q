@@ -136,6 +136,41 @@ describe("the card comes up with the sentence that names it", () => {
     expect(columns).toEqual([MEDTRAIL, BARIDI]);
   });
 
+  // Coordinator 2026-10-25 (I21): a comparison code already built is the
+  // real table, up first, while Q's words are still streaming.
+  it("shows a comparison's code-built table itself, figures and all, before the answer lands", () => {
+    const { container } = render(
+      <LivePreview
+        preview={{
+          ...preview(
+            "TABLE",
+            [MEDTRAIL, "MedTrail"],
+            [BARIDI, "Baridi Health"],
+          ),
+          table: {
+            kind: "TABLE",
+            title: "MedTrail and Baridi Health side by side",
+            columns: [
+              {
+                label: "MedTrail",
+                subject: { kind: "COMPANY", companyId: MEDTRAIL },
+              },
+              {
+                label: "Baridi Health",
+                subject: { kind: "COMPANY", companyId: BARIDI },
+              },
+            ],
+            rows: [{ label: "Traction", cells: ["$42,000 MRR", "$9,000 MRR"] }],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("$42,000 MRR")).toBeTruthy();
+    expect(screen.getByText("$9,000 MRR")).toBeTruthy();
+    // The real table, not the frame's empty columns.
+    expect(container.querySelector("[data-q-preview-column]")).toBeNull();
+  });
+
   it("goes when the answer settles: the answer's own blocks decide", () => {
     const turns = [
       person("p1", "Top three?"),

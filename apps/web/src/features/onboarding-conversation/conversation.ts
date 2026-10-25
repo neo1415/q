@@ -889,3 +889,17 @@ export function documentReading(
 export function nothingNewLine(filename: string): string {
   return `I've read ${filename}. It adds nothing new beyond what's already recorded.`;
 }
+
+/**
+ * The thread after a reload, in the order things were said: what was said
+ * before the absence, then the welcome back said now, then what they sent
+ * and Q never confirmed (live 25 Oct e2e: the welcome back sat above the
+ * whole restored thread).
+ */
+export function resumedThread<T>(
+  history: readonly T[],
+  welcome: readonly T[],
+  unsent: readonly T[],
+): T[] {
+  return [...history, ...welcome, ...unsent];
+}
