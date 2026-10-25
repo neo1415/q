@@ -10,7 +10,9 @@ import {
 } from "@capital-q/founder-onboarding";
 import {
   INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_HARD_EXCLUSION_STEPS,
   INVESTOR_INTERVIEW_CUES,
+  INVESTOR_SOFT_EXCLUSION_STEPS,
 } from "@capital-q/investor-onboarding";
 import type { OnboardingStepManifest } from "@capital-q/onboarding";
 import { type ModelGateway } from "@capital-q/model-gateway";
@@ -1005,6 +1007,46 @@ export function toResponseValue(
       return null;
   }
 }
+
+const HARD_EXCLUSION_STEPS: ReadonlySet<string> = new Set([
+  ...INVESTOR_HARD_EXCLUSION_STEPS,
+  ...Object.entries({ ...FOUNDER_INTERVIEW_CUES, ...INVESTOR_INTERVIEW_CUES })
+    .filter(([, cue]) => cue.kind === "EXCLUSION")
+    .map(([hardKey]) => hardKey),
+]);
+const SOFT_EXCLUSION_STEPS: ReadonlySet<string> = new Set([
+  ...INVESTOR_SOFT_EXCLUSION_STEPS,
+  ...Object.values({
+    ...FOUNDER_INTERVIEW_CUES,
+    ...INVESTOR_INTERVIEW_CUES,
+  }).flatMap((cue) => (cue.kind === "EXCLUSION" ? [cue.softStepKey] : [])),
+]);
+
+/**
+ * Whether a write to an exclusion step goes beyond what the reading of
+ * their words found (owner 2026-10-25; live e2e: "we never invest in
+ * gambling or tobacco" read as a firm exclusion, written as "rather not
+ * see"). The boundary is the reading's, by meaning; nothing here reads a
+ * word. A firm exclusion is written only where the reading found one
+ * declared (now, or kept from an earlier turn); a preference is not
+ * written where the reading found only a firm exclusion. Either way Q asks
+ * one short question rather than choosing: hard is never picked silently.
+ */
+export function exclusionMeaningUnsettled(
+  stepKey: string,
+  stated: ReadonlySet<string> | null,
+  statedEarlier: (stepKey: string) => boolean = () => false,
+): boolean {
+  const firm = (key: string) => stated?.has(key) === true || statedEarlier(key);
+  const statedHard = [...HARD_EXCLUSION_STEPS].some(firm);
+  const statedSoft = [...SOFT_EXCLUSION_STEPS].some(firm);
+  if (HARD_EXCLUSION_STEPS.has(stepKey)) return !statedHard;
+  if (SOFT_EXCLUSION_STEPS.has(stepKey)) return statedHard && !statedSoft;
+  return false;
+}
+
+export const EXCLUSION_MEANING_REASON =
+  "Nothing was saved here: their words could mean a firm exclusion (never invest, hidden from discovery) or a preference (rather not see, ranked lower), and this is not the one their words were read as. Ask them one short question which they mean, then record it in that step.";
 
 /**
  * The journeys' exclusion lists, each paired with its sibling (G, the

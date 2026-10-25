@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { EXCLUSION_MEANING_REASON } from "../src/voice/interview-steps.js";
 import { createOnboardingPort } from "../src/voice/onboarding-port.js";
 
 import { reading } from "./authority-fixtures.js";
@@ -43,6 +44,12 @@ type Case = {
    * answer (how they invest) sets up the profile, given in the same breath.
    */
   readonly newInvestor?: true;
+  /**
+   * A firm exclusion (owner 2026-10-25): saved only where the reading
+   * found one declared. With no reading of it, Q asks one short question
+   * instead, and nothing is saved: that is this case's right outcome.
+   */
+  readonly firmExclusion?: true;
 };
 
 const F = "founder" as const;
@@ -203,6 +210,7 @@ export const ALWAYS_SAVE_CASES: readonly Case[] = [
     quote: AG_INVESTOR.slice(0, 300),
     holds: "gambling or tobacco",
     notHolds: "Lisbon",
+    firmExclusion: true,
   },
   // Logged misses (live 2026-10-16).
   {
@@ -671,6 +679,18 @@ async function persisted(c: Case): Promise<{
   const tries = world.attempts().filter((key) => key === c.stepKey).length;
   if (process.env["CQ_EVAL_TRACE"] === "1" && !saved) {
     console.log(c.id, JSON.stringify(results), text);
+  }
+  // Unread, a firm exclusion is asked about, never saved silently.
+  if (c.firmExclusion === true && process.env["CQ_EVAL_READER"] !== "1") {
+    const asked = results.some(
+      (r) =>
+        r !== null &&
+        "stepKey" in r &&
+        r.stepKey === c.stepKey &&
+        r.outcome === "REJECTED" &&
+        r.reason === EXCLUSION_MEANING_REASON,
+    );
+    return { saved: asked && held === undefined, duplicated: false };
   }
   return { saved, duplicated: c.offPath !== true && tries > 1 };
 }

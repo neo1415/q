@@ -209,7 +209,10 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       progress: {
         currentStepKey,
         currentPhaseKey: null,
-        eligibleSteps: STEPS.map((step) => ({
+        // Off their path: not listed, as the service lists only eligible steps.
+        eligibleSteps: STEPS.filter(
+          (step) => options.ineligible?.includes(step.stepKey) !== true,
+        ).map((step) => ({
           stepKey: step.stepKey,
           required: step.required,
           status: held.has(step.stepKey)
