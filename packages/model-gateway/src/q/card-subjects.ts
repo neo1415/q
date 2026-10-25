@@ -289,6 +289,17 @@ export type ReadCompanyFacts = {
   readonly country: string | null;
   readonly founded: string | null;
   readonly website: string | null;
+  /**
+   * F-126: the team as the company's page shows it, when it could be read
+   * for this person; absent when it could not (never an invented team).
+   */
+  readonly team?:
+    | readonly {
+        readonly name: string;
+        readonly title: string | null;
+        readonly isFounder: boolean;
+      }[]
+    | undefined;
 };
 
 /**
@@ -372,6 +383,15 @@ export function createRunCompanies(limit = 200) {
           country: profile.data.headquartersCountry,
           founded: profile.data.foundedDate,
           website: profile.data.websiteUrl,
+          ...(profile.data.team === undefined
+            ? {}
+            : {
+                team: profile.data.team.map((member) => ({
+                  name: member.name,
+                  title: member.businessTitle,
+                  isFounder: member.isFounder,
+                })),
+              }),
         });
         if (!known.companyNames.has(profile.data.companyId)) {
           known.companyNames.set(

@@ -11,6 +11,7 @@ import {
 
 import {
   containsCompanyName,
+  type ReadCompanyFacts,
   type ReadCompanyFigure,
   type RunRead,
 } from "./card-subjects.js";
@@ -126,9 +127,28 @@ function asOfWords(asOf: string | null): string | null {
  * figures (read_company_figures), each "company-stated" with its date,
  * never verified; then the fit's traction reading. Unknown stays empty.
  */
+/**
+ * F-126 (QA on 5630e086f: Traction and Team read "Your mandate sets no
+ * preference" for both companies): a fact row says the company's own
+ * facts, or that it has stated none. How the mandate weighs them belongs
+ * to the fit rows.
+ */
+export const NOT_STATED = "Not stated";
+
+function teamCell(team: ReadCompanyFacts["team"]): string {
+  if (team === undefined || team.length === 0) return NOT_STATED;
+  const named = team.slice(0, 3).map((member) => {
+    const role = [member.isFounder ? "founder" : null, member.title]
+      .filter((part): part is string => part !== null && part.trim() !== "")
+      .join(", ");
+    return role.length === 0 ? member.name : `${member.name} (${role})`;
+  });
+  const more = team.length > 3 ? `, and ${String(team.length - 3)} more` : "";
+  return `${named.join("; ")}${more} (company-stated)`;
+}
+
 function tractionCell(
   figures: readonly ReadCompanyFigure[] | undefined,
-  fitRow: string,
 ): string {
   const stated = (figures ?? [])
     .filter((figure) => Number.isFinite(tractionRank(figure)))
@@ -142,7 +162,7 @@ function tractionCell(
         .slice(0, 140);
       return `${said} (company-stated${when === null ? "" : `, ${when}`})`;
     });
-  return [...stated, ...(fitRow.length === 0 ? [] : [fitRow])].join("; ");
+  return stated.length === 0 ? NOT_STATED : stated.join("; ");
 }
 
 function measures(profile: FitProfileDto | null): {
@@ -271,13 +291,10 @@ export function comparisonTableBlock(input: {
     {
       label: "Traction",
       cells: columns.map((id) =>
-        tractionCell(
-          input.read.companyFigures.get(id),
-          row(profile(id), "TRACTION"),
-        ),
+        tractionCell(input.read.companyFigures.get(id)),
       ),
     },
-    { label: "Team", cells: columns.map((id) => row(profile(id), "TEAM")) },
+    { label: "Team", cells: columns.map((id) => teamCell(facts(id)?.team)) },
     {
       label: "Round terms",
       cells: columns.map((id) => row(profile(id), "ROUND_TERMS")),
@@ -482,7 +499,8 @@ export function comparisonSpokenLine(block: QResultBlock): string | null {
   const parts = block.columns.flatMap((column, index) => {
     const does = plainCell(what[index]).replace(/\.$/u, "");
     const place = plainCell(where[index]);
-    const moved = (traction[index] ?? "").trim();
+    const cell = (traction[index] ?? "").trim();
+    const moved = cell === NOT_STATED ? "" : cell;
     const bits = [
       does.length === 0 ? null : does.charAt(0).toLowerCase() + does.slice(1),
       place.length === 0 ? null : `based in ${place}`,
