@@ -354,8 +354,10 @@ export function useOnboardingJourney<
         // a silent success would leave a proposal looking accepted.
         return false;
       }
-      await run(() => resolve(input), true);
-      return true;
+      // Refused (already settled, the session moved on): false, so no
+      // screen says it was kept (live 25 Oct e2e: "All kept" beside "That
+      // didn't go through").
+      return run(() => resolve(input), true);
     },
     answerQuestion: async (input) => {
       const answer = requireClient().answerQuestion;

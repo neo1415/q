@@ -11,6 +11,8 @@ import {
   gapValue,
   hasFindingsFrom,
   composerHint,
+  keptAllLine,
+  stillWaiting,
   pendingQuestion,
   redrawnThread,
   progressLines,
@@ -694,5 +696,35 @@ describe("the composer's hint follows Q's question (live 24 Oct)", () => {
     expect(composerHint({ ...description, placeholder: "" }, null)).toBe(
       "Type your answer",
     );
+  });
+});
+
+describe("Keep all (live 25 Oct e2e)", () => {
+  it("says all kept only when every one went through", () => {
+    expect(keptAllLine([true, true, true])).toBe("All kept. Thank you.");
+    expect(keptAllLine([true, false, true])).toBe(
+      "Kept 2; one didn't go through. It's still waiting below.",
+    );
+    expect(keptAllLine([true, false, false])).toBe(
+      "Kept 1; 2 didn't go through. They're still waiting below.",
+    );
+  });
+
+  it("says nothing when nothing was kept: the failure is already on screen", () => {
+    expect(keptAllLine([false, false])).toBeNull();
+    expect(keptAllLine([])).toBeNull();
+  });
+
+  it("keeps only offers still waiting, never one already retired", () => {
+    const view = {
+      pendingSuggestions: [
+        { id: "s-1", status: "PENDING" },
+        { id: "s-2", status: "EXPIRED" },
+      ],
+    } as never;
+    expect(stillWaiting(view, "s-1")).toBe(true);
+    expect(stillWaiting(view, "s-2")).toBe(false);
+    expect(stillWaiting(view, "s-3")).toBe(false);
+    expect(stillWaiting(undefined, "s-1")).toBe(false);
   });
 });

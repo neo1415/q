@@ -839,3 +839,31 @@ export function hasFindingsFrom(
     ),
   );
 }
+
+/** Whether an offer is still waiting for the person in this session view. */
+export function stillWaiting(
+  view: Pick<OnboardingSessionView, "pendingSuggestions"> | undefined,
+  suggestionId: string,
+): boolean {
+  return (
+    view?.pendingSuggestions.some(
+      (suggestion) =>
+        suggestion.id === suggestionId && suggestion.status === "PENDING",
+    ) ?? false
+  );
+}
+
+/**
+ * What Q says after "Keep all": all kept only when every one went through
+ * (live 25 Oct e2e: "All kept. Thank you." beside "That didn't go
+ * through"). Nothing kept, nothing said: the failure is already on screen.
+ */
+export function keptAllLine(outcomes: readonly boolean[]): string | null {
+  const kept = outcomes.filter(Boolean).length;
+  const failed = outcomes.length - kept;
+  if (kept === 0) return null;
+  if (failed === 0) return "All kept. Thank you.";
+  return failed === 1
+    ? `Kept ${String(kept)}; one didn't go through. It's still waiting below.`
+    : `Kept ${String(kept)}; ${String(failed)} didn't go through. They're still waiting below.`;
+}
