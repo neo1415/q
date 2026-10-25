@@ -25,6 +25,33 @@ something changes, and read the top N when someone asks (CLAUDE.md
 "Recommendations": precomputed, versioned, reproducible; no ranking work in the
 critical path).
 
+## Inputs: feature snapshots for every eligible company
+
+Found on 2026-10-25 (production, read-only counts): savanna-seed has `CURRENT`
+feature snapshots (`recommendation.feature_snapshots`, all on its active
+mandate, v23) for only **89 of the 463** listed companies.
+
+The cause: snapshots are written by the slate builder, for the candidates of the
+one window it builds from (`candidates/window.ts`). The fit service reads stage,
+sector, geography and the other snapshot-backed parameters from them. So today
+even a working network rank sees about 374 companies with no feature inputs.
+Their snapshot parameters read as `UNKNOWN`, and they score low or "not enough
+information". This is not because they fit poorly; it is unknown, never
+negative evidence. The rank is only as wide as snapshot coverage.
+
+So the projection's build must first make sure every eligible company has a
+current snapshot for the mandate version, not only the slate window's
+candidates:
+
+- compute missing or stale snapshots in batches (the same generator the slate
+  uses, with the same feature schema and eligibility policy);
+- then score.
+
+This is the build's dominant cost, so it belongs in the worker, never in a
+question. Until it lands, Q's answer should not claim coverage it does not
+have. Open question 5 below asks whether to also say how many companies could
+be scored.
+
 ## What is stored
 
 Two tables in the `recommendation` schema, migration
@@ -187,3 +214,7 @@ and parallel extra is an ask.
    triggers a rebuild, and until it lands, Q uses the lean live rank.
 4. Should the projection also serve Discover's "best fit" sort, so Discover and
    Q truly share one order, while the slate keeps its rotation for the feed?
+5. Snapshot coverage: build snapshots for every eligible company per mandate
+   version (worker cost, about 463 per investor per mandate change), and until
+   then, should Q's "best fit" say how many of the companies could be scored
+   (e.g. "89 of 463 have enough on record to score")?

@@ -115,20 +115,34 @@ describe("spoken questions to the Q&A bank", () => {
     }
   });
 
+  // One wall-clock sample per question failed on a busy runner (a GC pause
+  // or a descheduled thread lands on one match). Each question is timed on
+  // fresh indexes in every round, so the misheard-word cache never makes a
+  // repeat cheaper. Its fastest round is its cost: a real slowdown raises
+  // every round, noise only some. The bounds are the original ones.
   it("matches in well under 20 ms", () => {
-    investor.match("warm up");
-    founder.match("warm up");
-    let slowest = 0;
-    let total = 0;
+    const ROUNDS = 7;
     const all = [...HELD_OUT, ...BLIND];
-    for (const [question, id] of all) {
-      const started = performance.now();
-      indexFor(id).match(question);
-      const took = performance.now() - started;
-      slowest = Math.max(slowest, took);
-      total += took;
+    const fastest = all.map(() => Number.POSITIVE_INFINITY);
+    for (let round = 0; round < ROUNDS; round += 1) {
+      const fresh = {
+        INVESTOR: buildQaIndex("INVESTOR"),
+        FOUNDER: buildQaIndex("FOUNDER"),
+      };
+      fresh.INVESTOR.match("warm up");
+      fresh.FOUNDER.match("warm up");
+      all.forEach(([question, id], index) => {
+        const index_ =
+          sideOf(id) === "FOUNDER" ? fresh.FOUNDER : fresh.INVESTOR;
+        const started = performance.now();
+        index_.match(question);
+        const took = performance.now() - started;
+        fastest[index] = Math.min(fastest[index] ?? took, took);
+      });
     }
+    const slowest = Math.max(...fastest);
+    const mean = fastest.reduce((sum, t) => sum + t, 0) / fastest.length;
     expect(slowest).toBeLessThan(20);
-    expect(total / all.length).toBeLessThan(2);
+    expect(mean).toBeLessThan(2);
   });
 });

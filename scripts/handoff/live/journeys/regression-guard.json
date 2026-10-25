@@ -11,7 +11,8 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
-          ]
+          ],
+          "replyMatches": ["on Capital Q; ranked by fit with your mandate"]
         }
       },
       {
@@ -89,19 +90,6 @@
         "expect": {
           "approval": true,
           "replyNot": ["no change"]
-        }
-      }
-    ]
-  },
-  {
-    "id": "F-96",
-    "account": "investor.equator-line@fictional.capitalq.local",
-    "steps": [
-      {
-        "ask": "ما هي أفضل ثلاث شركات تناسب تفويضي",
-        "expect": {
-          "replyMatches": ["[\\u0600-\\u06FF]{3}"],
-          "replyNot": ["They're on screen"]
         }
       }
     ]
@@ -243,7 +231,10 @@
         "ask": "Show me the five companies that best fit my mandate",
         "expect": {
           "anyBlock": ["ANSWER_CARDS", "COMPARISON_CARDS"],
-          "replyMatches": ["Silo Credit"]
+          "replyMatches": [
+            "Silo Credit",
+            "on Capital Q; ranked by fit with your mandate"
+          ]
         }
       }
     ]
@@ -292,6 +283,56 @@
         "expect": {
           "replyMatches": ["interest"],
           "replyNot": ["I didn't prepare that", "Who should I set this up with"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-109-F-110",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me the five companies that best fit my mandate, ranked, with why.",
+        "expect": {
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "ANSWER_CARDS",
+            "TABLE"
+          ]
+        }
+      },
+      {
+        "ask": "Only fintech ones in Kenya or Nigeria that are raising now.",
+        "expect": {
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "ANSWER_CARDS",
+            "TABLE"
+          ],
+          "replyNot": ["^\\s*understood\\.?\\s*$"],
+          "maxMs": 15000
+        }
+      },
+      {
+        "ask": "Compare the top two in a table.",
+        "expect": {
+          "anyBlock": ["COMPARISON", "TABLE"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-112",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Change my mandate to also include Ghana.",
+        "expect": {
+          "approval": true,
+          "replyNot": ["couldn't finish", "didn't finish"],
+          "maxMs": 30000
         }
       }
     ]

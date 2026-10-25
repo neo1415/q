@@ -179,7 +179,9 @@ export type ItemSubject = {
 const KIND_WORDS: Readonly<
   Partial<Record<QTurnObjectBlock["kind"], readonly string[]>>
 > = {
-  ANSWER_CARDS: ["cards", "card", "list", "shortlist", "these companies"],
+  // QA F10/F-105 (25 Oct): not "card" alone -- "show me my Q Card" kept
+  // the investor cards up over its own approval card.
+  ANSWER_CARDS: ["cards", "list", "shortlist", "these companies"],
   COMPARISON: ["comparison", "side by side", "compare"],
   COMPARISON_CARDS: ["comparison", "side by side", "compare"],
   TABLE: ["table", "grid", "side by side", "columns", "rows"],
@@ -322,6 +324,14 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
 const POINTS_BACK =
   /\b(?:them|those|these|this one|that one|both|each of|all (?:three|four|five)|the (?:two|three|four|five)|the (?:first|second|third|fourth|fifth|last)|number (?:one|two|three|four|five|\d))\b/u;
 
+/**
+ * The person's words, folded, without "Q Card": their own card is never
+ * the cards on the stage (QA F10, 25 Oct 2026).
+ */
+function askedWords(question: string): string {
+  return ` ${folded(question)} `.replace(/ q cards? /gu, " ");
+}
+
 /** True when this answer (or the question it answers) is about the object. */
 export function refersTo(
   subject: ItemSubject,
@@ -338,7 +348,7 @@ export function refersTo(
   if (subject.answeredOnce) return false;
   if (!onStage) {
     if (question === undefined) return false;
-    const asked = ` ${folded(question)} `;
+    const asked = askedWords(question);
     return (
       subject.names.some((name) => asked.includes(` ${name} `)) ||
       subject.kindWords.some((word) => asked.includes(` ${word} `))
@@ -355,7 +365,7 @@ export function refersTo(
     if (one !== null && subject.ids.has(one)) return true;
   }
   const said = ` ${folded(answer.text)} `;
-  const asked = question === undefined ? " " : ` ${folded(question)} `;
+  const asked = question === undefined ? " " : askedWords(question);
   for (const name of subject.names) {
     if (said.includes(` ${name} `) || asked.includes(` ${name} `)) return true;
   }

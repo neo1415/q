@@ -163,6 +163,15 @@ describe("an artifact stays while it is the subject (FAIL-1)", () => {
 });
 
 describe("QA F-105: a stale card leaves for unrelated answers", () => {
+  it("'show me my Q Card' is not about the cards on the stage (F10)", () => {
+    const turns = [
+      ...TOP3,
+      person("p2", "Show me my Q Card and the share link."),
+      answer("a2", "You don't have a Q Card yet."),
+    ];
+    expect(onStageNow(turns)).toBeNull();
+  });
+
   it("an answer that brings its own approval takes the stage (founder Q page)", () => {
     // FAILED BEFORE: "accept Norrland Grid's interest" named a card on the
     // set, so the set stayed "In focus" and the approval sat below it.
