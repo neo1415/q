@@ -194,6 +194,14 @@ export const DiscoverRequestSchema = z
     previous: z.boolean().default(false),
     /** v58: companies raising now ("raising a seed round"). */
     raising: z.boolean().default(false),
+    /**
+     * v66 (QA F-114): Discover's own narrowing choices, only when they
+     * stated them ("only verified ones", "with a pitch video", "that
+     * share their raise"). Never inferred; absent is false.
+     */
+    verifiedOnly: z.boolean().default(false),
+    hasPitch: z.boolean().default(false),
+    raiseShared: z.boolean().default(false),
   })
   .strict();
 export type DiscoverRequest = z.infer<typeof DiscoverRequestSchema>;

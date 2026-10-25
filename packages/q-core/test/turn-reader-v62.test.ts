@@ -22,7 +22,7 @@ import {
 describe("TURN_READER v62", () => {
   it("v61 kept whole plus two rules after TEAM JOB (v63 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(65);
+    expect(active.definition.version).toBe(66);
     expect(TURN_READER_V61.status).toBe("DEPRECATED");
     const added = `${V62_DEEP_WORK}${V62_WORK_FROM_EARLIER}`;
     expect(TURN_READER_V62.template).toContain(`${V49_TEAM_JOB}${added}`);

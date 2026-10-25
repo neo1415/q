@@ -20,7 +20,7 @@ describe("TURN_READER v46", () => {
   it("was the active reader; v45 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(65);
+    ).toBe(66);
     expect(TURN_READER_V45.status).toBe("DEPRECATED");
   });
 
@@ -55,6 +55,9 @@ describe("TURN_READER v46", () => {
       mandateRelevant: false,
       previous: false,
       raising: false,
+      verifiedOnly: false,
+      hasPitch: false,
+      raiseShared: false,
     });
     const plain = TurnReaderV46ResultSchema.parse({
       kind: "QUESTION_TO_Q",
