@@ -224,7 +224,6 @@
     ]
   },
   {
-<<<<<<< HEAD
     "id": "F-82-savanna-top-five",
     "account": "investor.savanna-seed@fictional.capitalq.local",
     "steps": [
@@ -256,7 +255,36 @@
             "Anchor's profile"
           ]
         }
-=======
+      }
+    ]
+  },
+  {
+    "id": "F-92-savanna-ledgerfold-call",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Book a call with Ledgerfold next Tuesday at 3pm",
+        "expect": {
+          "approval": true,
+          "replyNot": ["about Call with"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-92-savanna-mizan-call",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Schedule a call with Mizan's founders next week",
+        "expect": {
+          "replyMatches": ["interest"],
+          "replyNot": ["I didn't prepare that", "Who should I set this up with"]
+        }
+      }
+    ]
+  },
+  {
     "id": "F-109-F-110",
     "account": "investor.savanna-seed@fictional.capitalq.local",
     "steps": [
@@ -289,21 +317,10 @@
         "expect": {
           "anyBlock": ["COMPARISON", "TABLE"]
         }
->>>>>>> origin/qa/guard-cases
       }
     ]
   },
   {
-<<<<<<< HEAD
-    "id": "F-92-savanna-ledgerfold-call",
-    "account": "investor.savanna-seed@fictional.capitalq.local",
-    "steps": [
-      {
-        "ask": "Book a call with Ledgerfold next Tuesday at 3pm",
-        "expect": {
-          "approval": true,
-          "replyNot": ["about Call with"]
-=======
     "id": "F-112",
     "account": "investor.equator-line@fictional.capitalq.local",
     "steps": [
@@ -313,31 +330,6 @@
           "approval": true,
           "replyNot": ["couldn't finish", "didn't finish"],
           "maxMs": 30000
->>>>>>> origin/qa/guard-cases
-        }
-      }
-    ]
-  },
-  {
-<<<<<<< HEAD
-    "id": "F-92-savanna-mizan-call",
-    "account": "investor.savanna-seed@fictional.capitalq.local",
-    "steps": [
-      {
-        "ask": "Schedule a call with Mizan's founders next week",
-        "expect": {
-          "replyMatches": ["interest"],
-          "replyNot": ["I didn't prepare that", "Who should I set this up with"]
-=======
-    "id": "F-113",
-    "account": "investor.equator-line@fictional.capitalq.local",
-    "steps": [
-      {
-        "ask": "ما هي أفضل ثلاث شركات تناسب تفويضي الاستثماري؟",
-        "expect": {
-          "replyMatches": ["[\\u0600-\\u06FF]{3}"],
-          "replyNot": ["\\b(Right|Pipeline|Mandate|Want me to)\\b"]
->>>>>>> origin/qa/guard-cases
         }
       }
     ]
