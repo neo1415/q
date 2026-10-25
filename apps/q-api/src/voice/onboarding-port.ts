@@ -7,6 +7,7 @@ import {
   getOnboardingSession,
   getTaxonomyNode,
   resolveOnboardingSuggestion,
+  listInvestorMandates,
   submitOnboardingResponse,
   submitOnboardingResponses,
   withdrawOnboardingResponse,
@@ -318,6 +319,20 @@ function normalisedText(text: string): string {
 }
 
 /**
+ * The one mandate the journey may choose for the investor, as the mandate
+ * step's own context does: their only open mandate, or their only draft.
+ * Never "the first one"; anything else is their choice. Null: theirs.
+ */
+export function preselectedMandate(
+  mandates: readonly { readonly id: string; readonly status: string }[],
+): string | null {
+  const open = mandates.filter((m) => m.status !== "CLOSED");
+  if (open.length === 1) return open[0]?.id ?? null;
+  const drafts = open.filter((m) => m.status === "DRAFT");
+  return drafts.length === 1 ? (drafts[0]?.id ?? null) : null;
+}
+
+/**
  * A step that points at a platform record (the mandate being defined), not
  * a vocabulary: the journey's to settle, never a question for the person
  * (live 2026-10-16; QA 25 Oct: asked again on return after "Looks right").
@@ -539,6 +554,64 @@ export function createOnboardingPort(input: {
   });
 
   /**
+   * The mandate being defined, recorded whenever its step is open, not only
+   * while the session's cursor is on it (QA 25 Oct: the conversation moved
+   * the cursor past it, the step stayed open, and a session whose mandate
+   * was already live could never complete: in production no investor
+   * session has completed without it). The same rule the step's own
+   * context applies (`preselectedMandate`); anything less certain is left
+   * for the person's choice. Once per port: a list that names no single
+   * mandate is not read again this turn.
+   */
+  let mandateLooked = false;
+  const settleMandate = async (
+    view: OnboardingSessionView,
+  ): Promise<OnboardingSessionView> => {
+    if (mandateLooked || input.journeyType !== "investor") return view;
+    const subject = view.session.subject;
+    const open = view.progress.eligibleSteps.find(
+      (e) => e.stepKey === INVESTOR_STEPS.mandateContext,
+    );
+    if (
+      subject === null ||
+      subject.type !== "INVESTOR_ORGANISATION" ||
+      open === undefined ||
+      open.status === "COMPLETED" ||
+      open.status === "SKIPPED" ||
+      view.responses.some((r) => r.stepKey === INVESTOR_STEPS.mandateContext)
+    ) {
+      return view;
+    }
+    mandateLooked = true;
+    try {
+      const page = await listInvestorMandates(input.session, subject.id, {
+        limit: 50,
+      });
+      const mandateId = preselectedMandate(page.items);
+      if (mandateId === null) return view;
+      return await submitOnboardingResponse(
+        input.session,
+        input.onboardingSessionId,
+        {
+          stepKey: INVESTOR_STEPS.mandateContext,
+          response: {
+            value: {
+              type: "RESOURCE_REFERENCE",
+              resourceType: "INVESTOR_MANDATE",
+              resourceIds: [mandateId],
+            },
+            channel: "CONVERSATION",
+          },
+          expectedSessionVersion: view.session.version,
+        },
+        randomUUID(),
+      );
+    } catch {
+      return view;
+    }
+  };
+
+  /**
    * The journey's own preselection, recorded (ADR 0016).
    *
    * A reference step whose view names `suggestedMandateId` has one draft
@@ -550,10 +623,12 @@ export function createOnboardingPort(input: {
     view: OnboardingSessionView,
   ): Promise<OnboardingSessionView> => {
     const step = view.currentStep;
-    if (step === null || step === undefined) return view;
-    if (step.presentation.stepType !== "reference_select") return view;
+    if (step === null || step === undefined) return settleMandate(view);
+    if (step.presentation.stepType !== "reference_select") {
+      return settleMandate(view);
+    }
     const resourceType = step.presentation.resourceType;
-    if (resourceType === "TAXONOMY_NODE") return view;
+    if (resourceType === "TAXONOMY_NODE") return settleMandate(view);
     const suggested = step.context?.["suggestedMandateId"];
     if (typeof suggested !== "string" || suggested.length === 0) return view;
     try {
