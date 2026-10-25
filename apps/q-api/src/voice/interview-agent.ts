@@ -2135,7 +2135,7 @@ export function createInterviewAgent(
           const question = flow.next.question.trim();
           const asked = InterviewAgentV16ResultSchema.safeParse({
             reply: `${leadSaid} ${question.endsWith("?") ? question : `${question}?`}`,
-            asking: flow.next.stepKey,
+            asking: flow.next.evidence ? null : flow.next.stepKey,
           });
           return asked.success ? asked.data : null;
         }
@@ -2153,6 +2153,8 @@ export function createInterviewAgent(
               ? { aside: RESEARCH_NOTHING_LINE }
               : {}),
         };
+        // An evidence ask has no hand-written translation: the model's.
+        if (language !== null && flow.next.evidence) return null;
         const reply =
           language === null
             ? quickAcknowledgement(acknowledgement)
@@ -2164,7 +2166,7 @@ export function createInterviewAgent(
         if (reply === null) return null;
         const parsed = InterviewAgentV16ResultSchema.safeParse({
           reply: withLead(reply),
-          asking: flow.next.stepKey,
+          asking: flow.next.evidence ? null : flow.next.stepKey,
         });
         return parsed.success ? parsed.data : null;
       };
@@ -2957,7 +2959,9 @@ export function createInterviewAgent(
         // The question code added is the one asked: its options go with it
         // (owner 2026-10-21: Q asked the stage and no choices showed).
         const added =
-          nextFlow.next === null ? undefined : steps.get(nextFlow.next.stepKey);
+          nextFlow.next === null || nextFlow.next.evidence
+            ? undefined
+            : steps.get(nextFlow.next.stepKey);
         if (added !== undefined && !covered.has(added.stepKey)) {
           askedOpen = toOpenStep(added, view);
           stillOpen = view.progress.eligibleSteps.some(

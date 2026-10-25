@@ -1,6 +1,10 @@
 import type { OnboardingState } from "@capital-q/q-tools";
 
-import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import {
+  EVIDENCE_QUESTION_FALLBACK,
+  EVIDENCE_QUESTIONS,
+  SPOKEN_QUESTIONS,
+} from "./step-copy.js";
 
 /**
  * A proactive onboarding interview (owner requirement 2026-10-16).
@@ -22,6 +26,11 @@ export type FlowNext = {
   readonly question: string;
   readonly optional: boolean;
   readonly confirming: boolean;
+  /**
+   * Saved already; the ask is for a document that supports it (QA F-132).
+   * Not the step's own question, so its controls do not go with it.
+   */
+  readonly evidence: boolean;
 };
 
 export type OnboardingFlow = {
@@ -111,12 +120,13 @@ export function onboardingFlowFor(input: {
       ? null
       : {
           stepKey: top.stepKey,
-          question: (SPOKEN_QUESTIONS[top.stepKey] ?? topStep.question).slice(
-            0,
-            300,
-          ),
+          question: (top.reason === "EVIDENCE_NEEDED"
+            ? (EVIDENCE_QUESTIONS[top.stepKey] ?? EVIDENCE_QUESTION_FALLBACK)
+            : (SPOKEN_QUESTIONS[top.stepKey] ?? topStep.question)
+          ).slice(0, 300),
           optional: !topStep.required && topStep.priority !== "ESSENTIAL",
           confirming: top.reason === "CONFIRM_PROPOSAL",
+          evidence: top.reason === "EVIDENCE_NEEDED",
         };
 
   const minutes = Math.max(1, state.minutesLeft ?? 10);
@@ -169,6 +179,9 @@ export function onboardingFlowFor(input: {
   return { note: lines.join(" "), next, essentialsDone, optionalLeft };
 }
 
+/** The offer to skip an optional question, as code says it. */
+const OPTIONAL_TAIL = "We can come back to this if you'd rather skip it.";
+
 /** Whether a reply already puts a question to the person. */
 export function asksSomething(reply: string): boolean {
   return /\?/.test(reply) || /؟/.test(reply);
@@ -189,7 +202,7 @@ export function withNextQuestion(
     const ask = flow.next.question.endsWith("?")
       ? flow.next.question
       : `${flow.next.question}?`;
-    return `${trimmed} ${ask}${flow.next.optional ? " We can come back to this if you'd rather skip it." : ""}`.trim();
+    return `${trimmed} ${ask}${flow.next.optional ? ` ${OPTIONAL_TAIL}` : ""}`.trim();
   }
   if (flow.essentialsDone) {
     return `${trimmed} Would you like to finish now, or keep going with the optional details?`.trim();
@@ -223,13 +236,23 @@ export function withoutAnsweredQuestions(
   // dropped when nothing does (live 2026-10-16, after accepted findings).
   const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
   const kept: string[] = [];
+  let dropped = false;
   for (const sentence of sentences) {
+    // The skip offer belongs to the question it follows: with that
+    // question gone, it goes too (QA F-132: "…(sector). We can come back
+    // to this if you'd rather skip it." with nothing asked).
+    if (dropped && sentence.trim() === OPTIONAL_TAIL) {
+      dropped = false;
+      continue;
+    }
+    dropped = false;
     const lower = normalWords(sentence);
     const hit = cores.find((core) => lower.includes(core));
     if (hit === undefined || !sentence.includes("?")) {
       kept.push(sentence);
       continue;
     }
+    dropped = true;
     const cut = sentence.search(/\s*(?:[—–;:]|,\s*and\b|\band\b,?\s*first\b)/u);
     const before = cut > 0 ? sentence.slice(0, cut).trim() : "";
     if (
