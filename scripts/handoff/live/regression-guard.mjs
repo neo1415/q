@@ -32,7 +32,6 @@ const FAILURE_LANGUAGE = [
   "revision failed",
   "something went wrong",
   "internal error",
-  "try again later",
 ];
 const ANSWERED = new Set(["COMPLETED", "AWAITING_INPUT", "AWAITING_APPROVAL"]);
 
