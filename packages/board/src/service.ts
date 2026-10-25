@@ -43,6 +43,25 @@ export type BoardOutcome<T> =
   | { readonly outcome: "OK"; readonly value: T; readonly replayed: boolean }
   | { readonly outcome: "REFUSED"; readonly code: BoardRefusal };
 
+/**
+ * QA F-117 (25 Oct 2026): the board listed a job that had FAILED under
+ * "Doing". What an item's Q job needs from the person, by the job's own
+ * status: a stopped or held job is never "Doing". Null: nothing.
+ */
+export function jobAttention(status: string | undefined): string | null {
+  switch (status) {
+    case "FAILED":
+      return "Q couldn't finish this. Ask Q to try again.";
+    case "HELD":
+      return "Q is waiting for you on the Work page.";
+    case "STOPPED":
+      return "This work was stopped.";
+    case undefined:
+    default:
+      return null;
+  }
+}
+
 /** A Q job's status, as the workforce reads it for the person. */
 export type BoardJobStatusPort = (
   actor: ActorContext,
@@ -332,13 +351,19 @@ export function createBoardService(dependencies: {
     });
   };
 
-  /** Items whose Q job finished move to DONE: code reading job status, never a model. */
-  const finishDoneJobs = async (actor: ActorContext): Promise<void> => {
-    if (dependencies.jobStatus === undefined) return;
+  /**
+   * Items whose Q job finished move to DONE, and (F-117) items in DOING
+   * whose job stopped or waits for them go back to TO DO: code reading job
+   * status, never a model. The statuses read, for the list's attention.
+   */
+  const syncJobs = async (
+    actor: ActorContext,
+  ): Promise<ReadonlyMap<string, string>> => {
+    if (dependencies.jobStatus === undefined) return new Map();
     const linked = (await currentItems(dependencies.sql, actor)).filter(
       (item) => item.work_job_id !== null && item.status !== "DONE",
     );
-    if (linked.length === 0) return;
+    if (linked.length === 0) return new Map();
     const statuses = await dependencies
       .jobStatus(
         actor,
@@ -351,9 +376,28 @@ export function createBoardService(dependencies: {
       (item) =>
         item.work_job_id !== null && statuses.get(item.work_job_id) === "DONE",
     );
-    if (done.length === 0) return;
+    const stopped = linked.filter(
+      (item) =>
+        item.status === "DOING" &&
+        item.work_job_id !== null &&
+        jobAttention(statuses.get(item.work_job_id)) !== null,
+    );
+    if (done.length === 0 && stopped.length === 0) return statuses;
     await transactions.run(async ({ sql }) => {
       await lockBoard(sql, actor);
+      for (const item of stopped) {
+        const current = await ownItem(sql, actor, item.id);
+        if (current?.archived_at !== null || current.status !== "DOING") {
+          continue;
+        }
+        await moveWithin(
+          sql,
+          actor,
+          current,
+          { status: "TODO", index: 0 },
+          { action: "MOVED", by: "Q" },
+        );
+      }
       for (const item of done) {
         const current = await ownItem(sql, actor, item.id);
         if (current?.archived_at !== null || current.status === "DONE") {
@@ -371,14 +415,22 @@ export function createBoardService(dependencies: {
         );
       }
     });
+    return statuses;
   };
 
   return {
     list: async (actor) => {
-      await finishDoneJobs(actor);
+      const statuses = await syncJobs(actor);
       const items = await currentItems(dependencies.sql, actor);
       return {
-        items: items.map(toItem),
+        items: items.map((row) => {
+          const attention =
+            row.work_job_id === null || row.status === "DONE"
+              ? null
+              : jobAttention(statuses.get(row.work_job_id));
+          const item = toItem(row);
+          return attention === null ? item : { ...item, attention };
+        }),
         columns: [...BOARD_COLUMNS],
         visibility: "personal_private",
       };

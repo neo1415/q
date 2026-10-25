@@ -7,6 +7,7 @@
  */
 export {
   createBoardService,
+  jobAttention,
   type BoardChangedBy,
   type BoardJobStatusPort,
   type BoardOutcome,

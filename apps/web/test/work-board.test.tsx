@@ -310,3 +310,23 @@ describe("WorkBoard", () => {
     }
   });
 });
+
+describe("F-117: a job's column follows its real state", () => {
+  it("a failed job says plainly that it needs you, never that Q is working", () => {
+    render(
+      <WorkBoard
+        initial={[
+          {
+            ...item(4, "Write the growth plan"),
+            workJobId: "c0000000-0000-4000-8000-000000000001",
+            attention: "Q couldn't finish this. Ask Q to try again.",
+          },
+        ]}
+      />,
+    );
+    expect(document.querySelector("[data-board-attention]")?.textContent).toBe(
+      "Needs you: Q couldn't finish this. Ask Q to try again.",
+    );
+    expect(screen.queryByText(/Q is working on it/u)).toBeNull();
+  });
+});

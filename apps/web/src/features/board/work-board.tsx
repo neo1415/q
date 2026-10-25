@@ -478,11 +478,22 @@ export function WorkBoard({
                         {item.dueOn === null
                           ? ""
                           : ` · ${t("due")} ${item.dueOn}`}
-                        {item.workJobId === null
+                        {item.workJobId === null ||
+                        (item.attention ?? null) !== null
                           ? ""
                           : ` · ${item.status === "DONE" ? t("Q finished this") : t("Q is working on it")}`}
                         {item.createdBy === "Q" ? ` · ${t("added by Q")}` : ""}
                       </span>
+                      {/* QA F-117: Q's job stopped or waits for them. */}
+                      {item.attention === undefined ||
+                      item.attention === null ? null : (
+                        <span
+                          className="cq-body-sm text-(--cq-text-primary)"
+                          data-board-attention
+                        >
+                          {`${t("Needs you")}: ${t(item.attention)}`}
+                        </span>
+                      )}
                       {item.notes === null ? null : (
                         <span className="cq-body-sm text-(--cq-text-secondary)">
                           {item.notes}

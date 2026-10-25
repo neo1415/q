@@ -73,6 +73,12 @@ export const BoardItemSchema = z
     dueOn: LocalDateSchema.nullable(),
     /** Q's job working on this item, when Q was asked to. */
     workJobId: UuidSchema.nullable(),
+    /**
+     * QA F-117: Q's job on this item stopped or waits for them, in plain
+     * words. Read from the job when the board is read; absent or null:
+     * nothing needs them.
+     */
+    attention: z.string().min(1).max(200).nullable().optional(),
     /** PERSON: they added it. Q: Q added it for them, as asked. */
     createdBy: z.enum(["PERSON", "Q"]),
     revision: z.number().int().min(1),
