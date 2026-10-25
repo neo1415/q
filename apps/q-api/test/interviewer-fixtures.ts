@@ -95,6 +95,13 @@ export type WorldOptions = {
    * service does (409 STEP_NOT_ELIGIBLE), as revenue for a pre-seed company.
    */
   readonly ineligible?: readonly string[] | undefined;
+  /** The session's subject (the investor organisation it is bound to). */
+  readonly subject?:
+    | {
+        readonly type: "INVESTOR_ORGANISATION" | "COMPANY";
+        readonly id: string;
+      }
+    | undefined;
   /**
    * Steps that open on their path only once another is answered (the raise
    * amount after "are you raising?"): refused as STEP_NOT_ELIGIBLE until
@@ -197,7 +204,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         definitionVersionId: "22222222-2222-4222-8222-222222222222",
         definitionVersion: 1,
         status: completed ? "COMPLETED" : "ACTIVE",
-        subject: null,
+        subject: options.subject ?? null,
         currentStepKey,
         version,
         startedAt: NOW,

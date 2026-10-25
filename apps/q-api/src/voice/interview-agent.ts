@@ -108,6 +108,7 @@ import {
   onboardingFlowFor,
   withNextQuestion,
   withoutUnbackedFieldClaims,
+  withoutUnbackedReadingClaims,
   withoutRepeatedReceipt,
   withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
@@ -150,6 +151,22 @@ const RecordedResultsSchema = z
     data: z.object({ results: z.array(OnboardingRecordResultSchema) }),
   })
   .transform((body) => ({ results: body.data.results }));
+/** An accept's results, as code records them or as the tool returned them. */
+const AcceptResultsSchema = z.union([
+  z.object({ results: z.array(z.object({ outcome: z.string() })) }),
+  z.object({
+    ok: z.literal(true),
+    data: z.object({ results: z.array(z.object({ outcome: z.string() })) }),
+  }),
+]);
+/** Whether an accept wrote anything to the record. */
+function acceptedIn(result: unknown): boolean {
+  const parsed = AcceptResultsSchema.safeParse(result);
+  if (!parsed.success) return false;
+  const results =
+    "results" in parsed.data ? parsed.data.results : parsed.data.data.results;
+  return results.some((r) => r.outcome === "COMMITTED");
+}
 const MAX_CALLS = 8;
 
 /**
@@ -2118,7 +2135,7 @@ export function createInterviewAgent(
           const question = flow.next.question.trim();
           const asked = InterviewAgentV16ResultSchema.safeParse({
             reply: `${leadSaid} ${question.endsWith("?") ? question : `${question}?`}`,
-            asking: flow.next.stepKey,
+            asking: flow.next.evidence ? null : flow.next.stepKey,
           });
           return asked.success ? asked.data : null;
         }
@@ -2136,6 +2153,8 @@ export function createInterviewAgent(
               ? { aside: RESEARCH_NOTHING_LINE }
               : {}),
         };
+        // An evidence ask has no hand-written translation: the model's.
+        if (language !== null && flow.next.evidence) return null;
         const reply =
           language === null
             ? quickAcknowledgement(acknowledgement)
@@ -2147,7 +2166,7 @@ export function createInterviewAgent(
         if (reply === null) return null;
         const parsed = InterviewAgentV16ResultSchema.safeParse({
           reply: withLead(reply),
-          asking: flow.next.stepKey,
+          asking: flow.next.evidence ? null : flow.next.stepKey,
         });
         return parsed.success ? parsed.data : null;
       };
@@ -2752,7 +2771,27 @@ export function createInterviewAgent(
         "interview reply named an unsaved field as saved; removed",
       );
     }
-    let reply = notVerbatim(fieldBackedReply, lastQTurn ?? null, {
+    // Never "the deck points are confirmed" while its readings still wait
+    // (QA F-134): the claim is read from what this turn accepted.
+    const readingBackedReply = writtenByCode
+      ? fieldBackedReply
+      : withoutUnbackedReadingClaims(fieldBackedReply, {
+          acceptedThisTurn: actions.some(
+            (action) =>
+              action.tool === "accept_recommendation" &&
+              acceptedIn(action.result),
+          ),
+          stillWaiting: (
+            await port.pendingRecommendations().catch(() => [])
+          ).filter((item) => item.fromDocument).length,
+        });
+    if (readingBackedReply !== fieldBackedReply) {
+      logger.info(
+        {},
+        "interview reply said the readings were confirmed while they wait; removed",
+      );
+    }
+    let reply = notVerbatim(readingBackedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         // An English rewording only where the reply is English or will be
@@ -2920,7 +2959,9 @@ export function createInterviewAgent(
         // The question code added is the one asked: its options go with it
         // (owner 2026-10-21: Q asked the stage and no choices showed).
         const added =
-          nextFlow.next === null ? undefined : steps.get(nextFlow.next.stepKey);
+          nextFlow.next === null || nextFlow.next.evidence
+            ? undefined
+            : steps.get(nextFlow.next.stepKey);
         if (added !== undefined && !covered.has(added.stepKey)) {
           askedOpen = toOpenStep(added, view);
           stillOpen = view.progress.eligibleSteps.some(

@@ -20,6 +20,9 @@ import {
   keptAllLine,
   stillWaiting,
   pendingQuestion,
+  confirmChipLabel,
+  keepListedThenConfirm,
+  notKeptLine,
   questionShown,
   questionAfterTap,
   reviewShown,
@@ -414,6 +417,30 @@ describe("pendingQuestion: a reload redraws, it does not re-open", () => {
   it("an unreadable time is never taken as 'nothing moved'", () => {
     expect(pendingQuestion([asked], "not a time")).toBeNull();
   });
+
+  it("a kept acknowledgement of a tap is not a question on the table (QA F-129)", () => {
+    const tapped = [
+      asked,
+      {
+        role: "PERSON" as const,
+        text: "Seed",
+        createdAt: "2026-09-24T22:03:10.000Z",
+      },
+      {
+        role: "Q" as const,
+        text: "Stage: Seed. Noted.",
+        createdAt: "2026-09-24T22:03:11.000Z",
+      },
+    ];
+    expect(pendingQuestion(tapped, "2026-09-24T22:03:09.000Z")).toBeNull();
+    // What Q says to stop is still the line on the table (pause honoured).
+    expect(
+      pendingQuestion(
+        [{ ...asked, text: "Understood, we'll stop here." }],
+        "2026-09-24T22:02:59.000Z",
+      ),
+    ).toBe("Understood, we'll stop here.");
+  });
 });
 
 describe("questionOnReturn: a line said before an absence is history (live 25 Oct e2e)", () => {
@@ -497,6 +524,77 @@ describe("a confirmation shows what it confirms (QA F-130, 25 Oct)", () => {
     expect(reviewShown(false, { control: "chips" })).toBe(false);
     expect(reviewShown(true, { control: "chips" })).toBe(true);
     expect(reviewShown(false, null)).toBe(false);
+  });
+});
+
+describe('"That\'s right" keeps exactly the readings on screen (QA F-130, decision A)', () => {
+  const listed = [
+    { id: "r1", label: "Paying customers" },
+    { id: "r2", label: "Instrument" },
+  ];
+
+  it("says what it keeps, and how many", () => {
+    expect(confirmChipLabel("That's right", 0)).toBe("That's right");
+    expect(confirmChipLabel("That's right", 1)).toBe(
+      "That's right, keep this one",
+    );
+    expect(confirmChipLabel("That's right", 5)).toBe(
+      "That's right, keep all 5",
+    );
+  });
+
+  it("keeps the rendered set, never a reading that arrived after, then confirms", async () => {
+    const kept: string[] = [];
+    let confirmed = 0;
+    // r3 landed after the confirmation was shown: waiting, but not listed.
+    const waiting = new Set(["r1", "r2", "r3"]);
+    const outcome = await keepListedThenConfirm({
+      listed,
+      stillWaiting: (id) => waiting.has(id),
+      keep: (id) => {
+        kept.push(id);
+        return Promise.resolve(true);
+      },
+      confirm: () => {
+        confirmed += 1;
+        return Promise.resolve();
+      },
+    });
+    expect(kept).toEqual(["r1", "r2"]);
+    expect(confirmed).toBe(1);
+    expect(outcome).toEqual({ confirmed: true, failed: [] });
+  });
+
+  it("one settled elsewhere is not kept twice", async () => {
+    const kept: string[] = [];
+    await keepListedThenConfirm({
+      listed,
+      stillWaiting: (id) => id !== "r1",
+      keep: (id) => {
+        kept.push(id);
+        return Promise.resolve(true);
+      },
+      confirm: () => Promise.resolve(),
+    });
+    expect(kept).toEqual(["r2"]);
+  });
+
+  it("a partial failure leaves the summary unconfirmed and names what didn't keep", async () => {
+    let confirmed = 0;
+    const outcome = await keepListedThenConfirm({
+      listed,
+      stillWaiting: () => true,
+      keep: (id) => Promise.resolve(id === "r1"),
+      confirm: () => {
+        confirmed += 1;
+        return Promise.resolve();
+      },
+    });
+    expect(confirmed).toBe(0);
+    expect(outcome).toEqual({ confirmed: false, failed: ["Instrument"] });
+    expect(notKeptLine(outcome.failed)).toBe(
+      "Instrument didn't go through, so I haven't confirmed the summary yet. It's still waiting below.",
+    );
   });
 });
 

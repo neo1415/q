@@ -26,7 +26,10 @@ import {
   toOpenStep,
   type InterviewTurnOutcome,
 } from "./interview-steps.js";
-import type { FoundRecommendation } from "./onboarding-port.js";
+import {
+  isPlatformReference,
+  type FoundRecommendation,
+} from "./onboarding-port.js";
 import type { PresenceFound, PresenceTrigger } from "./presence-trigger.js";
 import { languageInfo } from "@capital-q/q-core/language";
 
@@ -125,14 +128,20 @@ export function nextUnansweredStep(
     answersKnownFromJourney(journeyType).map((k) => k.stepKey),
   );
   const answered = new Set(view.responses.map((r) => r.stepKey));
-  const open = view.progress.eligibleSteps.filter(
-    (e) =>
+  const open = view.progress.eligibleSteps.filter((e) => {
+    const step = steps.get(e.stepKey);
+    return (
       e.status !== "COMPLETED" &&
       e.status !== "SKIPPED" &&
       !answered.has(e.stepKey) &&
       !known.has(e.stepKey) &&
-      steps.has(e.stepKey),
-  );
+      step !== undefined &&
+      // The mandate being defined is the journey's to settle, never asked
+      // (QA 25 Oct: "your main investment strategy, or a different one?"
+      // on return, after the mandate was confirmed).
+      !isPlatformReference(step)
+    );
+  });
   // Required before optional, otherwise the journey's own order.
   const chosen =
     among === undefined

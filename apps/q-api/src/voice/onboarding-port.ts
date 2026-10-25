@@ -7,6 +7,7 @@ import {
   getOnboardingSession,
   getTaxonomyNode,
   resolveOnboardingSuggestion,
+  listInvestorMandates,
   submitOnboardingResponse,
   submitOnboardingResponses,
   withdrawOnboardingResponse,
@@ -295,6 +296,8 @@ export type BoundOnboardingPort = OnboardingToolPort &
         readonly stepKey: string;
         readonly value: string;
         readonly rationale: string | null;
+        /** Read from their own uploaded document (a deck read-back). */
+        readonly fromDocument: boolean;
       }[]
     >;
     /**
@@ -313,6 +316,32 @@ function normalisedText(text: string): string {
     .replace(/[‘’“”"']/gu, "")
     .replace(/\s+/gu, " ")
     .trim();
+}
+
+/**
+ * The one mandate the journey may choose for the investor, as the mandate
+ * step's own context does: their only open mandate, or their only draft.
+ * Never "the first one"; anything else is their choice. Null: theirs.
+ */
+export function preselectedMandate(
+  mandates: readonly { readonly id: string; readonly status: string }[],
+): string | null {
+  const open = mandates.filter((m) => m.status !== "CLOSED");
+  if (open.length === 1) return open[0]?.id ?? null;
+  const drafts = open.filter((m) => m.status === "DRAFT");
+  return drafts.length === 1 ? (drafts[0]?.id ?? null) : null;
+}
+
+/**
+ * A step that points at a platform record (the mandate being defined), not
+ * a vocabulary: the journey's to settle, never a question for the person
+ * (live 2026-10-16; QA 25 Oct: asked again on return after "Looks right").
+ */
+export function isPlatformReference(step: OnboardingStepManifest): boolean {
+  return (
+    step.configuration.stepType === "reference_select" &&
+    step.configuration.resourceType !== "TAXONOMY_NODE"
+  );
 }
 
 /**
@@ -498,6 +527,21 @@ export function createOnboardingPort(input: {
       list.filter((r) => input.unheardSteps?.has(r.stepKey) !== true),
     )
     .catch(() => []);
+  /**
+   * A reading from their own document that Q's last turn read back to
+   * them word for word (QA F-134, 25 Oct): their plain yes to it is their
+   * approval of exactly what they heard, as for Q's summary of their
+   * words. A reading Q did not say back is not theirs to approve.
+   */
+  const readBackHeard = async (
+    step: OnboardingStepManifest,
+    held: {
+      readonly value: OnboardingResponseValue;
+      readonly fromDocument?: boolean | undefined;
+    },
+  ): Promise<boolean> =>
+    held.fromDocument === true &&
+    heardBack(await spoken(step, held.value, await current()), input.lastQTurn);
   /** The person's own words carry this write, or it does not happen. */
   const said = (quote: string): boolean =>
     input.personTurns.some(
@@ -508,6 +552,64 @@ export function createOnboardingPort(input: {
     outcome: "REJECTED",
     reason: UNSAID_REASON,
   });
+
+  /**
+   * The mandate being defined, recorded whenever its step is open, not only
+   * while the session's cursor is on it (QA 25 Oct: the conversation moved
+   * the cursor past it, the step stayed open, and a session whose mandate
+   * was already live could never complete: in production no investor
+   * session has completed without it). The same rule the step's own
+   * context applies (`preselectedMandate`); anything less certain is left
+   * for the person's choice. Once per port: a list that names no single
+   * mandate is not read again this turn.
+   */
+  let mandateLooked = false;
+  const settleMandate = async (
+    view: OnboardingSessionView,
+  ): Promise<OnboardingSessionView> => {
+    if (mandateLooked || input.journeyType !== "investor") return view;
+    const subject = view.session.subject;
+    const open = view.progress.eligibleSteps.find(
+      (e) => e.stepKey === INVESTOR_STEPS.mandateContext,
+    );
+    if (
+      subject === null ||
+      subject.type !== "INVESTOR_ORGANISATION" ||
+      open === undefined ||
+      open.status === "COMPLETED" ||
+      open.status === "SKIPPED" ||
+      view.responses.some((r) => r.stepKey === INVESTOR_STEPS.mandateContext)
+    ) {
+      return view;
+    }
+    mandateLooked = true;
+    try {
+      const page = await listInvestorMandates(input.session, subject.id, {
+        limit: 50,
+      });
+      const mandateId = preselectedMandate(page.items);
+      if (mandateId === null) return view;
+      return await submitOnboardingResponse(
+        input.session,
+        input.onboardingSessionId,
+        {
+          stepKey: INVESTOR_STEPS.mandateContext,
+          response: {
+            value: {
+              type: "RESOURCE_REFERENCE",
+              resourceType: "INVESTOR_MANDATE",
+              resourceIds: [mandateId],
+            },
+            channel: "CONVERSATION",
+          },
+          expectedSessionVersion: view.session.version,
+        },
+        randomUUID(),
+      );
+    } catch {
+      return view;
+    }
+  };
 
   /**
    * The journey's own preselection, recorded (ADR 0016).
@@ -521,10 +623,12 @@ export function createOnboardingPort(input: {
     view: OnboardingSessionView,
   ): Promise<OnboardingSessionView> => {
     const step = view.currentStep;
-    if (step === null || step === undefined) return view;
-    if (step.presentation.stepType !== "reference_select") return view;
+    if (step === null || step === undefined) return settleMandate(view);
+    if (step.presentation.stepType !== "reference_select") {
+      return settleMandate(view);
+    }
     const resourceType = step.presentation.resourceType;
-    if (resourceType === "TAXONOMY_NODE") return view;
+    if (resourceType === "TAXONOMY_NODE") return settleMandate(view);
     const suggested = step.context?.["suggestedMandateId"];
     if (typeof suggested !== "string" || suggested.length === 0) return view;
     try {
@@ -881,11 +985,6 @@ export function createOnboardingPort(input: {
     );
     trusted = true;
   };
-
-  /** A step that points at a platform record (a mandate), not a vocabulary. */
-  const isPlatformReference = (step: OnboardingStepManifest): boolean =>
-    step.configuration.stepType === "reference_select" &&
-    step.configuration.resourceType !== "TAXONOMY_NODE";
 
   /** Where a refusal names a prerequisite by its field, the step that holds it. */
   const stepNamed = (suffix: string | null): string | undefined =>
@@ -2738,7 +2837,7 @@ export function createOnboardingPort(input: {
         // A plain yes (or "go ahead and save it") to the summary they just
         // heard is decided by code; anything else is the reader's.
         const affirmed =
-          paraphrase &&
+          (paraphrase || (await readBackHeard(step, held))) &&
           readBackReplyOf(input.personTurns[0] ?? "") === "AFFIRM";
         const authority = affirmed
           ? null
@@ -3333,16 +3432,19 @@ export function createOnboardingPort(input: {
       if (latest === undefined || readBackReplyOf(latest) !== "AFFIRM") {
         return new Set<string>();
       }
-      return new Set(
-        (await heard)
-          .filter(
-            (held) =>
-              isParaphraseRationale(held.rationale) &&
-              held.value.type === "TEXT" &&
-              heardBack(held.value.text, input.lastQTurn),
-          )
-          .map((held) => held.stepKey),
-      );
+      const affirmed = new Set<string>();
+      for (const held of await heard) {
+        const step = steps.get(held.stepKey);
+        if (
+          (isParaphraseRationale(held.rationale) &&
+            held.value.type === "TEXT" &&
+            heardBack(held.value.text, input.lastQTurn)) ||
+          (step !== undefined && (await readBackHeard(step, held)))
+        ) {
+          affirmed.add(held.stepKey);
+        }
+      }
+      return affirmed;
     },
     pendingRecommendations: async () => {
       const view = await current();
@@ -3351,6 +3453,7 @@ export function createOnboardingPort(input: {
         stepKey: string;
         value: string;
         rationale: string | null;
+        fromDocument: boolean;
       }[] = [];
       for (const item of list) {
         const step = steps.get(item.stepKey);
@@ -3359,6 +3462,7 @@ export function createOnboardingPort(input: {
           stepKey: item.stepKey,
           value: (await spoken(step, item.value, view)).slice(0, 600),
           rationale: item.rationale,
+          fromDocument: item.fromDocument === true,
         });
       }
       return out;

@@ -659,7 +659,9 @@ export function pendingQuestion(
     return null;
   }
   const text = last.text.trim();
-  return text.length === 0 ? null : text;
+  // "Stage: Seed. Noted.", kept after a tap (QA F-129), acknowledges an
+  // answer: nothing is asked, and Q opens afresh.
+  return text.length === 0 || isTapAcknowledgement(text) ? null : text;
 }
 
 /**
@@ -749,13 +751,21 @@ function joinNames(names: readonly string[]): string {
  */
 
 /** Q's short acknowledgement of a tapped option (§17-§18). */
+/** The receipt `acknowledgeValue` writes ends so; nothing Q asks does. */
+const TAP_ACKNOWLEDGEMENT_END = ". Noted.";
+
+/** Whether a line of Q's is the receipt code wrote for a tapped answer. */
+export function isTapAcknowledgement(text: string): boolean {
+  return text.trim().endsWith(TAP_ACKNOWLEDGEMENT_END);
+}
+
 export function acknowledgeValue(
   stepKey: string,
   value: OnboardingResponseValue,
   vocabulary: JourneyVocabulary,
   labels?: Readonly<Record<string, string>>,
 ): string {
-  return `${vocabulary.stepTitle(stepKey)}: ${trimSentenceEnd(vocabulary.describe(stepKey, value, labels))}. Noted.`;
+  return `${vocabulary.stepTitle(stepKey)}: ${trimSentenceEnd(vocabulary.describe(stepKey, value, labels))}${TAP_ACKNOWLEDGEMENT_END}`;
 }
 
 /** Q's own sentence on screen, and the step it was said about. */
@@ -948,6 +958,53 @@ export function keptAllLine(outcomes: readonly boolean[]): string | null {
   return failed === 1
     ? `Kept ${String(kept)}; one didn't go through. It's still waiting below.`
     : `Kept ${String(kept)}; ${String(failed)} didn't go through. They're still waiting below.`;
+}
+
+/** A reading on screen under "I picked up", by the id it was rendered with. */
+export type ListedReading = { readonly id: string; readonly label: string };
+
+/**
+ * The confirmation's own label while readings wait beside it (QA F-130,
+ * coordinator decision A): it says it keeps them, and how many, so one
+ * approval covers exactly what is on screen.
+ */
+export function confirmChipLabel(label: string, listed: number): string {
+  if (listed === 0) return label;
+  return listed === 1
+    ? `${label}, keep this one`
+    : `${label}, keep all ${String(listed)}`;
+}
+
+/**
+ * "That's right" with readings on screen (QA F-130: the review was
+ * confirmed and the deck's five read-back facts stayed PENDING). Keeps
+ * exactly the readings listed when the confirmation was shown, by the ids
+ * they were rendered with, never one that arrived after; one already
+ * settled elsewhere is not kept twice. Only when every listed reading kept
+ * is the summary confirmed: a failure leaves it unconfirmed, and says which.
+ */
+export async function keepListedThenConfirm(input: {
+  readonly listed: readonly ListedReading[];
+  readonly stillWaiting: (id: string) => boolean;
+  readonly keep: (id: string) => Promise<boolean>;
+  readonly confirm: () => Promise<void>;
+}): Promise<{
+  readonly confirmed: boolean;
+  readonly failed: readonly string[];
+}> {
+  const failed: string[] = [];
+  for (const reading of input.listed) {
+    if (!input.stillWaiting(reading.id)) continue;
+    if (!(await input.keep(reading.id))) failed.push(reading.label);
+  }
+  if (failed.length > 0) return { confirmed: false, failed };
+  await input.confirm();
+  return { confirmed: true, failed };
+}
+
+/** Q's line when some listed readings did not keep. */
+export function notKeptLine(failed: readonly string[]): string {
+  return `${failed.join(", ")} didn't go through, so I haven't confirmed the summary yet. ${failed.length === 1 ? "It's" : "They're"} still waiting below.`;
 }
 
 /**
