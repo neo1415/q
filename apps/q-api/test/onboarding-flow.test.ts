@@ -120,3 +120,48 @@ describe("QA F-48: Q greets by a given name, or none", () => {
     expect(firstNameOf("Ama Mensah")).toBe("Ama");
   });
 });
+
+describe("a saved answer that wants evidence is never asked again (QA F-132, 25 Oct)", () => {
+  const evidence = state(
+    [
+      step("F1.categories", { status: "ANSWERED", value: "Logistics" }),
+      step("F5.customers", {
+        question: "How many paying customers do you have?",
+        status: "ANSWERED",
+        value: "1,200",
+        priority: "IMPORTANT",
+        coverage: "EVIDENCE_NEEDED",
+      }),
+    ],
+    [{ stepKey: "F5.customers", reason: "EVIDENCE_NEEDED" }],
+  );
+  const flow = onboardingFlowFor({
+    journey: "founder",
+    opening: false,
+    state: evidence,
+    firstName: null,
+    knownName: null,
+  });
+
+  it("asks for the document, not the answer, and brings no controls with it", () => {
+    expect(flow.next?.question).toBe(
+      "Do you have something that shows your paying customers, such as a customer list or your accounts?",
+    );
+    expect(flow.next?.evidence).toBe(true);
+  });
+
+  it("the skip offer is said once, after the one question", () => {
+    const reply = withNextQuestion(
+      withoutAnsweredQuestions(
+        "Thanks, I've noted Logistics (sector). How many paying customers do you have? We can come back to this if you'd rather skip it.",
+        evidence,
+        { "F5.customers": "How many paying customers do you have?" },
+      ),
+      flow,
+      false,
+    );
+    expect(reply).toBe(
+      "Thanks, I've noted Logistics (sector). Do you have something that shows your paying customers, such as a customer list or your accounts? We can come back to this if you'd rather skip it.",
+    );
+  });
+});

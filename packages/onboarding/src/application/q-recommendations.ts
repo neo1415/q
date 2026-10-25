@@ -54,6 +54,8 @@ export type QRecommendation = {
    * the person said.
    */
   readonly sources: readonly OnboardingSourceRef[];
+  /** Read from their own uploaded document (a deck read-back), not Q's. */
+  readonly fromDocument?: boolean | undefined;
 };
 
 /**
@@ -263,6 +265,7 @@ export function createOnboardingQRecommendations(options: {
                 : null),
             payloadSha256: payloadSha256(s.suggestedValue),
             sources: publicOf(s.sourceRefs),
+            fromDocument: fromDocument(s.sourceRefs),
           }));
       }),
   };

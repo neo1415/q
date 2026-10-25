@@ -48,6 +48,7 @@ import { announceQGestures } from "../q-swarm/q-gestures";
 import {
   onboardingThreadAction,
   onboardingThreadKeepAction,
+  onboardingThreadKeepTapAction,
 } from "./thread-actions";
 import { upsertLine } from "../voice/session";
 import { useVoiceInterview } from "../voice/use-voice-interview";
@@ -92,6 +93,10 @@ import {
   taxonomyProposal,
   composerHint,
   keptAllLine,
+  confirmChipLabel,
+  keepListedThenConfirm,
+  notKeptLine,
+  type ListedReading,
   stillWaiting,
   questionOnReturn,
   redrawnThread,
@@ -436,6 +441,16 @@ export function QOnboardingWorkspace({
     setQQuestion(questionAfterTap());
     setQAskedStep(null);
     setQAsking(null);
+  }, []);
+  /**
+   * A tapped exchange, kept in the thread the server holds (QA F-129): a
+   * reload redraws it, as it does what they typed or said.
+   */
+  const keepTapped = useCallback((said: string, acknowledged: string) => {
+    const sessionId = viewRef.current?.session.id;
+    if (sessionId !== undefined) {
+      void onboardingThreadKeepTapAction(sessionId, said, acknowledged);
+    }
   }, []);
 
   /**
@@ -1187,7 +1202,9 @@ export function QOnboardingWorkspace({
         const ok = await actions.submitValue({ stepKey, value: tapped });
         if (ok) {
           answeredByTap();
-          push("Q", acknowledgeValue(stepKey, tapped, vocabulary));
+          const acknowledged = acknowledgeValue(stepKey, tapped, vocabulary);
+          push("Q", acknowledged);
+          keepTapped(spoken ?? chip.label, acknowledged);
         } else {
           // A refused or conflicted tap used to leave their choice looking
           // made (onboarding speed 2026-10-20).
@@ -1217,6 +1234,7 @@ export function QOnboardingWorkspace({
       voiceActive,
       voiceSendText,
       answeredByTap,
+      keepTapped,
     ],
   );
 
@@ -1246,7 +1264,9 @@ export function QOnboardingWorkspace({
       const ok = await actions.submitValue({ stepKey, value });
       if (ok) {
         answeredByTap();
-        push("Q", acknowledgeValue(stepKey, value, vocabulary));
+        const acknowledged = acknowledgeValue(stepKey, value, vocabulary);
+        push("Q", acknowledged);
+        keepTapped(chosen.map((chip) => chip.label).join(", "), acknowledged);
       } else {
         markUnsent(personLine, () => {
           setTurns((current) =>
@@ -1273,6 +1293,7 @@ export function QOnboardingWorkspace({
     voiceActive,
     voiceSendText,
     answeredByTap,
+    keepTapped,
   ]);
 
   const togglePick = (chip: QuickChip) => {
@@ -1340,7 +1361,9 @@ export function QOnboardingWorkspace({
     }
     if (ok) {
       answeredByTap();
-      push("Q", `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`);
+      const acknowledged = `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`;
+      push("Q", acknowledged);
+      keepTapped(spoken, acknowledged);
     }
     if (ok && voiceActive) {
       voiceSendText("Let's continue.");
@@ -1357,6 +1380,7 @@ export function QOnboardingWorkspace({
     voiceActive,
     voiceSendText,
     answeredByTap,
+    keepTapped,
   ]);
 
   const toggleTaxonomy = (node: {
@@ -1411,6 +1435,29 @@ export function QOnboardingWorkspace({
   const notThis = async (suggestionId: string) => {
     settleReading();
     await actions.resolveSuggestion({ suggestionId, resolution: "REJECT" });
+  };
+  /** The readings on screen under "I picked up", as rendered now. */
+  const listedReadings: readonly ListedReading[] =
+    prompt?.control === "confirm"
+      ? otherProposals.map((item) => ({
+          id: item.suggestion.id,
+          label: item.label,
+        }))
+      : [];
+  const confirmsWithReadings = (chip: QuickChip): boolean =>
+    chip.value?.type === "CONFIRMATION" && chip.value.confirmed;
+  const confirmWithReadings = async (
+    chip: QuickChip,
+    label: string,
+    listed: readonly ListedReading[],
+  ) => {
+    const outcome = await keepListedThenConfirm({
+      listed,
+      stillWaiting: (id) => stillWaiting(viewRef.current, id),
+      keep,
+      confirm: () => submitChip(chip, label),
+    });
+    if (!outcome.confirmed) push("Q", notKeptLine(outcome.failed));
   };
   const keepAll = async () => {
     const outcomes: boolean[] = [];
@@ -2080,17 +2127,27 @@ export function QOnboardingWorkspace({
         <div className="flex flex-col gap-3" data-q-quick-controls>
           {prompt.control === "chips" || prompt.control === "confirm" ? (
             <div className="flex flex-wrap items-center gap-2">
-              {visibleChips.map((chip) => (
-                <Button
-                  key={chip.label}
-                  size="compact"
-                  variant="secondary"
-                  disabled={working}
-                  onClick={() => void submitChip(chip)}
-                >
-                  {chip.label}
-                </Button>
-              ))}
+              {visibleChips.map((chip) => {
+                // A confirmation beside readings keeps exactly the ones on
+                // screen in this render (QA F-130, decision A).
+                const listed = confirmsWithReadings(chip) ? listedReadings : [];
+                const label = confirmChipLabel(chip.label, listed.length);
+                return (
+                  <Button
+                    key={chip.label}
+                    size="compact"
+                    variant="secondary"
+                    disabled={working}
+                    onClick={() =>
+                      void (listed.length > 0
+                        ? confirmWithReadings(chip, label, listed)
+                        : submitChip(chip))
+                    }
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
             </div>
           ) : null}
 

@@ -889,3 +889,41 @@ describe("a reopening asks the question still waiting (live NEM 2026-10-17)", ()
     expect(stepStillAsked(view, "founder", "Noted.")).toBeNull();
   });
 });
+
+describe("the mandate being defined is never asked (QA 25 Oct)", () => {
+  it("on return after the mandate was confirmed, the next question is a real one", () => {
+    const base = stuckView();
+    const view = {
+      ...base,
+      session: { ...base.session, journeyType: "investor" },
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          {
+            stepKey: "I0.organisation_name",
+            required: true,
+            status: "COMPLETED",
+          },
+          { stepKey: "I1.mandate_context", required: true, status: "PENDING" },
+          { stepKey: "I0.business_title", required: false, status: "PENDING" },
+          { stepKey: "I11.review", required: true, status: "COMPLETED" },
+        ],
+      },
+      responses: [
+        {
+          stepKey: "I0.organisation_name",
+          value: { type: "TEXT", text: "Harmattan Ventures" },
+        },
+        {
+          stepKey: "I11.review",
+          value: { type: "CONFIRMATION", confirmed: true },
+        },
+      ],
+    } as unknown as OnboardingSessionView;
+    const next = nextUnansweredStep(view, "investor");
+    expect(next?.stepKey).not.toBe("I1.mandate_context");
+    expect(resumeLine(view, "investor")).not.toMatch(
+      /main investment strategy/u,
+    );
+  });
+});

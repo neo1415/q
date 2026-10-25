@@ -82,3 +82,20 @@ export function stepNoun(stepKey: string, prompt: string): string {
   const trimmed = prompt.trim().replace(/[.?!:]+$/, "");
   return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
 }
+
+/**
+ * What Q asks for a saved answer that a document would support (QA F-132,
+ * 25 Oct): coverage marks it EVIDENCE_NEEDED, and Q asked the value's own
+ * question again ("How many paying customers do you have?" with 1,200 on
+ * the record). The ask is for the document, never the answer.
+ */
+export const EVIDENCE_QUESTIONS: Readonly<Record<string, string>> = {
+  "F5.customers":
+    "Do you have something that shows your paying customers, such as a customer list or your accounts?",
+  "F5.monthly_revenue":
+    "Do you have accounts or a financial model that show your monthly revenue?",
+};
+
+/** For any other answer a document would support. */
+export const EVIDENCE_QUESTION_FALLBACK =
+  "Do you have a document that backs that up, such as your accounts?";
