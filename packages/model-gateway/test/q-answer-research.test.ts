@@ -1924,8 +1924,10 @@ describe("whom the web and pictures are for is the reader's, never a guess from 
     earlierAsked?: string,
   ) {
     const asked: string[] = [];
+    // Pages matched to them: a picture could be shown, so one is asked
+    // for (spend rule 2026-10-25: never otherwise).
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
-      researchOutcome(p, "Zino Aviation flies charter."),
+      withMatch(researchOutcome(p, "Zino Aviation flies charter."), "MATCH"),
     );
     const { seam, request, answerBlocks, messages } = build({
       script: [
@@ -3105,7 +3107,7 @@ describe("the web lane lands within its budget or is dropped (owner 2026-10-23)"
 describe("pictures whatever the research mode (live 2026-10-23)", () => {
   // QA QO-09: a picture search by name alone is no evidence; with no public
   // page found about them this turn, none is shown.
-  it("looks for the named company's pictures on a turn read as their own records, and shows one only with evidence", async () => {
+  it("on a turn read as their own records, with no page matched to them, pays for no picture search and shows none", async () => {
     const asked: string[] = [];
     const port: QToolPort = {
       offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
@@ -3146,8 +3148,9 @@ describe("pictures whatever the research mode (live 2026-10-23)", () => {
     expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
       "ANSWERED",
     );
-    expect(asked).toEqual(["Zino Aviation"]);
-    // Records answered; no public search found a page about them.
+    // Records answered and no public search matched a page to them: no
+    // picture could be shown, so none is paid for (spend rule 2026-10-25).
+    expect(asked).toEqual([]);
     expect(
       answerBlocks.filter(
         (block) => (block as { kind?: string }).kind === "PICTURE",

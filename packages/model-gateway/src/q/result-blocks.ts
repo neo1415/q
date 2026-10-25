@@ -898,6 +898,8 @@ export type QPublicPicturePort = {
     /** What Q said to them: a name in it they pointed at may be searched. */
     readonly shownText?: readonly string[] | undefined;
     readonly signal?: AbortSignal | undefined;
+    /** The run asking: one image search a run (spend rule 2026-10-25). */
+    readonly runId?: string | undefined;
   }) => Promise<
     readonly {
       readonly imageUrl: string;

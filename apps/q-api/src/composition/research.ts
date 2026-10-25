@@ -58,6 +58,8 @@ import {
   createBrightDataResearchProvider,
 } from "@capital-q/q-research/providers/brightdata";
 import { withCircuitBreaker } from "@capital-q/q-research/providers/breaker";
+
+import { credentialBreaker, type ResearchCredential } from "./breakers.js";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
 import { createBraveResearchProvider } from "@capital-q/q-research/providers/brave";
@@ -299,72 +301,92 @@ export function composeResearch(
   // front, so the same search or page asked for twice is paid once.
   // Profiles: Bright Data's LinkedIn datasets need only the key.
   const brightData = dependencies.secrets.brightData;
+  // Production 2026-10-25: a refused or spent key (401/402/432) was asked
+  // ~12 times a turn. Each index rests behind its credential's breaker, for
+  // the process, shared by every consumer below and by the picture search
+  // on the same key; its opening is logged once.
+  const warn = (fields: Readonly<Record<string, unknown>>, message: string) =>
+    logger?.warn(fields, message);
+  const behind = (
+    credential: ResearchCredential,
+    index: PublicWebResearchProvider,
+  ): PublicWebResearchProvider =>
+    withCircuitBreaker(index, {
+      breaker: credentialBreaker(credential, warn),
+    });
   const indexes = [
     ...(brightData !== undefined &&
     brightData.serpZone !== undefined &&
     brightData.unlockerZone !== undefined
       ? [
-          createBrightDataResearchProvider({
-            apiKey: brightData.apiKey.reveal(),
-            serpZone: brightData.serpZone,
-            unlockerZone: brightData.unlockerZone,
-          }),
+          behind(
+            "brightdata",
+            createBrightDataResearchProvider({
+              apiKey: brightData.apiKey.reveal(),
+              serpZone: brightData.serpZone,
+              unlockerZone: brightData.unlockerZone,
+            }),
+          ),
         ]
       : []),
     ...(dependencies.secrets.tavily === undefined
       ? []
       : [
-          createTavilyResearchProvider({
-            apiKey: dependencies.secrets.tavily.reveal(),
-          }),
+          behind(
+            "tavily",
+            createTavilyResearchProvider({
+              apiKey: dependencies.secrets.tavily.reveal(),
+            }),
+          ),
         ]),
     // SERP_API_KEY has been configured with a Serper.dev key under a
     // SerpApi name: the detecting provider settles which vendor answers.
     ...(dependencies.secrets.serpApi === undefined
       ? []
       : [
-          createDetectingSerpProvider({
-            apiKey: dependencies.secrets.serpApi.reveal(),
-          }),
+          behind(
+            "serp",
+            createDetectingSerpProvider({
+              apiKey: dependencies.secrets.serpApi.reveal(),
+            }),
+          ),
         ]),
     ...(dependencies.secrets.serper === undefined
       ? []
       : [
-          createSerperResearchProvider({
-            apiKey: dependencies.secrets.serper.reveal(),
-          }),
+          behind(
+            "serper",
+            createSerperResearchProvider({
+              apiKey: dependencies.secrets.serper.reveal(),
+            }),
+          ),
         ]),
     // Brave keeps its own index (owner 2026-10-23): searched beside the
     // others, merged; it reads no pages, so a page read passes it by.
     ...(dependencies.secrets.brave === undefined
       ? []
       : [
-          createBraveResearchProvider({
-            apiKey: dependencies.secrets.brave.reveal(),
-          }),
+          behind(
+            "brave",
+            createBraveResearchProvider({
+              apiKey: dependencies.secrets.brave.reveal(),
+            }),
+          ),
         ]),
     ...(dependencies.secrets.scrapingBee === undefined
       ? []
       : [
-          createScrapingBeeResearchProvider({
-            apiKey: dependencies.secrets.scrapingBee.reveal(),
-          }),
+          behind(
+            "scrapingbee",
+            createScrapingBeeResearchProvider({
+              apiKey: dependencies.secrets.scrapingBee.reveal(),
+            }),
+          ),
         ]),
     // Last: our own vetted read of the pages a search surfaced, so a page
     // is read even when every paid reader is spent (live 2026-10-23).
-    createDirectPageReader(),
-  ].map((index) =>
-    // Production 2026-10-25: a refused or spent key (401/402/432) was asked
-    // ~12 times a turn. One breaker per provider for the process, shared by
-    // every consumer below; its opening is logged once.
-    withCircuitBreaker(index, {
-      onTrip: (trip) =>
-        logger?.warn(
-          trip,
-          "public research provider resting: its key was refused or its credit is spent",
-        ),
-    }),
-  );
+    behind("direct", createDirectPageReader()),
+  ];
   const provider =
     dependencies.provider ??
     // No index that searches (only the page reader): no research at all.

@@ -40,14 +40,22 @@ export type BreakerTrip = {
   readonly coolOffMs: number;
 };
 
-export function withCircuitBreaker(
-  provider: PublicWebResearchProvider,
+/**
+ * One breaker, for one credential: several providers on the same key (the
+ * SERP key's web and image searches; Brave's) share it, so a spent key
+ * rests everywhere it is used (coordinator 2026-10-25).
+ */
+export type CircuitBreaker = {
+  readonly guard: <T>(code: string, call: () => Promise<T>) => Promise<T>;
+};
+
+export function createCircuitBreaker(
   options: {
     readonly now?: (() => number) | undefined;
     /** Called once each time the breaker opens. */
     readonly onTrip?: ((trip: BreakerTrip) => void) | undefined;
   } = {},
-): PublicWebResearchProvider {
+): CircuitBreaker {
   const now = options.now ?? Date.now;
   let openUntil = 0;
   let opened: ResearchProviderFailure | null = null;
@@ -60,47 +68,62 @@ export function withCircuitBreaker(
         ? BREAKER_COOL_OFF_MS.RATE_LIMIT
         : null;
 
-  const guarded = async <T>(call: () => Promise<T>): Promise<T> => {
-    if (opened !== null && now() < openUntil) {
-      throw new ResearchProviderResting({
-        providerCode: provider.code,
-        failureClass: opened.failureClass,
-        status: opened.status,
-      });
-    }
-    try {
-      const result = await call();
-      opened = null;
-      return result;
-    } catch (error: unknown) {
-      if (isResearchProviderFailure(error)) {
-        const coolOffMs = coolOffFor(error);
-        if (coolOffMs !== null) {
-          // Calls in flight together fail together: logged once.
-          const already = opened !== null && now() < openUntil;
-          opened = error;
-          openUntil = now() + coolOffMs;
-          if (!already)
-            options.onTrip?.({
-              provider: provider.code,
-              status: error.status,
-              failureClass: error.failureClass,
-              coolOffMs,
-            });
-        }
+  return {
+    guard: async (code, call) => {
+      if (opened !== null && now() < openUntil) {
+        throw new ResearchProviderResting({
+          providerCode: code as ResearchProviderFailure["providerCode"],
+          failureClass: opened.failureClass,
+          status: opened.status,
+        });
       }
-      throw error;
-    }
+      try {
+        const result = await call();
+        opened = null;
+        return result;
+      } catch (error: unknown) {
+        if (isResearchProviderFailure(error)) {
+          const coolOffMs = coolOffFor(error);
+          if (coolOffMs !== null) {
+            // Calls in flight together fail together: logged once.
+            const already = opened !== null && now() < openUntil;
+            opened = error;
+            openUntil = now() + coolOffMs;
+            if (!already) {
+              options.onTrip?.({
+                provider: code,
+                status: error.status,
+                failureClass: error.failureClass,
+                coolOffMs,
+              });
+            }
+          }
+        }
+        throw error;
+      }
+    },
   };
+}
 
+export function withCircuitBreaker(
+  provider: PublicWebResearchProvider,
+  options: {
+    readonly now?: (() => number) | undefined;
+    /** Called once each time the breaker opens. */
+    readonly onTrip?: ((trip: BreakerTrip) => void) | undefined;
+    /** The credential's breaker, when another provider shares the key. */
+    readonly breaker?: CircuitBreaker | undefined;
+  } = {},
+): PublicWebResearchProvider {
+  const breaker = options.breaker ?? createCircuitBreaker(options);
   return {
     get code() {
       return provider.code;
     },
     search: (request, context) =>
-      guarded(() => provider.search(request, context)),
+      breaker.guard(provider.code, () => provider.search(request, context)),
     extract: (request, context) =>
-      guarded(() => provider.extract(request, context)),
+      breaker.guard(provider.code, () => provider.extract(request, context)),
     ...(provider.canSearch === false ? { canSearch: false as const } : {}),
     ...(provider.canReadPages === false
       ? { canReadPages: false as const }
