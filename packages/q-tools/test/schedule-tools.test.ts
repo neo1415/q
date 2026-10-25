@@ -7,6 +7,7 @@ import {
   type RelationshipBrief,
 } from "@capital-q/contracts";
 
+import { meetingProposalBody } from "../src/tools/schedule.js";
 import {
   createDefaultQTools,
   createQToolExecutor,
@@ -1014,5 +1015,33 @@ describe("zoneFromWords: a place as they said it", () => {
     expect(zoneFromWords("Nairobi, Kenya")).toBe("Africa/Nairobi");
     expect(zoneFromWords("sounds good")).toBeNull();
     expect(zoneFromWords("")).toBeNull();
+  });
+});
+
+describe("the chat proposal of a call (live a7b99c465)", () => {
+  const at = {
+    durationMinutes: 30,
+    iso: "2026-10-27T14:00:00.000Z",
+    timeZone: "Africa/Lagos",
+  } as const;
+
+  it("never says the call is 'about Call with' the person it is sent to", () => {
+    const body = meetingProposalBody({
+      ...at,
+      purpose: "Call with Ledgerfold",
+      counterpartName: "Ledgerfold",
+    });
+    expect(body).not.toMatch(/about Call with/u);
+    expect(body).toMatch(/^Would .+ work for a 30-minute call\? /u);
+  });
+
+  it("keeps a purpose that says something", () => {
+    expect(
+      meetingProposalBody({
+        ...at,
+        purpose: "Their Series A plan",
+        counterpartName: "Ledgerfold",
+      }),
+    ).toMatch(/call about Their Series A plan\?/u);
   });
 });
