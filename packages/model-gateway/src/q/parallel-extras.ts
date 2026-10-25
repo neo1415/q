@@ -29,6 +29,18 @@ export const EXTRAS_ELSEWHERE_NOTE: ModelMessage = {
     "A second writer, working from these same facts at the same time, writes this turn's findings and cards. Leave `findings`, `answerCards` and `comparisonCards` out of your object and write everything else as usual. Do not say in the answer that cards or findings follow.",
 };
 
+/**
+ * Coordinator 2026-10-25 (I21): told to the one writer of a comparison
+ * code resolved, which has no extras' writer. The table and its verdict
+ * are Capital Q's and go out with the answer; cards and findings would
+ * only restate them.
+ */
+export const TABLE_IS_THE_COMPARISON: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "Capital Q shows this comparison's table on their screen with the answer, and its verdict leads it. Leave `findings`, `answerCards` and `comparisonCards` out of your object and write everything else as usual. Do not say in the answer that a table or cards follow.",
+};
+
 /** Told to the extras' writer, in place of the note above. */
 export const EXTRAS_ONLY_NOTE: ModelMessage = {
   role: "SYSTEM",

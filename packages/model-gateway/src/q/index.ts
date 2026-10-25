@@ -221,6 +221,7 @@ import {
 import { outputSplitOf } from "./output-split.js";
 import {
   EXTRAS_ELSEWHERE_NOTE,
+  TABLE_IS_THE_COMPARISON,
   extrasMessages,
   joinExtras,
 } from "./parallel-extras.js";
@@ -5033,6 +5034,7 @@ export function createModelGatewayQAnswer(
           focusDossier: onScreenDossier,
           qWork: true,
           ownCompany: ownCompany !== null,
+          comparison: compareTable !== null,
         },
       });
       // A named person, company or body is answered by code from the
@@ -5376,6 +5378,7 @@ export function createModelGatewayQAnswer(
           focusDossier: onScreenDossier,
           qWork: wideReads.ownDay !== null,
           ownCompany: ownCompany !== null,
+          comparison: compareTable !== null,
         },
       });
       if (route.path === "PREPARED_CONTEXT") offered = [];
@@ -7602,19 +7605,29 @@ export function createModelGatewayQAnswer(
       // Owner 2026-10-22: typed answers have their findings and cards
       // written beside them (parallel-extras.ts). Not spoken (three
       // findings at most, and the speculation gate), not a document.
+      // Coordinator 2026-10-25 (I21): a comparison code resolved has no
+      // second writer. Its table and verdict are the comparison; the
+      // extras' cards and findings restated it (849 tokens, and the settle
+      // waited 8.75 s for them), so the one writer leaves them out.
       const splitExtras =
         dependencies.parallelExtras === true &&
         request.spoken !== true &&
         request.writingDocument !== true &&
-        request.turnUnread !== true;
+        request.turnUnread !== true &&
+        compareTable === null;
       // Before the tools-first note, which stays last where there is one.
-      if (splitExtras) {
+      const whoWritesExtras = splitExtras
+        ? EXTRAS_ELSEWHERE_NOTE
+        : compareTable !== null
+          ? TABLE_IS_THE_COMPARISON
+          : null;
+      if (whoWritesExtras !== null) {
         messages =
           offered.length === 0
-            ? [...messages, EXTRAS_ELSEWHERE_NOTE]
+            ? [...messages, whoWritesExtras]
             : [
                 ...messages.slice(0, -1),
-                EXTRAS_ELSEWHERE_NOTE,
+                whoWritesExtras,
                 ...messages.slice(-1),
               ];
       }
