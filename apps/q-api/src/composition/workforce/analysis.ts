@@ -12,6 +12,7 @@ import type {
 } from "@capital-q/q-core";
 
 import type { ResearchDossier, Spend } from "./deep-research.js";
+import type { PublicSourcesGap } from "./jobs.js";
 import { safeReport, type LiveReport } from "./live.js";
 import type { Trace, Who, WorkforceModels } from "./models.js";
 
@@ -75,7 +76,17 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
   return { sources, facts };
 }
 
-export function researchText(facts: readonly AnalysisFact[]): string {
+export function researchText(
+  facts: readonly AnalysisFact[],
+  gap: PublicSourcesGap | null = null,
+): string {
+  // Production 2026-10-25: the public web could not be searched. The
+  // document is written from Capital Q's records and the person's own
+  // documents, and what only public sources could tell stays unknown.
+  if (facts.length === 0 && gap === "UNAVAILABLE")
+    return "PUBLIC SOURCES UNAVAILABLE: the public web could not be searched for this document. Write from Capital Q's records and the person's own documents only. Whatever only public sources could tell (market size, competitors, prices, recent news) is not known: say so where it matters, never estimate or invent it.";
+  if (facts.length === 0 && gap === "NONE_FOUND")
+    return "NO PUBLIC SOURCES FOUND: the searches found nothing public for this. Write from Capital Q's records and the person's own documents only; what only public sources could tell is not known -- say so, never invent it.";
   if (facts.length === 0)
     return "No public research was available for this document.";
   return facts
@@ -374,12 +385,19 @@ function split(
  * it cites as findings), then the sources it cites, numbered as cited,
  * then what is not known. Code writes the Sources section, never a model.
  */
+export const PUBLIC_UNAVAILABLE_GAP =
+  "Public sources were unavailable when this was prepared: nothing here comes from the public web, and what only public sources could tell (market size, competitors, prices, recent news) is not known.";
+export const PUBLIC_NONE_FOUND_GAP =
+  "No public sources were found for this: nothing here comes from the public web, and what only public sources could tell is not known.";
+
 export function analysisContent(input: {
   readonly draft: AnalysisDocumentResult;
   readonly review: AnalysisReview;
   readonly sources: readonly AnalysisSource[];
   readonly facts: readonly AnalysisFact[];
   readonly seed: string;
+  /** The public research it rests on could not be had: stated by code. */
+  readonly publicSources?: PublicSourcesGap | null | undefined;
 }): QArtifactContent {
   const { draft, review } = input;
   const sections = draft.sections.map((section, index) => ({
@@ -411,6 +429,12 @@ export function analysisContent(input: {
           `Public sources this document cites. A source states what it states; Capital Q has not verified it.\n${sourceLines.join("\n")}`,
         );
   const gaps = [
+    // Stated by code, never left to the writer (2026-10-25).
+    ...(input.publicSources === "UNAVAILABLE"
+      ? [PUBLIC_UNAVAILABLE_GAP]
+      : input.publicSources === "NONE_FOUND"
+        ? [PUBLIC_NONE_FOUND_GAP]
+        : []),
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>

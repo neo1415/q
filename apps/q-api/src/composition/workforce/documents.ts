@@ -274,7 +274,7 @@ export function createWorkforceDocuments(dependencies: {
         purpose: input.goal,
         today,
         company,
-        research: researchText(merged.facts),
+        research: researchText(merged.facts, input.publicSources ?? null),
         sources: sourcesText(merged.sources),
         sourceIndices: new Set(merged.sources.map((source) => source.index)),
       },
@@ -292,6 +292,7 @@ export function createWorkforceDocuments(dependencies: {
       sources: merged.sources,
       facts: merged.facts,
       seed: `${input.jobId}:${input.stepKey}`,
+      publicSources: input.publicSources ?? null,
     });
     // Filed under a fresh decision, as the person now.
     const refreshed = await dependencies.freshActor(actor);

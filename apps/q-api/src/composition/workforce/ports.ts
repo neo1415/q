@@ -303,6 +303,7 @@ export function createWorkforcePorts(
                 return {
                   status: "UNAVAILABLE" as const,
                   message: "Not yours to research.",
+                  reason: "NOT_ALLOWED" as const,
                 };
               }
               return services.research({
