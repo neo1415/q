@@ -17,6 +17,8 @@ import {
   keptAllLine,
   stillWaiting,
   pendingQuestion,
+  questionShown,
+  questionAfterTap,
   questionOnReturn,
   redrawnThread,
   progressLines,
@@ -451,6 +453,35 @@ describe("questionOnReturn: a line said before an absence is history (live 25 Oc
         Date.parse("2026-10-25T19:31:00Z"),
       ),
     ).toBe("What early signal do you have?");
+  });
+});
+
+describe("a tapped answer moves the question on (QA F-131, 25 Oct)", () => {
+  const opener = {
+    stepKey: "F2.stage",
+    text: "Picking up where we left off. What stage is the company at?",
+    sticky: true,
+  };
+  const next = { stepKey: "F2.role", text: "What's your role?" };
+
+  it("Q's opening stays on screen while the session settles (the case it exists for)", () => {
+    expect(questionShown(next, opener, false)).toBe(opener.text);
+  });
+
+  it("after a tap, the step the session moved to asks its own question", () => {
+    expect(questionShown(next, questionAfterTap(), false)).toBe(
+      "What's your role?",
+    );
+  });
+
+  it("a silent step still shows nothing of its own", () => {
+    expect(
+      questionShown(
+        { stepKey: "I1.mandate_context", text: "Which mandate?" },
+        questionAfterTap(),
+        true,
+      ),
+    ).toBeNull();
   });
 });
 
