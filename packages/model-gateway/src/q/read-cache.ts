@@ -73,7 +73,7 @@ function personOf(context: QToolExecutionContext): string {
 }
 
 /** Stable JSON: the same arguments in any key order are the same read. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value !== null && typeof value === "object") {
     return `{${Object.keys(value)
