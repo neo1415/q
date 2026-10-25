@@ -9111,7 +9111,13 @@ export function createModelGatewayQAnswer(
             parityGap === "NOT_IN_REGISTRY" &&
             (analyst.findings.length > 0 || analyst.answerCards !== null)
           )
-            ? couldNotDoLine(parityGap)
+            ? parityGap === "NOT_CALLED" &&
+              request.askedAction !== undefined &&
+              MESSAGE_TOOLS.has(request.askedAction)
+              ? // Guard run 1 (2026-10-25, run b6f9236c): the draft was
+                // written above; "I didn't prepare that" contradicted it.
+                DRAFT_NOT_ON_CARD_LINE
+              : couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
           logger?.warn(
@@ -9802,6 +9808,10 @@ export function withoutRememberTalk(
     .trim();
 }
 
+/** A message they asked for, written in the answer but not put on its card. */
+export const DRAFT_NOT_ON_CARD_LINE =
+  "That draft isn't on a card yet, so nothing has been sent. Say \"prepare it\" and I'll put it on a card for your approval.";
+
 export function couldNotDoLine(gap: string): string {
   switch (gap) {
     case "DECLARED_NOT_OFFERED":
@@ -9827,7 +9837,7 @@ export function couldNotDoLine(gap: string): string {
  * gets the could-not line.
  */
 const NOTHING_DONE_EXPLAINED =
-  /\b(?:already\b|(?:can(?:no|['’])t|couldn['’]t|could not|unable to|not able to|won['’]t be able to)\s+(?:\w+\s+){0,3}?(?:do|express|send|prepar|mak|chang|record|book|shar|request|ask|add|creat|sav|pass|mov|accept|declin|invit)\w*|nothing (?:was|has been|is) (?:done|prepared|changed|needed)|(?:isn['’]t|is not) (?:needed|necessary|possible|available)|no need to)/iu;
+  /\b(?:already\b|(?:can(?:no|['’])t|couldn['’]t|could not|unable to|not able to|won['’]t be able to)\s+(?:\w+\s+){0,3}?(?:do|express|send|prepar|mak|chang|record|book|shar|request|ask|add|creat|sav|pass|mov|accept|declin|invit)\w*|nothing (?:was|has been|is) (?:done|prepared|changed|needed)|(?:isn['’]t|is not) (?:needed|necessary|possible|available)|no need to|(?:isn['’]t|is not|aren['’]t|are not|you['’]re not|you are not) (?:yet )?connected|(?:the )?(?:next|first) step (?:is|would be)|you['’]d (?:first )?need to)/iu;
 export function explainsNothingDone(text: string): boolean {
   return NOTHING_DONE_EXPLAINED.test(text);
 }
