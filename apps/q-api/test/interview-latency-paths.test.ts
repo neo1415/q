@@ -517,6 +517,39 @@ describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)",
   });
 });
 
+describe("a stated step off their path never holds the code reply (live 25 Oct e2e)", () => {
+  it("the paying-customers count of a seed company: one model round, code replies", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.website",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Quillmark Health",
+      },
+      ineligible: ["F5.customers"],
+    });
+    const said = "Seed stage, based in Kenya, with 210 paying customers.";
+    const model = recordingModel([
+      { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
+      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      // The reading found the count stated; a seed company's path has no
+      // step for it until its signal is "Paying customers".
+      delegation: readerOf(
+        reading({ stated: ["F1.stage", "F1.country", "F5.customers"] }),
+      ),
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    expect(model.calls()).toBe(1);
+    expect(outcome.reply).toContain("Seed (stage)");
+    expect(world.recordedValue("F5.customers")).toBeUndefined();
+  });
+});
+
 describe("a code receipt is never cut by the claim guard (live AL)", () => {
   it("keeps the receipt that quotes a long description", async () => {
     const world = founderWorld();

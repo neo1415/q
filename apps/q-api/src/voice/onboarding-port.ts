@@ -65,7 +65,9 @@ import type {
 } from "@capital-q/q-tools";
 
 import {
+  EXCLUSION_MEANING_REASON,
   EXCLUSION_SIBLINGS,
+  exclusionMeaningUnsettled,
   asciiDigits,
   definitionFor,
   describeValue,
@@ -2013,6 +2015,25 @@ export function createOnboardingPort(input: {
           outcome: "REJECTED",
           reason:
             "They have not handed you this choice, so nothing was recorded. Hold it with recommend, say what you suggest and why, and let them decide.",
+        });
+      }
+    }
+    // A firm exclusion only from a declared one, and never a preference
+    // written over one: which they meant is the reading's, by meaning.
+    // No reader in this composition (as notStated): the check stands aside.
+    if (answer.basis !== "DELEGATED" && input.authority !== undefined) {
+      const meant = await input.authority();
+      if (
+        exclusionMeaningUnsettled(
+          answer.stepKey,
+          meant?.stated ?? null,
+          (key) => input.statedEarlier?.(key, answer.quote) === true,
+        )
+      ) {
+        return done({
+          stepKey: answer.stepKey.slice(0, 80),
+          outcome: "REJECTED",
+          reason: EXCLUSION_MEANING_REASON,
         });
       }
     }
