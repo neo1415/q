@@ -22,6 +22,7 @@ import {
   pendingQuestion,
   questionShown,
   questionAfterTap,
+  reviewShown,
   questionOnReturn,
   redrawnThread,
   progressLines,
@@ -485,6 +486,17 @@ describe("a tapped answer moves the question on (QA F-131, 25 Oct)", () => {
         true,
       ),
     ).toBeNull();
+  });
+});
+
+describe("a confirmation shows what it confirms (QA F-130, 25 Oct)", () => {
+  it("is shown while Q asks to confirm, opened or not", () => {
+    expect(reviewShown(false, { control: "confirm" })).toBe(true);
+  });
+  it("is otherwise shown only when opened", () => {
+    expect(reviewShown(false, { control: "chips" })).toBe(false);
+    expect(reviewShown(true, { control: "chips" })).toBe(true);
+    expect(reviewShown(false, null)).toBe(false);
   });
 });
 

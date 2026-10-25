@@ -851,6 +851,20 @@ export function splitForQ(
 export const BRIDGE_LINE = "Back to where we were.";
 
 /** The value a review line shows, or a plain "not yet" (§29). */
+/**
+ * Whether what Q understood is on screen (QA F-130, 25 Oct): "Here's what
+ * I understood. Does it look right?" was asked with nothing of what Q
+ * understood shown, so "That's right" confirmed an empty summary. While Q
+ * asks a confirmation, the summary it confirms is always shown with it;
+ * otherwise only when they open it.
+ */
+export function reviewShown(
+  opened: boolean,
+  prompt: { readonly control: ControlKind } | null,
+): boolean {
+  return opened || prompt?.control === "confirm";
+}
+
 export function reviewLines(
   view: OnboardingSessionView,
   vocabulary: JourneyVocabulary,
