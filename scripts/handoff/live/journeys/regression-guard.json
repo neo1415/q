@@ -11,8 +11,7 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
-          ],
-          "replyMatches": ["on Capital Q; ranked by fit with your mandate"]
+          ]
         }
       },
       {
@@ -40,6 +39,12 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
+          ],
+          "replyMatches": ["Anchor"],
+          "replyNot": [
+            "look up Anchor",
+            "Anchor without enough information",
+            "Anchor's profile"
           ]
         }
       }
@@ -255,8 +260,10 @@
           "replyNot": [
             "look up Anchor",
             "Anchor isn't on record",
-            "Anchor's profile"
-          ]
+            "Anchor's profile",
+            "Anchor without enough information"
+          ],
+          "replyMatches": ["Anchor"]
         }
       }
     ]
@@ -333,6 +340,24 @@
           "approval": true,
           "replyNot": ["couldn't finish", "didn't finish"],
           "maxMs": 30000
+        }
+      }
+    ]
+  },
+  {
+    "id": "W-web-spend",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "note": "2026-10-25: ~25 paid provider calls for one turn, and with every key spent the reply implied the facts don't exist. Check the q-api log for this run: 'public research provider call' at most 2 per provider, and either sources or 'I can't search the public web right now'.",
+    "steps": [
+      {
+        "ask": "Who is the founder of Paystack?",
+        "expect": {
+          "replyNot": [
+            "no public (presence|information|record)",
+            "(couldn't|could not|didn't|did not) find (any(thing)?|no) (about|on|information)",
+            "(doesn't|does not) (appear to )?exist"
+          ],
+          "maxMs": 20000
         }
       }
     ]

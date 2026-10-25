@@ -143,23 +143,17 @@ describe("public web research service", () => {
     expect(provider.egressed()).not.toContain(PRIVATE_MARKER);
     expect(outcome.query).not.toContain(PRIVATE_MARKER);
     expect(outcome.queryMinimised).toBe(true);
-    // Budget: the search and its parallel past-month twin, five distinct
-    // results considered, three extracted (as asked), at most two per domain.
-    // Planned queries (the model's, the person's own sentence, the name
-    // with its country), each composed, plus one past-month twin.
-    expect(provider.searches.map((s) => s.freshness)).toEqual([
-      "ANY",
-      "ANY",
-      "ANY",
-      "PAST_MONTH",
-    ]);
-    expect(outcome.queries).toHaveLength(3);
+    // Budget (production 2026-10-25): what the question needs -- two
+    // searches up front, each composed; three extracted (as asked), at
+    // most two per domain.
+    expect(provider.searches.map((s) => s.freshness)).toEqual(["ANY", "ANY"]);
+    expect(outcome.queries).toHaveLength(2);
     for (const search of provider.searches) {
       expect(search.query).not.toContain(PRIVATE_MARKER);
     }
     expect(outcome.entityResolution.status).toBe("RESOLVED");
     expect(outcome.budget).toEqual({
-      searchCalls: 4,
+      searchCalls: 2,
       resultsConsidered: 5,
       extractCalls: 1,
       sourcesExtracted: 3,
@@ -330,12 +324,12 @@ describe("public web research service", () => {
       userText: "who are the competitors of Kibo Health Systems",
       subject: { ...ownedCompany, persistAsEvidence: false },
       includeDomains: ["nowhere.example"],
+      // One phrasing: the refinement fits within the two a turn may make.
+      focused: true,
     });
     expect(outcome.status).toBe("OK");
-    // The planned queries and the past-month twin, then one refinement.
-    expect(
-      provider.searches.filter((s) => s.freshness === "PAST_MONTH"),
-    ).toHaveLength(1);
+    // One search, then one refinement: two in all (the spend rule).
+    expect(provider.searches).toHaveLength(2);
     expect(provider.searches.at(-1)?.query).toBe(
       "Kibo Health Systems kibohealth.example Nigeria",
     );

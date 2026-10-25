@@ -46,6 +46,7 @@ import {
   createBrightDataResearchProvider,
 } from "@capital-q/q-research/providers/brightdata";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
+import { withCircuitBreaker } from "@capital-q/q-research/providers/breaker";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
 import { createSerpApiResearchProvider } from "@capital-q/q-research/providers/serpapi";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
@@ -440,7 +441,8 @@ export function composeWorkerResearchProvider(
             apiKey: secrets.serpApi.reveal(),
           }),
         ]),
-  ];
+    // A refused or spent key rests instead of being asked again (2026-10-25).
+  ].map((index) => withCircuitBreaker(index));
   const provider =
     indexes.length === 0
       ? undefined

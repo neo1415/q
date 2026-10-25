@@ -45,6 +45,10 @@
       "types": "./dist/providers/serp-detect.d.ts",
       "default": "./dist/providers/serp-detect.js"
     },
+    "./providers/breaker": {
+      "types": "./dist/providers/breaker.d.ts",
+      "default": "./dist/providers/breaker.js"
+    },
     "./providers/fallback": {
       "types": "./dist/providers/fallback.d.ts",
       "default": "./dist/providers/fallback.js"

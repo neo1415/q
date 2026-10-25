@@ -14,14 +14,17 @@ import { z } from "zod";
 /** Per Q research turn (§8, §36). */
 export const RESEARCH_BOUNDS = {
   /**
-   * Search calls a single research turn may make: up to four planned
-   * queries, the past-month companion of the first, and one refinement.
-   * Each call may fan out to every configured index in parallel.
+   * Search calls a single research turn may make, the refinement included.
+   * Each call may fan out to every configured index that is not resting.
    */
-  // Up to four phrasings, the month's news and the LinkedIn lane's two.
-  maxSearchCalls: 8,
+  // At most two searches a turn (owner's spend rule 2026-10-25: up to
+  // seven a turn spent every key's credit); the refinement fits only when
+  // a single search was made and it found nothing.
+  maxSearchCalls: 2,
+  /** Searches one research call makes up front: what the question needs. */
+  searchesPerResearch: 2,
   /** Distinct queries one research turn plans (web search 2026-10-06). */
-  maxPlannedQueries: 4,
+  maxPlannedQueries: 2,
   /** Hits one search call may return after merging every index's results. */
   maxMergedResults: 12,
   /** Each index's own deadline inside a parallel search, in milliseconds. */

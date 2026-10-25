@@ -91,17 +91,19 @@ describe("research reuse within a run", () => {
     expect(h.registered).toHaveLength(1);
   });
 
-  it("researches again for a different run or a different question", async () => {
+  it("researches again for a different run; within one run, once (the spend rule)", async () => {
     const h = harness();
     const counts: number[] = [];
     await h.research("90000000-0000-4000-8000-000000000001", "Kobo360 markets");
     counts.push(h.provider.searches.length);
     await h.research("90000000-0000-4000-8000-000000000002", "Kobo360 markets");
     counts.push(h.provider.searches.length);
+    // Owner's spend rule 2026-10-25: a run reaches the providers once; a
+    // second question in it is answered from what the run found.
     await h.research("90000000-0000-4000-8000-000000000002", "Kobo360 funding");
     counts.push(h.provider.searches.length);
     expect(counts[0]).toBeGreaterThan(0);
     expect(counts[1]).toBeGreaterThan(counts[0] ?? 0);
-    expect(counts[2]).toBeGreaterThan(counts[1] ?? 0);
+    expect(counts[2]).toBe(counts[1]);
   });
 });

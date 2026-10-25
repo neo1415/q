@@ -34,6 +34,7 @@ import {
   GUIDANCE,
   NOT_FOUND_GUIDANCE,
   RESEARCH_GUIDANCE_MAX,
+  UNAVAILABLE_GUIDANCE,
 } from "../src/tools/research-public-web.js";
 
 /**
@@ -205,6 +206,9 @@ describe("what the research tool tells the answer", () => {
         RESEARCH_GUIDANCE_MAX,
       );
     }
+    expect(UNAVAILABLE_GUIDANCE.length).toBeLessThanOrEqual(
+      RESEARCH_GUIDANCE_MAX,
+    );
   });
 });
 
@@ -703,6 +707,11 @@ describe("public_web.search", () => {
     const text = JSON.stringify(result.data);
     expect(text).not.toMatch(/429|tavily|api\.|https?:\/\/api/i);
     expect(typeof result.data["message"]).toBe("string");
+    // Production 2026-10-25: a search that could not run is said to be
+    // unavailable, never read as "nothing exists".
+    expect(result.data["guidance"]).toBe(UNAVAILABLE_GUIDANCE);
+    expect(UNAVAILABLE_GUIDANCE).toMatch(/can't search the public web/u);
+    expect(UNAVAILABLE_GUIDANCE).toMatch(/Never say or suggest that nothing/u);
   });
 
   it("F/G: every registered tool is READ_ONLY and SAFE_READ; nothing can write company, investor or exclusion state", () => {

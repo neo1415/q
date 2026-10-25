@@ -132,6 +132,11 @@ export type ResearchCommand = {
    * for every question of the set.
    */
   readonly focused?: boolean | undefined;
+  /**
+   * One of a planned job's own questions (deep research): bounded by its
+   * plan, so not by the per-run budget that holds a turn to what it needs.
+   */
+  readonly planned?: boolean | undefined;
   /** Deep research: words from public pages this run already read (egress.ts). */
   readonly publicTerms?: readonly string[] | undefined;
   /** Deep research: research vocabulary may travel (egress.ts). */
@@ -284,6 +289,9 @@ export type PublicWebResearchServiceDependencies = {
 const RUN_ALLOWLIST_TTL_MS = 6 * 60 * 60 * 1000;
 const RUN_ALLOWLIST_MAX_RUNS = 500;
 const MAX_PER_DOMAIN = 2;
+/** Research calls one run may send to the providers (see `budgeted`). */
+export const RESEARCH_RUN_BUDGET = 1;
+
 const PROVIDER_UNAVAILABLE_MESSAGE =
   "Public sources couldn't be checked right now. Capital Q's own information is still available.";
 const NO_IDENTITY_MESSAGE =
@@ -590,7 +598,46 @@ export function createPublicWebResearchService(
     completed.set(key, outcome);
   };
 
-  return {
+  /**
+   * Production 2026-10-25: the turn's early search and the model's own
+   * research each searched again, with every index each time. A run makes
+   * at most RESEARCH_RUN_BUDGET research calls that reach the providers;
+   * beyond them, the run's last outcome answers (an identical query is
+   * already reused above). By tenant and run, bounded like the allowlist.
+   */
+  const byRun = new Map<
+    string,
+    { calls: number; last: ResearchOutcome | null }
+  >();
+  const budgeted = async (
+    command: Parameters<PublicWebResearchService["research"]>[0],
+    run: (
+      command: Parameters<PublicWebResearchService["research"]>[0],
+    ) => Promise<ResearchOutcome>,
+  ): Promise<ResearchOutcome> => {
+    const key = `${command.actor.tenantId}:${command.runId}`;
+    const spent = byRun.get(key) ?? { calls: 0, last: null };
+    if (command.planned === true) return run(command);
+    if (spent.calls >= RESEARCH_RUN_BUDGET && spent.last !== null) {
+      metrics.reused.add(1, { operation: "research_run_budget" });
+      logger?.info(
+        { runId: command.runId, calls: spent.calls },
+        "public research run budget spent; the run's last result answers",
+      );
+      return spent.last;
+    }
+    if (!byRun.has(key) && byRun.size >= RUN_ALLOWLIST_MAX_RUNS) {
+      const oldest = byRun.keys().next().value;
+      if (oldest !== undefined) byRun.delete(oldest);
+    }
+    spent.calls += 1;
+    byRun.set(key, spent);
+    const outcome = await run(command);
+    spent.last = outcome;
+    return outcome;
+  };
+
+  const service: PublicWebResearchService = {
     seenInRun: (runId) => [...(allowlist.get(runId)?.urls ?? [])],
 
     research: async (command) => {
@@ -648,15 +695,11 @@ export function createPublicWebResearchService(
       };
       const focused = command.focused === true;
       plan(command.requestedQuery, focused ? false : leadWithSubject);
-      // The same words without the subject in front, when it was put
-      // there: the question may be about the world, not about them.
-      if (!focused) plan(command.requestedQuery, false);
-      for (const also of command.alsoQueries ?? [])
-        plan(also, focused ? false : leadWithSubject);
-      // Their sentence as they put it, with nothing put in front: a market
-      // question is not a question about their own company.
-      if (!focused) plan(searchPhrase(command.userText), false);
-      // The name with its country, when a name is what is being looked up.
+      // Two slots (2026-10-25), filled by what the question most needs:
+      // the name with its country when a name is what is being looked up,
+      // then the model's other phrasings, then the same words without the
+      // subject in front (the question may be about the world, not them),
+      // then their sentence as they put it.
       if (
         !focused &&
         entity !== null &&
@@ -669,6 +712,10 @@ export function createPublicWebResearchService(
           : null;
         plan([entity.name, country ?? ""].join(" "));
       }
+      for (const also of command.alsoQueries ?? [])
+        plan(also, focused ? false : leadWithSubject);
+      if (!focused) plan(command.requestedQuery, false);
+      if (!focused) plan(searchPhrase(command.userText), false);
       const primary = planned[0];
       if (primary === undefined) {
         return { status: "NO_PUBLIC_IDENTITY", message: NO_IDENTITY_MESSAGE };
@@ -709,46 +756,51 @@ export function createPublicWebResearchService(
       };
 
       const freshness = command.freshness ?? "ANY";
-      // The planned queries side by side, and the first one again over the
-      // past month (founder direction 2026-09-29: recent coverage is what a
-      // general ranking buries). A query that fails costs only its own
-      // hits; the turn fails only when every one did.
-      const requests = [
-        ...planned.map((query) => ({
-          query,
-          maxResults: RESEARCH_BOUNDS.maxSearchResults,
-          freshness,
-          includeDomains,
-        })),
-        ...(freshness === "ANY" && !focused
+      const search = (query: string) => ({
+        query,
+        maxResults: RESEARCH_BOUNDS.maxSearchResults,
+        freshness,
+        includeDomains,
+      });
+      // What the question needs, and no more (production 2026-10-25: up to
+      // seven searches a turn, each asked of every index, ~25 paid calls for
+      // "Who is the founder of Paystack?"): the first phrasing; then, for
+      // someone named, LinkedIn's public people and company pages in one
+      // search (owner 2026-10-23; only what the index shows, nothing behind
+      // a sign-in); else the second phrasing; else the month's coverage
+      // from the news verticals (founder direction 2026-09-29).
+      const lane =
+        !focused &&
+        entity !== null &&
+        aboutSomeoneElse &&
+        includeDomains.length === 0
+          ? [
+              {
+                query: entity.name,
+                maxResults: RESEARCH_BOUNDS.maxRecentResults,
+                freshness: "ANY" as const,
+                includeDomains: [...LINKEDIN_LANE],
+              },
+            ]
+          : [];
+      const news =
+        freshness === "ANY" && !focused
           ? [
               {
                 query: primary,
                 maxResults: RESEARCH_BOUNDS.maxRecentResults,
                 freshness: "PAST_MONTH" as const,
                 includeDomains,
-                // The month's coverage from the indexes' news verticals
-                // (Brave, Tavily), where recent reporting lives.
                 topic: "NEWS" as const,
               },
             ]
-          : []),
-        // The LinkedIn lane (owner 2026-10-23): someone named is looked for
-        // among LinkedIn's public people and company pages too, beside the
-        // general search. Only what the index shows (title, snippet) is
-        // used; nothing behind a sign-in is read, ever (LinkedIn's terms).
-        ...(!focused &&
-        entity !== null &&
-        aboutSomeoneElse &&
-        includeDomains.length === 0
-          ? LINKEDIN_LANE.map((site) => ({
-              query: entity.name,
-              maxResults: RESEARCH_BOUNDS.maxRecentResults,
-              freshness: "ANY" as const,
-              includeDomains: [site],
-            }))
-          : []),
-      ].slice(0, RESEARCH_BOUNDS.maxSearchCalls - 1);
+          : [];
+      const requests = [
+        search(primary),
+        ...lane,
+        ...planned.slice(1).map(search),
+        ...news,
+      ].slice(0, RESEARCH_BOUNDS.searchesPerResearch);
       let searchCalls = requests.length;
       const settled = await Promise.allSettled(
         requests.map((request) => provider.search(request, context)),
@@ -1092,5 +1144,10 @@ export function createPublicWebResearchService(
       }
       return { status: "OK", sources, rejectedUrls };
     },
+  };
+  const unbudgeted = service.research;
+  return {
+    ...service,
+    research: (command) => budgeted(command, unbudgeted),
   };
 }
