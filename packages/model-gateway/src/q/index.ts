@@ -289,6 +289,7 @@ import {
 import { withoutInternalFailureLines } from "./internal-failure-lines.js";
 import {
   discoverFilterDecision,
+  newestAnswerListsCompanies,
   SET_DISCOVER_FILTERS_TOOL,
   type DiscoverRule,
 } from "./discover-filter-rule.js";
@@ -2901,20 +2902,6 @@ export function createModelGatewayQAnswer(
       return null;
     }
     const earlier = history.filter((m) => m.id !== latest.id);
-    // QA F-114: what this turn may put on their Discover filters (below).
-    noteDiscoverRule(request.runId, {
-      discover: request.discoverCompanies ?? null,
-      narrowing:
-        request.discoverCompanies !== undefined &&
-        (request.discoverCompanies.previous ||
-          newestAnswerCards(earlier).length > 0),
-      // A narrowing read as "set the filters" away from Discover is still a
-      // question about the list; the page changes when they are on it or
-      // asked to go there.
-      asked:
-        request.askedAction === "open_page" ||
-        plan.screen?.route === "DISCOVER",
-    });
     const toolContext: QToolExecutionContext = {
       actor: request.actor,
       runId: request.runId,
@@ -4810,6 +4797,26 @@ export function createModelGatewayQAnswer(
         attention,
         counterparty,
       } = prepared;
+      // QA F-114: what this turn may put on their Discover filters. Noted
+      // here, from the read turn: the turn is warmed before it is read
+      // (answer.ts), so a rule noted while preparing never saw the reading
+      // and refused nothing live (F-109/F-110, run 4dbd529e).
+      noteDiscoverRule(request.runId, {
+        discover: request.discoverCompanies ?? null,
+        // Any list of companies in Q's newest answer is "the list" (cards,
+        // comparison cards, a table): F-109/F-110 narrowed comparison cards.
+        narrowing:
+          request.discoverCompanies?.previous === true ||
+          ((request.discoverCompanies !== undefined ||
+            request.askedAction === SET_DISCOVER_FILTERS_TOOL) &&
+            newestAnswerListsCompanies(earlier)),
+        // A narrowing read as "set the filters" away from Discover is still a
+        // question about the list; the page changes when they are on it or
+        // asked to go there.
+        asked:
+          request.askedAction === "open_page" ||
+          plan.screen?.route === "DISCOVER",
+      });
       // The turn's own reading decides a comparison: a prepare warmed before
       // the reading built none, so its reads run now (see compareFor).
       const lateCompare =
@@ -7004,15 +7011,23 @@ export function createModelGatewayQAnswer(
       // K1 (live 2026-10-09 15:57): companies of a kind are listed from
       // the catalog by code; the analyst is never asked to describe cards.
       // Null (no catalog here): the full path answers.
+      // F-109/F-110: a narrowing of Q's own list they did not ask to see on
+      // Discover is answered here by code, whatever kind of turn it was
+      // read as -- never by model rounds that refuse a filter and then
+      // list the companies (16-28 s live).
+      const rule = discoverRuleByRun.get(request.runId);
+      const narrowingHere = rule?.narrowing === true && !rule.asked;
       if (
         catalogAsk !== undefined &&
         request.writingDocument !== true &&
-        // F-114: a narrowing read as "set the Discover filters" away from
-        // Discover is answered here, in the thread, as the narrowed list.
-        (request.askedAction === undefined ||
-          (request.askedAction === SET_DISCOVER_FILTERS_TOOL &&
-            plan.screen?.route !== "DISCOVER")) &&
-        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+        (narrowingHere ||
+          // F-114: a narrowing read as "set the Discover filters" away
+          // from Discover is answered here, in the thread.
+          ((request.askedAction === undefined ||
+            (request.askedAction === SET_DISCOVER_FILTERS_TOOL &&
+              plan.screen?.route !== "DISCOVER")) &&
+            (request.turnKind === undefined ||
+              request.turnKind === "QUESTION_TO_Q")))
       ) {
         const discoverStarted = Date.now();
         const found = await discoverFor(catalogAsk);

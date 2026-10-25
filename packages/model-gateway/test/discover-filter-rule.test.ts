@@ -21,7 +21,10 @@ import {
   createStaticModelCatalog,
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
-import { discoverFilterDecision } from "../src/q/discover-filter-rule.js";
+import {
+  discoverFilterDecision,
+  newestAnswerListsCompanies,
+} from "../src/q/discover-filter-rule.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 /**
@@ -68,6 +71,7 @@ function build(
       "Your opening names the kiosks by 0:06; lead with the litre price.",
     ),
   ],
+  before: readonly QConversationMessage[] = [],
 ) {
   const alpha = createFakeModelProvider({ code: "alpha", script });
   const gateway = createModelGateway({
@@ -82,6 +86,7 @@ function build(
     sleep: () => Promise.resolve(),
   });
   const messages = [
+    ...before,
     {
       id: randomUUID(),
       tenantId: TENANT,
@@ -119,7 +124,7 @@ function build(
       insert: (_tx: unknown, input: { content: string }) => {
         persisted.push(input.content);
         return Promise.resolve({
-          ...messages[0],
+          ...messages[messages.length - 1],
           id: randomUUID(),
           role: "Q",
           content: input.content,
@@ -197,6 +202,64 @@ describe("QA F-114: a Discover filter carries only what they stated", () => {
       sectors: ["fintech"],
       countries: ["KE", "NG"],
     });
+  });
+});
+
+/** Q's "ranked, with why" answer: comparison cards, not answer cards. */
+const rankedWithWhy = {
+  id: randomUUID(),
+  tenantId: TENANT,
+  conversationId: CONVERSATION,
+  runId: randomUUID(),
+  role: "Q",
+  content: "Your five strongest fits, ranked, with why.",
+  contentType: "TEXT",
+  blocks: [
+    {
+      kind: "COMPARISON_CARDS",
+      title: "Your strongest fits",
+      items: [
+        { name: "Silo Credit", subtitle: null, points: ["Fintech, Nigeria"] },
+        { name: "Ledgerfold", subtitle: null, points: ["Fintech, Nigeria"] },
+      ],
+    },
+  ],
+  createdAt: new Date(Date.now() - 60_000).toISOString(),
+} as unknown as QConversationMessage;
+
+describe("F-109/F-110: the rule is the read turn's, not the warm-up's", () => {
+  it("a narrowing of Q's comparison cards, warmed before it was read, never sets Discover", async () => {
+    const { seam, request, executed } = build(
+      "Only fintech ones in Kenya or Nigeria that are raising now.",
+      [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "filters",
+              name: "set_discover_filters",
+              arguments: {
+                sectors: ["fintech"],
+                countries: ["KE", "NG"],
+                raiseDisclosedOnly: true,
+              },
+            },
+          ],
+        },
+        analystText("Silo Credit and Ledgerfold are raising now."),
+      ],
+      [rankedWithWhy],
+    );
+    // answer.ts warms the turn while it is still being read.
+    seam.warm?.(request);
+    await seam.answer({
+      ...request,
+      turnKind: "INSTRUCTION",
+      askedAction: "set_discover_filters",
+    });
+    expect(executed.map((one) => one.name)).not.toContain(
+      "set_discover_filters",
+    );
   });
 });
 
@@ -294,5 +357,34 @@ describe("discoverFilterDecision", () => {
         undefined,
       ),
     ).toEqual({ kind: "SET", arguments: { sectors: ["fintech"] } });
+  });
+});
+
+describe("newestAnswerListsCompanies", () => {
+  const q = (blocks: unknown[]) => ({ role: "Q", blocks });
+  it("counts comparison cards, a table and two company references as Q's list", () => {
+    expect(
+      newestAnswerListsCompanies([q([{ kind: "COMPARISON_CARDS" }])]),
+    ).toBe(true);
+    expect(newestAnswerListsCompanies([q([{ kind: "TABLE" }])])).toBe(true);
+    expect(
+      newestAnswerListsCompanies([
+        q([
+          { kind: "COMPANY_REFERENCE", companyId: "a" },
+          { kind: "COMPANY_REFERENCE", companyId: "b" },
+        ]),
+      ]),
+    ).toBe(true);
+  });
+
+  it("only the newest answer, and not one company or plain text", () => {
+    expect(
+      newestAnswerListsCompanies([
+        q([{ kind: "COMPARISON_CARDS" }]),
+        { role: "USER" },
+        q([{ kind: "COMPANY_REFERENCE", companyId: "a" }]),
+      ]),
+    ).toBe(false);
+    expect(newestAnswerListsCompanies([q([])])).toBe(false);
   });
 });
