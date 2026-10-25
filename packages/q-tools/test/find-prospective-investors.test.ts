@@ -525,3 +525,102 @@ describe("published sector, exact or close", () => {
     expect([...ids].sort()).toEqual([LONDON_ANGEL, NAIROBI_VC, QUIET].sort());
   });
 });
+
+// F-133 (QA fresh e2e, a Ghana logistics founder): "which investors fit
+// me" named Qatari and US networks with sector unknown above real fits.
+// Hard eligibility first; then what is known to fit; unknown is never a
+// fit and never a penalty.
+describe("what an investor publishes orders the list, and rules out (F-133)", () => {
+  const ids = {
+    doha: "21000000-0000-4000-8000-000000000001",
+    rayan: "22000000-0000-4000-8000-000000000002",
+    openvc: "23000000-0000-4000-8000-000000000003",
+    savannah: "24000000-0000-4000-8000-000000000004",
+    westQuiet: "25000000-0000-4000-8000-000000000005",
+    rhine: "26000000-0000-4000-8000-000000000006",
+  };
+  const items = [
+    ["doha", "Alchemist Doha", "ACCELERATOR", "QA", "ACTIVELY_INVESTING"],
+    ["rayan", "AlRayan Ventures", "VC", "QA", "ACTIVELY_INVESTING"],
+    ["openvc", "OpenVC", "VC", "US", "ACTIVELY_INVESTING"],
+    ["savannah", "Savannah Seed Partners", "VC", "NG", null],
+    // No profile reason at all: it used to be dropped before its card,
+    // which names the company's region, was read.
+    ["westQuiet", "Harmattan Fund", "OTHER", null, null],
+    // Publishes Europe only: not a fit for a company based elsewhere.
+    ["rhine", "Rhine Capital", "VC", "DE", "ACTIVELY_INVESTING"],
+  ].map(([key, name, type, hq, deploying]) => ({
+    investorOrganisationId: ids[key as keyof typeof ids],
+    displayName: name,
+    investorType: type,
+    hqCountry: hq,
+    publicDescription: null,
+    websiteUrl: null,
+    deploymentState: deploying,
+  }));
+  const published = {
+    [ids.savannah]: { stage: "MET", sector: "UNKNOWN", geography: "MET" },
+    [ids.westQuiet]: { stage: "UNKNOWN", sector: "UNKNOWN", geography: "MET" },
+    [ids.rhine]: { stage: "MET", sector: "UNKNOWN", geography: "NOT_MET" },
+  } as const;
+
+  it("leaves out a published geography the company is not in, and puts what is known to fit above the unknown", async () => {
+    const discovery = {
+      sideFor: () => Promise.resolve("FOUNDER"),
+      discoverCompanies: () => Promise.reject(new Error("not used")),
+      discoverInvestors: () =>
+        Promise.resolve({
+          rankingVersion: "discovery.v1",
+          items,
+          notes: [],
+          nextCursor: null,
+        }),
+    } as unknown as DiscoveryService;
+    const port = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            discovery,
+            investorSectorFocus: {
+              forOwnCompany: () =>
+                Promise.resolve({
+                  company: [],
+                  investors: Object.entries(published).map(
+                    ([investorOrganisationId, publishedFit]) => ({
+                      investorOrganisationId,
+                      sectors: [],
+                      publishedFit,
+                    }),
+                  ),
+                }),
+              resolve: () => [],
+            },
+          }),
+        ),
+      ),
+    });
+    const outcome = await port.execute(
+      call({ companyId: COMPANY_A }),
+      contextFor(actorA, founderPlan),
+    );
+    const data = (
+      outcome.result as {
+        data: {
+          prospects: { name: string; fitKnown?: boolean }[];
+          notes: string[];
+        };
+      }
+    ).data;
+    expect(data.prospects.map((p) => [p.name, p.fitKnown])).toEqual([
+      ["Savannah Seed Partners", true],
+      ["Harmattan Fund", true],
+      // Nothing they publish says how this company fits: after, and not
+      // called a fit.
+      ["Alchemist Doha", false],
+      ["AlRayan Ventures", false],
+      ["OpenVC", false],
+    ]);
+    expect(data.prospects.map((p) => p.name)).not.toContain("Rhine Capital");
+    expect(data.notes.join(" ")).toContain("1 left out");
+  });
+});

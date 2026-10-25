@@ -335,6 +335,19 @@ function knownDrafts(input: {
     const card = cardFromKnownEntity(record);
     if (card === null) continue;
     const overlap = overlapScore(textOf(record), input.sector, input.stage);
+    // F-133 (QA: with no place, kind or sector to go on, every prepared
+    // investor scored the same and the first by name were said to fit):
+    // with nothing to filter by, a prepared entity is a candidate only
+    // when what it is known for overlaps what was asked. Unknown is never
+    // a fit.
+    if (
+      !input.filter &&
+      input.kinds.length === 0 &&
+      !overlap.sector &&
+      !overlap.stage
+    ) {
+      continue;
+    }
     const country = countryName(inSet[0] ?? found[0]);
     const base =
       role === "DOOR_OPENER"

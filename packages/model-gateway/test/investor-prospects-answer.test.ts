@@ -345,3 +345,31 @@ describe("which investors a founder should talk to first", () => {
     expect(fitWords(undefined)).toBeNull();
   });
 });
+
+// F-133: nothing the investors publish is known to fit; they are named as
+// the nearest, never as fits, and each card says the fit is not known.
+describe("unknown is never said to fit (F-133)", () => {
+  const unknown = ["Alchemist Doha", "OpenVC"].map((name, at) => ({
+    investorOrganisationId: `3100000${String(at)}-0000-4000-8000-000000000001`,
+    name,
+    investorType: "VC",
+    hqCountry: at === 0 ? "QA" : "US",
+    publicDescription: null,
+    deploymentState: "ACTIVELY_INVESTING",
+    reasons: [{ kind: "DEPLOYING", detail: "says it is actively investing" }],
+    label: "likely fit, not evidence of interest",
+    gate: null,
+    fitKnown: false,
+  }));
+
+  it("says it cannot tell which fit, and no card reads Likely fit", () => {
+    const picks = pickProspects([], unknown, 3);
+    const text = investorProspectsText(picks, 3);
+    expect(text).toMatch(/^None of the investors on Capital Q publishes/u);
+    expect(text).not.toMatch(/Talk to|likely fit from/u);
+    const block = prospectCardsBlock(picks);
+    for (const card of block?.cards ?? []) {
+      expect(card.view).toMatch(/^Fit not known yet/u);
+    }
+  });
+});
