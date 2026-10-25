@@ -496,8 +496,11 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         // types, green flags and exclusions reached this tool with nothing
         // it owns, and the empty update surfaced as a contract error. Name
         // the tool that does own those answers so Q can use it instead.
+        // Guidance for Q's answer (guard run 2026-10-25): the right tool is
+        // named, loaded and used in the same turn; never said as it stands.
         return refusal(
           "None of that is a mandate field this changes (name, discovery mode, cheque range, stages or the mandate in their own words). Sectors, geographies, business models, customer types, founder preferences, green flags and exclusions are changed with propose_profile_answer_change.",
+          { forModel: true },
         );
       }
       if (operation === "CREATE") {
@@ -549,6 +552,7 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         if (unchanged) {
           return refusal(
             "Nothing would change: the mandate already says that. If they asked to add or remove a sector, geography, business model, customer type, founder preference, green flag or exclusion, prepare it with propose_profile_answer_change instead.",
+            { forModel: true },
           );
         }
       }
