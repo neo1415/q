@@ -272,26 +272,29 @@ export function createDiscoverCompaniesTool(
       // F-82 (live 2026-10-24): disclosure decides at most
       // DISCLOSURE_BATCH more per call and throws past it; a scan of the
       // whole network is decided in batches, in order.
-      const decisions: Awaited<
-        ReturnType<typeof ports.disclosure.evaluateMany>
-      >[number][] = [];
+      // Owner 2026-10-25: the batches are decided side by side (at most
+      // five, three for the live network), in order.
+      const batches: (typeof found.candidates)[] = [];
       for (
         let start = 0;
         start < found.candidates.length;
         start += DISCLOSURE_BATCH
       ) {
-        decisions.push(
-          ...(await ports.disclosure.evaluateMany(
-            found.candidates
-              .slice(start, start + DISCLOSURE_BATCH)
-              .map((candidate) => ({
+        batches.push(found.candidates.slice(start, start + DISCLOSURE_BATCH));
+      }
+      const decisions = (
+        await Promise.all(
+          batches.map((batch) =>
+            ports.disclosure.evaluateMany(
+              batch.map((candidate) => ({
                 principal: actorPrincipal(context.actor),
                 resource: { type: "company" as const, id: candidate.companyId },
                 requestedAccess: "view" as const,
               })),
-          )),
-        );
-      }
+            ),
+          ),
+        )
+      ).flat();
       const seen = new Set<string>();
       const visible = found.candidates.filter((candidate, index) => {
         const decision = decisions[index];

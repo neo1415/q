@@ -393,6 +393,16 @@ describe("@capital-q/capital against local PostgreSQL", () => {
             CompanyIdSchema.parse(randomUUID()),
           ),
         ).resolves.toBeNull();
+        // Owner 2026-10-25: the same read for many companies in one query;
+        // a company with no ACTIVE objective is simply absent.
+        const many = await port.getCurrentForCompanies?.([
+          { tenantId: actor.tenantId, companyId: companyA },
+          {
+            tenantId: actor.tenantId,
+            companyId: CompanyIdSchema.parse(randomUUID()),
+          },
+        ]);
+        expect(many).toEqual([snapshot]);
       },
     );
   });
