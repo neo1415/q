@@ -93,6 +93,10 @@ import {
   taxonomyProposal,
   composerHint,
   keptAllLine,
+  confirmChipLabel,
+  keepListedThenConfirm,
+  notKeptLine,
+  type ListedReading,
   stillWaiting,
   questionOnReturn,
   redrawnThread,
@@ -1432,6 +1436,29 @@ export function QOnboardingWorkspace({
     settleReading();
     await actions.resolveSuggestion({ suggestionId, resolution: "REJECT" });
   };
+  /** The readings on screen under "I picked up", as rendered now. */
+  const listedReadings: readonly ListedReading[] =
+    prompt?.control === "confirm"
+      ? otherProposals.map((item) => ({
+          id: item.suggestion.id,
+          label: item.label,
+        }))
+      : [];
+  const confirmsWithReadings = (chip: QuickChip): boolean =>
+    chip.value?.type === "CONFIRMATION" && chip.value.confirmed;
+  const confirmWithReadings = async (
+    chip: QuickChip,
+    label: string,
+    listed: readonly ListedReading[],
+  ) => {
+    const outcome = await keepListedThenConfirm({
+      listed,
+      stillWaiting: (id) => stillWaiting(viewRef.current, id),
+      keep,
+      confirm: () => submitChip(chip, label),
+    });
+    if (!outcome.confirmed) push("Q", notKeptLine(outcome.failed));
+  };
   const keepAll = async () => {
     const outcomes: boolean[] = [];
     for (const item of otherProposals) {
@@ -2100,17 +2127,27 @@ export function QOnboardingWorkspace({
         <div className="flex flex-col gap-3" data-q-quick-controls>
           {prompt.control === "chips" || prompt.control === "confirm" ? (
             <div className="flex flex-wrap items-center gap-2">
-              {visibleChips.map((chip) => (
-                <Button
-                  key={chip.label}
-                  size="compact"
-                  variant="secondary"
-                  disabled={working}
-                  onClick={() => void submitChip(chip)}
-                >
-                  {chip.label}
-                </Button>
-              ))}
+              {visibleChips.map((chip) => {
+                // A confirmation beside readings keeps exactly the ones on
+                // screen in this render (QA F-130, decision A).
+                const listed = confirmsWithReadings(chip) ? listedReadings : [];
+                const label = confirmChipLabel(chip.label, listed.length);
+                return (
+                  <Button
+                    key={chip.label}
+                    size="compact"
+                    variant="secondary"
+                    disabled={working}
+                    onClick={() =>
+                      void (listed.length > 0
+                        ? confirmWithReadings(chip, label, listed)
+                        : submitChip(chip))
+                    }
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
             </div>
           ) : null}
 
