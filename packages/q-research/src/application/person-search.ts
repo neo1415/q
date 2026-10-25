@@ -50,8 +50,12 @@ import {
 export const PERSON_SEARCH_BUDGET = {
   /** Default per-call deadline for an index with no measured tail of its own. */
   perCallMs: 3_000,
-  /** The whole search, including ranking. */
-  overallMs: 4_500,
+  /**
+   * The whole search, including ranking. Production 2026-10-25: Serper
+   * answered past its 2.2 s deadline, so the only live index was cut off
+   * on a normal day; each index now has its measured tail with headroom.
+   */
+  overallMs: 6_000,
   /**
    * Queries planned for one person (owner's spend rule 2026-10-25: a turn
    * costs one or two searches): the name in its place, then its LinkedIn
@@ -64,8 +68,8 @@ export const PERSON_SEARCH_BUDGET = {
 
 /** Deadline by index, from the measured tails (Serper.dev p95 1.7 s; Tavily p95 3.4 s). */
 const PROVIDER_DEADLINE_MS: Readonly<Record<string, number>> = {
-  serper: 2_200,
-  serpapi: 2_500,
+  serper: 4_000,
+  serpapi: 4_000,
   tavily: 3_200,
   brightdata: 3_000,
   scrapingbee: 4_000,

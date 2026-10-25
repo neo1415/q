@@ -81,6 +81,11 @@ export function fastLaneOf(
     // card for a name nobody asked about, never act.
     const person = skim.person;
     if (person === null) return null;
+    // Production 2026-10-25 ("Who is the founder of Paystack?"): the skim's
+    // own reading named an organisation with a role -- the person asked
+    // for is whoever holds that role there, not named, so the lookup of
+    // the organisation's name answers nothing. The full reading takes it.
+    if (person.kind !== "PERSON" && person.role !== null) return null;
     return {
       questionKind: "PERSON_SEARCH",
       personSearch: {

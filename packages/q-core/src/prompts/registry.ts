@@ -193,6 +193,7 @@ import { TURN_SKIM_V5 } from "./tasks/turn-skim.v5.js";
 import { TURN_SKIM_V6 } from "./tasks/turn-skim.v6.js";
 import { TURN_SKIM_V7 } from "./tasks/turn-skim.v7.js";
 import { TURN_SKIM_V8 } from "./tasks/turn-skim.v8.js";
+import { TURN_SKIM_V9 } from "./tasks/turn-skim.v9.js";
 import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
@@ -693,7 +694,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_SKIM_V5,
     TURN_SKIM_V6,
     TURN_SKIM_V7,
-    TURN_SKIM_V8,
+    { ...TURN_SKIM_V8, status: "DEPRECATED" },
+    TURN_SKIM_V9,
     PERSON_BRIEF_READER_V1,
     BRIEFING_COMMAND_V1,
     GATEQ_DOSSIER_SYNTHESIS_V1,

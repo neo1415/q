@@ -16,7 +16,7 @@ import {
 describe("TURN_SKIM v6: the skim says whom the turn is about", () => {
   it("is v5 kept whole plus the subject rule (v7 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_SKIM");
-    expect(active.definition.version).toBe(8);
+    expect(active.definition.version).toBe(9);
     expect(TURN_SKIM_V5.status).toBe("DEPRECATED");
     expect(TURN_SKIM_V6.template.replace(V6_SUBJECT, "")).toBe(
       TURN_SKIM_V5.template,

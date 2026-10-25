@@ -1849,6 +1849,7 @@ export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";
 export { TURN_SKIM_V8, V8_KINDS } from "./prompts/tasks/turn-skim.v8.js";
+export { TURN_SKIM_V9, V9_ASKS_OF_IT } from "./prompts/tasks/turn-skim.v9.js";
 
 export {
   COMPANY_ANALYST_V23,
