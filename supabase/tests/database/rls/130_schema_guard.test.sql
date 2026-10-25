@@ -134,6 +134,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('onboarding', 'utterances',             'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'interview_turns',        'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'interview_readings',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'document_reviews',       'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'nudge_states',           'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'pending_writes',         'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'session_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
