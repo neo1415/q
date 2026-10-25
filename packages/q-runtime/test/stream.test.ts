@@ -430,6 +430,60 @@ describe("createQRunStreamService", () => {
     });
   });
 
+  // Coordinator 2026-10-25 (I21): a comparison code built goes up first.
+  it("carries a comparison's code-built table on the preview frame, before any words", async () => {
+    const { s, service, deltas, notify } = world();
+    started(s);
+    const iterator = service.open({
+      run: s.current,
+      afterSequence: 0,
+      signal: new AbortController().signal,
+    });
+    const items: QRunStreamItem[] = [];
+    const messageId = randomUUID();
+    const [a, b] = [randomUUID(), randomUUID()];
+    const table = {
+      kind: "TABLE" as const,
+      title: "Mizan and Silo Credit side by side",
+      columns: [
+        { label: "Mizan", subject: { kind: "COMPANY" as const, companyId: a } },
+        {
+          label: "Silo Credit",
+          subject: { kind: "COMPANY" as const, companyId: b },
+        },
+      ],
+      rows: [{ label: "Traction", cells: ["$42,000 MRR", "$9,000 MRR"] }],
+    };
+    let published = false;
+    for await (const item of iterator) {
+      items.push(item);
+      if (item.kind === "durable" && item.event.sequence === 1 && !published) {
+        published = true;
+        deltas.publish({
+          runId: RUN_ID as never,
+          tenantId: TENANT as never,
+          messageId: messageId as never,
+          text: "",
+          preview: {
+            subjects: table.columns.map((column) => ({
+              subject: column.subject,
+              name: column.label,
+            })),
+            layout: "TABLE",
+            table,
+          },
+        });
+      }
+      if (item.kind === "delta") notify(completed(s));
+      if (item.kind === "end") break;
+    }
+    const live = items.flatMap((i) => (i.kind === "delta" ? [i.event] : []));
+    expect(live.map((event) => event.type)).toEqual(["q.artifact.preview"]);
+    expect(live[0]?.data).toEqual(
+      expect.objectContaining({ layout: "TABLE", table }),
+    );
+  });
+
   it("stops at the replay cap instead of loading a run's history without bound", async () => {
     const { s, service } = world(run(), {
       replayMaxEvents: 5,

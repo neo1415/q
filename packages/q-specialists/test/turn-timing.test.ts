@@ -527,6 +527,12 @@ const question = (kind: string, text: string) => ({
   fromShown: null,
 });
 
+function journeyNamed(name: string): Journey {
+  const found = JOURNEYS.find((one) => one.name === name);
+  if (found === undefined) throw new Error(`no journey ${name}`);
+  return found;
+}
+
 export const JOURNEYS: readonly Journey[] = [
   {
     name: "typed question about one company",
@@ -1172,15 +1178,14 @@ describe("turn timing harness", () => {
   }, 600_000);
 
   it("owner 2026-10-22: findings and cards written beside the answer finish the turn sooner", async () => {
+    // Typed turns that take the extras' writer. A comparison code
+    // resolved does not (I21, below): its table and verdict are the
+    // comparison, so it is proved on its own.
     const typed = [
       "typed question about one company",
-      "comparison of two companies",
+      "typed question, company named in lowercase",
       "public web search by name",
-    ].map((name) => {
-      const found = JOURNEYS.find((one) => one.name === name);
-      if (found === undefined) throw new Error(`no journey ${name}`);
-      return found;
-    });
+    ].map(journeyNamed);
     for (const journey of typed) {
       await journeyTimed(journey);
       await journeyTimed(journey, { parallelExtras: true });
@@ -1217,5 +1222,17 @@ describe("turn timing harness", () => {
         (one.firstWordsMs ?? 0) + 300,
       );
     }
+  }, 600_000);
+
+  // Coordinator 2026-10-25 (I21): a comparison code resolved is answered
+  // over its table by one writer, extras on or off; nothing restates it.
+  it("a comparison code resolved has no extras' writer, extras on or off", async () => {
+    const journey = journeyNamed("comparison of two companies");
+    const one = await journeyTimed(journey);
+    const two = await journeyTimed(journey, { parallelExtras: true });
+    expect(two.calls.some((c) => c.startsWith("extras:"))).toBe(false);
+    expect(two.modelCalls).toBe(one.modelCalls);
+    expect(two.modelCalls).toBe(3);
+    expect(two.stored.join(" ")).toContain("Northwind Ledger declares");
   }, 600_000);
 });
