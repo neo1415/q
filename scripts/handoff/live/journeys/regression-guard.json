@@ -12,7 +12,7 @@
             "TABLE",
             "ANSWER_CARDS"
           ],
-          "replyNot": ["couldn't rank the whole network"]
+          "replyMatches": ["on Capital Q; ranked by fit with your mandate"]
         }
       },
       {
@@ -231,7 +231,10 @@
         "ask": "Show me the five companies that best fit my mandate",
         "expect": {
           "anyBlock": ["ANSWER_CARDS", "COMPARISON_CARDS"],
-          "replyMatches": ["Silo Credit"]
+          "replyMatches": [
+            "Silo Credit",
+            "on Capital Q; ranked by fit with your mandate"
+          ]
         }
       }
     ]

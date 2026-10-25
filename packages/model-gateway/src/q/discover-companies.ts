@@ -129,7 +129,7 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
         : null,
     rankFailed:
       typeof data.fitRankFailed?.cause === "string"
-        ? data.fitRankFailed.cause.slice(0, 80)
+        ? data.fitRankFailed.cause.slice(0, 200)
         : null,
   };
 }

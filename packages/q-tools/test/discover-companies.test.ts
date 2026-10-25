@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { failureCause } from "../src/tools/discover-companies.js";
 
 import type { CompanyCatalogPort } from "../src/index.js";
 import {
@@ -356,5 +359,22 @@ describe("DISCOVER_COMPANIES raising (F-10): only companies stating a current ra
     const data = (outcome.result as { data: Record<string, unknown> }).data;
     expect((data["companies"] as unknown[]).length).toBe(5);
     expect(data["raising"]).toEqual({ filter: "UNAVAILABLE", matched: 60 });
+  });
+});
+
+describe("a failed rank's cause, for the log (live P0, a7b99c465)", () => {
+  it("names a schema failure's paths and issue codes, never its values", () => {
+    let thrown: unknown = null;
+    try {
+      z.object({ entries: z.array(z.number()).max(1) }).parse({
+        entries: [7, 8],
+      });
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    const cause = failureCause(thrown);
+    expect(cause).toBe("ZodError(entries:too_big)");
+    expect(cause).not.toMatch(/7|8/u);
+    expect(failureCause(new RangeError("too many: secret"))).toBe("RangeError");
   });
 });

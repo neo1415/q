@@ -31,6 +31,37 @@ import type { QToolPorts } from "../ports.js";
  * the first companies by name, then ranked).
  */
 
+/** How long a failure's cause may be, for the log. */
+const CAUSE_MAX = 200;
+
+/**
+ * A failure as its class, and for a schema failure where it failed (the
+ * paths and issue codes, never a value): the live P0 logged "ZodError"
+ * alone, and finding the schema took a code read.
+ */
+export function failureCause(error: unknown): string {
+  if (!(error instanceof Error)) return "UNKNOWN";
+  const issues = (error as { readonly issues?: unknown }).issues;
+  const where = Array.isArray(issues)
+    ? issues
+        .slice(0, 3)
+        .flatMap((issue: unknown) => {
+          if (typeof issue !== "object" || issue === null) return [];
+          const { path, code } = issue as {
+            readonly path?: unknown;
+            readonly code?: unknown;
+          };
+          const at = Array.isArray(path) ? path.map(String).join(".") : "";
+          return [`${at}:${typeof code === "string" ? code : "?"}`];
+        })
+        .join(",")
+    : "";
+  return (where === "" ? error.name : `${error.name}(${where})`).slice(
+    0,
+    CAUSE_MAX,
+  );
+}
+
 export const DISCOVER_COMPANIES = "discovery.companies" as const;
 
 const LIMIT_MAX = 24;
@@ -134,7 +165,7 @@ export const DiscoverCompaniesOutputSchema = z
      * the error's class name only, for the log.
      */
     fitRankFailed: z
-      .object({ cause: z.string().min(1).max(80) })
+      .object({ cause: z.string().min(1).max(CAUSE_MAX) })
       .strict()
       .optional(),
     /** Declared profiles, not an assessment and not a recommendation. */
@@ -320,9 +351,7 @@ export function createDiscoverCompaniesTool(
               input.limit,
             )
             .catch((error: unknown) => {
-              rankFailure.cause = (
-                error instanceof Error ? error.name : "UNKNOWN"
-              ).slice(0, 80);
+              rankFailure.cause = failureCause(error);
               return null;
             })) ?? null
         );

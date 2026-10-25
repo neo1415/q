@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   FIT_PARAMETERS,
   FitComparisonDtoSchema,
+  FIT_COMPARISON_MAX,
   FitProfileDtoSchema,
   type FitOutcome,
   type FitParameter,
@@ -945,6 +946,19 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
       100, 100, 100, 100, 63,
     ]);
     expect(w.read.flat()).toEqual(ids);
+  });
+
+  // P0 (live a7b99c465, every investor): the catalog asks rank for its
+  // page of 24, and the comparison it returns holds at most 10 entries,
+  // so every network rank threw a ZodError and the answer fell back.
+  it("rank asked for more than a comparison holds: the best ten, never a ZodError", async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => ID(i + 1));
+    const w = world({});
+    const result = await w.service.rank?.(actor, ids, 24);
+    expect(result?.kind).toBe("OK");
+    if (result?.kind !== "OK") return;
+    expect(result.comparison.entries).toHaveLength(FIT_COMPARISON_MAX);
+    expect(result.comparison.considered).toBe(30);
   });
 
   it("rank refuses a non-investor before reading anything", async () => {
