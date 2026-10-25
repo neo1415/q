@@ -223,7 +223,7 @@
       {
         "ask": "Show me my Q Card and the share link.",
         "expect": {
-          "replyMatches": ["https://[^\\s]+/@[a-z0-9-]+"],
+          "replyMatches": ["https://[^\\s]+/@[a-z0-9-]+|Claim @[a-z0-9-]+"],
           "replyNot": ["^Understood\\.?$"]
         }
       }
