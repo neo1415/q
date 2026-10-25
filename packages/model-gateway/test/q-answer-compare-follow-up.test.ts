@@ -202,6 +202,8 @@ function build(
   answer = "Mizan is in Cairo doing merchant payments at $42,000 MRR; Silo Credit is in Kano lending to agri-dealers at $9,000.",
   /** Q showed no cards before this turn. */
   noCards = false,
+  /** Typed answers' findings and cards written beside them (q-api default). */
+  parallelExtras = false,
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -304,6 +306,7 @@ function build(
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools,
+    parallelExtras,
   });
   const request = {
     runId: run,
@@ -388,6 +391,31 @@ describe("compare the top two, right after a list of five", () => {
     const traction = table?.rows.find((row) => row.label === "Traction");
     expect(traction?.cells[0]).toContain("$42,000");
     expect(traction?.cells[1]).toContain("$9,000");
+  });
+
+  // Coordinator 2026-10-25 (I21, live 5a3490b6, 16.4 s): the table was
+  // built, then a tool round re-read both companies and two writers
+  // (answer, then cards and findings restating the table) ran.
+  it("answers over the table in one call: no tool round, no second writer", async () => {
+    const { seam, request, alpha, stored } = build(
+      "How do the top two stack up?",
+      { compare: { count: 2, names: [] } },
+      undefined,
+      false,
+      true,
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(1);
+    expect(alpha.calls[0]?.request.tools ?? []).toEqual([]);
+    const sent = sentTo(alpha);
+    expect(sent).toContain("COMPARED SIDE BY SIDE");
+    expect(sent).toContain("Capital Q shows this comparison's table");
+    expect(sent).not.toContain("A second writer");
+    expect(
+      (stored.at(-1)?.blocks ?? []).some(
+        (block) => Reflect.get(block as object, "kind") === "TABLE",
+      ),
+    ).toBe(true);
   });
 
   it("the same, when the turn was read as a fit question (live 23 Oct, run f5415b0c)", async () => {

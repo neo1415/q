@@ -156,3 +156,52 @@ describe("answerPathOf (K8)", () => {
     });
   });
 });
+
+// Coordinator 2026-10-25 (I21, live 5a3490b6: "how do the top two stack
+// up?" took a tool round that re-read both companies code had read).
+describe("a comparison code resolved (I21)", () => {
+  const compared = {
+    mandate: true,
+    onScreenRecord: false,
+    qWork: true,
+    ownCompany: false,
+    comparison: true,
+  };
+
+  it("is answered over its table, with no tool round, however it was read", () => {
+    for (const overrides of [
+      { questionKind: "ADVICE" },
+      { questionKind: undefined },
+      { fit: true },
+      { aboutNamedOther: true },
+      { researchMode: "OFFERED" as const },
+    ]) {
+      expect(answerPathOf(input({ ...overrides, prepared: compared }))).toEqual(
+        { path: "PREPARED_CONTEXT", because: "COMPARISON" },
+      );
+    }
+  });
+
+  it("keeps the full path for the web, an action or a document", () => {
+    for (const overrides of [
+      { researchMode: "EXPLICIT" as const },
+      { askedAction: true },
+      { writingDocument: true },
+    ]) {
+      expect(
+        answerPathOf(input({ ...overrides, prepared: compared })).path,
+      ).toBe("DEEP_ANALYSIS");
+    }
+  });
+
+  it("without a resolved comparison nothing changes", () => {
+    expect(
+      answerPathOf(
+        input({
+          questionKind: "ADVICE",
+          prepared: { ...compared, comparison: false },
+        }),
+      ).path,
+    ).toBe("DEEP_ANALYSIS");
+  });
+});
