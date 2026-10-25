@@ -58,6 +58,7 @@ import {
   type OnboardingSessionId,
   type OnboardingStepDefinition,
   type OnboardingSubject,
+  type OnboardingSourceRef,
   type OnboardingSuggestion,
   type OnboardingSuggestionId,
   type ValidatedOnboardingResponse,
@@ -148,7 +149,9 @@ import {
   type OnboardingSessionAggregate,
   presentationOf,
 } from "./view.js";
+import { proposalSource } from "./coverage.js";
 import { sameResponseValue } from "./pending-writes.js";
+import { supersededDocumentOffers, withSources } from "./superseded-offers.js";
 
 /**
  * Onboarding runtime use cases.
@@ -1960,12 +1963,31 @@ export function createOnboardingUseCases(
       if (rejected.some((v) => sameResponseValue(v, command.suggestedValue))) {
         throw new OnboardingSessionStateError("SUGGESTION_REJECTED_BEFORE");
       }
+      // Their material read again (a second deck, a new version, live 25
+      // Oct run b9-0746: "Stage · Seed" twice): an offer from their own
+      // documents of the same value is superseded, kept as EXPIRED history,
+      // and the new offer cites every document it was read in. A different
+      // value is a contradiction, and both stay until the person settles it.
+      let sourceRefs: readonly OnboardingSourceRef[] = command.sourceRefs;
+      const superseded =
+        proposalSource(command.sourceRefs) === "DOCUMENT"
+          ? supersededDocumentOffers(
+              await suggestions.listPending(tx.sql, session.id),
+              { stepKey: step.stepKey, suggestedValue: command.suggestedValue },
+            )
+          : [];
+      for (const earlier of superseded) {
+        // Already settled by someone else in between: nothing to carry over.
+        if (await suggestions.resolve(tx, earlier.id, "EXPIRED")) {
+          sourceRefs = withSources(sourceRefs, earlier.sourceRefs);
+        }
+      }
       return suggestions.insert(tx, {
         sessionId: session.id,
         stepKey: step.stepKey,
         targetField: command.targetField,
         suggestedValue: command.suggestedValue,
-        sourceRefs: command.sourceRefs,
+        sourceRefs,
         confidence: command.confidence,
         modelRunId: command.modelRunId,
         rationale:
