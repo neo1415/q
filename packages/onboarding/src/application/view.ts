@@ -11,6 +11,7 @@ import type { DatabaseExecutor } from "@capital-q/database";
 
 import type {
   OnboardingInterviewQuestion,
+  OnboardingInterviewTurnRecord,
   OnboardingResponse,
   OnboardingSession,
   OnboardingStepDefinition,
@@ -324,6 +325,27 @@ export function openAskedStep(
   );
   const status = asked && aggregate.states.get(asked.stepKey)?.status;
   return status === "COMPLETED" || status === "SKIPPED" ? undefined : asked;
+}
+
+/**
+ * The step Q's last line asked, while that line is still the question on
+ * the table: it is the newest line, and nothing moved the session after
+ * it was said (the browser's `pendingQuestion` uses the same rule).
+ */
+export function pendingAskedStepKey(
+  last:
+    | Pick<OnboardingInterviewTurnRecord, "role" | "stepKey" | "createdAt">
+    | undefined,
+  lastActivityAt: string,
+): string | undefined {
+  if (last === undefined || last.role !== "Q" || last.stepKey === null) {
+    return undefined;
+  }
+  const said = Date.parse(last.createdAt);
+  const moved = Date.parse(lastActivityAt);
+  return Number.isNaN(said) || Number.isNaN(moved) || said < moved
+    ? undefined
+    : last.stepKey;
 }
 
 /**

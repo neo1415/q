@@ -146,6 +146,7 @@ import {
   toSessionView,
   toStepView,
   openAskedStep,
+  pendingAskedStepKey,
   type OnboardingSessionAggregate,
   presentationOf,
 } from "./view.js";
@@ -1072,8 +1073,26 @@ export function createOnboardingUseCases(
       query.actor.userId,
       query.journeyType,
     );
-    return session === null ? null : view(sql, query.actor, session);
+    return session === null
+      ? null
+      : view(sql, query.actor, session, undefined, await askedOnTable(session));
   };
+
+  /**
+   * The step Q's last line asked, while that line is still the question on
+   * the table (live 25 Oct e2e: after a reload the screen showed the
+   * cursor's step, "Skip" only, under Q's "are you deploying capital
+   * now?", and its chips were gone).
+   */
+  const askedOnTable = async (
+    session: OnboardingSession,
+  ): Promise<string | undefined> =>
+    runtime.interviewTurns === undefined
+      ? undefined
+      : pendingAskedStepKey(
+          (await runtime.interviewTurns.listRecent(sql, session.id, 1)).at(-1),
+          session.lastActivityAt,
+        );
 
   const getSession = async (
     query: GetSessionQuery,
@@ -1084,7 +1103,13 @@ export function createOnboardingUseCases(
       query.actor,
       OnboardingSessionIdSchema.parse(query.sessionId),
     );
-    return view(sql, query.actor, session, undefined, query.askedStepKey);
+    return view(
+      sql,
+      query.actor,
+      session,
+      undefined,
+      query.askedStepKey ?? (await askedOnTable(session)),
+    );
   };
 
   const bindSessionContext = async (

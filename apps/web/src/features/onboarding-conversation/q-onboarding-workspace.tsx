@@ -729,11 +729,14 @@ export function QOnboardingWorkspace({
           setTurns((current) => [...restored, ...unsent, ...current]);
         }
         if (pending !== null) {
-          // Q is asking that line, about a step this screen cannot name
-          // after a reload: the composer's hint stays neutral rather than
-          // the form step's ("example.com" under "Are you deploying
-          // capital?", live 24 Oct).
-          setQAsking([]);
+          // Q is asking that line: its controls are the step it asked, which
+          // the session read carries (live 25 Oct e2e: after a reload the
+          // chips under "are you deploying capital now?" were gone, the
+          // cursor's step showing instead). Unknown, the composer's hint
+          // stays neutral rather than the form step's (live 24 Oct).
+          const asked = viewRef.current?.askedStep ?? null;
+          setQAskedStep(asked);
+          setQAsking(asked === null ? [] : [asked.stepKey]);
           return pending;
         }
         return actions
