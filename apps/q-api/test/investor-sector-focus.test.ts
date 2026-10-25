@@ -28,7 +28,7 @@ const nodeId = (code: string) => {
   return node.id;
 };
 
-function portWith(own: string | null) {
+function portWith(own: string | null, now?: () => number) {
   const projectionFor = vi.fn(() =>
     Promise.resolve({
       classifications: [
@@ -52,6 +52,7 @@ function portWith(own: string | null) {
       PublicIdentityService,
       "cardForSubject"
     >,
+    ...(now === undefined ? {} : { now }),
   });
   return { port, projectionFor, cardForSubject };
 }
@@ -103,5 +104,20 @@ describe("investor sector focus", () => {
     });
     expect(projectionFor).not.toHaveBeenCalled();
     expect(cardForSubject).not.toHaveBeenCalled();
+  });
+
+  // Egress (2026-10-24): a participant-audience card is the same for every
+  // reader, so it is read once per few minutes per process, not per turn.
+  it("reads each investor's card once per few minutes, across turns", async () => {
+    let clock = 0;
+    const { port, cardForSubject } = portWith(COMPANY, () => clock);
+    await port.forOwnCompany(actor, COMPANY, [INVESTOR]);
+    clock = 4 * 60 * 1000;
+    const again = await port.forOwnCompany(actor, COMPANY, [INVESTOR]);
+    expect(cardForSubject).toHaveBeenCalledTimes(1);
+    expect(again.investors[0]?.sectors.length).toBeGreaterThan(0);
+    clock = 6 * 60 * 1000;
+    await port.forOwnCompany(actor, COMPANY, [INVESTOR]);
+    expect(cardForSubject).toHaveBeenCalledTimes(2);
   });
 });
