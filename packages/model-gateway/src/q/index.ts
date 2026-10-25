@@ -8046,7 +8046,9 @@ export function createModelGatewayQAnswer(
                   unknownRootKeys: "DROP",
                 },
               );
-              if (accepted.ok && draftedNotPrepared()) {
+              // Whether or not the text fits the task's shape: a draft
+              // written instead of prepared (guard run 0527cfb8).
+              if (draftedNotPrepared()) {
                 askToDoIt(
                   result.output.text,
                   prepareMessageNote(request.askedAction ?? ""),

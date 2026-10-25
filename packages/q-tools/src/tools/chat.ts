@@ -274,7 +274,14 @@ export async function resolveRelationship(
       "RELATIONSHIP_CONTEXT",
       (filter) => filter.relationshipIds?.includes(id) === true,
     );
-    return bound === undefined ? null : id;
+    if (bound !== undefined) return id;
+    // Guard run (2026-10-25, run 7eebd402): an id from their own list of
+    // relationships, from any page, is theirs (as a name is); the party
+    // check of every service the tool then calls stands as for the page.
+    const own = await relationships.ownRelationships?.(actor).catch(() => null);
+    return (own?.items ?? []).some((item) => item.relationshipId === id)
+      ? id
+      : null;
   }
   if (input.companyId !== undefined) {
     if (!admitted(plan, { kind: "COMPANY", id: input.companyId })) return null;

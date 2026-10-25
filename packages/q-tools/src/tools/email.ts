@@ -199,14 +199,25 @@ export function createProposeEmailTool(
         let relationshipId = input.relationshipId;
         // A name (action parity 2026-10-02, "email Nixo" from any page):
         // one of their OWN relationships; the counterpart read below is the
-        // party check, as for the page.
-        const byName = input.counterpartName !== undefined;
-        if (byName && relationships !== undefined) {
-          const own = await relationships
-            .ownRelationships?.(actor)
-            .catch(() => null);
+        // party check, as for the page. An id from that same list is theirs
+        // too (guard run 2026-10-25, run 7eebd402: "needs its existing
+        // connection reference").
+        const ownList =
+          relationships === undefined
+            ? null
+            : await relationships.ownRelationships?.(actor).catch(() => null);
+        const ownId =
+          relationshipId !== undefined &&
+          (ownList?.items ?? []).some(
+            (item) => item.relationshipId === relationshipId,
+          );
+        const byName = input.counterpartName !== undefined || ownId;
+        if (
+          input.counterpartName !== undefined &&
+          relationships !== undefined
+        ) {
           const found = closestByName(
-            own?.items ?? [],
+            ownList?.items ?? [],
             input.counterpartName ?? "",
             (item) => item.counterpart.name,
           );
