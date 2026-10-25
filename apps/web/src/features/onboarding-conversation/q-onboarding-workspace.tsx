@@ -96,6 +96,9 @@ import {
   redrawnThread,
   welcomeBack,
   resumedThread,
+  questionShown,
+  questionAfterTap,
+  type QQuestion,
   type JourneyVocabulary,
   type QPrompt,
   type QuickChip,
@@ -297,17 +300,7 @@ export function QOnboardingWorkspace({
    * instead, and only while the session is still on the step Q asked
    * about; the definition's prompt is what a fresh screen falls back to.
    */
-  const [qQuestion, setQQuestion] = useState<{
-    readonly stepKey: string;
-    readonly text: string;
-    /**
-     * Q's opening (live acceptance 2026-10-16): shown whatever step the
-     * session settles on while it opens. The opening itself records what
-     * registration gave (the company name), which moves the step, and the
-     * opener was being discarded for the next step's column heading.
-     */
-    readonly sticky?: boolean;
-  } | null>(null);
+  const [qQuestion, setQQuestion] = useState<QQuestion | null>(null);
   /**
    * The steps Q's last turn asked about (its `askingAbout`), so the
    * composer's hint follows Q's question, not the form's step cursor (live
@@ -434,6 +427,15 @@ export function QOnboardingWorkspace({
    * one, when the turn did not move the step (held-reply.ts).
    */
   const pendingReply = useHeldReply(prompt, setQQuestion);
+  /**
+   * A tap answered Q (QA F-131): its sentence and the step it asked are
+   * settled, so the screen asks what the session moved to.
+   */
+  const answeredByTap = useCallback(() => {
+    setQQuestion(questionAfterTap());
+    setQAskedStep(null);
+    setQAsking(null);
+  }, []);
 
   /**
    * What the screen asks: Q's own sentence while the session is still on
@@ -449,17 +451,7 @@ export function QOnboardingWorkspace({
    */
   const silentStep =
     prompt !== null && /\.mandate_context$/.test(prompt.stepKey);
-  const questionText =
-    prompt === null
-      ? null
-      : qQuestion !== null &&
-          (qQuestion.stepKey === prompt.stepKey ||
-            silentStep ||
-            qQuestion.sticky === true)
-        ? qQuestion.text
-        : silentStep
-          ? null
-          : prompt.text;
+  const questionText = questionShown(prompt, qQuestion, silentStep);
 
   /** What is put on screen as Q's question; nothing at all on a silent step. */
   const liveQuestion: string | null =
@@ -1193,6 +1185,7 @@ export function QOnboardingWorkspace({
       const tap = async (): Promise<void> => {
         const ok = await actions.submitValue({ stepKey, value: tapped });
         if (ok) {
+          answeredByTap();
           push("Q", acknowledgeValue(stepKey, tapped, vocabulary));
         } else {
           // A refused or conflicted tap used to leave their choice looking
@@ -1222,6 +1215,7 @@ export function QOnboardingWorkspace({
       vocabulary,
       voiceActive,
       voiceSendText,
+      answeredByTap,
     ],
   );
 
@@ -1250,6 +1244,7 @@ export function QOnboardingWorkspace({
     const tap = async (): Promise<void> => {
       const ok = await actions.submitValue({ stepKey, value });
       if (ok) {
+        answeredByTap();
         push("Q", acknowledgeValue(stepKey, value, vocabulary));
       } else {
         markUnsent(personLine, () => {
@@ -1276,6 +1271,7 @@ export function QOnboardingWorkspace({
     vocabulary,
     voiceActive,
     voiceSendText,
+    answeredByTap,
   ]);
 
   const togglePick = (chip: QuickChip) => {
@@ -1342,6 +1338,7 @@ export function QOnboardingWorkspace({
       });
     }
     if (ok) {
+      answeredByTap();
       push("Q", `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`);
     }
     if (ok && voiceActive) {
@@ -1358,6 +1355,7 @@ export function QOnboardingWorkspace({
     vocabulary,
     voiceActive,
     voiceSendText,
+    answeredByTap,
   ]);
 
   const toggleTaxonomy = (node: {

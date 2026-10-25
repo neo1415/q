@@ -758,6 +758,52 @@ export function acknowledgeValue(
   return `${vocabulary.stepTitle(stepKey)}: ${trimSentenceEnd(vocabulary.describe(stepKey, value, labels))}. Noted.`;
 }
 
+/** Q's own sentence on screen, and the step it was said about. */
+export type QQuestion = {
+  readonly stepKey: string;
+  readonly text: string;
+  /**
+   * Q's opening (live acceptance 2026-10-16): shown whatever step the
+   * session settles on while it opens. The opening itself records what
+   * registration gave (the company name), which moves the step, and the
+   * opener was being discarded for the next step's column heading.
+   */
+  readonly sticky?: boolean;
+};
+
+/**
+ * What the screen asks: Q's own sentence while the session is still on
+ * the step Q asked about (or Q's opening, while it opens), the step's own
+ * question otherwise; nothing at all on a silent step.
+ */
+export function questionShown(
+  prompt: { readonly stepKey: string; readonly text: string } | null,
+  qQuestion: QQuestion | null,
+  silentStep: boolean,
+): string | null {
+  if (prompt === null) return null;
+  if (
+    qQuestion !== null &&
+    (qQuestion.stepKey === prompt.stepKey ||
+      silentStep ||
+      qQuestion.sticky === true)
+  ) {
+    return qQuestion.text;
+  }
+  return silentStep ? null : prompt.text;
+}
+
+/**
+ * Q's sentence once a tap has answered (QA F-131, 25 Oct: after "Seed",
+ * "CEO" or "Looks right" Q said "Noted." and its opening stayed on screen
+ * as the question; the next one showed only after a reload). A tap is the
+ * person's answer: Q's earlier sentence, its opening included, is answered
+ * and the step the session moved to asks its own question.
+ */
+export function questionAfterTap(): QQuestion | null {
+  return null;
+}
+
 /** The most one message to Q may carry (SayOnboardingRequestSchema). */
 export const SAY_MAX_CHARS = 2000;
 
