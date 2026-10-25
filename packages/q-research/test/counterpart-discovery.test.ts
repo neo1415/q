@@ -661,7 +661,6 @@ describe("nothing to match on is never a fit (F-133)", () => {
       ...SCOPE,
       regions: [],
       count: 3,
-      aboutMyCompany: true,
     });
     expect(names(found)).toEqual([]);
   });
@@ -676,7 +675,6 @@ describe("nothing to match on is never a fit (F-133)", () => {
       regions: [],
       stage: "seed",
       count: 3,
-      aboutMyCompany: true,
     });
     // "backing early-stage tech startups" is the only seed-stage match.
     expect(names(found)).toEqual(["Muhannad Taslaq"]);
