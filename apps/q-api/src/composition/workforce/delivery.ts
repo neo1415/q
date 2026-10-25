@@ -20,7 +20,7 @@ import { z } from "zod";
 
 import type { WorkforcePorts } from "./jobs.js";
 import type { WorkRow } from "./queue.js";
-import { doneOutputs } from "./results.js";
+import { doneOutputs, filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -81,6 +81,41 @@ export function deliveryText(document: DeliveredDocument): string {
   return lines.join("\n\n");
 }
 
+/**
+ * The one line a job's end leaves in the conversation when it filed no
+ * analysis: the document's name, or why there is none; "" when they
+ * stopped it themselves (they know).
+ */
+export function followUpLine(
+  row: Pick<WorkRow, "state" | "reason">,
+  documentTitle: string | null,
+): string {
+  const why = row.reason?.trim().replace(/\.$/u, "") ?? "";
+  switch (row.state) {
+    case "COMPLETED":
+      return documentTitle === null
+        ? "That work is done."
+        : `Your ${documentTitle.replace(/[.\s]+$/u, "")} is ready.`;
+    case "NEEDS_DECISION":
+    case "BLOCKED":
+      return why === ""
+        ? "That work is waiting for you before it can go on."
+        : `That work is waiting for you: ${why}.`;
+    case "FAILED":
+      return why === ""
+        ? "I couldn't finish that work, so there is no document."
+        : `I couldn't finish that work, so there is no document: ${why}.`;
+    // Stopped by the person (they know), or not ended yet: nothing to say.
+    case "CANCELLED":
+    case "QUEUED":
+    case "PLANNED":
+    case "AWAITING_AUTHORIZATION":
+    case "RUNNING":
+    case "RECOVERING":
+      return "";
+  }
+}
+
 function messageIdFor(jobId: string) {
   const hex = createHash("sha256")
     .update(`workforce-delivery:${jobId}`)
@@ -99,10 +134,121 @@ export function createWorkforceDelivery(dependencies: {
   >;
   readonly notify: WorkforcePorts["notify"];
   readonly logger?: Logger | undefined;
+  /**
+   * QA F-117: the READY documents a finished job filed that are not an
+   * analysis delivery, as the owner may read them. Absent: none found.
+   */
+  readonly filed?:
+    | ((
+        owner: Owner,
+        organisationId: string | null,
+        artifactIds: readonly string[],
+      ) => Promise<
+        readonly {
+          readonly artifactId: string;
+          readonly type: string;
+          readonly title: string;
+        }[]
+      >)
+    | undefined;
 }) {
+  /** One message for the job, in the conversation its run belongs to. */
+  const post = async (
+    owner: Owner,
+    row: WorkRow,
+    text: string,
+    blocks: readonly QResultBlock[],
+  ): Promise<boolean> => {
+    const runId = QRunIdSchema.safeParse(row.trace.runId);
+    if (!runId.success) return false;
+    try {
+      // The run is read as its owner: someone else's run is not found.
+      const run = await dependencies.runtime.runs.findForActor(
+        dependencies.sql,
+        TenantIdSchema.parse(owner.tenantId),
+        UserIdSchema.parse(owner.userId),
+        runId.data,
+      );
+      if (run === null || run.conversationId === null) return false;
+      const conversationId = run.conversationId;
+      await dependencies.transactions.run(async (tx) => {
+        const stored = await dependencies.runtime.messages.insert(tx, {
+          id: messageIdFor(row.job_id),
+          tenantId: run.tenantId,
+          conversationId,
+          runId: run.id,
+          role: "Q",
+          content: text,
+          blocks,
+        });
+        await appendRunEvent(
+          dependencies.runtime,
+          tx,
+          { id: run.id, tenantId: run.tenantId },
+          {
+            type: "q.message.completed",
+            data: {
+              message: {
+                ...(toQMessage(stored) as QResponseMessage),
+                blocks: [...blocks],
+              },
+            },
+          },
+        );
+      });
+      return true;
+    } catch (error: unknown) {
+      // Most often: already delivered (the message id is the job's).
+      dependencies.logger?.info(
+        { err: error, jobId: row.job_id },
+        "workforce delivery not posted to the conversation",
+      );
+      return false;
+    }
+  };
+
+  /**
+   * QA F-117 (25 Oct 2026): "On it. Starting now" was followed by neither
+   * a document nor a clear failure when the job filed a plain document or
+   * stopped. Every job that ends says so, once, in the conversation: the
+   * document it filed, or in plain words why there is none.
+   */
+  const followUp = async (owner: Owner, row: WorkRow): Promise<boolean> => {
+    const card: QResultBlock = {
+      kind: "WORK_IN_PROGRESS",
+      jobId: row.job_id,
+      title: "Q's work",
+    };
+    if (row.state === "COMPLETED") {
+      const ids = filedDocumentIds(row);
+      const [document] =
+        ids.length === 0 || dependencies.filed === undefined
+          ? []
+          : await dependencies
+              .filed(owner, row.trace.organisationId ?? null, ids)
+              .catch(() => []);
+      const type = QArtifactTypeSchema.safeParse(document?.type);
+      if (document !== undefined && type.success) {
+        const title = document.title.slice(0, 160);
+        return post(owner, row, followUpLine(row, title), [
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: QArtifactIdSchema.parse(document.artifactId),
+            type: type.data,
+            status: "READY",
+            title,
+          },
+          { ...card, title },
+        ]);
+      }
+    }
+    const line = followUpLine(row, null);
+    return line === "" ? false : post(owner, row, line, [card]);
+  };
+
   return async (owner: Owner, row: WorkRow): Promise<boolean> => {
     const document = deliveredDocument(row);
-    if (document === null) return false;
+    if (document === null) return followUp(owner, row);
     const text = deliveryText(document);
     const block: QResultBlock = {
       kind: "ARTIFACT_REFERENCE",
@@ -123,55 +269,7 @@ export function createWorkforceDelivery(dependencies: {
         title: document.delivery.title.slice(0, 160),
       },
     ];
-    let posted = false;
-    const runId = QRunIdSchema.safeParse(row.trace.runId);
-    if (runId.success) {
-      try {
-        // The run is read as its owner: someone else's run is not found.
-        const run = await dependencies.runtime.runs.findForActor(
-          dependencies.sql,
-          TenantIdSchema.parse(owner.tenantId),
-          UserIdSchema.parse(owner.userId),
-          runId.data,
-        );
-        if (run !== null && run.conversationId !== null) {
-          const conversationId = run.conversationId;
-          await dependencies.transactions.run(async (tx) => {
-            const stored = await dependencies.runtime.messages.insert(tx, {
-              id: messageIdFor(row.job_id),
-              tenantId: run.tenantId,
-              conversationId,
-              runId: run.id,
-              role: "Q",
-              content: text,
-              blocks,
-            });
-            await appendRunEvent(
-              dependencies.runtime,
-              tx,
-              { id: run.id, tenantId: run.tenantId },
-              {
-                type: "q.message.completed",
-                data: {
-                  message: {
-                    ...(toQMessage(stored) as QResponseMessage),
-                    blocks: [...blocks],
-                  },
-                },
-              },
-            );
-          });
-          posted = true;
-        }
-      } catch (error: unknown) {
-        // Most often: already delivered (the message id is the job's). The
-        // notice below is deduplicated the same way.
-        dependencies.logger?.info(
-          { err: error, jobId: row.job_id },
-          "workforce delivery not posted to the conversation",
-        );
-      }
-    }
+    const posted = await post(owner, row, text, blocks);
     await dependencies
       .notify(owner, {
         key: `wf:${row.job_id}:delivered`,

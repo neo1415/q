@@ -4854,6 +4854,53 @@ const workforceDiligence = createWorkforceDiligence({
 // Recovery D3: the durable workforce runner. It claims approved jobs under a
 // lease, renews it while a job runs and resumes any job a restart left
 // behind once its lease lapses. Jobs finish without anyone connected.
+/**
+ * A job's documents and approvals, resolved under the job owner's fresh
+ * context: the job page's read, and (QA F-117) the delivery's follow-up.
+ */
+const workforceDeliverables = async (
+  owner: { readonly tenantId: string; readonly userId: string },
+  organisationId: string | null,
+  references: {
+    readonly artifactIds: readonly string[];
+    readonly actionIds: readonly string[];
+  },
+) => {
+  const actor = await createOwnerActor({
+    resolver: actorContextResolver,
+    authUserOf: async (userId) =>
+      (
+        await database.sql<{ auth_user_id: string | null }[]>`
+                  select auth_user_id from identity.user_profiles where id = ${userId}`
+      )[0]?.auth_user_id ?? null,
+  })(owner.userId, organisationId);
+  if (actor === null || actor.tenantId !== owner.tenantId)
+    return { documents: [], approvals: [] };
+  const [documents, approvals] = await Promise.all([
+    Promise.all(
+      references.artifactIds.map((artifactId) =>
+        qArtifacts.service.read(actor, artifactId).catch(() => null),
+      ),
+    ),
+    Promise.all(
+      references.actionIds.map((actionId) =>
+        (async () => {
+          const approval = await qActions.findApprovalForAction(
+            actor.tenantId,
+            QActionProposalIdSchema.parse(actionId),
+          );
+          return approval === null
+            ? null
+            : qActions.getApproval({ actor, approvalId: approval.id });
+        })().catch(() => null),
+      ),
+    ),
+  ]);
+  return {
+    documents: documents.filter((document) => document !== null),
+    approvals: approvals.filter((approval) => approval !== null),
+  };
+};
 const agentWorkRunner = createAgentWorkRunner({
   queue: agentWorkQueue,
   store: workforceStore,
@@ -4869,6 +4916,20 @@ const agentWorkRunner = createAgentWorkRunner({
   jobsFor: workforceJobsFor,
   // Owner 2026-10-23: the finished document lands in the conversation.
   deliver: createWorkforceDelivery({
+    // QA F-117: a plain document's follow-up, read as its owner.
+    filed: async (owner, organisationId, artifactIds) =>
+      (
+        await workforceDeliverables(owner, organisationId, {
+          artifactIds,
+          actionIds: [],
+        })
+      ).documents
+        .filter((document) => document.artifact.status === "READY")
+        .map((document) => ({
+          artifactId: document.artifact.artifactId,
+          type: document.artifact.type,
+          title: document.artifact.title,
+        })),
     sql: database.sql,
     transactions: database.transactions,
     runtime: repositories,
@@ -7177,42 +7238,7 @@ const { app, logger: appLogger } = createApp(
         store: workforceStore,
         // Recovery D6: each job's durable work state, why it stopped, trace.
         work: agentWorkQueue,
-        deliverables: async (owner, organisationId, references) => {
-          const actor = await createOwnerActor({
-            resolver: actorContextResolver,
-            authUserOf: async (userId) =>
-              (
-                await database.sql<{ auth_user_id: string | null }[]>`
-                  select auth_user_id from identity.user_profiles where id = ${userId}`
-              )[0]?.auth_user_id ?? null,
-          })(owner.userId, organisationId);
-          if (actor === null || actor.tenantId !== owner.tenantId)
-            return { documents: [], approvals: [] };
-          const [documents, approvals] = await Promise.all([
-            Promise.all(
-              references.artifactIds.map((artifactId) =>
-                qArtifacts.service.read(actor, artifactId).catch(() => null),
-              ),
-            ),
-            Promise.all(
-              references.actionIds.map((actionId) =>
-                (async () => {
-                  const approval = await qActions.findApprovalForAction(
-                    actor.tenantId,
-                    QActionProposalIdSchema.parse(actionId),
-                  );
-                  return approval === null
-                    ? null
-                    : qActions.getApproval({ actor, approvalId: approval.id });
-                })().catch(() => null),
-              ),
-            ),
-          ]);
-          return {
-            documents: documents.filter((document) => document !== null),
-            approvals: approvals.filter((approval) => approval !== null),
-          };
-        },
+        deliverables: workforceDeliverables,
         costs: (owner, jobIds) =>
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
         monthCosts: (owner, at) =>

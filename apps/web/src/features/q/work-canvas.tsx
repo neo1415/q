@@ -599,6 +599,10 @@ export function WorkInProgressCard({
     }
   }
 
+  // QA 25 Oct (job 4d1a8b04): finished with no document to show, the card
+  // said "Done" over "Planning the work". Done is said by the status; the
+  // steps stand as they ended.
+  const finishedBare = live?.state === "DONE" && shown >= STEPS.length;
   const ended =
     live !== null &&
     (live.state === "FAILED" ||
@@ -686,7 +690,7 @@ export function WorkInProgressCard({
             </div>
           )}
         </div>
-      ) : (
+      ) : finishedBare ? null : (
         <StepInView step={inView} stage={live?.stage ?? null} />
       )}
     </section>
