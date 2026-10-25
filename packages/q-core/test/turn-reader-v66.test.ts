@@ -51,4 +51,24 @@ describe("TURN_READER v66: Discover's own narrowing choices, only when stated", 
       raiseShared: false,
     });
   });
+
+  // Reader lane review (2026-10-25): raising now is raising alone.
+  it("reads 'Show me fintechs in Kenya raising now' as raising, with no qualifier", () => {
+    const read = TurnReaderV65ResultSchema.parse({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: {
+        kind: "DISCOVER_COMPANIES",
+        text: "Show me fintechs in Kenya raising now",
+        discover: { sectors: ["fintech"], countries: ["KE"], raising: true },
+      },
+    });
+    expect(read.question?.discover).toMatchObject({
+      raising: true,
+      verifiedOnly: false,
+      hasPitch: false,
+      raiseShared: false,
+    });
+  });
 });
