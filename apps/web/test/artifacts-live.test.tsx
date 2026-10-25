@@ -200,6 +200,41 @@ describe("the card comes up with the sentence that names it", () => {
     expect(livePreviewOf(turns, shown)).toBeNull();
   });
 
+  // I21 (QA on 5630e086f): "compare the top two" is about two cards
+  // already on the stage; its table went up only as the answer landed.
+  it("puts a comparison's table up over the set it compares, while Q is still talking", () => {
+    const top = demoTop(3);
+    const [first, second] = top.cards;
+    const columns = [first, second].map((card) => ({
+      label: card?.name ?? "",
+      subject: card?.subject ?? null,
+    }));
+    const tablePreview: QArtifactPreview = {
+      messageId: QMessageIdSchema.parse(MSG),
+      subjects: columns.flatMap((column) =>
+        column.subject === null
+          ? []
+          : [{ subject: column.subject, name: column.label }],
+      ),
+      layout: "TABLE",
+      table: {
+        kind: "TABLE",
+        title: "Side by side",
+        columns,
+        rows: [{ label: "Traction", cells: ["Not stated", "Not stated"] }],
+      },
+    };
+    const turns = [
+      person("p1", "Top three?"),
+      answer("a1", "Three stand out.", { blocks: [top] }),
+      person("p2", "Compare the top two in a table"),
+      answer(MSG, "", { streaming: true, preview: tablePreview }),
+    ];
+    const shown = stageOf(shownItems(turns), turns).item;
+    expect(shown).not.toBeNull();
+    expect(livePreviewOf(turns, shown)?.table).toBeDefined();
+  });
+
   it("carries the stream's preview onto the live turn, and drops it with the persisted message", () => {
     const event = (type: string, data: unknown, sequence: number) =>
       ({

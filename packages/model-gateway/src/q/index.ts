@@ -5993,8 +5993,18 @@ export function createModelGatewayQAnswer(
       // told that line was said and continues after it).
       /** I21: when the comparison's table went up, from the seam's start. */
       let tableFirstMs: number | null = null;
+      /**
+       * QA 2026-10-25 (table at 9 s from Enter, tableMs 695 from the seam):
+       * the same moment from the run's start, the person's message.
+       */
+      const sinceRun = (): number | null => {
+        const at = Date.parse(latest.createdAt);
+        return Number.isFinite(at) ? Date.now() - at : null;
+      };
+      let tableSinceRunMs: number | null = null;
       if (tableFirst !== null) {
         tableFirstMs = Date.now() - startedAt;
+        tableSinceRunMs = sinceRun();
         send({
           runId: request.runId,
           tenantId: request.tenantId,
@@ -6011,6 +6021,11 @@ export function createModelGatewayQAnswer(
           {
             qRunId: request.runId,
             tableMs: tableFirstMs,
+            tableSinceRunMs,
+            // Whether anyone was listening, and whether a speculative
+            // answer held the frame until it was adopted.
+            subscribers: deltas?.subscriberCount(request.runId) ?? null,
+            heldBySpeculation: gate !== null && !gate.adopted(),
             verdict: earlyLead !== null,
           },
           "q comparison table went up first",
@@ -9908,6 +9923,8 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             // I21: time to the comparison's table beside time to settle
             // (totalMs); null when none went up first.
             tableMs: tableFirstMs,
+            tableSinceRunMs,
+            totalSinceRunMs: sinceRun(),
             phases,
             // How much of the answer the person already had before the
             // turn finished. Zero means nobody was listening, or the

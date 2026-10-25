@@ -698,6 +698,10 @@ export function livePreviewOf(
   // A summary the person asked for is its own object: its frame goes up
   // even before it names anyone, and over whatever was there.
   if (preview.layout === "SUMMARY") return preview;
+  // I21 (QA on 5630e086f: "compare the top two" put its table up only as
+  // the answer landed, 9 s after Enter): a comparison's table is its own
+  // object, though its companies are the cards already on the stage.
+  if (preview.table !== undefined) return preview;
   if (preview.subjects.length === 0) return null;
   if (shown !== null) {
     const there = subjectOf(shown);

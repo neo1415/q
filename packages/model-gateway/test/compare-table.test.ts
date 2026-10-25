@@ -449,3 +449,68 @@ describe("namesToCompare (no reader comparison)", () => {
     expect(namesToCompare("Which is better for me?")).toEqual([]);
   });
 });
+
+// F-126 (QA on 5630e086f): the Traction and Team rows read "Your mandate
+// sets no preference" for both companies. A fact row says the company's
+// own facts or "Not stated"; how the mandate weighs them is the fit's.
+describe("fact rows are the company's facts (F-126)", () => {
+  it("says each company's own traction and team, or Not stated, never the mandate's weighting", () => {
+    const { read, fits } = run();
+    read.companyFacts.set(MIZAN, {
+      ...(read.companyFacts.get(MIZAN) ?? {
+        about: null,
+        stageCode: null,
+        city: null,
+        country: null,
+        founded: null,
+        website: null,
+      }),
+      team: [
+        { name: "Amira Saleh", title: "CEO", isFounder: true },
+        { name: "Omar Fathy", title: null, isFounder: false },
+      ],
+    });
+    read.companyFigures.set(MIZAN, [
+      {
+        key: "revenue.mrr",
+        statement: "Monthly recurring revenue is $42,000.",
+        asOf: "2026-09-30",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    ]);
+    // The mandate weighs neither traction nor team for these two.
+    const unweighted = fits.map((fit) => ({
+      ...fit,
+      profile: {
+        ...fit.profile,
+        parameters: fit.profile.parameters.map((parameter) =>
+          parameter.parameter === "TRACTION" || parameter.parameter === "TEAM"
+            ? { ...parameter, applicable: false }
+            : parameter,
+        ),
+      },
+    }));
+    const block = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit in a table",
+      read,
+      fits: unweighted,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    const cells = (label: string) =>
+      block.rows.find((row) => row.label === label)?.cells ?? [];
+    expect(cells("Traction")[0]).toContain("$42,000");
+    expect(cells("Traction")[1]).toBe("Not stated");
+    expect(cells("Team")[0]).toBe(
+      "Amira Saleh (founder, CEO); Omar Fathy (company-stated)",
+    );
+    expect(cells("Team")[1]).toBe("Not stated");
+    for (const label of ["Traction", "Team"]) {
+      for (const cell of cells(label)) {
+        expect(cell).not.toMatch(/mandate/iu);
+      }
+    }
+    // "Not stated" is not said aloud as a figure.
+    expect(comparisonSpokenLine(block)).not.toMatch(/traction: Not stated/u);
+  });
+});
