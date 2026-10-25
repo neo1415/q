@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { UtcTimestampSchema } from "../common/time.js";
-import { QConversationIdSchema } from "./ids.js";
+import {
+  QConversationIdSchema,
+  QMessageIdSchema,
+  QRunIdSchema,
+} from "./ids.js";
 import { QMessageSchema } from "./message.js";
 import { QRunHandleSchema } from "./run.js";
 import { QSubjectRefsSchema } from "./subject.js";
@@ -65,9 +69,30 @@ export const QConversationDetailSchema = z
     messages: z.array(QMessageSchema).max(Q_CONVERSATION_MESSAGES_MAX),
     /** The conversation's latest run, so a client can follow one still in flight. */
     latestRun: QRunHandleSchema.nullable(),
+    /**
+     * Asked with `afterMessageId` only: runs a later fragment of the same
+     * utterance replaced. Their messages are no longer part of the thread,
+     * so a client drops any it holds.
+     */
+    withdrawnRunIds: z
+      .array(QRunIdSchema)
+      .max(Q_CONVERSATION_MESSAGES_MAX)
+      .optional(),
   })
   .strict();
 export type QConversationDetail = z.infer<typeof QConversationDetailSchema>;
+
+/**
+ * `GET /v1/q/conversations/:conversationId?afterMessageId=` (egress,
+ * 2026-10-24): only the messages after one the client already read, so
+ * a read-back is the new turns, never the whole thread again.
+ */
+export const QConversationReadQuerySchema = z
+  .object({ afterMessageId: QMessageIdSchema.optional() })
+  .strict();
+export type QConversationReadQuery = z.infer<
+  typeof QConversationReadQuerySchema
+>;
 
 /** `GET /v1/q/conversations?limit=&before=` */
 export const ListQConversationsQuerySchema = z

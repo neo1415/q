@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { carriedApproval } from "../src/features/q/carried-approval";
+import {
+  carriedApproval,
+  shownCardsKey,
+} from "../src/features/q/carried-approval";
 
 /**
  * QA 2026-10-01: the approval card disappeared from /home?c= after a reload.
@@ -158,5 +161,31 @@ describe("a waiting card shown again by a later answer (F-106)", () => {
 
   it("never brings another conversation's card that no answer here showed", () => {
     expect(carriedApproval("c-now", [earlier] as never, waiting)).toBeNull();
+  });
+});
+
+/**
+ * Egress (2026-10-24): the waiting approvals are asked of the server again
+ * only when the cards a thread shows change; a thread with no card asks
+ * nothing.
+ */
+describe("the cards a thread shows, as one key", () => {
+  const card = (proposalId: string) => ({
+    kind: "ACTION_PROPOSAL",
+    proposal: { proposalId },
+  });
+  it("is empty without a card, and the same however often a card is shown", () => {
+    expect(shownCardsKey([{ role: "Q", text: "Hi." }] as never)).toBe("");
+    const once = shownCardsKey([
+      { role: "Q", blocks: [card("p2")] },
+      { role: "Q", blocks: [card("p1")] },
+    ] as never);
+    const again = shownCardsKey([
+      { role: "Q", blocks: [card("p1")] },
+      { role: "USER", text: "and?" },
+      { role: "Q", blocks: [card("p2"), card("p1")] },
+    ] as never);
+    expect(once).toBe("p1,p2");
+    expect(again).toBe(once);
   });
 });

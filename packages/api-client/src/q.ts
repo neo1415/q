@@ -519,11 +519,21 @@ export function listQConversations(
 }
 
 /** `GET /v1/q/conversations/:conversationId` — the recent turns and the latest run. */
-export function getQConversation(session: ApiSession, conversationId: string) {
+export function getQConversation(
+  session: ApiSession,
+  conversationId: string,
+  options: { readonly afterMessageId?: string | undefined } = {},
+) {
+  // Egress (2026-10-24): a read-back asks only for what came after the
+  // last message it read.
+  const after =
+    options.afterMessageId === undefined
+      ? ""
+      : `?afterMessageId=${encodeURIComponent(options.afterMessageId)}`;
   return call(
     session,
     "GET",
-    conversationPath(conversationId),
+    `${conversationPath(conversationId)}${after}`,
     QConversationDetailSchema,
   );
 }

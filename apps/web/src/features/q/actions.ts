@@ -494,12 +494,26 @@ export async function listQConversationsAction(
 
 export async function readQConversationAction(
   rawConversationId: string,
+  rawAfterMessageId?: string,
 ): Promise<QActionResult<QConversationDetail>> {
   const conversationId = QConversationIdSchema.safeParse(rawConversationId);
   if (!conversationId.success) {
     return failure("I couldn't find that conversation.");
   }
-  return run((session) => getQConversation(session, conversationId.data));
+  const after =
+    rawAfterMessageId === undefined
+      ? undefined
+      : QMessageIdSchema.safeParse(rawAfterMessageId);
+  if (after !== undefined && !after.success) {
+    return failure("I couldn't find that conversation.");
+  }
+  return run((session) =>
+    getQConversation(
+      session,
+      conversationId.data,
+      after === undefined ? {} : { afterMessageId: after.data },
+    ),
+  );
 }
 
 export async function archiveQConversationAction(

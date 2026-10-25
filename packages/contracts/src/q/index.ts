@@ -808,11 +808,13 @@ export {
   Q_CONVERSATIONS_PAGE_MAX,
   Q_CONVERSATIONS_PATH,
   QConversationDetailSchema,
+  QConversationReadQuerySchema,
   QConversationSummarySchema,
   QConversationTitleSchema,
   type ListQConversationsQuery,
   type ListQConversationsResponse,
   type QConversationDetail,
+  type QConversationReadQuery,
   type QConversationSummary,
 } from "./conversation.js";
 

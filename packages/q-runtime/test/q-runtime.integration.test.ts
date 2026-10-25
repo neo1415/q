@@ -539,6 +539,71 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  // Egress (2026-10-24): a read-back asks only for what came after the last
+  // message it read, and is told which runs a later fragment replaced.
+  it("reads only the messages after one already read, and names replaced runs", async () => {
+    await withWorld(async ({ tx, service, adminA }) => {
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "delta-0000",
+        correlationId: CORRELATION(),
+      });
+      const fragment = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "All those" },
+        }),
+        utteranceRef: "voice:session:0.delta",
+        idempotencyKey: "delta-0001",
+        correlationId: CORRELATION(),
+      });
+      // One transaction shares now(): spread the turns out as they would be.
+      await tx.sql`update q_runtime.conversation_messages
+                      set created_at = now() + interval '1 second'
+                    where run_id = ${fragment.run.id}`;
+      const opened = await service.getConversation({
+        actor: adminA.actor,
+        conversationId: first.conversation.id,
+      });
+      const held = opened.detail.messages.at(-1)?.messageId;
+      expect(held).toBeDefined();
+      expect(opened.detail.withdrawnRunIds).toBeUndefined();
+
+      const nothingNew = await service.getConversation({
+        actor: adminA.actor,
+        conversationId: first.conversation.id,
+        afterMessageId: held,
+      });
+      expect(nothingNew.detail.messages).toEqual([]);
+      expect(nothingNew.detail.withdrawnRunIds).toEqual([]);
+
+      const whole = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "All those kinds of things" },
+        }),
+        utteranceRef: "voice:session:0.delta",
+        idempotencyKey: "delta-0002",
+        correlationId: CORRELATION(),
+      });
+      await tx.sql`update q_runtime.conversation_messages
+                      set created_at = now() + interval '2 seconds'
+                    where run_id = ${whole.run.id}`;
+      const delta = await service.getConversation({
+        actor: adminA.actor,
+        conversationId: first.conversation.id,
+        afterMessageId: held,
+      });
+      expect(delta.detail.messages.map((m) => m.text)).toEqual([
+        "All those kinds of things",
+      ]);
+      expect(delta.detail.withdrawnRunIds).toEqual([fragment.run.id]);
+    });
+  });
+
   // Founder fixture failure #9, live again 2026-10-01: one dictation was
   // stored as fourteen growing fragments, each its own run. Read back, an
   // utterance is one turn, its latest form, and the fragments do not take

@@ -121,3 +121,19 @@ export function carriedApproval(
   }
   return null;
 }
+
+/**
+ * Which cards this thread shows, as one key (egress, 2026-10-24): the
+ * waiting approvals are asked of the server again only when this changes.
+ * A thread that shows no card has nothing to carry and asks nothing.
+ */
+export function shownCardsKey(history: readonly QMessage[]): string {
+  const ids = new Set<string>();
+  for (const message of history) {
+    if (message.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (block.kind === "ACTION_PROPOSAL") ids.add(block.proposal.proposalId);
+    }
+  }
+  return [...ids].sort().join(",");
+}

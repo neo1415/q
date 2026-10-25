@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createQStreamState,
@@ -8,7 +8,11 @@ import {
   type QStreamState,
   type QStreamTransportStatus,
 } from "@capital-q/api-client";
-import type { QMessage, QViewingMoment } from "@capital-q/contracts";
+import type {
+  QMessage,
+  QPendingApproval,
+  QViewingMoment,
+} from "@capital-q/contracts";
 
 import {
   approveQApprovalAction,
@@ -20,8 +24,13 @@ import {
   type QStartedRun,
   type QSubjectInput,
 } from "./actions";
-import { carriedApproval, type CarriedApproval } from "./carried-approval";
+import {
+  carriedApproval,
+  shownCardsKey,
+  type CarriedApproval,
+} from "./carried-approval";
 import type { PendingTurn } from "./conversation";
+import { nextCursor, withDelta } from "./conversation-delta";
 import {
   actedHere,
   contextAsked,
@@ -237,7 +246,15 @@ export function useQConversation(
     options.conversationId ?? null,
   );
   /** A change still waiting in this conversation whose run is not the open one. */
-  const [carried, setCarried] = useState<CarriedApproval | null>(null);
+  /** The last message a read of the thread returned (conversation-delta.ts). */
+  const readCursor = useRef<string | null>(null);
+  // The server's waiting approvals as last read, and for which thread.
+  const [waiting, setWaiting] = useState<{
+    readonly key: string;
+    readonly items: readonly QPendingApproval[];
+    /** How long the thread was when read. */
+    readonly length: number;
+  } | null>(null);
 
   const conversationId = useRef<string | null>(null);
   /** The conversation id last taken from the caller, so a URL the hook itself wrote is not reopened. */
@@ -323,6 +340,7 @@ export function useQConversation(
     setRunId(null);
     openRun.current = null;
     finished.current = true;
+    readCursor.current = null;
   }, []);
 
   // Open the conversation the caller named, or start clean when it named
@@ -398,18 +416,19 @@ export function useQConversation(
           // record, so it stays. Dropping it left a conversation opened
           // mid-run (a Home card that started the run, then /home?c=)
           // showing Q's answer to a question nobody asked.
-          setHistory(
-            detail.messages.filter(
-              (message) =>
-                message.runId !== latest.runId || message.role === "USER",
-            ),
+          const recorded = detail.messages.filter(
+            (message) =>
+              message.runId !== latest.runId || message.role === "USER",
           );
+          setHistory(recorded);
+          readCursor.current = nextCursor(null, recorded);
           openRun.current = latest.runId;
           finished.current = false;
           setRunId(latest.runId);
           follow(latest.runId);
         } else {
           setHistory(detail.messages);
+          readCursor.current = nextCursor(null, detail.messages);
           openRun.current = latest?.runId ?? null;
           finished.current = true;
           setRunId(latest?.runId ?? null);
@@ -659,21 +678,86 @@ export function useQConversation(
   // F-106: the run that just finished counts too. "That's ready: … It's
   // waiting for your yes" shows a card an earlier run made; that run never
   // pauses here, so its card is found only through this lookup.
+  // Egress (2026-10-24): the server is asked again only when the cards
+  // this thread shows change, or a card on screen may have been decided
+  // since (a typed "go ahead", Work) and the thread has moved; otherwise
+  // the last read is re-read here.
   const live = runState.approval !== null;
   const finishedMessages = runState.messages;
+  const thread = useMemo(
+    () => [...history, ...finishedMessages],
+    [history, finishedMessages],
+  );
+  const cards = useMemo(() => shownCardsKey(thread), [thread]);
+  const waitingKey =
+    conversationIdState === null ? null : `${conversationIdState}|${cards}`;
+  const carried: CarriedApproval | null = useMemo(
+    () =>
+      live ||
+      conversationIdState === null ||
+      cards === "" ||
+      waiting === null ||
+      !waiting.key.startsWith(`${conversationIdState}|`)
+        ? null
+        : carriedApproval(conversationIdState, thread, waiting.items),
+    [live, conversationIdState, cards, waiting, thread],
+  );
   useEffect(() => {
-    if (streaming || live || conversationIdState === null) return;
+    if (streaming || live || waitingKey === null || cards === "") return;
+    if (
+      waiting !== null &&
+      waiting.key === waitingKey &&
+      (carried === null || waiting.length === thread.length)
+    ) {
+      return;
+    }
     let current = true;
-    const id = conversationIdState;
-    const thread = [...history, ...finishedMessages];
+    const length = thread.length;
     void pendingQApprovalsAction().then((result) => {
       if (!current || !result.ok) return;
-      setCarried(carriedApproval(id, thread, result.value));
+      setWaiting({ key: waitingKey, items: result.value, length });
     });
     return () => {
       current = false;
     };
-  }, [streaming, live, conversationIdState, history, finishedMessages]);
+  }, [streaming, live, waitingKey, cards, waiting, carried, thread.length]);
+
+  const streamedMessages = useRef<readonly QMessage[]>([]);
+  useEffect(() => {
+    streamedMessages.current = runState.messages;
+  }, [runState.messages]);
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const id = conversationId.current;
+    if (id === null || !finished.current) return false;
+    // Egress (2026-10-24): only what came after the last message read.
+    const after = readCursor.current;
+    const result = await readQConversationAction(id, after ?? undefined);
+    // Only if nothing moved while the read was out: same conversation, and
+    // no typed run started in the meantime.
+    if (!result.ok || conversationId.current !== id || !finished.current) {
+      return false;
+    }
+    const read = result.value;
+    if (after === null) {
+      setHistory(read.messages);
+    } else {
+      // The streamed copies of finished runs are folded in, so nothing
+      // they showed is lost when the stream state is cleared below.
+      const streamed = streamedMessages.current;
+      setHistory((current) =>
+        withDelta(
+          [...current, ...streamed],
+          read.messages,
+          read.withdrawnRunIds ?? [],
+        ),
+      );
+    }
+    readCursor.current = nextCursor(after, read.messages);
+    // Every finished run's messages are in the record now; keeping the
+    // streamed copy as well would show them twice.
+    setRunState(createQStreamState());
+    return recordSettled(read.latestRun);
+  }, []);
 
   // A decision on the open run's proposal. The run resumes on the server
   // after a yes and its remaining events are followed again from the
@@ -691,22 +775,24 @@ export function useQConversation(
           setNotice(result.message);
           return;
         }
-        setCarried(null);
-        const id = conversationId.current;
-        if (id !== null) {
-          for (const wait of [3_000, 10_000]) {
-            setTimeout(() => {
-              void readQConversationAction(id).then((read) => {
-                if (
-                  read.ok &&
-                  conversationId.current === id &&
-                  finished.current
-                ) {
-                  setHistory(read.value.messages);
-                }
-              });
-            }, wait);
-          }
+        // Decided: never carried again from the last read.
+        setWaiting((held) =>
+          held === null
+            ? null
+            : {
+                ...held,
+                items: held.items.filter(
+                  (item) => item.approvalId !== carried.approval.approvalId,
+                ),
+              },
+        );
+        // The engine runs the decided change; its line lands in the record
+        // shortly. Two reads of only what came after (never the whole
+        // thread again).
+        for (const wait of [3_000, 10_000]) {
+          setTimeout(() => {
+            void refresh();
+          }, wait);
         }
         return;
       }
@@ -729,7 +815,7 @@ export function useQConversation(
         follow(open);
       }
     },
-    [follow, runState.approval, carried],
+    [follow, refresh, runState.approval, carried],
   );
   const approve = useCallback(() => decide("APPROVE"), [decide]);
   const revised = useCallback(() => {
@@ -741,26 +827,6 @@ export function useQConversation(
   }, [follow]);
   const decline = useCallback(() => decide("REJECT"), [decide]);
 
-  const refresh = useCallback(async (): Promise<boolean> => {
-    const id = conversationId.current;
-    if (id === null || !finished.current) return false;
-    const result = await readQConversationAction(id);
-    // Only if nothing moved while the read was out: same conversation, and
-    // no typed run started in the meantime.
-    if (!result.ok || conversationId.current !== id || !finished.current) {
-      return false;
-    }
-    setHistory(result.value.messages);
-    // Every finished run's messages are in the record now; keeping the
-    // streamed copy as well would show them twice.
-    setRunState(createQStreamState());
-    return recordSettled(result.value.latestRun);
-  }, []);
-
-  const streamedMessages = useRef<readonly QMessage[]>([]);
-  useEffect(() => {
-    streamedMessages.current = runState.messages;
-  }, [runState.messages]);
   const absorb = useCallback((message: QMessage) => {
     if (
       streamedMessages.current.some(
