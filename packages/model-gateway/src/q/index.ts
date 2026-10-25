@@ -230,7 +230,12 @@ import {
   type HeldIdentity,
   type SearchEvidence,
 } from "./picture-corroboration.js";
-import { asksForFresh, createReadCache, type ReadCache } from "./read-cache.js";
+import {
+  asksForFresh,
+  canonical,
+  createReadCache,
+  type ReadCache,
+} from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
@@ -2614,6 +2619,16 @@ export function createModelGatewayQAnswer(
     result: { ok: false, error: { code: "NOT_ASKED", safeMessage } },
     latencyMs: 0,
   });
+  /**
+   * Efficiency pass (coordinator 2026-10-25, run 42b21b5f): a read made
+   * once in a turn -- by code ahead of the model, or by the model -- is not
+   * made again in the same turn. Their own records too (unlike the
+   * cross-turn cache): within one turn nothing of theirs moves unless the
+   * turn itself changes it, and then every read is made afresh.
+   */
+  const turnReads = new Map<string, Map<string, QToolCallOutcome>>();
+  const turnReadKey = (proposal: { name: string; arguments: unknown }) =>
+    `${proposal.name}|${canonical(proposal.arguments ?? {})}`;
   const tools: QToolPort = {
     offer: async (toolContext) => {
       const offered = await baseTools.offer(toolContext);
@@ -2657,6 +2672,20 @@ export function createModelGatewayQAnswer(
           : asked;
       const isRead =
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
+      const thisTurn = turnReads.get(toolContext.runId);
+      const readBefore = thisTurn?.get(turnReadKey(proposal));
+      if (readBefore !== undefined) {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: proposal.name },
+          "q read answered from this turn's own read",
+        );
+        return aboutThemOnly(
+          proposal,
+          toolContext.runId,
+          { ...readBefore, callId: proposal.callId, latencyMs: 0 },
+          toolContext.conversation?.latestUserText ?? "",
+        );
+      }
       // What Q knows, Q knows (read-cache.ts): the same read under the
       // same authority within minutes is answered from what was read.
       const kept = isRead ? readCache.get(proposal, toolContext) : null;
@@ -2687,14 +2716,32 @@ export function createModelGatewayQAnswer(
       );
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
+      if (
+        outcome.status === "SUCCEEDED" &&
+        outcome.result.ok &&
+        outcome.classification === "READ_ONLY"
+      ) {
+        // Kept for the rest of this turn, whoever read it first.
+        const reads =
+          turnReads.get(toolContext.runId) ??
+          new Map<string, QToolCallOutcome>();
+        reads.set(turnReadKey(proposal), outcome);
+        turnReads.set(toolContext.runId, reads);
+        if (turnReads.size > 256) {
+          const oldest = turnReads.keys().next().value;
+          if (oldest !== undefined) turnReads.delete(oldest);
+        }
+      }
       if (isRead) readCache.keep(proposal, toolContext, outcome);
       else if (
         outcome.status === "SUCCEEDED" &&
         (outcome.classification === "PREPARE" ||
           outcome.classification === "SIDE_EFFECT")
       ) {
-        // Something of theirs changed: what was read for them is not kept.
+        // Something of theirs changed: what was read for them is not kept,
+        // in this turn or after it.
         readCache.forget(toolContext);
+        turnReads.delete(toolContext.runId);
       }
       return aboutThemOnly(
         proposal,

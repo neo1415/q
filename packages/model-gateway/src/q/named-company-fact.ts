@@ -337,6 +337,24 @@ const NOT_COMPANY_WORDS = new Set([
   "the",
 ]);
 
+/** What follows a verb that opens a request: "Draft a…", "Write me…". */
+const REQUEST_OBJECT =
+  /^\s+(?:a|an|the|me|my|our|us|them|him|her|this|that|it|these|those|some|up|out)\b/iu;
+
+/**
+ * Efficiency pass (coordinator 2026-10-25, run 42b21b5f): "Draft a short
+ * update email to Savanna Seed Partners" searched "Draft" as a company.
+ * One capitalised word that opens a sentence and is followed by its object
+ * is the request's own verb, capitalised by grammar: never a candidate.
+ * "Ledgerfold is raising?" still is.
+ */
+function opensARequest(text: string, at: number, match: string): boolean {
+  if (/\s/u.test(match)) return false;
+  const before = text.slice(0, at);
+  if (!/(?:^|[.!?]\s+|\n\s*)$/u.test(before)) return false;
+  return REQUEST_OBJECT.test(text.slice(at + match.length));
+}
+
 /**
  * S3a: up to `max` capitalised names in the words ("Tell me about Baridi",
  * "risks with Ledgerfold"), as candidates to look up exactly. A candidate
@@ -347,7 +365,9 @@ export function companyNameCandidates(text: string, max = 2): string[] {
   const found: string[] = [];
   const pattern =
     /\b\p{Lu}[\p{L}\p{N}&'-]*(?:\s+(?:\p{Lu}[\p{L}\p{N}&'-]*|\p{N}+))*/gu;
-  for (const match of text.replace(/[’]/gu, "'").matchAll(pattern)) {
+  const said = text.replace(/[’]/gu, "'");
+  for (const match of said.matchAll(pattern)) {
+    if (opensARequest(said, match.index, match[0])) continue;
     const words = match[0]
       .split(/\s+/u)
       .filter((word) => !NOT_COMPANY_WORDS.has(word.toLowerCase()));

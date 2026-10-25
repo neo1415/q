@@ -30,6 +30,7 @@ import {
 } from "../src/index.js";
 import {
   CLIENT_ACTION_DONE_LINE,
+  companyNameCandidates,
   createModelGatewayQAnswer,
   noAuthorisedContext,
   Q_TOOL_LOOP_MAX_CALLS,
@@ -3658,5 +3659,60 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         saved,
       ),
     ).toBeNull();
+  });
+});
+
+/**
+ * Efficiency pass (coordinator 2026-10-25, run 42b21b5f): eight reads before
+ * one draft, with relationship.own.list read twice and "Draft" searched as
+ * a company. Tool executions per turn, measured.
+ */
+describe("a turn makes each read once", () => {
+  it("answers the same read again from this turn's own read", async () => {
+    // Their own relationships: never kept across turns (they change by
+    // their own approvals). Live, code read them before the turn's offer
+    // was noted, so that first read was not known as a read and the
+    // model's own call 17 s later ran again. Offered here as not yet known
+    // to be a read; the outcome says READ_ONLY, as the real tool does.
+    const OWN: QOfferedTool = {
+      ...GET_COMPANY,
+      classification: "ANALYTICAL",
+      toolName: "relationship.own.list",
+      definition: { ...GET_COMPANY.definition, name: "list_my_relationships" },
+    };
+    const tools = toolPort([OWN], (p) => ({
+      ...succeeded(p, { relationships: [] }),
+      toolName: "relationship.own.list",
+    }));
+    const read = (callId: string) => ({
+      kind: "TOOL_CALLS" as const,
+      calls: [{ callId, name: "list_my_relationships", arguments: {} }],
+    });
+    const { seam, request } = build({
+      // Code reads their standing ahead of the model; the model asks again.
+      script: [read("a"), { kind: "JSON", value: analystResult("ok") }],
+      tools,
+    });
+    await seam.answer(request);
+    // Before: 2 executions of the same read (code's, then the model's);
+    // now 1.
+    expect(tools.executed.map((p) => p.name)).toEqual([
+      "list_my_relationships",
+    ]);
+  });
+
+  it("never searches a request's opening verb as a company", () => {
+    expect(
+      companyNameCandidates(
+        "Draft a short update email to Savanna Seed Partners about our latest traction",
+      ),
+    ).toEqual(["Savanna Seed Partners"]);
+    expect(
+      companyNameCandidates("Write me a plan. Send our deck to Mizan"),
+    ).toEqual(["Mizan"]);
+    // A name that opens a sentence is still a name.
+    expect(companyNameCandidates("Ledgerfold is raising?")).toEqual([
+      "Ledgerfold",
+    ]);
   });
 });
