@@ -46,6 +46,8 @@ import type { OwnRecordNames } from "../src/company/own-names.js";
 import type { ArtifactPreparation } from "../src/company/prepare-artifact.js";
 import {
   createToolTeamJobPort,
+  ownWorkSummary,
+  teamJobBlocks,
   teamJobLine,
   teamJobOutcomeOf,
   type QTeamJobPort,
@@ -2020,6 +2022,37 @@ describe("saving work that has to start first, or never started", () => {
     expect(line).not.toContain("limit of work I can take on");
     expect(teamJobLine({ status: "LIMIT_REACHED" })).toMatch(
       /^Your monthly limit for Q's work is reached/u,
+    );
+  });
+
+  // QA F-123 (2026-10-25, run d5bcb2eb): "Starting now: you will research
+  // Silo Credit's market…" named the person as the one doing Q's work.
+  it("F-123: the start line and its card say Q's own work, never 'you will'", () => {
+    const plan = {
+      ...PLAN,
+      summary:
+        "You will research Silo Credit's market and competitors, then prepare a short analysis document.",
+    };
+    const outcome: TeamJobOutcome = {
+      status: "STARTED",
+      plan,
+      firstRead: null,
+      jobId: "99999999-2222-4333-8444-555555555555",
+    };
+    expect(teamJobLine(outcome)).toMatch(
+      /^On it\. Starting now: research Silo Credit's market and competitors, then prepare a short analysis document\./u,
+    );
+    expect(teamJobLine(outcome)).not.toMatch(/you will/iu);
+    expect(teamJobBlocks(outcome)).toMatchObject([
+      {
+        kind: "WORK_IN_PROGRESS",
+        title:
+          "Research Silo Credit's market and competitors, then prepare a short analysis document",
+      },
+    ]);
+    expect(ownWorkSummary("I'll draft your plan.")).toBe("draft your plan");
+    expect(ownWorkSummary("Research your market.")).toBe(
+      "Research your market",
     );
   });
 

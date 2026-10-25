@@ -174,6 +174,7 @@ import {
   JOB_PLAN_V10,
   JOB_PLAN_V11,
   JOB_PLAN_V12,
+  JOB_PLAN_V13,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
@@ -589,7 +590,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     JOB_PLAN_V9,
     JOB_PLAN_V10,
     { ...JOB_PLAN_V11, status: "DEPRECATED" },
-    JOB_PLAN_V12,
+    { ...JOB_PLAN_V12, status: "DEPRECATED" },
+    JOB_PLAN_V13,
     RESEARCH_PLAN_V1,
     RESEARCH_FACTS_V1,
     ANALYSIS_WRITE_V1,
