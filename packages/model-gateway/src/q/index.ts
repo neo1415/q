@@ -3260,7 +3260,37 @@ export function createModelGatewayQAnswer(
                 },
                 toolContext,
               )
-              .catch(() => null),
+              .then((outcome) => {
+                // Live a7b99c465 ("Which is better, Anchor or Afyascan?"):
+                // Anchor's profile and fit reads left no trace and the
+                // table had Anchor unscored. A read that did not succeed is
+                // logged, by tool, status and code (ids only, no content).
+                if (outcome.status !== "SUCCEEDED") {
+                  logger?.warn(
+                    {
+                      qRunId: request.runId,
+                      tool: tool.name,
+                      companyId,
+                      status: outcome.status,
+                      failureCode: outcome.failureCode,
+                    },
+                    "q compare read did not succeed",
+                  );
+                }
+                return outcome;
+              })
+              .catch((error: unknown) => {
+                logger?.warn(
+                  {
+                    qRunId: request.runId,
+                    tool: tool.name,
+                    companyId,
+                    error: error instanceof Error ? error.name : "UNKNOWN",
+                  },
+                  "q compare read threw",
+                );
+                return null;
+              }),
           ),
       );
       if (reads.length === 0) return null;
