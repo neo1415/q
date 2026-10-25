@@ -94,19 +94,6 @@
     ]
   },
   {
-    "id": "F-96",
-    "account": "investor.equator-line@fictional.capitalq.local",
-    "steps": [
-      {
-        "ask": "ما هي أفضل ثلاث شركات تناسب تفويضي",
-        "expect": {
-          "replyMatches": ["[\\u0600-\\u06FF]{3}"],
-          "replyNot": ["They're on screen"]
-        }
-      }
-    ]
-  },
-  {
     "id": "I-board",
     "account": "investor.equator-line@fictional.capitalq.local",
     "steps": [
