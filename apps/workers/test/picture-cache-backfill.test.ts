@@ -38,6 +38,7 @@ function world() {
     openObjectStream: () =>
       Promise.resolve({
         body: (async function* () {
+          await Promise.resolve();
           yield new Uint8Array([1, 2]);
           yield new Uint8Array([3]);
         })(),
