@@ -32,3 +32,17 @@ Open from this run: turn latency 12 s; 45 s from upload to findings (target: sec
 | Not saved                                                      | "crypto" (never invest) → not mapped to Speculative crypto; left for a product call                                                                                                       |
 
 Fixed: F-80 in #428 (deferred stage/cheque update bound the firm against a stale session version). Open: "crypto" mapping; turn latency ~15 s.
+
+## Run 6: 25 Oct 07:46–10:30 UTC, founder `loop-f-b9-0746` (one account, reused under the owner's spend rule)
+
+| Check                                                | Result                                                                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #452 on b9202164: Q's line after a reload            | Shown once, before and after the reload ✓                                                                                                                                                                                |
+| #454 on b9202164: deck panel vs Q                    | **Fail.** The panel had 10 "I picked up" facts (Stage · Seed, …); Q said "I can't read back the deck's findings … nothing from it has been saved yet" and asked for the stage                                            |
+| Hosted read                                          | 15 `EVIDENCE_DOCUMENT` suggestions at 07:47:38, the upload announcement at 07:47:40, Q at 07:47:45. `interview_readings` stated `F2.materials` for the announcement turn                                                 |
+| Root cause                                           | The reader read "I've just uploaded the deck" as stating the upload step; the refused write's reason said "add it with the upload button". A replay without that reading read the deck back                              |
+| Composer hint before a reload                        | General "Ask Q about companies, capital or relationships" under "what does the company do?"                                                                                                                              |
+| #484 on 07a748ac8: deck re-upload, 2 automatic turns | Q: "I'm reading tl-payroll-deck.pdf now …", then "I found these points in the uploaded deck: … seed stage, payroll and compliance for Ghanaian SMEs, two people on the team. Is that right?" ✓ Hint "Type your answer" ✓ |
+
+Fixed: #484 (the reader is never offered upload-only steps; once findings wait, the refusal says to read them back; a step without its own hint shows "Type your answer").
+Open from this run: a second deck's findings for the same steps appear in the panel beside the first deck's (Stage · Seed twice), not merged; "Type your answer" is not translated (Arabic deferred).
