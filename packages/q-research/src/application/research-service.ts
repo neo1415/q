@@ -2,6 +2,7 @@ import type { CorrelationId } from "@capital-q/contracts";
 import { getMeter, type Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
+import { isResting } from "../providers/breaker.js";
 import {
   RESEARCH_BOUNDS,
   type PublicWebFreshness,
@@ -439,6 +440,27 @@ export function createPublicWebResearchService(
     failure: ResearchProviderFailure,
     operation: "search" | "extract",
   ) => {
+    // Every index resting behind its breaker (2026-10-25): nothing was
+    // called, so nothing failed -- said as a skip, not as a provider
+    // failure (live: it read as ScrapingBee called past its breaker).
+    if (isResting(failure)) {
+      metrics.providerFailures.add(1, {
+        provider: failure.providerCode,
+        operation,
+        failure_class: "RESTING",
+      });
+      logger?.info(
+        {
+          provider: failure.providerCode,
+          operation,
+          failureClass: failure.failureClass,
+          status: failure.status,
+          resting: true,
+        },
+        "public research skipped: every provider is resting",
+      );
+      return;
+    }
     metrics.providerFailures.add(1, {
       provider: failure.providerCode,
       operation,

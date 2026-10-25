@@ -88,6 +88,8 @@ export function investorDiscoveryText(
     /** The kinds as they said them ("family offices"); none is investors. */
     readonly kinds?: readonly string[] | undefined;
     readonly sector?: string | null | undefined;
+    /** The public search could not run: only known records were looked at. */
+    readonly webUnavailable?: boolean | undefined;
   },
 ): string {
   const label = regionLabel(context.regionWords);
@@ -132,6 +134,13 @@ export function investorDiscoveryText(
           ? `I found only ${count} ${where}investor${known.length === 1 ? "" : "s"} who could fit${fit}: ${listOf(names)}.`
           : `Here ${known.length === 1 ? "is" : "are"} ${count} ${where}investor${known.length === 1 ? "" : "s"} who could fit${fit}: ${listOf(names)}.`;
   const parts = [lead];
+  // Live 2026-10-25: with every public index down, "I found only one" read
+  // as all there is. Said plainly: the public web was not searched.
+  if (context.webUnavailable === true) {
+    parts.push(
+      "Public search isn't answering right now, so these are only the ones Capital Q already knows.",
+    );
+  }
   if (known.length > 0 && publicFinds.length > 0) {
     parts.push(
       `From a public web search, not confirmed: ${listOf(publicFinds.map((one) => one.card.subject.displayName))}.`,
@@ -331,6 +340,7 @@ export async function runInvestorDiscovery(input: {
     regionWords?: unknown;
     countries?: unknown;
     webSearched?: unknown;
+    webUnavailable?: unknown;
   } | null;
   const status =
     data?.outcome === "FOUND" ||
@@ -376,6 +386,7 @@ export async function runInvestorDiscovery(input: {
         sameFirm(pick.name, one.card.subject.displayName),
       ),
   );
+  const webUnavailable = data.webUnavailable === true;
   const publicText = investorDiscoveryText(outside, {
     regionWords,
     asked,
@@ -383,6 +394,7 @@ export async function runInvestorDiscovery(input: {
     aboutMyCompany: ask.aboutMyCompany,
     kinds: ask.kinds,
     sector: ask.sector,
+    webUnavailable,
   });
   const total =
     onCapitalQ.length + outside.filter((one) => one.role === "INVESTOR").length;
@@ -393,7 +405,7 @@ export async function runInvestorDiscovery(input: {
   const text =
     onCapitalQ.length === 0
       ? publicText
-      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${outside.length === 0 ? `Outside Capital Q, the public search found nobody else I could name.${short}` : `Outside Capital Q: ${investorDiscoveryText(outside, { regionWords, asked: Math.max(1, outside.filter((one) => one.role === "INVESTOR").length), outcome: status, aboutMyCompany: ask.aboutMyCompany, kinds: ask.kinds, sector: ask.sector })}${short}`}`;
+      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${outside.length === 0 ? `${webUnavailable ? "Public search isn't answering right now, so I couldn't look beyond Capital Q." : "Outside Capital Q, the public search found nobody else I could name."}${short}` : `Outside Capital Q: ${investorDiscoveryText(outside, { regionWords, asked: Math.max(1, outside.filter((one) => one.role === "INVESTOR").length), outcome: status, aboutMyCompany: ask.aboutMyCompany, kinds: ask.kinds, sector: ask.sector, webUnavailable })}${short}`}`;
   return {
     text,
     block: oneList(
