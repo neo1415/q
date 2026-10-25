@@ -695,6 +695,14 @@ function loadCapabilities(
 }
 /** Calls in total per turn (raised from 6, autopilot P1 2026-10-06). */
 export const Q_TOOL_LOOP_MAX_CALLS = 10;
+/**
+ * F-106 (run 42b21b5f, 2026-10-25): eight reads and the email took nine of
+ * the ten calls, so the message prepared instead of an email they cannot
+ * send was skipped, and nothing was prepared. A follow-on that completes
+ * what they asked (the same words as a Capital Q message; the first
+ * contact) is never starved by the turn's reads: it has its own slots.
+ */
+export const OUTWARD_FOLLOW_ON_RESERVE = 2;
 
 /**
  * Speed lane C: how long an answer that is otherwise ready waits for the
@@ -8352,7 +8360,8 @@ export function createModelGatewayQAnswer(
                 chatInstead === null &&
                 offeredByName.has(CHAT_INSTEAD_TOOL) &&
                 !proposals.some((other) => other.name === CHAT_INSTEAD_TOOL) &&
-                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+                calls + chainedThisRound.length + 1 <=
+                  Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
               ) {
                 chatInstead = callTool(
                   {
@@ -8369,7 +8378,8 @@ export function createModelGatewayQAnswer(
                 firstContact === null &&
                 offeredByName.has(FIRST_CONTACT_TOOL) &&
                 !proposals.some((other) => other.name === FIRST_CONTACT_TOOL) &&
-                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+                calls + chainedThisRound.length + 1 <=
+                  Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
               ) {
                 firstContactWithNote = "note" in contact;
                 firstContact = callTool(
