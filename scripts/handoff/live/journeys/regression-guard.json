@@ -133,7 +133,15 @@
       {
         "ask": "Which investors fit Maji Loop best, and how well?",
         "expect": {
-          "anyBlock": ["INVESTOR_REFERENCE", "COMPARISON_CARDS", "TABLE"]
+          "anyBlock": [
+            "ANSWER_CARDS",
+            "INVESTOR_REFERENCE",
+            "COMPARISON_CARDS",
+            "TABLE"
+          ],
+          "replyNot": [
+            "Savanna Seed Partners[^.]*: Their Q Card does not say yet how you fit"
+          ]
         }
       }
     ]
@@ -157,6 +165,37 @@
     "steps": [
       { "ask": "How investor-ready is my company right now?" },
       { "ask": "Show me my fundraising pipeline" }
+    ]
+  },
+  {
+    "id": "F-106-reshown-card",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
+        "expect": { "approval": true }
+      },
+      {
+        "ask": "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
+        "expect": {
+          "approval": true,
+          "replyMatches": ["Ready to send: approve on the card"],
+          "replyNot": ["^Understood\\.?$"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-106-qcard-link",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me my Q Card and the share link.",
+        "expect": {
+          "replyMatches": ["https://[^\\s]+/@[a-z0-9-]+"],
+          "replyNot": ["^Understood\\.?$"]
+        }
+      }
     ]
   }
 ]
