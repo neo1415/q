@@ -6973,6 +6973,8 @@ export function createModelGatewayQAnswer(
               sharedReads: singleFlight.takeShared(request.runId),
               prepareMs: prepared.prepareMs,
               discoverMs: Date.now() - discoverStarted,
+              // Owner 2026-10-25: where discover's time went (ms by phase).
+              discoverPhasesMs: found.phasesMs ?? null,
               totalMs: Date.now() - startedAt,
             },
             "q answered companies of a kind from the catalog",

@@ -14,9 +14,9 @@ import {
  *
  * For each source, preferred first (the ECB's reference rates, then the
  * public market feed for currencies the ECB does not publish): the latest
- * stored set while it is current; otherwise fetched from the internet now,
- * stored for everyone after, and used. A fetch that fails falls back to the
- * last stored set, however old (its date is said beside the estimate).
+ * stored set. A stale one is still used at once (its date is said beside
+ * the estimate) and refreshed from the internet behind it, stored for
+ * everyone after; only when nothing is stored is it fetched now.
  */
 
 /** How old a stored set may be before it is fetched again. */
@@ -47,6 +47,24 @@ export function createLiveFxRates(dependencies: {
   readonly now?: (() => Date) | undefined;
 }): LiveFxRates {
   const now = dependencies.now ?? (() => new Date());
+  /** One fetch per source at a time, however many answers ask. */
+  const refreshing = new Map<FxRateSource, Promise<FxReferenceRates | null>>();
+  const refresh = (entry: {
+    readonly source: FxRateSource;
+    readonly provider: FxRateProvider;
+  }): Promise<FxReferenceRates | null> => {
+    const running = refreshing.get(entry.source);
+    if (running !== undefined) return running;
+    const work = (async () => {
+      const fetched = await entry.provider.fetchDaily().catch(() => null);
+      if (fetched !== null) {
+        await dependencies.store.record(fetched).catch(() => 0);
+      }
+      return fetched;
+    })().finally(() => refreshing.delete(entry.source));
+    refreshing.set(entry.source, work);
+    return work;
+  };
   const one = async (entry: {
     readonly source: FxRateSource;
     readonly provider: FxRateProvider;
@@ -54,17 +72,18 @@ export function createLiveFxRates(dependencies: {
     const stored = await dependencies.store
       .latest(entry.source)
       .catch(() => null);
-    if (
-      stored !== null &&
-      ageInDays(stored.rateDate, now()) <= FX_MAX_AGE_DAYS[entry.source]
-    ) {
-      return stored;
+    if (stored === null) {
+      // Nothing stored at all: go and get it now (bounded by its timeout).
+      return refresh(entry);
     }
-    // Not stored, or stale: go and get it.
-    const fetched = await entry.provider.fetchDaily().catch(() => null);
-    if (fetched === null) return stored;
-    await dependencies.store.record(fetched).catch(() => 0);
-    return fetched;
+    if (ageInDays(stored.rateDate, now()) > FX_MAX_AGE_DAYS[entry.source]) {
+      // Owner 2026-10-25 (discover 17–20 s on some calls): a stale set is
+      // used at once, its date said beside the estimate, and refreshed
+      // behind it; an answer never waits on the internet for a rate it
+      // already holds.
+      void refresh(entry);
+    }
+    return stored;
   };
   return {
     current: async () =>

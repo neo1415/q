@@ -188,6 +188,10 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
     const data = (outcome.result as { data: Record<string, unknown> }).data;
     expect(data["order"]).toBe("FIT");
     expect(data["total"]).toBe(463);
+    // Owner 2026-10-25: each phase's time, for the catalog log line.
+    expect(Object.keys(data["phasesMs"] as object)).toEqual(
+      expect.arrayContaining(["catalog", "disclosure", "raises", "rank"]),
+    );
     expect(data["totalAtLeast"]).toBe(false);
     const companies = data["companies"] as { companyId: string }[];
     // The 463rd by name, never cut by a first page or a batch, leads.

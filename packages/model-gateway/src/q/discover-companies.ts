@@ -71,6 +71,8 @@ type Catalog = {
   readonly raising: { readonly matched: number } | null;
   /** FIT was asked and the fit service failed: the cause, for the log. */
   readonly rankFailed: string | null;
+  /** Where the catalog read's time went, by phase (ms), for the log. */
+  readonly phasesMs: Readonly<Record<string, number>> | null;
 };
 
 /**
@@ -87,6 +89,8 @@ export type DiscoveryRankUnavailable = {
 };
 
 export type DiscoveryAnswer = {
+  /** Where the catalog read's time went, by phase (ms), for the log. */
+  readonly phasesMs?: Readonly<Record<string, number>> | null | undefined;
   readonly text: string;
   readonly block: QAnswerCardsBlock | null;
   /** How the list is ordered, as said. */
@@ -94,6 +98,18 @@ export type DiscoveryAnswer = {
   readonly shown: number;
   readonly calls: readonly QToolCallOutcome[];
 };
+
+/** Numbers by phase name only; anything else is dropped. */
+function phasesOf(value: unknown): Readonly<Record<string, number>> | null {
+  if (typeof value !== "object" || value === null) return null;
+  const out: Record<string, number> = {};
+  for (const [phase, ms] of Object.entries(value)) {
+    if (typeof ms === "number" && Number.isFinite(ms)) {
+      out[phase.slice(0, 40)] = ms;
+    }
+  }
+  return out;
+}
 
 function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
   if (outcome === null || !outcome.result.ok) return null;
@@ -109,6 +125,7 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
       readonly matched?: unknown;
     };
     readonly fitRankFailed?: { readonly cause?: unknown };
+    readonly phasesMs?: unknown;
   } | null;
   if (data === null || !Array.isArray(data.companies)) return null;
   return {
@@ -131,6 +148,7 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
       typeof data.fitRankFailed?.cause === "string"
         ? data.fitRankFailed.cause.slice(0, 200)
         : null,
+    phasesMs: phasesOf(data.phasesMs),
   };
 }
 
@@ -292,14 +310,35 @@ function capitalised(text: string): string {
  * be read here (the tool is not offered or failed), so the full path
  * answers instead. Never throws.
  */
-export async function runCompanyDiscovery(input: {
-  readonly ask: DiscoverAsk;
-  readonly tools: Pick<QToolPort, "execute">;
-  readonly context: QToolExecutionContext;
-  readonly available: ReadonlySet<string>;
-  /** The actor is on an investor organisation's side. */
-  readonly investor: boolean;
-}): Promise<DiscoveryAnswer | DiscoveryRankUnavailable | null> {
+type DiscoveryInput = Parameters<typeof discoverWith>[0];
+
+/**
+ * The answer to a DISCOVER_COMPANIES request (below), carrying where the
+ * catalog read's time went, by phase, for the caller's log.
+ */
+export async function runCompanyDiscovery(
+  input: DiscoveryInput,
+): Promise<DiscoveryAnswer | DiscoveryRankUnavailable | null> {
+  const timing: { phasesMs: Readonly<Record<string, number>> | null } = {
+    phasesMs: null,
+  };
+  const found = await discoverWith(input, timing);
+  return found === null || "rankUnavailable" in found
+    ? found
+    : { ...found, phasesMs: timing.phasesMs };
+}
+
+async function discoverWith(
+  input: {
+    readonly ask: DiscoverAsk;
+    readonly tools: Pick<QToolPort, "execute">;
+    readonly context: QToolExecutionContext;
+    readonly available: ReadonlySet<string>;
+    /** The actor is on an investor organisation's side. */
+    readonly investor: boolean;
+  },
+  timing: { phasesMs: Readonly<Record<string, number>> | null },
+): Promise<DiscoveryAnswer | DiscoveryRankUnavailable | null> {
   const { ask, tools, context, available } = input;
   if (!available.has(DISCOVER_TOOL) || ask.previous) return null;
   const count = Math.min(
@@ -345,6 +384,7 @@ export async function runCompanyDiscovery(input: {
     "q-discover-companies",
   );
   const catalog = catalogOf(outcome);
+  timing.phasesMs = catalog?.phasesMs ?? null;
   // A fit ranking that could not be made is never a name-ordered list
   // presented as one: the catalog was offered and failed, or it read the
   // matches and the fit service failed.
@@ -408,6 +448,7 @@ export async function runCompanyDiscovery(input: {
     // FIT order: the catalog already scored every match and these are the
     // best, so only they are read in full for their cards. A catalog that
     // could not rank (name order) has its first page scored, as before.
+    const cardsStarted = performance.now();
     const outcomes = await Promise.all(
       catalog.companies
         .slice(0, catalog.order === "FIT" ? count : DISCOVER_FIT_MAX)
@@ -419,6 +460,10 @@ export async function runCompanyDiscovery(input: {
           ),
         ),
     );
+    timing.phasesMs = {
+      ...(timing.phasesMs ?? {}),
+      cardFits: Math.round(performance.now() - cardsStarted),
+    };
     noMandate = outcomes.some(
       (outcome) =>
         outcome?.result.ok === true &&

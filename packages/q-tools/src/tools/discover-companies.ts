@@ -168,6 +168,8 @@ export const DiscoverCompaniesOutputSchema = z
       .object({ cause: z.string().min(1).max(CAUSE_MAX) })
       .strict()
       .optional(),
+    /** Where this read's time went, by phase (ms): ids and numbers only. */
+    phasesMs: z.record(z.string().max(40), z.number().int().min(0)).optional(),
     /** Declared profiles, not an assessment and not a recommendation. */
     truthClass: z.literal("USER_CLAIM"),
   })
@@ -258,6 +260,14 @@ export function createDiscoverCompaniesTool(
         };
       }
       const byFit = input.order === "FIT" && ports.fit?.rank !== undefined;
+      // Owner 2026-10-25: where the time goes, by phase (ms), for the log.
+      const phasesMs: Record<string, number> = {};
+      let mark = performance.now();
+      const lap = (phase: string): void => {
+        const at = performance.now();
+        phasesMs[phase] = Math.round(at - mark);
+        mark = at;
+      };
       const found = await catalog.find(context.actor, {
         sectors: input.sectors,
         countries: input.countries.map((code) => code.toUpperCase()),
@@ -282,6 +292,7 @@ export function createDiscoverCompaniesTool(
       ) {
         batches.push(found.candidates.slice(start, start + DISCLOSURE_BATCH));
       }
+      lap("catalog");
       const decisions = (
         await Promise.all(
           batches.map((batch) =>
@@ -310,6 +321,7 @@ export function createDiscoverCompaniesTool(
         seen.add(candidate.companyId);
         return true;
       });
+      lap("disclosure");
       // FIT: every visible match scored on their mandate, best first. A
       // reader who is not an investor, or has no mandate, gets name order.
       // Raising now: every visible match's raise, read as this reader may
@@ -359,9 +371,16 @@ export function createDiscoverCompaniesTool(
             })) ?? null
         );
       };
+      lap("raises");
       const first = byFit && eligible.length > 0 ? await rankOnce() : null;
       const ranked =
         first === null && rankFailure.cause !== null ? await rankOnce() : first;
+      lap("rank");
+      if (ranked?.kind === "OK" && ranked.phasesMs !== undefined) {
+        for (const [phase, ms] of Object.entries(ranked.phasesMs)) {
+          phasesMs[`rank.${phase}`] = ms;
+        }
+      }
       const order =
         ranked?.kind === "OK"
           ? ranked.comparison.entries.flatMap((entry) => {
@@ -399,6 +418,7 @@ export function createDiscoverCompaniesTool(
         ...(rankFailure.cause === null
           ? {}
           : { fitRankFailed: { cause: rankFailure.cause } }),
+        phasesMs,
         truthClass: "USER_CLAIM" as const,
       };
     },

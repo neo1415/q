@@ -181,7 +181,12 @@ export type FitProfilesResult =
   | { readonly kind: "NO_MANDATE" };
 
 export type FitTopResult =
-  | { readonly kind: "OK"; readonly comparison: FitComparisonDto }
+  | {
+      readonly kind: "OK";
+      readonly comparison: FitComparisonDto;
+      /** rank only: where its time went, by phase (ms), for the log. */
+      readonly phasesMs?: Readonly<Record<string, number>> | undefined;
+    }
   | { readonly kind: "NOT_INVESTOR" }
   | { readonly kind: "NO_MANDATE" };
 
@@ -285,7 +290,17 @@ export function createFitService(
     actor: ActorContext,
     companyIds: readonly string[],
     purpose?: "RANK",
+    /** Owner 2026-10-25: where a rank's time goes, by phase (ms). */
+    phases?: Record<string, number>,
   ): Promise<FitProfilesResult> => {
+    let mark = performance.now();
+    const lap = (phase: string): void => {
+      const at = performance.now();
+      if (phases !== undefined) {
+        phases[phase] = Math.round((phases[phase] ?? 0) + at - mark);
+      }
+      mark = at;
+    };
     const subject =
       await dependencies.investorSubject.investorOrganisationFor(actor);
     if (subject === null) return { kind: "NOT_INVESTOR" };
@@ -297,6 +312,7 @@ export function createFitService(
     // the whole network (463 live) asks in batches, one after another.
     // Owner 2026-10-25: the batches are evaluated side by side (at most
     // five), their results kept in order.
+    lap("subject");
     const chunks: string[][] = [];
     for (let start = 0; start < ids.length; start += ELIGIBILITY_BATCH_MAX) {
       chunks.push(ids.slice(start, start + ELIGIBILITY_BATCH_MAX));
@@ -389,6 +405,7 @@ export function createFitService(
     // bounded per call, so over the whole network the inputs are read in
     // batches, and a rank never fails for the size of the network.
     const admittedIds = admitted.map((r) => r.companyId);
+    lap("eligibility");
     const parts: string[][] = [];
     for (
       let start = 0;
@@ -447,9 +464,12 @@ export function createFitService(
         evidenceConfidential: input.evidenceConfidential ?? false,
       });
     }
+    lap("inputs");
     // Request order, as eligibility returned it. Scores are read only for
     // the companies eligibility admitted for this reader.
-    return withScores(actor, items);
+    const scored = await withScores(actor, items);
+    lap("scores");
+    return scored;
   };
 
   return {
@@ -478,10 +498,12 @@ export function createFitService(
     },
     rank: async (actor, companyIds, limit) => {
       const ids = [...new Set(companyIds)].slice(0, FIT_RANK_CANDIDATES_MAX);
-      const result = await profiles(actor, ids, "RANK");
+      const phasesMs: Record<string, number> = {};
+      const result = await profiles(actor, ids, "RANK", phasesMs);
       if (result.kind !== "OK") return result;
       return {
         kind: "OK",
+        phasesMs,
         comparison: buildFitComparison({
           items: result.items,
           sources: new Map(ids.map((id) => [id, new Set(["FEED" as const])])),
