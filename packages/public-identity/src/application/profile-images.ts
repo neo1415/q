@@ -37,6 +37,7 @@ import {
   QCardSubjectNotFoundError,
 } from "../domain/errors.js";
 import type { SubjectDirectory } from "./ports.js";
+import { reuseSignedPictureUrls } from "./signed-url-reuse.js";
 
 /**
  * Profile photos and covers (founder directive 2026-09-28, item 15).
@@ -61,6 +62,8 @@ export const PROFILE_IMAGE_BUCKET = "cq-profile-images" as const;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 /** Signed reads live briefly; pages re-read on every render. */
 export const PROFILE_IMAGE_READ_TTL_SECONDS = 60 * 60;
+/** A processed picture's key never changes: kept by the reader for good. */
+export const PICTURE_CACHE_CONTROL = "private, max-age=31536000, immutable";
 const MAX_PENDING_PER_HOUR = 20;
 /** Below this the rendition would be an upscaled blur. */
 const MIN_SOURCE_WIDTH = 200;
@@ -133,6 +136,7 @@ export type ProfileImageStorage = {
     readonly object: StoredImageObject;
     readonly body: Uint8Array;
     readonly contentType: string;
+    readonly cacheControl?: string | undefined;
   }) => Promise<void>;
   readonly deleteObject: (object: StoredImageObject) => Promise<void>;
 };
@@ -311,6 +315,11 @@ export function createProfileImageService(
   const { sql, transactions, authorization, audit, subjects, repository } =
     dependencies;
   const now = dependencies.now ?? (() => new Date());
+  // One signed URL per picture while it lasts (signed-url-reuse.ts).
+  const pictures =
+    dependencies.storage === undefined
+      ? undefined
+      : reuseSignedPictureUrls(dependencies.storage);
 
   const composed = () => {
     const { storage, processor } = dependencies;
@@ -363,7 +372,7 @@ export function createProfileImageService(
   };
 
   const signed = async (row: ProfileImageRow): Promise<string | null> => {
-    const storage = dependencies.storage;
+    const storage = pictures;
     if (storage === undefined || row.objectKey === null) return null;
     try {
       const { url } = await storage.createDownloadAuthorization({
@@ -524,6 +533,10 @@ export function createProfileImageService(
           object: { bucket: PROFILE_IMAGE_BUCKET, key: objectKey },
           body: processed.bytes,
           contentType: processed.contentType,
+          // Egress (2026-10-24): this key is this upload's alone and its
+          // bytes never change, so a browser keeps them instead of
+          // fetching them again on every list.
+          cacheControl: PICTURE_CACHE_CONTROL,
         })
         .catch(() => {
           throw new ProfileImageStorageUnavailableError();

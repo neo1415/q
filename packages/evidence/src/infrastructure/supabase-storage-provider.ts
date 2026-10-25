@@ -282,7 +282,7 @@ export function createSupabaseDocumentStorageProvider(
         headers: {
           "content-type": input.contentType,
           "x-upsert": "true",
-          "cache-control": "no-store",
+          "cache-control": input.cacheControl ?? "no-store",
         },
         // Copied into a Buffer so the request body is a concrete view over
         // its own ArrayBuffer, which is what fetch's body type requires.

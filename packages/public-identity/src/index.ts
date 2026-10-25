@@ -72,6 +72,7 @@ export {
 } from "./application/service.js";
 export {
   createProfileImageService,
+  PICTURE_CACHE_CONTROL,
   PROFILE_IMAGE_BUCKET,
   PROFILE_IMAGE_READ_TTL_SECONDS,
   type ProcessedImage,

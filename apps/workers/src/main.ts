@@ -243,6 +243,11 @@ import {
   runInvestabilitySweepTicker,
   withInvestabilityRecompute,
 } from "./investability/handler.js";
+import {
+  backfillPictureCache,
+  PICTURE_CACHE_BACKFILL_ENV,
+  pictureCacheModeOf,
+} from "./storage/picture-cache-backfill.js";
 
 const SERVICE_NAME = "workers";
 
@@ -1462,6 +1467,34 @@ void checkStoredDeckReadings({
   .catch((error: unknown) => {
     logger.warn({ err: error }, "deck figure check at start failed");
   });
+
+// Egress (2026-10-24): pictures stored no-store are rewritten cacheable,
+// once, when CQ_PICTURE_CACHE_BACKFILL is set (dry-run | apply). Off by
+// default; idempotent; never fatal.
+const pictureCacheMode = pictureCacheModeOf(
+  process.env[PICTURE_CACHE_BACKFILL_ENV],
+);
+if (pictureCacheMode !== null) {
+  if (storage === undefined) {
+    logger.warn(
+      {},
+      "picture cache backfill asked for, but storage is not configured",
+    );
+  } else {
+    void backfillPictureCache({
+      sql: database.sql,
+      storage,
+      mode: pictureCacheMode,
+      logger,
+    })
+      .then((report) => {
+        logger.info(report, "picture cache backfill at start");
+      })
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, "picture cache backfill at start failed");
+      });
+  }
+}
 
 // Q room W3 (R3): paged documents processed before page text existed get
 // their pages from their private artifacts. Bounded, idempotent, never fatal.
