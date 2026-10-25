@@ -12,7 +12,7 @@ import type {
   OnboardingStepDefinition,
   OnboardingStepState,
 } from "../contracts/index.js";
-import { evaluateBranch } from "./branch.js";
+import { evaluateBranch, referencedStepKeys } from "./branch.js";
 
 /**
  * The active path: ordered definition -> currently eligible steps -> their
@@ -53,6 +53,25 @@ export function computeActivePath(
     }
   }
   return { eligible, eligibleKeys, snapshot };
+}
+
+/**
+ * A step off the path for good: not eligible now, and every step its branch
+ * reads is already answered on the path, so no later answer can bring it
+ * back (live 25 Oct e2e: a deck's customer count offered for a step the
+ * company's stage had already ruled out was read back and never settled).
+ * A branch still waiting on an unanswered step is not decided.
+ */
+export function definitelyOffPath(
+  step: Pick<OnboardingStepDefinition, "stepKey" | "branching">,
+  path: Pick<ActivePath, "eligibleKeys" | "snapshot">,
+): boolean {
+  if (step.branching === null || path.eligibleKeys.has(step.stepKey)) {
+    return false;
+  }
+  return referencedStepKeys(step.branching).every((key) =>
+    path.snapshot.has(key),
+  );
 }
 
 const isSettled = (state: OnboardingStepState | undefined): boolean =>

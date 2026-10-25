@@ -37,7 +37,7 @@ describe("founder definition v5", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V5),
     ).not.toThrow();
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(6);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(7);
   });
 
   it("adds Qatar and the other missing GCC countries before 'somewhere else'", () => {

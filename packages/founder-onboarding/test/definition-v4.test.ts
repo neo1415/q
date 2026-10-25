@@ -39,7 +39,7 @@ describe("founder definition v4", () => {
       validateOnboardingManifest(FOUNDER_DEFINITION_V4),
     ).not.toThrow();
     expect(FOUNDER_DEFINITION_V4.version).toBe(4);
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(6);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(7);
   });
 
   it("keeps every v3 step unchanged and in v3's relative order", () => {
