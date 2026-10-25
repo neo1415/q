@@ -318,6 +318,18 @@ function normalisedText(text: string): string {
 }
 
 /**
+ * A step that points at a platform record (the mandate being defined), not
+ * a vocabulary: the journey's to settle, never a question for the person
+ * (live 2026-10-16; QA 25 Oct: asked again on return after "Looks right").
+ */
+export function isPlatformReference(step: OnboardingStepManifest): boolean {
+  return (
+    step.configuration.stepType === "reference_select" &&
+    step.configuration.resourceType !== "TAXONOMY_NODE"
+  );
+}
+
+/**
  * One concept, one answer (G): an open optional step in a concept family
  * another member of which is answered or set aside is covered by it.
  * Journey data names the families; nothing here reads a sentence.
@@ -898,11 +910,6 @@ export function createOnboardingPort(input: {
     );
     trusted = true;
   };
-
-  /** A step that points at a platform record (a mandate), not a vocabulary. */
-  const isPlatformReference = (step: OnboardingStepManifest): boolean =>
-    step.configuration.stepType === "reference_select" &&
-    step.configuration.resourceType !== "TAXONOMY_NODE";
 
   /** Where a refusal names a prerequisite by its field, the step that holds it. */
   const stepNamed = (suffix: string | null): string | undefined =>
