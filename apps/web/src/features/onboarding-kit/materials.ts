@@ -25,4 +25,6 @@ export type MaterialFileView = {
   readonly state: MaterialState;
   /** A plain sentence. Never a code, a queue id, a bucket or a stack trace. */
   readonly stateLabel: string;
+  /** The current version's content hash: the same file is never sent twice. */
+  readonly sha256?: string | undefined;
 };

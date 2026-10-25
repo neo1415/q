@@ -12,6 +12,9 @@ import {
   hasFindingsFrom,
   composerHint,
   documentReading,
+  sameFileAs,
+  alreadyHaveLine,
+  contentHashOf,
   nothingNewLine,
   resumedThread,
   keptAllLine,
@@ -774,6 +777,32 @@ describe("Keep all (live 25 Oct e2e)", () => {
     expect(stillWaiting(view, "s-2")).toBe(false);
     expect(stillWaiting(view, "s-3")).toBe(false);
     expect(stillWaiting(undefined, "s-1")).toBe(false);
+  });
+});
+
+describe("the same file uploaded again is not sent twice (live e2e 25 Oct)", () => {
+  const files = [
+    { id: "doc-1", filename: "deck.pdf", sha256: "a".repeat(64) },
+    { id: "doc-2", filename: "one-pager.pdf", sha256: undefined },
+  ];
+  it("is matched by its content hash only", () => {
+    expect(sameFileAs(files, "a".repeat(64))?.id).toBe("doc-1");
+    expect(sameFileAs(files, "b".repeat(64))).toBeUndefined();
+  });
+  it("Q says it already has it, by the name it was shared under", () => {
+    expect(alreadyHaveLine("deck.pdf", "deck.pdf")).toBe(
+      "I already have deck.pdf, so there's nothing new to read.",
+    );
+    expect(alreadyHaveLine("deck (1).pdf", "deck.pdf")).toBe(
+      "I already have that file as deck.pdf, so there's nothing new to read.",
+    );
+  });
+  it("hashes the bytes as the document store records them", async () => {
+    const bytes = new TextEncoder().encode("Tamarind Ledger");
+    const { createHash } = await import("node:crypto");
+    expect(await contentHashOf(new Blob([bytes]))).toBe(
+      createHash("sha256").update(bytes).digest("hex"),
+    );
   });
 });
 
