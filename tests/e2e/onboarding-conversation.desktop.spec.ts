@@ -61,14 +61,14 @@ test.describe("Q-led onboarding interview (desktop, real API)", () => {
     ).toBeVisible();
 
     // F1 — typing is the answer: the composer is the input.
-    await expect(asking(page, "Your company")).toBeVisible();
+    await expect(asking(page, "What's your company called?")).toBeVisible();
     const name = `E2E Freight ${Date.now().toString(36)}`;
     await sayToQ(page, name);
     await expect(
       workspace(page).getByText(`Company: ${name}. Noted.`),
     ).toBeVisible();
 
-    await expect(asking(page, "Website")).toBeVisible();
+    await expect(asking(page, "What's your website?")).toBeVisible();
     await sayToQ(page, "e2e-freight.example");
     await expect(
       workspace(page).getByText(/^Website: .*e2e-freight\.example\. Noted\.$/),
@@ -148,12 +148,16 @@ test.describe("Q-led onboarding interview (desktop, real API)", () => {
     ).toBeVisible();
 
     // F3 — the confirmation step's own label is the control.
-    await expect(asking(page, "Here's what I understood")).toBeVisible();
+    await expect(
+      asking(page, "Here's what I understood. Does it look right?"),
+    ).toBeVisible();
     await chip(page, "That's right").click();
     await expect(
       workspace(page).getByText("Company review: Confirmed. Noted."),
     ).toBeVisible();
-    await expect(asking(page, "Your role")).toBeVisible();
+    await expect(
+      asking(page, "What's your role in the company?"),
+    ).toBeVisible();
 
     // The form shows the same persisted state: the company created above,
     // and the interview's position (§22). Back in the thread, no greeting
@@ -165,11 +169,15 @@ test.describe("Q-led onboarding interview (desktop, real API)", () => {
       page.getByRole("heading", { level: 1, name: "Your founding team" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Back to Q", exact: true }).click();
-    await expect(asking(page, "Your role")).toBeVisible();
+    await expect(
+      asking(page, "What's your role in the company?"),
+    ).toBeVisible();
     await expect(workspace(page).getByText(/^Welcome back/)).toHaveCount(0);
 
     await page.reload();
-    await expect(asking(page, "Your role")).toBeVisible();
+    await expect(
+      asking(page, "What's your role in the company?"),
+    ).toBeVisible();
     await expect(workspace(page).getByText(/^Welcome back/)).toHaveCount(0);
     await workspace(page)
       .getByRole("button", { name: "Review what Q knows" })
@@ -193,13 +201,13 @@ test.describe("Q-led onboarding interview (desktop, real API)", () => {
       workspace(page).getByText("Investor type: Venture capital fund. Noted."),
     ).toBeVisible();
 
-    await expect(asking(page, "Your firm")).toBeVisible();
+    await expect(asking(page, "What's the name of your firm?")).toBeVisible();
     const firm = `E2E Northbank ${Date.now().toString(36)}`;
     await sayToQ(page, firm);
     await expect(
       workspace(page).getByText(`Organisation: ${firm}. Noted.`),
     ).toBeVisible();
-    await expect(asking(page, "Your role there")).toBeVisible();
+    await expect(asking(page, "What's your role there?")).toBeVisible();
     await expect(
       workspace(page).getByRole("button", { name: "Answer", exact: true }),
     ).toHaveCount(0);

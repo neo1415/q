@@ -6,6 +6,7 @@ import type {
   OnboardingStepView,
   OnboardingSuggestionView,
 } from "@capital-q/contracts";
+import { SPOKEN_QUESTIONS } from "@capital-q/onboarding/spoken-questions";
 
 /**
  * The Q-led interview, planned from persisted state (CQ-PRE-REC-001
@@ -134,13 +135,19 @@ const MAX_CHIPS = 12;
 const GENERIC_STRENGTH_PROMPT =
   /^how firm (?:is|are) (?:that|this|those|these)[?]?$/i;
 
-function questionText(
-  step: OnboardingStepView,
-  vocabulary: JourneyVocabulary,
+export function questionText(
+  step: Pick<OnboardingStepView, "stepKey" | "prompt">,
+  vocabulary: Pick<JourneyVocabulary, "stepTitle">,
 ): string {
-  return GENERIC_STRENGTH_PROMPT.test(step.prompt.trim())
-    ? `${vocabulary.stepTitle(step.stepKey)}?`
-    : step.prompt;
+  const prompt = step.prompt.trim();
+  if (GENERIC_STRENGTH_PROMPT.test(prompt)) {
+    return `${vocabulary.stepTitle(step.stepKey)}?`;
+  }
+  // A form label ("Website") is asked as Q asks it, from the one source the
+  // interview reads too (QA 25 Oct: "Website" as the heading after a tap).
+  return prompt.includes("?")
+    ? step.prompt
+    : (SPOKEN_QUESTIONS[step.stepKey] ?? step.prompt);
 }
 
 /** "Founders who have sold into banks before." reads once, not "before.. Noted." */
