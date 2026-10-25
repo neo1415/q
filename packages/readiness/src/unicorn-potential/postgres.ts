@@ -258,10 +258,13 @@ export function createPostgresUnicornPotentialStore(options: {
       }),
     current: async (ids, methodVersion) => {
       if (ids.length === 0) return new Map();
-      // Bounded history in one query, never an N+1 read per feed item.
+      // One query, never an N+1 read per feed item. Only the current revision
+      // and the one before it are used (momentum compares the immediate
+      // previous revision only), so read two per company, not a history:
+      // a 463-company rank read 20 each and paid the egress and the parse.
       const rows = await sql<
         Row[]
-      >`select a.company_id, a.revision, a.basis_hash, a.cohort_key, a.summary, a.assessed_at, a.observations from unnest(${[...new Set(ids)]}::uuid[]) requested(id) cross join lateral (select company_id, revision, basis_hash, cohort_key, summary, assessed_at, observations from core.company_unicorn_potential_assessments where company_id = requested.id and method_version = ${methodVersion} order by revision desc limit 20) a`;
+      >`select a.company_id, a.revision, a.basis_hash, a.cohort_key, a.summary, a.assessed_at, a.observations from unnest(${[...new Set(ids)]}::uuid[]) requested(id) cross join lateral (select company_id, revision, basis_hash, cohort_key, summary, assessed_at, observations from core.company_unicorn_potential_assessments where company_id = requested.id and method_version = ${methodVersion} order by revision desc limit 2) a`;
       const newest = new Map<string, Row>();
       for (const row of rows) {
         const prior = newest.get(row.company_id);
