@@ -46,3 +46,35 @@ Fixed: F-80 in #428 (deferred stage/cheque update bound the firm against a stale
 
 Fixed: #484 (the reader is never offered upload-only steps; once findings wait, the refusal says to read them back; a step without its own hint shows "Type your answer").
 Open from this run: a second deck's findings for the same steps appear in the panel beside the first deck's (Stage · Seed twice), not merged; "Type your answer" is not translated (Arabic deferred).
+
+## Run 7: 25 Oct 14:03–14:20 UTC, owner-approved fresh founder `e2e-f-1403` and investor `e2e-i-1403` on 2632e2cb9 (11 typed turns of 15, no voice)
+
+Founder (session cad1561f-0885-48af-bd2f-a28466af4d16):
+
+| Step                                     | Result                                                                                                                                                                                                                  |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-up                                  | ✓ 4.3 s to /welcome; Q's first words about 8 s                                                                                                                                                                          |
+| Turn 1 (name + what it does)             | ✓ company name and Ghana saved, description held for their yes; 16.7 s                                                                                                                                                  |
+| Turn 2 (yes, seed, CEO)                  | ✓ description, Seed and CEO saved (6 responses; the description suggestion EXPIRED once answered); 17.2 s                                                                                                               |
+| Reload mid-interview                     | **Partial.** The thread resumed, but the "That's right" confirm control was gone; the cursor's upload step showed                                                                                                       |
+| Deck upload                              | ✓ read back 64 s after upload, with no "not read" and no upload-button line. **Stale heading** (Q's previous question)                                                                                                  |
+| Duplicate offers                         | **Defect.** On the read-back turn Q's recommend wrote 6 Q_RECOMMENDATION offers equal to the deck's, 5 s later                                                                                                          |
+| "Keep all"                               | **Defect.** 5 accepted, then "That didn't go through: The onboarding session does not allow this action right now" beside Q's "All kept. Thank you."                                                                    |
+| Turn 3 (raising, $900k SAFE, category)   | ✓ raising, USD, SAFE, amount and categories saved (17 responses). **"210 customers is right" went to the F7 note**: F5.customers is off a seed company's path (laterStage only), so the deck's offer could never settle |
+| Turn 4 ("finish and go to my home page") | **Fail.** "we'll pause here … How many founders?": next question appended, no navigation, session ACTIVE. "Continue later" → /home works                                                                                |
+| Home                                     | **No proactive first answer** ("Welcome back, Abena. What's on your mind today?")                                                                                                                                       |
+| Turn 5 "How investor-ready am I?"        | ✓ 27 s, grounded and sourced; lists traction as open (customers not saved)                                                                                                                                              |
+
+Investor (session b087386d-0762-417c-8e44-af1944a9810b):
+
+| Step                     | Result                                                                                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-up                  | ✓ 6.9 s                                                                                                                                             |
+| Turn 1 (one sentence)    | ✓ 6 of 9 essentials in 20 s with an exact receipt (firm, VC, USD 250k–1M, Seed + Series A, Fintech + Logistics, NG/KE/GH, avoid gambling + tobacco) |
+| Turns 2–5                | ✓ deploying, discovery Balanced, inbound Qualified, "make it live": 11 responses; core.investor_mandates ACTIVE; recommendation slate CURRENT       |
+| Reload / page load       | **Fail, 3 repros.** The asked step's chips (deployment, discovery, "Looks right") vanish; only "Skip", from session.current_step_key I0.website     |
+| Discover                 | ✓ personalised card (Silo Credit) with "Why it's here" stage, location, sector; suitability 88                                                      |
+| Turn 6 top-five question | ✓ Dawaledger, Watchly, Portside, Silo Credit, Umoja Cover; the tie at 8.8 explained; "not a judgement of quality"                                   |
+
+Composer hints were right throughout ("Type your answer" / "Or say it in your own words"). Latency: 14–20 s per typed turn; 64 s from upload to read-back.
+Fixes: branch fix/e2e-onboarding-defects (reload asked step, Keep all, leaving for now, duplicate Q recommendations); seed paying customers in its own PR (definition version + migration).
