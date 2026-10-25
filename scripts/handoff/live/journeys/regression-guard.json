@@ -234,5 +234,66 @@
         }
       }
     ]
+  },
+  {
+    "id": "F-82-savanna-top-five",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me the five companies that best fit my mandate",
+        "expect": {
+          "anyBlock": ["ANSWER_CARDS", "COMPARISON_CARDS"],
+          "replyMatches": ["Silo Credit"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-82-savanna-anchor",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Which is better, Anchor or Afyascan?",
+        "expect": {
+          "anyBlock": [
+            "COMPARISON",
+            "COMPARISON_CARDS",
+            "TABLE",
+            "ANSWER_CARDS"
+          ],
+          "replyNot": [
+            "look up Anchor",
+            "Anchor isn't on record",
+            "Anchor's profile"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-92-savanna-ledgerfold-call",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Book a call with Ledgerfold next Tuesday at 3pm",
+        "expect": {
+          "approval": true,
+          "replyNot": ["about Call with"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-92-savanna-mizan-call",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Schedule a call with Mizan's founders next week",
+        "expect": {
+          "replyMatches": ["interest"],
+          "replyNot": ["I didn't prepare that", "Who should I set this up with"]
+        }
+      }
+    ]
   }
 ]
