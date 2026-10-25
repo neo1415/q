@@ -1,0 +1,162 @@
+[
+  {
+    "id": "I-top-five",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me the five companies that best fit my mandate",
+        "expect": {
+          "anyBlock": ["COMPANY_REFERENCE", "COMPARISON_CARDS", "TABLE"]
+        }
+      },
+      {
+        "ask": "How do the top two stack up?",
+        "expect": { "anyBlock": ["COMPARISON", "COMPARISON_CARDS", "TABLE"] }
+      }
+    ]
+  },
+  {
+    "id": "I-compare-named",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Which is better, Anchor or Afyascan?",
+        "expect": { "anyBlock": ["COMPARISON", "COMPARISON_CARDS", "TABLE"] }
+      }
+    ]
+  },
+  {
+    "id": "Qatari-investors",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Find me 3 Qatari investors who back fintech",
+        "expect": {
+          "replyNot": [
+            "no public sources",
+            "would you like me to (search|look)"
+          ],
+          "anyBlock": [
+            "INVESTOR_REFERENCE",
+            "PUBLIC_SOURCE",
+            "TABLE",
+            "COMPARISON_CARDS",
+            "WORK_IN_PROGRESS"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-108",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Do market research on Silo Credit's market and save it to my board",
+        "expect": {
+          "approval": false,
+          "anyBlock": ["WORK_IN_PROGRESS", "ARTIFACT_REFERENCE"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-93",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Add Ghana to my mandate's geographies",
+        "expect": { "approval": true, "replyNot": ["no change"] }
+      }
+    ]
+  },
+  {
+    "id": "F-96",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "ما هي أفضل ثلاث شركات تناسب تفويضي",
+        "expect": {
+          "replyMatches": ["[\\u0600-\\u06FF]{3}"],
+          "replyNot": ["They're on screen"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "I-board",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      { "ask": "What's on my board?" },
+      {
+        "ask": "Add 'Review Basketari repeat order data' to my board",
+        "expect": { "approval": false }
+      }
+    ]
+  },
+  {
+    "id": "I-public-company",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Who is the founder of Paystack?",
+        "expect": { "replyMatches": ["Shola|Akinlade|Ezra|Olubi"] }
+      }
+    ]
+  },
+  {
+    "id": "F-106",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Draft a short update email to Savanna Seed Partners about our latest traction",
+        "expect": { "approval": true }
+      }
+    ]
+  },
+  {
+    "id": "F-107",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "What do you think of my pitch video?",
+        "expect": {
+          "replyNot": ["revis(e|ing|ed) (the|your) deck", "You're on Home now"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-77",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Which investors fit Maji Loop best, and how well?",
+        "expect": {
+          "anyBlock": ["INVESTOR_REFERENCE", "COMPARISON_CARDS", "TABLE"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-90",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Write a 12-month growth plan for Maji Loop and save it to my board",
+        "expect": {
+          "approval": false,
+          "anyBlock": ["WORK_IN_PROGRESS", "ARTIFACT_REFERENCE"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-founder-ready",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      { "ask": "How investor-ready is my company right now?" },
+      { "ask": "Show me my fundraising pipeline" }
+    ]
+  }
+]
