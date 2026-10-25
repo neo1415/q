@@ -108,6 +108,7 @@ import {
   onboardingFlowFor,
   withNextQuestion,
   withoutUnbackedFieldClaims,
+  withoutUnbackedReadingClaims,
   withoutRepeatedReceipt,
   withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
@@ -150,6 +151,22 @@ const RecordedResultsSchema = z
     data: z.object({ results: z.array(OnboardingRecordResultSchema) }),
   })
   .transform((body) => ({ results: body.data.results }));
+/** An accept's results, as code records them or as the tool returned them. */
+const AcceptResultsSchema = z.union([
+  z.object({ results: z.array(z.object({ outcome: z.string() })) }),
+  z.object({
+    ok: z.literal(true),
+    data: z.object({ results: z.array(z.object({ outcome: z.string() })) }),
+  }),
+]);
+/** Whether an accept wrote anything to the record. */
+function acceptedIn(result: unknown): boolean {
+  const parsed = AcceptResultsSchema.safeParse(result);
+  if (!parsed.success) return false;
+  const results =
+    "results" in parsed.data ? parsed.data.results : parsed.data.data.results;
+  return results.some((r) => r.outcome === "COMMITTED");
+}
 const MAX_CALLS = 8;
 
 /**
@@ -2752,7 +2769,27 @@ export function createInterviewAgent(
         "interview reply named an unsaved field as saved; removed",
       );
     }
-    let reply = notVerbatim(fieldBackedReply, lastQTurn ?? null, {
+    // Never "the deck points are confirmed" while its readings still wait
+    // (QA F-134): the claim is read from what this turn accepted.
+    const readingBackedReply = writtenByCode
+      ? fieldBackedReply
+      : withoutUnbackedReadingClaims(fieldBackedReply, {
+          acceptedThisTurn: actions.some(
+            (action) =>
+              action.tool === "accept_recommendation" &&
+              acceptedIn(action.result),
+          ),
+          stillWaiting: (
+            await port.pendingRecommendations().catch(() => [])
+          ).filter((item) => item.fromDocument).length,
+        });
+    if (readingBackedReply !== fieldBackedReply) {
+      logger.info(
+        {},
+        "interview reply said the readings were confirmed while they wait; removed",
+      );
+    }
+    let reply = notVerbatim(readingBackedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         // An English rewording only where the reply is English or will be
