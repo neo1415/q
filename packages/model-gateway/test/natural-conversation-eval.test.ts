@@ -488,7 +488,11 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
       script: [answer(LIVE_Q2)],
     });
     expect(modelCalls).toBe(0);
-    expect(executed.filter((name) => name === "fit_profile")).toHaveLength(5);
+    // The five are read as one set, never one fit read per company.
+    expect(executed.filter((name) => name === "fit_profile")).toHaveLength(0);
+    expect(
+      executed.filter((name) => name === "fit_top_candidates:named"),
+    ).toHaveLength(1);
     const cards = cardsOf(blocks);
     expect(cards.map((card) => card.name)).toEqual([
       "Souqsheet",

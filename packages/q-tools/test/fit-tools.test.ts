@@ -362,6 +362,19 @@ describe("fit tools", () => {
     ]);
     expect(data.comparison?.entries[0]?.sources).toEqual(["FEED"]);
     expect(read).toEqual([COMPANY_A]);
+    // Read from their relationships, they are said as relationships.
+    const own = await port.execute(
+      call("fit_top_candidates", {
+        companyIds: [COMPANY_A],
+        source: "RELATIONSHIP",
+      }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!own.result.ok) throw new Error("expected a result");
+    expect(
+      FitTopCandidatesOutputSchema.parse(own.result.data).comparison?.entries[0]
+        ?.sources,
+    ).toEqual(["RELATIONSHIP"]);
   });
 
   it("a founder, or anyone without an investor side, gets nothing", async () => {

@@ -4,6 +4,7 @@ import {
   CompanyRaiseViewSchema,
   CompanyScoresDtoSchema,
   FIT_COMPARISON_MAX,
+  FitCandidateSourceSchema,
   FitComparisonDtoSchema,
   FitProfileDtoSchema,
   MoneySchema,
@@ -124,8 +125,11 @@ export const FitTopCandidatesInputSchema = z
       .max(FIT_COMPARISON_MAX)
       .optional()
       .describe(
-        "Put exactly these companies side by side instead of the top candidates; ids from discover_companies, never invented. limit is then ignored.",
+        "Put exactly these companies side by side instead of the top candidates; ids from discover_companies, relationships or saved companies, never invented. limit is then ignored.",
       ),
+    source: FitCandidateSourceSchema.optional().describe(
+      "With companyIds: where they came from (FEED for discover_companies, the default; RELATIONSHIP; SAVED; REQUEST).",
+    ),
   })
   .strict();
 export type FitTopCandidatesInput = z.infer<typeof FitTopCandidatesInputSchema>;
@@ -333,7 +337,11 @@ export function createFitTopCandidatesTool(
       const result =
         input.companyIds === undefined
           ? await fit.top(context.actor, input.limit ?? 3)
-          : await fit.compare(context.actor, input.companyIds, "FEED");
+          : await fit.compare(
+              context.actor,
+              input.companyIds,
+              input.source ?? "FEED",
+            );
       if (result.kind !== "OK") return none(result.kind);
       const views = await raiseViewsFor(
         ports,
