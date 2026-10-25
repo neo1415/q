@@ -3,6 +3,7 @@ import {
   QActionProposalIdSchema,
   QApprovalIdSchema,
   QRunIdSchema,
+  type QActionProposal,
   type QApprovalView,
 } from "@capital-q/contracts";
 import { APP_ACTIONS, PERSON_ACTIONS } from "@capital-q/app-actions";
@@ -349,31 +350,26 @@ export function createConversationApprovalPort(
   ): Promise<readonly ConversationProposal[]> => {
     const { actor } = context;
     const messages = await messagesOf(context);
-    const seen = new Map<
-      string,
-      { readonly summary: string; readonly actionType: string }
-    >();
+    const seen = new Map<string, QActionProposal>();
     for (const message of messages) {
       for (const block of message.blocks ?? []) {
         if (block.kind === "ACTION_PROPOSAL") {
-          seen.set(block.proposal.proposalId, {
-            summary: block.proposal.summary,
-            actionType: block.proposal.actionType,
-          });
+          seen.set(block.proposal.proposalId, block.proposal);
         }
       }
     }
     const proposals: ConversationProposal[] = [];
-    for (const [proposalId, { summary, actionType }] of [...seen].slice(
-      -PROPOSALS_MAX,
-    )) {
+    for (const [proposalId, proposal] of [...seen].slice(-PROPOSALS_MAX)) {
       const view = await viewOf(actor, proposalId, context.correlationId);
       if (view === null) continue;
       proposals.push({
         proposalId,
-        summary,
+        summary: proposal.summary,
         status: plainProposalStatus(view),
-        ...(OUTWARD_ACTION_TYPES.has(actionType) ? { outward: true } : {}),
+        ...(OUTWARD_ACTION_TYPES.has(proposal.actionType)
+          ? { outward: true }
+          : {}),
+        proposal,
       });
     }
     return proposals;

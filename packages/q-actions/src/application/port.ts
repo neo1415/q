@@ -1,3 +1,4 @@
+import type { QActionProposal as QActionCard } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type {
   QActionPort,
@@ -128,6 +129,8 @@ export function createQActionPort(options: {
           readonly proposalId: string;
           readonly summary: string;
           readonly status: string;
+          /** The card as the conversation showed it; absent: not shown. */
+          readonly proposal?: QActionCard | undefined;
         }[]
       >)
     | undefined;
@@ -153,12 +156,20 @@ export function createQActionPort(options: {
       tenantId: context.actor.tenantId,
       actorUserId: context.actor.userId,
     };
-    const say = async (line: string, reason: string) => {
+    const say = async (line: string, reason: string, card?: QActionCard) => {
       options.logger?.info(
         { qRunId: context.runId, outcome: "said", reason },
         "q waiting reminder",
       );
-      await narrator.note?.(run, line).catch(() => undefined);
+      await narrator
+        .note?.(
+          run,
+          line,
+          card === undefined
+            ? undefined
+            : [{ kind: "ACTION_PROPOSAL", proposal: card }],
+        )
+        .catch(() => undefined);
     };
     const skip = (reason: string) => {
       options.logger?.info(
@@ -203,9 +214,12 @@ export function createQActionPort(options: {
       } else if (others.length === 0) {
         skip("no other card waiting");
       } else {
+        // F-106 guard (2026-10-25): the card it names comes with it, so
+        // words about a waiting card are never without the card.
         await say(
           waitingLine(others.map((card) => card.summary)),
           "other card waiting",
+          others.at(-1)?.proposal,
         );
       }
       return outcome;

@@ -56,6 +56,11 @@ export const Q_TOOL_FAILURE_CODES = [
   // the safe message names their own plan, counts and the plan page.
   "ENTITLEMENT_REQUIRED",
   // end BILLING block
+  /**
+   * Nothing for this action to act on (guard run, 2026-10-25): its message
+   * is guidance for Q's answer, never said to the person as it stands.
+   */
+  "NOT_THIS_ACTION",
 ] as const;
 export type QToolFailureCode = (typeof Q_TOOL_FAILURE_CODES)[number];
 

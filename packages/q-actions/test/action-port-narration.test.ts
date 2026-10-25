@@ -386,11 +386,17 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
   const RAISE = "dddddddd-0000-4000-8000-000000000001";
   const DILIGENCE = "eeeeeeee-0000-4000-8000-000000000001";
   const build = (
-    cards: readonly { proposalId: string; summary: string; status: string }[],
+    cards: readonly {
+      proposalId: string;
+      summary: string;
+      status: string;
+      proposal?: never;
+    }[],
     result: Record<string, unknown> = {},
     actionType = "app.diligence.document.share",
   ) => {
     const said: string[] = [];
+    const shown: unknown[] = [];
     const logged: unknown[] = [];
     const record = (fields: unknown, message: string) => {
       if (message === "q waiting reminder") logged.push(fields);
@@ -417,8 +423,9 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
         },
         refused: () => Promise.resolve(),
         settled: () => Promise.resolve(),
-        note: (_run, line) => {
+        note: (_run, line, blocks) => {
           said.push(line);
+          shown.push(blocks);
           return Promise.resolve();
         },
       },
@@ -431,8 +438,31 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
         child: () => undefined,
       } as never,
     });
-    return { port, said, logged };
+    return { port, said, logged, shown };
   };
+
+  // Guard run 1 (2026-10-25, run fd2e668b): "Still waiting for your
+  // approval: Message Savanna Seed Partners." came with no card. The card
+  // the line names is shown with it.
+  it("the waiting line carries the card it names", async () => {
+    const card = {
+      proposalId: RAISE,
+      summary: "Message Savanna Seed Partners",
+    };
+    const { port, said, shown } = build([
+      {
+        proposalId: RAISE,
+        summary: "Message Savanna Seed Partners (fictional)",
+        status: "PENDING",
+        proposal: card as never,
+      },
+    ]);
+    await port.prepare(context);
+    expect(said.at(-1)).toBe(
+      "Still waiting for your approval: Message Savanna Seed Partners.",
+    );
+    expect(shown.at(-1)).toEqual([{ kind: "ACTION_PROPOSAL", proposal: card }]);
+  });
 
   it("the exact sequence: the diligence card, then the raise card still waiting", async () => {
     const { port, said, logged } = build([

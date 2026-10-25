@@ -198,8 +198,11 @@ export function createToolAppActionPort(dependencies: {
           // that reason is the answer (QA run 938a39b7: it was dropped and
           // Q asked "Want me to proceed?"). A generic refusal or a failure
           // says nothing worth saying, and the answer runs as before.
+          // Guidance for Q's answer (NOT_THIS_ACTION) is never the answer:
+          // the turn is answered in full instead (guard run, 2026-10-25).
           const reason = outcome.result.error.safeMessage.trim();
           return outcome.status === "DENIED" &&
+            outcome.result.error.code !== "NOT_THIS_ACTION" &&
             !GENERIC_REFUSALS.has(reason) &&
             reason.length > 0
             ? reason
