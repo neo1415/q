@@ -40,6 +40,12 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
+          ],
+          "replyMatches": ["Anchor"],
+          "replyNot": [
+            "look up Anchor",
+            "Anchor without enough information",
+            "Anchor's profile"
           ]
         }
       }
@@ -255,8 +261,10 @@
           "replyNot": [
             "look up Anchor",
             "Anchor isn't on record",
-            "Anchor's profile"
-          ]
+            "Anchor's profile",
+            "Anchor without enough information"
+          ],
+          "replyMatches": ["Anchor"]
         }
       }
     ]
