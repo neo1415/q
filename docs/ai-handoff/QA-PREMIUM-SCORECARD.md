@@ -33,6 +33,8 @@ Score % = sum ÷ (2 × items).
 
 **FULL re-score, 25 Oct 06:00–06:45 UTC on a7b99c46 (batches 11+12), owner spend rule:** 31 live text turns (investor A 9, investor B 7 on equator-line, founder 1 10, founder 2 3, Arabic 2), no voice, no new onboarding account. Voice (I19, I22), I4, I13, I15, F1, F7, U3, U6 and onboarding are carried from batch 8/9. Investor 34/44 = **77%**, founder 27/30 = **90%**, UI 18/20 = **90%**, onboarding 3/4 = **75%**; overall 82/98 = **84%**. Public web search providers are down on production (web-down rows tagged).
 
+**English-only (owner, 25 Oct 06:25): U8 Arabic deferred and left out.** UI 17/18 = **94%**; overall 81/96 = **84%** (old denominator with U8 at 1: 82/98 = 84%).
+
 ## Investor: the day-to-day and what bites
 
 | #   | Job                                                                                                                                     | Score | Last checked | Notes / finding ids                                                                                                                                                        |
@@ -98,7 +100,7 @@ Score % = sum ÷ (2 × items).
 | U5  | Empty states, loading and errors: helpful, never raw codes                              | 2     | 24 Oct 15h   | Unknown company, founder page, gibberish: clear and kind                                                                                                                    |
 | U6  | Mobile 390 px: no overflow, 44 px touch targets                                         | 2     | 24 Oct 17h   | 390 px dark: no overflow on 8 pages; F-87 FIXED (Q bubble moved off the next-step bar); F-86 is data                                                                        |
 | U7  | Light and dark themes; WCAG AA contrast                                                 | 2     | 24 Oct 15h   | Dark mode reads well                                                                                                                                                        |
-| U8  | Arabic / RTL                                                                            | 1     | 25 Oct 06h   | F-113 NEW: Arabic top three mixes English ("Right", "Pipeline", "Mandate", "Want me to go through one?"); the follow-up is fully Arabic, RTL; b12-f113-arabic-mixed.png     |
+| U8  | Arabic / RTL                                                                            | —     | 25 Oct 06h   | Deferred by owner (25 Oct): English first; not scored. Last seen F-113 (Arabic reply mixes English words)                                                                   |
 | U9  | No internal names shown ("Q's team", agent names)                                       | 2     | 24 Oct 15h   | No "Q's team:" on Work; no agent names seen                                                                                                                                 |
 | U10 | Approval cards: exact payload, edit, "Ready to send" wording                            | 1     | 25 Oct 06h   | Founder approval cards present, but F-105: the turn-2 "In focus" investor cards stay above later answers, pushing the card below the fold; b12-f105-founder-stale-cards.png |
 
