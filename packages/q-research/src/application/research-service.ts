@@ -45,7 +45,7 @@ import {
 import {
   isResearchProviderFailure,
   type PublicWebResearchProvider,
-  type ResearchProviderFailure,
+  ResearchProviderFailure,
 } from "../ports.js";
 
 /**
@@ -285,7 +285,18 @@ export type PublicWebResearchServiceDependencies = {
   readonly evidence?: ResearchEvidenceRecorder | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
+  /** How long the page reads may hold the answer (EXTRACT_BUDGET_MS). */
+  readonly extractBudgetMs?: number | undefined;
 };
+
+/**
+ * How long the page reads may hold the answer once the searches have
+ * landed (production 2026-10-25, run 37b56282: "Who is the founder of
+ * Paystack?" waited 8 s for an extract after the snippets already held the
+ * answer -- 16.5 s in all). Past it, the answer goes on the search
+ * snippets, as when a read fails, and says pages were not read.
+ */
+export const EXTRACT_BUDGET_MS = 3_000;
 
 const RUN_ALLOWLIST_TTL_MS = 6 * 60 * 60 * 1000;
 const RUN_ALLOWLIST_MAX_RUNS = 500;
@@ -399,6 +410,7 @@ export function createPublicWebResearchService(
   dependencies: PublicWebResearchServiceDependencies,
 ): PublicWebResearchService {
   const { provider, evidence, logger } = dependencies;
+  const extractBudgetMs = dependencies.extractBudgetMs ?? EXTRACT_BUDGET_MS;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/q-research");
   const metrics = {
@@ -917,12 +929,34 @@ export function createPublicWebResearchService(
       let pages = new Map<string, { title: string | null; text: string }>();
       let extractCalls = 0;
       if (chosen.length > 0) {
+        // Its own deadline: the reads never hold the answer past it (also
+        // raced, for a provider that does not heed its signal).
+        const deadline = AbortSignal.timeout(extractBudgetMs);
+        const reading = {
+          ...context,
+          signal:
+            context.signal === undefined
+              ? deadline
+              : AbortSignal.any([context.signal, deadline]),
+        };
+        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
           extractCalls += 1;
-          const extracted = await provider.extract(
-            { urls: chosen.map((hit) => hit.url) },
-            context,
-          );
+          const extracted = await Promise.race([
+            provider.extract({ urls: chosen.map((hit) => hit.url) }, reading),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () =>
+                  reject(
+                    new ResearchProviderFailure({
+                      providerCode: provider.code,
+                      failureClass: "TIMEOUT",
+                    }),
+                  ),
+                extractBudgetMs,
+              );
+            }),
+          ]);
           metrics.extractLatency.record(extracted.latencyMs, {
             provider: provider.code,
           });
@@ -937,7 +971,16 @@ export function createPublicWebResearchService(
             throw error;
           }
           // Search snippets still stand; the answer says pages were not read.
-          providerUnavailable(error, "extract");
+          if (error.failureClass === "TIMEOUT") {
+            logger?.info(
+              { runId: command.runId, budgetMs: extractBudgetMs },
+              "public research page reads past their budget; the answer goes on the snippets",
+            );
+          } else {
+            providerUnavailable(error, "extract");
+          }
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
         }
       }
 
