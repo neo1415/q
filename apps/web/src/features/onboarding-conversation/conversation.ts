@@ -663,6 +663,28 @@ export function pendingQuestion(
 }
 
 /**
+ * Q's last line as the question on the table when the screen opens. As
+ * `pendingQuestion`, except a line said before an absence (§26): it is
+ * history, shown above the welcome back, and Q opens afresh (live 25 Oct
+ * e2e: "Understood, we'll stop here" from hours earlier sat below
+ * "Welcome back" as if said now). Measured from the line itself, so the
+ * opening Q just said is still the question on the next reload.
+ */
+export function questionOnReturn(
+  turns: readonly {
+    readonly role: "Q" | "PERSON";
+    readonly text: string;
+    readonly createdAt: string;
+  }[],
+  lastActivityAt: string,
+  now: number = Date.now(),
+): string | null {
+  const pending = pendingQuestion(turns, lastActivityAt);
+  const said = Date.parse(turns.at(-1)?.createdAt ?? "");
+  return pending !== null && now - said < RESUME_AFTER_MS ? pending : null;
+}
+
+/**
  * The thread a reload redraws: what the server kept, less Q's last line
  * when that line is still the question on the table, which the screen
  * shows as the question, as it did before the reload (QA F-50: Q's line

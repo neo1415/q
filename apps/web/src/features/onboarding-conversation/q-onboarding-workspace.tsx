@@ -89,7 +89,7 @@ import {
   composerHint,
   keptAllLine,
   stillWaiting,
-  pendingQuestion,
+  questionOnReturn,
   redrawnThread,
   welcomeBack,
   resumedThread,
@@ -691,11 +691,11 @@ export function QOnboardingWorkspace({
       .then((kept) => {
         // Q is still asking what it last said: that line is the question,
         // and the interview is not opened a second time (see
-        // `pendingQuestion`). A reload redraws; it does not re-greet.
+        // `questionOnReturn`). A reload redraws; it does not re-greet.
         // Came for one section of their profile: Q opens on it, whatever
         // it was last waiting on.
         const pending =
-          focus === undefined ? pendingQuestion(kept, lastActivityAt) : null;
+          focus === undefined ? questionOnReturn(kept, lastActivityAt) : null;
         // The question on the table is shown as the question, not also as
         // the thread's last line (QA F-50: Q's line twice after a reload),
         // as it was before the reload.

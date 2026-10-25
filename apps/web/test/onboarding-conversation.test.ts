@@ -17,6 +17,7 @@ import {
   keptAllLine,
   stillWaiting,
   pendingQuestion,
+  questionOnReturn,
   redrawnThread,
   progressLines,
   promptFor,
@@ -406,6 +407,50 @@ describe("pendingQuestion: a reload redraws, it does not re-open", () => {
 
   it("an unreadable time is never taken as 'nothing moved'", () => {
     expect(pendingQuestion([asked], "not a time")).toBeNull();
+  });
+});
+
+describe("questionOnReturn: a line said before an absence is history (live 25 Oct e2e)", () => {
+  const stop = {
+    role: "Q" as const,
+    text: "Understood, we'll stop here.",
+    createdAt: "2026-10-25T17:03:10.000Z",
+  };
+  const lastActivity = "2026-10-25T17:03:09.000Z";
+
+  it("is still the question on a reload soon after", () => {
+    expect(
+      questionOnReturn(
+        [stop],
+        lastActivity,
+        Date.parse("2026-10-25T17:20:00Z"),
+      ),
+    ).toBe("Understood, we'll stop here.");
+  });
+
+  it("is not the question hours later: it stays above the welcome and Q opens afresh", () => {
+    expect(
+      questionOnReturn(
+        [stop],
+        lastActivity,
+        Date.parse("2026-10-25T19:30:00Z"),
+      ),
+    ).toBeNull();
+  });
+
+  it("the opening Q just said after the absence is the question on the next reload", () => {
+    const opener = {
+      role: "Q" as const,
+      text: "What early signal do you have?",
+      createdAt: "2026-10-25T19:30:05.000Z",
+    };
+    expect(
+      questionOnReturn(
+        [stop, opener],
+        lastActivity,
+        Date.parse("2026-10-25T19:31:00Z"),
+      ),
+    ).toBe("What early signal do you have?");
   });
 });
 
