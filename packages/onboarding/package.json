@@ -20,6 +20,10 @@
     "./documents": {
       "types": "./dist/application/documents.d.ts",
       "default": "./dist/application/documents.js"
+    },
+    "./spoken-questions": {
+      "types": "./dist/application/spoken-questions.d.ts",
+      "default": "./dist/application/spoken-questions.js"
     }
   },
   "main": "./dist/index.js",

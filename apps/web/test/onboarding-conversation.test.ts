@@ -22,6 +22,7 @@ import {
   pendingQuestion,
   questionShown,
   questionAfterTap,
+  questionText,
   reviewShown,
   questionOnReturn,
   redrawnThread,
@@ -497,6 +498,33 @@ describe("a confirmation shows what it confirms (QA F-130, 25 Oct)", () => {
     expect(reviewShown(false, { control: "chips" })).toBe(false);
     expect(reviewShown(true, { control: "chips" })).toBe(true);
     expect(reviewShown(false, null)).toBe(false);
+  });
+});
+
+describe('a label-only step is asked as a question (QA 25 Oct: "Website" after a tap)', () => {
+  const vocabulary = { stepTitle: (key: string) => key };
+  it("after a tap, the next label-only step shows its phrased question", () => {
+    const next = {
+      stepKey: "F1.website",
+      text: questionText(
+        { stepKey: "F1.website", prompt: "Website" },
+        vocabulary,
+      ),
+    };
+    expect(questionShown(next, questionAfterTap(), false)).toBe(
+      "What's your website?",
+    );
+  });
+  it("a prompt that already asks is kept as it is", () => {
+    expect(
+      questionText(
+        { stepKey: "F1.website", prompt: "Where can investors see it?" },
+        vocabulary,
+      ),
+    ).toBe("Where can investors see it?");
+    expect(
+      questionText({ stepKey: "X.unknown", prompt: "Team" }, vocabulary),
+    ).toBe("Team");
   });
 });
 
