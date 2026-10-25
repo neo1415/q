@@ -570,13 +570,23 @@ export function meetingProposalBody(input: {
   readonly durationMinutes: number;
   readonly iso: string;
   readonly timeZone: string | undefined;
+  /** Who it goes to: their own call title is not a topic to them. */
+  readonly counterpartName?: string | undefined;
 }): string {
   const instant = new Date(input.iso);
   const when =
     input.timeZone === undefined
       ? `${localLabel(instant, "UTC")} UTC`
       : `${localLabel(instant, input.timeZone)} (${input.timeZone})`;
-  const purpose = input.purpose.trim().replace(/[.\s]+$/u, "");
+  const stated = input.purpose.trim().replace(/[.\s]+$/u, "");
+  // Live a7b99c465: "a 30-minute call about Call with Ledgerfold", sent to
+  // Ledgerfold. The invite's own title, the one this tool gives a call
+  // ("Call with <them>"), says no more than "a call" does.
+  const purpose =
+    input.counterpartName !== undefined &&
+    stated.toLowerCase() === `call with ${input.counterpartName}`.toLowerCase()
+      ? ""
+      : stated;
   return `Would ${when} work for a ${String(input.durationMinutes)}-minute call${purpose === "" ? "" : ` about ${purpose}`}? If another time suits you better, suggest one here and I'll send an invite.`;
 }
 
@@ -1080,6 +1090,7 @@ export function createScheduleTools(
                 relationshipId: grant.relationshipId,
                 counterpartName: grant.counterpartName,
                 body: meetingProposalBody({
+                  counterpartName: grant.counterpartName,
                   purpose: input.purpose,
                   durationMinutes: input.durationMinutes,
                   iso: at.iso,
