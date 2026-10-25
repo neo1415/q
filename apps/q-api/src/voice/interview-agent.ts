@@ -1296,13 +1296,20 @@ export function createInterviewAgent(
               utterance,
               lastQ: lastQTurn ?? "",
               askedStep: lastAsked.get(input.onboardingSessionId) ?? null,
-              steps: journeySteps.map((step) => ({
-                stepKey: step.stepKey,
-                question:
-                  SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
-                about: step.configuration.supportingText ?? "",
-                required: step.required,
-              })),
+              // Only steps words can fill (live 25 Oct, run b9-0746): "I've
+              // just uploaded the deck" read as stating the upload step,
+              // whose refused write had Q say the deck was not read.
+              steps: journeySteps
+                .filter(
+                  (step) => step.configuration.stepType !== "document_upload",
+                )
+                .map((step) => ({
+                  stepKey: step.stepKey,
+                  question:
+                    SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
+                  about: step.configuration.supportingText ?? "",
+                  required: step.required,
+                })),
               pending: pending.map((item) => ({
                 stepKey: item.stepKey,
                 recommended: item.value,

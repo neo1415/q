@@ -69,6 +69,7 @@ import {
   asciiDigits,
   definitionFor,
   describeValue,
+  documentFindingsIn,
   optionsOf,
   readRefusal,
   recordedCurrency,
@@ -100,6 +101,16 @@ const HELD_FOR_FIRM_REASON =
  */
 export const UPLOAD_ONLY_REASON =
   "Nothing to record here, and nothing went wrong: this step is filled only by an upload. What they said they have is noted for this conversation. Do not record this step again; say once that they can add it with the upload button whenever they like (for a founder with no deck, offer to make one), then move on.";
+
+/**
+ * The same refusal once their material is in (live 25 Oct, run b9-0746):
+ * "I've just uploaded the deck" read as stating the upload step, the write
+ * was refused with "they can add it with the upload button", and Q told
+ * them the deck had not been read while its 15 facts waited on screen.
+ */
+export function uploadReadReason(findings: number): string {
+  return `Nothing to record here, and nothing went wrong: their upload already fills this step, and ${String(findings)} ${findings === 1 ? "fact" : "facts"} read from their material ${findings === 1 ? "waits" : "wait"} on screen for their confirmation. Do not record this step again. Never say it has not been read and never point them to the upload button: read back what was found and ask them to confirm it.`;
+}
 
 /**
  * The onboarding tools' port over the onboarding service's existing APIs,
@@ -1229,7 +1240,9 @@ export function createOnboardingPort(input: {
                     ? // Words never fill an upload step (live 2026-10-01: "a
                       // deck and audited financials" was retried on eight
                       // turns, one model round each, refused every time).
-                      UPLOAD_ONLY_REASON
+                      latest !== null && documentFindingsIn(latest) > 0
+                      ? uploadReadReason(documentFindingsIn(latest))
+                      : UPLOAD_ONLY_REASON
                     : "That does not fit what this step records.",
             },
       );
