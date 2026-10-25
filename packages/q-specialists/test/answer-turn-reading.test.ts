@@ -4104,6 +4104,18 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
         outcomeOf("FAILED", "INVALID_ARGUMENTS", "Arguments did not fit."),
       ).run(request(), action),
     ).toBeNull();
+    // Guard run (2026-10-25, runs fafa6adf, 3b7da40d): guidance for Q's
+    // answer was said as the whole reply. A NOT_THIS_ACTION refusal is never
+    // the answer; the turn is answered in full.
+    expect(
+      await portFor(
+        outcomeOf(
+          "DENIED",
+          "NOT_THIS_ACTION",
+          "No open question in their inbox matches it. Prepare their reply now as a message.",
+        ),
+      ).run(request(), action),
+    ).toBeNull();
   });
 });
 

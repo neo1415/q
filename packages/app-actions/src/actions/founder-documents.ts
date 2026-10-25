@@ -838,7 +838,7 @@ const ANSWER_INVESTOR_QUESTION = defineAppAction<
   tool: {
     name: "answer_investor_question",
     description:
-      "For a founder: prepares, for their approval, their answer to an investor's open question (from their inbox), in THEIR words, optionally with one of their documents as support. It is recorded as their claim, never as verified. Nothing is sent until they approve exactly it. When no open question matches (NOT_AVAILABLE), still give them the drafted answer in your reply, offer to send it to that investor as a message or add it to their data room, and say only at the end, in a few words, that no open question in their inbox matched it.",
+      "For a founder: prepares, for their approval, their answer to an investor's open question (from their inbox), in THEIR words, optionally with one of their documents as support. It is recorded as their claim, never as verified. Nothing is sent until they approve exactly it. When no open question matches (NOT_THIS_ACTION), prepare the same words as a message to that investor with propose_chat_message, for their approval, in this turn; only if that cannot be prepared, give them the drafted answer and say why. Say only at the end, in a few words, that no open question in their inbox matched it.",
     input: AnswerTool,
     references: { document: "UPLOAD" },
     scopes: ["COMPANY_PROFILE"],
@@ -877,7 +877,8 @@ const ANSWER_INVESTOR_QUESTION = defineAppAction<
         // QA F13 (re-score, 24 Oct): a reply led with this; the draft is
         // what they asked for, so this is said last, in a few words.
         return refusal(
-          "No open question in their inbox matches it, so it is not recorded against one; give them the draft and offer to send it or file it in their data room, and say this last, briefly.",
+          "No open question in their inbox matches it, so it is not recorded against one. Prepare their reply now as a message to that investor with propose_chat_message (their words as its body; it waits for their approval); if that cannot be prepared, give them the draft and say why. Mention only at the end, briefly, that no open question matched.",
+          { forModel: true },
         );
       return {
         questionId: chosen.question.questionId,

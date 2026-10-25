@@ -319,7 +319,12 @@ function toolFor(
         .toCanonical(resolved, context, own)
         .catch(() => null);
       if (canonical === null) return deny("NOT_AVAILABLE");
-      if (isRefusal(canonical)) return deny("NOT_AVAILABLE", canonical.refused);
+      if (isRefusal(canonical)) {
+        return deny(
+          canonical.forModel === true ? "NOT_THIS_ACTION" : "NOT_AVAILABLE",
+          canonical.refused,
+        );
+      }
       const parsed = action.input.safeParse(canonical);
       if (!parsed.success) {
         // The declaration's own contract refused a value: say which, so Q

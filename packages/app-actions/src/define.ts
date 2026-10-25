@@ -316,20 +316,34 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
 /**
  * Nothing to act on, said in the person's words (no Q Card yet, no raise
  * yet): Q says why rather than "not available".
+ *
+ * `forModel` (guard run, 2026-10-25, runs fafa6adf, 3b7da40d): the words
+ * guide Q's own answer ("give them the draft…") and are never said to the
+ * person; the turn is answered in full instead. Words for the person and
+ * words for the model are two kinds, never mixed in one string.
  */
-export type AppActionRefusal = { readonly refused: string };
+export type AppActionRefusal = {
+  readonly refused: string;
+  readonly forModel?: true | undefined;
+};
 
-export function refusal(words: string): AppActionRefusal {
-  return { refused: words };
+export function refusal(
+  words: string,
+  options: { readonly forModel?: true } = {},
+): AppActionRefusal {
+  return options.forModel === true
+    ? { refused: words, forModel: true }
+    : { refused: words };
 }
 
 export function isRefusal(value: unknown): value is AppActionRefusal {
+  if (typeof value !== "object" || value === null) return false;
+  const keys = Object.keys(value);
   return (
-    typeof value === "object" &&
-    value !== null &&
     "refused" in value &&
     typeof value.refused === "string" &&
-    Object.keys(value).length === 1
+    keys.every((key) => key === "refused" || key === "forModel") &&
+    (!("forModel" in value) || value.forModel === true)
   );
 }
 

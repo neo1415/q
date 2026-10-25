@@ -8760,6 +8760,10 @@ export function createModelGatewayQAnswer(
                   failureCode: claimed.failureCode,
                   latencyMs: claimed.latencyMs,
                 });
+                // Its card is on screen only once the claim was prepared.
+                if (qCardOfferMessage(claimed, offer.handle) !== null) {
+                  qCardClaimPrepared = true;
+                }
               }
             }
           }
@@ -9595,7 +9599,7 @@ export function createModelGatewayQAnswer(
               ? answerText
               : openedOnScreen
                 ? CLIENT_ACTION_DONE_LINE
-                : "Understood."
+                : (shownFindingsLine(analystBlocks) ?? "Understood.")
             : `${content}
 
 I've updated **${revisedArtifact.title}** — that's version ${String(revisedArtifact.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`.trim();
@@ -9954,6 +9958,26 @@ export function explainsNothingDone(text: string): boolean {
  */
 const DONE_CLAIMED =
   /\b(?:(?:is|are) now (?:recorded|saved|set|updated|changed|live|in place)|(?:i|i['’]ve|i have|we['’]ve|we have) (?:just )?(?:saved|updated|changed|recorded|sent|booked|set|added|removed|made)|(?:has|have) (?:now )?been (?:saved|updated|changed|recorded|sent|booked|set|added|removed)|(?:it['’]s|that['’]s) (?:done|saved|updated))\b/iu;
+/**
+ * Guard run (2026-10-25, run a3f0e2b0): "Understood." was the whole reply
+ * while the answer's findings were on screen. With no words left, the
+ * reply says what the answer shows: its first findings, as recorded.
+ */
+export function shownFindingsLine(
+  blocks: readonly QResultBlock[] | undefined,
+): string | null {
+  const said = (blocks ?? [])
+    .flatMap((block) =>
+      block.kind === "FINDING" ? [block.finding.statement.trim()] : [],
+    )
+    .filter((statement) => statement.length > 0)
+    .slice(0, 2)
+    .map((statement) =>
+      /[.!?]$/u.test(statement) ? statement : `${statement}.`,
+    );
+  return said.length === 0 ? null : said.join(" ");
+}
+
 export function claimsDone(text: string): boolean {
   return DONE_CLAIMED.test(text) && !NOTHING_DONE_EXPLAINED.test(text);
 }
