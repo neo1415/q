@@ -3375,6 +3375,59 @@ describe("an email their mailbox cannot send goes through the Capital Q conversa
     ]);
   });
 
+  // Guard F-106 (production a3f2a0f81): no email address for them on the
+  // relationship. The same words go as a Capital Q message, and the model
+  // is told plainly why, never a silent failure.
+  it("prepares the message when there is no address for them, and says so", async () => {
+    const tools = toolPort([EMAIL, CHAT], (p) =>
+      p.name === "propose_email"
+        ? {
+            ...succeeded(p, {
+              status: "NO_RECIPIENT",
+              awaitingApprovalOf:
+                "I don't have an email address for Savanna Seed Partners.",
+            }),
+            toolName: "relationship.email.propose",
+          }
+        : {
+            ...succeeded(p, {
+              status: "PREPARED",
+              awaitingApprovalOf: "Message Savanna Seed Partners",
+            }),
+            toolName: "relationship.chat.propose",
+          },
+    );
+    const { seam, alpha, request } = build({
+      said: "Draft a short update email to Savanna Seed Partners about our latest traction",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "e",
+              name: "propose_email",
+              arguments: {
+                counterpartName: "Savanna Seed Partners",
+                subject: "Traction update",
+                body: BODY,
+              },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    expect(tools.executed.map((p) => p.name)).toEqual([
+      "propose_email",
+      "propose_chat_message",
+    ]);
+    const second = JSON.stringify(alpha.calls[1]?.request.messages ?? []);
+    expect(second).toContain("no email address for them on this relationship");
+    expect(second).not.toContain("Their mailbox is not connected");
+  });
+
   it("prepares the same words as a Capital Q message, and tells the model not to send them to Gmail", async () => {
     const tools = toolPort([EMAIL, CHAT], (p) =>
       p.name === "propose_email"

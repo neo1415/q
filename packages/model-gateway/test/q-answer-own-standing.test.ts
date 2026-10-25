@@ -811,6 +811,30 @@ describe("what exists, and the parity gap", () => {
     );
   });
 
+  // Guard F-106 (production a3f2a0f81, runs 891e2a3d, c6561774): "I drafted
+  // a short traction update… Want me to show you the draft?" with no draft
+  // and no card. A question never shields a claim of work not done.
+  it("never says 'I drafted' when nothing was drafted, question or not", async () => {
+    const { seam, request, persisted } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {},
+      {
+        said: "Draft a short update email to Savanna Seed Partners about our latest traction",
+        answer:
+          "I drafted a short traction update for Savanna Seed Partners. Nothing is waiting for your approval yet. Want me to show you the draft?",
+      },
+    );
+    await seam.answer({
+      ...request,
+      turnKind: "TOOL_REQUEST",
+      askedAction: "get_q_daily",
+    });
+    const said = persisted.join("\n");
+    expect(said).not.toMatch(/I drafted/u);
+    expect(said).toMatch(/so nothing was (?:prepared or )?changed/u);
+  });
+
   it("confirms a remember ask in code's own words, with no could-not line (QA 2026-10-24)", async () => {
     const asked = async (said: string, answer: string) => {
       const { seam, request, persisted } = build(

@@ -8410,6 +8410,7 @@ export function createModelGatewayQAnswer(
             let firstContactWithNote = false;
             /** An email their mailbox could not send, as a Capital Q message instead (QA F-32). */
             let chatInstead: Promise<QToolCallOutcome> | null = null;
+            let chatInsteadWhy: "NO_MAILBOX" | "NO_ADDRESS" = "NO_MAILBOX";
             /** Their Q Card, prepared for approval when none is made (QA F-34). */
             let cardOffer: {
               readonly handle: string;
@@ -8548,6 +8549,12 @@ export function createModelGatewayQAnswer(
                 calls + chainedThisRound.length + 1 <=
                   Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
               ) {
+                chatInsteadWhy =
+                  outcome.result.ok &&
+                  (outcome.result.data as { readonly status?: unknown } | null)
+                    ?.status === "NO_RECIPIENT"
+                    ? "NO_ADDRESS"
+                    : "NO_MAILBOX";
                 chatInstead = callTool(
                   {
                     callId: "q-chat-instead",
@@ -8763,7 +8770,7 @@ export function createModelGatewayQAnswer(
                   failureCode: outcome.failureCode,
                   latencyMs: outcome.latencyMs,
                 });
-                const told = chatInsteadMessage(outcome);
+                const told = chatInsteadMessage(outcome, chatInsteadWhy);
                 if (told !== null) chainedResults.push(told);
               }
             }
@@ -9447,7 +9454,12 @@ export function createModelGatewayQAnswer(
           // A reply that asks them something ("Would you like me to…?")
           // is waiting on them; a could-not line after it contradicts the
           // question (QA run 4e3b1903).
-          !asksThePerson(statusTalk?.text ?? guarded.text) &&
+          // Guard F-106 (2026-10-25, runs 891e2a3d, c6561774): "I drafted a
+          // short traction update… Want me to show you the draft?" with no
+          // draft anywhere. A question never shields a claim of work that
+          // was not done.
+          (claimsDone(statusTalk?.text ?? guarded.text) ||
+            !asksThePerson(statusTalk?.text ?? guarded.text)) &&
           // QA 2026-10-23: the could-not line was appended in English
           // after the model's own reply in Arabic ("لم أستطع فتح صفحة
           // الاكتشاف"). The checks above read English words only, so a
@@ -9469,7 +9481,9 @@ export function createModelGatewayQAnswer(
           )
             ? parityGap === "NOT_CALLED" &&
               request.askedAction !== undefined &&
-              MESSAGE_TOOLS.has(request.askedAction)
+              MESSAGE_TOOLS.has(request.askedAction) &&
+              // The draft is only "that draft" when it is still said.
+              !claimsDone(statusTalk?.text ?? guarded.text)
               ? // Guard run 1 (2026-10-25, run b6f9236c): the draft was
                 // written above; "I didn't prepare that" contradicted it.
                 DRAFT_NOT_ON_CARD_LINE
@@ -10221,7 +10235,7 @@ export function explainsNothingDone(text: string): boolean {
  * done, so a match is a false claim and is not said.
  */
 const DONE_CLAIMED =
-  /\b(?:(?:is|are) now (?:recorded|saved|set|updated|changed|live|in place)|(?:i|i['’]ve|i have|we['’]ve|we have) (?:just )?(?:saved|updated|changed|recorded|sent|booked|set|added|removed|made)|(?:has|have) (?:now )?been (?:saved|updated|changed|recorded|sent|booked|set|added|removed)|(?:it['’]s|that['’]s) (?:done|saved|updated))\b/iu;
+  /\b(?:(?:is|are) now (?:recorded|saved|set|updated|changed|live|in place)|(?:i|i['’]ve|i have|we['’]ve|we have) (?:just )?(?:saved|updated|changed|recorded|sent|booked|set|added|removed|made|drafted|prepared|written|wrote)|(?:has|have) (?:now )?been (?:saved|updated|changed|recorded|sent|booked|set|added|removed)|(?:it['’]s|that['’]s) (?:done|saved|updated))\b/iu;
 /**
  * Guard run (2026-10-25, run a3f0e2b0): "Understood." was the whole reply
  * while the answer's findings were on screen. With no words left, the

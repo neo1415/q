@@ -73,10 +73,17 @@ export const ProposeEmailInputSchema = z
       .describe(
         "Or the other side's name as the person said it (from any page); Capital Q finds it among their own relationships.",
       ),
+    // Guard F-106 (2026-10-25): a name written here instead of an address
+    // failed the whole email (INVALID_ARGUMENTS). Anything that is not an
+    // address is no recipient named: the relationship's own contact is used.
     recipientEmail: z
-      .email()
-      .max(320)
-      .optional()
+      .preprocess(
+        (value) =>
+          typeof value === "string" && z.email().safeParse(value.trim()).success
+            ? value.trim()
+            : undefined,
+        z.email().max(320).optional(),
+      )
       .describe(
         "Only if the person named a specific person on the other side; otherwise leave it out.",
       ),
@@ -109,12 +116,14 @@ export const ProposeEmailOutputSchema = z
      * ONE_PER_TURN: another action is being prepared in this answer.
      * MAILBOX_NOT_CONNECTED: the person must connect Gmail in Settings first.
      * REPLY_UNAVAILABLE: Capital Q cannot send replies on this deployment.
+     * NO_RECIPIENT: the relationship holds no email address for them.
      */
     status: z.enum([
       "PREPARED",
       "ONE_PER_TURN",
       "MAILBOX_NOT_CONNECTED",
       "REPLY_UNAVAILABLE",
+      "NO_RECIPIENT",
     ]),
     awaitingApprovalOf: z.string(),
   })
@@ -126,7 +135,8 @@ type Grant =
       readonly kind: "RELATIONSHIP";
       readonly relationshipId: string;
       readonly counterpartName: string;
-      readonly to: string;
+      /** Null: the relationship has no email address for anyone. */
+      readonly to: string | null;
       readonly toName: string;
       readonly mailbox: boolean;
     }
@@ -252,19 +262,21 @@ export function createProposeEmailTool(
           wanted === undefined
             ? counterpart.contacts[0]
             : counterpart.contacts.find((c) => c.email === wanted);
-        if (recipient === undefined) {
+        if (recipient === undefined && wanted !== undefined) {
           // Never an address that is not on the relationship.
           return deny(
             "NOT_AVAILABLE",
             "I can only email people on the other side of this relationship.",
           );
         }
+        // No address on the relationship at all: said as it stands
+        // (NO_RECIPIENT), so the same words can go as a Capital Q message.
         return allow("CONFIDENTIAL", {
           kind: "RELATIONSHIP" as const,
           relationshipId,
           counterpartName: counterpart.name,
-          to: recipient.email,
-          toName: recipient.name,
+          to: recipient?.email ?? null,
+          toName: recipient?.name ?? counterpart.name,
           mailbox: (await email.mailbox(actor)) !== null,
         });
       } catch {
@@ -300,6 +312,12 @@ export function createProposeEmailTool(
         return Promise.resolve({
           status,
           awaitingApprovalOf: `Reply to ${grant.toName}, sent by Capital Q on your behalf (not from your own mailbox): "${input.subject}"`,
+        });
+      }
+      if (grant.to === null) {
+        return Promise.resolve({
+          status: "NO_RECIPIENT" as const,
+          awaitingApprovalOf: `I don't have an email address for ${grant.counterpartName}.`,
         });
       }
       if (email === undefined || !grant.mailbox) {

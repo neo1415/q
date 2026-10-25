@@ -6175,7 +6175,11 @@ export function createSpecialistQAnswer(
             .appActionRouter(request, {
               utterance: latest.content,
               candidates: [
-                ...offeredActions.filter((action) => appTools.has(action.name)),
+                // Every action this person may take here, by what it does
+                // (guard F-106, 2026-10-25: with only declared app actions
+                // listed, "draft an update email" had no email to choose and
+                // was routed to a chat message).
+                ...actions,
                 // Handing work over in general is one of the meanings a
                 // request to act can have; the router weighs it with the
                 // rest (QA 2026-10-03).
@@ -6205,9 +6209,19 @@ export function createSpecialistQAnswer(
         ),
       );
     }
+    // Routed to an action that is not a declared app action (an email, a
+    // meeting): the full answer does it, with that action as the one asked
+    // for -- offered, and held to it (the draft goes on its card).
+    const routedAsked =
+      routed !== null && routed !== DELEGATION_TOOL && !appTools.has(routed)
+        ? routed
+        : null;
+    const routedApp = routedAsked === null ? routed : null;
     const namedAction =
       readerNamed ??
-      (fundVisibility ? INVESTOR_VISIBILITY_TOOL : (recordAudience ?? routed));
+      (fundVisibility
+        ? INVESTOR_VISIBILITY_TOOL
+        : (recordAudience ?? routedApp));
     // How a request to act was routed, said once before any path can
     // return (lead 2026-10-03: the focus line came after the code-run
     // return, so a request done by code never logged one).
@@ -6559,7 +6573,9 @@ export function createSpecialistQAnswer(
       ...(read?.askedAction === undefined ||
       read.askedAction === null ||
       !actions.some((action) => action.name === read.askedAction)
-        ? {}
+        ? routedAsked === null
+          ? {}
+          : { askedAction: routedAsked }
         : { askedAction: read.askedAction }),
       ...(writingDocument ? { writingDocument: true } : {}),
       ...(series.step === null ? {} : { questionSequence: series.step }),

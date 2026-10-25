@@ -33,7 +33,11 @@ export function chatInsteadOf(
   if (call.name !== EMAIL_TOOL || !outcome.result.ok) return null;
   const status = (outcome.result.data as { readonly status?: unknown } | null)
     ?.status;
-  if (status !== "MAILBOX_NOT_CONNECTED") return null;
+  // No mailbox, or no address for them (guard F-106, 2026-10-25): the
+  // same words go as a Capital Q message, never nowhere.
+  if (status !== "MAILBOX_NOT_CONNECTED" && status !== "NO_RECIPIENT") {
+    return null;
+  }
   const args = call.arguments ?? {};
   const body = typeof args["body"] === "string" ? args["body"].trim() : "";
   if (body.length === 0) return null;
@@ -55,6 +59,7 @@ export function chatInsteadOf(
 /** What the model is told once Capital Q prepared the message instead. */
 export function chatInsteadMessage(
   outcome: QToolCallOutcome,
+  why: "NO_MAILBOX" | "NO_ADDRESS" = "NO_MAILBOX",
 ): ModelMessage | null {
   if (!outcome.result.ok) return null;
   const data = outcome.result.data as {
@@ -68,6 +73,9 @@ export function chatInsteadMessage(
       : "A message to them";
   return {
     role: "USER",
-    content: `[Capital Q, not the person] Their mailbox is not connected, and they are on Capital Q with this relationship, so Capital Q prepared the same words as a message in their Capital Q conversation, for their approval: "${what}". Nothing is sent until they approve. In your answer say, in your own words, that it is ready to send through Capital Q and waits for their approval. Do not tell them to connect Gmail or mention email unless they asked for an email.`,
+    content:
+      why === "NO_ADDRESS"
+        ? `[Capital Q, not the person] There is no email address for them on this relationship, so Capital Q prepared the same words as a message in their Capital Q conversation, for their approval: "${what}". Nothing is sent until they approve. In your answer say plainly that you don't have their email address, that the words are ready to send as a Capital Q message and wait for their approval, and that they can add the address if they want it emailed instead.`
+        : `[Capital Q, not the person] Their mailbox is not connected, and they are on Capital Q with this relationship, so Capital Q prepared the same words as a message in their Capital Q conversation, for their approval: "${what}". Nothing is sent until they approve. In your answer say, in your own words, that it is ready to send through Capital Q and waits for their approval. Do not tell them to connect Gmail or mention email unless they asked for an email.`,
   };
 }

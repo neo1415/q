@@ -4830,7 +4830,12 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
       },
     });
     await run.answer.answer(request());
-    expect(routedWith).toEqual([{ utterance: said, names: TOOLS }]);
+    // Guard F-106 (2026-10-25): every action this person may take here is
+    // a candidate, by what it does -- the declared app actions among them,
+    // and an email, which is not one.
+    expect(routedWith.map((r) => r.utterance)).toEqual([said]);
+    expect(routedWith[0]?.names).toEqual(expect.arrayContaining(TOOLS));
+    expect(routedWith[0]?.names).toContain("propose_email");
     // Logged before the code-run path returns (lead 2026-10-03).
     expect(lines).toContainEqual([
       "q request route",
@@ -4845,6 +4850,32 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
     // The engine says the card's status; nothing else is said here.
     expect(run.stored).toEqual([]);
     expect(run.delegated()).toBe(0);
+  });
+
+  // Guard F-106 (production a3f2a0f81, runs 891e2a3d, c6561774): "Draft a
+  // short update email to Savanna Seed Partners…" was routed to a chat
+  // message. Routed to an action that is not a declared app action, the
+  // full answer does it, with that action as the one asked for.
+  it("an email routed by meaning goes to the answer as the asked action, never the chat card", async () => {
+    const ran: unknown[] = [];
+    const run = seam({
+      said: "Draft a short update email to Savanna Seed Partners about our latest traction",
+      reading: untold(),
+      outcomes: [],
+      offeredTools: TOOLS,
+      appActionRouter: () => Promise.resolve("propose_email"),
+      appActionArguments: () => Promise.resolve({}),
+      appActions: {
+        tools: new Set(TOOLS),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve({ prepared: "the card" });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(ran).toEqual([]);
+    expect(run.askedActions).toEqual(["propose_email"]);
   });
 
   // wf, live 2026-10-16: "We're going into diligence on Harbourline Cargo
