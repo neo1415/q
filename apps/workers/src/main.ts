@@ -47,6 +47,7 @@ import {
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
   Q_WORK_WAKE_CHANNEL,
+  WORKERS_WAKE_CHANNEL,
 } from "@capital-q/contracts";
 import {
   companyCardSharesRaise,
@@ -237,7 +238,11 @@ import {
   refreshCompanyEmbeddings,
   runCompanyEmbeddingRefresh,
 } from "./recommendations/embeddings.js";
-import { runDocumentJobTicker } from "./documents/document-jobs.js";
+import {
+  DOCUMENT_JOB_INTERVAL_MS,
+  runDocumentJobTicker,
+} from "./documents/document-jobs.js";
+import { createIdleBackoff, createWakeSignal } from "./idle-backoff.js";
 import { composeInvestability } from "./investability/composition.js";
 import {
   runInvestabilitySweepTicker,
@@ -275,6 +280,11 @@ const database = createRequestDatabaseClient(databaseConfig);
 const startupAlertWatcher = createStartupAlertWatcher({ sql: database.sql });
 const registry = createProductionEventRegistry();
 const queues = createPgmqQueueClient(database.sql);
+// Idle loops back off (Supabase egress restriction, 24 Oct 2026); new work
+// announced by the database, or done by another loop, wakes them.
+const workersWake = createWakeSignal();
+const idleBackoff = (minMs: number) =>
+  createIdleBackoff({ minMs, wake: workersWake });
 
 const runner = createOutboxPublisherRunner({
   publisher: createOutboxPublisher({
@@ -287,6 +297,7 @@ const runner = createOutboxPublisherRunner({
   }),
   batchSize: config.outbox.batchSize,
   pollIntervalMs: config.outbox.pollIntervalMs,
+  idle: idleBackoff(config.outbox.pollIntervalMs),
   logger,
 });
 
@@ -730,6 +741,7 @@ const recommendationRefresh = createQueueRunner({
   }),
   batchSize: RECOMMENDATION_REFRESH_BATCH_SIZE,
   pollIntervalMs: RECOMMENDATION_REFRESH_POLL_INTERVAL_MS,
+  idle: idleBackoff(RECOMMENDATION_REFRESH_POLL_INTERVAL_MS),
   visibilityTimeoutSeconds:
     RefreshRecommendationSlateJob.retryPolicy.visibilityTimeoutSeconds,
   maxAttempts: RefreshRecommendationSlateJob.retryPolicy.maxAttempts,
@@ -1106,6 +1118,7 @@ const documentEvents = createQueueRunner({
   ),
   batchSize: config.documents.batchSize,
   pollIntervalMs: config.documents.pollIntervalMs,
+  idle: idleBackoff(config.documents.pollIntervalMs),
   visibilityTimeoutSeconds: 60,
   maxAttempts: 5,
   backoff: { initialDelaySeconds: 5, maxDelaySeconds: 300, jitter: true },
@@ -1181,6 +1194,7 @@ const documents =
         }),
         batchSize: config.documents.batchSize,
         pollIntervalMs: config.documents.pollIntervalMs,
+        idle: idleBackoff(config.documents.pollIntervalMs),
         visibilityTimeoutSeconds:
           ProcessDocumentJob.retryPolicy.visibilityTimeoutSeconds,
         maxAttempts: ProcessDocumentJob.retryPolicy.maxAttempts,
@@ -1389,6 +1403,23 @@ process.on("SIGTERM", shutdown);
 
 logger.info({ contracts: CONTRACTS_VERSION }, "worker runtime started");
 
+// The database's announcement of new work. (Re)connecting wakes every loop
+// too, because notifications sent while nobody listened are gone. If it
+// never starts, the loops still find work within the backoff ceiling.
+void database
+  .listen(
+    WORKERS_WAKE_CHANNEL,
+    () => workersWake.wake(),
+    () => workersWake.wake(),
+  )
+  .then(() => logger.info({}, "workers wake listener started"))
+  .catch((error: unknown) => {
+    logger.warn(
+      { error: error instanceof Error ? error.name : "unknown" },
+      "workers wake listener not started; idle loops wake on their backoff",
+    );
+  });
+
 // A deploy that bumps a generator, the ranker, its config, the eligibility
 // policy or the feature schema asks for NORMAL rebuilds of the slates built
 // by the old pipeline; the feed keeps serving them until superseded. Never
@@ -1562,6 +1593,7 @@ await Promise.all([
   }),
   runDocumentJobTicker({
     runner: documentJobs,
+    idle: idleBackoff(DOCUMENT_JOB_INTERVAL_MS),
     signal: shutdownController.signal,
     logger,
   }),

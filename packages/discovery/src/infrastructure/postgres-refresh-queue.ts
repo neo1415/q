@@ -1,3 +1,4 @@
+import { WORKERS_WAKE_CHANNEL } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import type { RefreshQueue } from "../slates/refresh.js";
@@ -15,7 +16,8 @@ export function createPostgresRefreshQueue(options: {
   return {
     send: async (queue, message) => {
       const rows = await sql`
-        select pgmq.send(${queue}, ${JSON.stringify(message)}::text::jsonb) as msg_id`;
+        select pgmq.send(${queue}, ${JSON.stringify(message)}::text::jsonb) as msg_id,
+               pg_notify(${WORKERS_WAKE_CHANNEL}, 'refresh') as woke`;
       const first = rows[0] as { readonly msg_id?: unknown } | undefined;
       return Number(first?.msg_id ?? 0);
     },

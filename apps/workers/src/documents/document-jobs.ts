@@ -15,6 +15,7 @@ import {
   type StockPhotoPort,
 } from "@capital-q/q-specialists";
 
+import { fixedInterval, type IdlePolicy } from "../idle-backoff.js";
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 
 /**
@@ -166,9 +167,15 @@ export async function runDocumentJobTicker(options: {
   readonly intervalMs?: number | undefined;
   readonly sleep?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
+  /** How to wait between empty polls; defaults to the interval each time. */
+  readonly idle?: IdlePolicy | undefined;
 }): Promise<void> {
-  const sleep = options.sleep ?? abortableSleep;
-  const intervalMs = options.intervalMs ?? DOCUMENT_JOB_INTERVAL_MS;
+  const idle =
+    options.idle ??
+    fixedInterval(
+      options.intervalMs ?? DOCUMENT_JOB_INTERVAL_MS,
+      options.sleep ?? abortableSleep,
+    );
   while (!options.signal.aborted) {
     let took = false;
     try {
@@ -179,6 +186,7 @@ export async function runDocumentJobTicker(options: {
         "document job tick failed; retrying next interval",
       );
     }
-    if (!took) await sleep(intervalMs, options.signal);
+    if (took) idle.worked();
+    else await idle.idle(options.signal);
   }
 }
