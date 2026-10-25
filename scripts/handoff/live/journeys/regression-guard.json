@@ -110,10 +110,12 @@
       {
         "ask": "Add 'Review Basketari repeat order data' to my board",
         "expect": {
-          "approval": false
+          "approval": false,
+          "replyNot": ["isn't available", "couldn't add"]
         }
       }
-    ]
+    ],
+    "note": "The item is the same every run on purpose: once it exists, a correct board says it is already there instead of adding a copy (F-115)."
   },
   {
     "id": "I-public-company",
