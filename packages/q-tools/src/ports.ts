@@ -79,6 +79,7 @@ import type {
   VisibilityStateDto,
   QDocumentEdit,
   PublishedFitDto,
+  QActionProposal,
 } from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
@@ -782,6 +783,12 @@ export type ConversationProposal = {
    * 2026-10-23). Absent: a profile or record edit.
    */
   readonly outward?: boolean | undefined;
+  /**
+   * The card as this conversation showed it (F-106 guard, 2026-10-25): a
+   * line naming a waiting card carries the card itself. Absent: not shown
+   * in this conversation.
+   */
+  readonly proposal?: QActionProposal | undefined;
 };
 
 /** Who is asking, in which run: the composition resolves the conversation from it. */

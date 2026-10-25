@@ -1532,6 +1532,54 @@ describe("answer seam tool loop", () => {
       );
     });
 
+    // Guard run 1 (2026-10-25, run b6f9236c): "Draft a short update email
+    // to Savanna Seed Partners…" was answered with the whole email written
+    // out, then "I didn't prepare that". The reading named the message
+    // tool: one more round to put the words on the card.
+    it("puts a drafted message on its card instead of writing it out", async () => {
+      const tools = toolPort([CHAT, INTEREST], (p) => ({
+        ...succeeded(p, {
+          status: "PREPARED",
+          awaitingApprovalOf: "Message Savanna Seed Partners",
+        }),
+        toolName: "relationship.chat.propose",
+      }));
+      const DRAFT =
+        "Hi Savanna team, a quick update: 96 kiosks live and 38,000 households served monthly.";
+      const { seam, alpha, request, messages } = build({
+        said: "Draft a short update to Savanna Seed Partners about our latest traction",
+        script: [
+          {
+            kind: "JSON",
+            value: analystResult(`Here is a draft:\n\n${DRAFT}`),
+          },
+          {
+            kind: "TOOL_CALLS",
+            calls: [
+              {
+                callId: "m",
+                name: "propose_chat_message",
+                arguments: {
+                  counterpartName: "Savanna Seed Partners",
+                  body: DRAFT,
+                },
+              },
+            ],
+          },
+          { kind: "JSON", value: analystResult("prepared") },
+        ],
+        tools,
+      });
+      await seam.answer({ ...request, askedAction: "propose_chat_message" });
+      expect(tools.executed.map((p) => p.name)).toContain(
+        "propose_chat_message",
+      );
+      expect(JSON.stringify(alpha.calls[1]?.request.messages ?? [])).toContain(
+        "Prepare it now: call propose_chat_message",
+      );
+      expect(messages.at(-1)?.content ?? "").not.toMatch(/didn't prepare/u);
+    });
+
     // QA I11 (batch-7 re-score, run ea1c4c13): the model read Basketari
     // and answered "it would need to be sent through your connected
     // Basketari relationship", calling no message tool, though an Express
@@ -3426,6 +3474,40 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
       tools,
     });
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(messages.at(-1)?.content).toBe(
+      "You don't have a Q Card yet, so there is no link to share. Claiming @maji-loop makes it at https://capitalq.example/@maji-loop: approve the claim on the card, or ask for another handle.",
+    );
+  });
+
+  // Guard run 1 (2026-10-25, run 88075f4a): the model never read the card
+  // and asked "Want me to claim @maji-loop?". Code reads it, prepares the
+  // claim, and the answer says how it stands.
+  it("reads their own card when asked about it, though the model did not", async () => {
+    const tools = toolPort([READ, CLAIM], (p) =>
+      p.name === "get_q_card"
+        ? { ...succeeded(p, notMade), toolName: "q_card.get" }
+        : {
+            ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
+            toolName: "app.q_card.handle.claim",
+          },
+    );
+    const { seam, messages, request } = build({
+      said: "Show me my Q Card and the share link.",
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult(
+            "I don't have the saved share link yet. Want me to claim @maji-loop for the card?",
+          ),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => [p.name, p.arguments])).toEqual([
+      ["get_q_card", { subject: "COMPANY" }],
+      ["claim_q_card_handle", { subject: "COMPANY", handle: "maji-loop" }],
+    ]);
     expect(messages.at(-1)?.content).toBe(
       "You don't have a Q Card yet, so there is no link to share. Claiming @maji-loop makes it at https://capitalq.example/@maji-loop: approve the claim on the card, or ask for another handle.",
     );
