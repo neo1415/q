@@ -11,7 +11,8 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
-          ]
+          ],
+          "replyNot": ["couldn't rank the whole network"]
         }
       },
       {
@@ -223,6 +224,7 @@
     ]
   },
   {
+<<<<<<< HEAD
     "id": "F-82-savanna-top-five",
     "account": "investor.savanna-seed@fictional.capitalq.local",
     "steps": [
@@ -254,10 +256,45 @@
             "Anchor's profile"
           ]
         }
+=======
+    "id": "F-109-F-110",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me the five companies that best fit my mandate, ranked, with why.",
+        "expect": {
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "ANSWER_CARDS",
+            "TABLE"
+          ]
+        }
+      },
+      {
+        "ask": "Only fintech ones in Kenya or Nigeria that are raising now.",
+        "expect": {
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "ANSWER_CARDS",
+            "TABLE"
+          ],
+          "replyNot": ["^\\s*understood\\.?\\s*$"],
+          "maxMs": 15000
+        }
+      },
+      {
+        "ask": "Compare the top two in a table.",
+        "expect": {
+          "anyBlock": ["COMPARISON", "TABLE"]
+        }
+>>>>>>> origin/qa/guard-cases
       }
     ]
   },
   {
+<<<<<<< HEAD
     "id": "F-92-savanna-ledgerfold-call",
     "account": "investor.savanna-seed@fictional.capitalq.local",
     "steps": [
@@ -266,11 +303,23 @@
         "expect": {
           "approval": true,
           "replyNot": ["about Call with"]
+=======
+    "id": "F-112",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Change my mandate to also include Ghana.",
+        "expect": {
+          "approval": true,
+          "replyNot": ["couldn't finish", "didn't finish"],
+          "maxMs": 30000
+>>>>>>> origin/qa/guard-cases
         }
       }
     ]
   },
   {
+<<<<<<< HEAD
     "id": "F-92-savanna-mizan-call",
     "account": "investor.savanna-seed@fictional.capitalq.local",
     "steps": [
@@ -279,6 +328,16 @@
         "expect": {
           "replyMatches": ["interest"],
           "replyNot": ["I didn't prepare that", "Who should I set this up with"]
+=======
+    "id": "F-113",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "ما هي أفضل ثلاث شركات تناسب تفويضي الاستثماري؟",
+        "expect": {
+          "replyMatches": ["[\\u0600-\\u06FF]{3}"],
+          "replyNot": ["\\b(Right|Pipeline|Mandate|Want me to)\\b"]
+>>>>>>> origin/qa/guard-cases
         }
       }
     ]
