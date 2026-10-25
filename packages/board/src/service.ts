@@ -289,10 +289,19 @@ async function renumber(
   return out;
 }
 
+/** Job statuses that end the work with no document: back to To do. */
+const ENDED_WITHOUT_RESULT: ReadonlySet<string> = new Set([
+  "FAILED",
+  "STOPPED",
+]);
+
 export function createBoardService(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
-  /** When present, items whose Q job is DONE are moved to DONE on read. */
+  /**
+   * When present, items whose Q job is DONE are moved to DONE on read, and
+   * those whose job failed or was stopped go back to TODO.
+   */
   readonly jobStatus?: BoardJobStatusPort | undefined;
 }): BoardService {
   const { transactions } = dependencies;
@@ -351,22 +360,36 @@ export function createBoardService(dependencies: {
       (item) =>
         item.work_job_id !== null && statuses.get(item.work_job_id) === "DONE",
     );
-    if (done.length === 0) return;
+    // F11 (QA re-score, 2026-10-25): a job that failed or was stopped left
+    // its item in Doing for good. Work that is no longer happening goes
+    // back to To do, so the board never shows it under way.
+    const ended = linked.filter(
+      (item) =>
+        item.work_job_id !== null &&
+        item.status === "DOING" &&
+        ENDED_WITHOUT_RESULT.has(statuses.get(item.work_job_id) ?? ""),
+    );
+    if (done.length === 0 && ended.length === 0) return;
     await transactions.run(async ({ sql }) => {
       await lockBoard(sql, actor);
-      for (const item of done) {
+      const moves = [
+        ...done.map((item) => ({ item, to: "DONE" as const })),
+        ...ended.map((item) => ({ item, to: "TODO" as const })),
+      ];
+      for (const { item, to } of moves) {
         const current = await ownItem(sql, actor, item.id);
-        if (current?.archived_at !== null || current.status === "DONE") {
+        if (current?.archived_at !== null || current.status === to) {
           continue;
         }
-        const doneCount = (await currentItems(sql, actor)).filter(
-          (one) => one.status === "DONE",
+        if (to === "TODO" && current.status !== "DOING") continue;
+        const count = (await currentItems(sql, actor)).filter(
+          (one) => one.status === to,
         ).length;
         await moveWithin(
           sql,
           actor,
           current,
-          { status: "DONE", index: doneCount },
+          { status: to, index: count },
           { action: "MOVED", by: "Q" },
         );
       }

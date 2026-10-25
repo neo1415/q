@@ -371,4 +371,31 @@ describe("@capital-q/board against PostgreSQL", () => {
       ["MOVED", "Q", "DONE"],
     ]);
   });
+
+  // F11 (QA re-score, 2026-10-25): six growth-plan items sat in Doing after
+  // their jobs failed. Work no longer happening goes back to To do.
+  it("moves an item back to TODO when its job failed or was stopped", async () => {
+    for (const ended of ["FAILED", "STOPPED"]) {
+      const added = await board.add(
+        a(),
+        { kind: "TASK", title: `Plan ${ended}` },
+        { by: "Q", idempotencyKey: randomUUID() },
+      );
+      if (added.outcome !== "OK") throw new Error("add");
+      await board.linkJob(a(), added.value.id, jobs.mine, {
+        idempotencyKey: randomUUID(),
+      });
+      jobStatus.set(jobs.mine, "HELD");
+      expect(
+        (await board.list(a())).items.find((item) => item.id === added.value.id)
+          ?.status,
+      ).toBe("DOING");
+      jobStatus.set(jobs.mine, ended);
+      expect(
+        (await board.list(a())).items.find((item) => item.id === added.value.id)
+          ?.status,
+        ended,
+      ).toBe("TODO");
+    }
+  });
 });
