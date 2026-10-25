@@ -91,6 +91,7 @@ import {
   pendingQuestion,
   redrawnThread,
   welcomeBack,
+  resumedThread,
   type JourneyVocabulary,
   type QPrompt,
   type QuickChip,
@@ -718,9 +719,14 @@ export function QOnboardingWorkspace({
             confirmSent(sessionId, text);
           }
         }
-        if (restored.length > 0 || unsent.length > 0) {
+        // The welcome back is said now, after what was said before the
+        // absence (live 25 Oct e2e: it sat above the whole restored thread).
+        const welcome: Turn[] =
+          greeting === null ? [] : [{ id: newId(), kind: "Q", text: greeting }];
+        const resumed = resumedThread(restored, welcome, unsent);
+        if (resumed.length > 0) {
           // A turn typed while the thread loaded stays after it.
-          setTurns((current) => [...restored, ...unsent, ...current]);
+          setTurns((current) => [...resumed, ...current]);
         }
         if (pending !== null) {
           // Q is asking that line: its controls are the step it asked, which
@@ -767,6 +773,7 @@ export function QOnboardingWorkspace({
     turns.length,
     actions,
     focus,
+    greeting,
   ]);
 
   const settleReading = useCallback(() => {
@@ -1860,9 +1867,6 @@ export function QOnboardingWorkspace({
         <CoverageSummary coverage={coverage} />
       )}
       <ol className="flex flex-col gap-4" aria-live="polite">
-        {greeting === null ? null : (
-          <QLine key="greeting" id="greeting" kind="Q" text={greeting} />
-        )}
         {turns.map((turn) => (
           <QLine
             key={turn.id}

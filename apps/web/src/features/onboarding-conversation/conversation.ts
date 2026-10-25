@@ -867,3 +867,17 @@ export function keptAllLine(outcomes: readonly boolean[]): string | null {
     ? `Kept ${String(kept)}; one didn't go through. It's still waiting below.`
     : `Kept ${String(kept)}; ${String(failed)} didn't go through. They're still waiting below.`;
 }
+
+/**
+ * The thread after a reload, in the order things were said: what was said
+ * before the absence, then the welcome back said now, then what they sent
+ * and Q never confirmed (live 25 Oct e2e: the welcome back sat above the
+ * whole restored thread).
+ */
+export function resumedThread<T>(
+  history: readonly T[],
+  welcome: readonly T[],
+  unsent: readonly T[],
+): T[] {
+  return [...history, ...welcome, ...unsent];
+}

@@ -11,6 +11,7 @@ import {
   gapValue,
   hasFindingsFrom,
   composerHint,
+  resumedThread,
   keptAllLine,
   stillWaiting,
   pendingQuestion,
@@ -726,5 +727,15 @@ describe("Keep all (live 25 Oct e2e)", () => {
     expect(stillWaiting(view, "s-2")).toBe(false);
     expect(stillWaiting(view, "s-3")).toBe(false);
     expect(stillWaiting(undefined, "s-1")).toBe(false);
+  });
+});
+
+describe("the thread after a reload keeps the order things were said (live 25 Oct e2e)", () => {
+  it("puts the welcome back after the restored history, before anything unsent", () => {
+    expect(
+      resumedThread(["earlier Q", "earlier you"], ["welcome back"], ["unsent"]),
+    ).toEqual(["earlier Q", "earlier you", "welcome back", "unsent"]);
+    expect(resumedThread([], ["welcome back"], [])).toEqual(["welcome back"]);
+    expect(resumedThread(["earlier"], [], [])).toEqual(["earlier"]);
   });
 });
