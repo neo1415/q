@@ -89,7 +89,12 @@ describe("the mandate being defined is settled whenever its step is open (QA 25 
     });
     const listed: string[] = [];
     const fetch: typeof world.fetch = (input, init) => {
-      const url = typeof input === "string" ? input : input.toString();
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
       if (
         (init?.method ?? "GET") === "GET" &&
         url.includes(`/${ORG}/mandates`)
