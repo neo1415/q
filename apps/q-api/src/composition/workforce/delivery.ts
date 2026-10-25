@@ -20,7 +20,7 @@ import { z } from "zod";
 
 import type { WorkforcePorts } from "./jobs.js";
 import type { WorkRow } from "./queue.js";
-import { doneOutputs } from "./results.js";
+import { doneOutputs, filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -154,6 +154,21 @@ export function createWorkforceDelivery(dependencies: {
   >;
   readonly notify: WorkforcePorts["notify"];
   readonly logger?: Logger | undefined;
+  /**
+   * Job 4d1a8b04 (QA 25 Oct): a plain document step records only its
+   * artifact id, so it never had an analysis delivery and the thread was
+   * told nothing. The filed documents, read as the job's owner (READY
+   * only); absent, a plain document is not announced.
+   */
+  readonly filed?:
+    | ((
+        owner: Owner,
+        organisationId: string | null,
+        artifactIds: readonly string[],
+      ) => Promise<
+        readonly { artifactId: string; type: string; title: string }[]
+      >)
+    | undefined;
 }) {
   /** One Q message on the job's own run, deduplicated by its id. */
   const post = async (
@@ -211,8 +226,48 @@ export function createWorkforceDelivery(dependencies: {
     }
   };
 
+  /** A finished job's plain document: one line and its card. */
+  const announceFiled = async (owner: Owner, row: WorkRow) => {
+    const ids = filedDocumentIds(row);
+    if (dependencies.filed === undefined || ids.length === 0) return false;
+    const filed = (
+      await dependencies
+        .filed(owner, row.trace.organisationId ?? null, ids)
+        .catch(() => [])
+    )[0];
+    const type = QArtifactTypeSchema.safeParse(filed?.type);
+    if (filed === undefined || !type.success) return false;
+    const title = filed.title.slice(0, 160);
+    const text = `Your ${title.replace(/[.\s]+$/u, "")} is ready.`;
+    const posted = await post(owner, row, messageIdFor(row.job_id), text, [
+      {
+        kind: "ARTIFACT_REFERENCE",
+        artifactId: QArtifactIdSchema.parse(filed.artifactId),
+        type: type.data,
+        status: "READY",
+        title,
+      },
+      { kind: "WORK_IN_PROGRESS", jobId: row.job_id, title },
+    ]);
+    await dependencies
+      .notify(owner, {
+        key: `wf:${row.job_id}:delivered`,
+        title: `${title.slice(0, 150)} is ready`,
+        body: text,
+      })
+      .catch(() => undefined);
+    dependencies.logger?.info(
+      { jobId: row.job_id, posted },
+      "workforce document delivered",
+    );
+    return posted;
+  };
+
   return async (owner: Owner, row: WorkRow): Promise<boolean> => {
     const document = deliveredDocument(row);
+    if (document === null && row.state === "COMPLETED") {
+      return announceFiled(owner, row);
+    }
     if (document === null) {
       const ended = endedWithoutDocumentText(row);
       if (ended === null) return false;

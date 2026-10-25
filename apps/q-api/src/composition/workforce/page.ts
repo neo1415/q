@@ -30,6 +30,7 @@ import type {
 } from "./store.js";
 import { progressOf } from "./progress.js";
 import { deliveredDocument } from "./delivery.js";
+import { filedDocumentIds } from "./results.js";
 import {
   LIVE_WORK_STATES,
   liveStageOf,
@@ -242,6 +243,39 @@ export function createWorkforcePage(dependencies: {
     return new Map(rows.map((row) => [row.job_id, row]));
   }
 
+  /** A finished job's first READY document, resolved as its owner may see it. */
+  async function filedDocumentOf(
+    owner: Owner,
+    work: WorkRow,
+  ): Promise<{
+    readonly artifactId: string;
+    readonly type: string;
+    readonly title: string;
+  } | null> {
+    const artifactIds = filedDocumentIds(work);
+    if (artifactIds.length === 0 || dependencies.deliverables === undefined) {
+      return null;
+    }
+    const resolved = await dependencies
+      .deliverables(owner, work.trace.organisationId ?? null, {
+        artifactIds,
+        actionIds: [],
+      })
+      .catch(() => null);
+    const ready = resolved?.documents.find(
+      (document) =>
+        artifactIds.includes(document.artifact.artifactId) &&
+        document.artifact.status === "READY",
+    );
+    return ready === undefined
+      ? null
+      : {
+          artifactId: ready.artifact.artifactId,
+          type: ready.artifact.type,
+          title: ready.artifact.title.slice(0, 160),
+        };
+  }
+
   async function costsOf(
     owner: Owner,
     jobs: readonly Pick<JobRow, "id" | "source_kind" | "source_id">[],
@@ -331,8 +365,16 @@ export function createWorkforcePage(dependencies: {
       const work = (await workOf(owner, [jobId])).get(jobId);
       if (work === undefined) return null;
       const plan = progressOf(work);
-      const filed = deliveredDocument(work);
       const working = LIVE_WORK_STATES.includes(work.state);
+      // QA 25 Oct (job 4d1a8b04, "a one-page investor update"): a document
+      // step that is not an analysis records only its artifact id, so the
+      // card said "Done" with no document. Such a document is resolved as
+      // the job's page resolves it, under the owner's fresh context.
+      const filed =
+        deliveredDocument(work) ??
+        (work.state === "COMPLETED"
+          ? await filedDocumentOf(owner, work)
+          : null);
       return {
         jobId: work.job_id,
         state: working
@@ -350,11 +392,13 @@ export function createWorkforcePage(dependencies: {
         document:
           filed === null
             ? null
-            : {
-                artifactId: filed.artifactId,
-                type: filed.delivery.artifactType,
-                title: filed.delivery.title.slice(0, 160),
-              },
+            : "delivery" in filed
+              ? {
+                  artifactId: filed.artifactId,
+                  type: filed.delivery.artifactType,
+                  title: filed.delivery.title.slice(0, 160),
+                }
+              : filed,
         reason: working || work.state === "COMPLETED" ? null : work.reason,
       };
     },
@@ -526,23 +570,13 @@ export function createWorkforcePage(dependencies: {
       timeline.sort((a, b) => a.at.localeCompare(b.at));
 
       const work = (await workOf(owner, [detail.job.id])).get(detail.job.id);
-      const completedDocument = z
+      const artifactIds = filedDocumentIds(work);
+      const completedAction = z
         .object({
           status: z.literal("DONE"),
-          outputs: z.object({ artifactId: UuidSchema }).passthrough(),
+          outputs: z.object({ qActionId: UuidSchema }).passthrough(),
         })
         .passthrough();
-      const artifactIds = [
-        ...new Set(
-          Object.values(work?.results ?? {}).flatMap((result) => {
-            const parsed = completedDocument.safeParse(result);
-            return parsed.success ? [parsed.data.outputs.artifactId] : [];
-          }),
-        ),
-      ].slice(0, 12);
-      const completedAction = completedDocument.extend({
-        outputs: z.object({ qActionId: UuidSchema }).passthrough(),
-      });
       const actionIds = [
         ...new Set(
           Object.values(work?.results ?? {}).flatMap((result) => {

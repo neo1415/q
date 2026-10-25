@@ -43,6 +43,25 @@ const DoneStepSchema = z.object({
   outputs: z.record(z.string(), z.unknown()),
 });
 
+/**
+ * The documents a job's finished steps filed, by artifact id, as each
+ * step recorded it (the job's stored results are a trust boundary).
+ */
+export function filedDocumentIds(
+  row: Pick<WorkRow, "results"> | undefined,
+): readonly string[] {
+  return [
+    ...new Set(
+      doneOutputs(row).flatMap((outputs) => {
+        const parsed = z
+          .object({ artifactId: z.string().uuid() })
+          .safeParse(outputs);
+        return parsed.success ? [parsed.data.artifactId] : [];
+      }),
+    ),
+  ].slice(0, 12);
+}
+
 export function doneOutputs(
   row: Pick<WorkRow, "results"> | undefined,
 ): readonly unknown[] {

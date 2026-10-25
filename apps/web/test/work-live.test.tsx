@@ -295,6 +295,20 @@ describe("the card", () => {
     await waitFor(() => expect(documentCard()).toBe("READY"));
   });
 
+  it("a DONE job with no document shows no planning step (job 4d1a8b04)", async () => {
+    serve([{ ...done, document: null }]);
+    render(<WorkInProgressCard block={work} />);
+    await waitFor(() =>
+      expect(
+        window.document
+          .querySelector("[data-q-work-status]")
+          ?.getAttribute("data-q-work-status"),
+      ).toBe("DONE"),
+    );
+    expect(window.document.querySelector("[data-q-work-in-view]")).toBeNull();
+    expect(screen.queryByText("Planning the work")).toBeNull();
+  });
+
   it("lands the sources read as their site and title, as text, never a link", async () => {
     serve([
       working({
