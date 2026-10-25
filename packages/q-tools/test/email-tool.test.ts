@@ -24,7 +24,9 @@ import {
 const RELATIONSHIP = "88888888-0000-4000-8000-0000000000e1";
 const ADA = { name: "Ada Founder", email: "ada@founder.example.invalid" };
 
-function world(options: { readonly mailbox?: boolean } = {}) {
+function world(
+  options: { readonly mailbox?: boolean; readonly noContacts?: boolean } = {},
+) {
   const prepared: unknown[] = [];
   const email: EmailIntelligencePort = {
     counterpart: (actor, relationshipId) =>
@@ -34,7 +36,7 @@ function world(options: { readonly mailbox?: boolean } = {}) {
               kind: "COMPANY" as const,
               id: COMPANY_B_NETWORK,
               name: "Apex",
-              contacts: [ADA],
+              contacts: options.noContacts === true ? [] : [ADA],
             }
           : null,
       ),
@@ -127,6 +129,37 @@ describe("propose_email", () => {
     expect(outcome.result).toMatchObject({
       ok: true,
       data: { status: "MAILBOX_NOT_CONNECTED" },
+    });
+    expect(prepared).toEqual([]);
+  });
+
+  // Guard F-106 (production a3f2a0f81, run 891e2a3d): a name in
+  // recipientEmail failed the whole email with INVALID_ARGUMENTS.
+  it("takes a recipient that is not an address as none named", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      call({ recipientEmail: "Savanna Seed Partners" }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toEqual([expect.objectContaining({ to: ADA.email })]);
+  });
+
+  it("says it has no address for them, never a silent failure", async () => {
+    const { executor, prepared } = world({ noContacts: true });
+    const outcome = await executor.execute(
+      call({}),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.result).toEqual({
+      ok: true,
+      data: {
+        status: "NO_RECIPIENT",
+        awaitingApprovalOf: "I don't have an email address for Apex.",
+      },
     });
     expect(prepared).toEqual([]);
   });

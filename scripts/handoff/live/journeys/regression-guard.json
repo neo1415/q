@@ -83,7 +83,9 @@
         "expect": {
           "approval": false,
           "anyBlock": ["WORK_IN_PROGRESS", "ARTIFACT_REFERENCE"],
-          "jobDocument": { "maxMs": 120000 }
+          "jobDocument": {
+            "maxMs": 120000
+          }
         }
       }
     ]
@@ -137,7 +139,12 @@
       {
         "ask": "Draft a short update email to Savanna Seed Partners about our latest traction",
         "expect": {
-          "approval": true
+          "approval": true,
+          "replyNot": [
+            "show you the draft",
+            "arguments (were )?not read",
+            "I couldn't (draft|write|prepare)"
+          ]
         }
       }
     ]
