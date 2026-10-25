@@ -767,6 +767,32 @@ export const JOB_PLAN_V11: PromptDefinition<
   ),
 };
 
+/**
+ * v12 (production 2026-10-25, run 341b8d61): "Do market research on Silo
+ * Credit's market and save it to my board" was cut off mid-plan at the
+ * output ceiling, and the retry kept no step. A plan is read by code and
+ * shown on a card: brief, so it always fits and always finishes.
+ */
+export const V12_BRIEF = `BE BRIEF: code reads this plan and the person sees it on a card. Each step's goal and why is one short sentence (under 160 characters). summary and outcome are one or two sentences each. Plan only the steps the request needs (usually two to four). At most three prerequisites and three next actions, only those that matter; cannot only when something truly cannot be done; firstRead null unless it changes the plan. Never repeat the same words across fields.
+
+`;
+
+export const JOB_PLAN_V12: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V11,
+  version: 12,
+  status: "ACTIVE",
+  changeDescription:
+    "Production 2026-10-25 (run 341b8d61): v11 plus BE BRIEF -- one-sentence goals and reasons, only the steps the request needs, short lists -- so a plan always finishes inside its output ceiling instead of being cut off and lost.",
+  effectiveFrom: "2026-10-25",
+  template: JOB_PLAN_V11.template.replace(
+    "THINK IN THIS ORDER",
+    `${V12_BRIEF}THINK IN THIS ORDER`,
+  ),
+};
+
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
 You are a second, independent specialist reviewing a {{documentKind}} another agent prepared for {{principalName}} about {{companyName}}. You did not write it. Your job is to find what is wrong with it, not to praise it. Code decides from your verdict whether it is revised.
 
