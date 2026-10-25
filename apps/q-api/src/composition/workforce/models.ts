@@ -92,6 +92,8 @@ export type AnalysisCritiqueInput = Omit<AnalysisCritiqueVariables, Frame>;
 export type Priced<O> = {
   readonly output: O;
   readonly costUsd: number | null;
+  /** List elements the gateway refused and dropped (paths, never values). */
+  readonly dropped?: readonly string[] | undefined;
 };
 export type ShortenQuestionsInput = {
   readonly companyName: string;
@@ -150,15 +152,24 @@ type DeepBudget =
   | typeof ANALYSIS_WRITE_BUDGET
   | typeof ANALYSIS_CRITIQUE_BUDGET;
 
-/** v5 also writes the outcome, prerequisites, reasons and next actions. */
-const PLAN = {
-  // F-78: one refused answer lost the whole plan; a second attempt (the
-  // gateway's next route) is cheap beside telling them Q failed.
-  maxAttempts: 2,
-  maxEstimatedCostUsd: 0.08,
-  maxOutputTokens: 2_800,
+/**
+ * v5 also writes the outcome, prerequisites, reasons and next actions.
+ * Production 2026-10-25 (run 341b8d61): a market-research plan was cut off
+ * at 2,800 tokens and lost. The ceiling is sized for a whole plan of the
+ * kind the request needs (four steps with their reasons, prerequisites and
+ * next actions, with room to close the object), and the money for a third
+ * attempt at that size -- a plan that cannot finish is no plan.
+ */
+export const PLAN_BUDGET = {
+  // F-78: one refused answer lost the whole plan; another attempt (the
+  // gateway's next route, with the room raised after a cut-off) is cheap
+  // beside telling them Q failed.
+  maxAttempts: 3,
+  maxEstimatedCostUsd: 0.25,
+  maxOutputTokens: 6_000,
   attemptTimeoutMs: 60_000,
 } as const;
+const PLAN = PLAN_BUDGET;
 
 export type WorkforceModels = {
   readonly review: (
@@ -327,10 +338,19 @@ export function createWorkforceModels(dependencies: {
       const amount = (
         response as { readonly cost?: { readonly amount?: unknown } }
       ).cost?.amount;
+      const dropped = (response.output as { readonly dropped?: unknown })
+        .dropped;
       return {
         output: parsed.data,
         costUsd:
           typeof amount === "number" && Number.isFinite(amount) ? amount : null,
+        ...(Array.isArray(dropped) && dropped.length > 0
+          ? {
+              dropped: dropped.filter(
+                (path): path is string => typeof path === "string",
+              ),
+            }
+          : {}),
       };
     } catch (error: unknown) {
       dependencies.logger?.warn(
@@ -387,22 +407,39 @@ export function createWorkforceModels(dependencies: {
     plan: async (who, trace, variables) => {
       // v10's tolerant result, normalised back to v9's shape (keys and
       // their references in the plan's key form, text clipped).
-      const plan = await call<PlanVariables, JobPlanResultV10>({
-        task: "JOB_PLAN",
-        taskClass: "STRUCTURED_EXTRACTION",
-        who,
-        trace,
-        variables,
-        schema: JobPlanResultV10Schema,
-        budget: PLAN,
-        environmentNotes:
-          "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
-        etiquette: null,
-        // A step with an unknown role is dropped; code then refuses what
-        // waited on it and replans, never runs a partial plan unchecked.
-        dropListItems: true,
-      });
-      return plan === null ? null : normalisePlanV10(plan);
+      const ask = () =>
+        priced<PlanVariables, JobPlanResultV10>({
+          task: "JOB_PLAN",
+          taskClass: "STRUCTURED_EXTRACTION",
+          who,
+          trace,
+          variables,
+          schema: JobPlanResultV10Schema,
+          budget: PLAN,
+          environmentNotes:
+            "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
+          etiquette: null,
+          // A step with an unknown role is dropped; code then refuses what
+          // waited on it and replans, never runs a partial plan unchecked.
+          dropListItems: true,
+        });
+      // Production 2026-10-25 (run 341b8d61): a retry kept no step -- every
+      // one dropped -- and was offered as a 0-step plan. A plan whose steps
+      // were all dropped is no plan: asked once more, then refused.
+      const emptied = (plan: Priced<JobPlanResultV10> | null) =>
+        plan !== null &&
+        plan.output.steps.length === 0 &&
+        (plan.dropped ?? []).some((path) => path.startsWith("steps"));
+      let plan = await ask();
+      if (emptied(plan)) {
+        dependencies.logger?.warn(
+          { task: "JOB_PLAN", dropped: plan?.dropped ?? [] },
+          "workforce plan kept no step; asked again",
+        );
+        plan = await ask();
+      }
+      if (plan === null || emptied(plan)) return null;
+      return normalisePlanV10(plan.output);
     },
     critique: (who, trace, variables) =>
       call<CritiqueVariables, SubstanceCritiqueResult>({
