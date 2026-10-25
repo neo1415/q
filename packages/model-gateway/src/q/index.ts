@@ -7832,6 +7832,42 @@ export function createModelGatewayQAnswer(
           let rounds = 0;
           let calls = 0;
           /**
+           * Guard run on 2632e2cb9 (runs 5728c8df, 0ce9c2bc): a tool the run
+           * may use but did not offer up front (it loads on demand) is
+           * loaded when code's follow-on needs it, or when a refusal names
+           * it as the right one, exactly as use_capability loads it: offered
+           * to the model, and named in the focus it executes under.
+           */
+          const offerFromRun = (
+            names: readonly string[],
+          ): readonly QOfferedTool[] => {
+            const loaded = (availableForRun ?? []).filter(
+              (tool) =>
+                names.includes(tool.definition.name) &&
+                !offeredByName.has(tool.definition.name),
+            );
+            if (loaded.length === 0) return [];
+            offered = [...offered, ...loaded].slice(0, MODEL_TOOLS_MAX);
+            for (const tool of loaded) {
+              offeredByName.set(tool.definition.name, tool);
+            }
+            const focus = toolContext.focus ?? { areas: [], tools: [] };
+            toolContext = {
+              ...toolContext,
+              focus: {
+                ...focus,
+                tools: [
+                  ...focus.tools,
+                  ...loaded.map((tool) => tool.definition.name),
+                ],
+              },
+            };
+            return loaded;
+          };
+          /** Offered now, or loaded for this follow-on from the run's tools. */
+          const canOffer = (name: string): boolean =>
+            offeredByName.has(name) || offerFromRun([name]).length > 0;
+          /**
            * Profiles code read after a search resolved to one company
            * (chained-read.ts), by company id: a later get_company for the
            * same id is answered from here rather than read again.
@@ -7911,6 +7947,8 @@ export function createModelGatewayQAnswer(
           // One more round, once, after use_capability loaded a tool: the
           // model calls it in the next step of the same turn.
           let loadRounds = 0;
+          // One more round, once, after a refusal named the right tool.
+          let redirectRounds = 0;
           let textRound = false;
           /** A read of their own records found something (owned-first.ts). */
           let ownedFound = false;
@@ -7933,7 +7971,8 @@ export function createModelGatewayQAnswer(
                 recoveryRounds +
                 sayDoRounds +
                 gapsRounds +
-                loadRounds &&
+                loadRounds +
+                redirectRounds &&
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
@@ -8420,7 +8459,7 @@ export function createModelGatewayQAnswer(
               if (
                 instead !== null &&
                 chatInstead === null &&
-                offeredByName.has(CHAT_INSTEAD_TOOL) &&
+                canOffer(CHAT_INSTEAD_TOOL) &&
                 !proposals.some((other) => other.name === CHAT_INSTEAD_TOOL) &&
                 calls + chainedThisRound.length + 1 <=
                   Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
@@ -8438,7 +8477,7 @@ export function createModelGatewayQAnswer(
               if (
                 contact !== null &&
                 firstContact === null &&
-                offeredByName.has(FIRST_CONTACT_TOOL) &&
+                canOffer(FIRST_CONTACT_TOOL) &&
                 !proposals.some((other) => other.name === FIRST_CONTACT_TOOL) &&
                 calls + chainedThisRound.length + 1 <=
                   Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
@@ -8493,32 +8532,41 @@ export function createModelGatewayQAnswer(
               if (call.name === FILL_PROFILE_GAPS_TOOL && outcome.result.ok) {
                 gaps = gapsLineOf(outcome.result.data) ?? gaps;
               }
-              if (call.name === USE_CAPABILITY_TOOL && outcome.result.ok) {
-                const loaded = loadCapabilities(
-                  outcome.result.data,
-                  availableForRun ?? [],
-                  offeredByName,
-                );
-                if (loaded.length > 0) {
-                  offered = [...offered, ...loaded].slice(0, MODEL_TOOLS_MAX);
-                  for (const tool of loaded) {
-                    offeredByName.set(tool.definition.name, tool);
-                  }
-                  // What was loaded may execute this turn exactly as a
-                  // tool the turn named (the registry's own rule).
-                  const focus = toolContext.focus ?? { areas: [], tools: [] };
-                  toolContext = {
-                    ...toolContext,
-                    focus: {
-                      ...focus,
-                      tools: [
-                        ...focus.tools,
-                        ...loaded.map((tool) => tool.definition.name),
-                      ],
-                    },
-                  };
-                  if (loadRounds === 0) loadRounds = 1;
+              // A refusal that names the tool that does what was asked
+              // ("…prepare it with propose_profile_answer_change instead"):
+              // that tool is loaded and the model gets one more step.
+              if (outcome.status === "DENIED" && !outcome.result.ok) {
+                const named = (availableForRun ?? [])
+                  .map((tool) => tool.definition.name)
+                  .filter(
+                    (name) =>
+                      name !== call.name &&
+                      new RegExp(`\\b${name}\\b`, "u").test(
+                        outcome.result.ok
+                          ? ""
+                          : outcome.result.error.safeMessage,
+                      ),
+                  );
+                const loadedNamed = offerFromRun(named);
+                if (
+                  (loadedNamed.length > 0 ||
+                    named.some((name) => offeredByName.has(name))) &&
+                  redirectRounds === 0
+                ) {
+                  redirectRounds = 1;
                 }
+              }
+              if (call.name === USE_CAPABILITY_TOOL && outcome.result.ok) {
+                // What was loaded may execute this turn exactly as a tool
+                // the turn named (the registry's own rule).
+                const loaded = offerFromRun(
+                  loadCapabilities(
+                    outcome.result.data,
+                    availableForRun ?? [],
+                    offeredByName,
+                  ).map((tool) => tool.definition.name),
+                );
+                if (loaded.length > 0 && loadRounds === 0) loadRounds = 1;
                 logger?.info(
                   {
                     key: "q.capability_loaded",

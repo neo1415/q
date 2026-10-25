@@ -3716,3 +3716,186 @@ describe("a turn makes each read once", () => {
     ]);
   });
 });
+
+/**
+ * Guard run on 2632e2cb9 (runs 5728c8df, 0ce9c2bc): the tool that does what
+ * was asked loads on demand, so it was not offered when it was needed --
+ * "add Ghana to my mandate" was refused by change_my_mandate (geographies
+ * are propose_profile_answer_change's), and the message prepared instead of
+ * an email went nowhere because propose_chat_message was not offered.
+ */
+describe("the tool that does it is loaded when it is needed", () => {
+  const offeredTool = (
+    name: string,
+    toolName: string,
+    classification: QOfferedTool["classification"],
+  ): QOfferedTool => ({
+    toolName,
+    toolVersion: 1,
+    classification,
+    definition: {
+      name,
+      description: name,
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  });
+  const CHANGE = offeredTool(
+    "change_my_mandate",
+    "app.investor.mandate.change",
+    "SIDE_EFFECT",
+  );
+  const ANSWER = offeredTool(
+    "propose_profile_answer_change",
+    "onboarding.answer.revise.propose",
+    "SIDE_EFFECT",
+  );
+  const EMAIL = offeredTool(
+    "propose_email",
+    "relationship.email.propose",
+    "SIDE_EFFECT",
+  );
+  const CHAT = offeredTool(
+    "propose_chat_message",
+    "relationship.chat.propose",
+    "SIDE_EFFECT",
+  );
+  const port = (
+    offer: readonly QOfferedTool[],
+    available: readonly QOfferedTool[],
+    answer: (proposal: QToolProposal) => QToolCallOutcome,
+  ) => {
+    const executed: { name: string; focusTools: readonly string[] }[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve(offer),
+      available: () => Promise.resolve(available),
+      execute: (proposal, context) => {
+        executed.push({
+          name: proposal.name,
+          focusTools: context.focus?.tools ?? [],
+        });
+        return Promise.resolve(answer(proposal));
+      },
+    };
+    return { tools, executed };
+  };
+
+  it("F-93: a refusal naming the right tool loads it, and the model uses it", async () => {
+    const { tools, executed } = port(
+      [GET_COMPANY, CHANGE],
+      [GET_COMPANY, CHANGE, ANSWER],
+      (p) =>
+        p.name === "change_my_mandate"
+          ? {
+              callId: p.callId,
+              toolName: "app.investor.mandate.change",
+              toolVersion: 1,
+              classification: "SIDE_EFFECT",
+              status: "DENIED",
+              failureCode: "NOT_THIS_ACTION",
+              sensitivity: null,
+              result: {
+                ok: false,
+                error: {
+                  code: "NOT_THIS_ACTION",
+                  safeMessage:
+                    "Geographies are changed with propose_profile_answer_change.",
+                },
+              },
+              latencyMs: 1,
+            }
+          : {
+              ...succeeded(p, { status: "PREPARED" }),
+              toolName: "onboarding.answer.revise.propose",
+              classification: "SIDE_EFFECT",
+            },
+    );
+    const { seam, alpha, request } = build({
+      said: "Add Ghana to my mandate's geographies",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "c", name: "change_my_mandate", arguments: {} }],
+        },
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "a",
+              name: "propose_profile_answer_change",
+              arguments: {},
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      turnKind: "TOOL_REQUEST",
+      askedAction: "change_my_mandate",
+    });
+    expect(alpha.calls[1]?.request.tools.map((t) => t.name)).toContain(
+      "propose_profile_answer_change",
+    );
+    expect(executed.map((e) => e.name)).toEqual([
+      "change_my_mandate",
+      "propose_profile_answer_change",
+    ]);
+    expect(executed[1]?.focusTools).toContain("propose_profile_answer_change");
+  });
+
+  it("F-106: the message instead of an email is prepared though it was not offered", async () => {
+    const BODY = "Hi Savanna team, an update on our traction.";
+    const { tools, executed } = port(
+      [GET_COMPANY, EMAIL],
+      [GET_COMPANY, EMAIL, CHAT],
+      (p) =>
+        p.name === "propose_email"
+          ? {
+              ...succeeded(p, {
+                status: "MAILBOX_NOT_CONNECTED",
+                awaitingApprovalOf: "Connect Gmail first.",
+              }),
+              toolName: "relationship.email.propose",
+              classification: "SIDE_EFFECT",
+            }
+          : {
+              ...succeeded(p, {
+                status: "PREPARED",
+                awaitingApprovalOf: "Message Savanna Seed Partners",
+              }),
+              toolName: "relationship.chat.propose",
+              classification: "SIDE_EFFECT",
+            },
+    );
+    const { seam, request } = build({
+      said: "Draft a short update email to Savanna Seed Partners about our latest traction",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "e",
+              name: "propose_email",
+              arguments: {
+                counterpartName: "Savanna Seed Partners",
+                subject: "Update",
+                body: BODY,
+              },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    expect(executed.map((e) => e.name)).toEqual([
+      "propose_email",
+      "propose_chat_message",
+    ]);
+    expect(executed[1]?.focusTools).toContain("propose_chat_message");
+  });
+});
