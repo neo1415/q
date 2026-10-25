@@ -78,6 +78,9 @@ import {
   isTaxonomySuggestion,
   pickedUp,
   documentReading,
+  sameFileAs,
+  alreadyHaveLine,
+  contentHashOf,
   nothingNewLine,
   publicSourceOf,
   progressLines,
@@ -1560,6 +1563,24 @@ export function QOnboardingWorkspace({
         const held = `I've added ${file.name}; it's here and waiting. You'll read it the moment my company exists, so ask me the company's name.`;
         if (voiceActive) setHeldUpload(held);
         else await sayNow.current(held);
+        return;
+      }
+      // The same file again: no new document, no second reading or review.
+      // Q says it already has it (live e2e 25 Oct). A failed check only
+      // means it is uploaded as before.
+      const already = await contentHashOf(file)
+        .then(async (sha256) => {
+          const listed = await materialListAction(companyIdForUpload);
+          return listed.ok ? sameFileAs(listed.value, sha256) : undefined;
+        })
+        .catch(() => undefined);
+      if (already !== undefined) {
+        const line = alreadyHaveLine(file.name, already.filename);
+        push("Q", line);
+        const sessionId = viewRef.current?.session.id;
+        if (sessionId !== undefined) {
+          void onboardingThreadKeepAction(sessionId, line);
+        }
         return;
       }
       setUploadNote(`Uploading ${file.name}`);

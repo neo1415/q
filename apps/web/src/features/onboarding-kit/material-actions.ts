@@ -267,6 +267,7 @@ export async function materialListAction(
         documentType: document.documentType,
         state,
         stateLabel: label,
+        sha256: document.currentVersion?.sha256,
       };
     });
   });

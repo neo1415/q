@@ -885,6 +885,36 @@ export function documentReading(
     : "READING";
 }
 
+/**
+ * The file they already shared, when this one is the same bytes (live e2e
+ * 25 Oct: each re-upload of one deck made a new document, read and
+ * reviewed again at a model's cost). Matched by content hash only.
+ */
+export function sameFileAs<T extends { readonly sha256?: string | undefined }>(
+  files: readonly T[],
+  sha256: string,
+): T | undefined {
+  return files.find((file) => file.sha256 === sha256);
+}
+
+/** Q's line, said by code, for a file it already has. */
+export function alreadyHaveLine(filename: string, existing: string): string {
+  return filename === existing
+    ? `I already have ${filename}, so there's nothing new to read.`
+    : `I already have that file as ${existing}, so there's nothing new to read.`;
+}
+
+/** A file's SHA-256 as lowercase hex, as the document store records it. */
+export async function contentHashOf(file: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer(),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 /** Q's line, said by code, for a document that added nothing new. */
 export function nothingNewLine(filename: string): string {
   return `I've read ${filename}. It adds nothing new beyond what's already recorded.`;
