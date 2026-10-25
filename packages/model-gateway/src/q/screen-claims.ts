@@ -60,6 +60,35 @@ export function plainQuotes(sentence: string): string {
   return sentence.replace(/[\u2018\u2019\u02bc\u2032]/gu, "'");
 }
 
+/**
+ * Whether the person asked for something to be opened or shown ("open my
+ * data room", "show me the deck", "take me to Discover"): only then is an
+ * unbacked screen claim owed an apology rather than simply dropped.
+ */
+const ASKED_TO_OPEN =
+  /\b(?:open|show|take me|bring up|pull up|go to|navigate|display|put (?:it|that|them) up)\b/iu;
+
+export function askedToOpen(text: string): boolean {
+  return ASKED_TO_OPEN.test(text);
+}
+
+/**
+ * QA F-111: block kinds that are drawn on their screen as the answer
+ * arrives. A sentence saying something is on screen is backed by any of
+ * them, not by a screen move alone.
+ */
+export const DRAWN_BLOCK_KINDS: ReadonlySet<string> = new Set([
+  "UI_INTENT",
+  "ANSWER_CARDS",
+  "COMPARISON_CARDS",
+  "TABLE",
+  "CHART",
+  "MAP",
+  "TIMELINE",
+  "PICTURE",
+  "ARTIFACT_REFERENCE",
+]);
+
 /** True when the sentence tells the person something is on their screen. */
 export function claimsOnScreen(sentence: string): boolean {
   const plain = plainQuotes(sentence);
@@ -73,7 +102,16 @@ export function claimsOnScreen(sentence: string): boolean {
  * finished text. `backed` is read at each sentence: the tool loop has run
  * before the answer's prose streams, so its client actions are known.
  */
-export function createScreenClaimGuard(backed: () => boolean) {
+export function createScreenClaimGuard(
+  backed: () => boolean,
+  /**
+   * QA F-111 (25 Oct 2026): a data-room answer nobody asked to open
+   * anything for ended "I haven't been able to open that on your screen."
+   * The apology is owed only when they asked for something to be opened
+   * or shown; otherwise the claim is simply dropped.
+   */
+  apologise = true,
+) {
   let corrected = false;
   let removed = 0;
   return {
@@ -81,8 +119,9 @@ export function createScreenClaimGuard(backed: () => boolean) {
       if (backed() || !claimsOnScreen(sentence)) return sentence;
       removed += 1;
       if (
-        claimsListOnScreen(sentence) &&
-        !CLAIMS.some((claim) => claim.test(plainQuotes(sentence)))
+        !apologise ||
+        (claimsListOnScreen(sentence) &&
+          !CLAIMS.some((claim) => claim.test(plainQuotes(sentence))))
       ) {
         return null;
       }
@@ -98,9 +137,10 @@ export function createScreenClaimGuard(backed: () => boolean) {
 export function withoutUnbackedScreenClaims(
   text: string,
   backed: boolean,
+  apologise = true,
 ): { readonly text: string; readonly removed: number } {
   if (backed) return { text, removed: 0 };
-  const guard = createScreenClaimGuard(() => false);
+  const guard = createScreenClaimGuard(() => false, apologise);
   // Line by line, so a list or a heading without a claim is untouched.
   const lines = text.split("\n").map((line) => {
     // Real sentence ends only: "8.8/10" is one piece, never "8. 8/10" (D9).

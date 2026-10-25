@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DRAWN_BLOCK_KINDS,
   NOT_ON_SCREEN_LINE,
+  askedToOpen,
   claimsOnScreen,
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -66,5 +68,30 @@ describe("screen claims", () => {
     expect(guard.sentence("It's on your screen now.")).toBe(
       "It's on your screen now.",
     );
+  });
+});
+
+describe("QA F-111: no apology for opening what nobody asked to open", () => {
+  const answer =
+    "Five documents are in your data room. Your access settings are now in view.";
+
+  it("drops the claim with no apology when nothing was asked to open", () => {
+    const out = withoutUnbackedScreenClaims(answer, false, false);
+    expect(out.text).toBe("Five documents are in your data room.");
+    expect(out.text).not.toContain(NOT_ON_SCREEN_LINE);
+  });
+
+  it("still says it plainly when they asked for something to be opened", () => {
+    expect(withoutUnbackedScreenClaims(answer, false, true).text).toContain(
+      NOT_ON_SCREEN_LINE,
+    );
+    expect(askedToOpen("Open my data room")).toBe(true);
+    expect(askedToOpen("Who can see my data room right now?")).toBe(false);
+  });
+
+  it("a table, picture or document card on screen backs the claim", () => {
+    for (const kind of ["TABLE", "CHART", "PICTURE", "ARTIFACT_REFERENCE"]) {
+      expect(DRAWN_BLOCK_KINDS.has(kind), kind).toBe(true);
+    }
   });
 });
