@@ -84,6 +84,7 @@ import {
   promptFor,
   promptStepOf,
   reviewLines,
+  reviewShown,
   stillNeeded,
   taxonomyProposal,
   composerHint,
@@ -1796,7 +1797,9 @@ export function QOnboardingWorkspace({
   }
 
   const working = busy || askingQ;
-  const review = showReview ? reviewLines(view, vocabulary, labels) : [];
+  // While Q asks to confirm, what it understood is shown with the question.
+  const reviewOnScreen = reviewShown(showReview, prompt);
+  const review = reviewOnScreen ? reviewLines(view, vocabulary, labels) : [];
   const stage = readingLanded
     ? otherProposals.length > 0
       ? "Here's what I picked up. Keep what's right, change what isn't."
@@ -2396,7 +2399,7 @@ export function QOnboardingWorkspace({
         ) : null}
       </div>
 
-      {showReview ? (
+      {reviewOnScreen ? (
         <section
           aria-label={t("What Q knows")}
           className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3"

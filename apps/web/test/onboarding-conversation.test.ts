@@ -17,6 +17,7 @@ import {
   keptAllLine,
   stillWaiting,
   pendingQuestion,
+  reviewShown,
   questionOnReturn,
   redrawnThread,
   progressLines,
@@ -451,6 +452,17 @@ describe("questionOnReturn: a line said before an absence is history (live 25 Oc
         Date.parse("2026-10-25T19:31:00Z"),
       ),
     ).toBe("What early signal do you have?");
+  });
+});
+
+describe("a confirmation shows what it confirms (QA F-130, 25 Oct)", () => {
+  it("is shown while Q asks to confirm, opened or not", () => {
+    expect(reviewShown(false, { control: "confirm" })).toBe(true);
+  });
+  it("is otherwise shown only when opened", () => {
+    expect(reviewShown(false, { control: "chips" })).toBe(false);
+    expect(reviewShown(true, { control: "chips" })).toBe(true);
+    expect(reviewShown(false, null)).toBe(false);
   });
 });
 
