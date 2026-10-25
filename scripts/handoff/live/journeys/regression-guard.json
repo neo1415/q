@@ -6,12 +6,24 @@
       {
         "ask": "Show me the five companies that best fit my mandate",
         "expect": {
-          "anyBlock": ["COMPANY_REFERENCE", "COMPARISON_CARDS", "TABLE"]
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "TABLE",
+            "ANSWER_CARDS"
+          ]
         }
       },
       {
         "ask": "How do the top two stack up?",
-        "expect": { "anyBlock": ["COMPARISON", "COMPARISON_CARDS", "TABLE"] }
+        "expect": {
+          "anyBlock": [
+            "COMPARISON",
+            "COMPARISON_CARDS",
+            "TABLE",
+            "ANSWER_CARDS"
+          ]
+        }
       }
     ]
   },
@@ -21,7 +33,14 @@
     "steps": [
       {
         "ask": "Which is better, Anchor or Afyascan?",
-        "expect": { "anyBlock": ["COMPARISON", "COMPARISON_CARDS", "TABLE"] }
+        "expect": {
+          "anyBlock": [
+            "COMPARISON",
+            "COMPARISON_CARDS",
+            "TABLE",
+            "ANSWER_CARDS"
+          ]
+        }
       }
     ]
   },
@@ -41,7 +60,8 @@
             "PUBLIC_SOURCE",
             "TABLE",
             "COMPARISON_CARDS",
-            "WORK_IN_PROGRESS"
+            "WORK_IN_PROGRESS",
+            "ANSWER_CARDS"
           ]
         }
       }
@@ -66,7 +86,10 @@
     "steps": [
       {
         "ask": "Add Ghana to my mandate's geographies",
-        "expect": { "approval": true, "replyNot": ["no change"] }
+        "expect": {
+          "approval": true,
+          "replyNot": ["no change"]
+        }
       }
     ]
   },
@@ -87,10 +110,14 @@
     "id": "I-board",
     "account": "investor.equator-line@fictional.capitalq.local",
     "steps": [
-      { "ask": "What's on my board?" },
+      {
+        "ask": "What's on my board?"
+      },
       {
         "ask": "Add 'Review Basketari repeat order data' to my board",
-        "expect": { "approval": false }
+        "expect": {
+          "approval": false
+        }
       }
     ]
   },
@@ -100,7 +127,9 @@
     "steps": [
       {
         "ask": "Who is the founder of Paystack?",
-        "expect": { "replyMatches": ["Shola|Akinlade|Ezra|Olubi"] }
+        "expect": {
+          "replyMatches": ["Shola|Akinlade|Ezra|Olubi"]
+        }
       }
     ]
   },
@@ -110,7 +139,9 @@
     "steps": [
       {
         "ask": "Draft a short update email to Savanna Seed Partners about our latest traction",
-        "expect": { "approval": true }
+        "expect": {
+          "approval": true
+        }
       }
     ]
   },
@@ -163,8 +194,12 @@
     "id": "F-founder-ready",
     "account": "founder.maji-loop@fictional.capitalq.local",
     "steps": [
-      { "ask": "How investor-ready is my company right now?" },
-      { "ask": "Show me my fundraising pipeline" }
+      {
+        "ask": "How investor-ready is my company right now?"
+      },
+      {
+        "ask": "Show me my fundraising pipeline"
+      }
     ]
   },
   {
@@ -173,7 +208,9 @@
     "steps": [
       {
         "ask": "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
-        "expect": { "approval": true }
+        "expect": {
+          "approval": true
+        }
       },
       {
         "ask": "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
