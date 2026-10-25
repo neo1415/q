@@ -346,7 +346,19 @@ async function discoverWith(
   timing: { phasesMs: Readonly<Record<string, number>> | null },
 ): Promise<DiscoveryAnswer | DiscoveryRankUnavailable | null> {
   const { ask, tools, context, available } = input;
-  if (!available.has(DISCOVER_TOOL) || ask.previous) return null;
+  // About the companies Q just showed with nothing to narrow them by ("tell
+  // me more about those"): the full path answers over those cards. A
+  // narrowing of them by sector, country, stage or raising now (F-109,
+  // F-110, F-114: "only fintech ones in Kenya or Nigeria that are raising
+  // now") is a catalog search with those filters, answered here by code;
+  // returning null for it sent the narrowing to model rounds (16-28 s
+  // live, and once a Discover filter nobody asked for).
+  const narrows =
+    ask.sectors.length > 0 ||
+    ask.countries.length > 0 ||
+    ask.stages.length > 0 ||
+    ask.raising === true;
+  if (!available.has(DISCOVER_TOOL) || (ask.previous && !narrows)) return null;
   const count = Math.min(
     Math.max(
       ask.count ??

@@ -270,6 +270,31 @@ const names = (block: QAnswerCardsBlock | null) =>
 const fitCalls = (asked: readonly { name: string }[]) =>
   asked.filter((call) => call.name === "fit_profile").length;
 
+describe("F-109/F-110/F-114: a narrowing of Q's list is answered by code", () => {
+  it("'only fintech ones' about the companies just shown is a catalog search", async () => {
+    const { answer, asked } = await discover(
+      ask({ text: "only fintech ones", previous: true, count: null }),
+    );
+    expect(asked.some((call) => call.name === "discover_companies")).toBe(true);
+    expect(names(answer.block).length).toBeGreaterThan(0);
+  });
+
+  it("about the companies just shown with nothing to narrow them by, the full path answers", async () => {
+    const answer = await runCompanyDiscovery({
+      ask: ask({
+        text: "tell me more about those",
+        sectors: [],
+        previous: true,
+      }),
+      tools: tools({}).port,
+      context: CONTEXT,
+      available: AVAILABLE,
+      investor: true,
+    });
+    expect(answer).toBeNull();
+  });
+});
+
 describe("DISCOVER_COMPANIES fast path (K1)", () => {
   it("an investor's 'show me three fintech companies' is ranked by fit with their mandate (owner 2026-10-23)", async () => {
     const { answer, asked } = await discover(ask({}));
