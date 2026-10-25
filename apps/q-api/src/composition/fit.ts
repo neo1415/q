@@ -46,7 +46,7 @@ import {
   INVESTABILITY_METHOD_VERSION,
 } from "@capital-q/readiness";
 import type { InvestorFeedPort } from "@capital-q/q-tools";
-import type { ActorContext } from "@capital-q/security";
+import { TenantIdSchema, type ActorContext } from "@capital-q/security";
 
 /**
  * Fit with the investor's own mandate, composed for the Q API (B1-B3;
@@ -78,8 +78,14 @@ export type FitCompositionDependencies = {
   readonly eligibilityPorts: EligibilityPorts;
   readonly eligibility: Pick<EligibilityService, "evaluate">;
   readonly companies: Pick<CompanyQueryPort, "findCanonicalCompany"> &
-    Partial<Pick<CompanyQueryPort, "findCanonicalCompanyProfile">>;
-  readonly capital: Pick<CapitalObjectiveQueryPort, "getCurrentForCompany">;
+    Partial<
+      Pick<
+        CompanyQueryPort,
+        "findCanonicalCompanyProfile" | "findCanonicalCompanies"
+      >
+    >;
+  readonly capital: Pick<CapitalObjectiveQueryPort, "getCurrentForCompany"> &
+    Partial<Pick<CapitalObjectiveQueryPort, "getCurrentForCompanies">>;
   readonly disclosure: Pick<DisclosureAccessService, "evaluateMany">;
   readonly relationships: (actor: ActorContext) => Promise<readonly string[]>;
   readonly requests: (actor: ActorContext) => Promise<readonly string[]>;
@@ -174,12 +180,54 @@ export function createFitComposition(
     }
     return fxKept.rates;
   };
+  /**
+   * Owner 2026-10-25 (the network rank took ~18 s): identities, current
+   * raises and Q Cards for a batch of companies are each ONE read, never
+   * one query per company queued behind the connection pool. A port
+   * without the batch read keeps the one-by-one read.
+   */
+  const identitiesOf = async (companyIds: readonly string[]) => {
+    const ids = companyIds.flatMap((raw) => {
+      const id = CompanyIdSchema.safeParse(raw);
+      return id.success ? [id.data] : [];
+    });
+    if (ids.length === 0) return [];
+    const many = dependencies.companies.findCanonicalCompanies;
+    if (many !== undefined) return many(ids);
+    return (await Promise.all(ids.map(identity))).filter((c) => c !== null);
+  };
+  const objectivesOf = async (
+    companies: readonly { readonly tenantId: string; readonly id: string }[],
+  ) => {
+    const many = dependencies.capital.getCurrentForCompanies;
+    const pairs = companies.flatMap((c) => {
+      const tenantId = TenantIdSchema.safeParse(c.tenantId);
+      const companyId = CompanyIdSchema.safeParse(c.id);
+      return tenantId.success && companyId.success
+        ? [{ tenantId: tenantId.data, companyId: companyId.data }]
+        : [];
+    });
+    if (pairs.length === 0) return [];
+    return many !== undefined
+      ? many(pairs)
+      : (
+          await Promise.all(
+            pairs.map((p) =>
+              dependencies.capital.getCurrentForCompany(
+                p.tenantId,
+                p.companyId,
+              ),
+            ),
+          )
+        ).filter((o) => o !== null);
+  };
+
   const inputs = createFitInputSource({
     fxRates,
     sql: dependencies.sql,
     eligibilityPorts: dependencies.eligibilityPorts,
     identities: async (companyIds, options) => {
-      const found = await Promise.all(companyIds.map(identity));
+      const found = await identitiesOf(companyIds);
       // A ranking reads names only (owner 2026-10-24, egress incident).
       const lines = options?.lines !== false;
       // The company's own one line, only where its profile is classified
@@ -219,32 +267,26 @@ export function createFitComposition(
     },
     raises: async (actor, companyIds) => {
       const out = new Map<string, FilterMoney>();
-      const companies = (await Promise.all(companyIds.map(identity))).filter(
-        (c) => c !== null,
-      );
-      const objectives = (
-        await Promise.all(
-          companies.map((c) =>
-            dependencies.capital.getCurrentForCompany(c.tenantId, c.id),
-          ),
-        )
-      ).filter(
-        (o): o is NonNullable<typeof o> => o !== null && o.status === "ACTIVE",
+      const companies = await identitiesOf(companyIds);
+      const objectives = (await objectivesOf(companies)).filter(
+        (o) => o.status === "ACTIVE",
       );
       if (objectives.length === 0) return out;
       // Owner 23 Oct: a raise the company put on its Q Card reaches every
       // signed-in investor; read through public-identity's own repository,
       // and a failed read is the private answer.
-      const published = await Promise.all(
-        objectives.map((o) =>
-          cards
-            .findCard(dependencies.sql, {
-              subjectType: "COMPANY",
-              subjectId: o.companyId,
-            })
-            .then(companyCardSharesRaise)
-            .catch(() => false),
-        ),
+      const cardsBy = await cards
+        .findCards(
+          dependencies.sql,
+          "COMPANY",
+          objectives.map((o) => o.companyId),
+        )
+        .then((found) => new Map(found.map((card) => [card.subjectId, card])))
+        .catch(() => null);
+      const published = objectives.map(
+        (o) =>
+          cardsBy !== null &&
+          companyCardSharesRaise(cardsBy.get(o.companyId) ?? null),
       );
       // Otherwise the raise is founder_private until shared: ask for THIS
       // reader.

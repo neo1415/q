@@ -190,6 +190,16 @@ export type CapitalObjectiveQueryPort = {
     tenantId: TenantId,
     companyId: CompanyId,
   ) => Promise<CapitalObjectiveSnapshot | null>;
+  /**
+   * The ACTIVE objective of each of many companies in one read, those that
+   * have one; same projection and rules as `getCurrentForCompany`.
+   */
+  readonly getCurrentForCompanies?: (
+    companies: readonly {
+      readonly tenantId: TenantId;
+      readonly companyId: CompanyId;
+    }[],
+  ) => Promise<readonly CapitalObjectiveSnapshot[]>;
   readonly getById: (
     tenantId: TenantId,
     companyId: CompanyId,
