@@ -471,7 +471,10 @@ export function createFitService(
         comparison: buildFitComparison({
           items: result.items,
           sources: new Map(ids.map((id) => [id, new Set(["FEED" as const])])),
-          limit,
+          // P0 (live a7b99c465): a comparison holds at most
+          // FIT_COMPARISON_MAX entries; asked for the catalog's page of 24
+          // it threw, on every network rank.
+          limit: Math.min(limit, FIT_COMPARISON_MAX),
           config,
           computedAt: clock().toISOString(),
           keepAll: true,
