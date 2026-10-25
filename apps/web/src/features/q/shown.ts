@@ -179,7 +179,9 @@ export type ItemSubject = {
 const KIND_WORDS: Readonly<
   Partial<Record<QTurnObjectBlock["kind"], readonly string[]>>
 > = {
-  ANSWER_CARDS: ["cards", "card", "list", "shortlist", "these companies"],
+  // QA F10/F-105 (25 Oct): not "card" alone -- "show me my Q Card" kept
+  // the investor cards up over its own approval card.
+  ANSWER_CARDS: ["cards", "list", "shortlist", "these companies"],
   COMPARISON: ["comparison", "side by side", "compare"],
   COMPARISON_CARDS: ["comparison", "side by side", "compare"],
   TABLE: ["table", "grid", "side by side", "columns", "rows"],
@@ -322,6 +324,14 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
 const POINTS_BACK =
   /\b(?:them|those|these|this one|that one|both|each of|all (?:three|four|five)|the (?:two|three|four|five)|the (?:first|second|third|fourth|fifth|last)|number (?:one|two|three|four|five|\d))\b/u;
 
+/**
+ * The person's words, folded, without "Q Card": their own card is never
+ * the cards on the stage (QA F10, 25 Oct 2026).
+ */
+function askedWords(question: string): string {
+  return ` ${folded(question)} `.replace(/ q cards? /gu, " ");
+}
+
 /** True when this answer (or the question it answers) is about the object. */
 export function refersTo(
   subject: ItemSubject,
@@ -338,7 +348,7 @@ export function refersTo(
   if (subject.answeredOnce) return false;
   if (!onStage) {
     if (question === undefined) return false;
-    const asked = ` ${folded(question)} `;
+    const asked = askedWords(question);
     return (
       subject.names.some((name) => asked.includes(` ${name} `)) ||
       subject.kindWords.some((word) => asked.includes(` ${word} `))
@@ -355,7 +365,7 @@ export function refersTo(
     if (one !== null && subject.ids.has(one)) return true;
   }
   const said = ` ${folded(answer.text)} `;
-  const asked = question === undefined ? " " : ` ${folded(question)} `;
+  const asked = question === undefined ? " " : askedWords(question);
   for (const name of subject.names) {
     if (said.includes(` ${name} `) || asked.includes(` ${name} `)) return true;
   }
@@ -390,6 +400,20 @@ export function writtenOut(turn: QTurn): boolean {
     /^(?:[-*+]|\d+[.)])\s+\S/u.test(line),
   ).length;
   return headings >= 2 || items >= 3;
+}
+
+/**
+ * Whether any message of this run carries an approval (an action prepared
+ * for their yes). The approval often arrives as the run's second message,
+ * which `settledAnswers` folds into the first.
+ */
+function bringsApproval(turns: readonly QTurn[], run: string): boolean {
+  return turns.some(
+    (turn) =>
+      turn.kind === "Q" &&
+      resultKey(turn) === run &&
+      turn.blocks.some((block) => block.kind === "ACTION_PROPOSAL"),
+  );
 }
 
 function settledAnswers(turns: readonly QTurn[]): readonly SettledAnswer[] {
@@ -523,6 +547,12 @@ export function stageOf(
     if (roomShowOf(one.turn, one.question ?? null) !== undefined) {
       return { item: null, why: "NONE" };
     }
+    // QA F-105 (25 Oct 2026, a7b99c46, founder Q page): turn 2's investor
+    // cards stayed "In focus" over "draft a reply to Savanna Seed" and
+    // "accept Zino's interest", which named investors on them, so each
+    // answer's approval card sat below the fold. An answer that brings an
+    // approval of its own is the newest display; older objects leave.
+    if (bringsApproval(turns, one.run)) return { item: null, why: "NONE" };
     // QA QO-32 (2026-10-23): "Prep me for a call with Zino" named a
     // company on the cards shown before, so those cards stayed up, under
     // the prep's last sentence ("I'll play Zino Aviation") as their line;

@@ -361,5 +361,42 @@
         }
       }
     ]
+  },
+  {
+    "id": "F-111",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Who can see my data room right now?",
+        "expect": {
+          "replyNot": ["able to open that on your screen"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F10",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me my Q Card and the share link.",
+        "expect": {
+          "approval": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-107-live",
+    "account": "founder.maji-loop@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "How is my pitch video doing, and how can I make it better?",
+        "expect": {
+          "approval": false,
+          "replyNot": ["document reference", "revise the pitch deck"]
+        }
+      }
+    ]
   }
 ]

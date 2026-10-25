@@ -93,7 +93,15 @@ export function qCardReadOf(
 }
 
 /** Code's own line about their card; never just "Understood.". */
-export function qCardLine(read: QCardRead): string {
+export function qCardLine(
+  read: QCardRead,
+  /**
+   * QA F10: the claim was prepared this turn, so its approval card is on
+   * screen. Not prepared, the line offers it; it never points at a card
+   * that is not there.
+   */
+  claimPrepared = true,
+): string {
   if (read.status === "SAVED") {
     if (read.publicUrl !== null) {
       return `Your Q Card is live. Share this link: ${read.publicUrl}`;
@@ -104,7 +112,9 @@ export function qCardLine(read: QCardRead): string {
     return "You don't have a Q Card yet. Tell me the handle you want and I'll prepare it for your approval.";
   }
   const at = read.suggestedUrl === null ? "" : ` at ${read.suggestedUrl}`;
-  return `You don't have a Q Card yet, so there is no link to share. Claiming @${read.suggestedHandle} makes it${at}: approve the claim on the card, or ask for another handle.`;
+  return claimPrepared
+    ? `You don't have a Q Card yet, so there is no link to share. Claiming @${read.suggestedHandle} makes it${at}: approve the claim on the card, or ask for another handle.`
+    : `You don't have a Q Card yet, so there is no link to share. I can prepare @${read.suggestedHandle} for your approval; it would be${at.length === 0 ? " your card's address" : at}. Want me to, or would you like another handle?`;
 }
 
 /** A sentence about their card, its handle, link or approval. */
@@ -119,19 +129,24 @@ const ABOUT_CARD =
  *   card yet, the handle and the address it would have);
  * - saved: the link is added after the words.
  */
-export function withQCardLink(answer: string, read: QCardRead): string {
+export function withQCardLink(
+  answer: string,
+  read: QCardRead,
+  claimPrepared = true,
+): string {
   const trimmed = answer.trim();
   const url = read.status === "SAVED" ? read.publicUrl : read.suggestedUrl;
-  if (url !== null && trimmed.includes(url)) return trimmed;
+  if (url !== null && trimmed.includes(url) && claimPrepared) return trimmed;
   if (read.status === "SAVED") {
     if (trimmed.length === 0 || read.publicUrl === null) {
       return trimmed.length === 0 ? qCardLine(read) : trimmed;
     }
     return `${trimmed}\n\nShare this link: ${read.publicUrl}`;
   }
+  const line = qCardLine(read, claimPrepared);
   const rest = (trimmed.match(/[^.!?\n]+[.!?]*\s*/gu) ?? [])
     .filter((sentence) => !ABOUT_CARD.test(sentence))
     .join("")
     .trim();
-  return rest.length === 0 ? qCardLine(read) : `${rest}\n\n${qCardLine(read)}`;
+  return rest.length === 0 ? line : `${rest}\n\n${line}`;
 }
