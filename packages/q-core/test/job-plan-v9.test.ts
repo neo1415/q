@@ -37,10 +37,10 @@ const plan = {
 };
 
 describe("JOB_PLAN v9", () => {
-  it("is built on v8 (v10, v11 and v12 keep its template) and says the summary to them", () => {
+  it("is built on v8 (v10, v11 and v12 keep its template; v13 rewords its summary rule, QA F-123) and says the summary to them", () => {
     expect(
       createDefaultPromptRegistry().getActive("JOB_PLAN").definition.version,
-    ).toBe(12);
+    ).toBe(13);
     expect(JOB_PLAN_V9.template).toContain("in the second person");
     expect(JOB_PLAN_V9.template).toContain('never "the person"');
     expect(JOB_PLAN_V9.template.length).toBeGreaterThan(

@@ -793,6 +793,38 @@ export const JOB_PLAN_V12: PromptDefinition<
   ),
 };
 
+/**
+ * v13 (QA F-123, 2026-10-25, run d5bcb2eb): the start line read "On it.
+ * Starting now: you will research Silo Credit's market…" -- v9's rule
+ * ("second person, saying what you will do") was read as the person doing
+ * the work. The summary names Q's own work as an instruction to itself;
+ * the person is only "your".
+ */
+export const V9_SPEAKING_TO_THEM =
+  'SPEAKING TO THEM: summary is one line said to them, in the second person, saying what you will do ("Research your market and write your 12-month growth plan"); never "the person", "the user" or "their" for them, and never a list of steps.';
+export const V13_SPEAKING_TO_THEM =
+  'SPEAKING TO THEM: summary is one line naming the work you yourself will do, as a plain instruction that starts with its verb ("Research your market and write your 12-month growth plan", "Research Silo Credit\'s market and competitors, then write a short analysis"). The person is only "your"; never "you will", "you\'ll" or "you" as the one doing it, never "I will", never "the person", "the user" or "their" for them, and never a list of steps.';
+
+if (JOB_PLAN_V12.template.split(V9_SPEAKING_TO_THEM).length !== 2) {
+  throw new Error("JOB_PLAN v13 rewrites v9's SPEAKING TO THEM, which changed");
+}
+
+export const JOB_PLAN_V13: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V12,
+  version: 13,
+  status: "ACTIVE",
+  changeDescription:
+    "QA F-123 (2026-10-25, run d5bcb2eb): v12 with SPEAKING TO THEM reworded -- the summary names Q's own work as a plain instruction starting with its verb, the person only as 'your', never 'you will' -- so the start line never says the person will do Q's work.",
+  effectiveFrom: "2026-10-25",
+  template: JOB_PLAN_V12.template.replace(
+    V9_SPEAKING_TO_THEM,
+    V13_SPEAKING_TO_THEM,
+  ),
+};
+
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
 You are a second, independent specialist reviewing a {{documentKind}} another agent prepared for {{principalName}} about {{companyName}}. You did not write it. Your job is to find what is wrong with it, not to praise it. Code decides from your verdict whether it is revised.
 
