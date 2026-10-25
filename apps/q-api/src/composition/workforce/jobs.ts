@@ -97,6 +97,11 @@ export type WorkforceDocumentInput = {
   readonly personRequest?: string | undefined;
   /** ANALYSIS: the research steps it waits on, their admitted facts. */
   readonly research?: readonly ResearchDossier[] | undefined;
+  /**
+   * The public research it rests on could not be had (2026-10-25): the
+   * document is written from Capital Q's own records and states the gap.
+   */
+  readonly publicSources?: PublicSourcesGap | undefined;
 };
 export type WorkforceDocumentResult =
   | {
@@ -252,7 +257,59 @@ export type ResearchFound =
       /** Deep research: admitted, sourced facts for the document after it. */
       readonly dossier?: ResearchDossier | undefined;
     }
-  | { readonly status: "UNAVAILABLE"; readonly message: string };
+  | {
+      readonly status: "UNAVAILABLE";
+      readonly message: string;
+      /**
+       * Why (production 2026-10-25): only NOT_ALLOWED stops the job; public
+       * sources that could not be reached, or held nothing, leave the work
+       * to go on from Capital Q's own records with the gap stated.
+       */
+      readonly reason?: ResearchGapReason | undefined;
+    };
+
+export type ResearchGapReason =
+  "PUBLIC_UNAVAILABLE" | "NO_SOURCES" | "NOTHING_TO_RESEARCH" | "NOT_ALLOWED";
+
+/** What a later step reads about the public research it rests on. */
+export type PublicSourcesGap = "UNAVAILABLE" | "NONE_FOUND" | "NOT_RUN";
+
+const GAP_OF: Readonly<
+  Record<Exclude<ResearchGapReason, "NOT_ALLOWED">, PublicSourcesGap>
+> = {
+  PUBLIC_UNAVAILABLE: "UNAVAILABLE",
+  NO_SOURCES: "NONE_FOUND",
+  NOTHING_TO_RESEARCH: "NOT_RUN",
+};
+
+const GAP_SUMMARY: Readonly<Record<PublicSourcesGap, string>> = {
+  UNAVAILABLE:
+    "Public sources couldn't be checked just now, so the work goes on from Capital Q's own records, with that gap stated.",
+  NONE_FOUND:
+    "The searches found no public sources for this, so the work goes on from Capital Q's own records, with that gap stated.",
+  NOT_RUN:
+    "There was nothing in the request to look up publicly, so the work goes on from Capital Q's own records.",
+};
+
+/** The gravest gap among the steps a step rests on, if any. */
+export function publicSourcesGapOf(
+  outputs: readonly (Readonly<Record<string, unknown>> | undefined)[],
+): PublicSourcesGap | null {
+  const gaps = outputs.map((one) => one?.["publicSources"]);
+  for (const gap of ["UNAVAILABLE", "NONE_FOUND", "NOT_RUN"] as const) {
+    if (gaps.includes(gap)) return gap;
+  }
+  return null;
+}
+
+/** The plain words a document's own line adds for its gap. */
+export const DOCUMENT_GAP_LINE: Readonly<Record<PublicSourcesGap, string>> = {
+  UNAVAILABLE:
+    "Public sources were unavailable, so it rests on Capital Q's own records; the gap is stated in it.",
+  NONE_FOUND:
+    "No public sources were found, so it rests on Capital Q's own records; the gap is stated in it.",
+  NOT_RUN: "It rests on Capital Q's own records.",
+};
 
 const MAX_PER_STEP = 25;
 
@@ -356,6 +413,9 @@ export function createWorkforceExecutors(dependencies: {
             );
             return parsed.success ? [parsed.data] : [];
           });
+          const publicSources = publicSourcesGapOf(
+            step.dependsOn.map((key) => context.results.get(key)?.outputs),
+          );
           // The critic, and the analyst writing for them, address the
           // person by name.
           const principalName =
@@ -383,6 +443,7 @@ export function createWorkforceExecutors(dependencies: {
               ...(source === undefined ? {} : { source }),
               ...(principalName === undefined ? {} : { principalName }),
               ...(research.length === 0 ? {} : { research }),
+              ...(publicSources === null ? {} : { publicSources }),
               ...(dependencies.goal === undefined
                 ? {}
                 : { personRequest: dependencies.goal.slice(0, 4_000) }),
@@ -408,10 +469,17 @@ export function createWorkforceExecutors(dependencies: {
                 };
               return {
                 status: "DONE",
-                summary:
+                summary: [
                   result.delivery === undefined
                     ? documentStepSummary(result.review)
                     : analysisStepSummary(result.delivery),
+                  // Said plainly where the work stands (2026-10-25).
+                  ...(publicSources === null
+                    ? []
+                    : [DOCUMENT_GAP_LINE[publicSources]]),
+                ]
+                  .join(" ")
+                  .slice(0, 500),
                 outputs: {
                   artifactId: result.artifactId,
                   ...(result.companyId === undefined
@@ -621,12 +689,28 @@ export function createWorkforceExecutors(dependencies: {
               progress: dependencies.documentContext?.progress,
             })
             .catch(() => null);
+          // Production 2026-10-25: every research-backed document job failed
+          // in 5 s with no draft while the public indexes rested. Public
+          // sources that cannot be reached, or hold nothing, are a gap, not
+          // a failure: the step completes, the steps after it go on from
+          // Capital Q's own records, and the gap is said and stated. Only a
+          // refusal (not theirs to research) stops it.
           if (found === null || found.status === "UNAVAILABLE") {
+            const reason = found?.reason ?? "PUBLIC_UNAVAILABLE";
+            if (reason === "NOT_ALLOWED") {
+              return {
+                status: "FAILED",
+                summary: found?.message ?? "Not yours to research.",
+              };
+            }
+            const gap = GAP_OF[reason];
             return {
-              status: "FAILED",
-              summary:
-                found?.message ??
-                "Public sources couldn't be checked just now.",
+              status: "DONE",
+              summary: GAP_SUMMARY[gap],
+              outputs: {
+                note: { query: null, truthClass: "UNKNOWN", sources: [] },
+                publicSources: gap,
+              },
             };
           }
           return {

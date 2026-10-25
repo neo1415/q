@@ -259,6 +259,7 @@ export function workforceDeepResearch(dependencies: {
       return {
         status: "UNAVAILABLE",
         message: "There was nothing in the request to research.",
+        reason: "NOTHING_TO_RESEARCH",
       };
     }
 
@@ -285,6 +286,7 @@ export function workforceDeepResearch(dependencies: {
         message: unavailable
           ? "Public sources couldn't be checked just now."
           : "The searches found no public sources for this.",
+        reason: unavailable ? "PUBLIC_UNAVAILABLE" : "NO_SOURCES",
       };
     }
 

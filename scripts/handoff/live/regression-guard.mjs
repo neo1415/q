@@ -107,6 +107,8 @@ async function turn(token, conv, ask) {
     status: run.status,
     reply: q.text ?? q.content ?? "",
     blocks: raw.map((b) => b.kind ?? b.type),
+    jobId:
+      raw.find((b) => (b.kind ?? b.type) === "WORK_IN_PROGRESS")?.jobId ?? null,
     approval:
       Boolean(run.pendingApproval) ||
       run.status === "AWAITING_APPROVAL" ||
@@ -137,6 +139,32 @@ function judge(r, expect = {}) {
   return why;
 }
 
+/**
+ * A job the turn started yields a document, degraded or not (2026-10-25:
+ * every research-backed job died in 5 s while the public indexes rested).
+ * Polls the job's live state, as its owner, until it files a document or
+ * stops; a FAILED or STOPPED job, or none within the bound, fails the case.
+ */
+async function jobOutcome(token, jobId, maxMs) {
+  if (!jobId) return ["no WORK_IN_PROGRESS job to follow"];
+  const t0 = Date.now();
+  for (;;) {
+    const live = (
+      await api(
+        token,
+        "GET",
+        `/v1/q/workforce/jobs/${encodeURIComponent(jobId)}/live`,
+      )
+    ).json;
+    if (live?.document) return [];
+    if (live?.state === "FAILED" || live?.state === "STOPPED")
+      return [`job ${live.state}: ${live.reason ?? "-"}`];
+    if (Date.now() - t0 > maxMs)
+      return [`no document within ${maxMs} ms (${live?.state ?? "?"})`];
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
 const results = [];
 let failed = 0;
 for (const c of CASES) {
@@ -148,6 +176,20 @@ for (const c of CASES) {
       const r = await turn(token, conv, step.ask);
       conv = r.conversationId ?? conv;
       const why = judge(r, step.expect);
+      // A document the turn filed itself needs no job to follow.
+      if (
+        step.expect?.jobDocument &&
+        !r.error &&
+        !(r.blocks ?? []).includes("ARTIFACT_REFERENCE")
+      ) {
+        why.push(
+          ...(await jobOutcome(
+            token,
+            r.jobId,
+            step.expect.jobDocument.maxMs ?? 120000,
+          )),
+        );
+      }
       if (why.length) failed++;
       results.push({ id: c.id, ask: step.ask, pass: !why.length, why, ...r });
       console.log(

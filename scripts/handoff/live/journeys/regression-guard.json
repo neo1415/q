@@ -82,7 +82,8 @@
         "ask": "Do market research on Silo Credit's market and save it to my board",
         "expect": {
           "approval": false,
-          "anyBlock": ["WORK_IN_PROGRESS", "ARTIFACT_REFERENCE"]
+          "anyBlock": ["WORK_IN_PROGRESS", "ARTIFACT_REFERENCE"],
+          "jobDocument": { "maxMs": 120000 }
         }
       }
     ]
