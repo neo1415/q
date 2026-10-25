@@ -325,6 +325,39 @@ export function withoutRepeatedReceipt(
     .trim();
 }
 
+/** "confirmed", "kept", "reflected": a claim that something was settled. */
+const SETTLED_CLAIM =
+  /\b(?:confirmed|accepted|kept|locked in|all set|reflected|taken care of)\b/iu;
+/** What a deck read-back is called in a reply. */
+const READING_TERM =
+  /\b(?:deck|read[- ]?back|points|document|upload|what (?:i|you) (?:read|found|picked up))\b/iu;
+
+/**
+ * A claim that the readings from their document are settled while they
+ * are still waiting on the person (QA F-134, 25 Oct: "The deck points are
+ * confirmed." with five read-back facts PENDING). The claim is read from
+ * state: unless a reading was accepted this turn, any sentence saying the
+ * deck's points are confirmed or kept is taken out while readings wait. A
+ * sentence asking something is always kept.
+ */
+export function withoutUnbackedReadingClaims(
+  reply: string,
+  state: { readonly acceptedThisTurn: boolean; readonly stillWaiting: number },
+): string {
+  if (state.acceptedThisTurn || state.stillWaiting === 0) return reply;
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  const kept = sentences.filter(
+    (sentence) =>
+      sentence.includes("?") ||
+      !(SETTLED_CLAIM.test(sentence) && READING_TERM.test(sentence)),
+  );
+  if (kept.length === sentences.length) return reply;
+  return kept
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /**
  * A "saved" claim naming a field that is not on the record (live AG
  * 2026-10-16: "I've saved your ... geography, sectors" when neither was

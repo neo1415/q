@@ -295,6 +295,8 @@ export type BoundOnboardingPort = OnboardingToolPort &
         readonly stepKey: string;
         readonly value: string;
         readonly rationale: string | null;
+        /** Read from their own uploaded document (a deck read-back). */
+        readonly fromDocument: boolean;
       }[]
     >;
     /**
@@ -488,6 +490,21 @@ export function createOnboardingPort(input: {
       list.filter((r) => input.unheardSteps?.has(r.stepKey) !== true),
     )
     .catch(() => []);
+  /**
+   * A reading from their own document that Q's last turn read back to
+   * them word for word (QA F-134, 25 Oct): their plain yes to it is their
+   * approval of exactly what they heard, as for Q's summary of their
+   * words. A reading Q did not say back is not theirs to approve.
+   */
+  const readBackHeard = async (
+    step: OnboardingStepManifest,
+    held: {
+      readonly value: OnboardingResponseValue;
+      readonly fromDocument?: boolean | undefined;
+    },
+  ): Promise<boolean> =>
+    held.fromDocument === true &&
+    heardBack(await spoken(step, held.value, await current()), input.lastQTurn);
   /** The person's own words carry this write, or it does not happen. */
   const said = (quote: string): boolean =>
     input.personTurns.some(
@@ -2707,7 +2724,7 @@ export function createOnboardingPort(input: {
         // A plain yes (or "go ahead and save it") to the summary they just
         // heard is decided by code; anything else is the reader's.
         const affirmed =
-          paraphrase &&
+          (paraphrase || (await readBackHeard(step, held))) &&
           readBackReplyOf(input.personTurns[0] ?? "") === "AFFIRM";
         const authority = affirmed
           ? null
@@ -3302,16 +3319,19 @@ export function createOnboardingPort(input: {
       if (latest === undefined || readBackReplyOf(latest) !== "AFFIRM") {
         return new Set<string>();
       }
-      return new Set(
-        (await heard)
-          .filter(
-            (held) =>
-              isParaphraseRationale(held.rationale) &&
-              held.value.type === "TEXT" &&
-              heardBack(held.value.text, input.lastQTurn),
-          )
-          .map((held) => held.stepKey),
-      );
+      const affirmed = new Set<string>();
+      for (const held of await heard) {
+        const step = steps.get(held.stepKey);
+        if (
+          (isParaphraseRationale(held.rationale) &&
+            held.value.type === "TEXT" &&
+            heardBack(held.value.text, input.lastQTurn)) ||
+          (step !== undefined && (await readBackHeard(step, held)))
+        ) {
+          affirmed.add(held.stepKey);
+        }
+      }
+      return affirmed;
     },
     pendingRecommendations: async () => {
       const view = await current();
@@ -3320,6 +3340,7 @@ export function createOnboardingPort(input: {
         stepKey: string;
         value: string;
         rationale: string | null;
+        fromDocument: boolean;
       }[] = [];
       for (const item of list) {
         const step = steps.get(item.stepKey);
@@ -3328,6 +3349,7 @@ export function createOnboardingPort(input: {
           stepKey: item.stepKey,
           value: (await spoken(step, item.value, view)).slice(0, 600),
           rationale: item.rationale,
+          fromDocument: item.fromDocument === true,
         });
       }
       return out;
