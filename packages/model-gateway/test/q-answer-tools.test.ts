@@ -3317,6 +3317,63 @@ describe("an email their mailbox cannot send goes through the Capital Q conversa
   const CHAT = tool("propose_chat_message", "relationship.chat.propose");
   const BODY = "Hello Amara, thank you for asking. Best, Wanjiru";
 
+  // F-106 (run 42b21b5f, 2026-10-25): eight reads before the email left no
+  // room for the message prepared instead, and nothing was prepared.
+  it("prepares the message instead even when the turn's reads used the budget", async () => {
+    const READ = tool("get_company", "company.get");
+    const tools = toolPort([READ, EMAIL, CHAT], (p) =>
+      p.name === "propose_email"
+        ? {
+            ...succeeded(p, {
+              status: "MAILBOX_NOT_CONNECTED",
+              awaitingApprovalOf: "Connect Gmail in Settings first.",
+            }),
+            toolName: "relationship.email.propose",
+          }
+        : p.name === "propose_chat_message"
+          ? {
+              ...succeeded(p, {
+                status: "PREPARED",
+                awaitingApprovalOf: "Message Savanna Seed Partners",
+              }),
+              toolName: "relationship.chat.propose",
+            }
+          : { ...succeeded(p, { ok: true }), toolName: "company.get" },
+    );
+    const reads = Array.from({ length: 8 }, (_, at) => ({
+      callId: `r${String(at)}`,
+      name: "get_company",
+      arguments: { companyId: `c${String(at)}` },
+    }));
+    const { seam, request } = build({
+      said: "Draft a short update email to Savanna Seed Partners about our latest traction",
+      script: [
+        { kind: "TOOL_CALLS", calls: reads },
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "e",
+              name: "propose_email",
+              arguments: {
+                counterpartName: "Savanna Seed Partners",
+                subject: "Traction update",
+                body: BODY,
+              },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    expect(tools.executed.map((p) => p.name).slice(-2)).toEqual([
+      "propose_email",
+      "propose_chat_message",
+    ]);
+  });
+
   it("prepares the same words as a Capital Q message, and tells the model not to send them to Gmail", async () => {
     const tools = toolPort([EMAIL, CHAT], (p) =>
       p.name === "propose_email"
