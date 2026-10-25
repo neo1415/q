@@ -163,6 +163,25 @@ describe("an artifact stays while it is the subject (FAIL-1)", () => {
 });
 
 describe("QA F-105: a stale card leaves for unrelated answers", () => {
+  it("an answer that brings its own approval takes the stage (founder Q page)", () => {
+    // FAILED BEFORE: "accept Norrland Grid's interest" named a card on the
+    // set, so the set stayed "In focus" and the approval sat below it.
+    const approval = {
+      kind: "ACTION_PROPOSAL",
+      proposal: { summary: "Accept Norrland Grid's interest" },
+    } as unknown as Extract<QTurn, { kind: "Q" }>["blocks"][number];
+    const turns = [
+      ...TOP3,
+      person("p2", "Reply to Norrland Grid: accept their interest."),
+      answer("a2", "Norrland Grid's acceptance is ready."),
+      // The run's second message: the approval itself.
+      answer("a2b", "That's ready. It's waiting for your yes.", [approval], {
+        runId: "run-a2",
+      }),
+    ];
+    expect(onStageNow(turns)).toBeNull();
+  });
+
   it("'it' in an unrelated question does not keep the cards", () => {
     // FAILED BEFORE: "how can I make it better?" pointed back at the cards.
     const turns = [

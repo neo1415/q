@@ -392,6 +392,20 @@ export function writtenOut(turn: QTurn): boolean {
   return headings >= 2 || items >= 3;
 }
 
+/**
+ * Whether any message of this run carries an approval (an action prepared
+ * for their yes). The approval often arrives as the run's second message,
+ * which `settledAnswers` folds into the first.
+ */
+function bringsApproval(turns: readonly QTurn[], run: string): boolean {
+  return turns.some(
+    (turn) =>
+      turn.kind === "Q" &&
+      resultKey(turn) === run &&
+      turn.blocks.some((block) => block.kind === "ACTION_PROPOSAL"),
+  );
+}
+
 function settledAnswers(turns: readonly QTurn[]): readonly SettledAnswer[] {
   const out: SettledAnswer[] = [];
   let question: string | undefined;
@@ -523,6 +537,12 @@ export function stageOf(
     if (roomShowOf(one.turn, one.question ?? null) !== undefined) {
       return { item: null, why: "NONE" };
     }
+    // QA F-105 (25 Oct 2026, a7b99c46, founder Q page): turn 2's investor
+    // cards stayed "In focus" over "draft a reply to Savanna Seed" and
+    // "accept Zino's interest", which named investors on them, so each
+    // answer's approval card sat below the fold. An answer that brings an
+    // approval of its own is the newest display; older objects leave.
+    if (bringsApproval(turns, one.run)) return { item: null, why: "NONE" };
     // QA QO-32 (2026-10-23): "Prep me for a call with Zino" named a
     // company on the cards shown before, so those cards stayed up, under
     // the prep's last sentence ("I'll play Zino Aviation") as their line;
