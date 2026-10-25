@@ -11,7 +11,8 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
-          ]
+          ],
+          "replyNot": ["couldn't rank the whole network"]
         }
       },
       {
@@ -231,6 +232,69 @@
         "expect": {
           "replyMatches": ["https://[^\\s]+/@[a-z0-9-]+"],
           "replyNot": ["^Understood\\.?$"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-109-F-110",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me the five companies that best fit my mandate, ranked, with why.",
+        "expect": {
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "ANSWER_CARDS",
+            "TABLE"
+          ]
+        }
+      },
+      {
+        "ask": "Only fintech ones in Kenya or Nigeria that are raising now.",
+        "expect": {
+          "anyBlock": [
+            "COMPANY_REFERENCE",
+            "COMPARISON_CARDS",
+            "ANSWER_CARDS",
+            "TABLE"
+          ],
+          "replyNot": ["^\\s*understood\\.?\\s*$"],
+          "maxMs": 15000
+        }
+      },
+      {
+        "ask": "Compare the top two in a table.",
+        "expect": {
+          "anyBlock": ["COMPARISON", "TABLE"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-112",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Change my mandate to also include Ghana.",
+        "expect": {
+          "approval": true,
+          "replyNot": ["couldn't finish", "didn't finish"],
+          "maxMs": 30000
+        }
+      }
+    ]
+  },
+  {
+    "id": "F-113",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "ما هي أفضل ثلاث شركات تناسب تفويضي الاستثماري؟",
+        "expect": {
+          "replyMatches": ["[\\u0600-\\u06FF]{3}"],
+          "replyNot": ["\\b(Right|Pipeline|Mandate|Want me to)\\b"]
         }
       }
     ]
