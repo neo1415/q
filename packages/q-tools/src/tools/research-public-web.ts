@@ -228,6 +228,13 @@ export const GUIDANCE =
  */
 export const AMBIGUOUS_GUIDANCE =
   " NOT SURE IT'S THEM: these pages may be about another organisation of that name (see each source's subjectMatch; POSSIBLE may be someone else). Say it as a person would: you're not sure it's them, here is what you found, and if that isn't them it's all you could find. Attribute nothing to them as fact; one detail that would settle it (website, country, sector) may be asked for in one short question.";
+/**
+ * Production 2026-10-25: every index was refused or spent, and answers read
+ * as if the facts did not exist. A search that could not run found nothing
+ * only because it did not run.
+ */
+export const UNAVAILABLE_GUIDANCE =
+  "PUBLIC WEB SEARCH UNAVAILABLE: the public web could not be searched just now; nothing was looked at. Say so plainly, once, in your first sentence (\"I can't search the public web right now\"), then answer from Capital Q's records and the conversation. Never say or suggest that nothing exists, that nothing was found, or that they have no public presence: it was not checked. Never guess public facts to fill the gap; offer to look again later.";
 export const NOT_FOUND_GUIDANCE =
   " NOT FOUND: no public page found is about that name. When Capital Q's records or the conversation answer the question, do not mention the web at all; only when nothing answers it, say once, naturally (\"I couldn't find anything about them online\"). Never describe pages not about them; never guess.";
 
@@ -412,7 +419,10 @@ export function createResearchPublicWebTool(
           comparison: [],
           budget: null,
           truthClass: "UNKNOWN",
-          guidance: GUIDANCE,
+          guidance:
+            outcome.status === "PROVIDER_UNAVAILABLE"
+              ? UNAVAILABLE_GUIDANCE
+              : GUIDANCE,
         };
       }
       return {

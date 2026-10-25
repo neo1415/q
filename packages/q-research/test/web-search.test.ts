@@ -182,7 +182,8 @@ describe("open-web search: an open question", () => {
     expect(new Set(outcome.queries).size).toBe(outcome.queries.length);
     // Both indexes saw every planned query, in parallel.
     expect(tavily.searches.length).toBe(serp.searches.length);
-    expect(tavily.searches.length).toBeGreaterThanOrEqual(3);
+    // What the question needs (2026-10-25): two searches, no more.
+    expect(tavily.searches.length).toBe(2);
     // One entry per page, however each index spelled it.
     const keys = outcome.sources.map((s) => canonicalUrlKey(s.url));
     expect(new Set(keys).size).toBe(keys.length);
@@ -311,9 +312,9 @@ describe("open-web search: a company or person by name, no website", () => {
     const lane = index.searches.filter((s) =>
       s.includeDomains.some((domain) => domain.startsWith("linkedin.com")),
     );
+    // One search over both (2026-10-25): every index ORs its sites.
     expect(lane.map((s) => s.includeDomains)).toEqual([
-      ["linkedin.com/in"],
-      ["linkedin.com/company"],
+      ["linkedin.com/in", "linkedin.com/company"],
     ]);
     expect(lane.every((s) => s.query === "zino aviation")).toBe(true);
     // The general search is asked too, unrestricted.

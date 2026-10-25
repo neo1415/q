@@ -107,15 +107,18 @@ const command = {
 };
 
 describe("person query planning", () => {
-  it("plans 3-5 distinct queries including a profile-index query", () => {
+  // Owner's spend rule 2026-10-25: a turn costs one or two searches.
+  it("plans two distinct queries: the name in its place and its profile index", () => {
     const planned = planPersonQueries({
       ...spec,
       organization: "Midmac",
       role: "finance director",
       variants: ["Shadi Kishta"],
     });
-    expect(planned.length).toBeGreaterThanOrEqual(3);
-    expect(planned.length).toBeLessThanOrEqual(5);
+    expect(planned.map((p) => p.kind)).toEqual([
+      "EXACT_PLACE",
+      "PROFILE_INDEX",
+    ]);
     expect(planned.some((p) => p.includeDomains.includes("linkedin.com"))).toBe(
       true,
     );
@@ -343,7 +346,9 @@ describe("fast person search under a deadline", () => {
     expect(run.result.outcome).toBe("UNAVAILABLE");
   });
 
-  it("cancels in-flight calls as soon as a clear winner is confirmed", async () => {
+  // Owner's spend rule 2026-10-25: the lead index takes the two queries and
+  // no other index is asked beside it; one that hangs is never called.
+  it("asks only the lead index, and answers fast with a clear winner", async () => {
     const started = Date.now();
     const run = await createPersonSearch({
       providers: [
@@ -354,7 +359,8 @@ describe("fast person search under a deadline", () => {
     }).search(command);
     expect(Date.now() - started).toBeLessThan(500);
     expect(run.result.outcome).toBe("MATCHED");
-    expect(run.calls.some((c) => c.outcome === "CANCELLED")).toBe(true);
+    expect(run.calls).toHaveLength(2);
+    expect(run.calls.every((c) => c.provider === "tavily")).toBe(true);
   });
 
   it("reports NOT_FOUND (not UNAVAILABLE) when indexes answered with nothing", async () => {

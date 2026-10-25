@@ -234,5 +234,23 @@
         }
       }
     ]
+  },
+  {
+    "id": "W-web-spend",
+    "account": "investor.equator-line@fictional.capitalq.local",
+    "note": "2026-10-25: ~25 paid provider calls for one turn, and with every key spent the reply implied the facts don't exist. Check the q-api log for this run: 'public research provider call' at most 2 per provider, and either sources or 'I can't search the public web right now'.",
+    "steps": [
+      {
+        "ask": "Who is the founder of Paystack?",
+        "expect": {
+          "replyNot": [
+            "no public (presence|information|record)",
+            "(couldn't|could not|didn't|did not) find (any(thing)?|no) (about|on|information)",
+            "(doesn't|does not) (appear to )?exist"
+          ],
+          "maxMs": 20000
+        }
+      }
+    ]
   }
 ]

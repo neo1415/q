@@ -57,6 +57,7 @@ import {
   createBrightDataProfileLookup,
   createBrightDataResearchProvider,
 } from "@capital-q/q-research/providers/brightdata";
+import { withCircuitBreaker } from "@capital-q/q-research/providers/breaker";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
 import { createBraveResearchProvider } from "@capital-q/q-research/providers/brave";
@@ -352,7 +353,18 @@ export function composeResearch(
     // Last: our own vetted read of the pages a search surfaced, so a page
     // is read even when every paid reader is spent (live 2026-10-23).
     createDirectPageReader(),
-  ];
+  ].map((index) =>
+    // Production 2026-10-25: a refused or spent key (401/402/432) was asked
+    // ~12 times a turn. One breaker per provider for the process, shared by
+    // every consumer below; its opening is logged once.
+    withCircuitBreaker(index, {
+      onTrip: (trip) =>
+        logger?.warn(
+          trip,
+          "public research provider resting: its key was refused or its credit is spent",
+        ),
+    }),
+  );
   const provider =
     dependencies.provider ??
     // No index that searches (only the page reader): no research at all.
