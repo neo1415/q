@@ -5301,7 +5301,17 @@ export function createSpecialistQAnswer(
         reRenderAskOf(
           latest.content,
           history.some((message) => message.role === "Q"),
-        )
+        ) ||
+        // Coordinator 2026-10-25 (live 792fe626, "how do the top two stack
+        // up?": three web searches, 6 s, before a word): a comparison of
+        // the companies Q showed, by their place in the list, is answered
+        // from Capital Q's own reads of them. The web only when the reading
+        // asks for public facts.
+        (read.compare !== undefined &&
+          read.compare !== null &&
+          read.compare.names.length === 0 &&
+          read.question?.kind !== "PUBLIC_FACTS" &&
+          read.question?.kind !== "REAL_WORLD_EXAMPLE")
         ? NO_RESEARCH
         : researchDirectiveFor(state, readingFromTurnReader(read), {
             available: dependencies.researchAvailable ?? true,
