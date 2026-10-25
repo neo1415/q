@@ -408,6 +408,30 @@ describe("pendingQuestion: a reload redraws, it does not re-open", () => {
   it("an unreadable time is never taken as 'nothing moved'", () => {
     expect(pendingQuestion([asked], "not a time")).toBeNull();
   });
+
+  it("a kept acknowledgement of a tap is not a question on the table (QA F-129)", () => {
+    const tapped = [
+      asked,
+      {
+        role: "PERSON" as const,
+        text: "Seed",
+        createdAt: "2026-09-24T22:03:10.000Z",
+      },
+      {
+        role: "Q" as const,
+        text: "Stage: Seed. Noted.",
+        createdAt: "2026-09-24T22:03:11.000Z",
+      },
+    ];
+    expect(pendingQuestion(tapped, "2026-09-24T22:03:09.000Z")).toBeNull();
+    // What Q says to stop is still the line on the table (pause honoured).
+    expect(
+      pendingQuestion(
+        [{ ...asked, text: "Understood, we'll stop here." }],
+        "2026-09-24T22:02:59.000Z",
+      ),
+    ).toBe("Understood, we'll stop here.");
+  });
 });
 
 describe("questionOnReturn: a line said before an absence is history (live 25 Oct e2e)", () => {

@@ -77,3 +77,45 @@ export async function onboardingThreadKeepAction(
     // never a lost answer.
   }
 }
+
+/**
+ * Keep an exchange the person had by tapping (QA F-129, 25 Oct): their
+ * choice and Q's acknowledgement were drawn on screen only, and a reload
+ * dropped them, so "Seed" or "Looks right" vanished from the conversation.
+ * Both roles in one exchange, in order. Best effort, like every display
+ * line: what was answered is read from the session, never from this.
+ */
+export async function onboardingThreadKeepTapAction(
+  rawSessionId: string,
+  rawSaid: string,
+  rawAcknowledged: string,
+): Promise<void> {
+  const sessionId = z.string().uuid().safeParse(rawSessionId);
+  const said = z.string().trim().min(1).max(4000).safeParse(rawSaid);
+  const acknowledged = z
+    .string()
+    .trim()
+    .min(1)
+    .max(4000)
+    .safeParse(rawAcknowledged);
+  if (!sessionId.success || !said.success || !acknowledged.success) return;
+  const { apiBaseUrl } = loadWebServerConfig();
+  if (apiBaseUrl === undefined) return;
+  const accessToken = await getSessionAccessToken();
+  if (accessToken === null) return;
+  try {
+    await appendOnboardingInterviewTurns(
+      { baseUrl: apiBaseUrl, accessToken },
+      sessionId.data,
+      {
+        turnRef: crypto.randomUUID(),
+        turns: [
+          { role: "PERSON", text: said.data, channel: "TEXT" },
+          { role: "Q", text: acknowledged.data, channel: "TEXT" },
+        ],
+      },
+    );
+  } catch {
+    // A display record; a missed exchange is a worse reload, never a lost answer.
+  }
+}
