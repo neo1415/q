@@ -7488,7 +7488,12 @@ export function createModelGatewayQAnswer(
             // 2026-10-01: 11-21 s on the public web for companies
             // Capital Q holds).
             onScreenCompany === null &&
-            wideReads.namedCompanies.length === 0) ||
+            wideReads.namedCompanies.length === 0 &&
+            // Coordinator 2026-10-25 (live 792fe626, "how do the top two
+            // stack up?": three web searches, 6 s): a comparison code
+            // resolved holds its companies' profiles, figures and fits;
+            // it skips the wide reads, so it is not "empty" for that.
+            compareTable === null) ||
           // The model asked the platform who might invest; it holds too
           // few. Investors exist in the world, so the world is asked too.
           (prospectsThin &&

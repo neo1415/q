@@ -595,6 +595,8 @@ function turnReaderInput(
     readonly tenantId: string;
     readonly userId: string;
     readonly correlationId: string;
+    /** The run the reading is for, so its model usage is the run's. */
+    readonly runId: string;
     readonly signal?: AbortSignal | undefined;
   },
   /**
@@ -630,6 +632,7 @@ function turnReaderInput(
       tenantId: context.tenantId,
       userId: context.userId,
       correlationId: context.correlationId,
+      qRunId: context.runId,
     },
     signal: context.signal,
   };
@@ -4148,6 +4151,7 @@ export function createSpecialistQAnswer(
               tenantId: input.tenantId,
               userId: input.actor.userId,
               correlationId: input.correlationId,
+              runId: input.runId,
               signal: input.signal,
             },
             referenceNote(
@@ -5073,6 +5077,7 @@ export function createSpecialistQAnswer(
             tenantId: request.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
+            runId: request.runId,
             signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),

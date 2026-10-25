@@ -1199,6 +1199,27 @@ describe("a comparison the reader read", () => {
   });
 });
 
+// Live 2026-10-25: the reader's 2.5-4.5 s carried no run, so a run's
+// model usage hid where its time went.
+describe("the reading is the run's", () => {
+  it("is asked for with the run it reads, so its usage is the run's", async () => {
+    const runs: (string | undefined)[] = [];
+    const run = seam({
+      said: "How do the top two stack up?",
+      reading: null,
+      read: (input) => {
+        runs.push(input.attribution.qRunId);
+        return Promise.resolve(null);
+      },
+      outcomes: [],
+    });
+    const asked = request();
+    await run.answer.answer(asked);
+    expect(runs.length).toBeGreaterThan(0);
+    expect(runs.every((one) => one === asked.runId)).toBe(true);
+  });
+});
+
 describe("a general turn is read before it is answered", () => {
   it("researches an advice question outside an interview (founder direction 2026-09-29)", async () => {
     const { answer, directives } = seam({
