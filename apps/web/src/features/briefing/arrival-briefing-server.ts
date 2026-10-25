@@ -137,6 +137,9 @@ export async function readArrivalBriefing(
   const now = Date.now();
   const since = parsed.data ?? new Date(now - 24 * 3_600_000).toISOString();
   const timings: Record<string, number> = {};
+  // One readiness read serves Q's questions and its first answer.
+  let readiness: ReturnType<typeof ownReadiness> | null = null;
+  const readinessOnce = () => (readiness ??= ownReadiness());
   const data = await readArrival(
     {
       account: () => accountDetails(),
@@ -161,7 +164,7 @@ export async function readArrivalBriefing(
       context: () => resolveOwnContext(),
       matches: (seen) => readMatches(seen),
       questions: async () => {
-        const readiness = await ownReadiness();
+        const readiness = await readinessOnce();
         return readiness === null
           ? null
           : readiness.followUps
@@ -169,6 +172,8 @@ export async function readArrivalBriefing(
               .slice(0, QUESTIONS_MAX);
       },
       deckReview: () => ownDeckReview(),
+      // Q's first answer after onboarding reads the same readiness.
+      readiness: () => readinessOnce(),
       thread: async (relationshipId) => {
         const result = await chatThreadAction(relationshipId);
         return result.ok ? result.value : null;
