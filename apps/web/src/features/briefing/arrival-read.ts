@@ -7,6 +7,7 @@ import type {
   QPendingApproval,
   QWorkDoneItemDto,
   QWorkSinceDto,
+  ReadinessDto,
   ReadinessFollowUp,
 } from "@capital-q/contracts";
 import type { ArrivalActivity } from "@capital-q/q-core/speech";
@@ -27,6 +28,7 @@ import {
   attentionFromSnapshot,
   sourceOfNotice,
 } from "./attention";
+import { founderStartOf } from "./founder-start";
 import type { ArrivalMatches } from "./matches";
 
 /**
@@ -59,6 +61,8 @@ export type ArrivalReads = {
   ) => Promise<ArrivalMatches | null>;
   /** Founders only (Q.01). */
   readonly questions: () => Promise<readonly ReadinessFollowUp[] | null>;
+  /** Founders only: their stored readiness, for Q's first answer. */
+  readonly readiness?: (() => Promise<ReadinessDto | null>) | undefined;
   /** Founders only (lead 2026-10-16). */
   readonly deckReview: () => Promise<{
     readonly pending: number;
@@ -188,6 +192,13 @@ export async function readArrival(
       ? safe("questions", () => reads.questions())
       : undefined,
   );
+  // Founders: their readiness, for Q's first answer (founder-start.ts).
+  const readinessOf = reads.readiness;
+  const readinessRead = contextRead.then((context) =>
+    context?.kind === "FOUNDER" && readinessOf !== undefined
+      ? safe("readiness", readinessOf)
+      : undefined,
+  );
   const deckRead = contextRead.then((context) =>
     context?.kind === "FOUNDER"
       ? safe("deckReview", () => reads.deckReview())
@@ -296,15 +307,33 @@ export async function readArrival(
       };
     }),
   );
-  const [account, sinceRead, matches, questions, deckReview, snapshot] =
-    await Promise.all([
-      accountRead,
-      workSinceRead,
-      matchesRead,
-      questionsRead,
-      deckRead,
-      snapshotRead,
-    ]);
+  const [
+    account,
+    sinceRead,
+    matches,
+    questions,
+    deckReview,
+    snapshot,
+    readiness,
+  ] = await Promise.all([
+    accountRead,
+    workSinceRead,
+    matchesRead,
+    questionsRead,
+    deckRead,
+    snapshotRead,
+    readinessRead,
+  ]);
+  const start =
+    readiness === undefined || readiness === null
+      ? null
+      : founderStartOf(
+          readiness,
+          (workforce?.jobs ?? []).map(({ job }) => ({
+            status: job.status,
+            goal: job.goal,
+          })),
+        );
   return {
     firstName: firstNameOf(account?.displayName),
     timeZone: sinceRead?.timeZone ?? null,
@@ -345,5 +374,6 @@ export async function readArrival(
     ...(deckReview === undefined || deckReview === null
       ? {}
       : { deckReview: { pending: deckReview.pending, href: deckReview.href } }),
+    ...(start === null ? {} : { start }),
   };
 }

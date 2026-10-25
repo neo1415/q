@@ -94,6 +94,7 @@ import {
   type QuickChip,
   type StillNeeded,
 } from "./conversation";
+import { useHeldReply } from "./held-reply";
 import { useT } from "@/features/i18n/language";
 import { WorkingLine } from "@/components/working/working-line";
 
@@ -422,19 +423,10 @@ export function QOnboardingWorkspace({
   /**
    * Q's last sentence, waiting for the session to settle on the step it
    * was about. `say` resolves once the view has been re-read, so the
-   * prompt this binds to is the one Q has just moved to.
+   * prompt this binds to is the one Q has just moved to -- or the same
+   * one, when the turn did not move the step (held-reply.ts).
    */
-  const pendingReply = useRef<string | null>(null);
-  useEffect(() => {
-    const reply = pendingReply.current;
-    if (reply === null) {
-      return;
-    }
-    pendingReply.current = null;
-    setQQuestion(
-      prompt === null ? null : { stepKey: prompt.stepKey, text: reply },
-    );
-  }, [prompt]);
+  const pendingReply = useHeldReply(prompt, setQQuestion);
 
   /**
    * What the screen asks: Q's own sentence while the session is still on
@@ -755,11 +747,10 @@ export function QOnboardingWorkspace({
       })
       .then((reply) => {
         if (reply !== null) {
-          pendingReply.current = reply;
-          // The prompt may not change, so bind it here as well as in the
-          // effect that watches for a new step.
+          // Bound here, sticky: the opener stays whatever step the
+          // session settles on while it opens.
           setQQuestion({ stepKey: prompt.stepKey, text: reply, sticky: true });
-          pendingReply.current = null;
+          pendingReply.drop();
         }
       })
       .finally(() => setOpened(true));
@@ -767,6 +758,7 @@ export function QOnboardingWorkspace({
     view?.session.id,
     view?.session.lastActivityAt,
     prompt,
+    pendingReply,
     turns.length,
     actions,
     focus,
@@ -1019,7 +1011,7 @@ export function QOnboardingWorkspace({
         // Q's line the moment the person answers it. Pushing as well would
         // print Q's sentence twice.
         setNarrowedTo(null);
-        pendingReply.current = turn.reply;
+        pendingReply.hold(turn.reply);
       } else {
         // No interviewer answered. Say so, rather than writing Q's side of
         // the conversation from the runtime's reading of the sentence.
@@ -1068,7 +1060,7 @@ export function QOnboardingWorkspace({
       if (turn.navigate === "HOME" && turn.reply !== null) {
         // "Let's finish this later" (owner 2026-10-16): Q's one-line
         // acknowledgement stays readable, then they are let into the app.
-        pendingReply.current = null;
+        pendingReply.drop();
         push("Q", turn.reply);
         window.setTimeout(() => {
           router.push("/home");
@@ -1099,6 +1091,7 @@ export function QOnboardingWorkspace({
     },
     [
       prompt,
+      pendingReply,
       liveQuestion,
       push,
       recentTurns,
@@ -1127,6 +1120,15 @@ export function QOnboardingWorkspace({
     },
     [sayOne],
   );
+  /**
+   * `say` as it is now. An upload waits up to minutes for Q's reading and
+   * then hands it to Q; the `say` it started with knew only the question
+   * on screen back then, and put that old question back in the thread.
+   */
+  const sayNow = useRef(say);
+  useEffect(() => {
+    sayNow.current = say;
+  }, [say]);
 
   /** Their unsent words, sent again in place of the line that failed. */
   const sendAgain = useCallback(
@@ -1538,7 +1540,7 @@ export function QOnboardingWorkspace({
         // to use the upload button. It is added; it waits on the name.
         const held = `I've added ${file.name}; it's here and waiting. You'll read it the moment my company exists, so ask me the company's name.`;
         if (voiceActive) setHeldUpload(held);
-        else await say(held);
+        else await sayNow.current(held);
         return;
       }
       setUploadNote(`Uploading ${file.name}`);
@@ -1657,7 +1659,7 @@ export function QOnboardingWorkspace({
         );
         setHeldUpload(told);
       } else {
-        await say(told);
+        await sayNow.current(told);
       }
       // The findings, when they land after Q moved on: handed to Q then.
       if (ready && readable && !found && (await waitForFindings(180_000))) {
@@ -1666,11 +1668,11 @@ export function QOnboardingWorkspace({
           setUploadNote(`${file.name} is read.`);
           setHeldUpload(landed);
         } else {
-          await say(landed);
+          await sayNow.current(landed);
         }
       }
     },
-    [companyIdForUpload, qSubject, actions, voiceActive, say],
+    [companyIdForUpload, qSubject, actions, voiceActive],
   );
   // F-49: the waiting file goes up once there is somewhere to file it.
   useEffect(() => {

@@ -85,6 +85,7 @@ import {
   type OpenerChoice,
 } from "./opener";
 import { tellLineOpenerAnswer } from "./opener-answer";
+import { FounderStartAnswer } from "./founder-start-answer";
 import { useQControl } from "@/features/q/control/q-control";
 
 import { loadArrival } from "./arrival-browser";
@@ -1318,6 +1319,15 @@ export function ArrivalBriefing({
   // Owner 2026-10-17: the Q page greets and asks one open question, like a
   // chat app's first screen; what waits comes up when they ask for it
   // (typed or said, useOpener). The dock elsewhere still offers the choice.
+  // A founder's first Home (no earlier visit known): Q leads with what it
+  // already knows, before the open question (coordinator 25 Oct).
+  const firstAnswer =
+    !compact &&
+    opener.choice === null &&
+    ready.data.hoursAway === null &&
+    ready.data.start !== undefined
+      ? ready.data.start
+      : null;
   const choices =
     compact && words.opener.offersChoice && opener.choice === null ? (
       <OpenerChoices
@@ -1380,6 +1390,9 @@ export function ArrivalBriefing({
           >
             {headline ?? words.greeting}
           </h1>
+          {firstAnswer === null ? null : (
+            <FounderStartAnswer start={firstAnswer} />
+          )}
           <p
             className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)"
             data-arrival-lowdown

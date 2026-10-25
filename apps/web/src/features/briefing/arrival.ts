@@ -31,6 +31,7 @@ import type {
 } from "@capital-q/contracts";
 
 import { attentionLines, unreadWords } from "./attention";
+import type { FounderStart } from "./founder-start";
 import { greetingSeed, warmGreeting } from "./greeting";
 import { matchesWords, type ArrivalMatches } from "./matches";
 import { openerOf, type Opener } from "./opener";
@@ -129,6 +130,12 @@ export type ArrivalData = {
    */
   readonly deckReview?:
     { readonly pending: number; readonly href: string } | null | undefined;
+  /**
+   * Founders: Q's first answer after onboarding, from their stored
+   * readiness and Q's jobs (founder-start.ts); absent: not a founder or
+   * the readiness could not be read.
+   */
+  readonly start?: FounderStart | undefined;
 };
 
 /**
