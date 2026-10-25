@@ -78,6 +78,8 @@ export type CounterpartDiscovery = {
   readonly countries: readonly string[];
   readonly regionWords: readonly string[];
   readonly webSearched: boolean;
+  /** The public search could not run (every index failed or resting). */
+  readonly webUnavailable: boolean;
   readonly webQuery: string | null;
   readonly elapsedMs: number;
 };
@@ -877,6 +879,7 @@ export function createCounterpartDiscovery(dependencies: {
         countries,
         regionWords,
         webSearched,
+        webUnavailable: webFailed,
         webQuery,
         elapsedMs: Math.max(0, now() - started),
       };

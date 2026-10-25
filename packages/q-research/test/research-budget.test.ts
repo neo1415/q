@@ -7,6 +7,8 @@ import {
   RESEARCH_BOUNDS,
 } from "../src/index.js";
 import { RESEARCH_RUN_BUDGET } from "../src/application/research-service.js";
+import { ResearchProviderFailure } from "../src/ports.js";
+import { withCircuitBreaker } from "../src/providers/breaker.js";
 import { createFakeResearchProvider } from "../src/providers/fake.js";
 
 /**
@@ -88,5 +90,49 @@ describe("public research spends what the question needs", () => {
       });
     }
     expect(provider.searches.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// Live 2026-10-25: with every index resting, the service's summary read as
+// "public research provider failed: scrapingbee 401" -- as if ScrapingBee
+// had been called past its breaker. Nothing was called: it says so.
+describe("every index resting", () => {
+  it("is logged as a skip, never as a provider failure", async () => {
+    let calls = 0;
+    const dead = withCircuitBreaker({
+      code: "scrapingbee",
+      search: () => {
+        calls += 1;
+        return Promise.reject(
+          new ResearchProviderFailure({
+            providerCode: "scrapingbee",
+            failureClass: "AUTHENTICATION",
+            status: 401,
+          }),
+        );
+      },
+      extract: () => Promise.reject(new Error("not used")),
+    });
+    const lines: string[] = [];
+    const logger = {
+      info: (_fields: unknown, message: string) =>
+        lines.push(`info:${message}`),
+      warn: (_fields: unknown, message: string) =>
+        lines.push(`warn:${message}`),
+      debug: () => undefined,
+      error: () => undefined,
+    } as never;
+    const service = createPublicWebResearchService({ provider: dead, logger });
+    await service.research(ask("run-e", "Paystack founder"));
+    const afterFirst = calls;
+    const second = await service.research(ask("run-f", "Paystack founder"));
+    expect(second.status).toBe("PROVIDER_UNAVAILABLE");
+    expect(calls).toBe(afterFirst);
+    expect(lines).toContain(
+      "info:public research skipped: every provider is resting",
+    );
+    expect(
+      lines.filter((line) => line === "warn:public research provider failed"),
+    ).toHaveLength(1);
   });
 });

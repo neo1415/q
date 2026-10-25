@@ -497,6 +497,26 @@ describe("public finds are firms that invest, each named once by its name", () =
   });
 });
 
+describe("public search down (live 2026-10-25)", () => {
+  it("names the known firms and says the web could not be searched", async () => {
+    const web = createFakeResearchProvider({
+      pages: [],
+      behaviour: { kind: "FAIL_SEARCH", failureClass: "AUTHENTICATION" },
+    });
+    const discovery = createCounterpartDiscovery({
+      known: await index(),
+      providers: [web],
+    });
+    const found = await discovery.discover({
+      ...SCOPE,
+      regions: ["Qatar"],
+      count: 3,
+    });
+    expect(found.outcome).toBe("FOUND");
+    expect(found.webUnavailable).toBe(true);
+  });
+});
+
 describe("discovery by kind, place and sector", () => {
   it("three Qatari VCs: the known three, and public firms named beside them", async () => {
     const web = createFakeResearchProvider({

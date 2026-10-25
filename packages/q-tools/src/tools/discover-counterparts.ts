@@ -106,6 +106,8 @@ export const DiscoverCounterpartsOutputSchema = z
     countries: z.array(z.string().length(2)).max(40),
     regionWords: z.array(z.string().max(40)).max(4),
     webSearched: z.boolean(),
+    /** The public search could not run: only records were looked at. */
+    webUnavailable: z.boolean().default(false),
     aboutMyCompany: z.boolean(),
     truthClass: z.literal("UNKNOWN"),
     guidance: z.string().max(800),
@@ -177,6 +179,7 @@ export function createDiscoverCounterpartsTool(
         countries: [...found.countries],
         regionWords: [...found.regionWords],
         webSearched: found.webSearched,
+        webUnavailable: found.webUnavailable,
         aboutMyCompany: input.aboutMyCompany,
         truthClass: "UNKNOWN",
         guidance: GUIDANCE,

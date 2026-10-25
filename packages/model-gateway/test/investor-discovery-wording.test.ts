@@ -87,3 +87,31 @@ describe("known firms and public finds", () => {
     expect(text).not.toMatch(/rehearsal/iu);
   });
 });
+
+// Live 2026-10-25: every public index down, and "I found only one Qatar
+// investor" read as all there is.
+describe("public search down: only what Capital Q knows, said so", () => {
+  it("says the public web was not searched", () => {
+    const text = investorDiscoveryText(
+      [
+        {
+          card: { subject: { displayName: "Rasmal Ventures" } },
+          role: "INVESTOR",
+          fit: [],
+          source: "KNOWN_ENTITY",
+        } as unknown as Parameters<typeof investorDiscoveryText>[0][number],
+      ],
+      {
+        regionWords: ["qatar"],
+        asked: 3,
+        outcome: "FOUND",
+        aboutMyCompany: false,
+        webUnavailable: true,
+      },
+    );
+    expect(text).toContain("I found only one Qatar investor");
+    expect(text).toContain(
+      "Public search isn't answering right now, so these are only the ones Capital Q already knows.",
+    );
+  });
+});
