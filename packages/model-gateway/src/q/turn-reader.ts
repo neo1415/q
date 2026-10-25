@@ -71,6 +71,11 @@ export type QTurnReader = {
       readonly tenantId: string;
       readonly userId: string;
       readonly correlationId: string;
+      /**
+       * The run read for (live 2026-10-25: the reader's 2.5-4.5 s carried
+       * no run, so a run's usage hid where its time went).
+       */
+      readonly qRunId?: string | undefined;
     };
     readonly signal?: AbortSignal | undefined;
   }) => Promise<QTurnReading | null>;

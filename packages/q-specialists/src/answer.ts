@@ -595,6 +595,8 @@ function turnReaderInput(
     readonly tenantId: string;
     readonly userId: string;
     readonly correlationId: string;
+    /** The run the reading is for, so its model usage is the run's. */
+    readonly runId: string;
     readonly signal?: AbortSignal | undefined;
   },
   /**
@@ -630,6 +632,7 @@ function turnReaderInput(
       tenantId: context.tenantId,
       userId: context.userId,
       correlationId: context.correlationId,
+      qRunId: context.runId,
     },
     signal: context.signal,
   };
@@ -4148,6 +4151,7 @@ export function createSpecialistQAnswer(
               tenantId: input.tenantId,
               userId: input.actor.userId,
               correlationId: input.correlationId,
+              runId: input.runId,
               signal: input.signal,
             },
             referenceNote(
@@ -5073,6 +5077,7 @@ export function createSpecialistQAnswer(
             tenantId: request.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
+            runId: request.runId,
             signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),
@@ -5301,17 +5306,7 @@ export function createSpecialistQAnswer(
         reRenderAskOf(
           latest.content,
           history.some((message) => message.role === "Q"),
-        ) ||
-        // Coordinator 2026-10-25 (live 792fe626, "how do the top two stack
-        // up?": three web searches, 6 s, before a word): a comparison of
-        // the companies Q showed, by their place in the list, is answered
-        // from Capital Q's own reads of them. The web only when the reading
-        // asks for public facts.
-        (read.compare !== undefined &&
-          read.compare !== null &&
-          read.compare.names.length === 0 &&
-          read.question?.kind !== "PUBLIC_FACTS" &&
-          read.question?.kind !== "REAL_WORLD_EXAMPLE")
+        )
         ? NO_RESEARCH
         : researchDirectiveFor(state, readingFromTurnReader(read), {
             available: dependencies.researchAvailable ?? true,

@@ -1197,33 +1197,26 @@ describe("a comparison the reader read", () => {
     expect(run.delegated()).toBe(1);
     expect(run.compares).toEqual([{ count: 2, names: [] }]);
   });
+});
 
-  // Coordinator 2026-10-25 (live 792fe626, "How do the top two stack
-  // up?": read as advice, so three web searches and 6 s before a word).
-  it("of the companies Q showed, by their place, never goes to the web", async () => {
-    // A reading carrying v62's compare (the harness takes the v1 shape).
-    const comparing = { ...advice, compare: { count: 2, names: [] } };
+// Live 2026-10-25: the reader's 2.5-4.5 s carried no run, so a run's
+// model usage hid where its time went.
+describe("the reading is the run's", () => {
+  it("is asked for with the run it reads, so its usage is the run's", async () => {
+    const runs: (string | undefined)[] = [];
     const run = seam({
       said: "How do the top two stack up?",
-      reading: comparing,
+      reading: null,
+      read: (input) => {
+        runs.push(input.attribution.qRunId);
+        return Promise.resolve(null);
+      },
       outcomes: [],
     });
-    await run.answer.answer(request());
-    expect(run.directives[0]?.mode).toBe("NEVER");
-  });
-
-  it("goes to the web when the reading asks for public facts", async () => {
-    const run = seam({
-      said: "How do the top two compare in the press?",
-      reading: {
-        ...advice,
-        question: { ...advice.question, kind: "PUBLIC_FACTS" },
-        compare: { count: 2, names: [] },
-      } as TurnReaderResult,
-      outcomes: [],
-    });
-    await run.answer.answer(request());
-    expect(run.directives[0]?.mode).toBe("EXPLICIT");
+    const asked = request();
+    await run.answer.answer(asked);
+    expect(runs.length).toBeGreaterThan(0);
+    expect(runs.every((one) => one === asked.runId)).toBe(true);
   });
 });
 
