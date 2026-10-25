@@ -305,6 +305,16 @@ export type BoundOnboardingPort = OnboardingToolPort &
     readonly affirmedParaphrases: () => Promise<ReadonlySet<string>>;
   };
 
+/** Text compared for "already says this": case, quotes and spacing aside. */
+function normalisedText(text: string): string {
+  return text
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[‘’“”"']/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
 /**
  * One concept, one answer (G): an open optional step in a concept family
  * another member of which is answered or set aside is covered by it.
@@ -1423,6 +1433,7 @@ export function createOnboardingPort(input: {
           0,
           600,
         ),
+        alreadyRecorded: true,
       };
     }
     const text = (existing.length > 0 ? `${existing}\n${line}` : line).slice(
@@ -1590,6 +1601,25 @@ export function createOnboardingPort(input: {
         question,
         reason:
           "Their words there only ask a question, so nothing was held or recorded. A question is never their answer; ask them if you want to know.",
+      };
+    }
+    // Already in what this step records (a note kept earlier): nothing to
+    // hold for their yes, and never offered to them again (live 25 Oct
+    // e2e: "Paying customers: the 210 customers is right" re-offered).
+    const onRecord = (await current()).responses.find(
+      (r) => r.stepKey === step.stepKey,
+    );
+    if (
+      onRecord?.value.type === "TEXT" &&
+      normalisedText(value.text).length > 0 &&
+      normalisedText(onRecord.value.text).includes(normalisedText(value.text))
+    ) {
+      return {
+        stepKey: step.stepKey,
+        outcome: "COMMITTED",
+        question,
+        recorded: value.text.slice(0, 600),
+        alreadyRecorded: true,
       };
     }
     if (store !== undefined) {
@@ -2228,6 +2258,7 @@ export function createOnboardingPort(input: {
       return done({
         stepKey: resolved.step.stepKey,
         outcome: "COMMITTED",
+        alreadyRecorded: true,
         question: (
           SPOKEN_QUESTIONS[resolved.step.stepKey] ??
           resolved.step.configuration.prompt

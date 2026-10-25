@@ -97,6 +97,7 @@ import {
   acknowledgementParts,
   quickAcknowledgement,
   quickReceipt,
+  receiptValueOf,
   RESEARCH_NOTHING_LINE,
   RESEARCH_STARTED_LINE,
   type ChoicesOf,
@@ -2333,12 +2334,14 @@ export function createInterviewAgent(
       if (receipt === null) return;
       leadSaid = receipt;
       for (const item of results) {
-        if (item.outcome !== "COMMITTED") continue;
+        if (item.outcome !== "COMMITTED" || item.alreadyRecorded === true) {
+          continue;
+        }
         receiptSaid.add(item.stepKey);
         if (item.recorded !== undefined && item.recorded !== null) {
-          receiptValues.push(
-            item.recorded.replace(/\s*\(in their words\)$/u, ""),
-          );
+          // As the receipt read it, so a reply repeating it matches (live
+          // 25 Oct e2e: a kept note said twice in one reply).
+          receiptValues.push(receiptValueOf(item));
         }
       }
       try {
@@ -2356,10 +2359,29 @@ export function createInterviewAgent(
       });
     };
     /** The reply as they saw it: the receipt said first, then the rest. */
-    const withLead = (reply: string): string => {
+    const withLead = (said: string): string => {
+      // Never "saved" again for what was already on the record (live 25
+      // Oct e2e: one kept note restated on every unrelated turn).
+      const reply = withoutRepeatedReceipt(said, alreadyOnRecord());
       if (leadSaid === null || reply.startsWith(leadSaid)) return reply;
       const rest = withoutRepeatedReceipt(reply, receiptValues);
       return rest.length === 0 ? leadSaid : `${leadSaid} ${rest}`;
+    };
+    /** What this turn's writes found already on the record, as read back. */
+    const alreadyOnRecord = (): string[] => {
+      const fresh = new Set<string>();
+      const already: string[] = [];
+      for (const action of actions) {
+        if (action.tool !== "record_answers") continue;
+        const parsed = RecordedResultsSchema.safeParse(action.result);
+        if (!parsed.success) continue;
+        for (const item of parsed.data.results) {
+          if (item.outcome !== "COMMITTED") continue;
+          if (item.alreadyRecorded === true) already.push(receiptValueOf(item));
+          else fresh.add(receiptValueOf(item));
+        }
+      }
+      return already.filter((value) => !fresh.has(value));
     };
     try {
       // Their words are kept before the first round's model sees them
