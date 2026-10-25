@@ -685,7 +685,8 @@ async function persisted(c: Case): Promise<{
     const asked = results.some(
       (r) =>
         r !== null &&
-        "stepKey" in r &&
+        "outcome" in r &&
+        "reason" in r &&
         r.stepKey === c.stepKey &&
         r.outcome === "REJECTED" &&
         r.reason === EXCLUSION_MEANING_REASON,
