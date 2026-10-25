@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { cx } from "@capital-q/ui";
 import { Bell, Check, Clock, ICON_SIZE, Upload, X } from "@capital-q/ui/icons";
@@ -122,6 +122,15 @@ function Queue({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDoneEarlier(readDone());
   }, []);
+  // A card's exit timer must not outlive the queue (navigating away mid-exit).
+  const exits = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const pending = exits.current;
+    return () => {
+      for (const timer of pending) clearTimeout(timer);
+      pending.clear();
+    };
+  }, []);
 
   const left = cards.filter((card) => !gone.has(card.key));
   const present = new Set(cards.map((card) => card.key));
@@ -135,10 +144,12 @@ function Queue({
   /** The card leaves (to the side), then the list closes up. */
   const leave = (card: NeedsYouCard) => {
     setLeaving((current) => new Set([...current, card.key]));
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      exits.current.delete(timer);
       setGone((current) => new Set([...current, card.key]));
       writeDone([...readDone(), card.key]);
     }, 240);
+    exits.current.add(timer);
   };
 
   const clear = (card: NeedsYouCard) => {
