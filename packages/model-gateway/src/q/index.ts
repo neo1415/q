@@ -1229,6 +1229,20 @@ function heldNamedIn(
 }
 
 /** A public search that ran and found no page (about them). */
+/** A public search that matched pages to whom it was about. */
+function pagesMatchThem(outcome: QToolCallOutcome): boolean {
+  if (!outcome.result.ok) return false;
+  const sources = (
+    outcome.result.data as {
+      readonly sources?: readonly { readonly subjectMatch?: unknown }[];
+    }
+  ).sources;
+  return (sources ?? []).some(
+    (source) =>
+      source.subjectMatch === "MATCH" || source.subjectMatch === "POSSIBLE",
+  );
+}
+
 function webFoundNothing(outcome: QToolCallOutcome): boolean {
   if (!outcome.result.ok) return false;
   const data = outcome.result.data as {
@@ -5174,25 +5188,45 @@ export function createModelGatewayQAnswer(
         typeof earlyWebName === "string"
           ? earlyWebName
           : (request.personSearch?.name.trim() ?? namedOther?.name);
+      // Owner's spend rule 2026-10-25: the picture search is paid for only
+      // when the answer can show a picture of them -- once a search matched
+      // pages to them, Capital Q holds their website, or the person lookup
+      // found them -- never on every turn that names someone. Started once,
+      // when first asked for (as the early web search lands, else as the
+      // answer is put together).
+      const pictureSearch = dependencies.publicPictures;
+      let picturesStarted: ReturnType<QPublicPicturePort["find"]> | null = null;
       const webPictures =
-        dependencies.publicPictures !== undefined &&
+        pictureSearch !== undefined &&
         !reRender &&
         typeof namedForPictures === "string" &&
         namedForPictures.length > 1
-          ? dependencies.publicPictures
-              .find({
-                name: namedForPictures,
-                ...(request.personSearch?.organization
-                  ? { organisation: request.personSearch.organization }
-                  : {}),
-                userText: latest.content,
-                earlierUserText:
-                  toolContext.conversation?.earlierUserText ?? [],
-                shownText: toolContext.conversation?.earlierQText ?? [],
-                signal: request.signal,
-              })
-              .catch(() => [])
+          ? () =>
+              (picturesStarted ??= pictureSearch
+                .find({
+                  name: namedForPictures,
+                  ...(request.personSearch?.organization
+                    ? { organisation: request.personSearch.organization }
+                    : {}),
+                  userText: latest.content,
+                  earlierUserText:
+                    toolContext.conversation?.earlierUserText ?? [],
+                  shownText: toolContext.conversation?.earlierQText ?? [],
+                  signal: request.signal,
+                  runId: request.runId,
+                })
+                .catch(() => []))
           : null;
+      // As the early web search lands with pages matched to them, their
+      // pictures are asked for beside the answer being written.
+      if (webPictures !== null && earlyWeb !== null) {
+        void earlyWeb.outcome.then(
+          (landed) => {
+            if (pagesMatchThem(landed)) void webPictures();
+          },
+          () => undefined,
+        );
+      }
       /** The early web search is still to be put in front of the model. */
       const earlyWebPending = (): boolean =>
         earlyWeb !== null && !earlyWeb.claimed;
@@ -6568,19 +6602,23 @@ export function createModelGatewayQAnswer(
         // Their picture from public pages, looked for beside the lookup
         // (owner 2026-10-23): the turn's own picture search when the web
         // search began with their name, else one for the name they asked.
+        // Asked for only once the lookup found them (spend rule 2026-10-25).
+        let laneStarted: ReturnType<QPublicPicturePort["find"]> | null = null;
         const lanePictures =
           webPictures ??
-          (dependencies.publicPictures !== undefined && askedName.length > 0
-            ? dependencies.publicPictures
-                .find({
-                  name: askedName,
-                  userText: latest.content,
-                  earlierUserText:
-                    toolContext.conversation?.earlierUserText ?? [],
-                  shownText: toolContext.conversation?.earlierQText ?? [],
-                  signal: request.signal,
-                })
-                .catch(() => [])
+          (pictureSearch !== undefined && askedName.length > 0
+            ? () =>
+                (laneStarted ??= pictureSearch
+                  .find({
+                    name: askedName,
+                    userText: latest.content,
+                    earlierUserText:
+                      toolContext.conversation?.earlierUserText ?? [],
+                    shownText: toolContext.conversation?.earlierQText ?? [],
+                    signal: request.signal,
+                    runId: request.runId,
+                  })
+                  .catch(() => []))
             : null);
         const found = await personFor(request.personSearch);
         if (found !== null) {
@@ -6622,7 +6660,8 @@ export function createModelGatewayQAnswer(
               ? []
               : publicPictureBlocks(
                   theirs(
-                    (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
+                    (await settledWithin(lanePictures(), PICTURE_WAIT_MS)) ??
+                      [],
                   ),
                   new Date().toISOString(),
                 );
@@ -6662,6 +6701,7 @@ export function createModelGatewayQAnswer(
                       toolContext.conversation?.earlierUserText ?? [],
                     shownText: toolContext.conversation?.earlierQText ?? [],
                     signal: request.signal,
+                    runId: request.runId,
                   }),
                   PICTURE_WAIT_MS,
                 )) ?? [],
@@ -9286,12 +9326,21 @@ export function createModelGatewayQAnswer(
           namedSubject === null
             ? null
             : heldOnRecord(companiesRead, namedSubject);
+        // Only when a picture could be shown (spend rule 2026-10-25): their
+        // website on record, or pages this turn's searches matched to them.
+        const couldShow =
+          (held?.website ?? null) !== null ||
+          webEvidence.some(
+            (source) =>
+              source.subjectMatch === "MATCH" ||
+              source.subjectMatch === "POSSIBLE",
+          );
         const fromPages =
-          webPictures === null || namedSubject === null
+          webPictures === null || namedSubject === null || !couldShow
             ? []
             : publicPictureBlocks(
                 corroboratedPictures(
-                  (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
+                  (await settledWithin(webPictures(), PICTURE_WAIT_MS)) ?? [],
                   {
                     name: namedSubject,
                     website: held?.website ?? null,

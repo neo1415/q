@@ -16,7 +16,10 @@ import { createBraveImageSearch } from "@capital-q/q-research/providers/brave";
 import {
   createDetectingImageSearch,
   createMergedImageSearch,
+  withImageBreaker,
 } from "@capital-q/q-research/providers/images";
+
+import { credentialBreaker } from "./breakers.js";
 
 /**
  * L-13 (owner ask 2026-10-20): pictures for Q's answers, from Pexels (the
@@ -104,13 +107,27 @@ export function createPublicQPictures(
   };
   const serp = usable(keys.serp);
   const brave = usable(keys.brave);
+  // Behind the same breaker as the web search on that key (2026-10-25): a
+  // spent SERP or Brave key rests for pictures too, and costs nothing.
+  const warn = (fields: Readonly<Record<string, unknown>>, message: string) =>
+    logger?.warn(fields, message);
   const providers = [
     ...(serp === null
       ? []
-      : [createDetectingImageSearch({ apiKey: serp, fetch: fetchImpl })]),
+      : [
+          withImageBreaker(
+            createDetectingImageSearch({ apiKey: serp, fetch: fetchImpl }),
+            credentialBreaker("serp", warn),
+          ),
+        ]),
     ...(brave === null
       ? []
-      : [createBraveImageSearch({ apiKey: brave, fetch: fetchImpl })]),
+      : [
+          withImageBreaker(
+            createBraveImageSearch({ apiKey: brave, fetch: fetchImpl }),
+            credentialBreaker("brave", warn),
+          ),
+        ]),
   ];
   if (providers.length === 0) return undefined;
   const search = createPublicPictureSearch({

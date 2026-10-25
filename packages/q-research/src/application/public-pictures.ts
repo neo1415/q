@@ -63,8 +63,17 @@ export type PublicPictureSearch = {
     readonly shownText?: readonly string[] | undefined;
     readonly max?: number | undefined;
     readonly signal?: AbortSignal | undefined;
+    /**
+     * The run asking: one image search a run reaches the index (owner's
+     * spend rule 2026-10-25); a second is answered from the cache or not
+     * at all.
+     */
+    readonly runId?: string | undefined;
   }) => Promise<readonly PublicPicture[]>;
 };
+
+/** How long one entity's image results are kept, and how many entities. */
+export const PICTURE_CACHE = { ttlMs: 6 * 60 * 60_000, max: 500 } as const;
 
 const DEFAULT_MAX = 2;
 
@@ -156,6 +165,7 @@ function preference(domain: string, name: string): number {
 
 export function createPublicPictureSearch(input: {
   readonly provider: PublicImageSearchProvider;
+  readonly now?: (() => number) | undefined;
   readonly logger?:
     | {
         readonly warn: (
@@ -165,6 +175,18 @@ export function createPublicPictureSearch(input: {
       }
     | undefined;
 }): PublicPictureSearch {
+  const now = input.now ?? Date.now;
+  /**
+   * Owner's spend rule 2026-10-25: an entity's image results are paid for
+   * once in a while, not on every turn that names them. By the composed
+   * query (the name as it leaves); failures are never kept.
+   */
+  const cache = new Map<
+    string,
+    { readonly at: number; readonly hits: readonly PublicImageHit[] }
+  >();
+  const searchedRuns = new Set<string>();
+  const RUNS_MAX = 2_000;
   return {
     find: async ({
       name,
@@ -174,6 +196,7 @@ export function createPublicPictureSearch(input: {
       shownText,
       max,
       signal,
+      runId,
     }) => {
       const org = organisation?.trim() ?? "";
       const composed = composeEgressQuery({
@@ -186,15 +209,36 @@ export function createPublicPictureSearch(input: {
       // Only a name made wholly of the person's own words, or one Q showed
       // them and they pointed at, is searched.
       if (!composed.ok || composed.droppedTokens > 0) return [];
+      const key = composed.query.toLowerCase();
+      const kept = cache.get(key);
       let hits: readonly PublicImageHit[];
-      try {
-        hits = await input.provider.searchImages(composed.query, { signal });
-      } catch (error: unknown) {
-        input.logger?.warn(
-          { provider: input.provider.code, err: error },
-          "public picture search failed; the answer goes without pictures",
-        );
+      if (kept !== undefined && now() - kept.at < PICTURE_CACHE.ttlMs) {
+        hits = kept.hits;
+      } else if (runId !== undefined && searchedRuns.has(runId)) {
+        // This run already paid for its one image search.
         return [];
+      } else {
+        if (runId !== undefined) {
+          if (searchedRuns.size >= RUNS_MAX) searchedRuns.clear();
+          searchedRuns.add(runId);
+        }
+        try {
+          hits = await input.provider.searchImages(composed.query, {
+            signal,
+          });
+        } catch (error: unknown) {
+          input.logger?.warn(
+            { provider: input.provider.code, err: error },
+            "public picture search failed; the answer goes without pictures",
+          );
+          return [];
+        }
+        cache.delete(key);
+        if (cache.size >= PICTURE_CACHE.max) {
+          const oldest = cache.keys().next().value;
+          if (oldest !== undefined) cache.delete(oldest);
+        }
+        cache.set(key, { at: now(), hits });
       }
       const candidates: (PublicPicture & {
         readonly rank: number;

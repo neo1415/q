@@ -3,6 +3,7 @@ import type {
   PublicImageSearchProvider,
 } from "../application/public-pictures.js";
 import { ResearchProviderFailure } from "../ports.js";
+import type { CircuitBreaker } from "./breaker.js";
 
 /**
  * Google Images results behind the PublicImageSearchProvider port, from the
@@ -251,5 +252,23 @@ export function createMergedImageSearch(
       }
       return merged;
     },
+  };
+}
+
+/**
+ * An image search behind its credential's breaker (coordinator 2026-10-25):
+ * the SERP key's image search rests with its web search, so a spent key
+ * costs nothing here either. A Serper "not enough credits" is a 402.
+ */
+export function withImageBreaker(
+  provider: PublicImageSearchProvider,
+  breaker: CircuitBreaker,
+): PublicImageSearchProvider {
+  return {
+    get code() {
+      return provider.code;
+    },
+    searchImages: (query, context) =>
+      breaker.guard(provider.code, () => provider.searchImages(query, context)),
   };
 }
