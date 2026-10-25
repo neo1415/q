@@ -307,6 +307,13 @@ describe("fit composition", () => {
     // each for identities (names and raises), objectives and Q Cards;
     // never one query per company.
     expect(queries.oneByOne).toBe(0);
+    // Where its time went, by phase (owner 2026-10-25), for the log.
+    expect(Object.keys(result.phasesMs ?? {}).sort()).toEqual([
+      "eligibility",
+      "inputs",
+      "scores",
+      "subject",
+    ]);
     expect(queries.identities).toBe(10);
     expect(queries.objectives).toBe(5);
     expect(queries.cards).toBe(5);

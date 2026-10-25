@@ -108,6 +108,42 @@ describe("exchange rates, found when not stored", () => {
     expect((await live.current())[0]?.rateDate).toBe("2026-10-01");
   });
 
+  // Owner 2026-10-25 (discover 17–20 s on some calls): a stale set waited
+  // on a 15 s internet fetch inside the network fit rank. An answer never
+  // waits for the internet when a set is stored: the stored set serves at
+  // once, and one refresh runs behind it.
+  it("a stale set serves at once while one refresh runs in the background", async () => {
+    const { store, recorded } = storeWith({ ECB_EUROFXREF: ecb("2026-10-01") });
+    let fetches = 0;
+    let land: (rates: FxReferenceRates) => void = () => undefined;
+    const live = createLiveFxRates({
+      store,
+      providers: [
+        {
+          source: "ECB_EUROFXREF",
+          provider: {
+            fetchDaily: () => {
+              fetches += 1;
+              return new Promise<FxReferenceRates>((resolve) => {
+                land = resolve;
+              });
+            },
+          },
+        },
+      ],
+      now: () => NOW,
+    });
+    const first = await live.current();
+    const second = await live.current();
+    expect(first[0]?.rateDate).toBe("2026-10-01");
+    expect(second[0]?.rateDate).toBe("2026-10-01");
+    // One refresh in flight, however many asks.
+    expect(fetches).toBe(1);
+    land(ecb("2026-10-23"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(recorded.map((r) => r.rateDate)).toEqual(["2026-10-23"]);
+  });
+
   it("reads the market feed strictly, base EUR, dated by its update time", () => {
     const rates = parseMarketLatest({
       result: "success",

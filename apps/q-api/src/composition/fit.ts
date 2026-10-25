@@ -475,7 +475,12 @@ export function withRankCache(
       ].join("|");
       const now = clock().getTime();
       const hit = kept.get(key);
-      if (hit !== undefined && now - hit.at < RANK_CACHE_MS) return hit.result;
+      if (hit !== undefined && now - hit.at < RANK_CACHE_MS) {
+        // Its phases were another call's: a hit says it was one.
+        return hit.result.kind === "OK"
+          ? { ...hit.result, phasesMs: { cacheHit: 0 } }
+          : hit.result;
+      }
       const result = await rank(actor, companyIds, limit);
       if (result.kind === "OK") {
         kept.delete(key);
