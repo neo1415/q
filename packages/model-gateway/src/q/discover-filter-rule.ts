@@ -13,8 +13,9 @@
  *   asked for it (the reader's named action) or are on it.
  * - A filter Q does set carries only what they stated: sector, country and
  *   stage as the turn reader read them, and a raise range the model gives.
- *   Verified only, has a pitch video and raise shared only are the
- *   person's own choices on the filter sheet; Q never adds them. "Raising
+ *   Verified only, has a pitch video and raise shared only are kept
+ *   exactly when the reader read them from the person's words ("only
+ *   verified ones"), and dropped when only the model added them. "Raising
  *   now" is not "raise shared": a raise stated in a pitch counts as raising
  *   for the rank, so the page is not narrowed to shared raises for it.
  */
@@ -28,6 +29,9 @@ export type DiscoverRule = {
     readonly countries: readonly string[];
     readonly stages: readonly string[];
     readonly raising?: boolean | undefined;
+    readonly verifiedOnly?: boolean | undefined;
+    readonly hasPitch?: boolean | undefined;
+    readonly raiseShared?: boolean | undefined;
   } | null;
   /** A narrowing of a list Q just answered. */
   readonly narrowing: boolean;
@@ -39,7 +43,12 @@ export type DiscoverFilterDecision =
   | { readonly kind: "REFUSE"; readonly safeMessage: string }
   | { readonly kind: "SET"; readonly arguments: Record<string, unknown> };
 
-const QUALIFIERS = ["verifiedOnly", "hasPitch", "raiseDisclosedOnly"] as const;
+/** Each filter-sheet qualifier and the reading that states it. */
+const QUALIFIERS = [
+  ["verifiedOnly", "verifiedOnly"],
+  ["hasPitch", "hasPitch"],
+  ["raiseDisclosedOnly", "raiseShared"],
+] as const;
 
 export function discoverFilterDecision(
   args: unknown,
@@ -56,8 +65,11 @@ export function discoverFilterDecision(
     typeof args === "object" && args !== null
       ? { ...(args as Record<string, unknown>) }
       : {};
-  for (const qualifier of QUALIFIERS) delete given[qualifier];
   const read = rule?.discover ?? null;
+  for (const [qualifier, stated] of QUALIFIERS) {
+    if (read?.[stated] === true) given[qualifier] = true;
+    else delete given[qualifier];
+  }
   if (read !== null) {
     if (read.sectors.length > 0) given["sectors"] = [...read.sectors];
     if (read.countries.length > 0) {

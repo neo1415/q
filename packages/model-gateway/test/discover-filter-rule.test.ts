@@ -240,6 +240,53 @@ describe("discoverFilterDecision", () => {
     });
   });
 
+  // Coordinator 2026-10-25: a narrowing they state is theirs, like a
+  // sector or a country; only one the model added is dropped.
+  it("'only verified fintechs in Kenya' keeps verifiedOnly; the unstated pitch qualifier goes", () => {
+    const decision = discoverFilterDecision(
+      { sectors: ["fintech"], countries: ["KE"], hasPitch: true },
+      {
+        discover: {
+          sectors: ["fintech"],
+          countries: ["ke"],
+          stages: [],
+          verifiedOnly: true,
+        },
+        narrowing: false,
+        asked: true,
+      },
+    );
+    expect(decision).toEqual({
+      kind: "SET",
+      arguments: {
+        sectors: ["fintech"],
+        countries: ["KE"],
+        verifiedOnly: true,
+      },
+    });
+  });
+
+  it("keeps a stated pitch-video or shared-raise narrowing too", () => {
+    const decision = discoverFilterDecision(
+      {},
+      {
+        discover: {
+          sectors: [],
+          countries: [],
+          stages: [],
+          hasPitch: true,
+          raiseShared: true,
+        },
+        narrowing: false,
+        asked: true,
+      },
+    );
+    expect(decision).toEqual({
+      kind: "SET",
+      arguments: { hasPitch: true, raiseDisclosedOnly: true },
+    });
+  });
+
   it("with no reading, keeps the model's stated filters and still adds no qualifier", () => {
     expect(
       discoverFilterDecision(
