@@ -200,6 +200,18 @@ export const RecommendationContextSchema = z
   .strict();
 export type RecommendationContext = z.infer<typeof RecommendationContextSchema>;
 
+/**
+ * The same context as a persisted artifact carries it (a feature snapshot):
+ * any published policy version, as its own `eligibilityPolicyVersion`
+ * already accepts. P0 (live b92021641): snapshots written under
+ * eligibility.v4 threw "context.eligibilityPolicyVersion: invalid_value"
+ * on read after v5 shipped, and every network fit rank failed.
+ */
+export const PersistedRecommendationContextSchema =
+  RecommendationContextSchema.extend({
+    eligibilityPolicyVersion: z.enum(ELIGIBILITY_POLICY_VERSIONS),
+  });
+
 export const EligibilityResultSchema = z
   .object({
     eligibilityPolicyVersion: z.literal(ELIGIBILITY_POLICY_VERSION),

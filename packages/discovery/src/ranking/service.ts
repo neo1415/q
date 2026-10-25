@@ -2,6 +2,7 @@ import { getMeter, type Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
 import { FEATURE_SCHEMA_VERSION } from "../features/contracts.js";
+import { RecommendationContextSchema } from "../eligibility/contracts.js";
 import type {
   FeatureComputationDiagnostics,
   FeatureService,
@@ -90,7 +91,11 @@ export function createRankingService(dependencies: {
           ? []
           : await ranker.rank(
               {
-                recommendation: first.context,
+                // Snapshots computed just now carry the current policy;
+                // the read side accepts older ones, a ranking never does.
+                recommendation: RecommendationContextSchema.parse(
+                  first.context,
+                ),
                 mandateVersion: first.mandateVersion,
               },
               computed.snapshots.map((snapshot) => ({

@@ -1290,6 +1290,29 @@ async function computed(
   return result;
 }
 
+describe("a snapshot persisted under an earlier eligibility policy reads (P0, live b92021641)", () => {
+  // Live: Anchor's and Afyascan's CURRENT snapshots (savanna-seed, mandate
+  // v23) were written under eligibility.v4; reading them threw
+  // "ZodError(context.eligibilityPolicyVersion:invalid_value)", and every
+  // network fit rank fell back to the candidate sweep.
+  it("eligibility.v4 in its context and its own field: read as it was written", async () => {
+    const { snapshots } = await computed(harness());
+    const written = snapshots[0];
+    if (written === undefined) throw new Error("expected a snapshot");
+    const older = {
+      ...written,
+      eligibilityPolicyVersion: "eligibility.v4",
+      context: {
+        ...written.context,
+        eligibilityPolicyVersion: "eligibility.v4",
+      },
+    };
+    const read = RecommendationFeatureSnapshotSchema.parse(older);
+    expect(read.context.eligibilityPolicyVersion).toBe("eligibility.v4");
+    expect(read.eligibilityPolicyVersion).toBe("eligibility.v4");
+  });
+});
+
 describe("feature service", () => {
   it("computes one snapshot per eligible candidate, registry order, both provenances retained, two batch reads (§45–§46, §67)", async () => {
     const h = harness();

@@ -10,7 +10,7 @@ import {
   ELIGIBILITY_POLICY_VERSIONS,
   EligibilityDecisionSchema,
   RECOMMENDATION_MODES,
-  RecommendationContextSchema,
+  PersistedRecommendationContextSchema,
   RecommendationModeSchema,
 } from "../eligibility/contracts.js";
 import {
@@ -300,7 +300,9 @@ export const RecommendationFeatureSnapshotSchema = z
   .object({
     // Read side of a persisted artifact: every published version.
     featureSchemaVersion: z.enum(FEATURE_SCHEMA_VERSIONS),
-    context: RecommendationContextSchema,
+    // Read side, like its own policy version below: never a version bump
+    // that makes yesterday's snapshots unreadable.
+    context: PersistedRecommendationContextSchema,
     mandateId: z.string().uuid(),
     mandateVersion: z.number().int().min(1),
     companyId: z.string().uuid(),
