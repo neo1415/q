@@ -295,20 +295,26 @@ export function createFitService(
     // F-82 (live 2026-10-24): eligibility takes at most
     // ELIGIBILITY_BATCH_MAX ids per call and throws past it; a rank over
     // the whole network (463 live) asks in batches, one after another.
-    const evaluation: {
-      results: Awaited<
-        ReturnType<EligibilityService["evaluate"]>
-      >["results"][number][];
-    } = { results: [] };
+    // Owner 2026-10-25: the batches are evaluated side by side (at most
+    // five), their results kept in order.
+    const chunks: string[][] = [];
     for (let start = 0; start < ids.length; start += ELIGIBILITY_BATCH_MAX) {
-      const batch = await dependencies.eligibility.evaluate({
-        actor,
-        purpose: "VIEW",
-        viewpoint: "ACTOR",
-        companyIds: ids.slice(start, start + ELIGIBILITY_BATCH_MAX),
-      });
-      evaluation.results.push(...batch.results);
+      chunks.push(ids.slice(start, start + ELIGIBILITY_BATCH_MAX));
     }
+    const evaluation = {
+      results: (
+        await Promise.all(
+          chunks.map((companyIds) =>
+            dependencies.eligibility.evaluate({
+              actor,
+              purpose: "VIEW",
+              viewpoint: "ACTOR",
+              companyIds,
+            }),
+          ),
+        )
+      ).flatMap((batch) => batch.results),
+    };
     // F5: only marketplace participation stood in the way, and the company
     // is an unclaimed public profile: its fit is readable from public facts.
     const onlyNotReady = evaluation.results
@@ -379,24 +385,32 @@ export function createFitService(
       );
     }
 
-    // F-82 (live bbb4b6773): the inputs read fans out per company (feature
-    // snapshots, identities, raises), and its raise disclosure is bounded
-    // per call. Over the whole network it is read in batches, one after
-    // another, so a rank never fails for the size of the network.
+    // F-82 (live bbb4b6773): the raise disclosure inside the inputs read is
+    // bounded per call, so over the whole network the inputs are read in
+    // batches, and a rank never fails for the size of the network.
     const admittedIds = admitted.map((r) => r.companyId);
-    const inputs = new Map<string, FitCompanyInputs>();
+    const parts: string[][] = [];
     for (
       let start = 0;
       start < admittedIds.length;
       start += FIT_INPUTS_BATCH_MAX
     ) {
-      const part = await dependencies.inputs.read({
-        actor,
-        investorOrganisationId: subject.investorOrganisationId,
-        mandateId,
-        companyIds: admittedIds.slice(start, start + FIT_INPUTS_BATCH_MAX),
-        ...(purpose === undefined ? {} : { purpose }),
-      });
+      parts.push(admittedIds.slice(start, start + FIT_INPUTS_BATCH_MAX));
+    }
+    // Owner 2026-10-25: each batch is a handful of set reads now, so the
+    // batches run side by side (at most ten), merged in order.
+    const inputs = new Map<string, FitCompanyInputs>();
+    for (const part of await Promise.all(
+      parts.map((companyIds) =>
+        dependencies.inputs.read({
+          actor,
+          investorOrganisationId: subject.investorOrganisationId,
+          mandateId,
+          companyIds,
+          ...(purpose === undefined ? {} : { purpose }),
+        }),
+      ),
+    )) {
       for (const [companyId, input] of part) inputs.set(companyId, input);
     }
     const now = clock();

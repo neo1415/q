@@ -31,7 +31,14 @@ const PRIVATE = ID(2);
  * test publishes one (read through public-identity's own repository).
  */
 /** Queries the fit composition sent, by what they read (egress counts). */
-const queries = { snapshots: 0, profiles: 0 };
+const queries = {
+  snapshots: 0,
+  profiles: 0,
+  cards: 0,
+  identities: 0,
+  objectives: 0,
+  oneByOne: 0,
+};
 
 function cardSql(published: ReadonlyMap<string, unknown>) {
   return ((strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -41,12 +48,13 @@ function cardSql(published: ReadonlyMap<string, unknown>) {
     if (!strings.join("?").includes("core.shareable_identities")) {
       return Promise.resolve([]);
     }
-    const subjectId = values.find(
-      (v): v is string => typeof v === "string" && published.has(v),
-    );
-    if (subjectId === undefined) return Promise.resolve([]);
-    return Promise.resolve([
-      {
+    queries.cards += 1;
+    // One card or many (a batch read passes the ids as one array).
+    const subjects = values
+      .flatMap((v) => (Array.isArray(v) ? v : [v]))
+      .filter((v): v is string => typeof v === "string" && published.has(v));
+    return Promise.resolve(
+      subjects.map((subjectId) => ({
         id: ID(400),
         tenant_id: ID(5),
         organisation_id: ID(6),
@@ -58,8 +66,8 @@ function cardSql(published: ReadonlyMap<string, unknown>) {
         status: "ACTIVE",
         version: 1,
         updated_at: new Date(),
-      },
-    ]);
+      })),
+    );
   }) as never;
 }
 
@@ -128,23 +136,56 @@ function compose(
         queries.profiles += 1;
         return Promise.resolve(null);
       },
-      findCanonicalCompany: (id) =>
-        Promise.resolve({
+      findCanonicalCompany: (id) => {
+        queries.oneByOne += 1;
+        return Promise.resolve({
           id,
           tenantId: ID(5),
           organisationId: ID(6),
           canonicalName: names(id),
           companyStatus: "active",
-        } as never),
+        } as never);
+      },
+      findCanonicalCompanies: (ids) => {
+        queries.identities += 1;
+        return Promise.resolve(
+          ids.map(
+            (id) =>
+              ({
+                id,
+                tenantId: ID(5),
+                organisationId: ID(6),
+                canonicalName: names(id),
+                companyStatus: "active",
+              }) as never,
+          ),
+        );
+      },
     },
     capital: {
-      getCurrentForCompany: (_tenant, companyId) =>
-        Promise.resolve({
+      getCurrentForCompany: (_tenant, companyId) => {
+        queries.oneByOne += 1;
+        return Promise.resolve({
           id: `obj-${companyId}`,
           companyId,
           status: "ACTIVE",
           target: { amount: "2000000", currency: "USD" },
-        } as never),
+        } as never);
+      },
+      getCurrentForCompanies: (companies) => {
+        queries.objectives += 1;
+        return Promise.resolve(
+          companies.map(
+            ({ companyId }) =>
+              ({
+                id: `obj-${companyId}`,
+                companyId,
+                status: "ACTIVE",
+                target: { amount: "2000000", currency: "USD" },
+              }) as never,
+          ),
+        );
+      },
     },
     disclosure: {
       evaluateMany: (requests) =>
@@ -251,8 +292,8 @@ describe("fit composition", () => {
       (id) => id === SILO,
       (id) => (id === SILO ? "Silo Credit" : `A company ${id.slice(-4)}`),
     );
-    queries.snapshots = 0;
-    queries.profiles = 0;
+    for (const key of Object.keys(queries) as (keyof typeof queries)[])
+      queries[key] = 0;
     const result = await fit.rank?.(actor, ids, 5);
     expect(result?.kind).toBe("OK");
     if (result?.kind !== "OK") return;
@@ -262,6 +303,13 @@ describe("fit composition", () => {
     // never one per company, and no profile one-liners for a ranking.
     expect(queries.snapshots).toBe(5);
     expect(queries.profiles).toBe(0);
+    // Owner 2026-10-25 (the rank took ~18 s): per batch of 100, one read
+    // each for identities (names and raises), objectives and Q Cards;
+    // never one query per company.
+    expect(queries.oneByOne).toBe(0);
+    expect(queries.identities).toBe(10);
+    expect(queries.objectives).toBe(5);
+    expect(queries.cards).toBe(5);
   });
 
   it("top N reads the reader's own lists, and one list failing does not fail it", async () => {

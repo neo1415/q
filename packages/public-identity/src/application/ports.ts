@@ -127,6 +127,12 @@ export type PublicIdentityRepository = {
     sql: DatabaseExecutor,
     subject: QCardSubject,
   ) => Promise<CardRow | null>;
+  /** The cards of many subjects of one type in one read; absent ones have none. */
+  readonly findCards: (
+    sql: DatabaseExecutor,
+    subjectType: QCardSubject["subjectType"],
+    subjectIds: readonly string[],
+  ) => Promise<readonly CardRow[]>;
   readonly insertCard: (
     tx: TransactionContext,
     row: {

@@ -1,12 +1,15 @@
 import { z } from "zod";
 
 import type { DatabaseExecutor } from "@capital-q/database";
-import type { CompanyKnowledgePort } from "@capital-q/discovery";
+import {
+  KNOWLEDGE_DISCOVER_LIMIT_MAX,
+  type CompanyKnowledgePort,
+} from "@capital-q/discovery";
 import type { CompanyCatalogPort } from "@capital-q/q-tools";
 import { normalizeTaxonomyAlias } from "@capital-q/taxonomy";
 
 /** One knowledge page (KNOWLEDGE_DISCOVER_LIMIT_MAX). */
-const CATALOG_PAGE = 50;
+const CATALOG_PAGE = KNOWLEDGE_DISCOVER_LIMIT_MAX;
 /**
  * The most matches one catalog read takes, for a fit ranking over all.
  * F-82: past the whole network (463 live); at 200 the first 200 by name

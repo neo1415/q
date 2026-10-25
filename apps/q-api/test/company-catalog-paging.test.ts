@@ -5,6 +5,7 @@ import type {
   CompanyKnowledge,
   CompanyKnowledgePort,
 } from "@capital-q/discovery";
+import { KNOWLEDGE_DISCOVER_LIMIT_MAX } from "@capital-q/discovery";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -14,7 +15,7 @@ import {
 
 /**
  * Owner 2026-10-23: a fit ranking reads every match, never the first page
- * by name. The knowledge query returns at most one page (50), so the
+ * by name. The knowledge query returns at most one page, so the
  * catalog pages it by keyset until a short page or its bound.
  */
 
@@ -52,7 +53,7 @@ function knowledgeOf(count: number) {
         query.after === null || query.after === undefined
           ? 0
           : all.findIndex((c) => c.companyId === query.after?.companyId) + 1;
-      const limit = Math.min(query.limit, 50);
+      const limit = Math.min(query.limit, KNOWLEDGE_DISCOVER_LIMIT_MAX);
       pages.push(limit);
       return Promise.resolve(all.slice(start, start + limit));
     },
@@ -77,24 +78,28 @@ const find = (count: number, limit: number) => {
 };
 
 describe("company catalog paging (owner 2026-10-23)", () => {
-  it("reads every one of 137 matches over three pages, in order, none twice", async () => {
+  it("reads every one of 137 matches in one read, in order, none twice", async () => {
     const { found, pages } = await find(137, CATALOG_SCAN_MAX);
     expect(found.candidates).toHaveLength(137);
     expect(new Set(found.candidates.map((c) => c.companyId)).size).toBe(137);
     expect(found.candidates.at(-1)?.name).toBe("Company 137");
-    expect(pages).toEqual([50, 50, 50]);
+    expect(pages).toEqual([KNOWLEDGE_DISCOVER_LIMIT_MAX]);
   });
 
-  it("F-82: reads all 463 companies of the live network, not the first 200 by name", async () => {
-    const { found } = await find(463, CATALOG_SCAN_MAX);
+  it("F-82: reads all 463 companies of the live network, in one read (owner 2026-10-25)", async () => {
+    const { found, pages } = await find(463, CATALOG_SCAN_MAX);
     expect(found.candidates).toHaveLength(463);
     expect(found.candidates.at(-1)?.name).toBe("Company 463");
+    // One query, never ten sequential pages of 50.
+    expect(pages).toHaveLength(1);
   });
 
   it("stops at its bound, and a small limit reads one small page", async () => {
     const capped = await find(CATALOG_SCAN_MAX + 37, CATALOG_SCAN_MAX * 2);
     expect(capped.found.candidates).toHaveLength(CATALOG_SCAN_MAX);
-    expect(capped.pages).toHaveLength(CATALOG_SCAN_MAX / 50);
+    expect(capped.pages).toHaveLength(
+      CATALOG_SCAN_MAX / KNOWLEDGE_DISCOVER_LIMIT_MAX,
+    );
     const small = await find(500, 6);
     expect(small.found.candidates).toHaveLength(6);
     expect(small.pages).toEqual([6]);

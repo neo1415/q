@@ -128,7 +128,12 @@ export type CompanyKnowledgePort = {
   ) => Promise<ReadonlyMap<string, string | null>>;
 };
 
-export const KNOWLEDGE_DISCOVER_LIMIT_MAX = 50;
+/**
+ * One page of the catalog read. Owner 2026-10-25: the whole network (463
+ * live) is one page, not ten sequential pages of 50, for a fit ranking
+ * over every match. Its only caller pages past it, bounded.
+ */
+export const KNOWLEDGE_DISCOVER_LIMIT_MAX = 500;
 const IDS_MAX = 200;
 
 const Text = z.string();

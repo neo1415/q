@@ -11,7 +11,8 @@
             "COMPARISON_CARDS",
             "TABLE",
             "ANSWER_CARDS"
-          ]
+          ],
+          "maxMs": 8000
         }
       },
       {
@@ -239,7 +240,8 @@
           "replyMatches": [
             "Silo Credit",
             "on Capital Q; ranked by fit with your mandate"
-          ]
+          ],
+          "maxMs": 8000
         }
       }
     ]

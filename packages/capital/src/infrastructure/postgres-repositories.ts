@@ -319,6 +319,19 @@ export function createPostgresCapitalObjectiveQueryPort(options: {
       const objective = await repository.findActive(sql, tenantId, companyId);
       return objective === null ? null : toCapitalObjectiveSnapshot(objective);
     },
+    getCurrentForCompanies: async (companies) => {
+      if (companies.length === 0) return [];
+      // One read for many (owner 2026-10-25: a network fit rank read one
+      // objective per company, ~460 queries behind a small pool).
+      const rows = await sql`
+        ${objectiveSelect(sql)}
+         where (o.tenant_id, o.company_id) in (
+                 select * from unnest(
+                   ${companies.map((c) => c.tenantId)}::uuid[],
+                   ${companies.map((c) => c.companyId)}::uuid[]))
+           and o.status = 'ACTIVE'`;
+      return rows.map((row) => toCapitalObjectiveSnapshot(toObjective(row)));
+    },
     getById: async (tenantId, companyId, capitalObjectiveId) => {
       const objective = await repository.findById(
         sql,

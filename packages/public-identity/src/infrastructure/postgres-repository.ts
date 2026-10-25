@@ -143,6 +143,19 @@ export function createPostgresPublicIdentityRepository(): PublicIdentityReposito
       return row === undefined ? null : toCard(row);
     },
 
+    findCards: async (sql, subjectType, subjectIds) => {
+      if (subjectIds.length === 0) return [];
+      // One read for many (owner 2026-10-25: a network fit rank read one
+      // card per company).
+      const rows = await sql`
+        select id, tenant_id, organisation_id, subject_type, subject_id,
+               public_code, field_scopes, indexable, status, version, updated_at
+          from core.shareable_identities
+         where subject_type = ${subjectType}
+           and subject_id = any(${[...subjectIds]}::uuid[])`;
+      return rows.map(toCard);
+    },
+
     insertCard: async (tx, row) => {
       await tx.sql`
         insert into core.shareable_identities
