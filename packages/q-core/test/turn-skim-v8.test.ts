@@ -17,7 +17,7 @@ import {
 describe("TURN_SKIM v8: the kinds of investor asked for", () => {
   it("is the active skim", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_SKIM");
-    expect(active.definition.version).toBe(8);
+    expect(active.definition.version).toBe(9);
     expect(TURN_SKIM_V7.status).toBe("DEPRECATED");
     expect(TURN_SKIM_V8.template).toContain(V8_KINDS);
   });

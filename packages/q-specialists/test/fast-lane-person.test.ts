@@ -65,4 +65,42 @@ describe("fastLaneOf (W2 person search)", () => {
       ),
     ).toBeNull();
   });
+
+  // Production 2026-10-25 (run 3d8c2636): "Who is the founder of
+  // Paystack?" -- the skim named the company with the role asked for; the
+  // person wanted is not named, so the full reading takes it.
+  it("an organisation with a role asked of it is not a lookup of the organisation", () => {
+    expect(
+      fastLaneOf(
+        {
+          kind: "PERSON_SEARCH",
+          confidence: "HIGH",
+          count: null,
+          discover: null,
+          person: {
+            ...PERSON,
+            name: "Paystack",
+            kind: "ORGANIZATION",
+            city: null,
+            country: null,
+            role: "founder",
+          },
+        },
+        "Who is the founder of Paystack?",
+      ),
+    ).toBeNull();
+    // A named person with their role is still a lookup of that person.
+    expect(
+      fastLaneOf(
+        {
+          kind: "PERSON_SEARCH",
+          confidence: "HIGH",
+          count: null,
+          discover: null,
+          person: { ...PERSON, role: "finance director" },
+        },
+        "find Shadi Qishta, finance director in Doha",
+      )?.questionKind,
+    ).toBe("PERSON_SEARCH");
+  });
 });
