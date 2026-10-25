@@ -95,6 +95,26 @@ describe("a re-read document's offers", () => {
   });
 });
 
+describe("a Q recommendation of a value their document already offers", () => {
+  it("finds that offer, so the recommendation adds none (live 25 Oct e2e)", () => {
+    const deck = offer("F5.customers", { type: "RANGE", value: "210" }, DECK_1);
+    const otherStep = offer("F6.instrument", SEED, DECK_1);
+    expect(
+      supersededDocumentOffers([deck, otherStep], {
+        stepKey: "F5.customers",
+        suggestedValue: { type: "RANGE", value: "210" },
+      }),
+    ).toEqual([deck]);
+    // A different figure is Q's own recommendation, stored as before.
+    expect(
+      supersededDocumentOffers([deck], {
+        stepKey: "F5.customers",
+        suggestedValue: { type: "RANGE", value: "250" },
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe("the superseding offer's sources", () => {
   it("cite every document, newest first, each once", () => {
     expect(withSources(DECK_2, [...DECK_1, DECK_2[0]])).toEqual([

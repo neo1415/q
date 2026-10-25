@@ -355,3 +355,21 @@ export function withoutUnbackedFieldClaims(
   if (kept.length === sentences.length) return reply;
   return kept.join("").trim();
 }
+
+/**
+ * Their words ask to leave the interview for now: to finish here, stop for
+ * now, come back later or go to their home page (live 25 Oct e2e: "I would
+ * like to finish and go to my home page"). Narrow on purpose: a stated
+ * fact that only mentions finishing ("we finish payroll runs on Friday")
+ * names no leaving.
+ */
+const LEAVING = [
+  /\b(?:go|take me|send me|back) (?:to|back to) (?:my |the )?(?:home|dashboard)(?: ?page)?\b/iu,
+  /\b(?:continue|carry on|pick (?:this|it) up|come back|finish(?: this)?|do the rest|answer the rest)\b[^.?!]{0,40}\blater\b/iu,
+  /\b(?:that'?s|that is) (?:all|everything|enough) for (?:now|today)\b/iu,
+  /\b(?:stop|pause|leave it|leave this) (?:here|there|for now|for today)\b/iu,
+  /\bi(?:'d| would) like to (?:finish|stop|leave) (?:now|here|for now)\b/iu,
+];
+export function asksToLeave(utterance: string): boolean {
+  return LEAVING.some((pattern) => pattern.test(utterance));
+}

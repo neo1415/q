@@ -102,6 +102,7 @@ import {
   type ChoicesOf,
 } from "./quick-acknowledgement.js";
 import {
+  asksToLeave,
   firstNameOf,
   onboardingFlowFor,
   withNextQuestion,
@@ -1713,7 +1714,16 @@ export function createInterviewAgent(
           textStatedIn(authority.pronounce.term, lastQTurn ?? ""))
           ? authority.pronounce
           : null;
-      const pausing = authority.pausing && !opening;
+      // Leaving for now is honoured whichever way it reads (live 25 Oct
+      // e2e: "I would like to finish and go to my home page" with
+      // essentials open got "we'll pause here … How many founders?", the
+      // next question appended and no way out). A finish the journey
+      // cannot take yet is a pause: their answers wait, they go home.
+      const pausing =
+        !opening &&
+        (authority.pausing ||
+          (!state.canComplete &&
+            (authority.finishing || asksToLeave(utterance))));
       // Rendered against the state of each round, never the state when the
       // reading landed (live 2026-10-16: findings accepted by code this
       // turn, and the round was still told to ask for the description).

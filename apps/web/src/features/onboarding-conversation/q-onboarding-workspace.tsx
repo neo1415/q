@@ -86,6 +86,8 @@ import {
   stillNeeded,
   taxonomyProposal,
   composerHint,
+  keptAllLine,
+  stillWaiting,
   pendingQuestion,
   redrawnThread,
   welcomeBack,
@@ -721,11 +723,14 @@ export function QOnboardingWorkspace({
           setTurns((current) => [...restored, ...unsent, ...current]);
         }
         if (pending !== null) {
-          // Q is asking that line, about a step this screen cannot name
-          // after a reload: the composer's hint stays neutral rather than
-          // the form step's ("example.com" under "Are you deploying
-          // capital?", live 24 Oct).
-          setQAsking([]);
+          // Q is asking that line: its controls are the step it asked, which
+          // the session read carries (live 25 Oct e2e: after a reload the
+          // chips under "are you deploying capital now?" were gone, the
+          // cursor's step showing instead). Unknown, the composer's hint
+          // stays neutral rather than the form step's (live 24 Oct).
+          const asked = viewRef.current?.askedStep ?? null;
+          setQAskedStep(asked);
+          setQAsking(asked === null ? [] : [asked.stepKey]);
           return pending;
         }
         return actions
@@ -1389,19 +1394,25 @@ export function QOnboardingWorkspace({
     return () => clearTimeout(timer);
   }, [prompt, push, actions, recentTurns, voiceActive, arriving]);
 
-  const keep = async (suggestionId: string) => {
+  const keep = async (suggestionId: string): Promise<boolean> => {
     settleReading();
-    await actions.resolveSuggestion({ suggestionId, resolution: "ACCEPT" });
+    return actions.resolveSuggestion({ suggestionId, resolution: "ACCEPT" });
   };
   const notThis = async (suggestionId: string) => {
     settleReading();
     await actions.resolveSuggestion({ suggestionId, resolution: "REJECT" });
   };
   const keepAll = async () => {
+    const outcomes: boolean[] = [];
     for (const item of otherProposals) {
-      await keep(item.suggestion.id);
+      // Keeping one retires any other offer for the same step (live 25 Oct
+      // e2e: the second offer was refused as already settled). Only what
+      // is still waiting is kept.
+      if (!stillWaiting(viewRef.current, item.suggestion.id)) continue;
+      outcomes.push(await keep(item.suggestion.id));
     }
-    push("Q", "All kept. Thank you.");
+    const said = keptAllLine(outcomes);
+    if (said !== null) push("Q", said);
   };
 
   /** A gap answered in place, through the question's own path (§16, §21). */
