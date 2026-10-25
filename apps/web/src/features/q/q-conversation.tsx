@@ -101,6 +101,7 @@ import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
+import { earlierWork, PinnedWorkLines } from "./pinned-work";
 
 /*
  * Q room W7: what opens on request -- a document Q made, the previous
@@ -544,6 +545,18 @@ export function QConversationPanel({
       : lines.filter(
           (line) => !(line.role === "person" && words(line.text) === liveWords),
         );
+
+  // Documents still being made, asked for before the latest exchange: the
+  // presence view keeps a line for each (pinned-work.tsx).
+  const pinnedWork = useMemo(() => {
+    const latest = latestExchange(thread);
+    const turnsOf = (some: readonly (typeof thread)[number][]) =>
+      some.flatMap((line) => (line.turn === undefined ? [] : [line.turn]));
+    return earlierWork(
+      turnsOf(thread.slice(0, thread.length - latest.length)),
+      turnsOf(latest),
+    );
+  }, [thread]);
 
   // The newest words are where the eye is: the thread keeps its end in view.
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -1261,83 +1274,93 @@ export function QConversationPanel({
                             </button>
                           </div>
                         ) : (
-                          <ol
-                            className="flex w-full flex-col gap-5"
-                            aria-label={t("Conversation")}
+                          <div className="flex w-full flex-col gap-5">
+                            {/* A document still being made, asked for
+                              earlier: its line stays in view (owner
+                              2026-10-24, coordinator 25 Oct). */}
+                            <PinnedWorkLines
+                              jobs={pinnedWork}
+                              onOpenArtifact={showArtifact}
+                              onAsk={sayOrAsk}
+                            />
+                            <ol
+                              className="flex w-full flex-col gap-5"
+                              aria-label={t("Conversation")}
 
-                            data-q-thread
-                          >
-                            {latestExchange(thread).map((line) =>
-                              line.role === "person" ? (
+                              data-q-thread
+                            >
+                              {latestExchange(thread).map((line) =>
+                                line.role === "person" ? (
+                                  <li
+                                    key={line.id}
+                                    className="flex flex-col"
+                                    data-q-row="person"
+                                    data-q-turn-id={line.turnId ?? line.id}
+                                    data-q-turn-role="USER"
+                                    data-q-disposition={rowDisposition(line)}
+                                  >
+                                    <p className="cq-q-bubble cq-body">
+                                      <span className="sr-only">
+                                        {t("You:")}{" "}
+                                      </span>
+                                      {line.text}
+                                    </p>
+                                    <HideFromQ
+                                      conversationId={q.conversationId}
+                                      messageId={line.id}
+                                    />
+                                  </li>
+                                ) : (
+                                  <li
+                                    key={line.id}
+                                    className="flex flex-col"
+                                    data-q-row="q"
+                                    data-q-turn-id={line.turnId ?? line.id}
+                                    data-q-turn-role="Q"
+                                    data-q-disposition={rowDisposition(line)}
+                                    data-q-failure={rowFailure(line)}
+                                  >
+                                    <span className="sr-only">Q: </span>
+                                    {line.turn === undefined ? (
+                                      <QMarkdown
+                                        text={line.text}
+                                        className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)"
+                                      />
+                                    ) : (
+                                      <QAnswer
+                                        turn={line.turn}
+                                        mark={false}
+                                        // The stage around this thread draws
+                                        // the answer's pictures.
+                                        picturesInline={false}
+                                        onAsk={sayOrAsk}
+                                        onOpenArtifact={showArtifact}
+                                      />
+                                    )}
+                                  </li>
+                                ),
+                              )}
+                              {liveIsPerson ? (
                                 <li
-                                  key={line.id}
+                                  key={live.id}
                                   className="flex flex-col"
                                   data-q-row="person"
-                                  data-q-turn-id={line.turnId ?? line.id}
+                                  data-q-turn-id={live.id}
                                   data-q-turn-role="USER"
-                                  data-q-disposition={rowDisposition(line)}
                                 >
-                                  <p className="cq-q-bubble cq-body">
+                                  <p
+                                    className="cq-q-bubble is-live cq-body"
+                                    data-q-live-line
+                                  >
                                     <span className="sr-only">
-                                      {t("You:")}{" "}
+                                      {t("You, speaking:")}{" "}
                                     </span>
-                                    {line.text}
+                                    {live.text}
                                   </p>
-                                  <HideFromQ
-                                    conversationId={q.conversationId}
-                                    messageId={line.id}
-                                  />
                                 </li>
-                              ) : (
-                                <li
-                                  key={line.id}
-                                  className="flex flex-col"
-                                  data-q-row="q"
-                                  data-q-turn-id={line.turnId ?? line.id}
-                                  data-q-turn-role="Q"
-                                  data-q-disposition={rowDisposition(line)}
-                                  data-q-failure={rowFailure(line)}
-                                >
-                                  <span className="sr-only">Q: </span>
-                                  {line.turn === undefined ? (
-                                    <QMarkdown
-                                      text={line.text}
-                                      className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)"
-                                    />
-                                  ) : (
-                                    <QAnswer
-                                      turn={line.turn}
-                                      mark={false}
-                                      // The stage around this thread draws
-                                      // the answer's pictures.
-                                      picturesInline={false}
-                                      onAsk={sayOrAsk}
-                                      onOpenArtifact={showArtifact}
-                                    />
-                                  )}
-                                </li>
-                              ),
-                            )}
-                            {liveIsPerson ? (
-                              <li
-                                key={live.id}
-                                className="flex flex-col"
-                                data-q-row="person"
-                                data-q-turn-id={live.id}
-                                data-q-turn-role="USER"
-                              >
-                                <p
-                                  className="cq-q-bubble is-live cq-body"
-                                  data-q-live-line
-                                >
-                                  <span className="sr-only">
-                                    {t("You, speaking:")}{" "}
-                                  </span>
-                                  {live.text}
-                                </p>
-                              </li>
-                            ) : null}
-                          </ol>
+                              ) : null}
+                            </ol>
+                          </div>
                         )
                       }
                       waiting={

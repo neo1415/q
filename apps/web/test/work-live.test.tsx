@@ -23,10 +23,15 @@ import {
   stepStates,
   WorkInProgressCard,
 } from "../src/features/q/work-canvas";
+import { earlierWork, PinnedWorkLines } from "../src/features/q/pinned-work";
 import {
   liveFraction,
+  liveKey,
   liveLine,
   Q_WORK_SETTLED_EVENT,
+  resetWorkLive,
+  useWorkLive,
+  WORK_LIVE_WATCH_MS,
 } from "../src/features/q/work-live";
 
 /**
@@ -35,6 +40,7 @@ import {
  */
 afterEach(() => {
   cleanup();
+  resetWorkLive();
   vi.unstubAllGlobals();
 });
 
@@ -382,3 +388,97 @@ function documentCard(): string | null {
       ?.getAttribute("data-q-artifact-card") ?? null
   );
 }
+
+describe("coordinator 25 Oct: one poll per job, paced by real movement", () => {
+  it("counts the stage, the draft and the sections as movement, not a new source", () => {
+    const base = working();
+    expect(liveKey(base)).toBe(liveKey({ ...base, done: base.done + 1 }));
+    expect(liveKey(base)).not.toBe(
+      liveKey({ ...base, stage: stage({ ...base.stage, draft: 2 }) }),
+    );
+    expect(liveKey(base)).not.toBe(
+      liveKey({
+        ...base,
+        stage: stage({ ...base.stage, sections: ["Why Paystack"] }),
+      }),
+    );
+    expect(liveKey({ ...base, state: "WAITING" })).toBe("WAITING");
+  });
+
+  it("two places showing the same job read it once", async () => {
+    const fetch = serve([working()]);
+    function Shows() {
+      const { live } = useWorkLive(JOB);
+      return <p>{live?.state ?? "…"}</p>;
+    }
+    render(
+      <>
+        <Shows />
+        <Shows />
+      </>,
+    );
+    await waitFor(() => expect(screen.getAllByText("WORKING")).toHaveLength(2));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("after the watch window, a focus reads again instead of needing a reload", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const fetch = serve([working()]);
+      function Shows() {
+        const { live } = useWorkLive(JOB);
+        return <p>{live?.state ?? "…"}</p>;
+      }
+      render(<Shows />);
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      // Past the window: the next read finds it expired and stops.
+      await vi.advanceTimersByTimeAsync(WORK_LIVE_WATCH_MS + 60_000);
+      const stopped = fetch.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(fetch.mock.calls.length).toBe(stopped);
+      window.dispatchEvent(new Event("focus"));
+      await waitFor(() =>
+        expect(fetch.mock.calls.length).toBeGreaterThan(stopped),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("coordinator 25 Oct: a document being made stays in view", () => {
+  it("lists the jobs from before the latest exchange, once each", () => {
+    const earlier = [{ blocks: [work] }, { blocks: [work] }];
+    expect(earlierWork(earlier, []).map((job) => job.jobId)).toEqual([JOB]);
+    expect(earlierWork(earlier, [{ blocks: [work] }])).toEqual([]);
+  });
+
+  it("shows the title, the stage in words and the bar; a tap opens the card; done, it goes", async () => {
+    serve([working(), done]);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<PinnedWorkLines jobs={[work]} />);
+      await waitFor(() =>
+        expect(screen.getByText("Paystack and Halyard: the case")).toBeTruthy(),
+      );
+      expect(screen.getByText("Reviewing the first draft")).toBeTruthy();
+      expect(screen.getByRole("progressbar")).toBeTruthy();
+      fireEvent.click(
+        window.document.querySelector("[data-q-pinned-work-toggle]") as Element,
+      );
+      expect(
+        window.document.querySelector(
+          "[data-q-work-progress], [data-q-work-step]",
+        ),
+      ).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(2_600);
+      await waitFor(() =>
+        expect(
+          window.document.querySelector("[data-q-pinned-work-job]"),
+        ).toBeNull(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
