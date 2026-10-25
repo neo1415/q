@@ -31,6 +31,9 @@ const SKIM = {
     mandateRelevant: false,
     previous: false,
     raising: false,
+    verifiedOnly: false,
+    hasPitch: false,
+    raiseShared: false,
   },
 };
 

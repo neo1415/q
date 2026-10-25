@@ -28,7 +28,7 @@ import { DiscoverRequestSchema } from "../src/conversation/reading.js";
 describe("TURN_READER v58: the reader names whom the turn is about", () => {
   it("v57 plus the NAMED OTHER rule (v63 is active) and Lane 4's two mandate sentences", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(65);
+    expect(active.definition.version).toBe(66);
     expect(TURN_READER_V57.status).toBe("DEPRECATED");
     expect(TURN_READER_V58.template).toContain(
       `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`,

@@ -991,3 +991,11 @@ export const TurnReaderV65ResultSchema = TurnReaderV64ResultSchema.extend({
   discoverWhom: z.enum(TURN_DISCOVER_WHOM).nullable().default(null),
 }).strict();
 export type TurnReaderV65Result = z.infer<typeof TurnReaderV65ResultSchema>;
+
+/**
+ * v66 (QA F-114): the same output as v65; the discover structure's
+ * verifiedOnly, hasPitch and raiseShared (defaults false) are now asked
+ * for, so a stated narrowing reaches Discover's filters and an unstated
+ * one never does.
+ */
+export const TURN_READER_V66_SCHEMA_VERSION = 66;

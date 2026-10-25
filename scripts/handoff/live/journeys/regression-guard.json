@@ -403,5 +403,25 @@
         }
       }
     ]
+  },
+  {
+    "id": "F-114",
+    "account": "investor.savanna-seed@fictional.capitalq.local",
+    "steps": [
+      {
+        "ask": "Show me the five companies that best fit my mandate",
+        "expect": {
+          "anyBlock": ["ANSWER_CARDS", "COMPARISON_CARDS"]
+        }
+      },
+      {
+        "ask": "Only fintech ones in Kenya or Nigeria that are raising now.",
+        "expect": {
+          "replyMatches": ["Silo Credit|Ledgerfold|MedTrail"],
+          "replyNot": ["No companies match"],
+          "maxMs": 12000
+        }
+      }
+    ]
   }
 ]

@@ -38,7 +38,7 @@ export const TURN_READER_V65: PromptDefinition<
 > = {
   ...TURN_READER_V64,
   version: 65,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Coordinator 2026-10-24 (run beb74547): v64 plus A CHOICE BETWEEN NAMED COMPANIES -- 'which is better / fits me more / would you pick, A or B', in any words and any language -- is compare {names} in the order said, also when it asks which fits; a fit question sets compare as well, never instead of it. Also replyTo (Q_QUESTION / WAITING_CARD with the card / NEW) and discoverWhom (INVESTORS / COMPANIES), read by meaning, so code's word lists only decide when to wait for the reading (coordinator 2026-10-24).",
   effectiveFrom: "2026-10-24",

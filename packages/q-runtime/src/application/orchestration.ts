@@ -318,6 +318,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly previous: boolean;
         /** They asked for companies raising now. Absent is false. */
         readonly raising?: boolean | undefined;
+        /**
+         * QA F-114: Discover's own narrowing choices, only when they asked
+         * for them ("only verified ones"). Absent is false.
+         */
+        readonly verifiedOnly?: boolean | undefined;
+        readonly hasPitch?: boolean | undefined;
+        readonly raiseShared?: boolean | undefined;
       }
     | undefined;
   /**

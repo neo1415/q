@@ -287,6 +287,11 @@ import {
   ownPitchReviewFact,
 } from "./own-pitch-review.js";
 import { withoutInternalFailureLines } from "./internal-failure-lines.js";
+import {
+  discoverFilterDecision,
+  SET_DISCOVER_FILTERS_TOOL,
+  type DiscoverRule,
+} from "./discover-filter-rule.js";
 import { relationshipFact } from "./relationship-fact.js";
 import {
   ownIndexFact,
@@ -2580,6 +2585,27 @@ export function createModelGatewayQAnswer(
       if (oldest !== undefined) reviewOnlyRuns.delete(oldest);
     }
   };
+  /** QA F-114: each run's Discover filter rule (discover-filter-rule.ts). Bounded. */
+  const discoverRuleByRun = new Map<string, DiscoverRule>();
+  const noteDiscoverRule = (runId: string, rule: DiscoverRule): void => {
+    discoverRuleByRun.set(runId, rule);
+    if (discoverRuleByRun.size > 256) {
+      const [oldest] = discoverRuleByRun.keys();
+      if (oldest !== undefined) discoverRuleByRun.delete(oldest);
+    }
+  };
+  /** A call refused because the person did not ask for it. */
+  const notAsked = (callId: string, safeMessage: string): QToolCallOutcome => ({
+    callId,
+    toolName: null,
+    toolVersion: null,
+    classification: null,
+    status: "DENIED",
+    failureCode: "NOT_ASKED",
+    sensitivity: null,
+    result: { ok: false, error: { code: "NOT_ASKED", safeMessage } },
+    latencyMs: 0,
+  });
   const tools: QToolPort = {
     offer: async (toolContext) => {
       const offered = await baseTools.offer(toolContext);
@@ -2595,25 +2621,32 @@ export function createModelGatewayQAnswer(
             return all;
           },
         }),
-    execute: async (proposal, toolContext) => {
+    execute: async (asked, toolContext) => {
       if (
-        proposal.name === "revise_my_document" &&
+        asked.name === "revise_my_document" &&
         reviewOnlyRuns.has(toolContext.runId)
       ) {
-        const safeMessage =
-          "They asked for a review of their own pitch video, not a change to a document. Answer with the review from its transcript and change nothing.";
-        return {
-          callId: proposal.callId,
-          toolName: null,
-          toolVersion: null,
-          classification: null,
-          status: "DENIED",
-          failureCode: "NOT_ASKED",
-          sensitivity: null,
-          result: { ok: false, error: { code: "NOT_ASKED", safeMessage } },
-          latencyMs: 0,
-        };
+        return notAsked(
+          asked.callId,
+          "They asked for a review of their own pitch video, not a change to a document. Answer with the review from its transcript and change nothing.",
+        );
       }
+      // QA F-114: their Discover filters carry only what they stated, and
+      // change only when they asked for Discover.
+      const discover =
+        asked.name === SET_DISCOVER_FILTERS_TOOL
+          ? discoverFilterDecision(
+              asked.arguments,
+              discoverRuleByRun.get(toolContext.runId),
+            )
+          : null;
+      if (discover?.kind === "REFUSE") {
+        return notAsked(asked.callId, discover.safeMessage);
+      }
+      const proposal =
+        discover?.kind === "SET"
+          ? { ...asked, arguments: discover.arguments }
+          : asked;
       const isRead =
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
       // What Q knows, Q knows (read-cache.ts): the same read under the
@@ -2860,6 +2893,20 @@ export function createModelGatewayQAnswer(
       return null;
     }
     const earlier = history.filter((m) => m.id !== latest.id);
+    // QA F-114: what this turn may put on their Discover filters (below).
+    noteDiscoverRule(request.runId, {
+      discover: request.discoverCompanies ?? null,
+      narrowing:
+        request.discoverCompanies !== undefined &&
+        (request.discoverCompanies.previous ||
+          newestAnswerCards(earlier).length > 0),
+      // A narrowing read as "set the filters" away from Discover is still a
+      // question about the list; the page changes when they are on it or
+      // asked to go there.
+      asked:
+        request.askedAction === "open_page" ||
+        plan.screen?.route === "DISCOVER",
+    });
     const toolContext: QToolExecutionContext = {
       actor: request.actor,
       runId: request.runId,
@@ -6952,7 +6999,11 @@ export function createModelGatewayQAnswer(
       if (
         catalogAsk !== undefined &&
         request.writingDocument !== true &&
-        request.askedAction === undefined &&
+        // F-114: a narrowing read as "set the Discover filters" away from
+        // Discover is answered here, in the thread, as the narrowed list.
+        (request.askedAction === undefined ||
+          (request.askedAction === SET_DISCOVER_FILTERS_TOOL &&
+            plan.screen?.route !== "DISCOVER")) &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const discoverStarted = Date.now();

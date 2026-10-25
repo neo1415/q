@@ -6513,6 +6513,10 @@ export function createSpecialistQAnswer(
               previous: read.question.discover?.previous ?? false,
               // v58: they asked for companies raising now.
               raising: read.question.discover?.raising === true,
+              // v66 (QA F-114): Discover's narrowing choices they stated.
+              verifiedOnly: read.question.discover?.verifiedOnly === true,
+              hasPitch: read.question.discover?.hasPitch === true,
+              raiseShared: read.question.discover?.raiseShared === true,
             },
           }
         : {}),
