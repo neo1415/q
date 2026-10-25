@@ -52,8 +52,12 @@ export const PERSON_SEARCH_BUDGET = {
   perCallMs: 3_000,
   /** The whole search, including ranking. */
   overallMs: 4_500,
-  /** Queries planned for one person. */
-  maxQueries: 5,
+  /**
+   * Queries planned for one person (owner's spend rule 2026-10-25: a turn
+   * costs one or two searches): the name in its place, then its LinkedIn
+   * profile.
+   */
+  maxQueries: 2,
   /** Distinct hits kept per call. */
   hitsPerCall: 8,
 } as const;
@@ -370,21 +374,11 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
       let nextCall = 0;
 
       // The first index (the fastest and most accurate) takes every planned
-      // query; the others corroborate only the exact query and the spelling
-      // variant, so five queries do not cost five x n calls.
-      const assignments: {
-        planned: (typeof composed)[number];
-        at: number;
-      }[] = [];
-      composed.forEach((planned) => {
-        const corroborates =
-          planned.kind === "EXACT_PLACE" || planned.kind === "VARIANT";
-        providers.forEach((_provider, at) => {
-          if (at === 0 || corroborates) {
-            assignments.push({ planned, at });
-          }
-        });
-      });
+      // query, and no other index is asked beside it (owner's spend rule
+      // 2026-10-25: corroboration on every index made one turn cost many
+      // paid calls). A query passes to the next index only when the lead
+      // fails it; a resting key fails at once and costs nothing.
+      const assignments = composed.map((planned) => ({ planned, at: 0 }));
 
       const reevaluate = (): boolean => {
         decided = decideIdentity(spec, rankCandidates(spec, pool));
@@ -485,12 +479,8 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
               // A query only the lead index was given passes to the next
               // index when the lead fails it (live 2026-10-23: the lead was a
               // SERP key out of credit, so the LinkedIn query never ran and
-              // "Captain Zino Mario" stayed a name-only lead). Corroborated
-              // queries already run on every index.
-              const leadOnly =
-                planned.kind !== "EXACT_PLACE" && planned.kind !== "VARIANT";
+              // "Captain Zino Mario" stayed a name-only lead).
               if (
-                leadOnly &&
                 !cancelled &&
                 isResearchProviderFailure(error) &&
                 at + 1 < providers.length &&

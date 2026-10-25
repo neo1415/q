@@ -5,6 +5,7 @@ import {
   type PublicWebSearchResult,
 } from "../contracts.js";
 import { canonicalUrlKey } from "../domain/url-safety.js";
+import { isResting } from "./breaker.js";
 import {
   isResearchProviderFailure,
   ResearchProviderFailure,
@@ -67,6 +68,9 @@ export function createFallbackResearchProvider(input: {
     outcome: { readonly count: number } | { readonly error: unknown },
   ): void => {
     if (input.observe === undefined) return;
+    // A call the provider's breaker refused cost nothing and was logged
+    // once, when it opened.
+    if ("error" in outcome && isResting(outcome.error)) return;
     const latencyMs = Math.max(0, Date.now() - startedAt);
     input.observe(
       "count" in outcome

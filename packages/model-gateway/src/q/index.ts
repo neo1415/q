@@ -1231,10 +1231,14 @@ function heldNamedIn(
 /** A public search that ran and found no page (about them). */
 function webFoundNothing(outcome: QToolCallOutcome): boolean {
   if (!outcome.result.ok) return false;
-  const sources = (
-    outcome.result.data as { readonly sources?: readonly unknown[] }
-  ).sources;
-  return Array.isArray(sources) && sources.length === 0;
+  const data = outcome.result.data as {
+    readonly status?: unknown;
+    readonly sources?: readonly unknown[];
+  };
+  // A search that could not run found nothing only because it did not run
+  // (production 2026-10-25): the answer says the web is unavailable.
+  if (data.status === "PROVIDER_UNAVAILABLE") return false;
+  return Array.isArray(data.sources) && data.sources.length === 0;
 }
 
 /** How long a subject's empty public search stands for its conversation. */
@@ -5066,7 +5070,12 @@ export function createModelGatewayQAnswer(
                   );
                   if (emptyKey !== null && data !== null) {
                     searchedEmpty.delete(emptyKey);
-                    if ((data.sources?.length ?? 0) === 0) {
+                    // A search that could not run is not "found nothing":
+                    // never remembered as empty (2026-10-25).
+                    if (
+                      (data.sources?.length ?? 0) === 0 &&
+                      data.status !== "PROVIDER_UNAVAILABLE"
+                    ) {
                       searchedEmpty.set(emptyKey, {
                         outcome: settled,
                         at: Date.now(),

@@ -166,6 +166,7 @@ export function createDeepResearch(dependencies: {
               freshness,
               extractCount: pages,
               focused: true,
+              planned: true,
               researchVocabulary: true,
               ...(command.publicTerms === undefined
                 ? {}
