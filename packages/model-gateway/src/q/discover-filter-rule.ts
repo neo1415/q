@@ -79,3 +79,55 @@ export function discoverFilterDecision(
   }
   return { kind: "SET", arguments: given };
 }
+
+/**
+ * QA F-109/F-110 (run 4dbd529e): "ranked, with why" was answered as
+ * comparison cards, not answer cards, so the narrowing that followed was
+ * not seen as one of Q's own list and set their Discover filters. Q's
+ * newest answer gave a list of companies when it carries company answer
+ * cards, comparison cards, a table, or two or more company references.
+ */
+export function newestAnswerListsCompanies(
+  earlier: readonly {
+    readonly role: string;
+    readonly blocks?: readonly unknown[] | null | undefined;
+  }[],
+): boolean {
+  const newest = [...earlier].reverse().find((one) => one.role === "Q");
+  const blocks = (newest?.blocks ?? []).filter(
+    (block): block is object => typeof block === "object" && block !== null,
+  );
+  let references = 0;
+  for (const block of blocks) {
+    switch (Reflect.get(block, "kind")) {
+      case "ANSWER_CARDS": {
+        const cards: unknown = Reflect.get(block, "cards");
+        if (
+          Array.isArray(cards) &&
+          cards.some((card: unknown) => {
+            if (typeof card !== "object" || card === null) return false;
+            const subject: unknown = Reflect.get(card, "subject");
+            return (
+              typeof subject === "object" &&
+              subject !== null &&
+              Reflect.get(subject, "kind") === "COMPANY"
+            );
+          })
+        ) {
+          return true;
+        }
+        break;
+      }
+      case "COMPARISON_CARDS":
+      case "COMPARISON":
+      case "TABLE":
+        return true;
+      case "COMPANY_REFERENCE":
+        references += 1;
+        break;
+      default:
+        break;
+    }
+  }
+  return references >= 2;
+}
