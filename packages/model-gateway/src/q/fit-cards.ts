@@ -5,6 +5,7 @@ import {
   FitProfileDtoSchema,
   MoneySchema,
   type CompanyRaiseView,
+  type FitCandidateSource,
   QAnswerCardsBlockSchema,
   Q_ANSWER_CARD_MEASURES_MAX,
   fitScoreOutOf10,
@@ -110,6 +111,60 @@ function aboutOf(text: unknown): string | null {
 function moneyOf(value: unknown): Money | null {
   const parsed = MoneySchema.safeParse(value);
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Companies per named fit set read. The tool takes ten, but ten full
+ * profiles can pass the tool result bound; five (the usual page) stays
+ * well inside.
+ */
+export const FIT_SET_MAX = 5;
+
+/** One tool call through the run's port; null when it could not run. */
+export type FitToolRead = (
+  name: string,
+  args: Record<string, unknown>,
+  callId: string,
+) => Promise<QToolCallOutcome | null>;
+
+/**
+ * Owner 2026-10-25 (savanna cold miss: one fit_profile per card, each its
+ * own eligibility, inputs and scores read, 1.16 s for five): the fits of
+ * exactly these companies, a profiles call per five through
+ * `fit_top_candidates` when the run has it. A set that could not be read
+ * falls back to one fit_profile per company, as before. Outcomes come back
+ * in request order; each set's entries are in the fit order.
+ */
+export async function readFitSets(input: {
+  readonly ids: readonly string[];
+  readonly read: FitToolRead;
+  /** Whether this run may use `fit_top_candidates`. */
+  readonly sets: boolean;
+  readonly source: FitCandidateSource;
+  readonly callId: string;
+}): Promise<(QToolCallOutcome | null)[]> {
+  const { ids, read, callId } = input;
+  const one = (companyId: string, index: number) =>
+    read("fit_profile", { companyId }, `${callId}-${String(index)}`);
+  if (!input.sets) return Promise.all(ids.map(one));
+  const sets: string[][] = [];
+  for (let at = 0; at < ids.length; at += FIT_SET_MAX)
+    sets.push(ids.slice(at, at + FIT_SET_MAX));
+  const outcomes = await Promise.all(
+    sets.map(async (companyIds, set) => {
+      const outcome = await read(
+        "fit_top_candidates",
+        { companyIds, source: input.source },
+        `${callId}-set-${String(set)}`,
+      );
+      return outcome?.result.ok === true
+        ? [outcome]
+        : Promise.all(
+            companyIds.map((id, index) => one(id, set * FIT_SET_MAX + index)),
+          );
+    }),
+  );
+  return outcomes.flat();
 }
 
 /** Every fit one tool outcome carries, read through the contract. */

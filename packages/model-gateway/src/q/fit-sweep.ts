@@ -1,11 +1,11 @@
-import { fitScoreOutOf10 } from "@capital-q/contracts";
+import { fitScoreOutOf10, type FitCandidateSource } from "@capital-q/contracts";
 import type {
   QToolCallOutcome,
   QToolExecutionContext,
   QToolPort,
 } from "@capital-q/q-runtime";
 
-import { fitsInOutcome, type RunFit } from "./fit-cards.js";
+import { fitsInOutcome, readFitSets, type RunFit } from "./fit-cards.js";
 
 /**
  * Fit for a set of companies, computed by code before the model is asked
@@ -351,42 +351,65 @@ export async function runFitSweep(input: {
   const { ask, tools, context, available } = input;
   if (!available.has("fit_profile")) return null;
   const calls: QToolCallOutcome[] = [];
+  const read = async (
+    name: string,
+    args: Record<string, unknown>,
+    id: string,
+  ): Promise<QToolCallOutcome | null> => {
+    const outcome = await tools
+      .execute({ callId: id, name, arguments: args }, context)
+      .catch(() => null);
+    if (outcome !== null) calls.push(outcome);
+    return outcome;
+  };
   const call = async (
     name: string,
     args: Record<string, unknown>,
     id: string,
   ): Promise<RunFit[]> => {
-    const outcome = await tools
-      .execute({ callId: id, name, arguments: args }, context)
-      .catch(() => null);
-    if (outcome === null) return [];
-    calls.push(outcome);
-    return fitsInOutcome(outcome);
+    const outcome = await read(name, args, id);
+    return outcome === null ? [] : fitsInOutcome(outcome);
   };
   const own = ownSetOf(await input.own.catch(() => null));
   // v56: only for CANDIDATES; a PREVIOUS or named set is exactly its ids.
   const excluded = new Set(
     ask.scope === "CANDIDATES" ? (ask.exclude ?? []) : [],
   );
-  const wanted = new Map<string, string>();
-  const add = (rows: readonly { id: string; name: string }[]) => {
+  // Each company with where it came from, said beside its fit.
+  const wanted = new Map<string, FitCandidateSource>();
+  const add = (
+    rows: readonly { id: string; name: string }[],
+    source: FitCandidateSource,
+  ) => {
     for (const row of rows) {
       if (excluded.has(row.id)) continue;
-      if (!wanted.has(row.id)) wanted.set(row.id, row.name);
+      if (!wanted.has(row.id)) wanted.set(row.id, source);
     }
   };
   if (ask.scope === "PREVIOUS") {
-    // Exactly the companies just shown, each read through its own fit.
-    add((ask.within ?? []).map((id) => ({ id, name: "" })));
-  } else if (ask.scope === "RELATIONSHIPS") add(own.relationships);
-  else if (ask.scope === "SAVED") add(own.saved);
+    // Exactly the companies just shown, as discovery showed them.
+    add(
+      (ask.within ?? []).map((id) => ({ id, name: "" })),
+      "FEED",
+    );
+  } else if (ask.scope === "RELATIONSHIPS")
+    add(own.relationships, "RELATIONSHIP");
+  else if (ask.scope === "SAVED") add(own.saved, "SAVED");
   else {
     // Their own candidates as the platform orders them, plus their own
     // relationships and saves so a place filter has the whole set.
-    add(own.relationships);
-    add(own.saved);
+    add(own.relationships, "RELATIONSHIP");
+    add(own.saved, "SAVED");
   }
   const ids = [...wanted.keys()].slice(0, FIT_SWEEP_MAX);
+  const position = new Map(ids.map((id, index) => [id, index]));
+  // The companies are read as sets, one per source, never one fit read
+  // per company.
+  const bySource = new Map<FitCandidateSource, string[]>();
+  for (const id of ids) {
+    const source = wanted.get(id) ?? "FEED";
+    bySource.set(source, [...(bySource.get(source) ?? []), id]);
+  }
   const [top, each] = await Promise.all([
     ask.scope === "CANDIDATES" && available.has("fit_top_candidates")
       ? call(
@@ -409,14 +432,29 @@ export async function runFitSweep(input: {
         )
       : Promise.resolve([] as RunFit[]),
     Promise.all(
-      ids.map((companyId, index) =>
-        call("fit_profile", { companyId }, `q-fit-sweep-${String(index)}`),
+      [...bySource].map(([source, companyIds]) =>
+        readFitSets({
+          ids: companyIds,
+          read,
+          sets: available.has("fit_top_candidates"),
+          source,
+          callId: `q-fit-sweep-${source.toLowerCase()}`,
+        }),
       ),
     ),
   ]);
+  // A set's entries come in the fit order; ties keep the asked order, as
+  // one read per company did.
+  const named = each
+    .flat()
+    .flatMap((outcome) => (outcome === null ? [] : fitsInOutcome(outcome)))
+    .sort(
+      (a, b) =>
+        (position.get(a.companyId) ?? 0) - (position.get(b.companyId) ?? 0),
+    );
   const byId = new Map<string, RunFit>();
   const leftOut = new Set<string>();
-  for (const fit of [...top, ...each.flat()]) {
+  for (const fit of [...top, ...named]) {
     if (excluded.has(fit.companyId)) {
       leftOut.add(fit.companyId);
       continue;

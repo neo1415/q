@@ -69,19 +69,27 @@ function fitTools(top: number) {
   const asked: string[] = [];
   const port: Pick<QToolPort, "execute"> = {
     execute: (proposal) => {
+      // A named set reads exactly its companies; recorded as each one, so
+      // "fit_top_candidates" here is only ever the candidate list.
+      const named = (proposal.arguments as { companyIds?: string[] })
+        .companyIds;
       asked.push(
-        proposal.name === "fit_profile"
-          ? String((proposal.arguments as { companyId: string }).companyId)
-          : proposal.name,
+        ...(proposal.name === "fit_profile"
+          ? [String((proposal.arguments as { companyId: string }).companyId)]
+          : (named ?? [proposal.name])),
       );
       if (proposal.name === "fit_top_candidates") {
-        const entries = Array.from({ length: top }, (_, index) => {
-          const fit = incidentFit(index + 1).result.data as {
+        const entry = (n: number) => {
+          const fit = incidentFit(n).result.data as {
             name: string;
             profile: unknown;
           };
           return { name: fit.name, line: null, profile: fit.profile };
-        });
+        };
+        const entries =
+          named === undefined
+            ? Array.from({ length: top }, (_, index) => entry(index + 1))
+            : named.map((id) => entry(Number(id.slice(-2))));
         return Promise.resolve({
           callId: proposal.callId,
           toolName: "fit.top_candidates",
@@ -392,5 +400,82 @@ describe("explicit names after an evidence follow-up", () => {
         "Compare Superhalyard and an unknown company",
       ),
     ).toEqual([]);
+  });
+});
+
+// Owner 2026-10-25 (savanna cold miss: one fit_profile per company): the
+// sweep reads its own companies as sets, each labelled with where it came
+// from, and falls back to one read per company when a set fails.
+describe("the sweep reads its own companies as sets", () => {
+  const own = {
+    relationships: [1, 2].map((n) => ({
+      counterpart: { kind: "COMPANY", id: ID(n), name: `Company ${String(n)}` },
+    })),
+    // A saved company already in a relationship is read once.
+    saved: [2, 3].map((n) => ({
+      companyId: ID(n),
+      name: `Company ${String(n)}`,
+    })),
+  };
+  async function run(setFails: boolean) {
+    const ask = fitSweepAsk("top three companies for my mandate", [], []);
+    if (ask === null) throw new Error("not a fit question");
+    const tools = fitTools(0);
+    const calls: { name: string; args: Record<string, unknown> }[] = [];
+    const execute = vi.fn<QToolPort["execute"]>((proposal, context) => {
+      const args = proposal.arguments as Record<string, unknown>;
+      calls.push({ name: proposal.name, args });
+      if (setFails && Array.isArray(args["companyIds"]))
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "fit.top_candidates",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "FAILED",
+          failureCode: "RESULT_TOO_LARGE",
+          sensitivity: null,
+          result: {
+            ok: false,
+            error: { code: "RESULT_TOO_LARGE", safeMessage: "Too large." },
+          },
+          latencyMs: 1,
+        });
+      return tools.port.execute(proposal, context);
+    });
+    const result = await runFitSweep({
+      ask,
+      tools: { execute },
+      context: CONTEXT,
+      available: AVAILABLE,
+      own: Promise.resolve(own),
+    });
+    if (result === null) throw new Error("no sweep");
+    return { calls, result };
+  }
+
+  it("one set per source, never one fit_profile per company", async () => {
+    const { calls, result } = await run(false);
+    const sets = calls.filter((call) => Array.isArray(call.args["companyIds"]));
+    expect(sets.map((call) => call.args)).toEqual([
+      { companyIds: [ID(1), ID(2)], source: "RELATIONSHIP" },
+      { companyIds: [ID(3)], source: "SAVED" },
+    ]);
+    expect(calls.filter((call) => call.name === "fit_profile")).toHaveLength(0);
+    expect(result.fits.map((fit) => fit.companyId).sort()).toEqual(
+      [ID(1), ID(2), ID(3)].sort(),
+    );
+  });
+
+  it("a set that fails is read one company at a time, the same fits", async () => {
+    const batched = await run(false);
+    const fallback = await run(true);
+    expect(
+      fallback.calls
+        .filter((call) => call.name === "fit_profile")
+        .map((call) => call.args["companyId"]),
+    ).toEqual([ID(1), ID(2), ID(3)]);
+    expect(fallback.result.fits.map((fit) => fit.companyId)).toEqual(
+      batched.result.fits.map((fit) => fit.companyId),
+    );
   });
 });

@@ -15,6 +15,7 @@ import {
   cardRaiseWords,
   fitSweepCardsBlock,
   fitsInOutcome,
+  readFitSets,
   type RunFit,
 } from "./fit-cards.js";
 
@@ -46,11 +47,6 @@ export const DISCOVER_FIT_MAX = 24;
 const DISCOVER_TOOL = "discover_companies";
 const FIT_TOOL = "fit_profile";
 const FIT_SET_TOOL = "fit_top_candidates";
-/**
- * Cards per fit set read. The tool takes ten, but ten full profiles can
- * pass the tool result bound; five (the usual page) stays well inside.
- */
-const FIT_SET_MAX = 5;
 
 type CatalogCompany = {
   readonly companyId: string;
@@ -470,31 +466,14 @@ async function discoverWith(
     const shown = catalog.companies
       .slice(0, catalog.order === "FIT" ? count : DISCOVER_FIT_MAX)
       .map((company) => company.companyId);
-    // Owner 2026-10-25 (savanna cold miss: one fit_profile per card, each
-    // its own eligibility, inputs and scores read, 1.16 s for five): the
-    // cards are read as one set, a profiles call per five. A set that
-    // could not be read falls back to one read per card, as before.
-    const one = (companyId: string) =>
-      execute(FIT_TOOL, { companyId }, `q-discover-fit-${companyId}`);
-    const sets: string[][] = [];
-    for (let at = 0; at < shown.length; at += FIT_SET_MAX)
-      sets.push(shown.slice(at, at + FIT_SET_MAX));
-    const outcomes = available.has(FIT_SET_TOOL)
-      ? (
-          await Promise.all(
-            sets.map(async (companyIds, index) => {
-              const set = await execute(
-                FIT_SET_TOOL,
-                { companyIds },
-                `q-discover-fits-${String(index)}`,
-              );
-              return set?.result.ok === true
-                ? [set]
-                : Promise.all(companyIds.map(one));
-            }),
-          )
-        ).flat()
-      : await Promise.all(shown.map(one));
+    // The cards are read as sets, never one fit read per card.
+    const outcomes = await readFitSets({
+      ids: shown,
+      read: execute,
+      sets: available.has(FIT_SET_TOOL),
+      source: "FEED",
+      callId: "q-discover-fit",
+    });
     timing.phasesMs = {
       ...(timing.phasesMs ?? {}),
       cardFits: Math.round(performance.now() - cardsStarted),
