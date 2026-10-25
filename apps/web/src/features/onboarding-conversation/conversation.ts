@@ -692,11 +692,19 @@ export function composerHint(
   if (asking !== null && !asking.includes(prompt.stepKey)) {
     return "Type your answer";
   }
-  return prompt.control === "chips" ||
+  if (
+    prompt.control === "chips" ||
     prompt.control === "multi_chips" ||
     prompt.control === "confirm"
-    ? "Or say it in your own words"
-    : prompt.placeholder;
+  ) {
+    return "Or say it in your own words";
+  }
+  // A step with no hint of its own is still an answer to Q's question,
+  // never the general "Ask Q about companies…" (live 25 Oct, run b9-0746:
+  // under "what does the company do?").
+  return prompt.placeholder !== undefined && prompt.placeholder.length > 0
+    ? prompt.placeholder
+    : "Type your answer";
 }
 
 function joinNames(names: readonly string[]): string {

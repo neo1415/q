@@ -681,4 +681,18 @@ describe("the composer's hint follows Q's question (live 24 Oct)", () => {
     );
     expect(composerHint(website, [])).toBe("Type your answer");
   });
+
+  it("is an answer's hint, never the general one, for a step without its own (live 25 Oct)", () => {
+    const description = {
+      stepKey: "F1.description",
+      control: "text" as const,
+      placeholder: undefined,
+    };
+    expect(composerHint(description, ["F1.description"])).toBe(
+      "Type your answer",
+    );
+    expect(composerHint({ ...description, placeholder: "" }, null)).toBe(
+      "Type your answer",
+    );
+  });
 });

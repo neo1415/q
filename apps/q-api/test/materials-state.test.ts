@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { OnboardingSessionView } from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding/definition";
 
-import { toOpenStep } from "../src/voice/interview-steps.js";
+import {
+  documentFindingsIn,
+  toOpenStep,
+} from "../src/voice/interview-steps.js";
 
 /**
  * QA F1/O1 (24 Oct): the panel showed "11 to confirm" from the founder's
@@ -54,5 +57,14 @@ describe("the materials step as Q sees it", () => {
     expect(toOpenStep(materials, view("PUBLIC_PAGE"))?.note).toMatch(
       /upload button/u,
     );
+  });
+});
+
+describe("their documents' findings, counted once for every reader", () => {
+  it("counts facts from their own documents, never from Q's research", () => {
+    expect(documentFindingsIn(view("EVIDENCE_DOCUMENT"))).toBe(1);
+    expect(documentFindingsIn(view("EVIDENCE_DOCUMENT_VERSION"))).toBe(1);
+    expect(documentFindingsIn(view("PUBLIC_PAGE"))).toBe(0);
+    expect(documentFindingsIn(view(null))).toBe(0);
   });
 });

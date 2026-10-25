@@ -24,6 +24,22 @@ import {
   type InterviewDestination,
 } from "@capital-q/q-core";
 /**
+ * Facts read from the person's own documents that wait on screen for their
+ * confirmation: the "I picked up" panel's count. While any wait, their
+ * material is in and read, whatever step is open.
+ */
+export function documentFindingsIn(view: OnboardingSessionView): number {
+  return view.pendingSuggestions.filter((suggestion) =>
+    // A document of theirs, or one version of it.
+    suggestion.sourceRefs.some(
+      (ref) =>
+        ref.sourceType === "EVIDENCE_DOCUMENT" ||
+        ref.sourceType === "EVIDENCE_DOCUMENT_VERSION",
+    ),
+  ).length;
+}
+
+/**
  * Q conducting the interview (CQ-Q-VOICE-001 rework).
  *
  * One turn: read the session as Capital Q's records hold it, hand the model
@@ -535,14 +551,7 @@ export function toOpenStep(
       // while Q said the deck had not been read and pointed to the upload
       // button. Q reads the same state the panel shows: facts read from
       // their own documents and waiting for them mean the material is in.
-      const fromTheirDocuments = view.pendingSuggestions.filter((suggestion) =>
-        // A document of theirs, or one version of it.
-        suggestion.sourceRefs.some(
-          (ref) =>
-            ref.sourceType === "EVIDENCE_DOCUMENT" ||
-            ref.sourceType === "EVIDENCE_DOCUMENT_VERSION",
-        ),
-      ).length;
+      const fromTheirDocuments = documentFindingsIn(view);
       if (fromTheirDocuments > 0) {
         return {
           ...base,

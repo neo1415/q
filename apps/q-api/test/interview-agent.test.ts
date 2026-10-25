@@ -7,7 +7,13 @@ import { createLogger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
+import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
+
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
+import {
+  UPLOAD_ONLY_REASON,
+  uploadReadReason,
+} from "../src/voice/onboarding-port.js";
 
 import { readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
@@ -1020,5 +1026,54 @@ describe("an answer outside the options is kept in their words (founder directio
       recommendations: world.recommendations,
     }).turn({ ...turn(world, "I invest my own money"), actor });
     expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+  });
+});
+
+describe("an upload announced in words (live 25 Oct, run b9-0746)", () => {
+  it("never offers the reader a step only an upload fills", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F1.company_name": "Tamarind Ledger" },
+    });
+    const { gateway } = model([{ reply: "What does it do?" }]);
+    const offered: string[][] = [];
+    const reader: QDelegationReader = {
+      read: (input) => {
+        offered.push(input.steps.map((step) => step.stepKey));
+        return Promise.resolve(reading({}));
+      },
+    };
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: reader,
+    }).turn({
+      ...turn(
+        world,
+        "I've just uploaded tamarind-ledger-deck.pdf. Read back what you found in it and check it with me.",
+      ),
+      actor,
+    });
+    const uploadOnly = FOUNDER_DEFINITION_CURRENT.steps
+      .filter((step) => step.configuration.stepType === "document_upload")
+      .map((step) => step.stepKey);
+    expect(uploadOnly.length).toBeGreaterThan(0);
+    expect(offered).toHaveLength(1);
+    expect(offered[0]).toContain("F1.description");
+    for (const key of uploadOnly) expect(offered[0]).not.toContain(key);
+  });
+
+  it("refuses words for the upload step by pointing at what was read, once something was", () => {
+    const reason = uploadReadReason(15);
+    expect(reason).toMatch(/15 facts read from their material wait on screen/u);
+    expect(reason).toMatch(/never point them to the upload button/u);
+    expect(uploadReadReason(1)).toMatch(
+      /1 fact read from their material waits/u,
+    );
+    // Nothing of theirs read yet: the upload button is still the answer.
+    expect(UPLOAD_ONLY_REASON).toMatch(/upload button whenever they like/u);
   });
 });
