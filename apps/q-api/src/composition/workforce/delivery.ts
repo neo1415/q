@@ -81,9 +81,64 @@ export function deliveryText(document: DeliveredDocument): string {
   return lines.join("\n\n");
 }
 
-function messageIdFor(jobId: string) {
+const PlanSummarySchema = z.object({
+  summary: z.string().trim().min(1).max(400),
+});
+
+/**
+ * F11 (coordinator 2026-10-25): a job that ended with no document said
+ * nothing; the conversation kept "it moves to Done, with its document".
+ * One short line: what did not get done and why, in plain words, and what
+ * happens next. Its reason is the job's own (a step's summary or the
+ * runner's), never a model's new words.
+ */
+export function endedWithoutDocumentText(
+  row: Pick<WorkRow, "state" | "reason" | "plan">,
+): string | null {
+  // Only its one-line summary is needed; an older stored plan still has it.
+  const plan = PlanSummarySchema.safeParse(row.plan);
+  const what = plan.success
+    ? plan.data.summary.trim().replace(/[.\s]+$/u, "")
+    : "";
+  const work =
+    what.length === 0
+      ? "That work"
+      : `${what.charAt(0).toUpperCase()}${what.slice(1)}`;
+  const why = (row.reason ?? "").trim().replace(/[.\s]+$/u, "");
+  switch (row.state) {
+    case "FAILED":
+      return why.length === 0
+        ? `${work} didn't finish: a step of the work failed, so there's no document. Ask me to try again, or ask for a shorter version I can answer here.`
+        : `${work} didn't finish: ${why.charAt(0).toLowerCase()}${why.slice(1)}. There's no document; ask me to try again, or ask for a shorter version I can answer here.`;
+    case "CANCELLED":
+      return `${work} was stopped, so there's no document. Ask me again whenever you want it.`;
+    case "BLOCKED":
+      // Never started: its plan's limit, or a plan that couldn't run.
+      return why.length === 0
+        ? `${work} couldn't go ahead, so there's no document. Ask me again and I'll plan it afresh.`
+        : `${work} couldn't go ahead: ${why.charAt(0).toLowerCase()}${why.slice(1)}.`;
+    case "NEEDS_DECISION":
+      return why.length === 0
+        ? `${work} is on hold, waiting for you. Open it in Work to see what it needs.`
+        : `${work} is on hold, waiting for this: ${why.charAt(0).toLowerCase()}${why.slice(1)}.`;
+    case "PLANNED":
+    case "AWAITING_AUTHORIZATION":
+    case "QUEUED":
+    case "RUNNING":
+    case "RECOVERING":
+    case "COMPLETED":
+      // Not ended, or ended with its document: nothing to say here.
+      return null;
+  }
+}
+
+function messageIdFor(jobId: string, ending?: string) {
   const hex = createHash("sha256")
-    .update(`workforce-delivery:${jobId}`)
+    .update(
+      ending === undefined
+        ? `workforce-delivery:${jobId}`
+        : `workforce-ending:${jobId}:${ending}`,
+    )
     .digest("hex");
   return QMessageIdSchema.parse(
     `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`,
@@ -100,9 +155,87 @@ export function createWorkforceDelivery(dependencies: {
   readonly notify: WorkforcePorts["notify"];
   readonly logger?: Logger | undefined;
 }) {
+  /** One Q message on the job's own run, deduplicated by its id. */
+  const post = async (
+    owner: Owner,
+    row: WorkRow,
+    id: ReturnType<typeof messageIdFor>,
+    text: string,
+    blocks: readonly QResultBlock[] | undefined,
+  ): Promise<boolean> => {
+    const runId = QRunIdSchema.safeParse(row.trace.runId);
+    if (!runId.success) return false;
+    try {
+      // The run is read as its owner: someone else's run is not found.
+      const run = await dependencies.runtime.runs.findForActor(
+        dependencies.sql,
+        TenantIdSchema.parse(owner.tenantId),
+        UserIdSchema.parse(owner.userId),
+        runId.data,
+      );
+      if (run === null || run.conversationId === null) return false;
+      const conversationId = run.conversationId;
+      await dependencies.transactions.run(async (tx) => {
+        const stored = await dependencies.runtime.messages.insert(tx, {
+          id,
+          tenantId: run.tenantId,
+          conversationId,
+          runId: run.id,
+          role: "Q",
+          content: text,
+          ...(blocks === undefined ? {} : { blocks }),
+        });
+        await appendRunEvent(
+          dependencies.runtime,
+          tx,
+          { id: run.id, tenantId: run.tenantId },
+          {
+            type: "q.message.completed",
+            data: {
+              message: {
+                ...(toQMessage(stored) as QResponseMessage),
+                ...(blocks === undefined ? {} : { blocks: [...blocks] }),
+              },
+            },
+          },
+        );
+      });
+      return true;
+    } catch (error: unknown) {
+      // Most often: already said (the message id is the job's).
+      dependencies.logger?.info(
+        { err: error, jobId: row.job_id },
+        "workforce delivery not posted to the conversation",
+      );
+      return false;
+    }
+  };
+
   return async (owner: Owner, row: WorkRow): Promise<boolean> => {
     const document = deliveredDocument(row);
-    if (document === null) return false;
+    if (document === null) {
+      const ended = endedWithoutDocumentText(row);
+      if (ended === null) return false;
+      const posted = await post(
+        owner,
+        row,
+        messageIdFor(row.job_id, row.state),
+        ended,
+        undefined,
+      );
+      await dependencies
+        .notify(owner, {
+          key: `wf:${row.job_id}:${row.state.toLowerCase()}`,
+          title: ended.split(":")[0]?.slice(0, 150) ?? "Q's work",
+          body: ended.slice(0, 600),
+        })
+        .catch(() => undefined);
+      dependencies.logger?.info(
+        { jobId: row.job_id, state: row.state, posted },
+        "workforce job ended without a document; said so",
+      );
+      return posted;
+    }
     const text = deliveryText(document);
     const block: QResultBlock = {
       kind: "ARTIFACT_REFERENCE",
@@ -123,55 +256,13 @@ export function createWorkforceDelivery(dependencies: {
         title: document.delivery.title.slice(0, 160),
       },
     ];
-    let posted = false;
-    const runId = QRunIdSchema.safeParse(row.trace.runId);
-    if (runId.success) {
-      try {
-        // The run is read as its owner: someone else's run is not found.
-        const run = await dependencies.runtime.runs.findForActor(
-          dependencies.sql,
-          TenantIdSchema.parse(owner.tenantId),
-          UserIdSchema.parse(owner.userId),
-          runId.data,
-        );
-        if (run !== null && run.conversationId !== null) {
-          const conversationId = run.conversationId;
-          await dependencies.transactions.run(async (tx) => {
-            const stored = await dependencies.runtime.messages.insert(tx, {
-              id: messageIdFor(row.job_id),
-              tenantId: run.tenantId,
-              conversationId,
-              runId: run.id,
-              role: "Q",
-              content: text,
-              blocks,
-            });
-            await appendRunEvent(
-              dependencies.runtime,
-              tx,
-              { id: run.id, tenantId: run.tenantId },
-              {
-                type: "q.message.completed",
-                data: {
-                  message: {
-                    ...(toQMessage(stored) as QResponseMessage),
-                    blocks: [...blocks],
-                  },
-                },
-              },
-            );
-          });
-          posted = true;
-        }
-      } catch (error: unknown) {
-        // Most often: already delivered (the message id is the job's). The
-        // notice below is deduplicated the same way.
-        dependencies.logger?.info(
-          { err: error, jobId: row.job_id },
-          "workforce delivery not posted to the conversation",
-        );
-      }
-    }
+    const posted = await post(
+      owner,
+      row,
+      messageIdFor(row.job_id),
+      text,
+      blocks,
+    );
     await dependencies
       .notify(owner, {
         key: `wf:${row.job_id}:delivered`,

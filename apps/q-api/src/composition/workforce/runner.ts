@@ -83,6 +83,16 @@ export function createAgentWorkRunner(dependencies: {
   const leaseMs = dependencies.leaseMs ?? WORK_LEASE_MS;
   let running: Promise<number> | null = null;
 
+  /** The job's document, or one line on how it ended, in its conversation. */
+  const deliverAfter = async (owner: Owner, jobId: string): Promise<void> => {
+    if (dependencies.deliver === undefined) return;
+    const [after] = await queue.forOwner(owner, [jobId]).catch(() => []);
+    if (after === undefined) return;
+    await dependencies.deliver(owner, after).catch((error: unknown) => {
+      logger?.warn({ err: error, jobId }, "workforce delivery failed");
+    });
+  };
+
   async function runOne(row: WorkRow): Promise<void> {
     const owner: Owner = { tenantId: row.tenant_id, userId: row.user_id };
     const finish = async (state: EndState, reason: string | null) => {
@@ -229,6 +239,8 @@ export function createAgentWorkRunner(dependencies: {
             ? "Your plan's limit for Q's work is reached; raise it to go on."
             : "The approved plan couldn't be run.",
         );
+        // F11: said in the conversation too, never silently held.
+        await deliverAfter(owner, row.job_id);
         return;
       }
       const statuses = result.steps.map((step) => step.status);
@@ -244,21 +256,9 @@ export function createAgentWorkRunner(dependencies: {
         endStateOf("STARTED", jobStatus),
         waiting === undefined ? null : waiting.summary,
       );
-      if (dependencies.deliver !== undefined) {
-        // What the steps recorded, as stored: a document made before a
-        // later step stopped is still theirs to read.
-        const [after] = await queue
-          .forOwner(owner, [row.job_id])
-          .catch(() => []);
-        if (after !== undefined) {
-          await dependencies.deliver(owner, after).catch((error: unknown) => {
-            logger?.warn(
-              { err: error, jobId: row.job_id },
-              "workforce delivery failed",
-            );
-          });
-        }
-      }
+      // What the steps recorded, as stored: a document made before a
+      // later step stopped is still theirs to read.
+      await deliverAfter(owner, row.job_id);
     } catch (error: unknown) {
       logger?.warn(
         { err: error, jobId: row.job_id, attempt: row.attempts },
@@ -279,13 +279,12 @@ export function createAgentWorkRunner(dependencies: {
   const pass = async (): Promise<number> => {
     const swept = await queue.sweep();
     for (const failed of swept.failed) {
+      const owner = { tenantId: failed.tenant_id, userId: failed.user_id };
       await store
-        .setJobStatus(
-          { tenantId: failed.tenant_id, userId: failed.user_id },
-          failed.job_id,
-          "FAILED",
-        )
+        .setJobStatus(owner, failed.job_id, "FAILED")
         .catch(() => undefined);
+      // F11: out of attempts is said in the conversation, once.
+      await deliverAfter(owner, failed.job_id);
     }
     const claimed = await queue.claim(workerId, leaseMs, CLAIM_PER_PASS);
     // Every claimed row already holds a lease. Start its run and heartbeat
