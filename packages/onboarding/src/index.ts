@@ -95,6 +95,7 @@ export {
 } from "./runtime/branch.js";
 export {
   computeActivePath,
+  definitelyOffPath,
   computeProgress,
   nextIncompleteStep,
   pathChanges,

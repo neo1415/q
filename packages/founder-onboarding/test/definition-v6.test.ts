@@ -23,11 +23,11 @@ const MIGRATION = fileURLToPath(
 );
 
 describe("founder definition v6", () => {
-  it("is valid, and current", () => {
+  it("is valid, and superseded by v7 for new sessions", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V6),
     ).not.toThrow();
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(6);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(7);
   });
 
   it("keeps every v5 step unchanged and in v5's relative order", () => {

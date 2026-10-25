@@ -24,7 +24,7 @@ select is(
 -- already running it keep their own journey (CQ-Q-021 §82).
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  6, 'founder definition points new sessions at version 6 (20261228180500: the company profile sections)');
+  7, 'founder definition points new sessions at version 7 (20261231130000: paying customers asked at seed)');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v

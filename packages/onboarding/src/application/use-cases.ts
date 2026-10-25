@@ -89,6 +89,7 @@ import {
 } from "../events/index.js";
 import {
   computeActivePath,
+  definitelyOffPath,
   nextIncompleteStep,
   pathChanges,
   previousVisitedStep,
@@ -1993,6 +1994,22 @@ export function createOnboardingUseCases(
       // documents of the same value is superseded, kept as EXPIRED history,
       // and the new offer cites every document it was read in. A different
       // value is a contradiction, and both stay until the person settles it.
+      // An offer from their documents for a step their answers have ruled
+      // out for good is never made: it could never be settled, and Q would
+      // read it back as a question (live 25 Oct e2e). The fact stays in
+      // the document's evidence.
+      if (proposalSource(command.sourceRefs) === "DOCUMENT") {
+        const current = new Map(
+          (await runtime.responses.listCurrent(tx.sql, session.id)).map(
+            (response) => [response.stepKey, response],
+          ),
+        );
+        if (
+          definitelyOffPath(step, computeActivePath(published.steps, current))
+        ) {
+          throw new OnboardingSessionStateError("STEP_NOT_ELIGIBLE");
+        }
+      }
       let sourceRefs: readonly OnboardingSourceRef[] = command.sourceRefs;
       const superseded =
         proposalSource(command.sourceRefs) === "DOCUMENT"

@@ -68,12 +68,16 @@ export {
 } from "./founder-v5.js";
 /**
  * The version new founder sessions pin to, for code that reads the journey
- * (labels, step order, the interview). It is a superset of v2-v5, so an
+ * (labels, step order, the interview). It is a superset of v2-v6, so an
  * older session reads correctly through it.
  */
 export {
+  FOUNDER_DEFINITION_V7,
+  FOUNDER_DEFINITION_V7 as FOUNDER_DEFINITION_CURRENT,
+  FOUNDER_DEFINITION_V7_VERSION,
+} from "./founder-v7.js";
+export {
   FOUNDER_DEFINITION_V6,
-  FOUNDER_DEFINITION_V6 as FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V6_VERSION,
   FOUNDER_PROFILE_PHASE,
   FOUNDER_PROFILE_SECTION_STEPS,
