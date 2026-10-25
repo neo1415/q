@@ -24,6 +24,7 @@ import {
   createPostgresOnboardingSuggestionRepository,
 } from "../infrastructure/postgres-session-repository.js";
 import { sameResponseValue } from "./pending-writes.js";
+import { supersededDocumentOffers } from "./superseded-offers.js";
 import { createDefinitionCache } from "./view.js";
 
 /**
@@ -173,13 +174,31 @@ export function createOnboardingQRecommendations(options: {
         if (rejected.some((v) => sameResponseValue(v, value))) {
           throw new OnboardingSessionStateError("SUGGESTION_REJECTED_BEFORE");
         }
-        for (const earlier of await suggestions.listPending(
-          tx.sql,
-          sessionId,
-        )) {
+        const waiting = await suggestions.listPending(tx.sql, sessionId);
+        for (const earlier of waiting) {
           if (earlier.stepKey === step.stepKey && isQ(earlier.sourceRefs)) {
             await suggestions.resolve(tx, earlier.id, "EXPIRED");
           }
+        }
+        // Their own document already offers this value (live 25 Oct e2e:
+        // Q recommended six values the deck had offered five seconds
+        // earlier, and the panel stacked them): that offer is the one put
+        // to them, and their yes accepts it. Nothing new is stored.
+        const offered = supersededDocumentOffers(waiting, {
+          stepKey: step.stepKey,
+          suggestedValue: value,
+        })[0];
+        if (offered !== undefined) {
+          return {
+            id: offered.id,
+            stepKey: offered.stepKey,
+            value: offered.suggestedValue,
+            rationale:
+              offered.rationale ??
+              (input.rationale.trim().slice(0, 300) || null),
+            payloadSha256: payloadSha256(offered.suggestedValue),
+            sources: publicOf(offered.sourceRefs),
+          };
         }
         const created = await suggestions.insert(tx, {
           sessionId,
