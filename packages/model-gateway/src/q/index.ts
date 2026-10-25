@@ -5991,7 +5991,10 @@ export function createModelGatewayQAnswer(
       };
       // The table, then code's verdict as its opening line (the model is
       // told that line was said and continues after it).
+      /** I21: when the comparison's table went up, from the seam's start. */
+      let tableFirstMs: number | null = null;
       if (tableFirst !== null) {
+        tableFirstMs = Date.now() - startedAt;
         send({
           runId: request.runId,
           tenantId: request.tenantId,
@@ -6007,7 +6010,7 @@ export function createModelGatewayQAnswer(
         logger?.info(
           {
             qRunId: request.runId,
-            tableMs: Date.now() - startedAt,
+            tableMs: tableFirstMs,
             verdict: earlyLead !== null,
           },
           "q comparison table went up first",
@@ -9902,6 +9905,9 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             sharedReads: singleFlight.takeShared(request.runId),
             prepareMs: prepared.prepareMs,
             totalMs: Date.now() - startedAt,
+            // I21: time to the comparison's table beside time to settle
+            // (totalMs); null when none went up first.
+            tableMs: tableFirstMs,
             phases,
             // How much of the answer the person already had before the
             // turn finished. Zero means nobody was listening, or the
