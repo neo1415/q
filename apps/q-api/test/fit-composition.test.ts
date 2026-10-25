@@ -51,7 +51,7 @@ function cardSql(published: ReadonlyMap<string, unknown>) {
     queries.cards += 1;
     // One card or many (a batch read passes the ids as one array).
     const subjects = values
-      .flatMap((v) => (Array.isArray(v) ? v : [v]))
+      .flatMap((v): readonly unknown[] => (Array.isArray(v) ? v : [v]))
       .filter((v): v is string => typeof v === "string" && published.has(v));
     return Promise.resolve(
       subjects.map((subjectId) => ({
