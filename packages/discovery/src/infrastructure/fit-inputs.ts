@@ -13,7 +13,7 @@ import type { FitStatedEvidence } from "../fit/stated.js";
 import type { FxReferenceRates } from "../fx/ecb.js";
 import type { FilterMoney } from "../slates/filters.js";
 
-import { readCurrentFeatureSnapshot } from "./postgres-feature-snapshot-store.js";
+import { readCurrentFeatureSnapshots } from "./postgres-feature-snapshot-store.js";
 
 /**
  * The fit model's inputs, read from what already exists (B1; ADR 0052):
@@ -41,6 +41,8 @@ export type FitInputSourceDependencies = {
   /** Names (and the one-liner) the reader may see; ids the reader may not see are absent. */
   readonly identities: (
     companyIds: readonly string[],
+    /** lines false: names only, no profile read (a ranking). */
+    options?: { readonly lines: boolean },
   ) => Promise<
     ReadonlyMap<
       string,
@@ -99,26 +101,26 @@ export function createFitInputSource(
           mandateId: query.mandateId,
         }),
         dependencies.eligibilityPorts.companies.findMany(ids),
-        dependencies.identities(ids),
+        // A ranking needs names, not the one-liner each card shows.
+        dependencies.identities(ids, { lines: query.purpose !== "RANK" }),
         dependencies.raises === undefined
           ? Promise.resolve(new Map<string, FilterMoney>())
           : dependencies
               .raises(query.actor, ids)
               .catch(() => new Map<string, FilterMoney>()),
-        Promise.all(
-          ids.map((companyId) =>
-            readCurrentFeatureSnapshot(dependencies.sql, {
-              investorOrganisationId: query.investorOrganisationId,
-              mandateId: query.mandateId,
-              companyId,
-              mode: MODE,
-            }),
-          ),
-        ),
+        // One query for all of them (owner 2026-10-24, egress incident).
+        readCurrentFeatureSnapshots(dependencies.sql, {
+          investorOrganisationId: query.investorOrganisationId,
+          mandateId: query.mandateId,
+          companyIds: ids,
+          mode: MODE,
+        }),
         businessModelsOf(dependencies.sql, ids, query.mandateId).catch(
           () => EMPTY_MODELS,
         ),
-        dependencies.stated === undefined
+        // What they stated is context for Q's view, never scored: a
+        // ranking does not read it (owner 2026-10-24, egress incident).
+        dependencies.stated === undefined || query.purpose === "RANK"
           ? Promise.resolve(new Map<string, FitStatedEvidence>())
           : dependencies
               .stated(query.actor, ids)
@@ -144,7 +146,7 @@ export function createFitInputSource(
       const factsById = new Map(facts.map((f) => [f.companyId, f] as const));
 
       const out = new Map<string, FitCompanyInputs>();
-      ids.forEach((companyId, index) => {
+      ids.forEach((companyId) => {
         const identity = identities.get(companyId);
         if (identity === undefined) return;
         const company = factsById.get(companyId);
@@ -183,7 +185,7 @@ export function createFitInputSource(
           fx,
         };
         out.set(companyId, {
-          snapshot: snapshots[index] ?? null,
+          snapshot: snapshots.get(companyId) ?? null,
           declared,
           name: identity.name,
           line:
