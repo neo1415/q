@@ -4830,7 +4830,7 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
       said,
       reading: untold(),
       outcomes: [],
-      offeredTools: TOOLS,
+      offeredTools: [...TOOLS, "propose_email"],
       appActionRouter: (_request, input) => {
         routedWith.push({
           utterance: input.utterance,
@@ -4857,6 +4857,17 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
     expect(routedWith.map((r) => r.utterance)).toEqual([said]);
     expect(routedWith[0]?.names).toEqual(expect.arrayContaining(TOOLS));
     expect(routedWith[0]?.names).toContain("propose_email");
+    // Only what this run offers (guard F-106-reshown-card, 2026-10-26): an
+    // action the registry declares but this run cannot take is never a
+    // route.
+    expect(
+      (routedWith[0]?.names ?? []).filter(
+        (name) =>
+          ![...TOOLS, "propose_email", "propose_standing_instruction"].includes(
+            name,
+          ),
+      ),
+    ).toEqual([]);
     // Logged before the code-run path returns (lead 2026-10-03).
     expect(lines).toContainEqual([
       "q request route",

@@ -6183,8 +6183,10 @@ export function createSpecialistQAnswer(
                 // Every action this person may take here, by what it does
                 // (guard F-106, 2026-10-25: with only declared app actions
                 // listed, "draft an update email" had no email to choose and
-                // was routed to a chat message).
-                ...actions,
+                // was routed to a chat message). Only those offered: one the
+                // registry declares but this run cannot take is never the
+                // route (guard F-106-reshown-card, 2026-10-26).
+                ...offeredActions,
                 // Handing work over in general is one of the meanings a
                 // request to act can have; the router weighs it with the
                 // rest (QA 2026-10-03).

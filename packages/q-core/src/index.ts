@@ -1397,6 +1397,7 @@ export {
 } from "./prompts/schemas/profile-gap-reader.js";
 export { APP_ACTION_ARGUMENTS_V1 } from "./prompts/tasks/app-action-arguments.v1.js";
 export { APP_ACTION_ROUTER_V1 } from "./prompts/tasks/app-action-router.v1.js";
+export { APP_ACTION_ROUTER_V2 } from "./prompts/tasks/app-action-router.v2.js";
 export { NAVIGATION_CHOOSER_V1 } from "./prompts/tasks/navigation-chooser.v1.js";
 export {
   NAVIGATION_CHOOSER_SCHEMA_NAME,

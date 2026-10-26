@@ -8069,16 +8069,53 @@ export function createModelGatewayQAnswer(
             !toolCalls.some(
               (call) => call.providerName === "research_public_web",
             ) && !(researchToolNow() !== undefined && researchHopDue());
+          /**
+           * Guard F-106-reshown-card (2026-10-26, run 61b1fa6d): "Draft a
+           * short reply … then send it" spent both rounds on reads, and the
+           * answer after them, with no tools, wrote the reply out instead
+           * of preparing it. The message they asked for, not yet tried:
+           * one more round, once, to prepare it on its card.
+           */
+          let askedRounds = 0;
+          const askedRoundDue = (): boolean => {
+            const asked = request.askedAction;
+            if (
+              askedRounds > 0 ||
+              // Told once already, by the draft round below.
+              sayDoRounds > 0 ||
+              asked === undefined ||
+              !MESSAGE_TOOLS.has(asked) ||
+              !offeredByName.has(asked) ||
+              toolCalls.some(
+                (call) =>
+                  MESSAGE_TOOLS.has(call.providerName) ||
+                  call.providerName === FIRST_CONTACT_TOOL,
+              ) ||
+              calls >= Q_TOOL_LOOP_MAX_CALLS ||
+              request.signal?.aborted === true
+            ) {
+              return false;
+            }
+            askedRounds = 1;
+            messages = [...messages, prepareMessageNote(asked)];
+            logger?.info(
+              { qRunId: request.runId, asked },
+              "the message they asked for, not tried: one more round to prepare it",
+            );
+            return true;
+          };
           while (
-            rounds <
+            (rounds <
               1 +
                 (chainedRoundAllowed() ? Q_TOOL_LOOP_MAX_ROUNDS - 1 : 0) +
                 recoveryRounds +
                 sayDoRounds +
                 gapsRounds +
                 loadRounds +
-                redirectRounds &&
-            calls < Q_TOOL_LOOP_MAX_CALLS
+                redirectRounds +
+                askedRounds &&
+              calls < Q_TOOL_LOOP_MAX_CALLS) ||
+            askedRoundDue()
           ) {
             modelCalls += 1;
             // A round that began answering and was asked again: its extras
@@ -8241,6 +8278,7 @@ export function createModelGatewayQAnswer(
                     call.providerName === FIRST_CONTACT_TOOL,
                 ) &&
                 sayDoRounds === 0 &&
+                askedRounds === 0 &&
                 calls < Q_TOOL_LOOP_MAX_CALLS &&
                 request.signal?.aborted !== true
               );

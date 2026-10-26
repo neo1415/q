@@ -213,7 +213,9 @@
       {
         "ask": "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
         "expect": {
-          "approval": true
+          "approval": true,
+          "replyNot": ["didn't prepare that", "Best, \\w+[”\"]?\\s*$"],
+          "maxMs": 15000
         }
       },
       {
@@ -221,7 +223,11 @@
         "expect": {
           "approval": true,
           "replyMatches": ["Ready to send: approve on the card"],
-          "replyNot": ["^Understood\\.?$"]
+          "replyNot": [
+            "^Understood\\.?$",
+            "not sent because it was not approved"
+          ],
+          "maxMs": 15000
         }
       }
     ]
