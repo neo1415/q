@@ -7659,6 +7659,14 @@ export function createModelGatewayQAnswer(
        * 2026-10-03: one status per card per answer).
        */
       let preparedByTool = false;
+      /**
+       * A card is waiting for their approval from this turn (any tool's,
+       * the email's Capital Q message instead, or a first contact): the
+       * card is the answer's substance, so no second writer adds findings
+       * beside it (coordinator 2026-10-26, run 42cecfd2: the extras call
+       * ran 0.9 s past the answer on an email card).
+       */
+      let cardPrepared = false;
       /** Code prepared the first contact this run (QO-08): the reply is code's, not the model's. */
       let firstContactPrepared = false;
       /** Their interest already stands (sent, or connected): its own line. */
@@ -7809,7 +7817,15 @@ export function createModelGatewayQAnswer(
         extrasSeen = "";
       };
       const startExtras = (): void => {
-        if (!splitExtras || extras !== null || roundMessages === null) return;
+        if (
+          !splitExtras ||
+          extras !== null ||
+          roundMessages === null ||
+          preparedByTool ||
+          cardPrepared
+        ) {
+          return;
+        }
         const read = extrasMessages(roundMessages);
         const stop = new AbortController();
         const started = Date.now();
@@ -8851,6 +8867,13 @@ export function createModelGatewayQAnswer(
                 });
                 const told = chatInsteadMessage(outcome, chatInsteadWhy);
                 if (told !== null) chainedResults.push(told);
+                if (
+                  outcome.result.ok &&
+                  (outcome.result.data as { readonly status?: unknown } | null)
+                    ?.status === "PREPARED"
+                ) {
+                  cardPrepared = true;
+                }
               }
             }
             if (firstContact !== null) {
@@ -8868,6 +8891,7 @@ export function createModelGatewayQAnswer(
                 if (told !== null) {
                   chainedResults.push(told);
                   firstContactPrepared = true;
+                  cardPrepared = true;
                 }
               }
             }
@@ -9037,6 +9061,7 @@ export function createModelGatewayQAnswer(
                 : null;
               if (data?.status === "PREPARED") {
                 firstContactPrepared = true;
+                cardPrepared = true;
               } else if (
                 data?.status === "ALREADY_EXPRESSED" &&
                 typeof data.awaitingApprovalOf === "string"
