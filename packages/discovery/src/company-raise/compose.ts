@@ -51,13 +51,11 @@ export type CompanyRaiseContextPorts = {
       >
     >;
   };
-  /** Media's playback rule, as a yes or no. */
-  readonly mayPlay: (
-    actor: ActorContext,
-    companyId: string,
-    mediaAssetId: string,
-  ) => Promise<boolean>;
-  /** The raise said in that pitch (Media's transcript + `firstPitchRaise`). */
+  /**
+   * The raise said in that pitch (Media's transcript + `firstPitchRaise`),
+   * read under Media's playback rule: null for a pitch this reader may not
+   * play. It is the only playback check the raise makes.
+   */
   readonly pitchRaise: CompanyRaiseReaderPorts["pitchRaise"];
 };
 
@@ -93,29 +91,19 @@ export function composeCompanyRaiseReader(
         revokedAt: policy.revokedAt,
       })),
     isInvestor: ports.isInvestor,
-    playablePitches: async (actor, companyId) => {
+    pitches: async (_actor, companyId) => {
       const set = (
         await ports.pitches().findDiscoverablePitches([companyId])
       ).get(companyId);
       if (set === undefined) return [];
-      const offered = [set, ...set.more].slice(0, RAISE_PITCHES_MAX);
-      const playable = await Promise.all(
-        offered.map((pitch) =>
-          ports
-            .mayPlay(actor, companyId, pitch.mediaAssetId)
-            .catch(() => false),
-        ),
-      );
-      return offered
-        .filter((_, index) => playable[index] === true)
-        .map((pitch) => ({
-          mediaAssetId: pitch.mediaAssetId,
-          // Both pitch audiences are offered to signed-in Capital Q
-          // participants (INVESTORS is the network's investor subset);
-          // ADR-001 has no narrower scope, and the reader only holds a
-          // pitch the playback rule admitted.
-          visibility: "network_visible" as const,
-        }));
+      return [set, ...set.more].slice(0, RAISE_PITCHES_MAX).map((pitch) => ({
+        mediaAssetId: pitch.mediaAssetId,
+        // Both pitch audiences are offered to signed-in Capital Q
+        // participants (INVESTORS is the network's investor subset);
+        // ADR-001 has no narrower scope, and a raise is only ever read
+        // from a pitch the playback rule admitted (pitchRaise).
+        visibility: "network_visible" as const,
+      }));
     },
     pitchRaise: ports.pitchRaise,
   });
