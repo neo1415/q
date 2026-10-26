@@ -24,6 +24,7 @@ import {
   type PermittedContextPlan,
 } from "@capital-q/contracts";
 import { CompanyIdSchema } from "@capital-q/companies";
+import type { QToolExecutionContext } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -255,6 +256,22 @@ function toolFor(
         ? declared.input.extend({ reason: CardReasonSchema })
         : declared.input,
     output: AppToolOutputSchema,
+    // Whether it can apply to them at all, checked before its inputs are
+    // read; whose conversation it is stays authorize's to decide.
+    ...(declared.applies === undefined
+      ? {}
+      : {
+          applies: async (execution: QToolExecutionContext) =>
+            (await declared.applies?.(
+              {
+                actor: execution.actor,
+                idempotencyKey: appActionKey(execution.runId, action.name, {}),
+                correlationId: correlationOf(execution.correlationId),
+                surface: "Q",
+              },
+              own,
+            )) !== false,
+        }),
     authorize: async (input, execution) => {
       const { actor, plan } = execution;
       if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");

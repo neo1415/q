@@ -124,6 +124,16 @@ export type QToolDefinition<I, O, G> = {
    * false.
    */
   readonly offeredWhenNamed?: boolean | undefined;
+  /**
+   * Whether it can apply to this person at all right now, before any input
+   * is known (a reply to an investor's open question, with none open).
+   * False: left off the list the turn reader and router choose from this
+   * run, since it could only refuse (guard F-106-reshown-card, 2026-10-26:
+   * chosen first, its inputs read for 1.5 s, then refused). Checked only
+   * for that list; a failed check keeps it. Absent: always.
+   */
+  readonly applies?:
+    ((context: QToolExecutionContext) => Promise<boolean>) | undefined;
   /** Offered only when the plan holds at least one of these scope kinds; empty = always. */
   readonly requiredScopeKinds: readonly QKnowledgeScopeKind[];
   readonly approval: "NONE";

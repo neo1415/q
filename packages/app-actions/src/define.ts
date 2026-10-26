@@ -130,6 +130,14 @@ export type AppActionTool<In, ToolIn> = {
     ports: AppActionPorts,
   ) => Promise<In | AppActionRefusal | null>;
   /**
+   * Whether it can apply to them at all right now, before Q reads its
+   * inputs from their words (an answer to an open question, with none
+   * open). False: Q's reader is not offered it this turn. Absent: always.
+   */
+  readonly applies?:
+    | ((context: AppActionContext, ports: AppActionPorts) => Promise<boolean>)
+    | undefined;
+  /**
    * A check only Q's path needs before preparing a card, in the person's
    * words (a handle already taken): the screen's route gets the service's
    * own answer instead. Null: nothing to refuse.

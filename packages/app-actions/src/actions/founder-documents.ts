@@ -843,6 +843,22 @@ const ANSWER_INVESTOR_QUESTION = defineAppAction<
     references: { document: "UPLOAD" },
     scopes: ["COMPANY_PROFILE"],
     purposes: ["OWN_COMPANY_QUESTION", "ACTION_PREPARATION"],
+    // Guard F-106-reshown-card (2026-10-26, run 352e44e1): "Savanna Seed
+    // asked about … Draft a short reply" chose this with no question open,
+    // read its inputs (1.5 s) and refused. With none open it is not on the
+    // reader's list, so the reply goes straight to the message. A failed
+    // read keeps it (the refusal still holds).
+    applies: async (context, ports) => {
+      const open = await openItems(ports, context);
+      return (
+        open === null ||
+        open.some(
+          (item) =>
+            item.kind === "QUESTIONS" &&
+            item.questions.some((question) => question.answer === null),
+        )
+      );
+    },
     eval: {
       say: [
         "Tell Zino we had 131 paying customers in September.",
