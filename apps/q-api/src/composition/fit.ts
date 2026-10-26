@@ -102,6 +102,13 @@ export type FitCompositionDependencies = {
         companyId: string,
       ) => Promise<CompanyDeckView | null>)
     | undefined;
+  /** The same, for many companies in one read (one findability check). */
+  readonly deckViews?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, CompanyDeckView | null>>)
+    | undefined;
   readonly viewer: FitQViewer;
   readonly logger?: Logger | undefined;
 };
@@ -135,13 +142,21 @@ export function createFitComposition(
         : dependencies.raiseReader
             .raisesFor(actor, companyIds)
             .catch(() => null),
-      Promise.all(
-        companyIds.map((companyId) =>
-          dependencies.deckView === undefined
-            ? Promise.resolve(null)
-            : dependencies.deckView(actor, companyId).catch(() => null),
-        ),
-      ),
+      // Coordinator 2026-10-26: the decks of the companies shown are read
+      // together, so the investor's findability is asked once, not per deck.
+      dependencies.deckViews !== undefined
+        ? dependencies.deckViews(actor, companyIds).then(
+            (views) =>
+              companyIds.map((companyId) => views.get(companyId) ?? null),
+            () => companyIds.map(() => null),
+          )
+        : Promise.all(
+            companyIds.map((companyId) =>
+              dependencies.deckView === undefined
+                ? Promise.resolve(null)
+                : dependencies.deckView(actor, companyId).catch(() => null),
+            ),
+          ),
     ]);
     const out = new Map<string, FitStatedEvidence>();
     companyIds.forEach((companyId, index) => {

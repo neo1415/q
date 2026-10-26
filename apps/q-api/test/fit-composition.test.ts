@@ -39,6 +39,8 @@ const queries = {
   objectives: 0,
   oneByOne: 0,
   unicorn: 0,
+  deckOne: 0,
+  deckMany: 0,
 };
 
 function cardSql(published: ReadonlyMap<string, unknown>) {
@@ -87,6 +89,8 @@ function compose(
     id === SHARED ? "Sunline" : "Kora",
   /** The investor's own relationships, as company ids. */
   relationships: readonly string[] = [SHARED],
+  /** How the decks are read: one by one, or together. */
+  decks: "ONE" | "MANY" = "MANY",
 ) {
   const eligibilityPorts = {
     investorSubject: {
@@ -209,6 +213,18 @@ function compose(
           ),
         ),
     },
+    deckView: () => {
+      queries.deckOne += 1;
+      return Promise.resolve(null);
+    },
+    ...(decks === "MANY"
+      ? {
+          deckViews: (_actor: unknown, ids: readonly string[]) => {
+            queries.deckMany += 1;
+            return Promise.resolve(new Map(ids.map((id) => [id, null])));
+          },
+        }
+      : {}),
     relationships: () => Promise.resolve([...relationships]),
     requests: () => Promise.reject(new Error("requests down")),
     feed: {
@@ -367,6 +383,42 @@ describe("fit composition", () => {
     ] as const) {
       expect(many[key]).toBe(few[key]);
     }
+  });
+
+  it("the full read of the companies shown reads their decks together, once", async () => {
+    const ids = Array.from({ length: 20 }, (_, i) => ID(3000 + i));
+    const read = async (decks: "ONE" | "MANY") => {
+      const { fit } = compose(
+        { n: 0 },
+        new Map(),
+        () => false,
+        (id) => `Company ${id.slice(-4)}`,
+        ids,
+        decks,
+      );
+      for (const key of Object.keys(queries) as (keyof typeof queries)[])
+        queries[key] = 0;
+      // The read top makes of the N it shows (and compare of the named).
+      const result = await fit.compare(actor, ids.slice(0, 5), "FEED");
+      expect(result.kind).toBe("OK");
+      return {
+        result,
+        deckOne: queries.deckOne,
+        deckMany: queries.deckMany,
+      };
+    };
+    const together = await read("MANY");
+    expect(together.deckMany).toBe(1);
+    expect(together.deckOne).toBe(0);
+    // Without the batched read, one deck read per company shown.
+    const alone = await read("ONE");
+    expect(alone.deckOne).toBe(5);
+    // The same comparison either way (when it was computed aside).
+    const timeless = (value: unknown) =>
+      JSON.stringify(value, (key, v: unknown) =>
+        key === "computedAt" ? undefined : v,
+      );
+    expect(timeless(together.result)).toBe(timeless(alone.result));
   });
 
   it("top N reads the reader's own lists, and one list failing does not fail it", async () => {
