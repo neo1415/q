@@ -493,14 +493,25 @@ export function createListConnectionRequests(
       investorOrganisationId,
       INBOX_LIMIT,
     );
-    const out: { interest: Interest; company: CompanyIdentity }[] = [];
-    for (const interest of listed) {
-      const company = await dependencies.companies.findCanonicalCompany(
-        interest.companyId,
-      );
-      if (company !== null) out.push({ interest, company });
-    }
-    return out;
+    // Coordinator 2026-10-26 (live 8965cbe4: fit_top_candidates spent
+    // ~500 database round trips a call, reading this inbox): every listed
+    // request's company in one read, never one query per request in
+    // turn. A port without the batch read keeps the one-by-one read.
+    const ids = [...new Set(listed.map((interest) => interest.companyId))];
+    const many = dependencies.companies.findCanonicalCompanies;
+    const found =
+      many !== undefined
+        ? await many(ids)
+        : (
+            await Promise.all(
+              ids.map((id) => dependencies.companies.findCanonicalCompany(id)),
+            )
+          ).filter((company): company is CompanyIdentity => company !== null);
+    const byId = new Map(found.map((company) => [company.id, company]));
+    return listed.flatMap((interest) => {
+      const company = byId.get(interest.companyId);
+      return company === undefined ? [] : [{ interest, company }];
+    });
   };
 }
 

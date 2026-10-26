@@ -537,17 +537,39 @@ export function createFitService(
         set.add(c.source);
         sources.set(c.companyId, set);
       }
-      const result = await profiles(actor, [...sources.keys()]);
-      if (result.kind !== "OK") return result;
+      // Coordinator 2026-10-26 (live 8965cbe4: 996 round trips in
+      // fit_top_candidates): every candidate is ordered on the lean read
+      // (the fit never reads one-liners, stated evidence or scores), and
+      // only the N shown are then read in full. The order and the counts
+      // are the lean read's; the details are the full read's.
+      const computedAt = clock().toISOString();
+      const ranked = await profiles(actor, [...sources.keys()], "RANK");
+      if (ranked.kind !== "OK") return ranked;
+      const lean = buildFitComparison({
+        items: ranked.items,
+        sources,
+        limit,
+        config,
+        computedAt,
+      });
+      const shown = lean.entries.map((entry) => entry.companyId);
+      if (shown.length === 0) return { kind: "OK", comparison: lean };
+      const full = await profiles(actor, shown);
+      if (full.kind !== "OK") return full;
+      const detailed = buildFitComparison({
+        items: full.items,
+        sources,
+        limit,
+        config,
+        computedAt,
+      });
       return {
         kind: "OK",
-        comparison: buildFitComparison({
-          items: result.items,
-          sources,
-          limit,
-          config,
-          computedAt: clock().toISOString(),
-        }),
+        comparison: {
+          ...detailed,
+          considered: lean.considered,
+          leftOut: lean.leftOut,
+        },
       };
     },
   };

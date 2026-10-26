@@ -661,6 +661,8 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     readonly investability?: ReadonlyMap<string, InvestabilityDto>;
   }) {
     const read: string[][] = [];
+    /** Each inputs read's purpose: "RANK" (lean) or "FULL". */
+    const purposes: string[] = [];
     const scored: string[][] = [];
     const evaluated: string[][] = [];
     const service = createFitService({
@@ -703,6 +705,7 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
       inputs: {
         read: (query) => {
           read.push([...query.companyIds]);
+          purposes.push(query.purpose ?? "FULL");
           const map = new Map<string, FitCompanyInputs>();
           for (const id of query.companyIds) {
             map.set(id, {
@@ -745,7 +748,7 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
           }),
       clock: () => NOW,
     });
-    return { service, read, evaluated, scored };
+    return { service, read, purposes, evaluated, scored };
   }
 
   it("a non-investor gets nothing, and nothing is read", async () => {
@@ -868,6 +871,28 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(w.read).toEqual([]);
   });
 
+  // Coordinator 2026-10-26 (live 8965cbe4: 996 round trips in
+  // fit_top_candidates): all candidates are ordered on the lean read; only
+  // the N shown are read in full.
+  it("top N reads every candidate lean and only the ones shown in full", async () => {
+    const w = world({
+      candidates: [1, 2, 3, 4, 5].map((n) => ({
+        companyId: ID(n),
+        source: "FEED" as const,
+      })),
+    });
+    const result = await w.service.top(actor, 2);
+    expect(result.kind).toBe("OK");
+    if (result.kind !== "OK") return;
+    expect(result.comparison.entries).toHaveLength(2);
+    expect(result.comparison.considered).toBe(5);
+    expect(w.purposes).toEqual(["RANK", "FULL"]);
+    expect(w.read[0]).toHaveLength(5);
+    expect(w.read[1]?.sort()).toEqual(
+      result.comparison.entries.map((e) => e.companyId).sort(),
+    );
+  });
+
   it("top N ranks only the investor's own candidates, merging their sources", async () => {
     const w = world({
       candidates: [
@@ -879,7 +904,13 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     const result = await w.service.top(actor, 3);
     expect(result.kind).toBe("OK");
     if (result.kind !== "OK") return;
-    expect(w.evaluated).toEqual([[ID(1), ID(2)]]);
+    // Every candidate is authorised once for the order, then the ones shown
+    // again before their full read (2026-10-26: only the shown are read in
+    // full); here both are shown.
+    expect(w.evaluated).toEqual([
+      [ID(1), ID(2)],
+      [ID(1), ID(2)],
+    ]);
     expect(result.comparison.entries.map((e) => e.companyId).sort()).toEqual([
       ID(1),
       ID(2),
