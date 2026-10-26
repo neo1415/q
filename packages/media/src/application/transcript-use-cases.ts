@@ -8,7 +8,10 @@ import {
 } from "../domain/errors.js";
 import { cuesAround, parseWebVtt, type TimedCue } from "../domain/web-vtt.js";
 import type { MediaServiceDependencies } from "./dependencies.js";
-import { createResolvePlayableAsset } from "./upload-use-cases.js";
+import {
+  createResolvePlayableAsset,
+  createResolvePlayableAssets,
+} from "./upload-use-cases.js";
 
 /**
  * A pitch's timed transcript (R18: "Q watches the video with us").
@@ -232,6 +235,76 @@ export function createGetPitchTranscript(
       mediaAssetId: asset.id,
       tenantId: asset.tenantId,
     };
+  };
+}
+
+/**
+ * getPitchTranscript for many pitches at once (coordinator 2026-10-26): the
+ * playback rule decides each exactly as it does alone, in a fixed few
+ * reads, and the transcripts are read together. A pitch this reader may
+ * not play is absent: no transcript, as alone it is not found.
+ */
+export function createGetPitchTranscripts(
+  dependencies: MediaServiceDependencies,
+) {
+  const playable = createResolvePlayableAssets(dependencies);
+  const { repositories, sql } = dependencies;
+  return async (query: {
+    readonly actor: ActorContext;
+    readonly pitches: readonly {
+      readonly companyId: string;
+      readonly mediaAssetId: MediaAssetId;
+    }[];
+  }): Promise<ReadonlyMap<MediaAssetId, PitchTranscriptView>> => {
+    const assets = [...(await playable(query.actor, query.pitches)).values()];
+    const out = new Map<MediaAssetId, PitchTranscriptView>();
+    if (assets.length === 0) return out;
+    const transcripts = repositories.pitchTranscripts;
+    const stored = new Map<
+      MediaAssetId,
+      NonNullable<Awaited<ReturnType<NonNullable<typeof transcripts>["find"]>>>
+    >();
+    if (transcripts !== undefined) {
+      const many = transcripts.findMany;
+      const found =
+        many !== undefined
+          ? await many(
+              sql,
+              assets.map((asset) => ({
+                tenantId: asset.tenantId,
+                mediaAssetId: asset.id,
+              })),
+            )
+          : (
+              await Promise.all(
+                assets.map((asset) =>
+                  transcripts.find(sql, asset.tenantId, asset.id),
+                ),
+              )
+            ).filter((row) => row !== null);
+      for (const row of found) stored.set(row.mediaAssetId, row);
+    }
+    for (const asset of assets) {
+      const row = stored.get(asset.id);
+      out.set(
+        asset.id,
+        row !== undefined
+          ? {
+              status: "AVAILABLE",
+              mediaAssetId: asset.id,
+              tenantId: asset.tenantId,
+              language: row.language,
+              cues: row.cues,
+              vtt: row.vtt,
+            }
+          : {
+              status: asset.transcriptState === "PENDING" ? "PENDING" : "NONE",
+              mediaAssetId: asset.id,
+              tenantId: asset.tenantId,
+            },
+      );
+    }
+    return out;
   };
 }
 

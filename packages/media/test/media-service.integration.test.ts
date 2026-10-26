@@ -8,6 +8,8 @@ import { parseDatabaseConfig } from "@capital-q/config/database";
 import { createEventRegistry, type CorrelationId } from "@capital-q/contracts";
 import {
   createRequestDatabaseClient,
+  createRoundTripCounter,
+  withRoundTripCounter,
   type RequestDatabase,
   type TransactionContext,
   type TransactionManager,
@@ -16,6 +18,7 @@ import { createOutboxWriter } from "@capital-q/eventing";
 import {
   AuthUserIdSchema,
   createAuthorizationService,
+  OrganisationIdSchema,
   resolveHumanActorContext,
   TenantIdSchema,
   type ActorContext,
@@ -32,6 +35,8 @@ import {
   createMediaService,
   createPostgresCompanyPitchQueryPort,
   createPostgresDiscoverablePitchQueryPort,
+  createPostgresMediaAssetRepository,
+  createPostgresPitchTranscriptRepository,
   createPostgresNetworkPitchQueryPort,
   MediaAssetConflictError,
   MediaAssetNotFoundError,
@@ -263,6 +268,78 @@ describe("@capital-q/media against local PostgreSQL", () => {
        order by id`;
     return rows.map((row) => row.event_type);
   };
+
+  // Coordinator 2026-10-26 (live trace): the raise's pitch reads read each
+  // asset and transcript one at a time. The batch reads take exact (tenant,
+  // asset) pairs, as findById and find do: never another tenant's asset or
+  // transcript, one round trip for the set, the same rows as one by one.
+  it("reads many assets and transcripts by exact tenant pairs, in one round trip each", async () => {
+    await withWorld(
+      async ({ tx, adminA, adminB, tenantA, companyA, tenantB, companyB }) => {
+        const assets = createPostgresMediaAssetRepository();
+        const transcripts = createPostgresPitchTranscriptRepository();
+        const insert = (
+          tenantId: string,
+          companyId: string,
+          who: ActorContext,
+        ) =>
+          assets.insert(tx, {
+            tenantId: TenantIdSchema.parse(tenantId),
+            ownerType: "COMPANY",
+            ownerId: companyId,
+            ownerOrganisationId: OrganisationIdSchema.parse(who.organisationId),
+            purpose: "FOUNDER_PITCH",
+            playbackPolicy: "AUTHORISED",
+            createdByUserId: who.userId,
+          });
+        const a1 = await insert(tenantA, companyA, adminA);
+        const a2 = await insert(tenantA, companyA, adminA);
+        const b1 = await insert(tenantB, companyB, adminB);
+        await transcripts.insert(tx, {
+          tenantId: a1.tenantId,
+          mediaAssetId: a1.id,
+          language: "en",
+          source: "PROVIDER_GENERATED",
+          cues: [
+            { startMs: 0, endMs: 1000, text: "We are raising a seed round" },
+          ],
+          vtt: "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nWe are raising a seed round\n",
+        });
+        const pairs = [
+          { tenantId: a1.tenantId, mediaAssetId: a1.id },
+          { tenantId: a2.tenantId, mediaAssetId: a2.id },
+          { tenantId: b1.tenantId, mediaAssetId: b1.id },
+          // Another tenant's asset asked under this one: nothing.
+          { tenantId: a1.tenantId, mediaAssetId: b1.id },
+        ];
+        const counter = createRoundTripCounter();
+        const [found, stored] = await withRoundTripCounter(
+          counter,
+          async () =>
+            [
+              await assets.findByIds?.(tx.sql, pairs),
+              await transcripts.findMany?.(tx.sql, [
+                { tenantId: a1.tenantId, mediaAssetId: a1.id },
+                { tenantId: b1.tenantId, mediaAssetId: a1.id },
+              ]),
+            ] as const,
+        );
+        expect(counter.count).toBe(2);
+        expect(new Set((found ?? []).map((asset) => asset.id))).toEqual(
+          new Set([a1.id, a2.id, b1.id]),
+        );
+        expect(found).toHaveLength(3);
+        for (const asset of found ?? []) {
+          expect(asset).toEqual(
+            await assets.findById(tx.sql, asset.tenantId, asset.id),
+          );
+        }
+        expect(stored).toEqual([
+          await transcripts.find(tx.sql, a1.tenantId, a1.id),
+        ]);
+      },
+    );
+  });
 
   it("creates a pitch record that is honest about what happened", async () => {
     await withWorld(async (world) => {

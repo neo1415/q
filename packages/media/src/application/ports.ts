@@ -45,6 +45,19 @@ export type MediaAssetRepository = {
     mediaAssetId: MediaAssetId,
   ) => Promise<MediaAsset | null>;
   /**
+   * findById for many (tenant, asset) pairs in one read, each matched as a
+   * pair exactly as findById matches it. Optional: callers fall back to it.
+   */
+  readonly findByIds?:
+    | ((
+        executor: DatabaseExecutor,
+        pairs: readonly {
+          readonly tenantId: TenantId;
+          readonly mediaAssetId: MediaAssetId;
+        }[],
+      ) => Promise<readonly MediaAsset[]>)
+    | undefined;
+  /**
    * The asset a provider's identifier names, in whichever tenant holds it
    * (CQ-MEDIA-012). Cross-tenant by necessity — a provider webhook carries
    * no tenant — and therefore a lookup only: the caller has already
@@ -252,6 +265,19 @@ export type PitchTranscriptRepository = {
     tenantId: TenantId,
     mediaAssetId: MediaAssetId,
   ) => Promise<StoredPitchTranscript | null>;
+  /**
+   * find for many (tenant, asset) pairs in one read: for each, the earliest
+   * written, as find returns it. Optional: callers fall back to find.
+   */
+  readonly findMany?:
+    | ((
+        executor: DatabaseExecutor,
+        pairs: readonly {
+          readonly tenantId: TenantId;
+          readonly mediaAssetId: MediaAssetId;
+        }[],
+      ) => Promise<readonly StoredPitchTranscript[]>)
+    | undefined;
   /** Idempotent on (asset, language): a second write keeps the first. */
   readonly insert: (
     tx: TransactionContext,
@@ -369,6 +395,24 @@ export type PitchViewerAccessPort = {
         readonly tenantId: TenantId;
         readonly ownerOrganisationId: OrganisationId;
       } | null>)
+    | undefined;
+  /**
+   * resolveViewableCompany for many companies in one evaluation, by company
+   * id (absent: not viewable). Optional: callers ask one at a time.
+   */
+  readonly resolveViewableCompanies?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<
+        ReadonlyMap<
+          string,
+          {
+            readonly tenantId: TenantId;
+            readonly ownerOrganisationId: OrganisationId;
+          }
+        >
+      >)
     | undefined;
 };
 

@@ -173,6 +173,17 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
     },
 
     findById,
+    findByIds: async (executor, pairs) => {
+      if (pairs.length === 0) return [];
+      // Exact (tenant, asset) pairs via unnest: no cross product.
+      const tenants = pairs.map((pair) => pair.tenantId);
+      const ids = pairs.map((pair) => pair.mediaAssetId);
+      const rows = await executor`
+        ${select(executor)}
+          join unnest(${tenants}::uuid[], ${ids}::uuid[]) as wanted (tenant_id, id)
+            on wanted.tenant_id = m.tenant_id and wanted.id = m.id`;
+      return rows.map(toAsset);
+    },
 
     findByProviderAssetId: async (executor, provider, providerAssetId) => {
       // Served by media_assets_provider_asset_idx; unique per provider.
@@ -373,6 +384,31 @@ const TranscriptRow = z.object({
 
 export function createPostgresPitchTranscriptRepository(): PitchTranscriptRepository {
   return {
+    findMany: async (executor, pairs) => {
+      if (pairs.length === 0) return [];
+      // Exact (tenant, asset) pairs; per asset the earliest written, as
+      // find returns it.
+      const tenants = pairs.map((pair) => pair.tenantId);
+      const ids = pairs.map((pair) => pair.mediaAssetId);
+      const rows = await executor`
+        select distinct on (t.media_asset_id)
+               t.media_asset_id, t.language, t.source, t.cues, t.vtt, t.created_at
+          from media.pitch_transcripts t
+          join unnest(${tenants}::uuid[], ${ids}::uuid[]) as wanted (tenant_id, media_asset_id)
+            on wanted.tenant_id = t.tenant_id and wanted.media_asset_id = t.media_asset_id
+         order by t.media_asset_id, t.created_at`;
+      return rows.map((row) => {
+        const r = TranscriptRow.parse(row);
+        return {
+          mediaAssetId: r.media_asset_id,
+          language: r.language,
+          source: r.source,
+          cues: r.cues,
+          vtt: r.vtt,
+          createdAt: r.created_at,
+        };
+      });
+    },
     find: async (executor, tenantId, mediaAssetId) => {
       // One language today; the earliest written is the transcript.
       const rows = await executor`

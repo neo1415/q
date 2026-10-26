@@ -25,6 +25,7 @@ import {
 } from "./publish-use-cases.js";
 import {
   createGetPitchTranscript,
+  createGetPitchTranscripts,
   createGetPitchTranscriptByPitch,
   createMayPlayPitch,
   createSweepPitchCaptions,
@@ -70,6 +71,7 @@ export type MediaService = {
    * by company and pitch for the player, by pitch alone for Q.
    */
   readonly getPitchTranscript: ReturnType<typeof createGetPitchTranscript>;
+  readonly getPitchTranscripts: ReturnType<typeof createGetPitchTranscripts>;
   readonly getPitchTranscriptByPitch: ReturnType<
     typeof createGetPitchTranscriptByPitch
   >;
@@ -154,6 +156,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     authorisePlayback: createAuthorisePlayback(dependencies),
     authoriseDownload: createAuthoriseDownload(dependencies),
     getPitchTranscript: createGetPitchTranscript(dependencies),
+    getPitchTranscripts: createGetPitchTranscripts(dependencies),
     getPitchTranscriptByPitch: createGetPitchTranscriptByPitch(dependencies),
     syncPitchTranscript: createSyncPitchTranscript(dependencies),
     sweepPitchCaptions: createSweepPitchCaptions(dependencies),
