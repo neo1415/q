@@ -43,7 +43,7 @@ export const TURN_READER_V68: PromptDefinition<
 > = {
   ...TURN_READER_V67,
   version: 68,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Coordinator 2026-10-26 (the reader's fixed cost): v67's rules unchanged; a reading writes only the fields that differ from their defaults (the provider schema requires only kind, confidence and transcript), which Capital Q reads back as those defaults; the page's controls move to the end with the other per-turn inputs, so the rules are one cacheable prefix.",
   effectiveFrom: "2026-10-26",

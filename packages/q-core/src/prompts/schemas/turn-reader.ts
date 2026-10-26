@@ -1011,3 +1011,6 @@ export const TURN_READER_V67_SCHEMA_VERSION = 67;
  * the fields that differ from their defaults; read back the same.
  */
 export const TURN_READER_V68_SCHEMA_VERSION = 68;
+
+/** v69 (run 7b51d28d): the same output, each field only where it belongs. */
+export const TURN_READER_V69_SCHEMA_VERSION = 69;

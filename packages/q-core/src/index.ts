@@ -439,6 +439,7 @@ export {
   TURN_READER_V66_SCHEMA_VERSION,
   TURN_READER_V67_SCHEMA_VERSION,
   TURN_READER_V68_SCHEMA_VERSION,
+  TURN_READER_V69_SCHEMA_VERSION,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -1858,6 +1859,10 @@ export {
   V68_CONTROLS_LISTED_BELOW,
   V68_ONLY_WHAT_APPLIES,
 } from "./prompts/tasks/turn-reader.v68.js";
+export {
+  TURN_READER_V69,
+  V69_FIELDS_WHERE_THEY_BELONG,
+} from "./prompts/tasks/turn-reader.v69.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";
