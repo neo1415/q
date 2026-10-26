@@ -253,3 +253,120 @@ describe("propose_email by name, from any page (action parity 2026-10-02)", () =
     expect(prepared).toHaveLength(1);
   });
 });
+
+// Live d3a197b4 (2026-10-26): an asked email drafted in its first round was
+// refused at "(root)" (it named the other side more than once, or not at
+// all) and cost three more rounds before the card. Named more than once,
+// it resolves in authorize's order, only among the reader's own
+// relationships; named not at all, the refusal says what to fix.
+describe("propose_email from a first round", () => {
+  const OTHER_COMPANY = "99999999-0000-4000-8000-0000000000f1";
+  const byName = () => {
+    const prepared: unknown[] = [];
+    const email: EmailIntelligencePort = {
+      counterpart: (actor, relationshipId) =>
+        Promise.resolve(
+          actor.userId === actorB.userId && relationshipId === RELATIONSHIP
+            ? {
+                kind: "COMPANY" as const,
+                id: COMPANY_B_NETWORK,
+                name: "Apex",
+                contacts: [ADA],
+              }
+            : null,
+        ),
+      mailbox: () => Promise.resolve({ email: "investor@example.invalid" }),
+      prepareForApproval: (entry) => {
+        prepared.push(entry.payload);
+        return "PREPARED";
+      },
+    };
+    const relationships = {
+      ownRelationships: (actor: typeof actorA) =>
+        Promise.resolve({
+          side: "INVESTOR" as const,
+          items:
+            actor.userId === actorB.userId
+              ? [
+                  {
+                    relationshipId: RELATIONSHIP,
+                    counterpart: {
+                      kind: "COMPANY",
+                      id: COMPANY_B_NETWORK,
+                      name: "Apex",
+                    },
+                    state: "CONNECTED",
+                  },
+                ]
+              : [],
+        } as never),
+      withCompany: () => Promise.resolve(null),
+      withInvestor: () => Promise.resolve(null),
+    } as never;
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(fakePorts({ email, relationships })),
+      ),
+    });
+    return { executor, prepared };
+  };
+  const first = (target: Record<string, unknown>) => ({
+    callId: "e1",
+    name: "propose_email",
+    arguments: {
+      ...target,
+      subject: "Our latest traction",
+      body: "Hi Ada, 96 kiosks are live. Best, Ben",
+    },
+  });
+
+  it("names them twice (their name and another id): validates and goes to the relationship their name finds", async () => {
+    const { executor, prepared } = byName();
+    for (const target of [
+      { counterpartName: "apex", companyId: OTHER_COMPANY },
+      { counterpartName: "apex", relationshipId: RELATIONSHIP },
+    ]) {
+      const outcome = await executor.execute(
+        first(target),
+        contextFor(actorB, investorPlan),
+      );
+      expect(outcome.status, JSON.stringify(Object.keys(target))).toBe(
+        "SUCCEEDED",
+      );
+    }
+    expect(prepared).toHaveLength(2);
+    expect(prepared[0]).toMatchObject({
+      relationshipId: RELATIONSHIP,
+      to: ADA.email,
+    });
+  });
+
+  it("named twice by someone with no such relationship, still prepares nothing", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", relationshipId: RELATIONSHIP }),
+      contextFor(
+        actorA,
+        planFor(actorA, "GENERAL_QUESTION", [
+          { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+        ]),
+      ),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+    expect(prepared).toEqual([]);
+  });
+
+  it("named not at all, says what to fix, in the schema's words, never a value", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({}),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+    const said = outcome.result.ok ? "" : outcome.result.error.safeMessage;
+    expect(said).toContain("Arguments are invalid at: (root).");
+    expect(said).toContain("name the other side: counterpartName");
+    expect(said).not.toContain("96 kiosks");
+    expect(prepared).toEqual([]);
+  });
+});

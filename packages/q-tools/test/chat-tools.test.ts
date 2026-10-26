@@ -322,6 +322,46 @@ describe("chat proposals", () => {
     expect(prepared).toHaveLength(1);
   });
 
+  // Live d3a197b4 (2026-10-26): a message named twice was refused at
+  // "(root)" and cost rounds before the card. Their name for the other side
+  // decides (resolveRelationship's order), only among their own.
+  it("named twice (their name and an id that is not theirs): their name finds the relationship; a stranger gets nothing", async () => {
+    const { executor, prepared } = world();
+    const twice = {
+      callId: "c4t",
+      name: "propose_chat_message",
+      arguments: {
+        counterpartName: "apex",
+        relationshipId: OTHER,
+        body: "Shall we talk Tuesday?",
+      },
+    };
+    const outcome = await executor.execute(
+      twice,
+      contextFor(actorB, base(actorB)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toEqual([
+      {
+        actionType: "chat.message.send",
+        payload: {
+          relationshipId: RELATIONSHIP,
+          counterpartName: "Apex",
+          body: "Shall we talk Tuesday?",
+        },
+      },
+    ]);
+    const stranger = await executor.execute(
+      twice,
+      contextFor(actorA, base(actorA)),
+    );
+    expect(stranger.result).not.toMatchObject({ data: { status: "PREPARED" } });
+    expect(prepared).toHaveLength(1);
+  });
+
   it('"send a message to nixo telling them i am looking forward to the next meeting": a message card for Nixo, from Home', async () => {
     const { executor, prepared } = world({ counterpart: "Nixo" });
     const outcome = await executor.execute(

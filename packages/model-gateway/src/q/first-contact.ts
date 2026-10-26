@@ -109,14 +109,16 @@ export function firstContactOf(
   const body = typeof args.body === "string" ? args.body.trim() : "";
   const note =
     body.length > 0 && body.length <= INTEREST_NOTE_MAX ? { note: body } : {};
-  if (typeof args.companyId === "string" && args.companyId.length > 0) {
-    return { companyId: args.companyId, ...note };
-  }
+  // Their name for the other side first (live d3a197b4, 2026-10-26: a
+  // message may name it twice), as the message tool itself resolved it.
   if (
     typeof args.counterpartName === "string" &&
     args.counterpartName.trim().length > 0
   ) {
     return { company: args.counterpartName.trim(), ...note };
+  }
+  if (typeof args.companyId === "string" && args.companyId.length > 0) {
+    return { companyId: args.companyId, ...note };
   }
   return null;
 }

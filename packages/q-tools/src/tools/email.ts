@@ -93,6 +93,10 @@ export const ProposeEmailInputSchema = z
     ),
   })
   .strict()
+  // Named more than once (live d3a197b4, 2026-10-26): resolved in authorize's
+  // order -- a reply to an inbound email, then their name for the other
+  // side, then the relationship, then a company or investor id -- each
+  // found only among the reader's own or admitted relationships.
   .refine(
     (input) =>
       [
@@ -101,10 +105,10 @@ export const ProposeEmailInputSchema = z
         input.investorOrganisationId,
         input.counterpartName,
         input.inboundEmailId,
-      ].filter((id) => id !== undefined).length === 1,
+      ].some((id) => id !== undefined),
     {
       message:
-        "name exactly one of relationshipId, companyId, investorOrganisationId, counterpartName or inboundEmailId",
+        "name the other side: counterpartName (their name as the person said it), or relationshipId, companyId or investorOrganisationId, or inboundEmailId to reply to an email",
     },
   );
 export type ProposeEmailInput = z.infer<typeof ProposeEmailInputSchema>;

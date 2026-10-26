@@ -241,6 +241,32 @@ export const ONE_REF = {
 };
 
 /**
+ * A message names its other side at least once (live d3a197b4, 2026-10-26:
+ * an asked email drafted in its first round was refused at "(root)" and
+ * cost three more rounds). Named more than once, the relationship is
+ * resolved in resolveRelationship's order -- their name for the other
+ * side, then the relationship, then a company or investor id -- and every
+ * branch still finds it only among the reader's own or admitted ones.
+ */
+export function atLeastOne(input: {
+  readonly relationshipId?: string | undefined;
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  readonly counterpartName?: string | undefined;
+}): boolean {
+  return [
+    input.relationshipId,
+    input.companyId,
+    input.investorOrganisationId,
+    input.counterpartName,
+  ].some((id) => id !== undefined);
+}
+export const SOME_REF = {
+  message:
+    "name the other side: counterpartName (their name as the person said it), or relationshipId, companyId or investorOrganisationId",
+};
+
+/**
  * One relationship for this run: bound by the firewall when named by id,
  * or found through an admitted counterparty. Null when neither.
  */
@@ -445,7 +471,7 @@ export const ProposeChatMessageInputSchema = z
     reason: CardReasonSchema,
   })
   .strict()
-  .refine(exactlyOne, ONE_REF);
+  .refine(atLeastOne, SOME_REF);
 export type ProposeChatMessageInput = z.infer<
   typeof ProposeChatMessageInputSchema
 >;
