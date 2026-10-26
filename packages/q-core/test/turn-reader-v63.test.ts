@@ -16,7 +16,7 @@ import {
 describe("TURN_READER v63", () => {
   it("is the active reader, v62 kept whole plus LIST and ADD", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(68);
+    expect(active.definition.version).toBe(69);
     expect(TURN_READER_V62.status).toBe("DEPRECATED");
     expect(TURN_READER_V63.template).toContain(
       `${V61_BOARD_ASK}${V63_BOARD_LIST_ADD}`,
