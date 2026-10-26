@@ -29,7 +29,7 @@ export const TURN_READER_V66: PromptDefinition<
 > = {
   ...TURN_READER_V65,
   version: 66,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA F-114 (coordinator 2026-10-25): v65 plus verifiedOnly, hasPitch and raiseShared in the discover structure, true only when the person asks for that narrowing, by meaning in any language; code keeps those Discover filters only when read, and drops them when only the model added them. Same output schema.",
   effectiveFrom: "2026-10-25",

@@ -64,23 +64,41 @@ export type ConversationContext = {
   readonly text: string;
 };
 
+/**
+ * How much of a value is kept. OUTLINE keeps every listed item, in its
+ * place, with its own short fields, and drops the lists inside it (a
+ * card's measures and reasons): the order and names survive a turn too
+ * long to keep whole (guard I-top-five, 2026-10-26: five answer cards
+ * were cut after the second, mid-card).
+ */
+type Keep = { readonly stringChars: number; readonly listDepth: number };
+const WHOLE: Keep = { stringChars: STRING_CHARS, listDepth: Infinity };
+/** The blocks, and the items a block lists (its cards, rows, findings). */
+const OUTLINE: Keep = { stringChars: 80, listDepth: 2 };
+
 /** A value with its nulls, empty strings and empty lists dropped; lists numbered. */
-function compact(value: unknown, depth = 0): unknown {
+function compact(
+  value: unknown,
+  depth = 0,
+  keep: Keep = WHOLE,
+  lists = 0,
+): unknown {
   if (value === null || value === undefined) return undefined;
   if (typeof value === "string") {
     const text = value.trim();
     if (text.length === 0) return undefined;
-    return text.length > STRING_CHARS
-      ? `${text.slice(0, STRING_CHARS - 1)}…`
+    return text.length > keep.stringChars
+      ? `${text.slice(0, keep.stringChars - 1)}…`
       : text;
   }
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (depth > 6) return undefined;
   if (Array.isArray(value)) {
+    if (lists >= keep.listDepth) return undefined;
     const items = value
       .slice(0, LIST_ITEMS_MAX)
       .map((item: unknown, index) => {
-        const kept = compact(item, depth + 1);
+        const kept = compact(item, depth + 1, keep, lists + 1);
         // Order is part of what was shown ("the second one"): an object
         // in a list carries its place, 1-based, as the person counts.
         return kept !== null && typeof kept === "object" && !Array.isArray(kept)
@@ -93,7 +111,7 @@ function compact(value: unknown, depth = 0): unknown {
   if (typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, field] of Object.entries(value)) {
-      const kept = compact(field, depth + 1);
+      const kept = compact(field, depth + 1, keep, lists);
       if (kept !== undefined) out[key] = kept;
     }
     return Object.keys(out).length === 0 ? undefined : out;
@@ -103,11 +121,16 @@ function compact(value: unknown, depth = 0): unknown {
 
 function renderTurn(turn: ShownTurn): string {
   const said = turn.said.trim().slice(0, SAID_CHARS);
-  const shown = compact(turn.blocks);
-  const fetched = compact(turn.fetched);
-  const line = `T${String(turn.turn)}: said ${JSON.stringify(said)}${
-    shown === undefined ? "" : ` | showed ${JSON.stringify(shown)}`
-  }${fetched === undefined ? "" : ` | fetched ${JSON.stringify(fetched)}`}`;
+  const render = (keep: Keep): string => {
+    const shown = compact(turn.blocks, 0, keep);
+    const fetched = compact(turn.fetched, 0, keep);
+    return `T${String(turn.turn)}: said ${JSON.stringify(said)}${
+      shown === undefined ? "" : ` | showed ${JSON.stringify(shown)}`
+    }${fetched === undefined ? "" : ` | fetched ${JSON.stringify(fetched)}`}`;
+  };
+  const whole = render(WHOLE);
+  if (whole.length <= TURN_CHARS) return whole;
+  const line = render(OUTLINE);
   return line.length > TURN_CHARS ? `${line.slice(0, TURN_CHARS - 1)}…` : line;
 }
 

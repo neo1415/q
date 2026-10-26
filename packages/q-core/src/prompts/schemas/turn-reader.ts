@@ -999,3 +999,9 @@ export type TurnReaderV65Result = z.infer<typeof TurnReaderV65ResultSchema>;
  * one never does.
  */
 export const TURN_READER_V66_SCHEMA_VERSION = 66;
+
+/**
+ * v67 (guard I-top-five): the same output as v65; "how do the top two
+ * stack up?" over a longer list Q showed is now read as compare {count}.
+ */
+export const TURN_READER_V67_SCHEMA_VERSION = 67;
