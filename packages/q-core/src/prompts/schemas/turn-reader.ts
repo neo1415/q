@@ -1005,3 +1005,9 @@ export const TURN_READER_V66_SCHEMA_VERSION = 66;
  * stack up?" over a longer list Q showed is now read as compare {count}.
  */
 export const TURN_READER_V67_SCHEMA_VERSION = 67;
+
+/**
+ * v68 (the reader's fixed cost): the same output as v65, written with only
+ * the fields that differ from their defaults; read back the same.
+ */
+export const TURN_READER_V68_SCHEMA_VERSION = 68;

@@ -31,7 +31,7 @@ export const TURN_READER_V67: PromptDefinition<
 > = {
   ...TURN_READER_V66,
   version: 67,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Guard I-top-five (coordinator 2026-10-26, run 97d4c273): v66 plus THE TOP N OF A LIST YOU SHOWED -- 'how do the top two stack up / the first three compare', in any words and any language, after a longer list Q showed -- is compare {count: N} from the top of that list, whatever else the turn is. Same output schema; research is read as before.",
   effectiveFrom: "2026-10-26",

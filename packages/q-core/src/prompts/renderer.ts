@@ -176,7 +176,10 @@ export function renderPrompt<V>(
       : {
           kind: "STRUCTURED",
           schemaName: output.schemaName,
-          jsonSchema: toJsonSchema(output.schema),
+          jsonSchema: toJsonSchema(
+            output.schema,
+            output.onlyWhatApplies === true,
+          ),
         };
   const outputIdentity =
     output.kind === "TEXT"
@@ -215,8 +218,14 @@ export function renderPrompt<V>(
   };
 }
 
-function toJsonSchema(schema: z.ZodType<unknown>): Record<string, unknown> {
+function toJsonSchema(
+  schema: z.ZodType<unknown>,
+  onlyWhatApplies = false,
+): Record<string, unknown> {
   // Zod 4 emits standard JSON Schema; providers receive that, Capital Q
-  // validates with the Zod schema itself.
-  return toJSONSchema(schema);
+  // validates with the Zod schema itself. As the schema's input, a field
+  // with a default is not required: left out, it parses as that default.
+  return onlyWhatApplies
+    ? toJSONSchema(schema, { io: "input" })
+    : toJSONSchema(schema);
 }

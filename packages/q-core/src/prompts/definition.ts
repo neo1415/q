@@ -243,6 +243,15 @@ export type PromptOutputSpec<O> =
       readonly schemaName: string;
       readonly schemaVersion: number;
       readonly schema: z.ZodType<O>;
+      /**
+       * The provider is told only the fields without a default are
+       * required, so a field at its default may be left out; the schema
+       * reads it back as that default. Each output token costs ~10 ms
+       * (TURN_READER, coordinator 2026-10-26: ~150 of a reading's ~270
+       * tokens were fields written at their defaults). Absent: every field
+       * is required, as before.
+       */
+      readonly onlyWhatApplies?: true | undefined;
     };
 
 export type PromptDefinition<V = unknown, O = unknown> = {
@@ -382,7 +391,9 @@ export function promptContentHash(
 ): string {
   const output =
     definition.output.kind === "STRUCTURED"
-      ? `${definition.output.schemaName}/v${definition.output.schemaVersion}`
+      ? `${definition.output.schemaName}/v${definition.output.schemaVersion}${
+          definition.output.onlyWhatApplies === true ? "/only-what-applies" : ""
+        }`
       : "text";
   return createHash("sha256")
     .update(promptVersionId(definition.id, definition.version))
