@@ -11,6 +11,7 @@ import {
   type ScheduleIntelligencePort,
 } from "../src/index.js";
 import { actorA, actorB, contextFor, fakePorts, planFor } from "./support.js";
+import { DIFFERENT_COUNTERPARTS } from "../src/tools/chat.js";
 
 /**
  * R34 chat tools: Q reads a thread and prepares chat actions only for a
@@ -320,6 +321,61 @@ describe("chat proposals", () => {
     );
     expect(stranger.result).not.toMatchObject({ data: { status: "PREPARED" } });
     expect(prepared).toHaveLength(1);
+  });
+
+  // Live d3a197b4 (2026-10-26): a message named twice was refused at
+  // "(root)" and cost rounds before the card. Every reference must be the
+  // same one of their relationships (#550); a message is never aimed by
+  // picking one over another.
+  it("named twice and agreeing (their name and its relationship id): prepared to that relationship", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      {
+        callId: "c4t",
+        name: "propose_chat_message",
+        arguments: {
+          counterpartName: "apex",
+          relationshipId: RELATIONSHIP,
+          body: "Shall we talk Tuesday?",
+        },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toEqual([
+      {
+        actionType: "chat.message.send",
+        payload: {
+          relationshipId: RELATIONSHIP,
+          counterpartName: "Apex",
+          body: "Shall we talk Tuesday?",
+        },
+      },
+    ]);
+  });
+
+  it("named twice and disagreeing (their name and an id that is not that relationship): refused, nothing prepared", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      {
+        callId: "c4d",
+        name: "propose_chat_message",
+        arguments: {
+          counterpartName: "apex",
+          relationshipId: OTHER,
+          body: "Shall we talk Tuesday?",
+        },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(outcome.result.ok ? "" : outcome.result.error.safeMessage).toBe(
+      DIFFERENT_COUNTERPARTS,
+    );
+    expect(prepared).toEqual([]);
   });
 
   it('"send a message to nixo telling them i am looking forward to the next meeting": a message card for Nixo, from Home', async () => {

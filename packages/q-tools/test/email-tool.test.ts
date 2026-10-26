@@ -14,6 +14,7 @@ import {
   fakePorts,
   planFor,
 } from "./support.js";
+import { DIFFERENT_COUNTERPARTS } from "../src/tools/chat.js";
 
 /**
  * propose_email (BIZ-007): a draft to the other side of one relationship,
@@ -251,5 +252,162 @@ describe("propose_email by name, from any page (action parity 2026-10-02)", () =
     );
     expect(stranger.status).not.toBe("SUCCEEDED");
     expect(prepared).toHaveLength(1);
+  });
+});
+
+// Live d3a197b4 (2026-10-26): an asked email drafted in its first round was
+// refused at "(root)" (it named the other side more than once, or not at
+// all) and cost three more rounds before the card. Named more than once,
+// every reference must be the same one of their relationships (#550): an
+// email is never aimed by picking one reference over another.
+describe("propose_email from a first round", () => {
+  const OTHER_COMPANY = "99999999-0000-4000-8000-0000000000f1";
+  const BASKETARI = "88888888-0000-4000-8000-0000000000e2";
+  const byName = () => {
+    const prepared: unknown[] = [];
+    const email: EmailIntelligencePort = {
+      counterpart: (actor, relationshipId) =>
+        Promise.resolve(
+          actor.userId === actorB.userId && relationshipId === RELATIONSHIP
+            ? {
+                kind: "COMPANY" as const,
+                id: COMPANY_B_NETWORK,
+                name: "Apex",
+                contacts: [ADA],
+              }
+            : null,
+        ),
+      mailbox: () => Promise.resolve({ email: "investor@example.invalid" }),
+      prepareForApproval: (entry) => {
+        prepared.push(entry.payload);
+        return "PREPARED";
+      },
+    };
+    const relationships = {
+      ownRelationships: (actor: typeof actorA) =>
+        Promise.resolve({
+          side: "INVESTOR" as const,
+          items:
+            actor.userId === actorB.userId
+              ? [
+                  {
+                    relationshipId: RELATIONSHIP,
+                    counterpart: {
+                      kind: "COMPANY",
+                      id: COMPANY_B_NETWORK,
+                      name: "Apex",
+                    },
+                    state: "CONNECTED",
+                  },
+                  {
+                    relationshipId: BASKETARI,
+                    counterpart: {
+                      kind: "COMPANY",
+                      id: OTHER_COMPANY,
+                      name: "Basketari",
+                    },
+                    state: "CONNECTED",
+                  },
+                ]
+              : [],
+        } as never),
+      withCompany: () => Promise.resolve(null),
+      withInvestor: () => Promise.resolve(null),
+    } as never;
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(fakePorts({ email, relationships })),
+      ),
+    });
+    return { executor, prepared };
+  };
+  const first = (target: Record<string, unknown>) => ({
+    callId: "e1",
+    name: "propose_email",
+    arguments: {
+      ...target,
+      subject: "Our latest traction",
+      body: "Hi Ada, 96 kiosks are live. Best, Ben",
+    },
+  });
+  const refusal = (outcome: { result: unknown }) =>
+    (outcome.result as { ok: boolean; error?: { safeMessage: string } }).error
+      ?.safeMessage ?? "";
+
+  it("their name and an id that agree: validates and prepares to that relationship", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", relationshipId: RELATIONSHIP }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(prepared).toEqual([
+      expect.objectContaining({ relationshipId: RELATIONSHIP, to: ADA.email }),
+    ]);
+  });
+
+  it("their name and an id for another of their relationships: refused, nothing prepared", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", relationshipId: BASKETARI }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(refusal(outcome)).toBe(DIFFERENT_COUNTERPARTS);
+    expect(prepared).toEqual([]);
+  });
+
+  it("their name and an id that names none of theirs: refused, never sent by the name alone", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", companyId: OTHER_COMPANY }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(refusal(outcome)).toBe(DIFFERENT_COUNTERPARTS);
+    expect(prepared).toEqual([]);
+  });
+
+  it("a reply to an inbound email that also names a relationship: refused", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({
+        inboundEmailId: "77777777-0000-4000-8000-0000000000a1",
+        counterpartName: "apex",
+      }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(refusal(outcome)).toBe(DIFFERENT_COUNTERPARTS);
+    expect(prepared).toEqual([]);
+  });
+
+  it("named twice by someone with no such relationship, still prepares nothing", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", relationshipId: RELATIONSHIP }),
+      contextFor(
+        actorA,
+        planFor(actorA, "GENERAL_QUESTION", [
+          { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+        ]),
+      ),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+    expect(prepared).toEqual([]);
+  });
+
+  it("named not at all, says what to fix, in the schema's words, never a value", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({}),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+    const said = refusal(outcome);
+    expect(said).toContain("Arguments are invalid at: (root).");
+    expect(said).toContain("name the other side: counterpartName");
+    expect(said).not.toContain("96 kiosks");
+    expect(prepared).toEqual([]);
   });
 });

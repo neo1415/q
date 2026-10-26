@@ -241,6 +241,32 @@ export const ONE_REF = {
 };
 
 /**
+ * A message names its other side at least once (live d3a197b4, 2026-10-26:
+ * an asked email drafted in its first round was refused at "(root)" and
+ * cost three more rounds). Named more than once, the relationship is
+ * resolved in resolveRelationship's order -- their name for the other
+ * side, then the relationship, then a company or investor id -- and every
+ * branch still finds it only among the reader's own or admitted ones.
+ */
+export function atLeastOne(input: {
+  readonly relationshipId?: string | undefined;
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  readonly counterpartName?: string | undefined;
+}): boolean {
+  return [
+    input.relationshipId,
+    input.companyId,
+    input.investorOrganisationId,
+    input.counterpartName,
+  ].some((id) => id !== undefined);
+}
+export const SOME_REF = {
+  message:
+    "name the other side: counterpartName (their name as the person said it), or relationshipId, companyId or investorOrganisationId",
+};
+
+/**
  * One relationship for this run: bound by the firewall when named by id,
  * or found through an admitted counterparty. Null when neither.
  */
@@ -298,6 +324,76 @@ export async function resolveRelationship(
     );
   }
   return null;
+}
+
+/**
+ * Coordinator 2026-10-26 (#550): named more than once, each reference is
+ * resolved on its own, through the same authorised paths, and they must
+ * all be the same one of the reader's relationships. Any that disagrees
+ * or resolves to none refuses the whole call: an outward message is never
+ * aimed by picking one reference over another.
+ */
+export const DIFFERENT_COUNTERPARTS =
+  "The references given do not all name the same one of their relationships, so nothing was prepared. Call it again naming the other side once: counterpartName, their name as the person said it.";
+
+const REF_KEYS = [
+  "counterpartName",
+  "relationshipId",
+  "companyId",
+  "investorOrganisationId",
+] as const;
+
+/** How many references a call gives for its other side. */
+export function refsGiven(input: {
+  readonly relationshipId?: string | undefined;
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  readonly counterpartName?: string | undefined;
+}): number {
+  return REF_KEYS.filter((key) => input[key] !== undefined).length;
+}
+
+/** The one relationship every given reference names (null when none), or that they disagree. */
+export type AgreedRelationship =
+  | { readonly kind: "ONE"; readonly relationshipId: string | null }
+  | { readonly kind: "DIFFERENT" };
+
+/**
+ * The one relationship every given reference names, null when there is
+ * none, or DIFFERENT when they do not agree.
+ */
+export async function agreedRelationship(
+  input: {
+    readonly relationshipId?: string | undefined;
+    readonly companyId?: string | undefined;
+    readonly investorOrganisationId?: string | undefined;
+    readonly counterpartName?: string | undefined;
+  },
+  actor: ActorContext,
+  plan: PermittedContextPlan,
+  relationships: RelationshipIntelligencePort,
+): Promise<AgreedRelationship> {
+  const given = REF_KEYS.filter((key) => input[key] !== undefined);
+  if (given.length <= 1) {
+    return {
+      kind: "ONE",
+      relationshipId: await resolveRelationship(
+        input,
+        actor,
+        plan,
+        relationships,
+      ),
+    };
+  }
+  const each = await Promise.all(
+    given.map((key) =>
+      resolveRelationship({ [key]: input[key] }, actor, plan, relationships),
+    ),
+  );
+  const first = each[0] ?? null;
+  return first !== null && each.every((id) => id === first)
+    ? { kind: "ONE", relationshipId: first }
+    : { kind: "DIFFERENT" };
 }
 
 // --- list_messages ---------------------------------------------------------
@@ -445,7 +541,7 @@ export const ProposeChatMessageInputSchema = z
     reason: CardReasonSchema,
   })
   .strict()
-  .refine(exactlyOne, ONE_REF);
+  .refine(atLeastOne, SOME_REF);
 export type ProposeChatMessageInput = z.infer<
   typeof ProposeChatMessageInputSchema
 >;
@@ -489,12 +585,16 @@ function proposalTool<I extends ProposeChatMessageInput>(
     output: ChatProposalOutputSchema,
     authorize: async (input, { actor, plan }) => {
       try {
-        const relationshipId = await resolveRelationship(
+        const agreed = await agreedRelationship(
           input,
           actor,
           plan,
           relationships,
         );
+        if (agreed.kind === "DIFFERENT") {
+          return deny("NOT_AVAILABLE", DIFFERENT_COUNTERPARTS);
+        }
+        const { relationshipId } = agreed;
         if (relationshipId === null) return deny("NOT_AVAILABLE");
         const thread = await chat.thread(actor, relationshipId);
         if (thread === null) return deny("NOT_AVAILABLE");

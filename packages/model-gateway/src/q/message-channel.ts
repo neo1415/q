@@ -41,11 +41,13 @@ export function chatInsteadOf(
   const args = call.arguments ?? {};
   const body = typeof args["body"] === "string" ? args["body"].trim() : "";
   if (body.length === 0) return null;
+  // The email's own order (its authorize): their name for the other side
+  // first, so the message goes to the relationship the email resolved.
   for (const key of [
+    "counterpartName",
     "relationshipId",
     "companyId",
     "investorOrganisationId",
-    "counterpartName",
   ] as const) {
     const value = args[key];
     if (typeof value === "string" && value.trim().length > 0) {

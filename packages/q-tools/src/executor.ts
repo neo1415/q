@@ -70,8 +70,52 @@ function isAborted(signal: AbortSignal | undefined): boolean {
   return signal !== undefined && signal.aborted;
 }
 
+/**
+ * What is wrong with the arguments as a whole (path "(root)"), said in the
+ * schema's own words: live d3a197b4 (2026-10-26) got only "invalid at:
+ * (root)" and an instruction to look an id up, and spent three rounds (~12
+ * s) before the card. A refinement's message is written in code; an
+ * unknown field is named by kind, never by what the model wrote.
+ */
+function rootIssue(issue: {
+  readonly code?: string;
+  readonly message?: string;
+}): string | null {
+  if (issue.code === "custom" && typeof issue.message === "string")
+    return issue.message;
+  if (issue.code === "unrecognized_keys")
+    return "a field this tool does not take: leave out any field not in its schema";
+  if (issue.code === "invalid_type")
+    return "the arguments must be one JSON object";
+  return null;
+}
+
+/** Issue kinds, for the log line: which check refused, never a value. */
+export function argumentIssueCodes(
+  issues: readonly { readonly code?: string }[],
+): readonly string[] {
+  return [...new Set(issues.map((issue) => issue.code ?? "unknown"))].slice(
+    0,
+    8,
+  );
+}
+
 /** Issue paths only: a model-generated value never travels back as text. */
-function argumentIssues(issues: readonly { path: PropertyKey[] }[]): string {
+function argumentIssues(
+  issues: readonly {
+    path: PropertyKey[];
+    readonly code?: string;
+    readonly message?: string;
+  }[],
+): string {
+  const root = [
+    ...new Set(
+      issues
+        .filter((issue) => issue.path.length === 0)
+        .map(rootIssue)
+        .filter((said): said is string => said !== null),
+    ),
+  ].slice(0, 3);
   const paths = [
     ...new Set(
       issues.map((issue) =>
@@ -81,10 +125,16 @@ function argumentIssues(issues: readonly { path: PropertyKey[] }[]): string {
       ),
     ),
   ].slice(0, 8);
+  // A field path the model can fix in place; only the arguments as a whole
+  // being wrong says what to fix there, in the schema's words.
+  const fixes =
+    root.length === 0
+      ? ""
+      : ` ${root.map((said) => `At (root): ${said}.`).join(" ")} Call the tool again with that corrected.`;
   // Said to the model, which speaks to the person: never ask them for an
   // id or relay this (live 2026-10-02: "I need Tallyloom's company record
   // ID"). Ids come from the run's own tools.
-  return `Arguments are invalid at: ${paths.join(", ")}. Do not ask the person for an id or mention this error: find the id with list_my_relationships or a search tool and try again, or tell them plainly what you could not do and the next step you can take.`;
+  return `Arguments are invalid at: ${paths.join(", ")}.${fixes} Do not ask the person for an id or mention this error: find the id with list_my_relationships or a search tool and try again, or tell them plainly what you could not do and the next step you can take.`;
 }
 
 export function createQToolExecutor(
@@ -102,6 +152,8 @@ export function createQToolExecutor(
   const finish = (
     context: QToolExecutionContext,
     outcome: QToolCallOutcome,
+    /** Which checks refused the arguments (issue kinds only). */
+    invalidCodes?: readonly string[],
   ): QToolCallOutcome => {
     const labels = {
       tool: outcome.toolName ?? "unknown",
@@ -131,6 +183,7 @@ export function createQToolExecutor(
                 /invalid at: ([^.]*)\./u.exec(
                   outcome.result.error.safeMessage,
                 )?.[1] ?? null,
+              ...(invalidCodes === undefined ? {} : { invalidCodes }),
             }
           : {}),
       },
@@ -183,6 +236,7 @@ export function createQToolExecutor(
                 argumentIssues(parsed.error.issues),
                 elapsed(),
               ),
+              argumentIssueCodes(parsed.error.issues),
             );
           }
           // The actor the run was authorised for is the only actor a tool
