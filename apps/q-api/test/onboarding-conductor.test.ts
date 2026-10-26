@@ -980,7 +980,7 @@ describe("a confirmation on resume shows what it confirms (QA 26 Oct)", () => {
     const noCurrency = {
       ...view,
       responses: view.responses.filter((r) => r.stepKey !== "F6.currency"),
-    } as OnboardingSessionView;
+    };
     const line = resumeLine(noCurrency, "founder");
     expect(line).toContain("1,200,000");
     expect(line).not.toContain("$");
