@@ -318,6 +318,23 @@ function normalisedText(text: string): string {
     .trim();
 }
 
+/**
+ * Their words kept beside the categories that matched (a category answer
+ * with a note): reported as such, so nothing claims them as a category.
+ */
+function keptInWordsOf(
+  value: OnboardingResponseValue,
+  note: string | undefined,
+): { keptInWords?: string[] } {
+  if (value.type !== "RESOURCE_REFERENCE" || note === undefined) return {};
+  const words = note
+    .split(/;\s*/u)
+    .map((w) => w.trim().slice(0, 200))
+    .filter((w) => w.length > 0)
+    .slice(0, 8);
+  return words.length === 0 ? {} : { keptInWords: words };
+}
+
 /** Whether the mandate step is open and unanswered on an investor's session. */
 export function mandateStepOpen(
   view: OnboardingSessionView,
@@ -748,7 +765,10 @@ export function createOnboardingPort(input: {
     if (note === undefined) return spoken(step, value, view);
     if (value.type === "RESOURCE_REFERENCE" && value.resourceIds.length > 0) {
       const names = await spoken(step, value, view);
-      if (names.length > 0) return `${names}, and “${note}” as you said it`;
+      // Their words matched no category: said so, never as one.
+      if (names.length > 0) {
+        return `${names}, with “${note}” kept as you said it (no category matched it)`;
+      }
     }
     return `${note} (in their words)`;
   };
@@ -1170,9 +1190,13 @@ export function createOnboardingPort(input: {
         // categories still save (live AO 2026-10-17: "port technology"
         // for "anything that makes ports less painful" lost all sectors).
         const quote = answer.quote ?? "";
+        // Their own words are never dropped: in the quote, or in any turn
+        // of theirs (QA F-137: "crypto" in "We never invest in crypto or
+        // gambling" was lost when the quote left it out).
         const kept = unmatched
           .map((phrase) =>
-            textStatedIn(phrase, quote)
+            textStatedIn(phrase, quote) ||
+            input.personTurns.some((said) => textStatedIn(phrase, said))
               ? phrase
               : quote.trim().length > 0
                 ? fieldClausesOf(quote, phrase)
@@ -1630,6 +1654,7 @@ export function createOnboardingPort(input: {
           SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
         ).slice(0, 400),
         recorded: (await recordedLine(step, value, note, after)).slice(0, 600),
+        ...keptInWordsOf(value, note),
         ...(prepared.movedFrom === undefined
           ? {}
           : { movedFrom: prepared.movedFrom }),
@@ -2357,10 +2382,15 @@ export function createOnboardingPort(input: {
       resolved.note !== undefined &&
       answer.basis !== "DELEGATED" &&
       // Each piece of their other words is theirs (pieces need not sit
-      // side by side in the quote).
+      // side by side in the quote, and may sit in another of their turns:
+      // QA F-137, "crypto" left out of the model's quote).
       !resolved.note
         .split(/\s*;\s*/u)
-        .every((piece) => textStatedIn(piece, answer.quote)) &&
+        .every(
+          (piece) =>
+            textStatedIn(piece, answer.quote) ||
+            input.personTurns.some((said) => textStatedIn(piece, said)),
+        ) &&
       !(
         input.lastQTurn !== undefined &&
         textStatedIn(resolved.note, input.lastQTurn)
@@ -2535,6 +2565,7 @@ export function createOnboardingPort(input: {
                 after,
               )
             ).slice(0, 600),
+            ...keptInWordsOf(item.value, item.plan.note),
             ...(item.movedFrom === undefined
               ? {}
               : { movedFrom: item.movedFrom }),
