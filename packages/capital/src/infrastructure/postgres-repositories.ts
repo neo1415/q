@@ -315,6 +315,29 @@ export function createPostgresCapitalObjectiveQueryPort(options: {
         status: parsed.status,
       };
     },
+    // Coordinator 2026-10-26 (live 7fb7e429: ~900 round trips a network
+    // rank, two per raise disclosure checked): one read for many.
+    findCanonicalCapitalObjectives: async (capitalObjectiveIds) => {
+      if (capitalObjectiveIds.length === 0) return [];
+      const rows = await sql`
+        select o.id, o.tenant_id, o.company_id, o.status
+          from core.capital_objectives o
+         where o.id = any(${[...capitalObjectiveIds]}::uuid[])`;
+      return rows.map((row) => {
+        const parsed = Row.pick({
+          id: true,
+          tenant_id: true,
+          company_id: true,
+          status: true,
+        }).parse(row);
+        return {
+          id: parsed.id,
+          tenantId: parsed.tenant_id,
+          companyId: parsed.company_id,
+          status: parsed.status,
+        };
+      });
+    },
     getCurrentForCompany: async (tenantId, companyId) => {
       const objective = await repository.findActive(sql, tenantId, companyId);
       return objective === null ? null : toCapitalObjectiveSnapshot(objective);

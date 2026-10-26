@@ -186,6 +186,13 @@ export type CapitalObjectiveQueryPort = {
   readonly findCanonicalCapitalObjective: (
     capitalObjectiveId: CapitalObjectiveId,
   ) => Promise<CapitalObjectiveOwnershipFacts | null>;
+  /**
+   * The same ownership facts for many objectives in one read (absent ids
+   * are left out). Optional: callers fall back to the one-by-one read.
+   */
+  readonly findCanonicalCapitalObjectives?: (
+    capitalObjectiveIds: readonly CapitalObjectiveId[],
+  ) => Promise<readonly CapitalObjectiveOwnershipFacts[]>;
   readonly getCurrentForCompany: (
     tenantId: TenantId,
     companyId: CompanyId,
