@@ -24,6 +24,7 @@ import {
   DIFFERENT_COUNTERPARTS,
   refsGiven,
 } from "./chat.js";
+import { CardReasonSchema, reasonOf } from "./card-reason.js";
 import { closestByName } from "./connection-requests.js";
 import { admitted } from "./relationships.js";
 
@@ -94,6 +95,11 @@ export const ProposeEmailInputSchema = z
         "Only if the person named a specific person on the other side; otherwise leave it out.",
       ),
     subject: EmailSubjectSchema.describe("A short, plain subject line."),
+    // Live a1db17ec (2026-10-26): the email turn's first call carried a
+    // field this schema did not take (invalidCodes unrecognized_keys) and
+    // cost two rounds. Every other proposal beside it takes the card's
+    // "Why: …" reason; an email does too, carried to its card the same way.
+    reason: CardReasonSchema,
     body: EmailBodySchema.describe(
       "The whole email, in the person's voice, signed with their name. Plain text. No claims the evidence does not support. A note to founders they are not yet connected with says why this investor is interested: their declared mandate (stage, sector, geography, cheque) against what the company does and its stage, from what you have read in this conversation. Never generic, never a claim you have not read.",
     ),
@@ -380,6 +386,7 @@ export function createProposeEmailTool(
           subject: input.subject,
           body: input.body,
         },
+        reason: reasonOf(input),
       });
       return Promise.resolve({
         status,

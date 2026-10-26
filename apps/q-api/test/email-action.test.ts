@@ -223,4 +223,26 @@ describe("the email board", () => {
     expect(proposal).toEqual({ actionType: EMAIL_SEND, payload });
     expect(EmailSendPayloadSchema.safeParse(payload).success).toBe(true);
   });
+  // Live a1db17ec (2026-10-26): an email takes the card's reason as every
+  // proposal does; it is presentation only, never part of what is sent.
+  it("puts the card's reason on the proposal, never in the email", async () => {
+    const board = createEmailActionBoard();
+    board.prepareForApproval({
+      runId: "run-2",
+      tenantId: actor.tenantId,
+      actorUserId: actor.userId,
+      payload,
+      reason: "They asked for quarterly numbers.",
+    });
+    const proposal = await board.proposer.propose({
+      runId: "run-2",
+      actor,
+    } as never);
+    expect(proposal).toEqual({
+      actionType: EMAIL_SEND,
+      payload,
+      reason: "They asked for quarterly numbers.",
+    });
+    expect(JSON.stringify(payload)).not.toContain("quarterly");
+  });
 });

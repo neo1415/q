@@ -100,6 +100,32 @@ export function argumentIssueCodes(
   );
 }
 
+/** A field name as a schema would write one; anything else is not logged. */
+const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,39}$/u;
+
+/**
+ * The unknown field names a call carried, for the log line only (live
+ * a1db17ec: unrecognized_keys at "(root)", and no way to see which). Field
+ * names shaped like a schema's; never a value, never said to the model.
+ */
+export function argumentUnknownKeys(
+  issues: readonly { readonly code?: string; readonly keys?: unknown }[],
+): readonly string[] {
+  return [
+    ...new Set(
+      issues
+        .filter((issue) => issue.code === "unrecognized_keys")
+        .flatMap((issue): readonly unknown[] =>
+          Array.isArray(issue.keys) ? (issue.keys as readonly unknown[]) : [],
+        )
+        .filter(
+          (key): key is string =>
+            typeof key === "string" && FIELD_NAME.test(key),
+        ),
+    ),
+  ].slice(0, 8);
+}
+
 /** Issue paths only: a model-generated value never travels back as text. */
 function argumentIssues(
   issues: readonly {
@@ -152,8 +178,11 @@ export function createQToolExecutor(
   const finish = (
     context: QToolExecutionContext,
     outcome: QToolCallOutcome,
-    /** Which checks refused the arguments (issue kinds only). */
-    invalidCodes?: readonly string[],
+    /** Which checks refused the arguments (issue kinds, unknown field names). */
+    invalid?: {
+      readonly codes: readonly string[];
+      readonly unknownKeys: readonly string[];
+    },
   ): QToolCallOutcome => {
     const labels = {
       tool: outcome.toolName ?? "unknown",
@@ -183,7 +212,14 @@ export function createQToolExecutor(
                 /invalid at: ([^.]*)\./u.exec(
                   outcome.result.error.safeMessage,
                 )?.[1] ?? null,
-              ...(invalidCodes === undefined ? {} : { invalidCodes }),
+              ...(invalid === undefined
+                ? {}
+                : {
+                    invalidCodes: invalid.codes,
+                    ...(invalid.unknownKeys.length === 0
+                      ? {}
+                      : { unknownKeys: invalid.unknownKeys }),
+                  }),
             }
           : {}),
       },
@@ -236,7 +272,10 @@ export function createQToolExecutor(
                 argumentIssues(parsed.error.issues),
                 elapsed(),
               ),
-              argumentIssueCodes(parsed.error.issues),
+              {
+                codes: argumentIssueCodes(parsed.error.issues),
+                unknownKeys: argumentUnknownKeys(parsed.error.issues),
+              },
             );
           }
           // The actor the run was authorised for is the only actor a tool

@@ -265,6 +265,7 @@ describe("propose_email from a first round", () => {
   const BASKETARI = "88888888-0000-4000-8000-0000000000e2";
   const byName = () => {
     const prepared: unknown[] = [];
+    const reasons: (string | undefined)[] = [];
     const email: EmailIntelligencePort = {
       counterpart: (actor, relationshipId) =>
         Promise.resolve(
@@ -280,6 +281,7 @@ describe("propose_email from a first round", () => {
       mailbox: () => Promise.resolve({ email: "investor@example.invalid" }),
       prepareForApproval: (entry) => {
         prepared.push(entry.payload);
+        reasons.push(entry.reason);
         return "PREPARED";
       },
     };
@@ -319,7 +321,7 @@ describe("propose_email from a first round", () => {
         createDefaultQTools(fakePorts({ email, relationships })),
       ),
     });
-    return { executor, prepared };
+    return { executor, prepared, reasons };
   };
   const first = (target: Record<string, unknown>) => ({
     callId: "e1",
@@ -333,6 +335,37 @@ describe("propose_email from a first round", () => {
   const refusal = (outcome: { result: unknown }) =>
     (outcome.result as { ok: boolean; error?: { safeMessage: string } }).error
       ?.safeMessage ?? "";
+
+  // Live a1db17ec (2026-10-26): the first call carried a field the email
+  // did not take (unrecognized_keys) where every proposal beside it takes
+  // the card's reason. It validates, and the reason reaches the card.
+  it("a first call with the card's reason validates, and the reason reaches the card", async () => {
+    const { executor, prepared, reasons } = byName();
+    const outcome = await executor.execute(
+      first({
+        counterpartName: "apex",
+        reason: "They led your seed round and asked for quarterly numbers.",
+      }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(prepared).toHaveLength(1);
+    expect(reasons).toEqual([
+      "They led your seed round and asked for quarterly numbers.",
+    ]);
+  });
+
+  it("a field no proposal takes is still refused, and named for the log only", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", attachments: ["deck.pdf"] }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+    expect(refusal(outcome)).toContain("a field this tool does not take");
+    expect(refusal(outcome)).not.toContain("deck.pdf");
+    expect(prepared).toEqual([]);
+  });
 
   it("their name and an id that agree: validates and prepares to that relationship", async () => {
     const { executor, prepared } = byName();

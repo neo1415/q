@@ -248,6 +248,8 @@ export function createEmailActionBoard(
       tenantId: string;
       actorUserId: string;
       payload: EmailSendPayload;
+      /** "Why: …" on the card; presentation only, never part of the send. */
+      reason?: string | undefined;
       at: number;
     }
   >();
@@ -268,6 +270,7 @@ export function createEmailActionBoard(
         tenantId: entry.tenantId,
         actorUserId: entry.actorUserId,
         payload: entry.payload,
+        ...(entry.reason === undefined ? {} : { reason: entry.reason }),
         at: now(),
       });
       return "PREPARED";
@@ -290,10 +293,12 @@ export function createEmailActionBoard(
           });
         }
         const review = options.review;
+        const why = entry.reason === undefined ? {} : { reason: entry.reason };
         if (review === undefined) {
           return Promise.resolve({
             actionType: EMAIL_SEND,
             payload: parsed.data,
+            ...why,
           });
         }
         const payload = parsed.data;
@@ -331,6 +336,7 @@ export function createEmailActionBoard(
             return {
               actionType: EMAIL_SEND,
               payload: graded.success ? graded.data : payload,
+              ...why,
               // Offered on this card: its decision is the draft's feedback.
               onProposed: (actionId: string) =>
                 review.settle(context.actor, verdict, "OFFERED", actionId),

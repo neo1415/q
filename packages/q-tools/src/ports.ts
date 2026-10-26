@@ -419,6 +419,8 @@ export type EmailIntelligencePort = {
       readonly subject: string;
       readonly body: string;
     };
+    /** Why Q proposes it ("Why: …" on the card); presentation only. */
+    readonly reason?: string | undefined;
   }) => "PREPARED" | "ONE_PER_TURN";
 };
 
