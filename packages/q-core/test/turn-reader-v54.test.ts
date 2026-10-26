@@ -19,7 +19,7 @@ import {
 describe("TURN_READER v54: SHOWN, read by meaning", () => {
   it("v53's rules unchanged; v55 extends it", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(66);
+    expect(active.definition.version).toBe(67);
     expect(TURN_READER_V53.status).toBe("DEPRECATED");
     expect(TURN_READER_V54.template).toContain(V53_Q_PITCH);
     expect(TURN_READER_V54.template).toContain(V54_FROM_SHOWN);

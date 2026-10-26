@@ -18,12 +18,8 @@
       {
         "ask": "How do the top two stack up?",
         "expect": {
-          "anyBlock": [
-            "COMPARISON",
-            "COMPARISON_CARDS",
-            "TABLE",
-            "ANSWER_CARDS"
-          ]
+          "anyBlock": ["TABLE", "COMPARISON", "COMPARISON_CARDS"],
+          "maxMs": 15000
         }
       }
     ]
