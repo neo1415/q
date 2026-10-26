@@ -25,6 +25,13 @@ const BUDGET = {
   attemptTimeoutMs: 8_000,
 } as const;
 
+/**
+ * A small read that has not answered by now is asked of the same model
+ * again, the first answer winning (coordinator 2026-10-26, run aa71616c: a
+ * 7,058 ms stall; such reads answer at p99 2.5 s, 3 of 536 past 3 s).
+ */
+export const SMALL_READ_HEDGE_MS = 3_000;
+
 export function createAppActionArgumentReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly tools: QToolPort;
@@ -91,6 +98,7 @@ export function createAppActionArgumentReader(dependencies: {
         },
         {
           schema: AppActionArgumentsResultSchema,
+          sameModelHedgeAfterMs: SMALL_READ_HEDGE_MS,
           // The signal is the call's option, never part of the request:
           // the gateway's request contract is strict, and a request with a
           // signal in it was refused as invalid before any provider was

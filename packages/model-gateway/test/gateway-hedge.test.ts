@@ -121,3 +121,93 @@ describe("hedged requests", () => {
     expect(beta.calls.length).toBeGreaterThanOrEqual(1);
   }, 10_000);
 });
+
+/**
+ * Coordinator 2026-10-26 (run aa71616c): a small arguments read stalled
+ * 7,058 ms on the only eligible model, so no hedge could fire. A caller
+ * may opt in to asking the same model again (`sameModelHedgeAfterMs`).
+ */
+describe("hedged on the same model, when the caller opts in", () => {
+  function alone(alpha: readonly FakeBehaviour[]) {
+    const a = createFakeModelProvider({ code: "alpha", script: alpha });
+    const usage = createInMemoryModelUsageRepository();
+    const gateway = createModelGateway({
+      // Tools allowed, so a request carrying them is eligible and the
+      // only thing left to decide is the hedge.
+      catalog: createStaticModelCatalog(
+        testCatalog((snapshot) => ({
+          ...snapshot,
+          models: snapshot.models.map((model) => ({
+            ...model,
+            supportsTools: true,
+          })),
+        })),
+      ),
+      // beta is in the catalog but not registered: alpha is the only model.
+      registry: createModelProviderRegistry([a]),
+      usage,
+      sleep: () => Promise.resolve(),
+      random: () => 0.5,
+    });
+    return { gateway, alpha: a, usage };
+  }
+
+  it("asks the same model again after the delay; the first answer wins and the other is aborted", async () => {
+    const { gateway, alpha, usage } = alone([SLOW, QUICK]);
+    const { value, ms } = await timed(() =>
+      gateway.execute(request(), { sameModelHedgeAfterMs: 100 }),
+    );
+    expect(value.output).toMatchObject({ kind: "TEXT", text: "quick second" });
+    expect(alpha.calls).toHaveLength(2);
+    expect(ms).toBeLessThan(450);
+    // The slow first attempt was stopped, not left to finish: recorded
+    // as cancelled once its abort lands.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(usage.entries.map((entry) => entry.success)).toContain(false);
+  });
+
+  it("never hedges a caller that did not opt in", async () => {
+    const { gateway, alpha } = alone([SLOW, QUICK]);
+    const { value, ms } = await timed(() => gateway.execute(request()));
+    expect(value.output).toMatchObject({ kind: "TEXT", text: "slow first" });
+    expect(alpha.calls).toHaveLength(1);
+    expect(ms).toBeGreaterThanOrEqual(550);
+  });
+
+  it("never hedges a request that carries tools", async () => {
+    const { gateway, alpha } = alone([SLOW, QUICK]);
+    const withTools = {
+      ...request(),
+      tools: [
+        {
+          name: "propose_chat_message",
+          description: "Drafts a message for their approval.",
+          inputJsonSchema: { type: "object", properties: {} },
+        },
+      ],
+    };
+    const value = await gateway.execute(withTools, {
+      sameModelHedgeAfterMs: 100,
+    });
+    expect(value.output).toMatchObject({ kind: "TEXT", text: "slow first" });
+    expect(alpha.calls).toHaveLength(1);
+  });
+
+  it("never hedges a streamed answer", async () => {
+    const { gateway, alpha } = alone([SLOW, QUICK]);
+    await gateway.execute(request(), {
+      sameModelHedgeAfterMs: 100,
+      onTextDelta: () => undefined,
+    });
+    expect(alpha.calls).toHaveLength(1);
+  });
+
+  it("does not hedge an answer in time", async () => {
+    const { gateway, alpha } = alone([
+      { kind: "TEXT", text: "on time", delayMs: 20 },
+      QUICK,
+    ]);
+    await gateway.execute(request(), { sameModelHedgeAfterMs: 200 });
+    expect(alpha.calls).toHaveLength(1);
+  });
+});

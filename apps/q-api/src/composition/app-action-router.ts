@@ -12,6 +12,8 @@ import {
 } from "@capital-q/q-core";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
+import { SMALL_READ_HEDGE_MS } from "./app-action-arguments.js";
+
 /**
  * Which ONE declared app action a request to act asks for (lead
  * 2026-10-03, runs 9b4ef8d1, 7dd0bc2c, 31d085ac). Asked only when the turn
@@ -96,6 +98,7 @@ export function createAppActionRouter(dependencies: {
         },
         {
           schema: AppActionRouterResultSchema,
+          sameModelHedgeAfterMs: SMALL_READ_HEDGE_MS,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
       );
