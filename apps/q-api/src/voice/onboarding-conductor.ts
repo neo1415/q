@@ -7,6 +7,7 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
+import { displayOnboardingValue } from "@capital-q/onboarding";
 import {
   FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
@@ -27,7 +28,9 @@ import {
   type InterviewTurnOutcome,
 } from "./interview-steps.js";
 import {
+  coverageProfileFor,
   isPlatformReference,
+  settleMandateStep,
   type FoundRecommendation,
 } from "./onboarding-port.js";
 import type { PresenceFound, PresenceTrigger } from "./presence-trigger.js";
@@ -161,6 +164,89 @@ export function nextUnansweredStep(
 }
 
 /**
+ * What each confirmation confirms: the phases whose answers it sums up
+ * (QA 25-26 Oct: "Here's what I understood. Does it look right?" and "Save
+ * this as your capital objective?" were asked with nothing of what they
+ * confirm).
+ */
+const CONFIRMS: Readonly<Record<string, readonly string[]>> = {
+  "F3.review": ["F1", "F2"],
+  "F6.confirm": ["F6"],
+  "F8.snapshot": ["F1", "F2", "F5", "F6"],
+  "I11.review": ["I2", "I3"],
+};
+const CONFIRMED_ITEMS = 6;
+
+/**
+ * What a confirmation step confirms, read from the session: each answer in
+ * its phases, by its label ("Raise target: $1.2 million"). Null when the
+ * step confirms nothing on record, or is not a confirmation.
+ */
+export function confirmedContent(
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+  stepKey: string,
+): string | null {
+  const phases = CONFIRMS[stepKey];
+  if (phases === undefined) return null;
+  const labels = coverageProfileFor(journeyType).fields;
+  const answers = new Map(view.responses.map((r) => [r.stepKey, r.value]));
+  const items = definitionFor(journeyType)
+    .steps.filter(
+      (s) =>
+        s.stepKey !== stepKey &&
+        s.configuration.stepType !== "confirmation" &&
+        phases.includes(s.configuration.phaseKey ?? ""),
+    )
+    .flatMap((s) => {
+      const value = answers.get(s.stepKey);
+      if (value === undefined) return [];
+      const label = (labels[s.stepKey]?.label ?? s.configuration.prompt)
+        .replace(/[?:]$/u, "")
+        .trim();
+      return [`${label}: ${displayOnboardingValue(s, value)}`];
+    })
+    .slice(0, CONFIRMED_ITEMS);
+  return items.length === 0 ? null : items.join("; ");
+}
+
+/**
+ * The step a reopening asks: the one chosen, unless it is a confirmation
+ * with nothing on record to show, which never asks a bare "does this look
+ * right?" — the next open question is asked instead (it still comes back
+ * once there is something to confirm).
+ */
+export function resumeAsk(
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+  chosen: NextStep,
+): NextStep {
+  if (
+    CONFIRMS[chosen.stepKey] === undefined ||
+    confirmedContent(view, journeyType, chosen.stepKey) !== null
+  ) {
+    return chosen;
+  }
+  const others = definitionFor(journeyType)
+    .steps.filter((s) => s.configuration.stepType !== "confirmation")
+    .map((s) => s.stepKey);
+  return nextUnansweredStep(view, journeyType, others) ?? chosen;
+}
+
+/** The lines that ask a step, a confirmation with what it confirms. */
+function askLines(
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+  step: NextStep,
+): readonly Line[] {
+  const content = confirmedContent(view, journeyType, step.stepKey);
+  return [
+    ...(content === null ? [] : [{ text: `Here's what I have: ${content}.` }]),
+    { text: step.question, stepKey: step.stepKey },
+  ];
+}
+
+/**
  * The open step Q's last line was asking, when that line carries the step's
  * own question. A reopening asks it again rather than jumping to the next
  * required step (live NEM 2026-10-17: the greeting asked what the company
@@ -197,14 +283,18 @@ export function resumeLines(
       { text: "Your setup is complete. What would you like to look at next?" },
     ];
   }
-  const next = nextUnansweredStep(view, journeyType);
-  return next === null
-    ? [
-        {
-          text: "Picking up where we left off: I have what I need. Shall I finish your setup?",
-        },
-      ]
-    : [{ text: PICKING_UP }, { text: next.question, stepKey: next.stepKey }];
+  const chosen = nextUnansweredStep(view, journeyType);
+  if (chosen === null) {
+    return [
+      {
+        text: "Picking up where we left off: I have what I need. Shall I finish your setup?",
+      },
+    ];
+  }
+  return [
+    { text: PICKING_UP },
+    ...askLines(view, journeyType, resumeAsk(view, journeyType, chosen)),
+  ];
 }
 
 /** What Q says when a conversation already under way is opened again. */
@@ -215,10 +305,8 @@ export function resumeLine(
   if (view.session.status === "COMPLETED") {
     return "Your setup is complete. What would you like to look at next?";
   }
-  const next = nextUnansweredStep(view, journeyType);
-  return next === null
-    ? "Picking up where we left off: I have what I need. Shall I finish your setup?"
-    : `Picking up where we left off. ${next.question}`;
+  const lines = resumeLines(view, journeyType);
+  return lines.map((line) => line.text).join(lines.length > 1 ? " " : "");
 }
 
 function asksSomething(reply: string): boolean {
@@ -762,6 +850,14 @@ export function createOnboardingConductor(
       input.session,
       input.onboardingSessionId,
     );
+    // The mandate being defined is settled here too, not only on a turn
+    // (live 26 Oct: a resume left it open until the next typed turn).
+    view = await settleMandateStep(
+      input.session,
+      input.onboardingSessionId,
+      view,
+      input.journeyType,
+    );
     // The profile section they came to fill (lane ov's Overview link,
     // ?section=): its first open step is asked on resume too (live AG
     // 2026-10-16: a resumed conversation ignored the section). A line with
@@ -785,14 +881,18 @@ export function createOnboardingConductor(
       focused === null && view.session.status !== "COMPLETED"
         ? stepStillAsked(view, input.journeyType, lastQ)
         : null;
-    const ask = focused ?? pending;
-    const next = ask ?? nextUnansweredStep(view, input.journeyType);
+    const asked = focused ?? pending;
+    const ask =
+      asked === null ? null : resumeAsk(view, input.journeyType, asked);
+    const chosen = ask ?? nextUnansweredStep(view, input.journeyType);
+    const next =
+      chosen === null ? null : resumeAsk(view, input.journeyType, chosen);
     let lines: readonly Line[] =
       ask === null
         ? resumeLines(view, input.journeyType)
         : [
             ...(spoken || focused !== null ? [{ text: PICKING_UP }] : []),
-            { text: ask.question, stepKey: ask.stepKey },
+            ...askLines(view, input.journeyType, ask),
           ];
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);
