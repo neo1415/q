@@ -5,6 +5,7 @@ import {
   type QAppActionAsks,
   type QAppActionPort,
   type QAppActionPrepared,
+  type QAppActionRedirect,
   type TurnAppAction,
 } from "./app-action-turn.js";
 import {
@@ -1813,6 +1814,17 @@ export function createSpecialistQAnswer(
       lastActed.delete(oldest);
     }
   };
+  /** Guidance for the answer, never said as the reply (NOT_THIS_ACTION). */
+  const isRedirect = (
+    said: string | QAppActionPrepared | QAppActionAsks | QAppActionRedirect,
+  ): said is QAppActionRedirect =>
+    typeof said === "object" && "redirect" in said;
+  /** What a declared action said, when it is for the person. */
+  const forThePerson = (
+    said:
+      string | QAppActionPrepared | QAppActionAsks | QAppActionRedirect | null,
+  ): string | QAppActionPrepared | QAppActionAsks | null =>
+    said === null || isRedirect(said) ? null : said;
   const saidByAction = async (
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
@@ -4377,7 +4389,9 @@ export function createSpecialistQAnswer(
       "q repeats its last action",
     );
     if (action === null) return null;
-    const said = await actions.run(request, action).catch(() => null);
+    const said = forThePerson(
+      await actions.run(request, action).catch(() => null),
+    );
     if (said === null) {
       noteAction(request, conversationId, action, "NOT_DONE", last.utterance);
       return null;
@@ -6068,9 +6082,9 @@ export function createSpecialistQAnswer(
         },
         "a declared action waiting on their reply continues",
       );
-      const continued = await dependencies.appActions
-        .run(request, action)
-        .catch(() => null);
+      const continued = forThePerson(
+        await dependencies.appActions.run(request, action).catch(() => null),
+      );
       if (continued !== null) {
         return saidByAction(request, conversationId, action, continued);
       }
@@ -6103,9 +6117,11 @@ export function createSpecialistQAnswer(
             { qRunId: request.runId, tool: action.tool },
             "the city they gave continues the action Q asked it for",
           );
-          const said = await dependencies.appActions
-            .run(request, action)
-            .catch(() => null);
+          const said = forThePerson(
+            await dependencies.appActions
+              .run(request, action)
+              .catch(() => null),
+          );
           if (said !== null) {
             return saidByAction(request, conversationId, action, said);
           }
@@ -6277,6 +6293,15 @@ export function createSpecialistQAnswer(
             return { tool, arguments: args };
           })()
         : null);
+    /**
+     * Guard F-106-reshown-card (2026-10-26, run 8f9221fa): "Savanna Seed
+     * asked about … Draft a short reply …" ran answer_investor_question,
+     * which found no open question and said, for Q, to prepare the reply
+     * with propose_chat_message. That guidance was dropped, the answer ran
+     * with no action asked, and nothing was prepared. The action the
+     * refusal names, when this run offers it, is the one asked for.
+     */
+    let redirectedTo: string | null = null;
     if (
       dependencies.appActions !== undefined &&
       appAction !== null &&
@@ -6285,17 +6310,57 @@ export function createSpecialistQAnswer(
       dependencies.appActions.tools.has(appAction.tool) &&
       !writingDocument
     ) {
-      const said = await dependencies.appActions
+      const ran = await dependencies.appActions
         .run(request, appAction)
         .catch(() => null);
+      const said = forThePerson(ran);
       if (said !== null) {
         return saidByAction(request, conversationId, appAction, said);
+      }
+      if (ran !== null && isRedirect(ran)) {
+        redirectedTo =
+          offeredActions
+            .map((action) => action.name)
+            .find(
+              (name) =>
+                name !== appAction.tool &&
+                new RegExp(`\\b${name}\\b`, "u").test(ran.redirect),
+            ) ?? null;
+        logger?.info(
+          { qRunId: request.runId, tool: appAction.tool, redirectedTo },
+          "a declared action refused with guidance for the answer",
+        );
+        // Named a declared action itself: run by code, as a named one is,
+        // with its inputs read from their words (the 8 s path; the full
+        // answer took 16 s for the same card).
+        if (
+          redirectedTo !== null &&
+          appTools.has(redirectedTo) &&
+          dependencies.appActionArguments !== undefined
+        ) {
+          const tool = redirectedTo;
+          const args = await dependencies
+            .appActionArguments(request, { tool, utterance: latest.content })
+            .catch(() => null);
+          if (args !== null && args !== undefined) {
+            const instead = { tool, arguments: args };
+            const done = forThePerson(
+              await dependencies.appActions
+                .run(request, instead)
+                .catch(() => null),
+            );
+            if (done !== null) {
+              return saidByAction(request, conversationId, instead, done);
+            }
+          }
+        }
       }
       // The reader's own arguments did not fit the tool (parity eval
       // 2026-10-02: "Change our fund's website to ..." failed
       // INVALID_ARGUMENTS): once, the arguments are read again against the
       // tool's own schema, and the same tool runs with them.
       if (
+        redirectedTo === null &&
         appActionOf(read) !== null &&
         dependencies.appActionArguments !== undefined &&
         offeredNames.has(appAction.tool)
@@ -6318,9 +6383,11 @@ export function createSpecialistQAnswer(
           again !== null &&
           JSON.stringify(again) !== JSON.stringify(appAction.arguments)
         ) {
-          const retried = await dependencies.appActions
-            .run(request, { tool: appAction.tool, arguments: again })
-            .catch(() => null);
+          const retried = forThePerson(
+            await dependencies.appActions
+              .run(request, { tool: appAction.tool, arguments: again })
+              .catch(() => null),
+          );
           if (retried !== null) {
             return saidByAction(
               request,
@@ -6447,6 +6514,8 @@ export function createSpecialistQAnswer(
       ...(appActionOf(read) === null ? [] : [appActionOf(read)?.tool ?? ""]),
       // What the router named, so a code-run miss still offers it.
       ...(routed === null ? [] : [routed]),
+      // What a declared action's refusal named for the answer to take.
+      ...(redirectedTo === null ? [] : [redirectedTo]),
       // Reader v61: any board ask (a named item kept, Q's work on items)
       // is the board tool's, on whatever purpose this run has.
       ...((read?.boardAsk ?? null) !== null || mentionsOwnBoard(latest.content)
@@ -6577,13 +6646,15 @@ export function createSpecialistQAnswer(
         : {}),
       ...(readinessLead === null ? {} : { leadLines: readinessLead }),
       // Only a name the reader was given counts (ADR 0040 parity).
-      ...(read?.askedAction === undefined ||
-      read.askedAction === null ||
-      !actions.some((action) => action.name === read.askedAction)
-        ? routedAsked === null
-          ? {}
-          : { askedAction: routedAsked }
-        : { askedAction: read.askedAction }),
+      ...(redirectedTo !== null
+        ? { askedAction: redirectedTo }
+        : read?.askedAction === undefined ||
+            read.askedAction === null ||
+            !actions.some((action) => action.name === read.askedAction)
+          ? routedAsked === null
+            ? {}
+            : { askedAction: routedAsked }
+          : { askedAction: read.askedAction }),
       ...(writingDocument ? { writingDocument: true } : {}),
       ...(series.step === null ? {} : { questionSequence: series.step }),
       ...(toolFocus === null ? {} : { toolFocus }),

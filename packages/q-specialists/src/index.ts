@@ -357,6 +357,7 @@ export {
   type PendingAppActionStore,
   type QAppActionPort,
   type QAppActionPrepared,
+  type QAppActionRedirect,
   type TurnAppAction,
 } from "./app-action-turn.js";
 export { createToolReadinessLead } from "./readiness-lead.js";
