@@ -56,6 +56,22 @@ export function chatInsteadOf(
   return null;
 }
 
+/**
+ * B2 (coordinator 2026-10-26): the reply once the message they asked for is
+ * on its card, said by code. Every round after the card only wrote text
+ * that the card's status replaced (run 42cecfd2: two more ~48k-token calls
+ * after it). The card carries the words; nothing is sent until they approve.
+ */
+export const MESSAGE_PREPARED_REPLY =
+  "It's drafted and on the card for your approval. Nothing is sent until you approve it.";
+
+/** The same, when Capital Q prepared it as a Capital Q message instead. */
+export function chatInsteadReply(why: "NO_MAILBOX" | "NO_ADDRESS"): string {
+  return why === "NO_ADDRESS"
+    ? "I don't have their email address, so the same words are ready to send as a Capital Q message, waiting for your approval. Add their address if you'd rather it went by email."
+    : "Your mailbox isn't connected, so the same words are ready to send as a Capital Q message, waiting for your approval. Nothing is sent until you approve it.";
+}
+
 /** What the model is told once Capital Q prepared the message instead. */
 export function chatInsteadMessage(
   outcome: QToolCallOutcome,

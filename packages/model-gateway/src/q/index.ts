@@ -195,6 +195,8 @@ import {
   firstContactMessage,
   firstContactOf,
   MESSAGE_TOOLS,
+  MESSAGE_TURN_TOOLS,
+  asksForMessage,
   prepareMessageNote,
 } from "./first-contact.js";
 import {
@@ -210,6 +212,8 @@ import {
 import {
   CHAT_INSTEAD_TOOL,
   chatInsteadMessage,
+  chatInsteadReply,
+  MESSAGE_PREPARED_REPLY,
   chatInsteadOf,
 } from "./message-channel.js";
 import {
@@ -3817,6 +3821,32 @@ export function createModelGatewayQAnswer(
       ownCompanyId = own.companyId;
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
+    // Coordinator 2026-10-26 (B, run 42cecfd2): a founder's asked note or
+    // email spent a tool round reading their own figures before drafting.
+    // They are read here, beside the other reads, through the same tool
+    // and plan, so the first round drafts with their real figures.
+    let ownFigures: readonly AuthorisedFact[] = [];
+    const ownFiguresRead = (async (): Promise<void> => {
+      if (!asksForMessage(request.askedAction)) return;
+      const { names } = await prefetchToolsRead;
+      if (!names.has("read_company_figures")) return;
+      await ownCompanyRead;
+      if (ownCompanyId === null || ownCompany === null) return;
+      const outcome = await tools.execute(
+        {
+          callId: "q-own-figures",
+          name: "read_company_figures",
+          arguments: { companyId: ownCompanyId },
+        },
+        toolContext,
+      );
+      if (outcome.result.ok) {
+        ownFigures = companyFiguresFacts(
+          outcome.result.data,
+          "Their own company",
+        );
+      }
+    })();
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
         const call = {
@@ -4362,6 +4392,7 @@ export function createModelGatewayQAnswer(
     await Promise.all([
       timed("mandate", mandateRead),
       timed("ownCompany", ownCompanyRead),
+      timed("ownFigures", ownFiguresRead),
       timed("relationship", relationshipRead),
       timed("pitch", pitchRead),
       timed("company", companyRead),
@@ -4432,6 +4463,7 @@ export function createModelGatewayQAnswer(
       ownProfileCall,
       ownMandateData: (): unknown => ownMandateData,
       ownCompany,
+      ownFigures,
       ownCompanyId,
       ownInvestor,
       relationship,
@@ -4807,6 +4839,7 @@ export function createModelGatewayQAnswer(
         memory,
         ownProfile,
         ownCompany,
+        ownFigures,
         ownProfileCall,
         relationship,
         relationshipCall,
@@ -5386,6 +5419,18 @@ export function createModelGatewayQAnswer(
         },
       });
       if (route.path === "PREPARED_CONTEXT") offered = [];
+      // Coordinator 2026-10-26 (B, run 42cecfd2: 18.3 s, three ~48k-token
+      // rounds): an asked note or email is offered only the reads that
+      // find the person and their records, and the tool that prepares it,
+      // so a round carries a fraction of the catalogue.
+      else if (
+        asksForMessage(request.askedAction) &&
+        request.writingDocument !== true
+      ) {
+        offered = offered.filter((tool) =>
+          MESSAGE_TURN_TOOLS.has(tool.definition.name),
+        );
+      }
       logger?.info(
         {
           qRunId: request.runId,
@@ -5601,6 +5646,7 @@ export function createModelGatewayQAnswer(
           ...w.onboardingFacts,
           ...(ownProfile === null ? [] : [ownProfile]),
           ...(ownCompany === null ? [] : [ownCompany]),
+          ...ownFigures,
           ...(onScreenCompany === null ? [] : [onScreenCompany]),
           ...w.namedCompanies,
           ...(onScreenDaily === null ? [] : [onScreenDaily]),
@@ -7661,6 +7707,8 @@ export function createModelGatewayQAnswer(
       let preparedByTool = false;
       /** Code prepared the first contact this run (QO-08): the reply is code's, not the model's. */
       let firstContactPrepared = false;
+      /** B2: the message they asked for is on its card; the reply is code's. */
+      let askedMessageReply: string | null = null;
       /** Their interest already stands (sent, or connected): its own line. */
       let firstContactAlready: string | null = null;
       /** Their own Q Card as get_q_card read it this turn (batch 9). */
@@ -7721,7 +7769,12 @@ export function createModelGatewayQAnswer(
       // second writer. Its table and verdict are the comparison; the
       // extras' cards and findings restated it (849 tokens, and the settle
       // waited 8.75 s for them), so the one writer leaves them out.
+      // Coordinator 2026-10-26 (B): an asked note or email has no second
+      // writer. The prepared card is the answer; the extras restated it,
+      // and one started on the round's prose was cancelled when that
+      // round turned to its tools (run 42cecfd2, a 0-token call).
       const splitExtras =
+        !asksForMessage(request.askedAction) &&
         dependencies.parallelExtras === true &&
         request.spoken !== true &&
         request.writingDocument !== true &&
@@ -8490,6 +8543,9 @@ export function createModelGatewayQAnswer(
             /** An email their mailbox could not send, as a Capital Q message instead (QA F-32). */
             let chatInstead: Promise<QToolCallOutcome> | null = null;
             let chatInsteadWhy: "NO_MAILBOX" | "NO_ADDRESS" = "NO_MAILBOX";
+            /** B2: this round put a message on its card (a message tool's own, or the chat instead). */
+            let messagePrepared = false;
+            let chatInsteadPrepared = false;
             /** Their Q Card, prepared for approval when none is made (QA F-34). */
             let cardOffer: {
               readonly handle: string;
@@ -8764,6 +8820,7 @@ export function createModelGatewayQAnswer(
                   ?.status === "PREPARED"
               ) {
                 preparedByTool = true;
+                if (asksForMessage(call.name)) messagePrepared = true;
               }
               if (acted !== null && !actedLines.includes(acted)) {
                 actedLines.push(acted);
@@ -8850,7 +8907,10 @@ export function createModelGatewayQAnswer(
                   latencyMs: outcome.latencyMs,
                 });
                 const told = chatInsteadMessage(outcome, chatInsteadWhy);
-                if (told !== null) chainedResults.push(told);
+                if (told !== null) {
+                  chainedResults.push(told);
+                  chatInsteadPrepared = true;
+                }
               }
             }
             if (firstContact !== null) {
@@ -8872,6 +8932,37 @@ export function createModelGatewayQAnswer(
               }
             }
             messages = [...messages, assistant, ...results, ...chainedResults];
+            // B2 (coordinator 2026-10-26, run 42cecfd2): the message they
+            // asked for is on its card. What any later round wrote about
+            // it was replaced by the card's status, so the loop ends and
+            // the reply is code's; the card keeps the model's words.
+            if (
+              asksForMessage(request.askedAction) &&
+              (messagePrepared || chatInsteadPrepared || firstContactPrepared)
+            ) {
+              askedMessageReply = firstContactPrepared
+                ? FIRST_CONTACT_REPLY
+                : chatInsteadPrepared
+                  ? chatInsteadReply(chatInsteadWhy)
+                  : MESSAGE_PREPARED_REPLY;
+              final = result;
+              analyst = ANALYST_RESULT_SCHEMA.parse({
+                answer: askedMessageReply,
+                responseShape: "CONCISE",
+                findings: [],
+                missingEvidence: [],
+                contradictions: [],
+                insufficientEvidence: false,
+                recommendation: null,
+                clarifyingQuestions: [],
+                declined: false,
+              });
+              logger?.info(
+                { qRunId: request.runId, rounds },
+                "the message they asked for is on its card: the reply is code's",
+              );
+              break;
+            }
             if (
               gapsRounds === 0 &&
               (gaps as { readonly status: string } | null)?.status ===
@@ -8918,7 +9009,11 @@ export function createModelGatewayQAnswer(
         // own records returned. A round that answered without it (an
         // adapter that does not stream) is answered again with it; nothing
         // of that round was said.
-        if (earlyWeb !== null && !earlyWeb.claimed) {
+        if (
+          earlyWeb !== null &&
+          !earlyWeb.claimed &&
+          askedMessageReply === null
+        ) {
           earlyWeb.claimed = true;
           // The web lands within its own budget or is dropped: the answer
           // never waits on it past that (owner 2026-10-23).
@@ -9938,17 +10033,19 @@ export function createModelGatewayQAnswer(
           ? FIRST_CONTACT_REPLY
           : firstContactAlready !== null
             ? firstContactAlready
-            : builtCards !== null && hasOrphanListItems(artifactSafe.text)
-              ? fitCardsSummary(builtCards)
-              : request.spoken === true && cardsShown
-                ? spokenBeforeCards(artifactSafe.text)
-                : qCardRead !== null
-                  ? withQCardLink(
-                      artifactSafe.text,
-                      qCardRead,
-                      qCardClaimPrepared,
-                    )
-                  : artifactSafe.text;
+            : askedMessageReply !== null
+              ? askedMessageReply
+              : builtCards !== null && hasOrphanListItems(artifactSafe.text)
+                ? fitCardsSummary(builtCards)
+                : request.spoken === true && cardsShown
+                  ? spokenBeforeCards(artifactSafe.text)
+                  : qCardRead !== null
+                    ? withQCardLink(
+                        artifactSafe.text,
+                        qCardRead,
+                        qCardClaimPrepared,
+                      )
+                    : artifactSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },
