@@ -3153,6 +3153,57 @@ describe("findings and cards written beside the answer (owner 2026-10-22)", () =
     expect(seam.lastObservation()?.modelCalls).toBe(2);
   });
 
+  // Coordinator 2026-10-26 (run 42cecfd2): an email card's turn waited
+  // 0.9 s past its answer for findings written beside the card. A card
+  // prepared this turn is the substance; no second writer runs.
+  it("writes no extras once a card is prepared", async () => {
+    const CHAT: QOfferedTool = {
+      ...GET_COMPANY,
+      toolName: "relationship.chat.propose",
+      classification: "SIDE_EFFECT",
+      definition: { ...GET_COMPANY.definition, name: "propose_chat_message" },
+    };
+    const tools = toolPort([CHAT], (p) => ({
+      ...succeeded(p, {
+        status: "PREPARED",
+        awaitingApprovalOf: "Message Savanna Seed Partners",
+      }),
+      toolName: "relationship.chat.propose",
+    }));
+    const { seam, alpha, request } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "m",
+              name: "propose_chat_message",
+              arguments: {
+                counterpartName: "Savanna Seed Partners",
+                body: "We'll share it once September is reconciled.",
+              },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Extras."),
+            findings: [finding("Savanna Seed asked about margin.")],
+          },
+        },
+      ],
+      tools,
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => p.name)).toEqual(["propose_chat_message"]);
+    // The tool round and the answer: no third, extras call.
+    expect(alpha.calls).toHaveLength(2);
+    expect(seam.lastObservation()?.modelCalls).toBe(2);
+  });
+
   it("starts the extras as a tool turn's answering round begins, after the reads", async () => {
     const tools = toolPort([GET_COMPANY], (p) =>
       succeeded(p, { name: "Northwind" }),
