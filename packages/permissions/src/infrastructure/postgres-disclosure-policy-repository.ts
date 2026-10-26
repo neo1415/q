@@ -176,6 +176,21 @@ export function createPostgresDisclosurePolicyRepository(): DisclosurePolicyRepo
          order by p.created_at, p.id`;
       return rows.map(toPolicy);
     },
+    findAllForResources: async (executor, resources) => {
+      if (resources.length === 0) {
+        return [];
+      }
+      // Exact (type, id) pairs via unnest, revoked history included, as
+      // findAllForResource returns it for one.
+      const types = resources.map((resource) => resource.type);
+      const ids = resources.map((resource) => resource.id);
+      const rows = await executor`
+        ${policySelect(executor)}
+          join unnest(${types}::text[], ${ids}::uuid[]) as wanted (resource_type, resource_id)
+            on wanted.resource_type = p.resource_type and wanted.resource_id = p.resource_id
+         order by p.created_at, p.id`;
+      return rows.map(toPolicy);
+    },
     revoke: async (tx, disclosurePolicyId, revokedAt) => {
       const rows = await tx.sql`
         update permissions.disclosure_policies p

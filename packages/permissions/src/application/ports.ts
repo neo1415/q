@@ -151,6 +151,16 @@ export type DisclosurePolicyRepository = {
     resource: DisclosureResourceRef,
   ) => Promise<readonly DisclosurePolicy[]>;
   /**
+   * The same for many resources in one read (exact type and id pairs),
+   * bounded by the caller. Optional: callers fall back to the one above.
+   */
+  readonly findAllForResources?:
+    | ((
+        executor: DatabaseExecutor,
+        resources: readonly DisclosureResourceRef[],
+      ) => Promise<readonly DisclosurePolicy[]>)
+    | undefined;
+  /**
    * Sets revoked_at on an unrevoked row. Returns the revoked policy, or null
    * when the row was already revoked or does not exist.
    */
