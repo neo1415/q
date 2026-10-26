@@ -2,6 +2,8 @@
 
 **Purpose:** any coding agent (Codex, Claude Code on any account) picks up the same work without this chat. These files are the single shared memory. There are no model-specific project memories: Codex reads `AGENTS.md`, Claude reads `CLAUDE.md`, and both point here.
 
+**Latest handoff (2026-10-26): read [`HANDOFF-2026-10-26.md`](HANDOFF-2026-10-26.md) first.**
+
 **Continuity (2026-10-11):** Codex Cloud is completing the current demo release; Claude Code may continue immediately from the prominent latest status in STATE.md. Shared handoff files and branch SHAs govern continuity; no model-specific memory or replacement application.
 
 > **Latest handover (23 Oct 2026):** read [`HANDOFF-2026-10-23.md`](HANDOFF-2026-10-23.md) first: the deployed state, the workers in flight, the owner decisions and the open items.
