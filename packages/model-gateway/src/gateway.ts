@@ -128,6 +128,16 @@ export type ModelGatewayExecuteOptions<T> = {
    */
   readonly firstAttemptTimeoutMs?: number | undefined;
   /**
+   * Opt-in, for small reads a person waits on (coordinator 2026-10-26, run
+   * aa71616c: an arguments read of 1,981 tokens stalled 7,058 ms on the
+   * only eligible model; such reads answer at p99 2.5 s). When the policy
+   * has no other eligible model to hedge to, the same model is asked again
+   * after this long, and the first answer wins; the other is aborted.
+   * Only for a first attempt with no tools and nothing streamed, within
+   * the budget's attempts and cost. Absent: no change.
+   */
+  readonly sameModelHedgeAfterMs?: number | undefined;
+  /**
    * STRUCTURED output only: whether one refused element of a list refuses
    * the whole object (REFUSE, the default) or is dropped and logged
    * (DROP). For callers whose lists are independent readings.
@@ -728,6 +738,7 @@ export function createModelGateway(
             span,
             options.onTextDelta,
             options.firstAttemptTimeoutMs,
+            options.sameModelHedgeAfterMs,
             {
               invalidListItems: options.invalidListItems,
               lenientFields: options.lenientFields,
@@ -751,6 +762,7 @@ export function createModelGateway(
     },
     onTextDelta: ((text: string) => void) | undefined,
     firstAttemptTimeoutMs: number | undefined,
+    sameModelHedgeAfterMs: number | undefined,
     accept: AcceptOptions,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
@@ -961,7 +973,7 @@ export function createModelGateway(
         // A hedge (L1): the first attempt of a request nobody is listening
         // to word by word, with the policy's hedge configured and a second
         // model eligible, asks that model too once hedgeAfterMs has passed.
-        const hedgeTo =
+        const otherModel =
           attemptNumber === 1 &&
           onTextDelta === undefined &&
           hedgeAfterMs !== null &&
@@ -977,6 +989,26 @@ export function createModelGateway(
                     request.budget.maxEstimatedCostUsd,
               )
             : undefined;
+        // No other model to hedge to: the same one, when the caller opted
+        // in, for a read with no tools and nothing streamed.
+        const sameModel =
+          otherModel === undefined &&
+          sameModelHedgeAfterMs !== undefined &&
+          attemptNumber === 1 &&
+          onTextDelta === undefined &&
+          request.tools.length === 0 &&
+          request.budget.maxAttempts >= 2 &&
+          spentUsd + 2 * candidate.estimatedAttemptCostUsd <=
+            request.budget.maxEstimatedCostUsd
+            ? candidate
+            : undefined;
+        const hedgeTo = otherModel ?? sameModel;
+        const hedgeDelayMs =
+          otherModel !== undefined
+            ? hedgeAfterMs
+            : sameModel !== undefined
+              ? (sameModelHedgeAfterMs ?? null)
+              : null;
         const hedgeProvider =
           hedgeTo === undefined
             ? undefined
@@ -984,7 +1016,7 @@ export function createModelGateway(
         const settled =
           hedgeTo === undefined ||
           hedgeProvider === undefined ||
-          hedgeAfterMs === null
+          hedgeDelayMs === null
             ? {
                 outcome: await run(
                   candidate,
@@ -1009,7 +1041,7 @@ export function createModelGateway(
                   ),
                 firstCandidate: candidate,
                 secondCandidate: hedgeTo,
-                hedgeAfterMs,
+                hedgeAfterMs: hedgeDelayMs,
                 callerSignal,
                 onHedge: () => {
                   attemptNumber += 1;
@@ -1023,7 +1055,8 @@ export function createModelGateway(
                       routingPolicy: policy.code,
                       first: `${candidate.provider.code}/${candidate.model.modelCode}`,
                       second: `${hedgeTo.provider.code}/${hedgeTo.model.modelCode}`,
-                      hedgeAfterMs,
+                      hedgeAfterMs: hedgeDelayMs,
+                      sameModel: sameModel !== undefined,
                       qRunId: request.attribution.qRunId,
                     },
                     "model request hedged",
