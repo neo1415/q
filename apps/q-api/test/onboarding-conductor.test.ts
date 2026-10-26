@@ -970,6 +970,20 @@ describe("a confirmation on resume shows what it confirms (QA 26 Oct)", () => {
       /^Picking up where we left off\. Here's what I have: .+\. Save this as your capital objective\?$/u,
     );
     expect(line).toMatch(/SAFE/iu);
+    // A sum in its own currency (live 26 Oct: "Raise target: 1200000").
+    expect(line).toContain("$1.2 million");
+    expect(line).not.toContain("1200000");
+  });
+
+  it("without a currency on record the figure is grouped, never dollars", () => {
+    const view = raiseView(true);
+    const noCurrency = {
+      ...view,
+      responses: view.responses.filter((r) => r.stepKey !== "F6.currency"),
+    } as OnboardingSessionView;
+    const line = resumeLine(noCurrency, "founder");
+    expect(line).toContain("1,200,000");
+    expect(line).not.toContain("$");
   });
 
   it("with nothing to show, the open question is asked instead", () => {

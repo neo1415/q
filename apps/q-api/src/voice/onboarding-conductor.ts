@@ -7,7 +7,10 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
-import { displayOnboardingValue } from "@capital-q/onboarding";
+import {
+  displayOnboardingValue,
+  type OnboardingStepManifest,
+} from "@capital-q/onboarding";
 import {
   FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
@@ -23,6 +26,8 @@ import {
 } from "./interview-agent.js";
 import {
   definitionFor,
+  describeValue,
+  MONEY_STEP,
   optionsOf,
   toOpenStep,
   type InterviewTurnOutcome,
@@ -191,23 +196,53 @@ export function confirmedContent(
   if (phases === undefined) return null;
   const labels = coverageProfileFor(journeyType).fields;
   const answers = new Map(view.responses.map((r) => [r.stepKey, r.value]));
-  const items = definitionFor(journeyType)
-    .steps.filter(
-      (s) =>
-        s.stepKey !== stepKey &&
-        s.configuration.stepType !== "confirmation" &&
-        phases.includes(s.configuration.phaseKey ?? ""),
-    )
+  const confirmed = definitionFor(journeyType).steps.filter(
+    (s) =>
+      s.stepKey !== stepKey &&
+      s.configuration.stepType !== "confirmation" &&
+      phases.includes(s.configuration.phaseKey ?? ""),
+  );
+  // The currency answered among what is confirmed (the raise's own, not a
+  // reporting currency); never assumed.
+  const currencyAnswer = confirmed
+    .filter((s) => /\.currency$/u.test(s.stepKey))
+    .map((s) => answers.get(s.stepKey))
+    .find((v) => v?.type === "SINGLE_SELECT");
+  const currency =
+    currencyAnswer?.type === "SINGLE_SELECT" ? currencyAnswer.optionKey : null;
+  const items = confirmed
     .flatMap((s) => {
       const value = answers.get(s.stepKey);
       if (value === undefined) return [];
       const label = (labels[s.stepKey]?.label ?? s.configuration.prompt)
         .replace(/[?:]$/u, "")
         .trim();
-      return [`${label}: ${displayOnboardingValue(s, value)}`];
+      return [`${label}: ${confirmedValue(s, value, currency)}`];
     })
     .slice(0, CONFIRMED_ITEMS);
   return items.length === 0 ? null : items.join("; ");
+}
+
+/**
+ * One confirmed answer as a person reads it: a sum of money in its own
+ * currency ("$1.2 million", live 26 Oct: "Raise target: 1200000"); without
+ * a currency on record, the plain figure, grouped ("1,200,000"), never
+ * dollars by default.
+ */
+function confirmedValue(
+  step: OnboardingStepManifest,
+  value: OnboardingSessionView["responses"][number]["value"],
+  currency: string | null,
+): string {
+  if (value.type === "RANGE" && MONEY_STEP.test(step.stepKey)) {
+    const figure = Number.parseFloat(String(value.value));
+    if (Number.isFinite(figure)) {
+      return currency === null
+        ? new Intl.NumberFormat("en-GB").format(figure)
+        : describeValue(step, value, currency);
+    }
+  }
+  return displayOnboardingValue(step, value);
 }
 
 /**
