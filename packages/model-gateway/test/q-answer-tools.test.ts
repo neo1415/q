@@ -3237,6 +3237,93 @@ describe("findings and cards written beside the answer (owner 2026-10-22)", () =
     ).not.toContain("Seed stage.");
   });
 
+  // Production 2026-10-26 (run 7b51d28d): the conversation writer's round
+  // wrote 2,457 tokens, fields nobody reads among them.
+  const fieldsOf = (output: unknown): string[] =>
+    Object.keys(
+      (output as { jsonSchema?: { properties?: object } }).jsonSchema
+        ?.properties ?? {},
+    ).sort();
+
+  it("with extras beside it, the answer's writer is not asked for the findings, cards or the specialist's channels", async () => {
+    const { seam, alpha, request } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Northwind is close.") },
+        {
+          kind: "JSON",
+          value: {
+            answer: "Close.",
+            responseShape: "CONCISE",
+            insufficientEvidence: false,
+            findings: [finding("Northwind declares a seed stage.")],
+            answerCards: null,
+            comparisonCards: null,
+          },
+        },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const [answerCall, extrasCall] = alpha.calls.map((c) => c.request);
+    const answerFields = fieldsOf(answerCall?.output);
+    for (const gone of [
+      "companyFindings",
+      "coverage",
+      "materialChanges",
+      "findings",
+      "answerCards",
+      "comparisonCards",
+    ]) {
+      expect(answerFields).not.toContain(gone);
+    }
+    // What only it writes, and the person relies on, is still asked for.
+    for (const kept of [
+      "answer",
+      "missingEvidence",
+      "contradictions",
+      "clarifyingQuestions",
+      "userStatements",
+      "profileUpdates",
+      "actionTalk",
+    ]) {
+      expect(answerFields).toContain(kept);
+    }
+    expect(
+      (
+        answerCall?.output as { jsonSchema?: { required?: string[] } }
+      ).jsonSchema?.required
+        ?.slice()
+        .sort(),
+    ).toEqual(answerFields);
+    // The extras' own shape is unchanged.
+    expect(fieldsOf(extrasCall?.output)).toEqual([...EXTRAS_FIELDS].sort());
+  });
+
+  it("with no extras, the turn's findings come only from findings: the specialist's channels are not asked for", async () => {
+    const { seam, alpha, request, completed } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Northwind declares a seed stage."),
+            findings: [finding("Northwind declares a seed stage.")],
+          },
+        },
+      ],
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(1);
+    const answerFields = fieldsOf(alpha.calls[0]?.request.output);
+    expect(answerFields).toContain("findings");
+    expect(answerFields).toContain("answerCards");
+    for (const gone of ["companyFindings", "coverage", "materialChanges"]) {
+      expect(answerFields).not.toContain(gone);
+    }
+    expect(findingBlocks(completed)).toEqual([
+      "Northwind declares a seed stage.",
+    ]);
+  });
+
   // Coordinator 2026-10-26 (run 42cecfd2): an email card's turn waited
   // 0.9 s past its answer for findings written beside the card. A card
   // prepared this turn is the substance; no second writer runs.
