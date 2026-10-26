@@ -8,12 +8,13 @@ import { friendlyDetail } from "../src/features/onboarding-kit/problem-words";
  * dropped from the server's sentence.
  */
 describe("onboarding refusals in plain words", () => {
-  it("explains that Q's first reading is still running", () => {
+  it("explains in words that fit founder and investor alike (QA F-138)", () => {
     const out = friendlyDetail(
       "The onboarding session does not allow this action right now. (REQUIRED_STEPS_INCOMPLETE)",
     );
     expect(out.reason).toBe("REQUIRED_STEPS_INCOMPLETE");
-    expect(out.text).toMatch(/first reading/u);
+    expect(out.text).toMatch(/can't finish quite yet/u);
+    expect(out.text).not.toMatch(/company/u);
     expect(out.text).not.toMatch(/[A-Z]{3,}_[A-Z]/u);
   });
 

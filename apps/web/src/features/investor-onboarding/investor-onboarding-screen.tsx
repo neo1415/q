@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
+import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { QMark } from "@capital-q/ui/q-mark";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
@@ -14,6 +15,7 @@ import { INVESTOR_VOCABULARY } from "./conversation-adapter";
 import { reviewLines } from "../onboarding-conversation/conversation";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
 import { ContinueLater } from "../onboarding-kit/components/continue-later";
+import { finishJourney } from "../onboarding-kit/finish";
 import { FormCoverageArea } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
 import { phasesFor } from "../onboarding-kit/coverage";
@@ -241,8 +243,7 @@ export function InvestorOnboardingScreen({
   const isFinal = step.kind === "handoff";
 
   const finishFromQ = async () => {
-    await actions.submit({ kind: "handoff", confirmed: true });
-    if (await actions.complete()) {
+    if (await finishJourney(actions, INVESTOR_STEPS.handoff)) {
       // ADMIN-4 block: straight into "Verify you and <fund>", skippable.
       router.push("/verification?from=setup&next=discover");
     }

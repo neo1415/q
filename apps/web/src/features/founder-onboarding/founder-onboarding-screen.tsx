@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
+import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { QMark } from "@capital-q/ui/q-mark";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
@@ -13,6 +14,7 @@ import { createFounderOnboardingClient } from "./adapters/compose";
 import { FOUNDER_VOCABULARY } from "./conversation-adapter";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
 import { ContinueLater } from "../onboarding-kit/components/continue-later";
+import { finishJourney } from "../onboarding-kit/finish";
 import { FormCoverageArea } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
 import { phasesFor } from "../onboarding-kit/coverage";
@@ -255,8 +257,7 @@ export function FounderOnboardingScreen({
   const isFinal = step.kind === "snapshot";
 
   const finishFromQ = async () => {
-    await actions.submit({ kind: "snapshot", confirmed: true });
-    if (await actions.complete()) {
+    if (await finishJourney(actions, FOUNDER_STEPS.snapshot)) {
       // ADMIN-4 block (founder direction 2026-10-02): straight into
       // "Verify you and <company>", skippable; skipping goes on to the
       // profile, where the founder checks what Q put together (2026-09-30).
