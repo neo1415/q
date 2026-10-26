@@ -44,6 +44,12 @@ export function appActionOf(read: object | null): TurnAppAction | null {
  * 2026-10-03: one status per card per answer).
  */
 export type QAppActionPrepared = { readonly prepared: string };
+/**
+ * Refused with guidance for Q's answer, never for the person (NOT_THIS_ACTION):
+ * the answer runs in full, and an action the guidance names is the one asked
+ * for (guard F-106-reshown-card, 2026-10-26).
+ */
+export type QAppActionRedirect = { readonly redirect: string };
 
 /**
  * The action asked one thing it needs before it can be prepared (their
@@ -61,7 +67,9 @@ export type QAppActionPort = {
   readonly run: (
     request: QAnswerRequest,
     action: TurnAppAction,
-  ) => Promise<string | QAppActionPrepared | QAppActionAsks | null>;
+  ) => Promise<
+    string | QAppActionPrepared | QAppActionAsks | QAppActionRedirect | null
+  >;
 };
 
 /** What a declared action is waiting on, kept on the conversation. */
@@ -201,8 +209,13 @@ export function createToolAppActionPort(dependencies: {
           // Guidance for Q's answer (NOT_THIS_ACTION) is never the answer:
           // the turn is answered in full instead (guard run, 2026-10-25).
           const reason = outcome.result.error.safeMessage.trim();
+          if (
+            outcome.status === "DENIED" &&
+            outcome.result.error.code === "NOT_THIS_ACTION"
+          ) {
+            return reason.length > 0 ? { redirect: reason } : null;
+          }
           return outcome.status === "DENIED" &&
-            outcome.result.error.code !== "NOT_THIS_ACTION" &&
             !GENERIC_REFUSALS.has(reason) &&
             reason.length > 0
             ? reason

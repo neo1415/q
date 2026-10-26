@@ -4127,7 +4127,8 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     ).toBeNull();
     // Guard run (2026-10-25, runs fafa6adf, 3b7da40d): guidance for Q's
     // answer was said as the whole reply. A NOT_THIS_ACTION refusal is never
-    // the answer; the turn is answered in full.
+    // the answer; the turn is answered in full, and its guidance is handed
+    // to the answer, not said (guard F-106-reshown-card, 2026-10-26).
     expect(
       await portFor(
         outcomeOf(
@@ -4136,7 +4137,10 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
           "No open question in their inbox matches it. Prepare their reply now as a message.",
         ),
       ).run(request(), action),
-    ).toBeNull();
+    ).toEqual({
+      redirect:
+        "No open question in their inbox matches it. Prepare their reply now as a message.",
+    });
   });
 });
 
@@ -4240,6 +4244,108 @@ describe("a named app action with no arguments is still done (parity eval 2026-1
  * not fit the tool (INVALID_ARGUMENTS) and nothing was done. The arguments
  * are read once more against the tool's own schema and the same tool runs.
  */
+/**
+ * Guard F-106-reshown-card (2026-10-26, run 8f9221fa): answer_investor_question
+ * found no open question and said, for Q, to prepare the reply with
+ * propose_chat_message. The guidance was dropped and the answer ran with no
+ * action asked; nothing was prepared. The action it names is now the one
+ * asked for, offered to the answer, and the guidance is never the reply.
+ */
+describe("a declared action refused with guidance for the answer", () => {
+  const reading = {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: true,
+    tool: null,
+    handOver: null,
+    appAction: {
+      tool: "answer_investor_question",
+      arguments: {
+        question: "gross margin per litre",
+        answer: "After September.",
+      },
+    },
+  } as unknown as TurnReaderResult;
+  const GUIDANCE =
+    "No open question in their inbox matches it, so it is not recorded against one. Prepare their reply now as a message to that investor with propose_chat_message.";
+
+  it("runs the declared action the refusal names, by code", async () => {
+    const asked: string[] = [];
+    const ran: string[] = [];
+    const run = seam({
+      said: "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
+      reading,
+      outcomes: [],
+      offeredTools: ["answer_investor_question", "propose_chat_message"],
+      appActions: {
+        tools: new Set(["answer_investor_question", "propose_chat_message"]),
+        run: (_request, action) => {
+          ran.push(action.tool);
+          return Promise.resolve(
+            action.tool === "propose_chat_message"
+              ? { prepared: "Message Savanna Seed Partners" }
+              : { redirect: GUIDANCE },
+          );
+        },
+      },
+      appActionArguments: (_request, input) => {
+        asked.push(input.tool);
+        return Promise.resolve({
+          counterpartName: "Savanna Seed Partners",
+          body: "We'll share it once September is reconciled.",
+        });
+      },
+    });
+    await run.answer.answer(request());
+    expect(ran).toEqual(["answer_investor_question", "propose_chat_message"]);
+    expect(asked).toEqual(["propose_chat_message"]);
+    // Done by code: the full answer never ran.
+    expect(run.askedActions).toEqual([]);
+    expect(run.stored.map((m) => m.content).join(" ")).not.toContain(
+      "No open question",
+    );
+  });
+
+  it("asks the answer for it when code cannot read its inputs", async () => {
+    const run = seam({
+      said: "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
+      reading,
+      outcomes: [],
+      offeredTools: ["answer_investor_question", "propose_chat_message"],
+      appActions: {
+        tools: new Set(["answer_investor_question", "propose_chat_message"]),
+        run: () => Promise.resolve({ redirect: GUIDANCE }),
+      },
+      appActionArguments: () => Promise.resolve(null),
+    });
+    await run.answer.answer(request());
+    expect(run.askedActions).toEqual(["propose_chat_message"]);
+    expect(JSON.stringify(run.focuses.at(-1))).toContain(
+      "propose_chat_message",
+    );
+    expect(run.stored.map((m) => m.content).join(" ")).not.toContain(
+      "No open question",
+    );
+  });
+
+  it("names nothing this run does not offer", async () => {
+    const run = seam({
+      said: "Savanna Seed asked about our gross margin per litre. Draft a short reply.",
+      reading,
+      outcomes: [],
+      offeredTools: ["answer_investor_question"],
+      appActions: {
+        tools: new Set(["answer_investor_question"]),
+        run: () => Promise.resolve({ redirect: GUIDANCE }),
+      },
+    });
+    await run.answer.answer(request());
+    expect(run.askedActions).not.toContain("propose_chat_message");
+  });
+});
+
 describe("a reader's arguments the tool refuses are read again (parity eval 2026-10-02)", () => {
   const withAction = (args: Record<string, unknown>) =>
     ({
