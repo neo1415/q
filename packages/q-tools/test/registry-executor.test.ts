@@ -255,6 +255,33 @@ describe("tool execution pipeline", () => {
     expect(text).not.toContain("MUCH-TOO-LONG-VALUE");
   });
 
+  // Live a1db17ec (2026-10-26): "(root)" unrecognized_keys, and no way to
+  // see which field. The log line names it; never its value, never to the
+  // model, and only a name shaped like a schema's.
+  it("logs which unknown fields a call carried, by name only", async () => {
+    const { port, logLines } = build();
+    const outcome = await port.execute(
+      {
+        callId: "c1",
+        name: "test_read",
+        arguments: {
+          q: "x",
+          reason: "SECRET-VALUE-NEVER-LOGGED",
+          "Dear Ada, our revenue": 1,
+        },
+      },
+      contextFor(actorA, general),
+    );
+    expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+    const log = logLines.join("\n");
+    expect(log).toContain('"invalidCodes":["unrecognized_keys"]');
+    expect(log).toContain('"unknownKeys":["reason"]');
+    expect(log).not.toContain("SECRET-VALUE-NEVER-LOGGED");
+    expect(log).not.toContain("Dear Ada");
+    const said = outcome.result.ok ? "" : outcome.result.error.safeMessage;
+    expect(said).not.toContain("reason");
+  });
+
   it("refuses an actor that does not match the plan it was authorised under", async () => {
     const { port } = build();
     const outcome = await port.execute(
