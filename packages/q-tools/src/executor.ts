@@ -385,7 +385,19 @@ export function createQToolExecutor(
           const output = definition.output.safeParse(produced);
           if (!output.success) {
             logger?.error(
-              { qRunId: context.runId, tool: definition.id },
+              {
+                qRunId: context.runId,
+                tool: definition.id,
+                // Which fields and why, as paths and Zod's own codes, never
+                // a value (F-135: the refusal said only "the tool", and a
+                // field drift hid for days).
+                refusals: output.error.issues
+                  .slice(0, 8)
+                  .map(
+                    (issue) =>
+                      `${issue.path.map(String).join(".")}:${issue.code}`,
+                  ),
+              },
               "q tool produced output its schema refuses",
             );
             return finish(

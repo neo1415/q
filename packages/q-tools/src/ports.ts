@@ -6,6 +6,7 @@ import type {
   AddBoardItemRequest,
   BoardItem,
   BoardList,
+  CompanyProfileTeamMember,
   InvestorGateFitDto,
   MoveBoardItemRequest,
   UpdateBoardItemRequest,
@@ -483,16 +484,7 @@ export type CompanyTeamPort = {
       readonly companyId: string;
       readonly organisationId: string;
     },
-  ) => Promise<
-    | readonly {
-        readonly name: string;
-        readonly relationshipType: string;
-        readonly businessTitle: string | null;
-        readonly isFounder: boolean;
-        readonly shortBio: string | null;
-      }[]
-    | null
-  >;
+  ) => Promise<readonly CompanyProfileTeamMember[] | null>;
 };
 
 export type PitchMomentPort = {

@@ -6,6 +6,7 @@ import {
   type CompanyProfileFacts,
 } from "@capital-q/companies";
 import {
+  CompanyProfileTeamMemberSchema,
   CompanyStatusSchema,
   UuidSchema,
   type QSensitivityClass,
@@ -74,21 +75,15 @@ export const GetCompanyOutputSchema = z
      * The team as the company's page shows it (QA F-16): the owner, or an
      * investor the pitch rule admits. Absent when it could not be read for
      * them; an empty list is a company with no team members recorded.
+     *
+     * The page's own contract (CompanyProfileTeamMemberSchema), so the tool
+     * and the page cannot drift apart. Production 2026-10-26 (F-135, run
+     * 57fbf492): a company with no members names its founders from its
+     * public claim, each marked `source: PUBLIC_SOURCE`; this schema did
+     * not know the field, every such profile was refused as invalid tool
+     * output, and Duplo's founders, figures and identity were lost.
      */
-    team: z
-      .array(
-        z
-          .object({
-            name: z.string(),
-            relationshipType: z.string(),
-            businessTitle: z.string().nullable(),
-            isFounder: z.boolean(),
-            shortBio: z.string().nullable(),
-          })
-          .strict(),
-      )
-      .max(50)
-      .optional(),
+    team: z.array(CompanyProfileTeamMemberSchema).max(50).optional(),
     /** Profile fields are what the company declared about itself. */
     truthClass: z.literal("USER_CLAIM"),
   })

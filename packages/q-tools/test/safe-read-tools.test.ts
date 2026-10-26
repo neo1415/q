@@ -87,12 +87,80 @@ describe("GET_COMPANY", () => {
     ).toEqual(["company.view"]);
   });
 
+  // F-135 (production 2026-10-26, run 57fbf492): a company with no members
+  // names its founders from its public claim, each marked PUBLIC_SOURCE
+  // (Duplo's real shape: name, title, founder, no bio, source). This tool's
+  // schema did not know `source`; every such profile failed as invalid tool
+  // output and its founders, figures and identity were lost.
+  it("serves a profile whose founders come from its public claim, labelled PUBLIC_SOURCE (F-135)", async () => {
+    const team = [
+      {
+        name: "Yele Oyekola",
+        relationshipType: "team_member" as const,
+        businessTitle: "CEO and co-founder",
+        isFounder: true,
+        shortBio: null,
+        source: "PUBLIC_SOURCE" as const,
+      },
+      {
+        name: "Tunde Akinnuwa",
+        relationshipType: "team_member" as const,
+        businessTitle: "Chief Product Officer (co-founder)",
+        isFounder: true,
+        shortBio: null,
+        source: "PUBLIC_SOURCE" as const,
+      },
+    ];
+    const { port: withTeam } = port({
+      companyTeam: { teamFor: () => Promise.resolve(team) },
+    });
+    const outcome = await withTeam.execute(
+      {
+        callId: "f135",
+        name: "get_company",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.failureCode).toBeNull();
+    expect(outcome.result).toMatchObject({ ok: true, data: { team } });
+  });
+
+  it("still refuses a team member outside the page's contract", async () => {
+    const { port: withTeam } = port({
+      companyTeam: {
+        teamFor: () =>
+          Promise.resolve([
+            {
+              name: "Someone",
+              relationshipType: "team_member" as const,
+              businessTitle: null,
+              isFounder: false,
+              shortBio: null,
+              email: "someone@example.com",
+            } as unknown as never,
+          ]),
+      },
+    });
+    const outcome = await withTeam.execute(
+      {
+        callId: "f135-b",
+        name: "get_company",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(outcome.status).toBe("FAILED");
+    expect(outcome.failureCode).toBe("INVALID_TOOL_OUTPUT");
+  });
+
   it("carries the team as the page shows it, only when the team port admits the reader (QA F-16)", async () => {
     const asked: { actor: string; companyId: string }[] = [];
     const team = [
       {
         name: "Amina Bello",
-        relationshipType: "team_member",
+        relationshipType: "team_member" as const,
         businessTitle: "CEO",
         isFounder: true,
         shortBio: null,
