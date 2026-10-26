@@ -1,5 +1,7 @@
-import type { ModelMessage } from "@capital-q/contracts";
+import type { ModelMessage, ModelOutputSpec } from "@capital-q/contracts";
 import type { CompanyAnalystV26Result } from "@capital-q/q-core";
+
+import { narrowedOutput } from "./compare-answer.js";
 
 /**
  * Owner 2026-10-22: the answer and its extras are written at the same
@@ -47,6 +49,30 @@ export const EXTRAS_ONLY_NOTE: ModelMessage = {
   content:
     "Another writer is writing this turn's answer prose now, from the same facts. Your object is for its `findings` and, where the question compares or ranks companies, its `answerCards` or `comparisonCards`, under the same rules as always: every finding stands on the facts and tool results above, with its truth class and evidence status. Set `answer` to one short sentence stating the main point, which nobody reads, `responseShape` and `insufficientEvidence` as you judge them and `recommendation` to null. Leave every other field out. Call no tool.",
 };
+
+/**
+ * Production 2026-10-26 (run 186c0788, "How investor-ready is my company
+ * right now?"): the extras' writer took 12.1 s for 1,522 output tokens
+ * while the answer beside it took 4.9 s, and the turn settled on the
+ * extras. Its note already says to leave every other field out, but the
+ * strict schema made it write all of them. It is asked only for what it
+ * is for (its findings and cards) and the few fields its note names; code
+ * fills the rest with their empty values, which is all the join ever took
+ * from them (joinExtras reads findings, answerCards, comparisonCards).
+ */
+export const EXTRAS_FIELDS = [
+  "answer",
+  "responseShape",
+  "insufficientEvidence",
+  "findings",
+  "answerCards",
+  "comparisonCards",
+] as const;
+
+/** The extras' writer's output spec: its own fields only. */
+export function extrasOutput(output: ModelOutputSpec): ModelOutputSpec {
+  return narrowedOutput(output, EXTRAS_FIELDS);
+}
 
 /** The extras' writer's messages: the round's own, with its note swapped. */
 export function extrasMessages(

@@ -40,6 +40,7 @@ import {
 import { FIRST_CONTACT_REPLY, firstContactOf } from "../src/q/first-contact.js";
 import { onScreenCompanyFact } from "../src/q/company-fact.js";
 import { chatInsteadOf } from "../src/q/message-channel.js";
+import { EXTRAS_FIELDS } from "../src/q/parallel-extras.js";
 import { qCardOfferOf } from "../src/q/q-card-offer.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
@@ -3151,6 +3152,89 @@ describe("findings and cards written beside the answer (owner 2026-10-22)", () =
       (completed[0] as { message: { text: string } }).message.text,
     ).not.toContain("Seed stage.");
     expect(seam.lastObservation()?.modelCalls).toBe(2);
+  });
+
+  // Production 2026-10-26 (run 186c0788): the extras' writer took 12.1 s
+  // for 1,522 tokens beside a 4.9 s answer, the strict schema making it
+  // write every field its note says to leave out.
+  it("the extras' writer is asked only for its own fields; a reply of just those joins as before", async () => {
+    const cards = {
+      shape: "RESEARCH",
+      title: "Northwind",
+      cards: [
+        {
+          name: "Northwind",
+          line: null,
+          reasons: ["Declares a seed stage."],
+          measures: [],
+          view: null,
+          said: null,
+          citations: [],
+        },
+      ],
+      followUps: [],
+    };
+    const { seam, alpha, request, completed } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult("Northwind declares a seed stage."),
+        },
+        {
+          // Only what the narrowed shape asks for: no recommendation, no
+          // clarifyingQuestions, nothing else.
+          kind: "JSON",
+          value: {
+            answer: "Seed stage.",
+            responseShape: "CONCISE",
+            insufficientEvidence: false,
+            findings: [finding("Northwind declares a seed stage.")],
+            answerCards: cards,
+            comparisonCards: null,
+          },
+        },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(2);
+    const [answerCall, extrasCall] = alpha.calls.map((c) => c.request);
+    const fieldsOf = (output: unknown): string[] => {
+      const spec = output as {
+        kind: string;
+        jsonSchema?: { properties?: object; required?: string[] };
+      };
+      return Object.keys(spec.jsonSchema?.properties ?? {}).sort();
+    };
+    // The answer's shape is untouched; the extras' is its own fields only.
+    expect(fieldsOf(answerCall?.output)).toContain("userStatements");
+    expect(fieldsOf(extrasCall?.output)).toEqual([...EXTRAS_FIELDS].sort());
+    expect(
+      [
+        ...((extrasCall?.output as { jsonSchema?: { required?: string[] } })
+          .jsonSchema?.required ?? []),
+      ].sort(),
+    ).toEqual([...EXTRAS_FIELDS].sort());
+    // The same findings and cards reach the message as a full reply's.
+    expect(findingBlocks(completed)).toEqual([
+      "Northwind declares a seed stage.",
+    ]);
+    const blocks =
+      (
+        completed[0] as {
+          message: {
+            blocks?: { kind: string; cards?: { name: string }[] }[];
+          };
+        }
+      ).message.blocks ?? [];
+    expect(
+      blocks
+        .find((block) => block.kind === "ANSWER_CARDS")
+        ?.cards?.map((card) => card.name),
+    ).toEqual(["Northwind"]);
+    expect(
+      (completed[0] as { message: { text: string } }).message.text,
+    ).not.toContain("Seed stage.");
   });
 
   // Coordinator 2026-10-26 (run 42cecfd2): an email card's turn waited
