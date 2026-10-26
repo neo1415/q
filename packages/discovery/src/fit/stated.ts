@@ -56,6 +56,12 @@ export type FitStatedEvidence = {
    * CONFIDENTIAL. Conservative: a deck not downloadable by investors counts.
    */
   readonly confidential: boolean;
+  /**
+   * The raise as this reader sees it, read once for the fit (coordinator
+   * 2026-10-26: the fit tool read it a second time for its cards). Never
+   * scored: what the cards and Q say, exactly as raiseFor gives it.
+   */
+  readonly raiseView?: CompanyRaiseView | undefined;
 };
 
 export const FIT_EVIDENCE_LINES_MAX = 60;

@@ -199,6 +199,9 @@ export function createFitInputSource(
               : { amount: raise.amount, currency: raise.currency },
           evidence: said?.evidence ?? [],
           evidenceConfidential: said?.confidential ?? false,
+          ...(said?.raiseView === undefined
+            ? {}
+            : { raiseView: said.raiseView }),
         });
       });
       return out;

@@ -231,10 +231,11 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
       if (result.kind !== "OK") return none(result.kind);
       const item = result.items[0];
       if (item === undefined) return none("NOT_FOUND");
-      const views = await raiseViewsFor(ports, context.actor, [
-        input.companyId,
-      ]);
-      const raiseView = views.get(input.companyId);
+      const raiseView =
+        item.raiseView ??
+        (await raiseViewsFor(ports, context.actor, [input.companyId])).get(
+          input.companyId,
+        );
       const output: FitProfileOutput = {
         status: "OK",
         name: item.name,
@@ -343,17 +344,22 @@ export function createFitTopCandidatesTool(
               input.source ?? "FEED",
             );
       if (result.kind !== "OK") return none(result.kind);
+      // Coordinator 2026-10-26 (live trace): the fit already read the raise
+      // of the companies it shows, as this reader sees it; only an entry
+      // that came without one is read here.
       const views = await raiseViewsFor(
         ports,
         context.actor,
-        result.comparison.entries.map((entry) => entry.companyId),
+        result.comparison.entries
+          .filter((entry) => entry.raiseView === undefined)
+          .map((entry) => entry.companyId),
       );
       const output: FitTopCandidatesOutput = {
         status: "OK",
         comparison: {
           ...result.comparison,
           entries: result.comparison.entries.map((entry) => {
-            const raiseView = views.get(entry.companyId);
+            const raiseView = entry.raiseView ?? views.get(entry.companyId);
             const compact =
               entry.scores === undefined
                 ? entry

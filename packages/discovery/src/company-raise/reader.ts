@@ -95,6 +95,59 @@ export type CompanyRaiseReaderPorts = {
     readonly amount: string;
     readonly currency: string;
   } | null>;
+  /**
+   * The same reads for many companies at once (coordinator 2026-10-26,
+   * live trace: the raise read each shown company one query at a time,
+   * twice per top-five ranking). Each is optional; without it the reader
+   * asks company by company, and either way it decides the same.
+   */
+  readonly findCanonicalCompanies?:
+    | ((
+        companyIds: readonly CompanyIdentity["id"][],
+      ) => Promise<readonly CompanyIdentity[]>)
+    | undefined;
+  /** Each company's current ACTIVE objective, by company id (absent: none). */
+  readonly currentObjectives?:
+    | ((
+        companies: readonly CompanyIdentity[],
+      ) => Promise<ReadonlyMap<string, RaiseObjectiveFact>>)
+    | undefined;
+  /** Each objective's policy history, by objective id. */
+  readonly objectivePoliciesMany?:
+    | ((
+        objectiveIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, readonly RaisePolicyRow[]>>)
+    | undefined;
+  /** Each company's discoverable pitches, newest first, by company id. */
+  readonly pitchesMany?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, readonly RaisePitchCandidate[]>>)
+    | undefined;
+  /**
+   * The raise said in each of these pitches, under the same playback rule
+   * as pitchRaise, by media asset id (absent or null: none said, or not
+   * playable to this reader).
+   */
+  readonly pitchRaises?:
+    | ((
+        actor: ActorContext,
+        pitches: readonly {
+          readonly companyId: string;
+          readonly mediaAssetId: string;
+        }[],
+      ) => Promise<
+        ReadonlyMap<
+          string,
+          {
+            readonly atSeconds: number;
+            readonly amount: string;
+            readonly currency: string;
+          } | null
+        >
+      >)
+    | undefined;
 };
 
 export type CompanyRaiseReader = {
@@ -135,64 +188,176 @@ async function settled<T>(read: Promise<T>, fallback: T): Promise<T> {
 export function createCompanyRaiseReader(
   ports: CompanyRaiseReaderPorts,
 ): CompanyRaiseReader {
-  const pitchClaimFor = async (
-    actor: ActorContext,
-    companyId: string,
-  ): Promise<PitchRaiseClaimFact | null> => {
-    const pitches = (await settled(ports.pitches(actor, companyId), [])).slice(
-      0,
-      RAISE_PITCHES_MAX,
-    );
-    // In order, newest first, stopping at the first raise: the same pitch
-    // wins on every surface, and older transcripts are not read for nothing.
-    for (const pitch of pitches) {
-      const said = await settled(
-        ports.pitchRaise(actor, companyId, pitch.mediaAssetId),
-        null,
-      );
-      if (said !== null) {
-        return {
-          pitchId: pitch.mediaAssetId,
-          atSeconds: said.atSeconds,
-          amount: said.amount,
-          currency: said.currency,
-          visibility: pitch.visibility,
-        };
-      }
+  const companiesOf = async (
+    ids: readonly CompanyIdentity["id"][],
+  ): Promise<readonly CompanyIdentity[]> => {
+    const many = ports.findCanonicalCompanies;
+    if (many !== undefined) {
+      const found = await settled(many(ids), []);
+      const byId = new Map(found.map((company) => [company.id, company]));
+      return ids.flatMap((id) => {
+        const company = byId.get(id);
+        return company === undefined ? [] : [company];
+      });
     }
-    return null;
+    return (
+      await Promise.all(
+        ids.map((id) => settled(ports.findCanonicalCompany(id), null)),
+      )
+    ).filter((company): company is CompanyIdentity => company !== null);
   };
 
-  const sharingOf = (objective: RaiseObjectiveFact | null) =>
-    objective === null
-      ? Promise.resolve<RaiseSharing>("PRIVATE")
-      : settled(
-          ports.objectivePolicies(objective.id).then(sharingFromPolicies),
-          // Unknown sharing is treated as hidden: privacy wins.
-          "HIDDEN",
-        );
+  const objectivesOf = async (
+    companies: readonly CompanyIdentity[],
+  ): Promise<readonly (RaiseObjectiveFact | null)[]> => {
+    const many = ports.currentObjectives;
+    if (many !== undefined) {
+      const found = await settled(
+        many(companies),
+        new Map<string, RaiseObjectiveFact>(),
+      );
+      return companies.map((company) => found.get(company.id) ?? null);
+    }
+    return Promise.all(
+      companies.map((company) =>
+        settled(ports.currentObjective(company), null),
+      ),
+    );
+  };
+
+  /** Each objective's sharing; unknown sharing is hidden (privacy wins). */
+  const sharingsOf = async (
+    objectiveIds: readonly string[],
+  ): Promise<ReadonlyMap<string, RaiseSharing>> => {
+    if (objectiveIds.length === 0) return new Map();
+    const many = ports.objectivePoliciesMany;
+    if (many !== undefined) {
+      const found = await settled<ReadonlyMap<
+        string,
+        readonly RaisePolicyRow[]
+      > | null>(many(objectiveIds), null);
+      return new Map(
+        objectiveIds.map((id) => [
+          id,
+          found === null ? "HIDDEN" : sharingFromPolicies(found.get(id) ?? []),
+        ]),
+      );
+    }
+    return new Map(
+      await Promise.all(
+        objectiveIds.map(
+          async (id) =>
+            [
+              id,
+              await settled<RaiseSharing>(
+                ports.objectivePolicies(id).then(sharingFromPolicies),
+                "HIDDEN",
+              ),
+            ] as const,
+        ),
+      ),
+    );
+  };
+
+  /**
+   * The first raise said in a pitch this reader may play, per company:
+   * each company's pitches newest first, bounded, stopping at its first
+   * raise. Asked in rounds (every company's next pitch together), so the
+   * same pitch wins as one by one, and older transcripts are not read for
+   * nothing.
+   */
+  const pitchClaimsOf = async (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ): Promise<ReadonlyMap<string, PitchRaiseClaimFact>> => {
+    const claims = new Map<string, PitchRaiseClaimFact>();
+    if (companyIds.length === 0) return claims;
+    const manyPitches = ports.pitchesMany;
+    const candidates: ReadonlyMap<string, readonly RaisePitchCandidate[]> =
+      manyPitches !== undefined
+        ? await settled(
+            manyPitches(actor, companyIds),
+            new Map<string, readonly RaisePitchCandidate[]>(),
+          )
+        : new Map(
+            await Promise.all(
+              companyIds.map(
+                async (companyId) =>
+                  [
+                    companyId,
+                    await settled(ports.pitches(actor, companyId), []),
+                  ] as const,
+              ),
+            ),
+          );
+    for (let round = 0; round < RAISE_PITCHES_MAX; round += 1) {
+      const asked = companyIds.flatMap((companyId) => {
+        if (claims.has(companyId)) return [];
+        const pitch = (candidates.get(companyId) ?? []).slice(
+          0,
+          RAISE_PITCHES_MAX,
+        )[round];
+        return pitch === undefined ? [] : [{ companyId, pitch }];
+      });
+      if (asked.length === 0) break;
+      const many = ports.pitchRaises;
+      const said: readonly ({
+        readonly atSeconds: number;
+        readonly amount: string;
+        readonly currency: string;
+      } | null)[] =
+        many !== undefined
+          ? await settled(
+              many(
+                actor,
+                asked.map(({ companyId, pitch }) => ({
+                  companyId,
+                  mediaAssetId: pitch.mediaAssetId,
+                })),
+              ).then((byPitch) =>
+                asked.map(
+                  ({ pitch }) => byPitch.get(pitch.mediaAssetId) ?? null,
+                ),
+              ),
+              asked.map(() => null),
+            )
+          : await Promise.all(
+              asked.map(({ companyId, pitch }) =>
+                settled(
+                  ports.pitchRaise(actor, companyId, pitch.mediaAssetId),
+                  null,
+                ),
+              ),
+            );
+      asked.forEach(({ companyId, pitch }, index) => {
+        const raise = said[index] ?? null;
+        if (raise !== null) {
+          claims.set(companyId, {
+            pitchId: pitch.mediaAssetId,
+            atSeconds: raise.atSeconds,
+            amount: raise.amount,
+            currency: raise.currency,
+            visibility: pitch.visibility,
+          });
+        }
+      });
+    }
+    return claims;
+  };
 
   const raisesFor = async (
     actor: ActorContext,
     companyIds: readonly string[],
   ): Promise<ReadonlyMap<string, CompanyRaiseView>> => {
-    const ids = [...new Set(companyIds)].slice(0, RAISE_BATCH_MAX);
+    const ids = [...new Set(companyIds)]
+      .slice(0, RAISE_BATCH_MAX)
+      .flatMap((raw) => {
+        const id = CompanyIdSchema.safeParse(raw);
+        return id.success ? [id.data] : [];
+      });
     const investorRead = settled(ports.isInvestor(actor), false);
-    const companies = (
-      await Promise.all(
-        ids.map(async (raw) => {
-          const id = CompanyIdSchema.safeParse(raw);
-          return id.success
-            ? settled(ports.findCanonicalCompany(id.data), null)
-            : null;
-        }),
-      )
-    ).filter((company): company is CompanyIdentity => company !== null);
-    const objectives = await Promise.all(
-      companies.map((company) =>
-        settled(ports.currentObjective(company), null),
-      ),
-    );
+    const companies = await companiesOf(ids);
+    const objectives = await objectivesOf(companies);
     const owned = companies.map(
       (company) =>
         actor.organisationId !== undefined &&
@@ -227,48 +392,67 @@ export function createCompanyRaiseReader(
       }
     });
     const investor = await investorRead;
-
-    const views = await Promise.all(
-      companies.map(async (company, index) => {
+    const viewers: readonly RaiseViewerKind[] = companies.map((_, index) =>
+      owned[index] === true ? "OWNER" : investor ? "INVESTOR" : "FOUNDER",
+    );
+    // A disclosed objective, or a founder reading someone else's company,
+    // needs neither the sharing history nor a pitch read.
+    const settledByDisclosure = companies.map((_, index) => {
+      const viewer = viewers[index];
+      return (
+        viewer === "FOUNDER" ||
+        (viewer === "INVESTOR" &&
+          objectives[index] !== null &&
+          allowReason.has(index))
+      );
+    });
+    const sharings = await sharingsOf(
+      companies.flatMap((_, index) => {
         const objective = objectives[index] ?? null;
-        const viewer: RaiseViewerKind =
-          owned[index] === true ? "OWNER" : investor ? "INVESTOR" : "FOUNDER";
-        const disclosedBecause = allowReason.get(index) ?? null;
-        // A disclosed objective, or a founder reading someone else's
-        // company, needs neither the sharing history nor a pitch read.
-        if (
-          viewer === "FOUNDER" ||
-          (viewer === "INVESTOR" &&
-            objective !== null &&
-            disclosedBecause !== null)
-        ) {
-          return presentCompanyRaise({
-            viewer,
-            objective,
-            disclosedBecause,
-            sharing: "PRIVATE",
-            pitchClaim: null,
-          });
-        }
-        const sharing = await sharingOf(objective);
-        const pitchClaim =
-          sharing === "HIDDEN" || (viewer === "OWNER" && objective !== null)
-            ? null
-            : await pitchClaimFor(actor, company.id);
-        return presentCompanyRaise({
-          viewer,
-          objective,
-          disclosedBecause,
-          sharing,
-          pitchClaim,
-        });
+        return settledByDisclosure[index] === true || objective === null
+          ? []
+          : [objective.id];
       }),
     );
+    const sharingAt = (index: number): RaiseSharing => {
+      const objective = objectives[index] ?? null;
+      return objective === null
+        ? "PRIVATE"
+        : (sharings.get(objective.id) ?? "HIDDEN");
+    };
+    const claims = await pitchClaimsOf(
+      actor,
+      companies.flatMap((company, index) =>
+        settledByDisclosure[index] === true ||
+        sharingAt(index) === "HIDDEN" ||
+        (viewers[index] === "OWNER" && objectives[index] !== null)
+          ? []
+          : [company.id as string],
+      ),
+    );
     return new Map(
-      companies.map((company, index) => [
-        company.id as string,
-        views[index] ?? NO_RAISE_VIEW,
-      ]),
+      companies.map((company, index) => {
+        const viewer = viewers[index] ?? "FOUNDER";
+        const objective = objectives[index] ?? null;
+        const disclosedBecause = allowReason.get(index) ?? null;
+        const view =
+          settledByDisclosure[index] === true
+            ? presentCompanyRaise({
+                viewer,
+                objective,
+                disclosedBecause,
+                sharing: "PRIVATE",
+                pitchClaim: null,
+              })
+            : presentCompanyRaise({
+                viewer,
+                objective,
+                disclosedBecause,
+                sharing: sharingAt(index),
+                pitchClaim: claims.get(company.id) ?? null,
+              });
+        return [company.id, view] as const;
+      }),
     );
   };
 

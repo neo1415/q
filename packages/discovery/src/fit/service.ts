@@ -14,6 +14,7 @@ import {
   SCORE_CONFIDENCE_LABELS,
   suitabilityFromFit,
   suitabilityLine,
+  type CompanyRaiseView,
   type CompanyScoresDto,
   type InvestabilityDto,
   type UnicornPotentialDto,
@@ -85,6 +86,8 @@ export type FitCompanyInputs = {
   readonly evidence?: readonly FitEvidenceLine[] | undefined;
   /** That evidence came through a grant: models read it only as CONFIDENTIAL. */
   readonly evidenceConfidential?: boolean | undefined;
+  /** The raise as this reader sees it (raiseFor), where it was read. */
+  readonly raiseView?: CompanyRaiseView | undefined;
 };
 
 export type FitInputSource = {
@@ -171,6 +174,8 @@ export type FitProfileItem = {
   /** For Q's view: what the company stated where this reader may see it. */
   readonly evidence?: readonly FitEvidenceLine[] | undefined;
   readonly evidenceConfidential?: boolean | undefined;
+  /** The raise as this reader sees it (raiseFor), where it was read. */
+  readonly raiseView?: CompanyRaiseView | undefined;
   /** Investability and Suitability: two scores, never blended. */
   readonly scores?: CompanyScoresDto | undefined;
 };
@@ -465,6 +470,9 @@ export function createFitService(
         raise: input.raise ?? null,
         evidence: input.evidence ?? [],
         evidenceConfidential: input.evidenceConfidential ?? false,
+        ...(input.raiseView === undefined
+          ? {}
+          : { raiseView: input.raiseView }),
       });
     }
     lap("inputs");
@@ -660,6 +668,7 @@ export function buildFitComparison(input: {
         ...(input.sources.get(item.assessment.profile.companyId) ?? ["FEED"]),
       ].sort(),
       profile: item.assessment.profile,
+      ...(item.raiseView === undefined ? {} : { raiseView: item.raiseView }),
       ...(item.scores === undefined ? {} : { scores: item.scores }),
       bestOn: bestOn(index),
     })),

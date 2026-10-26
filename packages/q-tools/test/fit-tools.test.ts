@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  NO_RAISE_VIEW,
   UNICORN_PILLAR_IDS,
   UnicornPotentialDtoSchema,
   MODEL_TOOL_RESULT_MAX_CHARS,
@@ -73,9 +74,12 @@ function tools(
     investor?: boolean;
     premium?: () => boolean;
     richSources?: boolean;
+    /** Companies whose raise view the fit's own read already carries. */
+    carriesRaise?: readonly string[];
   } = {},
 ) {
   const read: string[] = [];
+  const raiseReads: string[][] = [];
   const fit = createFitService({
     unicornPotential: (_actor, ids) =>
       Promise.resolve(
@@ -120,6 +124,9 @@ function tools(
                 declared: {},
                 name: id === COMPANY_A ? "Sunline Energy" : "Freightly",
                 line: null,
+                ...(options.carriesRaise?.includes(id) === true
+                  ? { raiseView: NO_RAISE_VIEW }
+                  : {}),
               },
             ]),
           ),
@@ -128,9 +135,25 @@ function tools(
     },
     candidates: () => Promise.resolve(options.candidates ?? []),
   });
-  const ports = fakePorts({ fit });
+  const ports = fakePorts({
+    fit,
+    ...(options.carriesRaise === undefined
+      ? {}
+      : {
+          companyRaise: {
+            raisesFor: (_actor, companyIds) => {
+              raiseReads.push([...companyIds]);
+              return Promise.resolve(
+                new Map(companyIds.map((id) => [id, NO_RAISE_VIEW])),
+              );
+            },
+            raiseFor: () => Promise.resolve(NO_RAISE_VIEW),
+          },
+        }),
+  });
   return {
     read,
+    raiseReads,
     port: createQToolExecutor({
       registry: createQToolRegistry(createDefaultQTools(ports)),
     }),
@@ -342,6 +365,28 @@ describe("fit tools", () => {
     expect(data.guidance).toContain("never a score of your own");
     if (data.comparison === null) throw new Error("expected comparison");
     expect(data.text).toBe(fitComparisonText(data.comparison));
+  });
+
+  // Coordinator 2026-10-26 (live trace): the fit already read the raise of
+  // the companies it shows; the tool read it again for its cards.
+  it("reads the raise only for entries the fit did not already carry it for", async () => {
+    const { port, raiseReads } = tools({
+      candidates: [
+        { companyId: COMPANY_B_NETWORK, source: "FEED" },
+        { companyId: COMPANY_A, source: "REQUEST" },
+      ],
+      carriesRaise: [COMPANY_A],
+    });
+    const outcome = await port.execute(
+      call("fit_top_candidates", { limit: 3 }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!outcome.result.ok) throw new Error("expected a result");
+    const data = FitTopCandidatesOutputSchema.parse(outcome.result.data);
+    expect(raiseReads).toEqual([[COMPANY_B_NETWORK]]);
+    for (const entry of data.comparison?.entries ?? []) {
+      expect(entry.raiseView, entry.name).toEqual(NO_RAISE_VIEW);
+    }
   });
 
   it("named companies are read as one set, each re-checked, labelled as discovered", async () => {

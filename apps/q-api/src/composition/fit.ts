@@ -160,12 +160,23 @@ export function createFitComposition(
     ]);
     const out = new Map<string, FitStatedEvidence>();
     companyIds.forEach((companyId, index) => {
+      const raiseView = raises?.get(companyId);
       const said = statedEvidenceFrom({
-        raise: raises?.get(companyId) ?? null,
+        raise: raiseView ?? null,
         deck: decks[index] ?? null,
       });
-      if (said.statedRound !== null || said.evidence.length > 0) {
-        out.set(companyId, said);
+      // Coordinator 2026-10-26: the raise view read here is the one the
+      // fit tool's cards show, so it is kept rather than read again. A
+      // failed read keeps none, and the tool reads it itself.
+      if (
+        said.statedRound !== null ||
+        said.evidence.length > 0 ||
+        raiseView !== undefined
+      ) {
+        out.set(
+          companyId,
+          raiseView === undefined ? said : { ...said, raiseView },
+        );
       }
     });
     return out;

@@ -7,7 +7,9 @@ import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import { CompanyRaiseViewSchema } from "@capital-q/contracts";
 import {
+  createRoundTripCounter,
   createRequestDatabaseClient,
+  withRoundTripCounter,
   type RequestDatabase,
   type TransactionContext,
 } from "@capital-q/database";
@@ -49,6 +51,9 @@ const TEST_DATABASE_URL =
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 
 class Rollback extends Error {}
+
+/** Companies, objectives, disclosure (resolve + policies), policy history, pitch sets. */
+const RAISE_SET_ROUND_TRIPS_MAX = 8;
 
 type Fixture = {
   readonly label: string;
@@ -95,6 +100,8 @@ type Label = (typeof FIXTURES)[number]["label"];
 
 type World = {
   readonly reader: CompanyRaiseReader;
+  /** As composed (batched), or one company at a time. */
+  readonly readerOf: (batched: boolean) => CompanyRaiseReader;
   readonly investor: ActorContext;
   readonly otherFounder: ActorContext;
   readonly companies: Record<
@@ -216,44 +223,72 @@ describe("raiseFor against local PostgreSQL", () => {
       relationshipParties: createRelationshipPartyResolver(disclosurePorts),
       clock: systemDisclosureClock,
     });
-    const reader = composeCompanyRaiseReader({
-      sql,
-      companies: companiesPort,
-      capital,
-      disclosure,
-      policies,
-      // The investor-subject resolver's answer for these fixtures.
-      isInvestor: (actor) =>
-        Promise.resolve(actor.organisationId === investorParty.organisationId),
-      pitches: () => ({
-        findDiscoverablePitches: (ids) =>
+    // Media's discoverable pitch sets, read for many companies at once (a
+    // stub: Media owns and tests its own read).
+    const pitchSets = (ids: readonly string[]) =>
+      Promise.resolve(
+        new Map(
+          ids
+            .filter((id) => pitchById.has(id))
+            .map((id) => [id, { mediaAssetId: pitchOf(id), more: [] }]),
+        ),
+      );
+    // As composed (the batched reads), or strictly one company at a time:
+    // the same real adapters with their batch reads withheld.
+    const readerOf = (batched: boolean) =>
+      composeCompanyRaiseReader({
+        sql,
+        companies: batched
+          ? companiesPort
+          : {
+              findCanonicalCompany: (companyId) =>
+                companiesPort.findCanonicalCompany(companyId),
+            },
+        capital: batched
+          ? capital
+          : {
+              getCurrentForCompany: (tenantId, companyId) =>
+                capital.getCurrentForCompany(tenantId, companyId),
+            },
+        disclosure,
+        policies: batched
+          ? policies
+          : {
+              findAllForResource: (executor, resource) =>
+                policies.findAllForResource(executor, resource),
+            },
+        // The investor-subject resolver's answer for these fixtures.
+        isInvestor: (actor) =>
           Promise.resolve(
-            new Map(
-              ids
-                .filter((id) => pitchById.has(id))
-                .map((id) => [id, { mediaAssetId: pitchOf(id), more: [] }]),
-            ),
+            actor.organisationId === investorParty.organisationId,
           ),
-      }),
-      // Read under Media's playback rule, as the transcript read is: a
-      // founder plays only their own pitch.
-      pitchRaise: (actor, companyId) => {
-        const mayPlay =
-          actor.organisationId === investorParty.organisationId ||
-          Object.values(companies).some(
-            (c) =>
-              c.id === companyId &&
-              c.founder.organisationId === actor.organisationId,
+        pitches: () => ({ findDiscoverablePitches: pitchSets }),
+        // Read under Media's playback rule, as the transcript read is: a
+        // founder plays only their own pitch.
+        pitchRaise: (actor, companyId) => {
+          const mayPlay =
+            actor.organisationId === investorParty.organisationId ||
+            Object.values(companies).some(
+              (c) =>
+                c.id === companyId &&
+                c.founder.organisationId === actor.organisationId,
+            );
+          const amount = pitchById.get(companyId);
+          return Promise.resolve(
+            !mayPlay || amount === undefined
+              ? null
+              : { atSeconds: 14, amount, currency: "USD" },
           );
-        const amount = pitchById.get(companyId);
-        return Promise.resolve(
-          !mayPlay || amount === undefined
-            ? null
-            : { atSeconds: 14, amount, currency: "USD" },
-        );
-      },
-    });
-    return { reader, investor: investorParty.actor, otherFounder, companies };
+        },
+      });
+    const reader = readerOf(true);
+    return {
+      reader,
+      readerOf,
+      investor: investorParty.actor,
+      otherFounder,
+      companies,
+    };
   }
 
   const pitchOf = (companyId: string) =>
@@ -272,6 +307,62 @@ describe("raiseFor against local PostgreSQL", () => {
     }
     expect(completed).toBe(true);
   }
+
+  // Coordinator 2026-10-26 (live trace, a top-five ranking: the raise read
+  // each shown company one query at a time). Through these real adapters
+  // the set is read in a fixed few round trips, and every reader's answer
+  // for every company is the one the one-by-one reads give.
+  it("reads a set of companies in a fixed few round trips, deciding as one by one", async () => {
+    await withWorld(async ({ readerOf, investor, otherFounder, companies }) => {
+      const ids = Object.values(companies).map((c) => c.id);
+      const viewers = [
+        investor,
+        otherFounder,
+        ...Object.values(companies).map((c) => c.founder),
+      ];
+      const counted = async (
+        batched: boolean,
+        who: ActorContext,
+        of: readonly string[],
+      ) => {
+        const counter = createRoundTripCounter();
+        const views = await withRoundTripCounter(counter, () =>
+          readerOf(batched).raisesFor(who, of),
+        );
+        return { views, trips: counter.count };
+      };
+      for (const who of viewers) {
+        const batched = await counted(true, who, ids);
+        const alone = await counted(false, who, ids);
+        expect(batched.views, who.organisationId).toEqual(alone.views);
+      }
+      // A fixed few for the set: one read per kind (companies, objectives,
+      // disclosure, policies, pitch sets), whatever its size; one by one,
+      // several per company.
+      const all = await counted(true, investor, ids);
+      const oneByOne = await counted(false, investor, ids);
+      console.info(
+        `raise round trips for ${String(ids.length)} companies: batched ${String(all.trips)}, one by one ${String(oneByOne.trips)}`,
+      );
+      expect(all.trips).toBeLessThanOrEqual(RAISE_SET_ROUND_TRIPS_MAX);
+      expect(oneByOne.trips).toBeGreaterThan(2 * ids.length);
+      // Denied stays denied, through either path: a private or revoked
+      // objective is never shown to the investor or to another tenant's
+      // founder, who also plays no one else's pitch.
+      const other = (await counted(true, otherFounder, ids)).views;
+      for (const label of [
+        "PrivateNoPitch",
+        "PrivateDisagree",
+        "Revoked",
+        "PitchOnly",
+      ] as const) {
+        expect(other.get(companies[label].id)?.money ?? null, label).toBeNull();
+      }
+      expect(
+        all.views.get(companies.PrivateNoPitch.id)?.money ?? null,
+      ).toBeNull();
+    });
+  });
 
   it("an investor gets one honest raise per company shape", async () => {
     await withWorld(async ({ reader, investor, companies }) => {
