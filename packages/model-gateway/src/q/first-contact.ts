@@ -43,6 +43,35 @@ export const MESSAGE_TOOLS: ReadonlySet<string> = new Set([
   "propose_email",
 ]);
 
+/** Whether the turn's reader read a note or message as the asked action. */
+export function asksForMessage(asked: string | undefined): boolean {
+  return (
+    asked !== undefined &&
+    (MESSAGE_TOOLS.has(asked) || asked === FIRST_CONTACT_TOOL)
+  );
+}
+
+/**
+ * What an asked note or email is offered (coordinator 2026-10-26, B): the
+ * reads that find the counterpart and the relationship, their own and the
+ * counterpart's records and figures for its body, and the tools that
+ * prepare it for approval. Tools are chosen by what the reader decided was
+ * asked, never by the words of the message.
+ */
+export const MESSAGE_TURN_TOOLS: ReadonlySet<string> = new Set([
+  ...MESSAGE_TOOLS,
+  FIRST_CONTACT_TOOL,
+  "propose_connection_request",
+  "list_my_relationships",
+  "get_relationship",
+  "search_network",
+  "search_companies",
+  "get_company",
+  "read_company_figures",
+  "get_investor_mandate",
+  "read_my_record",
+]);
+
 /**
  * A message they asked for, answered with its words but not prepared (guard
  * run 1, 2026-10-25): the words go on the card, through the tool the
