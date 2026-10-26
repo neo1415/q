@@ -927,3 +927,147 @@ describe("the mandate being defined is never asked (QA 25 Oct)", () => {
     );
   });
 });
+
+describe("a confirmation on resume shows what it confirms (QA 26 Oct)", () => {
+  const raiseView = (answered: boolean) => {
+    const base = stuckView();
+    const steps = ["F6.currency", "F6.target_amount", "F6.instrument"];
+    return {
+      ...base,
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          ...steps.map((stepKey) => ({
+            stepKey,
+            required: true,
+            status: answered ? "COMPLETED" : "PENDING",
+          })),
+          { stepKey: "F6.confirm", required: true, status: "PENDING" },
+        ],
+      },
+      responses: answered
+        ? [
+            {
+              stepKey: "F6.currency",
+              value: { type: "SINGLE_SELECT", optionKey: "usd" },
+            },
+            {
+              stepKey: "F6.target_amount",
+              value: { type: "RANGE", value: 1200000 },
+            },
+            {
+              stepKey: "F6.instrument",
+              value: { type: "SINGLE_SELECT", optionKey: "safe" },
+            },
+          ]
+        : [],
+    } as unknown as OnboardingSessionView;
+  };
+
+  it('"Save this as your capital objective?" comes with the raise it saves', () => {
+    const line = resumeLine(raiseView(true), "founder");
+    expect(line).toMatch(
+      /^Picking up where we left off\. Here's what I have: .+\. Save this as your capital objective\?$/u,
+    );
+    expect(line).toMatch(/SAFE/iu);
+  });
+
+  it("with nothing to show, the open question is asked instead", () => {
+    const line = resumeLine(raiseView(false), "founder");
+    expect(line).not.toMatch(/capital objective/u);
+    expect(line).not.toMatch(/Here's what I have/u);
+  });
+});
+
+describe("the resume settles the mandate being defined (live 26 Oct)", () => {
+  it("records their one mandate on reopening, with no typed turn", async () => {
+    const ORG = "d0000000-0000-4000-8000-000000000002";
+    const MANDATE = "e0000000-0000-4000-8000-000000000002";
+    const base = stuckView();
+    const view = {
+      ...base,
+      session: {
+        ...base.session,
+        journeyType: "investor",
+        subject: { type: "INVESTOR_ORGANISATION", id: ORG },
+      },
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          {
+            stepKey: "I0.organisation_name",
+            required: true,
+            status: "COMPLETED",
+          },
+          { stepKey: "I1.mandate_context", required: true, status: "PENDING" },
+          { stepKey: "I0.business_title", required: false, status: "PENDING" },
+        ],
+      },
+      responses: [
+        {
+          stepKey: "I0.organisation_name",
+          value: { type: "TEXT", text: "Kestrel Ridge" },
+        },
+      ],
+    } as unknown as OnboardingSessionView;
+    const { fetch: inner } = api({
+      kept: [
+        { role: "Q", text: "What's your role there?" },
+        { role: "PERSON", text: "Later." },
+      ],
+      view,
+    });
+    const submitted: unknown[] = [];
+    const f: typeof fetch = (req, init) => {
+      const url =
+        typeof req === "string" ? req : req instanceof URL ? req.href : req.url;
+      const method = init?.method ?? "GET";
+      if (method === "GET" && url.includes(`/${ORG}/mandates`)) {
+        return Promise.resolve(
+          Response.json({
+            items: [
+              {
+                id: MANDATE,
+                investorOrganisationId: ORG,
+                name: "Main strategy",
+                status: "ACTIVE",
+                discoveryMode: null,
+                effectiveFrom: null,
+                effectiveTo: null,
+                version: 1,
+                createdAt: NOW,
+              },
+            ],
+          }),
+        );
+      }
+      if (method === "POST" && url.includes("/responses")) {
+        submitted.push(
+          JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+        );
+      }
+      return inner(req, init);
+    };
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("unused"))),
+      portFor: fakePorts(view).portFor,
+      logger,
+    });
+    const outcome = await conductor.turn(
+      input(f, "", { journeyType: "investor" }),
+    );
+    expect(outcome.resumed).toBe(true);
+    const settled = submitted.find(
+      (body): body is { stepKey: string; response: { value: unknown } } =>
+        typeof body === "object" &&
+        body !== null &&
+        "stepKey" in body &&
+        body.stepKey === "I1.mandate_context",
+    );
+    expect(settled?.response.value).toEqual({
+      type: "RESOURCE_REFERENCE",
+      resourceType: "INVESTOR_MANDATE",
+      resourceIds: [MANDATE],
+    });
+  });
+});

@@ -318,6 +318,73 @@ function normalisedText(text: string): string {
     .trim();
 }
 
+/** Whether the mandate step is open and unanswered on an investor's session. */
+export function mandateStepOpen(
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+): boolean {
+  if (journeyType !== "investor") return false;
+  const subject = view.session.subject;
+  const open = view.progress.eligibleSteps.find(
+    (e) => e.stepKey === INVESTOR_STEPS.mandateContext,
+  );
+  return (
+    subject !== null &&
+    subject.type === "INVESTOR_ORGANISATION" &&
+    open !== undefined &&
+    open.status !== "COMPLETED" &&
+    open.status !== "SKIPPED" &&
+    !view.responses.some((r) => r.stepKey === INVESTOR_STEPS.mandateContext)
+  );
+}
+
+/**
+ * The mandate being defined, recorded whenever its step is open, not only
+ * while the session's cursor is on it (QA 25 Oct: the conversation moved
+ * the cursor past it, the step stayed open, and a session whose mandate
+ * was already live could never complete: in production no investor
+ * session has completed without it). Every path that reads the session
+ * for Q settles it: a turn's port, and the resume line. The same rule the
+ * step's own context applies (`preselectedMandate`), under the person's
+ * own token; anything less certain is left for their choice. Any failure
+ * leaves the view as it was.
+ */
+export async function settleMandateStep(
+  session: ApiSession,
+  onboardingSessionId: string,
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+): Promise<OnboardingSessionView> {
+  const subject = view.session.subject;
+  if (!mandateStepOpen(view, journeyType) || subject === null) return view;
+  try {
+    const page = await listInvestorMandates(session, subject.id, {
+      limit: 50,
+    });
+    const mandateId = preselectedMandate(page.items);
+    if (mandateId === null) return view;
+    return await submitOnboardingResponse(
+      session,
+      onboardingSessionId,
+      {
+        stepKey: INVESTOR_STEPS.mandateContext,
+        response: {
+          value: {
+            type: "RESOURCE_REFERENCE",
+            resourceType: "INVESTOR_MANDATE",
+            resourceIds: [mandateId],
+          },
+          channel: "CONVERSATION",
+        },
+        expectedSessionVersion: view.session.version,
+      },
+      randomUUID(),
+    );
+  } catch {
+    return view;
+  }
+}
+
 /**
  * The one mandate the journey may choose for the investor, as the mandate
  * step's own context does: their only open mandate, or their only draft.
@@ -554,61 +621,24 @@ export function createOnboardingPort(input: {
   });
 
   /**
-   * The mandate being defined, recorded whenever its step is open, not only
-   * while the session's cursor is on it (QA 25 Oct: the conversation moved
-   * the cursor past it, the step stayed open, and a session whose mandate
-   * was already live could never complete: in production no investor
-   * session has completed without it). The same rule the step's own
-   * context applies (`preselectedMandate`); anything less certain is left
-   * for the person's choice. Once per port: a list that names no single
+   * The mandate being defined, recorded whenever its step is open
+   * (`settleMandateStep`). Once per port: a list that names no single
    * mandate is not read again this turn.
    */
   let mandateLooked = false;
   const settleMandate = async (
     view: OnboardingSessionView,
   ): Promise<OnboardingSessionView> => {
-    if (mandateLooked || input.journeyType !== "investor") return view;
-    const subject = view.session.subject;
-    const open = view.progress.eligibleSteps.find(
-      (e) => e.stepKey === INVESTOR_STEPS.mandateContext,
-    );
-    if (
-      subject === null ||
-      subject.type !== "INVESTOR_ORGANISATION" ||
-      open === undefined ||
-      open.status === "COMPLETED" ||
-      open.status === "SKIPPED" ||
-      view.responses.some((r) => r.stepKey === INVESTOR_STEPS.mandateContext)
-    ) {
+    if (mandateLooked || !mandateStepOpen(view, input.journeyType)) {
       return view;
     }
     mandateLooked = true;
-    try {
-      const page = await listInvestorMandates(input.session, subject.id, {
-        limit: 50,
-      });
-      const mandateId = preselectedMandate(page.items);
-      if (mandateId === null) return view;
-      return await submitOnboardingResponse(
-        input.session,
-        input.onboardingSessionId,
-        {
-          stepKey: INVESTOR_STEPS.mandateContext,
-          response: {
-            value: {
-              type: "RESOURCE_REFERENCE",
-              resourceType: "INVESTOR_MANDATE",
-              resourceIds: [mandateId],
-            },
-            channel: "CONVERSATION",
-          },
-          expectedSessionVersion: view.session.version,
-        },
-        randomUUID(),
-      );
-    } catch {
-      return view;
-    }
+    return settleMandateStep(
+      input.session,
+      input.onboardingSessionId,
+      view,
+      input.journeyType,
+    );
   };
 
   /**
