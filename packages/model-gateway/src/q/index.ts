@@ -212,6 +212,8 @@ import {
 import {
   CHAT_INSTEAD_TOOL,
   chatInsteadMessage,
+  chatInsteadReply,
+  MESSAGE_PREPARED_REPLY,
   chatInsteadOf,
 } from "./message-channel.js";
 import {
@@ -7713,6 +7715,8 @@ export function createModelGatewayQAnswer(
       let cardPrepared = false;
       /** Code prepared the first contact this run (QO-08): the reply is code's, not the model's. */
       let firstContactPrepared = false;
+      /** B2: the message they asked for is on its card; the reply is code's. */
+      let askedMessageReply: string | null = null;
       /** Their interest already stands (sent, or connected): its own line. */
       let firstContactAlready: string | null = null;
       /** Their own Q Card as get_q_card read it this turn (batch 9). */
@@ -8555,6 +8559,9 @@ export function createModelGatewayQAnswer(
             /** An email their mailbox could not send, as a Capital Q message instead (QA F-32). */
             let chatInstead: Promise<QToolCallOutcome> | null = null;
             let chatInsteadWhy: "NO_MAILBOX" | "NO_ADDRESS" = "NO_MAILBOX";
+            /** B2: this round put a message on its card (a message tool's own, or the chat instead). */
+            let messagePrepared = false;
+            let chatInsteadPrepared = false;
             /** Their Q Card, prepared for approval when none is made (QA F-34). */
             let cardOffer: {
               readonly handle: string;
@@ -8829,6 +8836,7 @@ export function createModelGatewayQAnswer(
                   ?.status === "PREPARED"
               ) {
                 preparedByTool = true;
+                if (asksForMessage(call.name)) messagePrepared = true;
               }
               if (acted !== null && !actedLines.includes(acted)) {
                 actedLines.push(acted);
@@ -8915,7 +8923,10 @@ export function createModelGatewayQAnswer(
                   latencyMs: outcome.latencyMs,
                 });
                 const told = chatInsteadMessage(outcome, chatInsteadWhy);
-                if (told !== null) chainedResults.push(told);
+                if (told !== null) {
+                  chainedResults.push(told);
+                  chatInsteadPrepared = true;
+                }
                 if (
                   outcome.result.ok &&
                   (outcome.result.data as { readonly status?: unknown } | null)
@@ -8945,6 +8956,37 @@ export function createModelGatewayQAnswer(
               }
             }
             messages = [...messages, assistant, ...results, ...chainedResults];
+            // B2 (coordinator 2026-10-26, run 42cecfd2): the message they
+            // asked for is on its card. What any later round wrote about
+            // it was replaced by the card's status, so the loop ends and
+            // the reply is code's; the card keeps the model's words.
+            if (
+              asksForMessage(request.askedAction) &&
+              (messagePrepared || chatInsteadPrepared || firstContactPrepared)
+            ) {
+              askedMessageReply = firstContactPrepared
+                ? FIRST_CONTACT_REPLY
+                : chatInsteadPrepared
+                  ? chatInsteadReply(chatInsteadWhy)
+                  : MESSAGE_PREPARED_REPLY;
+              final = result;
+              analyst = ANALYST_RESULT_SCHEMA.parse({
+                answer: askedMessageReply,
+                responseShape: "CONCISE",
+                findings: [],
+                missingEvidence: [],
+                contradictions: [],
+                insufficientEvidence: false,
+                recommendation: null,
+                clarifyingQuestions: [],
+                declined: false,
+              });
+              logger?.info(
+                { qRunId: request.runId, rounds },
+                "the message they asked for is on its card: the reply is code's",
+              );
+              break;
+            }
             if (
               gapsRounds === 0 &&
               (gaps as { readonly status: string } | null)?.status ===
@@ -8991,7 +9033,11 @@ export function createModelGatewayQAnswer(
         // own records returned. A round that answered without it (an
         // adapter that does not stream) is answered again with it; nothing
         // of that round was said.
-        if (earlyWeb !== null && !earlyWeb.claimed) {
+        if (
+          earlyWeb !== null &&
+          !earlyWeb.claimed &&
+          askedMessageReply === null
+        ) {
           earlyWeb.claimed = true;
           // The web lands within its own budget or is dropped: the answer
           // never waits on it past that (owner 2026-10-23).
@@ -10012,17 +10058,19 @@ export function createModelGatewayQAnswer(
           ? FIRST_CONTACT_REPLY
           : firstContactAlready !== null
             ? firstContactAlready
-            : builtCards !== null && hasOrphanListItems(artifactSafe.text)
-              ? fitCardsSummary(builtCards)
-              : request.spoken === true && cardsShown
-                ? spokenBeforeCards(artifactSafe.text)
-                : qCardRead !== null
-                  ? withQCardLink(
-                      artifactSafe.text,
-                      qCardRead,
-                      qCardClaimPrepared,
-                    )
-                  : artifactSafe.text;
+            : askedMessageReply !== null
+              ? askedMessageReply
+              : builtCards !== null && hasOrphanListItems(artifactSafe.text)
+                ? fitCardsSummary(builtCards)
+                : request.spoken === true && cardsShown
+                  ? spokenBeforeCards(artifactSafe.text)
+                  : qCardRead !== null
+                    ? withQCardLink(
+                        artifactSafe.text,
+                        qCardRead,
+                        qCardClaimPrepared,
+                      )
+                    : artifactSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },
