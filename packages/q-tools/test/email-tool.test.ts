@@ -14,6 +14,7 @@ import {
   fakePorts,
   planFor,
 } from "./support.js";
+import { DIFFERENT_COUNTERPARTS } from "../src/tools/chat.js";
 
 /**
  * propose_email (BIZ-007): a draft to the other side of one relationship,
@@ -257,10 +258,11 @@ describe("propose_email by name, from any page (action parity 2026-10-02)", () =
 // Live d3a197b4 (2026-10-26): an asked email drafted in its first round was
 // refused at "(root)" (it named the other side more than once, or not at
 // all) and cost three more rounds before the card. Named more than once,
-// it resolves in authorize's order, only among the reader's own
-// relationships; named not at all, the refusal says what to fix.
+// every reference must be the same one of their relationships (#550): an
+// email is never aimed by picking one reference over another.
 describe("propose_email from a first round", () => {
   const OTHER_COMPANY = "99999999-0000-4000-8000-0000000000f1";
+  const BASKETARI = "88888888-0000-4000-8000-0000000000e2";
   const byName = () => {
     const prepared: unknown[] = [];
     const email: EmailIntelligencePort = {
@@ -297,6 +299,15 @@ describe("propose_email from a first round", () => {
                     },
                     state: "CONNECTED",
                   },
+                  {
+                    relationshipId: BASKETARI,
+                    counterpart: {
+                      kind: "COMPANY",
+                      id: OTHER_COMPANY,
+                      name: "Basketari",
+                    },
+                    state: "CONNECTED",
+                  },
                 ]
               : [],
         } as never),
@@ -319,26 +330,56 @@ describe("propose_email from a first round", () => {
       body: "Hi Ada, 96 kiosks are live. Best, Ben",
     },
   });
+  const refusal = (outcome: { result: unknown }) =>
+    (outcome.result as { ok: boolean; error?: { safeMessage: string } }).error
+      ?.safeMessage ?? "";
 
-  it("names them twice (their name and another id): validates and goes to the relationship their name finds", async () => {
+  it("their name and an id that agree: validates and prepares to that relationship", async () => {
     const { executor, prepared } = byName();
-    for (const target of [
-      { counterpartName: "apex", companyId: OTHER_COMPANY },
-      { counterpartName: "apex", relationshipId: RELATIONSHIP },
-    ]) {
-      const outcome = await executor.execute(
-        first(target),
-        contextFor(actorB, investorPlan),
-      );
-      expect(outcome.status, JSON.stringify(Object.keys(target))).toBe(
-        "SUCCEEDED",
-      );
-    }
-    expect(prepared).toHaveLength(2);
-    expect(prepared[0]).toMatchObject({
-      relationshipId: RELATIONSHIP,
-      to: ADA.email,
-    });
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", relationshipId: RELATIONSHIP }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(prepared).toEqual([
+      expect.objectContaining({ relationshipId: RELATIONSHIP, to: ADA.email }),
+    ]);
+  });
+
+  it("their name and an id for another of their relationships: refused, nothing prepared", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", relationshipId: BASKETARI }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(refusal(outcome)).toBe(DIFFERENT_COUNTERPARTS);
+    expect(prepared).toEqual([]);
+  });
+
+  it("their name and an id that names none of theirs: refused, never sent by the name alone", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({ counterpartName: "apex", companyId: OTHER_COMPANY }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(refusal(outcome)).toBe(DIFFERENT_COUNTERPARTS);
+    expect(prepared).toEqual([]);
+  });
+
+  it("a reply to an inbound email that also names a relationship: refused", async () => {
+    const { executor, prepared } = byName();
+    const outcome = await executor.execute(
+      first({
+        inboundEmailId: "77777777-0000-4000-8000-0000000000a1",
+        counterpartName: "apex",
+      }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(refusal(outcome)).toBe(DIFFERENT_COUNTERPARTS);
+    expect(prepared).toEqual([]);
   });
 
   it("named twice by someone with no such relationship, still prepares nothing", async () => {
@@ -363,7 +404,7 @@ describe("propose_email from a first round", () => {
       contextFor(actorB, investorPlan),
     );
     expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
-    const said = outcome.result.ok ? "" : outcome.result.error.safeMessage;
+    const said = refusal(outcome);
     expect(said).toContain("Arguments are invalid at: (root).");
     expect(said).toContain("name the other side: counterpartName");
     expect(said).not.toContain("96 kiosks");

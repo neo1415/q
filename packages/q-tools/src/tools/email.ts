@@ -12,12 +12,18 @@ import {
   defineQTool,
   deny,
   type AnyQToolDefinition,
+  type QToolAuthorization,
 } from "../definition.js";
 import type {
   EmailIntelligencePort,
   InboundEmailPort,
   RelationshipIntelligencePort,
 } from "../ports.js";
+import {
+  agreedRelationship,
+  DIFFERENT_COUNTERPARTS,
+  refsGiven,
+} from "./chat.js";
 import { closestByName } from "./connection-requests.js";
 import { admitted } from "./relationships.js";
 
@@ -182,6 +188,11 @@ export function createProposeEmailTool(
     input: ProposeEmailInputSchema,
     output: ProposeEmailOutputSchema,
     authorize: async (input, { actor, plan }) => {
+      // A reply goes to that email's sender; a relationship named beside it
+      // may be someone else, so the two are never combined (#550).
+      if (input.inboundEmailId !== undefined && refsGiven(input) > 0) {
+        return deny("NOT_AVAILABLE", DIFFERENT_COUNTERPARTS);
+      }
       if (input.inboundEmailId !== undefined) {
         // A reply: only to the sender of an email that came to THEM.
         if (inbound === undefined) return deny("NOT_AVAILABLE");
@@ -210,6 +221,61 @@ export function createProposeEmailTool(
       }
       if (email === undefined) return deny("NOT_AVAILABLE");
       try {
+        /**
+         * The relationship's own people, as the grant: byName when it was
+         * found among their own relationships (by name, or an id from that
+         * list), otherwise the plan must admit its counterpart.
+         */
+        const prepared = async (
+          relationshipId: string,
+          byName: boolean,
+        ): Promise<QToolAuthorization<Grant>> => {
+          const counterpart = await email.counterpart(actor, relationshipId);
+          if (
+            counterpart === null ||
+            (!byName &&
+              !admitted(plan, { kind: counterpart.kind, id: counterpart.id }))
+          ) {
+            return deny("NOT_AVAILABLE");
+          }
+          const wanted = input.recipientEmail?.toLowerCase();
+          const recipient =
+            wanted === undefined
+              ? counterpart.contacts[0]
+              : counterpart.contacts.find((c) => c.email === wanted);
+          if (recipient === undefined && wanted !== undefined) {
+            // Never an address that is not on the relationship.
+            return deny(
+              "NOT_AVAILABLE",
+              "I can only email people on the other side of this relationship.",
+            );
+          }
+          // No address on the relationship at all: said as it stands
+          // (NO_RECIPIENT), so the same words can go as a Capital Q message.
+          return allow("CONFIDENTIAL", {
+            kind: "RELATIONSHIP" as const,
+            relationshipId,
+            counterpartName: counterpart.name,
+            to: recipient?.email ?? null,
+            toName: recipient?.name ?? counterpart.name,
+            mailbox: (await email.mailbox(actor)) !== null,
+          });
+        };
+        // Named more than once: every reference must be the same one of
+        // their relationships, or nothing is prepared (#550).
+        if (refsGiven(input) > 1) {
+          if (relationships === undefined) return deny("NOT_AVAILABLE");
+          const agreed = await agreedRelationship(
+            input,
+            actor,
+            plan,
+            relationships,
+          );
+          if (agreed.kind === "DIFFERENT" || agreed.relationshipId === null) {
+            return deny("NOT_AVAILABLE", DIFFERENT_COUNTERPARTS);
+          }
+          return await prepared(agreed.relationshipId, true);
+        }
         let relationshipId = input.relationshipId;
         // A name (action parity 2026-10-02, "email Nixo" from any page):
         // one of their OWN relationships; the counterpart read below is the
@@ -253,36 +319,7 @@ export function createProposeEmailTool(
           relationshipId = status?.relationshipId;
         }
         if (relationshipId === undefined) return deny("NOT_AVAILABLE");
-        const counterpart = await email.counterpart(actor, relationshipId);
-        if (
-          counterpart === null ||
-          (!byName &&
-            !admitted(plan, { kind: counterpart.kind, id: counterpart.id }))
-        ) {
-          return deny("NOT_AVAILABLE");
-        }
-        const wanted = input.recipientEmail?.toLowerCase();
-        const recipient =
-          wanted === undefined
-            ? counterpart.contacts[0]
-            : counterpart.contacts.find((c) => c.email === wanted);
-        if (recipient === undefined && wanted !== undefined) {
-          // Never an address that is not on the relationship.
-          return deny(
-            "NOT_AVAILABLE",
-            "I can only email people on the other side of this relationship.",
-          );
-        }
-        // No address on the relationship at all: said as it stands
-        // (NO_RECIPIENT), so the same words can go as a Capital Q message.
-        return allow("CONFIDENTIAL", {
-          kind: "RELATIONSHIP" as const,
-          relationshipId,
-          counterpartName: counterpart.name,
-          to: recipient?.email ?? null,
-          toName: recipient?.name ?? counterpart.name,
-          mailbox: (await email.mailbox(actor)) !== null,
-        });
+        return await prepared(relationshipId, byName);
       } catch {
         return deny("NOT_AVAILABLE");
       }
