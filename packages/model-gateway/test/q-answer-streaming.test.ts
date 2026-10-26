@@ -298,6 +298,16 @@ describe("an answer that arrives as it is written", () => {
     ]);
   });
 
+  it("a sentence the recommendation guard removes is not said, and never replaced by its fallback mid-answer (live 2026-10-26)", async () => {
+    const { seam, request, published } = build(
+      "Paystack is in the top decile of fintech. Runway is 14 months.",
+    );
+    await seam.answer(request);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Runway is 14 months.",
+    ]);
+  });
+
   it("keeps a closing sentence about approval or saving for the stored answer, which may replace it with the engine's status", async () => {
     const { seam, request, published } = build(
       "Runway is 14 months. The change is waiting for your approval.",

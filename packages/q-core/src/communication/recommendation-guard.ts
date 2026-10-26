@@ -209,6 +209,16 @@ export type GuardedAnswer = {
 export function withoutRecommendationClaims(
   answer: string,
   grounds?: RecommendationGrounds | null,
+  options: {
+    /**
+     * False for a part of an answer (one streamed sentence, a lead): when
+     * nothing of it survives it is simply not said, and the finished
+     * answer decides (live 2026-10-26: the fallback was streamed to an
+     * investor mid-answer, as if Capital Q could not rank the cards it had
+     * just shown).
+     */
+    readonly fallback?: boolean;
+  } = {},
 ): GuardedAnswer {
   const parts = sentences(answer);
   const kept = parts.filter(
@@ -225,7 +235,7 @@ export function withoutRecommendationClaims(
   // deterministic explanation it already has rather than to this message.
   return {
     text:
-      text.length === 0 && !grounded(grounds)
+      text.length === 0 && !grounded(grounds) && options.fallback !== false
         ? RECOMMENDATION_UNAVAILABLE_MESSAGE
         : text,
     removed,

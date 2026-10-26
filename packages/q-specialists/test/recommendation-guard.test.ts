@@ -111,3 +111,15 @@ describe("QREC-002 · the finding-level guard and the prose guard agree", () => 
     expect(claimsRecommendationExplanation(sentence)).toBe(true);
   });
 });
+
+describe("a part of an answer is never replaced by the fallback (live 2026-10-26)", () => {
+  it("a sentence removed whole says nothing, rather than the fallback", () => {
+    const sentence = "Kora is in the top decile of fintech.";
+    expect(withoutRecommendationClaims(sentence).text).toBe(
+      RECOMMENDATION_UNAVAILABLE_MESSAGE,
+    );
+    expect(
+      withoutRecommendationClaims(sentence, null, { fallback: false }),
+    ).toEqual({ text: "", removed: 1 });
+  });
+});

@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import type { PermittedContextPlan } from "@capital-q/contracts";
+import {
+  FitProfileDtoSchema,
+  fitScoreOutOf10,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
+import { RECOMMENDATION_UNAVAILABLE_MESSAGE } from "@capital-q/q-core";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -469,6 +474,46 @@ describe("compare the top two, right after a list of five", () => {
     expect(
       said.match(/On Capital Q's mandate fit, Mizan leads/gu),
     ).toHaveLength(1);
+  });
+
+  it("the cards' own fit scores are Capital Q's to say, and a removed sentence is never streamed as the guard's fallback (live 2026-10-26)", async () => {
+    // "How do the top two stack up?": code read the two fits on screen,
+    // outside the model's tool round, so the score the analyst repeated was
+    // not Capital Q's to the guard; the sentence went, and the guard's "I
+    // can't explain how you'd be recommended" was streamed to an investor.
+    const mizan = FitProfileDtoSchema.parse(
+      (
+        fitFixture(MIZAN, "Mizan", {
+          STAGE: "STRONG",
+          SECTOR: "STRONG",
+          GEOGRAPHY: "STRONG",
+        }).result.data as { profile: unknown }
+      ).profile,
+    );
+    const score = fitScoreOutOf10(mizan);
+    expect(score).not.toBeNull();
+    const heard: QLiveDelta[] = [];
+    const deltas: QLiveDeltaBus = {
+      publish: (delta) => heard.push(delta),
+      subscribe: () => () => undefined,
+      subscriberCount: () => 1,
+    };
+    const { seam, request, stored } = build(
+      "How do the top two stack up?",
+      { compare: { count: 2, names: [] } },
+      `Mizan is ${String(score)}/10 on mandate fit. Mizan sits in the top decile of fintech. Mizan is in Cairo doing merchant payments at $42,000 MRR.`,
+      false,
+      true,
+      { delayMs: 50, deltas },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const said = heard.map((delta) => delta.text).join("");
+    const kept = stored.at(-1)?.content ?? "";
+    for (const text of [said, kept]) {
+      expect(text).not.toContain(RECOMMENDATION_UNAVAILABLE_MESSAGE);
+      expect(text).toContain(`Mizan is ${String(score)}/10 on mandate fit.`);
+      expect(text).not.toMatch(/top decile/u);
+    }
   });
 
   it("the same, when the turn was read as a fit question (live 23 Oct, run f5415b0c)", async () => {

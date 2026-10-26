@@ -2380,6 +2380,7 @@ function guardSentence(
   const guarded = withoutRecommendationClaims(
     inFirstPerson(withoutPromise).text,
     grounds,
+    { fallback: false },
   );
   const text = guarded.text.trim();
   return text.length === 0 ? null : text;
@@ -6127,7 +6128,7 @@ export function createModelGatewayQAnswer(
         const sentenceGuarded = guardSentence(
           citeAuthorisedFacts(sentence, facts),
           firstSentence,
-          recommendationGrounds,
+          groundsNow(),
         );
         firstSentence = false;
         // Nothing is "on your screen" unless a tool put it there (R0).
@@ -7564,6 +7565,25 @@ export function createModelGatewayQAnswer(
               ...(recommendationGrounds?.computed ?? []),
               ...computed,
             ]),
+          ],
+        };
+      };
+
+      /**
+       * The guard's grounds now: what the model's own tool calls returned,
+       * and every fit this run read, code's reads included (live
+       * 2026-10-26: "How do the top two stack up?" read the two fits by
+       * code, outside the model's tool round, so the scores on the cards
+       * on screen were not Capital Q's own to the guard, and the true
+       * sentence repeating one was removed).
+       */
+      const groundsNow = (): RecommendationGrounds | null => {
+        const fits = groundedFitWords(runFits.read(request.runId));
+        if (fits.length === 0) return recommendationGrounds;
+        return {
+          dimensions: recommendationGrounds?.dimensions ?? [],
+          computed: [
+            ...new Set([...(recommendationGrounds?.computed ?? []), ...fits]),
           ],
         };
       };
@@ -9278,7 +9298,7 @@ export function createModelGatewayQAnswer(
               ),
             ).text,
           ).text,
-          recommendationGrounds,
+          groundsNow(),
         );
         if (guarded.removed > 0) {
           logger?.warn(
@@ -10081,7 +10101,7 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
                 ),
                 facts,
               ),
-              recommendationGrounds,
+              groundsNow(),
             )
               .text.concat(
                 unread.requested ? `\n\n${UNPREPARED_CHANGE_LINE}` : "",
