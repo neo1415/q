@@ -82,6 +82,7 @@ export function StageCanvas({
         asked={asked}
         said={playback.said}
         focus={playback.focus}
+        walking={playback.walking}
         presence={presence}
         dismissed={closed}
         spotlight={spot.spotlight}
