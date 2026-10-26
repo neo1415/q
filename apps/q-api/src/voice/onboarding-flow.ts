@@ -381,6 +381,46 @@ export function withoutUnbackedReadingClaims(
     .trim();
 }
 
+/** A claim that something was excluded, filtered, matched or saved. */
+const CATEGORY_CLAIM =
+  /\b(?:exclud\w*|filter\w*|ruled out|never (?:be )?shown|matched|saved|recorded|noted)\b/iu;
+/** The sentence says the opposite: not matched, not a category. */
+const NOT_CLAIMED =
+  /\b(?:not|couldn't|could not|no category|didn't|did not|isn't|wasn't|as you said it)\b/iu;
+
+/**
+ * A claim that their words were saved as a category when no category
+ * matched them (QA F-137: "The exclusions are now saved as sectors to
+ * exclude outright: crypto and gambling" with only Gambling saved; "crypto"
+ * was kept in their words). Each sentence claiming an exclusion or save
+ * that names such words is taken out, unless it says they did not match.
+ * A sentence asking something is always kept.
+ */
+export function withoutUnbackedCategoryClaims(
+  reply: string,
+  keptInWords: readonly string[],
+): string {
+  const words = keptInWords
+    .map((w) => w.trim().toLowerCase())
+    .filter((w) => w.length >= 3);
+  if (words.length === 0) return reply;
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  const kept = sentences.filter((sentence) => {
+    if (sentence.includes("?")) return true;
+    const lower = sentence.toLowerCase();
+    return !(
+      CATEGORY_CLAIM.test(sentence) &&
+      !NOT_CLAIMED.test(sentence) &&
+      words.some((w) => lower.includes(w))
+    );
+  });
+  if (kept.length === sentences.length) return reply;
+  return kept
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /**
  * A "saved" claim naming a field that is not on the record (live AG
  * 2026-10-16: "I've saved your ... geography, sectors" when neither was

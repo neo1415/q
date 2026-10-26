@@ -243,6 +243,13 @@ export const OnboardingRecordResultSchema = z
     /** COMMITTED: what is now on the record, as a person would say it. */
     recorded: z.string().max(600).optional(),
     /**
+     * COMMITTED: their words that no category matched, kept as they said
+     * them beside the categories that did. Not a category: never say they
+     * are excluded, matched or filtered on (QA F-137: "crypto" claimed as
+     * an exclusion when only Gambling was saved).
+     */
+    keptInWords: z.array(z.string().max(200)).max(8).optional(),
+    /**
      * COMMITTED: nothing changed, it was already on the record (and said
      * when it was saved). Never say it is saved again, never offer it again
      * (live 25 Oct e2e: one note restated on every turn).

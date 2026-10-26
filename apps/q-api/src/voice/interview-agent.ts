@@ -109,6 +109,7 @@ import {
   withNextQuestion,
   withoutUnbackedFieldClaims,
   withoutUnbackedReadingClaims,
+  withoutUnbackedCategoryClaims,
   withoutRepeatedReceipt,
   withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
@@ -2791,7 +2792,25 @@ export function createInterviewAgent(
         "interview reply said the readings were confirmed while they wait; removed",
       );
     }
-    let reply = notVerbatim(readingBackedReply, lastQTurn ?? null, {
+    // Never their unmatched words claimed as a category (QA F-137): the
+    // claim is read from what this turn saved.
+    const keptInWords = actions.flatMap((action) => {
+      if (action.tool !== "record_answers") return [];
+      const parsed = RecordedResultsSchema.safeParse(action.result);
+      return parsed.success
+        ? parsed.data.results.flatMap((r) => r.keptInWords ?? [])
+        : [];
+    });
+    const categoryBackedReply = writtenByCode
+      ? readingBackedReply
+      : withoutUnbackedCategoryClaims(readingBackedReply, keptInWords);
+    if (categoryBackedReply !== readingBackedReply) {
+      logger.info(
+        {},
+        "interview reply claimed their unmatched words as a category; removed",
+      );
+    }
+    let reply = notVerbatim(categoryBackedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         // An English rewording only where the reply is English or will be
