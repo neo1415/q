@@ -60,6 +60,59 @@ export function narrowedOutput(
   };
 }
 
+/** An analyst output spec without `fields` (the rest kept, all required). */
+export function outputWithout(
+  output: ModelOutputSpec,
+  fields: readonly string[],
+): ModelOutputSpec {
+  if (output.kind !== "STRUCTURED") return output;
+  const schema = output.jsonSchema as {
+    readonly properties?: Readonly<Record<string, unknown>>;
+  };
+  const left = new Set(fields);
+  return narrowedOutput(
+    output,
+    Object.keys(schema.properties ?? {}).filter((field) => !left.has(field)),
+  );
+}
+
+/**
+ * Production 2026-10-26 (run 7b51d28d, "How investor-ready is my company
+ * right now?"): the conversation writer's one round wrote 2,457 tokens in
+ * 19.9 s, fields nobody reads among them.
+ *
+ * - The company specialist's own channels (companyFindings, coverage,
+ *   materialChanges) are never shown in conversation; the turn's note
+ *   already says to leave them out. Asked for them no more, the model's
+ *   points can only go to `findings`, which is shown.
+ * - When the extras' writer writes the findings and cards beside the
+ *   answer, the answer's writer is not asked for them as well.
+ *
+ * Everything else, the person's own statements and changes included, is
+ * asked for as before.
+ */
+export const SPECIALIST_ONLY_FIELDS = [
+  "companyFindings",
+  "coverage",
+  "materialChanges",
+] as const;
+export const EXTRAS_WRITE_FIELDS = [
+  "findings",
+  "answerCards",
+  "comparisonCards",
+] as const;
+
+/** The conversation writer's spec: what it alone writes, and is shown. */
+export function conversationAnswerOutput(
+  output: ModelOutputSpec,
+  extrasWriteBeside: boolean,
+): ModelOutputSpec {
+  return outputWithout(output, [
+    ...SPECIALIST_ONLY_FIELDS,
+    ...(extrasWriteBeside ? EXTRAS_WRITE_FIELDS : []),
+  ]);
+}
+
 /** The analyst's output spec, narrowed to the comparison's own fields. */
 export function compareAnswerOutput(output: ModelOutputSpec): ModelOutputSpec {
   return narrowedOutput(output, COMPARE_ANSWER_FIELDS);

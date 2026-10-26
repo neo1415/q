@@ -227,6 +227,7 @@ import {
   COMPARE_ANSWER_SCHEMA,
   NARROWED_ANALYST_SCHEMA,
   compareAnswerOutput,
+  conversationAnswerOutput,
   restatesVerdict,
 } from "./compare-answer.js";
 import { outputSplitOf } from "./output-split.js";
@@ -6300,7 +6301,7 @@ export function createModelGatewayQAnswer(
       const answerOutput = (): typeof rendered.output =>
         compareTable !== null
           ? compareAnswerOutput(rendered.output)
-          : rendered.output;
+          : conversationAnswerOutput(rendered.output, splitExtras);
       const options: ModelGatewayExecuteOptions<CompanyAnalystV26Result> = {
         signal: request.signal,
         // The schema the prompt in use (COMPANY_ANALYST v26, schema v26) writes to: live
