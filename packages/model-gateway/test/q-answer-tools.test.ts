@@ -1621,6 +1621,56 @@ describe("answer seam tool loop", () => {
       );
     });
 
+    // Guard F-106-reshown-card (2026-10-26, run 61b1fa6d): both rounds went
+    // on reads, and the answer after them, with no tools, wrote the reply
+    // out. The message asked for and not yet tried gets one more round.
+    it("prepares the asked message after the reads used both rounds", async () => {
+      const MAJI = "01c554bf-8bf1-4eb7-b460-5d841764c40b";
+      const tools = toolPort([GET_COMPANY, CHAT, INTEREST], (p) =>
+        p.name === "get_company"
+          ? succeeded(p, { companyId: MAJI, canonicalName: "Maji Loop" })
+          : {
+              ...succeeded(p, {
+                status: "PREPARED",
+                awaitingApprovalOf: "Message Savanna Seed Partners",
+              }),
+              toolName: "relationship.chat.propose",
+            },
+      );
+      const { seam, alpha, request, messages } = build({
+        said: "Savanna Seed asked about our gross margin per litre. Draft a short reply saying we will share it after reconciling September, then send it.",
+        script: [
+          call("g1", { companyId: MAJI }),
+          call("g2", { companyId: MAJI }),
+          {
+            kind: "TOOL_CALLS",
+            calls: [
+              {
+                callId: "m",
+                name: "propose_chat_message",
+                arguments: {
+                  counterpartName: "Savanna Seed Partners",
+                  body: "We'll share gross margin per litre once September is reconciled.",
+                },
+              },
+            ],
+          },
+          { kind: "JSON", value: analystResult("prepared") },
+        ],
+        tools,
+      });
+      await seam.answer({ ...request, askedAction: "propose_chat_message" });
+      expect(tools.executed.map((p) => p.name)).toContain(
+        "propose_chat_message",
+      );
+      expect(JSON.stringify(alpha.calls[2]?.request.messages ?? [])).toContain(
+        "Prepare it now: call propose_chat_message",
+      );
+      expect(messages.at(-1)?.content ?? "").not.toMatch(
+        /didn't prepare|isn't on a card/u,
+      );
+    });
+
     // QA I11 (batch-7 re-score, run ea1c4c13): the model read Basketari
     // and answered "it would need to be sent through your connected
     // Basketari relationship", calling no message tool, though an Express

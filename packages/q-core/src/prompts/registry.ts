@@ -244,6 +244,7 @@ import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.j
 import { PROFILE_GAP_READER_V1 } from "./tasks/profile-gap-reader.v1.js";
 import { APP_ACTION_ARGUMENTS_V1 } from "./tasks/app-action-arguments.v1.js";
 import { APP_ACTION_ROUTER_V1 } from "./tasks/app-action-router.v1.js";
+import { APP_ACTION_ROUTER_V2 } from "./tasks/app-action-router.v2.js";
 import { NAVIGATION_CHOOSER_V1 } from "./tasks/navigation-chooser.v1.js";
 // DOCS block.
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
@@ -645,6 +646,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PROFILE_GAP_READER_V1,
     APP_ACTION_ARGUMENTS_V1,
     APP_ACTION_ROUTER_V1,
+    APP_ACTION_ROUTER_V2,
     NAVIGATION_CHOOSER_V1,
     // DOCS block.
     DOCUMENT_POLISH_V1,

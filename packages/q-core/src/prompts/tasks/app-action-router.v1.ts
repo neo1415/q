@@ -32,7 +32,7 @@ export const APP_ACTION_ROUTER_V1: PromptDefinition<
 > = {
   id: "APP_ACTION_ROUTER",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "FAST_CLASSIFICATION",
   owner: "q-core",
