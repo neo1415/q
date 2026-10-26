@@ -624,3 +624,80 @@ describe("what an investor publishes orders the list, and rules out (F-133)", ()
     expect(data.notes.join(" ")).toContain("1 left out");
   });
 });
+
+// Coordinator 2026-10-26 (live, Tamba Freight's top three included Atlas
+// Health Partners, fit entirely unknown): an investor with nothing known
+// takes a top slot only when fewer than three have any known fit.
+describe("nothing known ranks after every known fit", () => {
+  const known = [1, 2, 3].map(
+    (n) => `81000000-0000-4000-8000-00000000000${String(n)}`,
+  );
+  const ATLAS = "82000000-0000-4000-8000-000000000001";
+  const candidates = [ATLAS, ...known].map((id, at) => ({
+    investorOrganisationId: id,
+    // The unknown one first by name, so only the fit can put it last.
+    displayName:
+      at === 0 ? "Atlas Health Partners" : `Known Fund ${String(at)}`,
+    investorType: "VC",
+    hqCountry: null,
+    publicDescription: null,
+    websiteUrl: null,
+    deploymentState: "ACTIVELY_INVESTING",
+  }));
+  async function order(withFit: readonly string[]) {
+    const discovery = {
+      sideFor: () => Promise.resolve("FOUNDER"),
+      discoverCompanies: () => Promise.reject(new Error("not used")),
+      discoverInvestors: () =>
+        Promise.resolve({
+          rankingVersion: "discovery.v1",
+          items: candidates,
+          notes: [],
+          nextCursor: null,
+        }),
+    } as never;
+    const port = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            discovery,
+            investorSectorFocus: {
+              forOwnCompany: () =>
+                Promise.resolve({
+                  company: [],
+                  investors: withFit.map((investorOrganisationId) => ({
+                    investorOrganisationId,
+                    sectors: [],
+                    publishedFit: {
+                      stage: "MET",
+                      sector: "UNKNOWN",
+                      geography: "MET",
+                    },
+                  })),
+                }),
+              resolve: () => [],
+            },
+          }),
+        ),
+      ),
+    });
+    const outcome = await port.execute(
+      call({ companyId: COMPANY_A }),
+      contextFor(actorA, founderPlan),
+    );
+    return (
+      outcome.result as { data: { prospects: { name: string }[] } }
+    ).data.prospects.map((p) => p.name);
+  }
+
+  it("is fourth behind three known fits", async () => {
+    const names = await order(known);
+    expect(names.slice(0, 3)).not.toContain("Atlas Health Partners");
+    expect(names.indexOf("Atlas Health Partners")).toBe(3);
+  });
+
+  it("fills the third slot only when two have a known fit", async () => {
+    const names = await order(known.slice(0, 2));
+    expect(names.indexOf("Atlas Health Partners")).toBeLessThan(3);
+  });
+});

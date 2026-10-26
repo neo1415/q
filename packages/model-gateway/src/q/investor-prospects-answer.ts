@@ -456,7 +456,9 @@ export function investorProspectsText(
   for (const pick of picks) {
     const how = fitWords(pick.fit);
     parts.push(
-      `${pick.name}: ${sentence(how === null ? pick.why : `${how}. ${pick.why}`)}`,
+      // Live 2026-10-26: "…sector not known yet. they say they are…" --
+      // the fit words and the reasons are each their own sentence.
+      `${pick.name}: ${how === null ? sentence(pick.why) : `${sentence(how)} ${sentence(pick.why)}`.trim()}`,
     );
   }
   const interested = picks.filter((pick) => pick.kind === "INTERESTED").length;

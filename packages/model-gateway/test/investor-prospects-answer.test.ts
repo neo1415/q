@@ -442,3 +442,33 @@ describe("a card's levels are code's, never the model's (F-133)", () => {
     expect(JSON.stringify(out)).not.toContain("PARTIAL");
   });
 });
+
+// Live 2026-10-26 (Tamba Freight): "…sector not known yet. they say they
+// are actively investing" -- each sentence starts with a capital.
+describe("the prospects answer reads as sentences", () => {
+  it("starts every sentence with a capital, after the fit words too", () => {
+    const picks = pickProspects(
+      [],
+      [
+        {
+          investorOrganisationId: "71000000-0000-4000-8000-000000000001",
+          name: "Savanna Seed Partners",
+          investorType: "VC",
+          hqCountry: null,
+          publicDescription: null,
+          deploymentState: "ACTIVELY_INVESTING",
+          reasons: [
+            { kind: "DEPLOYING", detail: "says it is actively investing" },
+          ],
+          gate: null,
+          publishedFit: { stage: "MET", sector: "UNKNOWN", geography: "MET" },
+          fitKnown: true,
+        },
+      ],
+      3,
+    );
+    const text = investorProspectsText(picks, 3);
+    expect(text).toContain("Savanna Seed Partners: ");
+    expect(text).not.toMatch(/\.\s+\p{Ll}/u);
+  });
+});
