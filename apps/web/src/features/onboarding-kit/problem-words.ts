@@ -3,8 +3,11 @@
  * internal code: "(REQUIRED_STEPS_INCOMPLETE)" on a banner reads as a bug.
  */
 const REASON_WORDS: Readonly<Record<string, string>> = {
+  // Journey-neutral (QA F-138: an investor was told Q was reading "your
+  // company"). True for both: a founder's first reading is still filling
+  // it in (waiting is the fix), or an answer is still to give.
   REQUIRED_STEPS_INCOMPLETE:
-    "Q is still finishing its first reading of your company. It takes a few seconds; try again in a moment.",
+    "Setup can't finish quite yet: an answer it needs isn't in place. Try again in a moment, or answer what Q asks.",
   STEP_NOT_ELIGIBLE: "That step isn't open yet. Finish the one before it.",
 };
 
