@@ -15,6 +15,7 @@ import {
   type ReadCompanyFigure,
   type RunRead,
 } from "./card-subjects.js";
+import { restatesVerdict } from "./compare-answer.js";
 import { cardRaiseWords, type RunFit } from "./fit-cards.js";
 import { companyNameCandidates } from "./named-company-fact.js";
 
@@ -605,8 +606,10 @@ export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
     containsCompanyName(sentence, name);
   const competing =
     first !== undefined &&
-    names(first, verdict.other) &&
-    !names(first, verdict.leader);
+    ((names(first, verdict.other) && !names(first, verdict.leader)) ||
+      // Live 2026-10-26 (run 0adc1c1e): the model's opening said the
+      // verdict again in its own words; it is said once.
+      restatesVerdict(first, verdict));
   const body = (competing ? rest : sentences).join(" ").trim();
   return `${lead} ${body}`.trim();
 }

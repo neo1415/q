@@ -223,6 +223,11 @@ import {
   chainedCompanyOf,
   chainedKey,
 } from "./chained-read.js";
+import {
+  COMPARE_ANSWER_SCHEMA,
+  compareAnswerOutput,
+  restatesVerdict,
+} from "./compare-answer.js";
 import { outputSplitOf } from "./output-split.js";
 import {
   EXTRAS_ELSEWHERE_NOTE,
@@ -6166,6 +6171,14 @@ export function createModelGatewayQAnswer(
       );
       /** One whole sentence through the guards and out; see the note above. */
       const takeSentence = (sentence: string): void => {
+        // Code said the comparison's verdict first: a sentence of the
+        // model's that only says it again is not said twice (live
+        // 2026-10-26, run 0adc1c1e).
+        if (
+          compareVerdict !== null &&
+          restatesVerdict(sentence, compareVerdict)
+        )
+          return;
         // The tool loop has already run, so the grounds -- if the
         // model asked for them -- are known before the first sentence
         // is published.
@@ -6270,12 +6283,23 @@ export function createModelGatewayQAnswer(
         releaseLastSentence();
       };
 
+      /**
+       * The writer's own fields only when code resolved the comparison
+       * (compare-answer.ts): the table, verdict and cards are code's, and
+       * every field the schema asks for is time the person waits.
+       */
+      const answerSchema =
+        compareTable !== null ? COMPARE_ANSWER_SCHEMA : ANALYST_RESULT_SCHEMA;
+      const answerOutput = (): typeof rendered.output =>
+        compareTable !== null
+          ? compareAnswerOutput(rendered.output)
+          : rendered.output;
       const options: ModelGatewayExecuteOptions<CompanyAnalystV26Result> = {
         signal: request.signal,
         // The schema the prompt in use (COMPANY_ANALYST v26, schema v26) writes to: live
         // 2026-10-09, v17 refused every answer carrying v22's `visual` as an
         // unknown key, and each refusal re-ran the answer (10-15 s a turn).
-        schema: ANALYST_RESULT_SCHEMA,
+        schema: answerSchema,
         onTextDelta,
         // The analyst's lists are independent readings: one statement with
         // a malformed knowledge key must not throw away the profile change
@@ -8234,7 +8258,7 @@ export function createModelGatewayQAnswer(
                   // in text, tools kept (parity eval 2026-10-02).
                   output: textRound
                     ? ({ kind: "TEXT" } as const)
-                    : rendered.output,
+                    : answerOutput(),
                   // K7: one stable order, so the cached prefix holds.
                   tools: stableToolOrder(offered),
                 },
@@ -8433,7 +8457,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                ANALYST_RESULT_SCHEMA,
+                answerSchema,
                 {
                   invalidListItems: "DROP",
                   lenientFields: ANALYST_LENIENT_FIELDS,
@@ -9240,7 +9264,7 @@ export function createModelGatewayQAnswer(
           cancelExtras();
           roundMessages = messages;
           const answering = gateway.execute<CompanyAnalystV26Result>(
-            { ...base, messages, output: rendered.output },
+            { ...base, messages, output: answerOutput() },
             options,
           );
           startExtras();
@@ -9286,7 +9310,7 @@ export function createModelGatewayQAnswer(
                 : (() => {
                     const accepted = acceptStructuredOutput(
                       written.output.text,
-                      ANALYST_RESULT_SCHEMA,
+                      answerSchema,
                       {
                         invalidListItems: "DROP",
                         lenientFields: ANALYST_LENIENT_FIELDS,

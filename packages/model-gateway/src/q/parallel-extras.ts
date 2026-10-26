@@ -38,7 +38,7 @@ export const EXTRAS_ELSEWHERE_NOTE: ModelMessage = {
 export const TABLE_IS_THE_COMPARISON: ModelMessage = {
   role: "SYSTEM",
   content:
-    "Capital Q shows this comparison's table on their screen with the answer, and its verdict leads it. Leave `findings`, `answerCards` and `comparisonCards` out of your object and write everything else as usual. Do not say in the answer that a table or cards follow.",
+    "Capital Q shows this comparison's table on their screen with the answer, and Capital Q says its verdict on mandate fit first, before your words. Your object has only the fields its shape asks for. In `answer`, never say again which company leads or is level on mandate fit, or their fit scores: open with what decides between them beyond that score, then what is still unknown. Put what is missing in `missingEvidence`. Do not say in the answer that a table or cards follow.",
 };
 
 /** Told to the extras' writer, in place of the note above. */
