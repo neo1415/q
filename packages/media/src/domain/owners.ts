@@ -37,6 +37,13 @@ export type MediaOwnerResolver = {
     actor: ActorContext,
     ownerId: string,
   ) => Promise<ResolvedMediaOwner | null>;
+  /** resolve for many owners in one read, by owner id (absent: null). */
+  readonly resolveMany?:
+    | ((
+        actor: ActorContext,
+        ownerIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, ResolvedMediaOwner>>)
+    | undefined;
 };
 
 export type MediaOwnerResolverRegistry = {
@@ -45,6 +52,17 @@ export type MediaOwnerResolverRegistry = {
     actor: ActorContext,
     ref: MediaOwnerRef,
   ) => Promise<ResolvedMediaOwner | null>;
+  /**
+   * resolve for many owners of one type, by owner id: one read where the
+   * type's resolver has a batch form, otherwise one by one.
+   */
+  readonly resolveMany?:
+    | ((
+        actor: ActorContext,
+        ownerType: MediaOwnerType,
+        ownerIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, ResolvedMediaOwner>>)
+    | undefined;
 };
 
 export function createMediaOwnerResolverRegistry(
@@ -67,6 +85,23 @@ export function createMediaOwnerResolverRegistry(
         return null;
       }
       return resolver.resolve(actor, ref.ownerId);
+    },
+    resolveMany: async (actor, ownerType, ownerIds) => {
+      const resolver = byType.get(ownerType);
+      if (resolver === undefined) return new Map();
+      if (resolver.resolveMany !== undefined) {
+        return resolver.resolveMany(actor, ownerIds);
+      }
+      const out = new Map<string, ResolvedMediaOwner>();
+      for (const [ownerId, owner] of await Promise.all(
+        ownerIds.map(
+          async (ownerId) =>
+            [ownerId, await resolver.resolve(actor, ownerId)] as const,
+        ),
+      )) {
+        if (owner !== null) out.set(ownerId, owner);
+      }
+      return out;
     },
   };
 }
@@ -96,5 +131,36 @@ export function createCompanyMediaOwnerResolver(
         ownerOrganisationId: company.organisationId,
       };
     },
+    // The same read for many, in the actor's tenant only, exactly as resolve
+    // reads one (a company in another tenant resolves to nothing).
+    ...(companies.findCanonicalCompanies === undefined
+      ? {}
+      : {
+          resolveMany: async (
+            actor: ActorContext,
+            ownerIds: readonly string[],
+          ) => {
+            const ids = ownerIds.flatMap((ownerId) => {
+              const parsed = CompanyIdSchema.safeParse(ownerId);
+              return parsed.success ? [parsed.data] : [];
+            });
+            const out = new Map<string, ResolvedMediaOwner>();
+            if (
+              ids.length === 0 ||
+              companies.findCanonicalCompanies === undefined
+            )
+              return out;
+            for (const company of await companies.findCanonicalCompanies(ids)) {
+              if (company.tenantId !== actor.tenantId) continue;
+              out.set(company.id, {
+                ownerType: "COMPANY",
+                ownerId: company.id,
+                tenantId: company.tenantId,
+                ownerOrganisationId: company.organisationId,
+              });
+            }
+            return out;
+          },
+        }),
   };
 }

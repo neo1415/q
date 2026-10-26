@@ -743,6 +743,217 @@ export function createResolvePlayableAsset(
     (await asOwner(query)) ?? (await asViewer(query));
 }
 
+/**
+ * createResolvePlayableAsset for many pitches, deciding each exactly as it
+ * does alone (coordinator 2026-10-26, live trace: every pitch's check was a
+ * company read, an eligibility evaluation and an asset read, one pitch at a
+ * time). Owners first, in one read in the actor's own tenant and
+ * organisation, each owned company's capability checked fresh; then the
+ * viewer's sight of the rest in one evaluation; then the assets in one
+ * read. A pitch that would be refused alone is absent here, and a failed
+ * read refuses what it covered.
+ */
+export function createResolvePlayableAssets(
+  dependencies: MediaServiceDependencies,
+) {
+  const { repositories, viewers, owners } = dependencies;
+  type Sight = {
+    readonly tenantId: ResolvedMediaOwner["tenantId"];
+    readonly ownerOrganisationId: ResolvedMediaOwner["ownerOrganisationId"];
+  };
+  const quiet = <T>(read: Promise<T>, fallback: T): Promise<T> =>
+    read.catch(() => fallback);
+  return async (
+    actor: ActorContext,
+    pitches: readonly {
+      readonly companyId: string;
+      readonly mediaAssetId: MediaAssetId;
+    }[],
+  ): Promise<ReadonlyMap<MediaAssetId, MediaAsset>> => {
+    const out = new Map<MediaAssetId, MediaAsset>();
+    if (pitches.length === 0) return out;
+    const companyIds = [...new Set(pitches.map((p) => p.companyId))];
+
+    // The actor's own companies: in their tenant, of their organisation.
+    const organisationId = actor.organisationId;
+    // A failed owner read refuses everything it covered, as it fails the
+    // read of one pitch alone (never "try as a viewer instead").
+    let resolved: ReadonlyMap<string, ResolvedMediaOwner>;
+    try {
+      resolved =
+        organisationId === undefined
+          ? new Map<string, ResolvedMediaOwner>()
+          : owners.resolveMany !== undefined
+            ? await owners.resolveMany(actor, "COMPANY", companyIds)
+            : new Map(
+                (
+                  await Promise.all(
+                    companyIds.map(
+                      async (companyId) =>
+                        [
+                          companyId,
+                          await owners.resolve(actor, companyRef(companyId)),
+                        ] as const,
+                    ),
+                  )
+                ).flatMap(([companyId, owner]) =>
+                  owner === null ? [] : [[companyId, owner] as const],
+                ),
+              );
+    } catch {
+      return out;
+    }
+    const owned = new Map(
+      [...resolved].filter(
+        ([, owner]) =>
+          owner.tenantId === actor.tenantId &&
+          owner.ownerOrganisationId === organisationId,
+      ),
+    );
+    // Media view on what they own, fresh per company: a refusal there is a
+    // refusal (alone, it fails the read rather than trying as a viewer).
+    const ownerMay = new Set(
+      (
+        await Promise.all(
+          [...owned].map(async ([companyId, owner]) =>
+            (await dependencies.authorization
+              .requireCapability({
+                actor,
+                capability: MEDIA_VIEW,
+                resource: ownerScope(actor, owner),
+              })
+              .then(
+                () => true,
+                () => false,
+              ))
+              ? companyId
+              : null,
+          ),
+        )
+      ).filter((companyId): companyId is string => companyId !== null),
+    );
+
+    // Everyone else's: the viewer's sight of each company, in one evaluation.
+    const others = companyIds.filter((companyId) => !owned.has(companyId));
+    const many = viewers.resolveViewableCompanies;
+    // A failed sight read refuses the companies it covered, as it fails the
+    // read of one pitch alone (never "try the network audience instead").
+    const failed = new Set<string>();
+    const asInvestor = new Map<string, Sight>();
+    if (others.length > 0 && many !== undefined) {
+      try {
+        for (const [companyId, sight] of await many(actor, others)) {
+          asInvestor.set(companyId, sight);
+        }
+      } catch {
+        for (const companyId of others) failed.add(companyId);
+      }
+    } else {
+      await Promise.all(
+        others.map(async (companyId) => {
+          try {
+            const sight = await viewers.resolveViewableCompany(
+              actor,
+              companyId,
+            );
+            if (sight !== null) asInvestor.set(companyId, sight);
+          } catch {
+            failed.add(companyId);
+          }
+        }),
+      );
+    }
+    const network = viewers.resolveNetworkCompany;
+    const asNetwork = new Map<string, Sight>(
+      network === undefined
+        ? []
+        : (
+            await Promise.all(
+              others
+                .filter(
+                  (companyId) =>
+                    !asInvestor.has(companyId) && !failed.has(companyId),
+                )
+                .map(
+                  async (companyId) =>
+                    [
+                      companyId,
+                      await quiet(network(actor, companyId), null),
+                    ] as const,
+                ),
+            )
+          ).flatMap(([companyId, sight]) =>
+            sight === null ? [] : [[companyId, sight] as const],
+          ),
+    );
+
+    // The assets, each in the tenant its owner or the viewer's sight gave.
+    const tenantOf = (companyId: string) =>
+      ownerMay.has(companyId)
+        ? owned.get(companyId)?.tenantId
+        : owned.has(companyId)
+          ? undefined
+          : (asInvestor.get(companyId) ?? asNetwork.get(companyId))?.tenantId;
+    const pairs = pitches.flatMap((pitch) => {
+      const tenantId = tenantOf(pitch.companyId);
+      return tenantId === undefined
+        ? []
+        : [{ tenantId, mediaAssetId: pitch.mediaAssetId }];
+    });
+    const findMany = repositories.mediaAssets.findByIds;
+    const assets =
+      pairs.length === 0
+        ? []
+        : findMany !== undefined
+          ? await quiet(findMany(dependencies.sql, pairs), [])
+          : (
+              await Promise.all(
+                pairs.map((pair) =>
+                  quiet(
+                    repositories.mediaAssets.findById(
+                      dependencies.sql,
+                      pair.tenantId,
+                      pair.mediaAssetId,
+                    ),
+                    null,
+                  ),
+                ),
+              )
+            ).filter((asset): asset is MediaAsset => asset !== null);
+    const byPair = new Map(
+      assets.map((asset) => [`${asset.tenantId}/${asset.id}`, asset]),
+    );
+
+    for (const pitch of pitches) {
+      const tenantId = tenantOf(pitch.companyId);
+      if (tenantId === undefined) continue;
+      const asset = byPair.get(`${tenantId}/${pitch.mediaAssetId}`);
+      if (asset === undefined) continue;
+      const owner = owned.get(pitch.companyId);
+      if (owner !== undefined) {
+        // As asOwner: their own pitch, and ready to play.
+        if (belongsTo(asset, owner) && asset.status === "READY") {
+          out.set(pitch.mediaAssetId, asset);
+        }
+        continue;
+      }
+      const investor = asInvestor.get(pitch.companyId);
+      const sight = investor ?? asNetwork.get(pitch.companyId);
+      // As asViewer: the feed's own rule, not a looser one.
+      if (
+        sight !== undefined &&
+        asset.ownerId === pitch.companyId &&
+        asset.ownerOrganisationId === sight.ownerOrganisationId &&
+        toDiscoverablePitch(asset) !== null &&
+        (investor !== undefined || asset.audience === "NETWORK")
+      ) {
+        out.set(pitch.mediaAssetId, asset);
+      }
+    }
+    return out;
+  };
+}
+
 export function createAuthorisePlayback(
   dependencies: MediaServiceDependencies,
 ) {

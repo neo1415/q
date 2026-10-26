@@ -1486,6 +1486,70 @@ const pitchMedia = createMediaService({
             ownerOrganisationId: facts.organisationId,
           };
     },
+    // Coordinator 2026-10-26 (live trace): the same rule for many companies
+    // in one evaluation, for the raise's pitch reads (one per pitch before).
+    resolveViewableCompanies: async (actor, companyIds) => {
+      type Facts = Awaited<
+        ReturnType<typeof pitchMarketplaceFacts.findCanonicalMarketplaceFacts>
+      >[number];
+      const out = new Map<
+        string,
+        {
+          readonly tenantId: Facts["tenantId"];
+          readonly ownerOrganisationId: Facts["organisationId"];
+        }
+      >();
+      const ids = [
+        ...new Set(
+          companyIds.flatMap((raw) => {
+            const parsed = CompanyIdSchema.safeParse(raw);
+            return parsed.success ? [parsed.data] : [];
+          }),
+        ),
+      ];
+      if (ids.length === 0) return out;
+      const investor =
+        await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+          actor,
+        );
+      if (investor === null) return out;
+      const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
+        tenantId: actor.tenantId,
+        investorOrganisationId: investor.investorOrganisationId,
+        mandateId: null,
+      });
+      if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") {
+        return out;
+      }
+      const eligible = new Set<string>();
+      for (let at = 0; at < ids.length; at += ELIGIBILITY_BATCH_MAX) {
+        const chunk = ids.slice(at, at + ELIGIBILITY_BATCH_MAX);
+        const evaluation = await slateRead.eligibility.evaluate({
+          actor,
+          mode: "INVESTOR_DISCOVER",
+          purpose: "VIEW",
+          mandateId: mandate.mandate.mandateId,
+          companyIds: chunk,
+        });
+        const asked = new Set<string>(chunk);
+        for (const result of evaluation.results) {
+          if (result.decision === "ELIGIBLE" && asked.has(result.companyId)) {
+            eligible.add(result.companyId);
+          }
+        }
+      }
+      const admitted = ids.filter((id) => eligible.has(id));
+      if (admitted.length === 0) return out;
+      for (const facts of await pitchMarketplaceFacts.findCanonicalMarketplaceFacts(
+        admitted,
+      )) {
+        out.set(facts.id, {
+          tenantId: facts.tenantId,
+          ownerOrganisationId: facts.organisationId,
+        });
+      }
+      return out;
+    },
   },
 });
 // R2: the one company read for the raise, composed exactly as the API's
@@ -1513,6 +1577,25 @@ const companyRaise = composeCompanyRaiseReader({
       mediaAssetId: parsed.data,
     });
     return view.status === "AVAILABLE" ? firstPitchRaise(view.cues) : null;
+  },
+  // The same for every company's next pitch at once, under the same rule.
+  pitchRaises: async (actor, pitches) => {
+    const asked = pitches.flatMap((pitch) => {
+      const parsed = MediaAssetIdSchema.safeParse(pitch.mediaAssetId);
+      return parsed.success
+        ? [{ companyId: pitch.companyId, mediaAssetId: parsed.data }]
+        : [];
+    });
+    const views = await pitchMedia.getPitchTranscripts({
+      actor,
+      pitches: asked,
+    });
+    return new Map(
+      [...views].map(([mediaAssetId, view]) => [
+        mediaAssetId as string,
+        view.status === "AVAILABLE" ? firstPitchRaise(view.cues) : null,
+      ]),
+    );
   },
 });
 const recommendationExplanations = createRecommendationExplanationService({
