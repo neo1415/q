@@ -895,6 +895,12 @@ export type AnswerCanvasProps = AnswerCardActions & {
   readonly onFollowUp?: ((question: string) => void) | undefined;
   readonly showFollowUps?: boolean | undefined;
   /**
+   * Q's live line is walking through the cards: the follow-ups wait for
+   * the overview. Absent: they wait while a card is open (a static view).
+   * False (a text turn on the stage): they show at once.
+   */
+  readonly walking?: boolean | undefined;
+  /**
    * The card the conversation is about (spotlight.ts): it is the one large
    * card and the others shrink to a strip; null or absent: all level.
    */
@@ -914,6 +920,7 @@ export function AnswerCanvas({
   onCloseAll,
   onFollowUp,
   showFollowUps = true,
+  walking,
   spotlight = null,
   ...actions
 }: AnswerCanvasProps) {
@@ -1050,7 +1057,7 @@ export function AnswerCanvas({
           </div>
         )}
         {showFollowUps &&
-        focus < 0 &&
+        (walking === undefined ? focus < 0 : !walking) &&
         block.followUps.length > 0 &&
         onFollowUp !== undefined ? (
           <div

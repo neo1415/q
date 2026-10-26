@@ -133,21 +133,21 @@ describe("the card Q is talking about (C2)", () => {
     expect(steps[0]?.ms).toBeGreaterThanOrEqual(2600);
   });
 
-  it("follows the timed walk-through, and stops where the person taps", () => {
+  it("a text turn opens whole and is never paced: first card open, follow-ups now (run 8965cbe4)", () => {
     vi.useFakeTimers();
     const block = demoTop(3);
     const { result } = renderHook(() =>
       useAnswerPlayback(block, "a1", "Want them side by side?", false),
     );
     expect(result.current.focus).toBe(0);
-    act(() => {
-      vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0);
-    });
-    expect(result.current.focus).toBe(1);
-    act(() => result.current.choose(2));
+    expect(result.current.walking).toBe(false);
+    // No voice is speaking: the screen does not move on by itself.
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
+    expect(result.current.focus).toBe(0);
+    expect(result.current.walking).toBe(false);
+    act(() => result.current.choose(2));
     expect(result.current.focus).toBe(2);
   });
 
@@ -157,8 +157,10 @@ describe("the card Q is talking about (C2)", () => {
       useAnswerPlayback(block, "a1", "Want them side by side?", true),
     );
     expect(result.current.focus).toBe(-1);
+    expect(result.current.walking).toBe(false);
     act(() => announceQSaid("Atlas Ledger fits the sector."));
     expect(result.current.focus).toBe(2);
+    expect(result.current.walking).toBe(true);
     expect(result.current.said).toBe("Atlas Ledger fits the sector.");
     act(() => announceQSaid("That's the three."));
     expect(result.current.focus).toBe(2);
@@ -237,7 +239,7 @@ describe("the line under the cards belongs to this turn (F-11)", () => {
     expect(result.current.said).toBe("");
   });
 
-  it("the closing streaming in never restarts the walk-through", () => {
+  it("the closing streaming in never moves the open card", () => {
     vi.useFakeTimers();
     const block = demoTop(3);
     const { result, rerender } = renderHook(
@@ -245,16 +247,42 @@ describe("the line under the cards belongs to this turn (F-11)", () => {
         useAnswerPlayback(block, "a1", closing, false),
       { initialProps: { closing: "Want" } },
     );
-    act(() => {
-      vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0);
-    });
-    expect(result.current.focus).toBe(1);
+    act(() => result.current.choose(1));
     rerender({ closing: "Want them side by side?" });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
     expect(result.current.focus).toBe(1);
   });
 });
 
 describe("the canvas (C1, C3)", () => {
+  it("follow-ups show with a card open in a text turn; a live walk holds them for the overview", () => {
+    const block = { ...demoTop(2), followUps: ["Which one is raising now?"] };
+    const { rerender } = render(
+      <AnswerCanvas
+        block={block}
+        focus={0}
+        said=""
+        walking={false}
+        onFollowUp={() => undefined}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Which one is raising now?" }),
+    ).toBeTruthy();
+    rerender(
+      <AnswerCanvas
+        block={block}
+        focus={0}
+        said=""
+        walking
+        onFollowUp={() => undefined}
+      />,
+    );
+    expect(document.querySelector("[data-ac-followups]")).toBeNull();
+  });
+
   it("offers Open profile on a card with a company behind it, and opens it (R0)", () => {
     const block = demoTop(2);
     const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";

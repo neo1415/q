@@ -6,12 +6,7 @@ import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { Q_SAID_EVENT, saidText } from "@/features/q-swarm/q-said";
 
-import {
-  focusForSaid,
-  playbackSteps,
-  shortLine,
-  spokenLine,
-} from "./answer-canvas-logic";
+import { focusForSaid, shortLine, spokenLine } from "./answer-canvas-logic";
 
 export type AnswerPlayback = {
   /** The card Q is talking about; -1 for the overview. */
@@ -20,16 +15,26 @@ export type AnswerPlayback = {
   readonly said: string;
   /** The person chose a card: Q's walk-through stops there. */
   readonly choose: (index: number) => void;
+  /**
+   * A live line is still walking through the cards: what comes after the
+   * walk (the follow-ups) waits for the overview. False in a text turn.
+   */
+  readonly walking: boolean;
 };
 
 /**
  * Which card is open, kept in step with what Q says (C2).
  *
  * With a live voice line, Q's own lines drive it: each one arrives as a
- * `cq:q-said` event and the card it names comes into focus. Otherwise Q
- * walks through the cards at speaking pace, each card open in turn, and
- * ends on the overview; the line is the answer's own short close. A tap
- * on a card stops the walk-through there.
+ * `cq:q-said` event and the card it names comes into focus. A tap on a
+ * card stops that there.
+ *
+ * In a text turn nothing is said, so nothing is paced (live 2026-10-26,
+ * run 8965cbe4: the answer was done at 6 s, and the second card's detail
+ * and the follow-ups arrived about 16 s later, at speaking pace with no
+ * voice). The answer opens whole: the first card open, every other card's
+ * line, the follow-ups at once (`walking` is false); the line is the
+ * answer's own short close.
  *
  * F-11 (QA 2026-10-23): the line belongs to the current exchange. When a
  * later exchange is held over the same cards (`exchangeId` changes), the
@@ -79,17 +84,11 @@ export function useAnswerPlayback(
     });
   }
 
-  // The block is rebuilt with each conversation update; what Q walks
-  // through is keyed by the cards' own lines, so neither a re-render nor
-  // the closing line changing (it streams in) restarts it.
-  const steps = playbackSteps(block, closing);
-  const plan = steps
-    .filter((step) => step.focus >= 0)
-    .map((step) => `${String(step.focus)}:${step.said}`)
-    .join("\n");
-  const latest = useRef({ steps, cards: block.cards });
+  // The block is rebuilt with each conversation update; a live line is
+  // matched against the latest cards without re-subscribing.
+  const latest = useRef({ cards: block.cards });
   useEffect(() => {
-    latest.current = { steps, cards: block.cards };
+    latest.current = { cards: block.cards };
   });
 
   useEffect(() => {
@@ -108,29 +107,9 @@ export function useAnswerPlayback(
     return () => window.removeEventListener(Q_SAID_EVENT, onSaid);
   }, [live]);
 
-  const chosen = state.chosen;
-  useEffect(() => {
-    if (live || chosen) return;
-    const all = latest.current.steps;
-    let timer: number | undefined;
-    const run = (at: number) => {
-      const step = all[at];
-      if (step === undefined) return;
-      setState((current) =>
-        current.chosen
-          ? current
-          : { ...current, focus: step.focus, said: step.said },
-      );
-      if (at + 1 < all.length) {
-        timer = window.setTimeout(() => run(at + 1), step.ms);
-      }
-    };
-    run(0);
-    return () => window.clearTimeout(timer);
-  }, [plan, live, chosen, answerId]);
-
   return {
     focus: state.focus,
+    walking: live && state.focus >= 0,
     // F-11 (QA 2026-10-23, phone): in a text turn the line is at most one
     // short human line, the answer's own close; a card's stored line is
     // never the caption (the card shows its own words). Only a live voice
