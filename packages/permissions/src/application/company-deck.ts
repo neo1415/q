@@ -215,6 +215,17 @@ export function createCompanyDeckService(dependencies: {
     actor: ActorContext,
     companyId: string,
   ) => Promise<boolean>;
+  /**
+   * The same rule for many companies in one evaluation (coordinator
+   * 2026-10-26: the fit's top read each shown company's deck, one
+   * eligibility evaluation each). Without it, each is asked alone.
+   */
+  readonly investorMayFindAmong?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlySet<string>>)
+    | undefined;
   readonly ownerMayManage: (
     actor: ActorContext,
     company: DataRoomCompany,
@@ -260,6 +271,66 @@ export function createCompanyDeckService(dependencies: {
     return { viewer: "INVESTOR", company } as const;
   }
 
+  /**
+   * readerOf for many companies, deciding exactly as it does one by one:
+   * the investor's findability is asked once for all of them.
+   */
+  async function readersOf(actor: ActorContext, companyIds: readonly string[]) {
+    const companies = await Promise.all(
+      companyIds.map((companyId) =>
+        quietly(dependencies.company(companyId), null),
+      ),
+    );
+    const others = companies.filter(
+      (company): company is DataRoomCompany =>
+        company !== null && company.organisationId !== actor.organisationId,
+    );
+    const investor =
+      others.length > 0 &&
+      (await quietly(dependencies.isInvestor(actor), false));
+    const among = dependencies.investorMayFindAmong;
+    const findable: ReadonlySet<string> = !investor
+      ? new Set()
+      : among !== undefined
+        ? await quietly(
+            among(
+              actor,
+              others.map((company) => company.id),
+            ),
+            new Set<string>(),
+          )
+        : new Set(
+            (
+              await Promise.all(
+                others.map(async (company) =>
+                  (await quietly(
+                    dependencies.investorMayFind(actor, company.id),
+                    false,
+                  ))
+                    ? company.id
+                    : null,
+                ),
+              )
+            ).filter((id): id is string => id !== null),
+          );
+    return Promise.all(
+      companies.map(async (company) => {
+        if (company === null) return null;
+        if (company.organisationId === actor.organisationId) {
+          return (await quietly(
+            dependencies.ownerMayManage(actor, company),
+            false,
+          ))
+            ? ({ viewer: "OWNER", company } as const)
+            : null;
+        }
+        return findable.has(company.id)
+          ? ({ viewer: "INVESTOR", company } as const)
+          : null;
+      }),
+    );
+  }
+
   async function deckFor(
     actor: ActorContext,
     reader: NonNullable<Awaited<ReturnType<typeof readerOf>>>,
@@ -277,100 +348,114 @@ export function createCompanyDeckService(dependencies: {
     return open ? deck : null;
   }
 
+  async function viewFor(
+    actor: ActorContext,
+    reader: Awaited<ReturnType<typeof readerOf>>,
+  ): Promise<CompanyDeckView | null> {
+    if (reader === null) return null;
+    const deck = await deckFor(actor, reader);
+    if (deck === null) {
+      return {
+        viewer: reader.viewer,
+        companyId: reader.company.id,
+        deck: null,
+        extraction: null,
+        coaching: null,
+      };
+    }
+    const reading = await quietly(
+      store.extractionFor(sql, deck.versionId),
+      null,
+    );
+    const owner = reader.viewer === "OWNER";
+    const reviewed =
+      reading === null
+        ? null
+        : reviewedDeckSections(
+            reading.sections,
+            reading.reviews ?? [],
+            reading.confirmed,
+          );
+    const anyShown =
+      reviewed?.states.some(
+        (s) => s.state === "CONFIRMED" || s.state === "CORRECTED",
+      ) ?? false;
+    const allReviewed =
+      reviewed?.states.every((s) => s.state !== "PENDING") ?? false;
+    // The Write Gate, per section (F26): an investor sees only what the
+    // founder confirmed or wrote; the rest reads as unknown.
+    const shown = reading !== null && (owner || anyShown) ? reading : null;
+    return {
+      viewer: reader.viewer,
+      companyId: reader.company.id,
+      deck: {
+        documentId: deck.documentId,
+        title: deck.title,
+        versionNumber: deck.versionNumber,
+        pageCount: reading?.pageCount ?? null,
+        uploadedAt: deck.uploadedAt,
+        downloadable: deck.downloadAudience === "INVESTORS",
+        scanned: deck.scanned,
+      },
+      extraction:
+        shown === null
+          ? null
+          : {
+              extractionId: shown.id,
+              readAt: shown.createdAt,
+              versionNumber: deck.versionNumber,
+              confirmed: owner ? shown.confirmed || allReviewed : true,
+              // The rubric never leaves for anyone: stripped here for all.
+              sections:
+                reviewed === null
+                  ? orderDeckSections(shown.sections.map(deckSectionForReaders))
+                  : owner
+                    ? orderDeckSections(
+                        reviewed.sections.map(deckSectionForReaders),
+                      )
+                    : orderDeckSections(
+                        forInvestor(reviewed.sections, reviewed.states),
+                      ),
+              readingNumber: shown.readingNumber ?? 1,
+              ...(reviewed === null ? {} : { sectionStates: reviewed.states }),
+              ...(owner
+                ? {
+                    setAside: [...(shown.setAside ?? [])],
+                    readAgain: {
+                      left: Math.max(
+                        0,
+                        DECK_READ_AGAIN_MAX - (shown.readAgain?.used ?? 0),
+                      ),
+                      pending: shown.readAgain?.pending ?? false,
+                    },
+                  }
+                : {}),
+            },
+      coaching:
+        owner && reading !== null
+          ? dependencies.coach(reading.sections, reading.pageCount)
+          : null,
+    };
+  }
+
   return {
     view: async (
       actor: ActorContext,
       companyId: string,
-    ): Promise<CompanyDeckView | null> => {
-      const reader = await readerOf(actor, companyId);
-      if (reader === null) return null;
-      const deck = await deckFor(actor, reader);
-      if (deck === null) {
-        return {
-          viewer: reader.viewer,
-          companyId: reader.company.id,
-          deck: null,
-          extraction: null,
-          coaching: null,
-        };
-      }
-      const reading = await quietly(
-        store.extractionFor(sql, deck.versionId),
-        null,
+    ): Promise<CompanyDeckView | null> =>
+      viewFor(actor, await readerOf(actor, companyId)),
+
+    /** view, for many companies, by company id; the same answer for each. */
+    views: async (
+      actor: ActorContext,
+      companyIds: readonly string[],
+    ): Promise<ReadonlyMap<string, CompanyDeckView | null>> => {
+      const ids = [...new Set(companyIds)];
+      const readers = await readersOf(actor, ids);
+      const views = await Promise.all(
+        readers.map((reader) => viewFor(actor, reader)),
       );
-      const owner = reader.viewer === "OWNER";
-      const reviewed =
-        reading === null
-          ? null
-          : reviewedDeckSections(
-              reading.sections,
-              reading.reviews ?? [],
-              reading.confirmed,
-            );
-      const anyShown =
-        reviewed?.states.some(
-          (s) => s.state === "CONFIRMED" || s.state === "CORRECTED",
-        ) ?? false;
-      const allReviewed =
-        reviewed?.states.every((s) => s.state !== "PENDING") ?? false;
-      // The Write Gate, per section (F26): an investor sees only what the
-      // founder confirmed or wrote; the rest reads as unknown.
-      const shown = reading !== null && (owner || anyShown) ? reading : null;
-      return {
-        viewer: reader.viewer,
-        companyId: reader.company.id,
-        deck: {
-          documentId: deck.documentId,
-          title: deck.title,
-          versionNumber: deck.versionNumber,
-          pageCount: reading?.pageCount ?? null,
-          uploadedAt: deck.uploadedAt,
-          downloadable: deck.downloadAudience === "INVESTORS",
-          scanned: deck.scanned,
-        },
-        extraction:
-          shown === null
-            ? null
-            : {
-                extractionId: shown.id,
-                readAt: shown.createdAt,
-                versionNumber: deck.versionNumber,
-                confirmed: owner ? shown.confirmed || allReviewed : true,
-                // The rubric never leaves for anyone: stripped here for all.
-                sections:
-                  reviewed === null
-                    ? orderDeckSections(
-                        shown.sections.map(deckSectionForReaders),
-                      )
-                    : owner
-                      ? orderDeckSections(
-                          reviewed.sections.map(deckSectionForReaders),
-                        )
-                      : orderDeckSections(
-                          forInvestor(reviewed.sections, reviewed.states),
-                        ),
-                readingNumber: shown.readingNumber ?? 1,
-                ...(reviewed === null
-                  ? {}
-                  : { sectionStates: reviewed.states }),
-                ...(owner
-                  ? {
-                      setAside: [...(shown.setAside ?? [])],
-                      readAgain: {
-                        left: Math.max(
-                          0,
-                          DECK_READ_AGAIN_MAX - (shown.readAgain?.used ?? 0),
-                        ),
-                        pending: shown.readAgain?.pending ?? false,
-                      },
-                    }
-                  : {}),
-              },
-        coaching:
-          owner && reading !== null
-            ? dependencies.coach(reading.sections, reading.pageCount)
-            : null,
-      };
+      return new Map(ids.map((id, index) => [id, views[index] ?? null]));
     },
 
     /** The deck for reading, inline, with the reader's name over it when view only. */

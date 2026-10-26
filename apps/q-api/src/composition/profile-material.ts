@@ -70,6 +70,13 @@ export function createProfileMaterial(dependencies: {
     actor: ActorContext,
     companyId: string,
   ) => Promise<boolean>;
+  /** The same rule for many companies at once (the deck's batched views). */
+  readonly investorMayFindAmong?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlySet<string>>)
+    | undefined;
   readonly notify?:
     | ((input: {
         readonly relationshipId: string;
@@ -297,6 +304,7 @@ export function createProfileMaterial(dependencies: {
     isInvestor: async (actor) =>
       (await dependencies.investorOrganisationFor(actor)) !== null,
     investorMayFind: dependencies.investorMayFind,
+    investorMayFindAmong: dependencies.investorMayFindAmong,
     ownerMayManage,
     sharedWithActor: async (actor, companyId, documentId) => {
       const view = await dataRoom.view(actor, companyId);

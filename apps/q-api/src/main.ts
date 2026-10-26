@@ -624,6 +624,7 @@ import {
   createMaterialChanges,
   createSlateReadPipeline,
   composeCompanyRaiseReader,
+  ELIGIBILITY_BATCH_MAX,
   playablePitchPortFrom,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
@@ -2144,36 +2145,61 @@ const permissionsService = createPermissionsService({
 const companyTeamProjection = createPostgresCompanyTeamProjection({
   sql: database.sql,
 });
-const investorMayFind = async (
+/**
+ * Which of these companies the investor may find (the pitch rule, ADR
+ * 0041): one subject, one mandate and one eligibility evaluation for all
+ * of them (coordinator 2026-10-26: the fit's top asked it per shown
+ * company's deck). The one-company check is this, for one.
+ */
+const investorMayFindAmong = async (
   actor: ActorContext,
-  companyId: string,
-): Promise<boolean> => {
+  companyIds: readonly string[],
+): Promise<ReadonlySet<string>> => {
+  const ids = [
+    ...new Set(
+      companyIds.flatMap((raw) => {
+        const parsed = CompanyIdSchema.safeParse(raw);
+        return parsed.success ? [parsed.data] : [];
+      }),
+    ),
+  ];
+  if (ids.length === 0) return new Set();
   const investor =
     await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
       actor,
     );
-  if (investor === null) return false;
+  if (investor === null) return new Set();
   const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
     tenantId: actor.tenantId,
     investorOrganisationId: investor.investorOrganisationId,
     mandateId: null,
   });
   if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE")
-    return false;
-  const parsed = CompanyIdSchema.safeParse(companyId);
-  if (!parsed.success) return false;
-  const evaluation = await slateRead.eligibility.evaluate({
-    actor,
-    mode: "INVESTOR_DISCOVER",
-    purpose: "VIEW",
-    mandateId: mandate.mandate.mandateId,
-    companyIds: [parsed.data],
-  });
-  return evaluation.results.some(
-    (result) =>
-      result.companyId === parsed.data && result.decision === "ELIGIBLE",
-  );
+    return new Set();
+  const found = new Set<string>();
+  for (let at = 0; at < ids.length; at += ELIGIBILITY_BATCH_MAX) {
+    const chunk = ids.slice(at, at + ELIGIBILITY_BATCH_MAX);
+    const evaluation = await slateRead.eligibility.evaluate({
+      actor,
+      mode: "INVESTOR_DISCOVER",
+      purpose: "VIEW",
+      mandateId: mandate.mandate.mandateId,
+      companyIds: chunk,
+    });
+    const asked = new Set<string>(chunk);
+    for (const result of evaluation.results) {
+      if (result.decision === "ELIGIBLE" && asked.has(result.companyId)) {
+        found.add(result.companyId);
+      }
+    }
+  }
+  return found;
 };
+const investorMayFind = async (
+  actor: ActorContext,
+  companyId: string,
+): Promise<boolean> =>
+  (await investorMayFindAmong(actor, [companyId])).has(companyId);
 
 /**
  * Overnight A3-A8: the profile's data room and pitch deck, for Q's tools and
@@ -2194,6 +2220,7 @@ const profileMaterial = createProfileMaterial({
   investorOrganisationFor: (actor) =>
     slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
   investorMayFind,
+  investorMayFindAmong,
   // 2026-10-08: a request opens the founder's inbox at that request; an
   // answer opens the investor's view of the company's data room.
   notify: (input) =>
@@ -2595,6 +2622,8 @@ const fitComposition = createFitComposition({
   raiseReader: companyRaise,
   deckView: (actor, companyId) =>
     profileMaterial.companyDeck.view(actor, companyId),
+  deckViews: (actor, companyIds) =>
+    profileMaterial.companyDeck.views(actor, companyIds),
   viewer: createFitQViewer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
