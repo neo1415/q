@@ -124,6 +124,8 @@ A new account cannot message these sessions. Treat this table as history.
   (first visible change 5.2 s), I19 (voice, not testable). F-135 alone → 95.8%.
 - Receipts: `docs/ai-handoff/evidence/qa-premium/` on branch `qa/premium-scorecard`.
 
+- 10-26 11:10 (e8dc710dc): **95/96 = 99.0%** — Investor 43/44, Founder 30/30, UI 18/18, Onboarding 4/4. I9 0→2 (F-135, #558), I21 1→2 (first change ≤1.1 s, table 2.4 s), O2 1→2 (F-137 #557, F-138 #556). Only I19 voice = 1. MVP declared done; lanes stopped.
+
 ## Mistakes the coordinator made (so the next one doesn't)
 
 - Let a slow wrong path pass because a guard case accepted any card list.
