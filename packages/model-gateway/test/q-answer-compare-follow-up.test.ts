@@ -29,6 +29,7 @@ import {
   createStaticModelCatalog,
   type FakeBehaviour,
 } from "../src/index.js";
+import { COMPARE_ANSWER_FIELDS } from "../src/q/compare-answer.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import { fitFixture } from "./fit-fixture.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
@@ -214,10 +215,12 @@ function build(
   parallelExtras = false,
   /** How long the analyst takes to write, and who hears it as it goes. */
   live?: { readonly delayMs: number; readonly deltas: QLiveDeltaBus },
+  /** The writer's whole reply, when the test writes it itself. */
+  reply?: FakeBehaviour,
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
-    script: [analyst(answer, live?.delayMs)],
+    script: [reply ?? analyst(answer, live?.delayMs)],
   });
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(
@@ -514,6 +517,87 @@ describe("compare the top two, right after a list of five", () => {
       expect(text).toContain(`Mizan is ${String(score)}/10 on mandate fit.`);
       expect(text).not.toMatch(/top decile/u);
     }
+  });
+
+  it("a compare code resolved asks its writer only for its own judgement, says the verdict once, and keeps the decisive difference and what is missing (live 2026-10-26, run 0adc1c1e)", async () => {
+    const scoreOf = (
+      companyId: string,
+      name: string,
+      outcomes: Record<string, string>,
+    ) =>
+      fitScoreOutOf10(
+        FitProfileDtoSchema.parse(
+          (
+            fitFixture(companyId, name, outcomes).result.data as {
+              profile: unknown;
+            }
+          ).profile,
+        ),
+      );
+    const mizan = scoreOf(MIZAN, "Mizan", {
+      STAGE: "STRONG",
+      SECTOR: "STRONG",
+      GEOGRAPHY: "STRONG",
+    });
+    const silo = scoreOf(SILO, "Silo Credit", {
+      STAGE: "PARTIAL",
+      SECTOR: "STRONG",
+      GEOGRAPHY: "PARTIAL",
+    });
+    expect(mizan).not.toBeNull();
+    expect(silo).not.toBeNull();
+    const decisive =
+      "What separates them is traction: Mizan is at $42,000 MRR against Silo Credit's $9,000.";
+    const missing = "Neither company has shared its round terms yet.";
+    // Only the writer's own fields, as the narrowed shape asks.
+    const { seam, request, alpha, stored } = build(
+      "How do the top two stack up?",
+      { compare: { count: 2, names: [] } },
+      undefined,
+      false,
+      true,
+      undefined,
+      {
+        kind: "JSON",
+        value: {
+          answer: `Mizan leads Silo Credit on mandate fit, ${String(mizan)} to ${String(silo)}. ${decisive}`,
+          responseShape: "CONCISE",
+          missingEvidence: [missing],
+          contradictions: [],
+          insufficientEvidence: false,
+          clarifyingQuestions: [],
+          declined: false,
+          actionTalk: [],
+        },
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    // One writer, asked for its own fields only.
+    expect(alpha.calls).toHaveLength(1);
+    const output = alpha.calls[0]?.request.output;
+    if (output?.kind !== "STRUCTURED") throw new Error("a structured answer");
+    expect(
+      Object.keys(output.jsonSchema["properties"] as object).sort(),
+    ).toEqual([...COMPARE_ANSWER_FIELDS].sort());
+    expect(
+      [...(output.jsonSchema["required"] as readonly string[])].sort(),
+    ).toEqual([...COMPARE_ANSWER_FIELDS].sort());
+    const said = stored.at(-1)?.content ?? "";
+    // Code's verdict once; the writer's restatement of it is not said again.
+    expect(
+      said.match(/On Capital Q's mandate fit, Mizan leads/gu),
+    ).toHaveLength(1);
+    expect(said).not.toContain("Mizan leads Silo Credit on mandate fit");
+    // The writer's own judgement and what is missing stay.
+    expect(said).toContain(decisive);
+    const blocks = (stored.at(-1)?.blocks ?? []) as {
+      kind: string;
+      statement?: string;
+    }[];
+    expect(blocks).toContainEqual(
+      expect.objectContaining({ kind: "UNCERTAINTY", statement: missing }),
+    );
+    expect(blocks.some((block) => block.kind === "TABLE")).toBe(true);
   });
 
   it("the same, when the turn was read as a fit question (live 23 Oct, run f5415b0c)", async () => {
