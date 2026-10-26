@@ -21,6 +21,10 @@ import {
   createStaticModelCatalog,
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
+import {
+  chatInsteadReply,
+  MESSAGE_PREPARED_REPLY,
+} from "../src/q/message-channel.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 /**
@@ -51,6 +55,7 @@ const offered = (name: string, toolName: string): QOfferedTool => ({
 
 const OFFERED = [
   offered("propose_email", "relationship.email.propose"),
+  offered("propose_chat_message", "relationship.chat.propose"),
   offered("list_my_relationships", "relationship.list"),
   offered("read_company_figures", "company.figures"),
   offered("fit_top_candidates", "fit.top_candidates"),
@@ -72,7 +77,13 @@ const answer = (text: string) => ({
   },
 });
 
-function build(options: { asked?: string; ownProfileScope?: boolean } = {}) {
+function build(
+  options: {
+    asked?: string;
+    ownProfileScope?: boolean;
+    email?: "PREPARED" | "NO_RECIPIENT";
+  } = {},
+) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -118,6 +129,7 @@ function build(options: { asked?: string; ownProfileScope?: boolean } = {}) {
     } as never,
   ];
   const executed: QToolProposal[] = [];
+  const stored: { content: string }[] = [];
   const ok = (proposal: QToolProposal, toolName: string, data: unknown) =>
     ({
       callId: proposal.callId,
@@ -151,8 +163,16 @@ function build(options: { asked?: string; ownProfileScope?: boolean } = {}) {
       if (proposal.name === "propose_email") {
         return Promise.resolve(
           ok(proposal, "relationship.email.propose", {
-            status: "PREPARED",
+            status: options.email ?? "PREPARED",
             awaitingApprovalOf: "Email Savanna Seed Partners",
+          }),
+        );
+      }
+      if (proposal.name === "propose_chat_message") {
+        return Promise.resolve(
+          ok(proposal, "relationship.chat.propose", {
+            status: "PREPARED",
+            awaitingApprovalOf: "Message Savanna Seed Partners",
           }),
         );
       }
@@ -163,13 +183,15 @@ function build(options: { asked?: string; ownProfileScope?: boolean } = {}) {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
       listRecentForConversationOfRun: () => Promise.resolve([...messages]),
-      insert: (_tx: unknown, input: { content: string }) =>
-        Promise.resolve({
+      insert: (_tx: unknown, input: { content: string }) => {
+        stored.push(input);
+        return Promise.resolve({
           ...messages[0],
           id: randomUUID(),
           role: "Q",
           content: input.content,
-        } as QConversationMessage),
+        } as QConversationMessage);
+      },
       findById: () => Promise.resolve(null),
     },
     runs: { allocateEventSequence: () => Promise.resolve(2) },
@@ -223,7 +245,7 @@ function build(options: { asked?: string; ownProfileScope?: boolean } = {}) {
       maxSensitivity: "PUBLIC",
     },
   } as never;
-  return { seam, request, alpha, executed };
+  return { seam, request, alpha, executed, stored };
 }
 
 const ownFigureReads = (executed: readonly QToolProposal[]) =>
@@ -243,7 +265,12 @@ describe("an asked email is one focused round (coordinator 2026-10-26, B)", () =
     expect(first).toBeDefined();
     if (first === undefined) return;
     expect(offeredTo(first).sort()).toEqual(
-      ["list_my_relationships", "propose_email", "read_company_figures"].sort(),
+      [
+        "list_my_relationships",
+        "propose_chat_message",
+        "propose_email",
+        "read_company_figures",
+      ].sort(),
     );
   });
 
@@ -262,14 +289,32 @@ describe("an asked email is one focused round (coordinator 2026-10-26, B)", () =
     expect(executed.map((call) => call.name)).toContain("propose_email");
   });
 
-  it("has no second writer: the prepared card is the answer", async () => {
-    const { seam, request, alpha } = build({ asked: "propose_email" });
+  it("ends once the card is prepared: no later round, no second writer", async () => {
+    const { seam, request, alpha, stored } = build({ asked: "propose_email" });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    // B2: the round that prepares it is the turn's only model call.
+    expect(alpha.calls).toHaveLength(1);
+    expect(promptOf(alpha.calls[0] as never)).not.toContain("A second writer");
+    expect(stored.at(-1)?.content).toBe(MESSAGE_PREPARED_REPLY);
+  });
+
+  it("with no address for them, says so: the same words go as a Capital Q message", async () => {
+    const { seam, request, alpha, executed, stored } = build({
+      asked: "propose_email",
+      email: "NO_RECIPIENT",
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const instead = executed.find((call) => call.callId === "q-chat-instead");
+    expect(instead?.arguments).toMatchObject({ body: BODY });
+    expect(alpha.calls).toHaveLength(1);
+    expect(stored.at(-1)?.content).toBe(chatInsteadReply("NO_ADDRESS"));
+  });
+
+  it("a card prepared on a turn that asked no message keeps the model's answer", async () => {
+    const { seam, request, alpha, stored } = build();
     await seam.answer(request);
-    // The round that prepares it, then the answer: no extras' call.
-    expect(alpha.calls).toHaveLength(2);
-    for (const call of alpha.calls) {
-      expect(promptOf(call)).not.toContain("A second writer");
-    }
+    expect(alpha.calls.length).toBeGreaterThan(1);
+    expect(stored.at(-1)?.content).not.toBe(MESSAGE_PREPARED_REPLY);
   });
 
   it("reads no figures where the plan does not hold their own company's profile", async () => {
