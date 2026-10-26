@@ -70,8 +70,14 @@ export type CompanyRaiseReaderPorts = {
   ) => Promise<readonly RaisePolicyRow[]>;
   /** Whether the actor acts for an investor organisation. */
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
-  /** Pitches this reader may play, newest first (Media's playback rule). */
-  readonly playablePitches: (
+  /**
+   * The company's discoverable pitches, newest first. Whether this reader
+   * may play each is pitchRaise's to decide, under Media's playback rule,
+   * so the rule is applied once per pitch read (coordinator 2026-10-26:
+   * checked here first as well, it cost a viewer resolution and an asset
+   * read per pitch, twice, for every company shown).
+   */
+  readonly pitches: (
     actor: ActorContext,
     companyId: string,
   ) => Promise<readonly RaisePitchCandidate[]>;
@@ -133,9 +139,10 @@ export function createCompanyRaiseReader(
     actor: ActorContext,
     companyId: string,
   ): Promise<PitchRaiseClaimFact | null> => {
-    const pitches = (
-      await settled(ports.playablePitches(actor, companyId), [])
-    ).slice(0, RAISE_PITCHES_MAX);
+    const pitches = (await settled(ports.pitches(actor, companyId), [])).slice(
+      0,
+      RAISE_PITCHES_MAX,
+    );
     // In order, newest first, stopping at the first raise: the same pitch
     // wins on every surface, and older transcripts are not read for nothing.
     for (const pitch of pitches) {

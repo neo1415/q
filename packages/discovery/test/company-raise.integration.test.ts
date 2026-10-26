@@ -235,20 +235,19 @@ describe("raiseFor against local PostgreSQL", () => {
             ),
           ),
       }),
-      // Media's playback rule: a founder plays only their own pitch.
-      mayPlay: (actor, companyId) =>
-        Promise.resolve(
+      // Read under Media's playback rule, as the transcript read is: a
+      // founder plays only their own pitch.
+      pitchRaise: (actor, companyId) => {
+        const mayPlay =
           actor.organisationId === investorParty.organisationId ||
-            Object.values(companies).some(
-              (c) =>
-                c.id === companyId &&
-                c.founder.organisationId === actor.organisationId,
-            ),
-        ),
-      pitchRaise: (_actor, companyId) => {
+          Object.values(companies).some(
+            (c) =>
+              c.id === companyId &&
+              c.founder.organisationId === actor.organisationId,
+          );
         const amount = pitchById.get(companyId);
         return Promise.resolve(
-          amount === undefined
+          !mayPlay || amount === undefined
             ? null
             : { atSeconds: 14, amount, currency: "USD" },
         );

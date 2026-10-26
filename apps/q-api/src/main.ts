@@ -1503,12 +1503,6 @@ const companyRaise = composeCompanyRaiseReader({
       actor,
     )) !== null,
   pitches: () => raisePitches,
-  mayPlay: async (actor, companyId, mediaAssetId) => {
-    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
-    return parsed.success
-      ? pitchMedia.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
-      : false;
-  },
   pitchRaise: async (actor, companyId, mediaAssetId) => {
     const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
     if (!parsed.success) return null;

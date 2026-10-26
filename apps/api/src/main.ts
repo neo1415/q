@@ -1960,12 +1960,6 @@ const companyRaise = createApiCompanyRaiseReader({
       actor,
     )) !== null,
   pitches: () => discoverablePitches,
-  mayPlay: async (actor, companyId, mediaAssetId) => {
-    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
-    return parsed.success
-      ? media.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
-      : false;
-  },
   pitchCues: async (actor, companyId, mediaAssetId) => {
     const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
     if (!parsed.success) return null;

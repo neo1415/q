@@ -204,7 +204,7 @@ function reader(over: Partial<CompanyRaiseReaderPorts> = {}) {
     },
     isInvestor: (actor) =>
       Promise.resolve(actor.organisationId === INVESTOR_ORG),
-    playablePitches: () =>
+    pitches: () =>
       Promise.resolve([
         {
           mediaAssetId: "44444444-0000-4000-8000-000000000001",
@@ -270,7 +270,7 @@ describe("createCompanyRaiseReader", () => {
       disclosure: {
         evaluateMany: () => Promise.reject(new Error("down")),
       },
-      playablePitches: () => Promise.resolve([]),
+      pitches: () => Promise.resolve([]),
     });
     const view = await r.raiseFor(actorOf(INVESTOR_ORG), COMPANY);
     expect(view.source).toBe("NONE");

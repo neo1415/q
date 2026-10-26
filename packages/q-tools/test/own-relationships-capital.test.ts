@@ -789,7 +789,7 @@ describe("R2: Q's raise is the one company read", () => {
       disclosure,
       objectivePolicies: () => Promise.resolve([]),
       isInvestor: (actor) => Promise.resolve(actor.organisationId === ORG_I),
-      playablePitches: (_actor, companyId) =>
+      pitches: (_actor, companyId) =>
         Promise.resolve(
           companyId === SAVED_CO
             ? [{ mediaAssetId: PITCH, visibility: "network_visible" as const }]
