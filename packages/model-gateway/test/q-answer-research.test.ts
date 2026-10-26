@@ -2700,6 +2700,149 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
     ).toEqual([]);
   });
 
+  // F-135 (production 2026-10-26, run 57fbf492): Duplo's profile read failed,
+  // so its identity was not held; the search marked "Lego Duplo - Wikipedia"
+  // as matching by name, and its picture was shown as Duplo. A company
+  // Capital Q holds is never pictured by its name alone.
+  it("F-135: a company on Capital Q whose identity was not read this turn is never pictured by name", async () => {
+    const DUPLO = "d0d0d0d0-0000-4000-8000-000000000002";
+    const SEARCH: QOfferedTool = {
+      ...GET_COMPANY,
+      toolName: "company.search",
+      definition: {
+        name: "search_companies",
+        description: "Searches companies.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+    };
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, SEARCH, RESEARCH]),
+      execute: (proposal) => {
+        if (proposal.name === "research_public_web") {
+          return Promise.resolve(
+            onSite(
+              researchOutcome(proposal, "Lego Duplo is a line of toy bricks."),
+              "https://en.wikipedia.org/wiki/Lego_Duplo",
+            ),
+          );
+        }
+        if (proposal.name === "search_companies") {
+          return Promise.resolve({
+            callId: proposal.callId,
+            toolName: "company.search",
+            toolVersion: 1,
+            classification: "READ_ONLY",
+            status: "SUCCEEDED",
+            failureCode: null,
+            sensitivity: "NETWORK_VISIBLE",
+            result: {
+              ok: true,
+              data: {
+                items: [
+                  {
+                    companyId: DUPLO,
+                    canonicalName: "Duplo",
+                    currentStageCode: "seed",
+                    headquartersCountry: "NG",
+                    shortDescription: "B2B payments for African businesses.",
+                  },
+                ],
+                nextCursor: null,
+              },
+            },
+            latencyMs: 1,
+          } as QToolCallOutcome);
+        }
+        // The profile read fails, as Duplo's did in production.
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "company.get",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "FAILED" as const,
+          failureCode: "INVALID_TOOL_OUTPUT" as const,
+          sensitivity: null,
+          result: {
+            ok: false as const,
+            error: {
+              code: "INVALID_TOOL_OUTPUT" as const,
+              safeMessage: "The tool could not complete.",
+            },
+          },
+          latencyMs: 1,
+        } as QToolCallOutcome);
+      },
+    };
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "s1",
+              name: "search_companies",
+              arguments: { query: "Duplo" },
+            },
+          ],
+        },
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: DUPLO },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Duplo's founders are on its profile."),
+            visual: "PICTURE",
+            pictureQuery: "Duplo founders",
+          },
+        },
+      ],
+      tools: port,
+      userText: "Who are Duplo's founders? Background and photos.",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://upload.wikimedia.org/lego-duplo.jpg",
+              pageUrl: "https://en.wikipedia.org/wiki/Lego_Duplo",
+              domain: "en.wikipedia.org",
+              title: "Lego Duplo - Wikipedia",
+            },
+          ]),
+      },
+    });
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          aboutNamedOther: true,
+          namedOther: { name: "Duplo", kind: "COMPANY" },
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+    expect(JSON.stringify(answerBlocks)).not.toContain("Lego Duplo");
+  });
+
   // QA QO-09, persisting (owner's QA, 2026-10-23): "Tell me about Duplo",
   // Duplo being a company Capital Q holds, showed LEGO DUPLO Peppa Pig. The
   // search matched LEGO's pages by name; Capital Q's record places Duplo in

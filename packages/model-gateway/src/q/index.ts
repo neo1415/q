@@ -1249,6 +1249,14 @@ function heldOnRecord(read: RunRead, name: string): HeldIdentity | null {
   return null;
 }
 
+/** Whether Capital Q holds a company by this name (this run found it). */
+function namedOnRecord(read: RunRead, name: string): boolean {
+  const wanted = name.trim().toLowerCase();
+  return [...read.companyNames.values()].some(
+    (companyName) => companyName.trim().toLowerCase() === wanted,
+  );
+}
+
 /**
  * The companies this run read from Capital Q that the person named, by the
  * names their records carry (live 2026-10-24: "Who founded Duplo?" was
@@ -9966,15 +9974,27 @@ export function createModelGatewayQAnswer(
           namedSubject === null
             ? null
             : heldOnRecord(companiesRead, namedSubject);
+        // F-135 (production 2026-10-26, run 57fbf492): Capital Q holds a
+        // company by this name, but its identity was not read this run (the
+        // profile read failed), so nothing could tell its pages from a
+        // namesake's and "Lego Duplo - Wikipedia" was shown as Duplo. A
+        // company on record is pictured only against its held identity,
+        // never by its name alone. A name Capital Q does not hold keeps the
+        // research's own verdict ("not sure this is them").
+        const unheldOnRecord =
+          namedSubject !== null &&
+          held === null &&
+          namedOnRecord(companiesRead, namedSubject);
         // Only when a picture could be shown (spend rule 2026-10-25): their
         // website on record, or pages this turn's searches matched to them.
         const couldShow =
-          (held?.website ?? null) !== null ||
-          webEvidence.some(
-            (source) =>
-              source.subjectMatch === "MATCH" ||
-              source.subjectMatch === "POSSIBLE",
-          );
+          !unheldOnRecord &&
+          ((held?.website ?? null) !== null ||
+            webEvidence.some(
+              (source) =>
+                source.subjectMatch === "MATCH" ||
+                source.subjectMatch === "POSSIBLE",
+            ));
         const fromPages =
           webPictures === null || namedSubject === null || !couldShow
             ? []
