@@ -334,16 +334,15 @@ export function createFitComposition(
     sql: dependencies.sql,
   });
   const fit = createFitService({
-    companyIdentities: async (ids) => {
-      const found = await Promise.all(ids.map(identity));
-      return new Map(
-        found.flatMap((company) =>
+    // One read for every company, as the inputs read their identities.
+    companyIdentities: async (ids) =>
+      new Map(
+        (await identitiesOf(ids)).flatMap((company) =>
           company === null
             ? []
             : [[company.id, { name: company.canonicalName }] as const],
         ),
-      );
-    },
+      ),
     unicornPotential: dependencies.unicornPotential,
     investability: (companyIds) =>
       investabilityStore.current(companyIds, INVESTABILITY_METHOD_VERSION),

@@ -85,6 +85,8 @@ function compose(
   raiseShared: (companyId: string) => boolean = (id) => id === SHARED,
   names: (companyId: string) => string = (id) =>
     id === SHARED ? "Sunline" : "Kora",
+  /** The investor's own relationships, as company ids. */
+  relationships: readonly string[] = [SHARED],
 ) {
   const eligibilityPorts = {
     investorSubject: {
@@ -207,7 +209,7 @@ function compose(
           ),
         ),
     },
-    relationships: () => Promise.resolve([SHARED]),
+    relationships: () => Promise.resolve([...relationships]),
     requests: () => Promise.reject(new Error("requests down")),
     feed: {
       page: () =>
@@ -330,6 +332,41 @@ describe("fit composition", () => {
     expect(queries.identities).toBe(10);
     expect(queries.objectives).toBe(5);
     expect(queries.cards).toBe(5);
+  });
+
+  // Coordinator 2026-10-26 (live 8965cbe4: 996 round trips in
+  // fit_top_candidates): the top N's reads do not grow with its candidates.
+  it("top N over many candidates reads in batches, never one company at a time", async () => {
+    const counts = async (n: number) => {
+      const ids = Array.from({ length: n }, (_, i) => ID(2000 + i));
+      const { fit } = compose(
+        { n: 0 },
+        new Map(),
+        () => false,
+        (id) => `Company ${id.slice(-4)}`,
+        ids,
+      );
+      for (const key of Object.keys(queries) as (keyof typeof queries)[])
+        queries[key] = 0;
+      const result = await fit.top(actor, 3);
+      expect(result.kind).toBe("OK");
+      return { ...queries };
+    };
+    const few = await counts(10);
+    const many = await counts(90);
+    expect(many.oneByOne).toBe(0);
+    expect(few.oneByOne).toBe(0);
+    // One batch of inputs either way: the same number of reads, and
+    // one-liners only for the ones shown, never every candidate.
+    for (const key of [
+      "identities",
+      "objectives",
+      "cards",
+      "snapshots",
+      "profiles",
+    ] as const) {
+      expect(many[key]).toBe(few[key]);
+    }
   });
 
   it("top N reads the reader's own lists, and one list failing does not fail it", async () => {
