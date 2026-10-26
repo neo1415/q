@@ -189,8 +189,54 @@ export function createCapitalObjectiveDisclosureResolver(ports: {
   readonly capital: CapitalObjectiveQueryPort;
   readonly companies: CompanyQueryPort;
 }): DisclosureResourceResolver {
+  const describe = (
+    objective: {
+      readonly id: string;
+      readonly tenantId: DisclosureResourceDescriptor["tenantId"];
+    },
+    company: {
+      readonly organisationId: DisclosureResourceDescriptor["ownerOrganisationId"];
+    },
+  ): DisclosureResourceDescriptor => ({
+    resource: ref("capital_objective", objective.id),
+    tenantId: objective.tenantId,
+    ownerOrganisationId: company.organisationId,
+    // Company-side private; an ACTIVE objective is never automatically
+    // network-visible. Founder onboarding (F10) decides later.
+    intrinsicScope: "founder_private",
+  });
+  const many = ports.capital.findCanonicalCapitalObjectives;
+  const companiesMany = ports.companies.findCanonicalCompanies;
   return {
     resourceType: "capital_objective",
+    // Coordinator 2026-10-26 (live 7fb7e429: ~900 round trips in a network
+    // rank, an objective and its company read per raise checked): the
+    // objectives in one read, then their companies in one read.
+    ...(many === undefined || companiesMany === undefined
+      ? {}
+      : {
+          resolveMany: async (resourceIds: readonly string[]) => {
+            const ids = resourceIds.flatMap((raw) => {
+              const parsed = CapitalObjectiveIdSchema.safeParse(raw);
+              return parsed.success ? [parsed.data] : [];
+            });
+            if (ids.length === 0) return [];
+            const objectives = await many(ids);
+            const companies = new Map(
+              (
+                await companiesMany([
+                  ...new Set(objectives.map((o) => o.companyId)),
+                ])
+              ).map((company) => [company.id, company]),
+            );
+            return objectives.flatMap((objective) => {
+              const company = companies.get(objective.companyId);
+              return company === undefined
+                ? []
+                : [describe(objective, company)];
+            });
+          },
+        }),
     resolve: async (resourceId) => {
       const id = CapitalObjectiveIdSchema.safeParse(resourceId);
       if (!id.success) {
