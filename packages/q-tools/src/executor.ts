@@ -403,8 +403,19 @@ export function createQToolExecutor(
     // up to what one request can carry, exactly as the offer was before.
     // Declared app actions follow on any purpose: the reader may name one,
     // and a named one executes (lead 2026-10-03).
-    available: (context) =>
-      Promise.resolve(registry.available(context).map(toOfferedTool)),
+    available: async (context) => {
+      const listed = registry.available(context);
+      const applies = await Promise.all(
+        listed.map((record) =>
+          record.definition.applies === undefined
+            ? Promise.resolve(true)
+            : record.definition.applies(context).catch(() => true),
+        ),
+      );
+      return listed
+        .filter((_record, index) => applies[index] !== false)
+        .map(toOfferedTool);
+    },
     execute,
   };
 }
