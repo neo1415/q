@@ -33,14 +33,21 @@ export const COMPARE_ANSWER_FIELDS = [
   "actionTalk",
 ] as const;
 
-/** The analyst's output spec, narrowed to the comparison's own fields. */
-export function compareAnswerOutput(output: ModelOutputSpec): ModelOutputSpec {
+/**
+ * An analyst output spec narrowed to `fields`, all required: the model
+ * writes only those (the strict schema otherwise makes it emit every
+ * field, and every token is time the person waits).
+ */
+export function narrowedOutput(
+  output: ModelOutputSpec,
+  fields: readonly string[],
+): ModelOutputSpec {
   if (output.kind !== "STRUCTURED") return output;
   const schema = output.jsonSchema as {
     readonly properties?: Readonly<Record<string, unknown>>;
   };
   const properties = schema.properties ?? {};
-  const kept = COMPARE_ANSWER_FIELDS.filter((field) => field in properties);
+  const kept = fields.filter((field) => field in properties);
   return {
     ...output,
     jsonSchema: {
@@ -53,13 +60,18 @@ export function compareAnswerOutput(output: ModelOutputSpec): ModelOutputSpec {
   };
 }
 
+/** The analyst's output spec, narrowed to the comparison's own fields. */
+export function compareAnswerOutput(output: ModelOutputSpec): ModelOutputSpec {
+  return narrowedOutput(output, COMPARE_ANSWER_FIELDS);
+}
+
 /**
- * The analyst's result schema for a comparison's writer: what it was not
- * asked for is filled by code before the usual checks. Only `recommendation`
- * has no default of its own; every other field left out takes its
- * schema's empty value.
+ * The analyst's result schema for a writer asked for some fields only:
+ * what it was not asked for is filled by code before the usual checks.
+ * Only `recommendation` has no default of its own; every other field left
+ * out takes its schema's empty value.
  */
-export const COMPARE_ANSWER_SCHEMA: z.ZodType<CompanyAnalystV26Result> =
+export const NARROWED_ANALYST_SCHEMA: z.ZodType<CompanyAnalystV26Result> =
   z.preprocess(
     (value) =>
       value !== null && typeof value === "object" && !Array.isArray(value)
@@ -67,6 +79,9 @@ export const COMPARE_ANSWER_SCHEMA: z.ZodType<CompanyAnalystV26Result> =
         : value,
     CompanyAnalystV26ResultSchema,
   );
+
+/** The comparison's writer's schema (see NARROWED_ANALYST_SCHEMA). */
+export const COMPARE_ANSWER_SCHEMA = NARROWED_ANALYST_SCHEMA;
 
 /**
  * Whether one of the writer's sentences only says code's verdict again

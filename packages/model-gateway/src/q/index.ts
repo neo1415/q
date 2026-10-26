@@ -225,6 +225,7 @@ import {
 } from "./chained-read.js";
 import {
   COMPARE_ANSWER_SCHEMA,
+  NARROWED_ANALYST_SCHEMA,
   compareAnswerOutput,
   restatesVerdict,
 } from "./compare-answer.js";
@@ -233,6 +234,7 @@ import {
   EXTRAS_ELSEWHERE_NOTE,
   TABLE_IS_THE_COMPARISON,
   extrasMessages,
+  extrasOutput,
   joinExtras,
 } from "./parallel-extras.js";
 import {
@@ -7915,9 +7917,11 @@ export function createModelGatewayQAnswer(
         modelCalls += 1;
         const result = gateway
           .execute<CompanyAnalystV26Result>(
-            { ...base, messages: read, output: rendered.output },
+            { ...base, messages: read, output: extrasOutput(rendered.output) },
             {
               ...options,
+              // Its own fields only (parallel-extras.ts); code fills the rest.
+              schema: NARROWED_ANALYST_SCHEMA,
               signal:
                 request.signal === undefined
                   ? stop.signal
@@ -9315,7 +9319,7 @@ export function createModelGatewayQAnswer(
                 : (() => {
                     const accepted = acceptStructuredOutput(
                       written.output.text,
-                      answerSchema,
+                      NARROWED_ANALYST_SCHEMA,
                       {
                         invalidListItems: "DROP",
                         lenientFields: ANALYST_LENIENT_FIELDS,
