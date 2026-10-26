@@ -46,6 +46,39 @@ export function createPostgresProfileMaterialPorts(options: {
           };
     },
 
+    /** company for many ids in one read, by id (absent: none). */
+    companies: async (
+      companyIds: readonly string[],
+    ): Promise<ReadonlyMap<string, DataRoomCompany>> => {
+      const ids = [...new Set(companyIds.filter((id) => UUID.test(id)))];
+      if (ids.length === 0) return new Map();
+      const rows = await sql<
+        {
+          id: string;
+          tenant_id: string;
+          organisation_id: string;
+          canonical_name: string;
+          current_stage_code: string | null;
+          headquarters_country: string | null;
+        }[]
+      >`
+        select id, tenant_id, organisation_id, canonical_name, current_stage_code, headquarters_country
+          from core.companies where id = any(${ids}::uuid[])`;
+      return new Map(
+        rows.map((row) => [
+          row.id,
+          {
+            id: row.id,
+            tenantId: row.tenant_id,
+            organisationId: row.organisation_id,
+            name: row.canonical_name,
+            stageCode: row.current_stage_code,
+            countryCode: row.headquarters_country,
+          },
+        ]),
+      );
+    },
+
     investorName: async (investorOrganisationId: string): Promise<string> => {
       const rows = await sql<{ display_name: string }[]>`
         select display_name from core.investor_organisations where id = ${investorOrganisationId}`;

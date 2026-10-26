@@ -301,6 +301,7 @@ export function createProfileMaterial(dependencies: {
     transactions: dependencies.transactions,
     store,
     company: reads.company,
+    companies: reads.companies,
     isInvestor: async (actor) =>
       (await dependencies.investorOrganisationFor(actor)) !== null,
     investorMayFind: dependencies.investorMayFind,

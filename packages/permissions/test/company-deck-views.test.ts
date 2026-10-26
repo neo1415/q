@@ -75,8 +75,63 @@ function deckOf(companyId: string): CompanyDeckRecord | null {
   };
 }
 
-function world(options: { batched: boolean; amongFails?: boolean }) {
+function world(options: {
+  batched: boolean;
+  amongFails?: boolean;
+  /** The deck store and company reads for many, too (coordinator 2026-10-26). */
+  batchedReads?: boolean;
+  readsFail?: boolean;
+}) {
   const calls = { one: 0, among: 0 };
+  const reads = { one: 0, many: 0 };
+  const one = <T>(value: T): Promise<T> => {
+    reads.one += 1;
+    return options.readsFail === true
+      ? Promise.reject(new Error("down"))
+      : Promise.resolve(value);
+  };
+  const many = <T>(value: T): Promise<T> => {
+    reads.many += 1;
+    return options.readsFail === true
+      ? Promise.reject(new Error("down"))
+      : Promise.resolve(value);
+  };
+  const companyOf = (companyId: string) =>
+    companyId === C.unknown
+      ? null
+      : {
+          id: companyId,
+          tenantId: "t",
+          organisationId:
+            companyId === C.own || companyId === C.ownUnmanaged
+              ? OWN_ORG
+              : `org-${companyId}`,
+          name: "Company",
+          stageCode: "seed",
+          countryCode: "NG",
+        };
+  const extractionOf = (versionId: string) => ({
+    id: `x-${versionId}`,
+    documentId: "d",
+    documentVersionId: versionId,
+    pageCount: 10,
+    sections: DECK_SECTIONS.map((section) => ({
+      section,
+      status: "PRESENT" as const,
+      summary: "What the deck says.",
+      pages: [2],
+      facts: [],
+      confidence: "MEDIUM" as const,
+      criteria: {
+        clear: true,
+        strong: false,
+        exceptional: false,
+        note: "Private coaching note",
+      },
+    })),
+    createdAt: "2026-09-28T11:00:00.000Z",
+    confirmed: true,
+  });
   // The one rule both forms ask: the investor finds every company but one.
   const finds = (who: ActorContext, companyId: string) =>
     who === investor && companyId !== C.notFindable;
@@ -86,48 +141,39 @@ function world(options: { batched: boolean; amongFails?: boolean }) {
       run: (work) => work({ sql: {} } as never),
     },
     store: {
-      currentDeck: (_sql, companyId) => Promise.resolve(deckOf(companyId)),
-      extractionFor: (_sql, versionId) =>
-        Promise.resolve({
-          id: `x-${versionId}`,
-          documentId: "d",
-          documentVersionId: versionId,
-          pageCount: 10,
-          sections: DECK_SECTIONS.map((section) => ({
-            section,
-            status: "PRESENT" as const,
-            summary: "What the deck says.",
-            pages: [2],
-            facts: [],
-            confidence: "MEDIUM" as const,
-            criteria: {
-              clear: true,
-              strong: false,
-              exceptional: false,
-              note: "Private coaching note",
-            },
-          })),
-          createdAt: "2026-09-28T11:00:00.000Z",
-          confirmed: true,
-        }),
+      currentDeck: (_sql, companyId) => one(deckOf(companyId)),
+      extractionFor: (_sql, versionId) => one(extractionOf(versionId)),
+      ...(options.batchedReads === true
+        ? {
+            currentDecks: (_sql: unknown, ids: readonly string[]) =>
+              many(
+                new Map(
+                  ids.flatMap((id) => {
+                    const deck = deckOf(id);
+                    return deck === null ? [] : [[id, deck] as const];
+                  }),
+                ),
+              ),
+            extractionsFor: (_sql: unknown, versionIds: readonly string[]) =>
+              many(new Map(versionIds.map((v) => [v, extractionOf(v)]))),
+          }
+        : {}),
       confirmExtraction: () => Promise.resolve(false),
     },
-    company: (companyId) =>
-      Promise.resolve(
-        companyId === C.unknown
-          ? null
-          : {
-              id: companyId,
-              tenantId: "t",
-              organisationId:
-                companyId === C.own || companyId === C.ownUnmanaged
-                  ? OWN_ORG
-                  : `org-${companyId}`,
-              name: "Company",
-              stageCode: "seed",
-              countryCode: "NG",
-            },
-      ),
+    company: (companyId) => one(companyOf(companyId)),
+    ...(options.batchedReads === true
+      ? {
+          companies: (ids: readonly string[]) =>
+            many(
+              new Map(
+                ids.flatMap((id) => {
+                  const company = companyOf(id);
+                  return company === null ? [] : [[id, company] as const];
+                }),
+              ),
+            ),
+        }
+      : {}),
     isInvestor: (who) => Promise.resolve(who === investor || who === stranger),
     investorMayFind: (who, companyId) => {
       calls.one += 1;
@@ -155,7 +201,7 @@ function world(options: { batched: boolean; amongFails?: boolean }) {
     newCorrelationId: () => "cor",
     now: () => NOW,
   });
-  return { service, calls };
+  return { service, calls, reads };
 }
 
 const oneByOne = async (
@@ -214,5 +260,41 @@ describe("the decks of many companies, read together, decide as one by one", () 
     for (const companyId of ALL) {
       expect(views.get(companyId), companyId).toBeNull();
     }
+  });
+
+  // Coordinator 2026-10-26 (live trace): with the store and company reads
+  // for many, the decks of the companies shown are three reads, whoever
+  // reads them, and decide as one by one -- failures included.
+  for (const [label, who] of [
+    ["an investor", investor],
+    ["their own founder", founder],
+    ["a founder elsewhere", founderElsewhere],
+  ] as const) {
+    it(`${label}: the store read for many decides as one by one`, async () => {
+      const together = world({ batched: true, batchedReads: true });
+      const alone = world({ batched: true });
+      expect(await together.service.views(who, ALL)).toEqual(
+        await oneByOne(alone.service, who),
+      );
+      expect(together.reads.one).toBe(0);
+    });
+  }
+
+  it("an investor's decks: the companies, the decks and their readings, one read each", async () => {
+    const { service, reads } = world({ batched: true, batchedReads: true });
+    await service.views(investor, ALL);
+    expect(reads).toEqual({ one: 0, many: 3 });
+  });
+
+  it("a failed read is no deck, read together as one by one", async () => {
+    const together = world({
+      batched: true,
+      batchedReads: true,
+      readsFail: true,
+    });
+    const alone = world({ batched: true, readsFail: true });
+    expect(await together.service.views(investor, ALL)).toEqual(
+      await oneByOne(alone.service, investor),
+    );
   });
 });

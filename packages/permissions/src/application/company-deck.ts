@@ -171,6 +171,24 @@ export type CompanyDeckStore = {
     executor: DatabaseExecutor,
     documentVersionId: string,
   ) => Promise<CompanyDeckReading | null>;
+  /**
+   * currentDeck and extractionFor for many at once, by company id and by
+   * version id, each exactly as the one-key read (coordinator 2026-10-26:
+   * the fit's top read each shown company's deck one query at a time).
+   * Optional: the deck service reads one by one without them.
+   */
+  readonly currentDecks?:
+    | ((
+        executor: DatabaseExecutor,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, CompanyDeckRecord>>)
+    | undefined;
+  readonly extractionsFor?:
+    | ((
+        executor: DatabaseExecutor,
+        documentVersionIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, CompanyDeckReading>>)
+    | undefined;
   readonly confirmExtraction: (
     tx: TransactionContext,
     input: {
@@ -210,6 +228,12 @@ export function createCompanyDeckService(dependencies: {
   readonly transactions: TransactionManager;
   readonly store: CompanyDeckStore;
   readonly company: (companyId: string) => Promise<DataRoomCompany | null>;
+  /** company for many ids in one read (absent: read one by one). */
+  readonly companies?:
+    | ((
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, DataRoomCompany>>)
+    | undefined;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly investorMayFind: (
     actor: ActorContext,
@@ -276,11 +300,20 @@ export function createCompanyDeckService(dependencies: {
    * the investor's findability is asked once for all of them.
    */
   async function readersOf(actor: ActorContext, companyIds: readonly string[]) {
-    const companies = await Promise.all(
-      companyIds.map((companyId) =>
-        quietly(dependencies.company(companyId), null),
-      ),
-    );
+    const companiesMany = dependencies.companies;
+    const companies =
+      companiesMany !== undefined
+        ? await quietly(
+            companiesMany(companyIds).then((found) =>
+              companyIds.map((companyId) => found.get(companyId) ?? null),
+            ),
+            companyIds.map(() => null),
+          )
+        : await Promise.all(
+            companyIds.map((companyId) =>
+              quietly(dependencies.company(companyId), null),
+            ),
+          );
     const others = companies.filter(
       (company): company is DataRoomCompany =>
         company !== null && company.organisationId !== actor.organisationId,
@@ -334,8 +367,13 @@ export function createCompanyDeckService(dependencies: {
   async function deckFor(
     actor: ActorContext,
     reader: NonNullable<Awaited<ReturnType<typeof readerOf>>>,
+    /** The company's current deck, already read (views); else read here. */
+    current?: CompanyDeckRecord | null,
   ) {
-    const deck = await quietly(store.currentDeck(sql, reader.company.id), null);
+    const deck =
+      current !== undefined
+        ? current
+        : await quietly(store.currentDeck(sql, reader.company.id), null);
     if (deck === null) return null;
     if (reader.viewer === "OWNER") return deck;
     const open =
@@ -351,9 +389,14 @@ export function createCompanyDeckService(dependencies: {
   async function viewFor(
     actor: ActorContext,
     reader: Awaited<ReturnType<typeof readerOf>>,
+    /** Already read for many (views): the deck, then its reading. */
+    preloaded?: {
+      readonly deck: CompanyDeckRecord | null;
+      readonly readings?: ReadonlyMap<string, CompanyDeckReading | null>;
+    },
   ): Promise<CompanyDeckView | null> {
     if (reader === null) return null;
-    const deck = await deckFor(actor, reader);
+    const deck = await deckFor(actor, reader, preloaded?.deck);
     if (deck === null) {
       return {
         viewer: reader.viewer,
@@ -363,10 +406,11 @@ export function createCompanyDeckService(dependencies: {
         coaching: null,
       };
     }
-    const reading = await quietly(
-      store.extractionFor(sql, deck.versionId),
-      null,
-    );
+    const preread = preloaded?.readings?.get(deck.versionId);
+    const reading =
+      preread !== undefined
+        ? preread
+        : await quietly(store.extractionFor(sql, deck.versionId), null);
     const owner = reader.viewer === "OWNER";
     const reviewed =
       reading === null
@@ -452,8 +496,51 @@ export function createCompanyDeckService(dependencies: {
     ): Promise<ReadonlyMap<string, CompanyDeckView | null>> => {
       const ids = [...new Set(companyIds)];
       const readers = await readersOf(actor, ids);
+      // Coordinator 2026-10-26: the decks, then their readings, each in one
+      // read for the companies a reader may see; a failed read is no deck
+      // (or no reading), as it is for one.
+      const seen = readers.flatMap((reader) =>
+        reader === null ? [] : [reader.company.id],
+      );
+      const currentMany = store.currentDecks;
+      const decks: ReadonlyMap<string, CompanyDeckRecord> | null =
+        currentMany === undefined || seen.length === 0
+          ? null
+          : await quietly(
+              currentMany(sql, seen),
+              new Map<string, CompanyDeckRecord>(),
+            );
+      const readingsMany = store.extractionsFor;
+      const versions =
+        decks === null ? [] : [...decks.values()].map((deck) => deck.versionId);
+      const readings: ReadonlyMap<string, CompanyDeckReading | null> | null =
+        readingsMany === undefined || versions.length === 0
+          ? null
+          : await quietly(
+              readingsMany(sql, versions).then(
+                (found) =>
+                  new Map(
+                    versions.map((versionId) => [
+                      versionId,
+                      found.get(versionId) ?? null,
+                    ]),
+                  ),
+              ),
+              new Map(versions.map((versionId) => [versionId, null])),
+            );
       const views = await Promise.all(
-        readers.map((reader) => viewFor(actor, reader)),
+        readers.map((reader) =>
+          viewFor(
+            actor,
+            reader,
+            decks === null || reader === null
+              ? undefined
+              : {
+                  deck: decks.get(reader.company.id) ?? null,
+                  ...(readings === null ? {} : { readings }),
+                },
+          ),
+        ),
       );
       return new Map(ids.map((id, index) => [id, views[index] ?? null]));
     },

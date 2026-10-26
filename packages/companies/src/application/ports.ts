@@ -230,6 +230,16 @@ export type CompanyQueryPort = {
     companyId: CompanyId,
   ) => Promise<CompanyProfileFacts | null>;
   /**
+   * The same facts for many companies in one read (absent ids left out);
+   * permission-neutral exactly as the one above. Optional: callers fall
+   * back to it.
+   */
+  readonly findCanonicalCompanyProfiles?:
+    | ((
+        companyIds: readonly CompanyId[],
+      ) => Promise<readonly CompanyProfileFacts[]>)
+    | undefined;
+  /**
    * Bounded discovery over companies a viewer could be allowed to see: the
    * viewer's own organisation's companies plus companies classified
    * network_visible or public_external. Classification is a candidate

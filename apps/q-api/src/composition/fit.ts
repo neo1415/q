@@ -81,7 +81,9 @@ export type FitCompositionDependencies = {
     Partial<
       Pick<
         CompanyQueryPort,
-        "findCanonicalCompanyProfile" | "findCanonicalCompanies"
+        | "findCanonicalCompanyProfile"
+        | "findCanonicalCompanyProfiles"
+        | "findCanonicalCompanies"
       >
     >;
   readonly capital: Pick<CapitalObjectiveQueryPort, "getCurrentForCompany"> &
@@ -249,17 +251,33 @@ export function createFitComposition(
       // for the network (or beyond): the fit service asks only for
       // companies eligibility already admitted for this reader, and a
       // private profile's summary is never carried to someone else.
-      const profiles = await Promise.all(
-        found.map((c) =>
-          c === null ||
-          !lines ||
-          dependencies.companies.findCanonicalCompanyProfile === undefined
-            ? Promise.resolve(null)
-            : dependencies.companies
-                .findCanonicalCompanyProfile(c.id)
-                .catch(() => null),
-        ),
-      );
+      // Coordinator 2026-10-26 (live trace): one read for the companies
+      // shown, where the port has it; a failed read is no line, as for one.
+      const profilesMany = dependencies.companies.findCanonicalCompanyProfiles;
+      const profiles =
+        lines && profilesMany !== undefined
+          ? await profilesMany(
+              found.flatMap((c) => (c === null ? [] : [c.id])),
+            ).then(
+              (rows) => {
+                const byId = new Map(rows.map((row) => [row.id, row]));
+                return found.map((c) =>
+                  c === null ? null : (byId.get(c.id) ?? null),
+                );
+              },
+              () => found.map(() => null),
+            )
+          : await Promise.all(
+              found.map((c) =>
+                c === null ||
+                !lines ||
+                dependencies.companies.findCanonicalCompanyProfile === undefined
+                  ? Promise.resolve(null)
+                  : dependencies.companies
+                      .findCanonicalCompanyProfile(c.id)
+                      .catch(() => null),
+              ),
+            );
       return new Map(
         found.flatMap((c, index) => {
           if (c === null) return [];

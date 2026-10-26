@@ -495,6 +495,153 @@ export function createPostgresDataRoom() {
           };
     },
 
+    /**
+     * currentDeck for many companies in one round trip (coordinator
+     * 2026-10-26): the same query per company, as a lateral subquery, so
+     * each company's deck is exactly the one currentDeck returns.
+     */
+    currentDecks: async (
+      executor: DatabaseExecutor,
+      companyIds: readonly string[],
+    ): Promise<
+      ReadonlyMap<
+        string,
+        {
+          readonly documentId: string;
+          readonly tenantId: string;
+          readonly title: string;
+          readonly versionId: string;
+          readonly versionNumber: number;
+          readonly uploadedAt: string;
+          readonly downloadAudience: string;
+          readonly scanned: boolean;
+          readonly level: DataRoomLevel;
+        }
+      >
+    > => {
+      const ids = [...new Set(companyIds)];
+      if (ids.length === 0) return new Map();
+      const rows = await executor<
+        {
+          company_id: string;
+          id: string;
+          tenant_id: string;
+          title: string;
+          version_id: string;
+          version_number: number;
+          uploaded_at: Date;
+          download_audience: string;
+          malware_scan_status: string;
+          level: DataRoomLevel | null;
+        }[]
+      >`
+        select w.company_id, k.*
+          from unnest(${ids}::uuid[]) as w (company_id)
+          cross join lateral (
+            select d.id, d.tenant_id, d.title, v.id as version_id, v.version_number,
+                   v.uploaded_at, d.download_audience, v.malware_scan_status, e.level
+              from (select * from evidence.documents where owner_kind = 'ORGANISATION') d
+              join evidence.document_versions v
+                on v.id = d.current_version_id and v.tenant_id = d.tenant_id
+              left join evidence.data_room_entries e on e.document_id = d.id
+             where d.company_id = w.company_id
+               and d.document_type = 'PITCH_DECK'
+               and d.status = 'ACTIVE'
+               and v.malware_scan_status <> 'BLOCKED'
+             order by d.updated_at desc, d.id
+             limit 1
+          ) k`;
+      return new Map(
+        rows.map((row) => [
+          row.company_id,
+          {
+            documentId: row.id,
+            tenantId: row.tenant_id,
+            title: row.title,
+            versionId: row.version_id,
+            versionNumber: row.version_number,
+            uploadedAt: iso(row.uploaded_at),
+            downloadAudience: row.download_audience,
+            scanned: row.malware_scan_status === "CLEAN",
+            level: row.level ?? "PRIVATE",
+          },
+        ]),
+      );
+    },
+
+    /** extractionFor for many versions in one round trip, each exactly as it. */
+    extractionsFor: async (
+      executor: DatabaseExecutor,
+      documentVersionIds: readonly string[],
+    ): Promise<ReadonlyMap<string, DeckExtractionRow>> => {
+      const ids = [...new Set(documentVersionIds)];
+      if (ids.length === 0) return new Map();
+      const rows = await executor<
+        {
+          id: string;
+          document_id: string;
+          document_version_id: string;
+          page_count: number | null;
+          sections: DeckSectionReading[];
+          created_at: Date;
+          confirmed: boolean;
+          reading_number: number;
+          set_aside: DeckSetAside[] | null;
+          reviews: {
+            section: DeckSectionCode;
+            action: DeckSectionReviewAction;
+            correction: string | null;
+          }[];
+          used: number;
+          pending: boolean;
+        }[]
+      >`
+        select k.*
+          from unnest(${ids}::uuid[]) as w (document_version_id)
+          cross join lateral (
+            select x.id, x.document_id, x.document_version_id, x.page_count, x.sections,
+                   x.created_at, (c.extraction_id is not null) as confirmed,
+                   x.reading_number, x.set_aside,
+                   coalesce((
+                     select jsonb_agg(jsonb_build_object('section', r.section, 'action', r.action,
+                                                         'correction', r.correction))
+                       from (select distinct on (section) section, action, correction
+                               from evidence.deck_section_reviews
+                              where extraction_id = x.id
+                              order by section, created_at desc, id desc) r
+                   ), '[]'::jsonb) as reviews,
+                   (select count(*)::int from evidence.deck_read_again_requests q
+                     where q.document_version_id = x.document_version_id) as used,
+                   exists (select 1 from evidence.deck_read_again_requests q
+                            where q.document_version_id = x.document_version_id
+                              and not exists (select 1 from evidence.deck_read_again_outcomes o
+                                               where o.request_id = q.id)) as pending
+              from evidence.deck_extractions x
+              left join evidence.deck_extraction_confirmations c on c.extraction_id = x.id
+             where x.document_version_id = w.document_version_id
+             order by x.prompt_version desc, x.reading_number desc, x.created_at desc
+             limit 1
+          ) k`;
+      return new Map(
+        rows.map((row) => [
+          row.document_version_id,
+          {
+            id: row.id,
+            documentId: row.document_id,
+            documentVersionId: row.document_version_id,
+            pageCount: row.page_count,
+            sections: row.sections,
+            createdAt: iso(row.created_at),
+            confirmed: row.confirmed,
+            readingNumber: row.reading_number,
+            setAside: row.set_aside ?? [],
+            reviews: row.reviews,
+            readAgain: { used: row.used, pending: row.pending },
+          },
+        ]),
+      );
+    },
+
     /** The newest reading of exactly that version, and whether it was confirmed. */
     extractionFor: async (
       executor: DatabaseExecutor,

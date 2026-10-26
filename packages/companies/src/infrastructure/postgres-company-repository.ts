@@ -707,6 +707,18 @@ export function createPostgresCompanyQueryPort(options: {
          where c.id = ${companyId}`;
       return rows.length === 0 ? null : toProfileFacts(rows[0]);
     },
+    findCanonicalCompanyProfiles: async (companyIds) => {
+      if (companyIds.length === 0) return [];
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.legal_name,
+               c.website_url, c.founded_date::text as founded_date, c.headquarters_country,
+               c.headquarters_city, c.current_stage_code, c.primary_description,
+               c.short_description, c.company_status, c.marketplace_visibility,
+               c.demonstration_data
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])`;
+      return rows.map(toProfileFacts);
+    },
     searchCompanies: async (
       query: CompanySearchQuery,
     ): Promise<CompanySearchPage> => {
