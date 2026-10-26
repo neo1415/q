@@ -403,7 +403,28 @@ export function acceptStructuredOutput<T>(
   const dropped: string[] = [];
   for (let pass = 0; pass < DROP_PASSES_MAX && !parsed.success; pass += 1) {
     const removals = new Map<unknown[], Set<number>>();
+    /**
+     * A list longer than its bound keeps its first elements up to the
+     * bound (live 2026-10-26, run 186c0788: eight `userStatements` against
+     * a bound of six refused a whole readiness answer, and the turn paid
+     * two more full model calls). Its tail elements are the ones dropped:
+     * still only list ELEMENTS, nothing rewritten.
+     */
+    const cuts = new Map<unknown[], number>();
     for (const issue of parsed.error.issues) {
+      const listed = valueAt(working, issue.path);
+      const bound = (issue as { readonly maximum?: unknown }).maximum;
+      if (
+        issue.code === "too_big" &&
+        Array.isArray(listed) &&
+        typeof bound === "number" &&
+        Number.isInteger(bound) &&
+        bound >= 0
+      ) {
+        cuts.set(listed, bound);
+        dropped.push(`${describe(issue)}:cut`);
+        continue;
+      }
       const element = containingElement(working, issue.path);
       if (element === null) {
         // A refused field outside any list: nothing may be dropped for it.
@@ -419,6 +440,11 @@ export function acceptStructuredOutput<T>(
       for (const index of [...indices].sort((a, b) => b - a)) {
         list.splice(index, 1);
       }
+    }
+    // After the refused elements went, so what is kept is the first valid
+    // ones up to the bound.
+    for (const [list, bound] of cuts) {
+      if (list.length > bound) list.splice(bound);
     }
     if (dropped.length > DROPPED_MAX) {
       return { ok: false, stage: "SCHEMA", refusals: refused };

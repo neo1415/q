@@ -961,6 +961,11 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "visual",
   // v26 (L-13): a malformed search loses the picture, never the answer.
   "pictureQuery",
+  // Live 2026-10-26 (run 186c0788): a malformed display-name request or
+  // status flag refused a whole readiness answer. Each stands as its
+  // "nothing" value (no rename asked; no status line), never the answer.
+  "displayName",
+  "proposalStatus",
 ];
 
 /**
