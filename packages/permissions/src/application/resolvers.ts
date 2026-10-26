@@ -231,7 +231,9 @@ export function createCapitalObjectiveDisclosureResolver(ports: {
             );
             return objectives.flatMap((objective) => {
               const company = companies.get(objective.companyId);
-              return company === undefined
+              // A raise resolves only with its own tenant's company.
+              return company === undefined ||
+                company.tenantId !== objective.tenantId
                 ? []
                 : [describe(objective, company)];
             });
@@ -251,7 +253,8 @@ export function createCapitalObjectiveDisclosureResolver(ports: {
       const company = await ports.companies.findCanonicalCompany(
         objective.companyId,
       );
-      if (company === null) {
+      // A raise resolves only with its own tenant's company (2026-10-26).
+      if (company === null || company.tenantId !== objective.tenantId) {
         return null;
       }
       return {
