@@ -879,7 +879,11 @@ export function registerQVoiceRoutes(
                 },
                 firstName: firstNameOf(
                   signupContextFromToken(accessToken).displayName,
+                  signupContextFromToken(accessToken).organisationName,
                 ),
+                displayName: signupContextFromToken(accessToken).displayName,
+                organisationName:
+                  signupContextFromToken(accessToken).organisationName,
               });
         if (introduction !== null) firstMessage = introduction;
         else

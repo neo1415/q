@@ -14,6 +14,7 @@ import type { OnboardingState, OnboardingStepState } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 import type { HeldWritesStore } from "./held-writes.js";
+import type { InvestorResearch } from "./investor-research.js";
 import {
   createOnboardingPort,
   type RecommendationStore,
@@ -66,6 +67,11 @@ export type OnboardingConversation = {
     readonly accessToken: string;
     readonly onboarding: ConversationLine["onboarding"];
     readonly firstName: string | null;
+    /** Their name and organisation as given at sign-up: research starts on them. */
+    readonly displayName?: string | null | undefined;
+    readonly organisationName?: string | null | undefined;
+    /** The step the opening's question asks (the journey's own next step). */
+    readonly askStepKey?: string | null | undefined;
   }) => Promise<string | null>;
   /**
    * The voice asked the backend (they want to know what is saved, to stop
@@ -96,6 +102,17 @@ export function createOnboardingConversation(dependencies: {
   readonly delegation?: QDelegationReader | undefined;
   readonly heldWrites?: HeldWritesStore | undefined;
   readonly recommendations?: RecommendationStore | undefined;
+  /**
+   * Research first (BIZ-009): public sources on their firm or company,
+   * started at the opening and whenever its name or website is saved;
+   * what it finds is offered for their yes, never saved as an answer.
+   */
+  readonly research?:
+    | {
+        readonly investor?: InvestorResearch | undefined;
+        readonly founder?: InvestorResearch | undefined;
+      }
+    | undefined;
   readonly logger: Logger;
   readonly readAfterMs?: number | undefined;
   readonly fetch?: typeof fetch | undefined;
@@ -143,6 +160,34 @@ export function createOnboardingConversation(dependencies: {
         sessionId: line.onboarding.sessionId,
       }),
     });
+
+  const researchFor = (journey: "investor" | "founder") =>
+    journey === "investor"
+      ? dependencies.research?.investor
+      : dependencies.research?.founder;
+
+  /** Start a read of their firm or company once its name is known. */
+  const considerResearch = (
+    line: Pick<ConversationLine, "actor" | "accessToken" | "onboarding">,
+    identity: {
+      readonly firmName: string;
+      readonly websiteUrl: string | null;
+      readonly personName: string | null;
+    },
+  ) => {
+    if (identity.firmName.trim().length === 0) return;
+    researchFor(line.onboarding.journeyType)?.consider({
+      actor: line.actor,
+      session: sessionOf(line),
+      onboardingSessionId: line.onboarding.sessionId,
+      identity: {
+        firmName: identity.firmName.trim().slice(0, 160),
+        websiteUrl: identity.websiteUrl,
+        profileUrls: [],
+        personName: identity.personName,
+      },
+    });
+  };
 
   const keep = (line: ConversationLine, role: "PERSON" | "Q", text: string) => {
     const words = text.replace(/\s+/g, " ").trim();
@@ -265,6 +310,11 @@ export function createOnboardingConversation(dependencies: {
       },
       "onboarding conversation read and saved",
     );
+    const after = await port.state();
+    considerResearch(line, identityOf(after));
+    await researchFor(line.onboarding.journeyType)
+      ?.offerReady(line.onboarding.sessionId, port)
+      .catch(() => 0);
   };
 
   const readingFor = (line: ConversationLine): Reading => {
@@ -377,10 +427,20 @@ export function createOnboardingConversation(dependencies: {
           portFor(input, []).state(),
           listOnboardingInterviewTurns(session, input.onboarding.sessionId, 4),
         ]);
+        const fromRecord = identityOf(state);
+        considerResearch(input, {
+          firmName:
+            fromRecord.firmName.length > 0
+              ? fromRecord.firmName
+              : (input.organisationName ?? ""),
+          websiteUrl: fromRecord.websiteUrl,
+          personName: input.displayName ?? null,
+        });
         return openingOf({
           state,
           firstName: input.firstName,
           resumed: thread.items.some((turn) => turn.role === "PERSON"),
+          askStepKey: input.askStepKey ?? null,
         });
       } catch (error: unknown) {
         logger.warn(
@@ -535,8 +595,8 @@ export function briefOf(state: OnboardingState): string {
         ? `already saved: ${step.value ?? "answered"}`
         : step.status === "SET_ASIDE"
           ? "they chose to skip this"
-          : step.offered !== undefined
-            ? `not confirmed yet; Q found: ${step.offered}`
+          : (step.pendingRecommendation ?? step.offered) !== undefined
+            ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
             : "not covered yet";
     return `- ${step.required ? "Needed" : "Optional"}: ${topic}${
       options.length === 0 ? "" : ` (choices: ${options})`
@@ -568,11 +628,20 @@ export function openingOf(input: {
   readonly state: OnboardingState;
   readonly firstName: string | null;
   readonly resumed: boolean;
+  /** The journey's own next step, when the caller knows it. */
+  readonly askStepKey?: string | null | undefined;
 }): string {
   const { state } = input;
   const investor = state.journey === "investor";
   const topics = topicsOf(state.steps);
+  const asked =
+    input.askStepKey === null || input.askStepKey === undefined
+      ? undefined
+      : state.steps.find(
+          (step) => step.stepKey === input.askStepKey && step.status === "OPEN",
+        );
   const next =
+    asked ??
     state.steps.find(
       (step) =>
         isConversational(step) && step.status === "OPEN" && step.required,
@@ -611,6 +680,25 @@ export function openingOf(input: {
   ].join(" ");
 }
 
+/** Their firm or company as the record holds it, for research. */
+function identityOf(state: OnboardingState): {
+  readonly firmName: string;
+  readonly websiteUrl: string | null;
+  readonly personName: string | null;
+} {
+  const investor = state.journey === "investor";
+  const saved = (stepKey: string): string => {
+    const step = stepOf(state, stepKey);
+    return step?.status === "ANSWERED" ? (step.value ?? "").trim() : "";
+  };
+  const website = saved(investor ? "I0.website" : "F1.website");
+  return {
+    firmName: saved(investor ? "I0.organisation_name" : "F1.company_name"),
+    websiteUrl: website.length === 0 ? null : website,
+    personName: null,
+  };
+}
+
 function savedLines(state: OnboardingState): string[] {
   const topics = topicsOf(state.steps);
   return state.steps
@@ -639,6 +727,15 @@ export function readBack(state: OnboardingState): string {
     )
     .map((step) => topics.get(step.stepKey) ?? step.question)
     .slice(0, 6);
+  const found = state.steps
+    .filter((step) => isConversational(step) && step.status === "OPEN")
+    .flatMap((step) => {
+      const offer = step.pendingRecommendation ?? step.offered;
+      return offer === undefined
+        ? []
+        : [`${topics.get(step.stepKey) ?? step.question} ${offer}`];
+    })
+    .slice(0, 6);
   return [
     "From Capital Q's own records (this is what is actually saved; use only this):",
     saved.length === 0
@@ -650,6 +747,9 @@ export function readBack(state: OnboardingState): string {
     optional.length === 0
       ? ""
       : `Optional, not covered yet: ${optional.join("; ")}.`,
+    found.length === 0
+      ? ""
+      : `Found in their documents or public sources, not confirmed yet (put these to them in one go and ask if they're right): ${found.join("; ")}.`,
     needed.length === 0
       ? "Read back the essentials in a few plain sentences (never the list word for word), ask if anything is wrong or missing, and whether they'd like to finish. If they want to finish, pass their words on."
       : "Carry on naturally with what is still needed; mention optional ones lightly, as fine to skip or come back to.",

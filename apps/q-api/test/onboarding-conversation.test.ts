@@ -347,6 +347,64 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
     expect(said).toContain("pick up any time");
   });
 
+  it("starts research on their firm as Q introduces itself, and again once its name is saved", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const { fetch } = withThread(world);
+    const considered: { firmName: string; personName?: string | null }[] = [];
+    const research = {
+      consider: (request: {
+        readonly identity: { firmName: string; personName?: string | null };
+      }) => {
+        considered.push({
+          firmName: request.identity.firmName,
+          personName: request.identity.personName ?? null,
+        });
+        return true;
+      },
+      offerReady: () => Promise.resolve(0),
+      status: () => "IDLE",
+      unsaid: () => new Set<string>(),
+    } as unknown as NonNullable<
+      Parameters<typeof createOnboardingConversation>[0]["research"]
+    >["investor"];
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch,
+      logger,
+      readAfterMs: 5,
+      research: { investor: research },
+      reader: readerReturning({
+        answers: [
+          {
+            stepKey: "I0.organisation_name",
+            value: "Vaultlyne Capital",
+            quote: "Vaultlyne Capital",
+            ownWords: false,
+          },
+        ],
+        declined: [],
+      }),
+    });
+    await conversation.opening({
+      actor,
+      accessToken: "eyPRIVATE.NEVER-EMITTED.bearer",
+      onboarding: { sessionId: SESSION_ID, journeyType: "investor" },
+      firstName: "Tiara",
+      displayName: "Tiara Ade",
+      organisationName: "The Vaultlyne",
+    });
+    expect(considered).toEqual([
+      { firmName: "The Vaultlyne", personName: "Tiara Ade" },
+    ]);
+    const call = line();
+    conversation.heard(call, [
+      { role: "Q", text: "What's your firm called?" },
+      { role: "USER", text: "Vaultlyne Capital" },
+    ]);
+    await conversation.ended(call);
+    expect(considered.at(-1)?.firmName).toBe("Vaultlyne Capital");
+  });
+
   it("a reading that fails saves nothing and loses nothing: the thread is kept", async () => {
     const world = investorSession({ currentStepKey: "I0.investor_type" });
     const { thread, fetch } = withThread(world);

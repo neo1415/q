@@ -387,6 +387,70 @@ describe("no stuck steps", () => {
   });
 });
 
+describe("a brand-new conversation opens by code (owner 2026-10-27)", () => {
+  it("introduces Q at once, with no model turn, and still offers the first question's choices", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("model opening")));
+    const openings: {
+      askStepKey: string | null | undefined;
+      firstName: string | null;
+    }[] = [];
+    const { fetch: f, appended } = api({
+      view: stuckView({ answered: [] }),
+    });
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts().portFor,
+      logger,
+      introduction: {
+        opening: (request) => {
+          openings.push({
+            askStepKey: request.askStepKey,
+            firstName: request.firstName,
+          });
+          return Promise.resolve(
+            "Hi Aria, I'm Q, your analyst here at Capital Q. To start: What brings you to Capital Q?",
+          );
+        },
+      },
+    });
+    const outcome = await conductor.turn(input(f, ""));
+    expect(agent.calls).toEqual([]);
+    expect(outcome.reply).toMatch(/^Hi Aria, I'm Q/);
+    expect(outcome.intent).toBe("OPENING");
+    // The question said and the choices shown are the journey's same next step.
+    const next = nextUnansweredStep(stuckView({ answered: [] }), "founder");
+    expect(openings).toEqual([
+      { askStepKey: next?.stepKey, firstName: "Aria" },
+    ]);
+    expect(outcome.asking?.stepKey).toBe(next?.stepKey);
+    await tick();
+    expect(appended).toEqual([outcome.reply]);
+  });
+
+  it("a conversation already under way is never re-introduced", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Welcome back.")));
+    let introduced = 0;
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts().portFor,
+      logger,
+      introduction: {
+        opening: () => {
+          introduced += 1;
+          return Promise.resolve("Hi, I'm Q.");
+        },
+      },
+    });
+    await conductor.turn(
+      input(
+        api({ kept: [{ role: "PERSON", text: "Raising a seed round" }] }).fetch,
+        "",
+      ),
+    );
+    expect(introduced).toBe(0);
+  });
+});
+
 describe("Q leads", () => {
   it("ends a reply that asks nothing on the next unanswered step", async () => {
     const conductor = createOnboardingConductor({

@@ -6832,7 +6832,40 @@ const presenceTrigger =
 // every entry -- typed route, voice think, duplex ask_q, a voice line's
 // opening -- goes through the same rules: one brain, no stuck steps, Q
 // leads, research findings put back as questions, one turn at a time.
+/**
+ * Owner 2026-10-27: voice onboarding is a conversation first. Q holds the
+ * conversation on the live line from the setup's checklist; what is said
+ * is kept in the onboarding thread and saved from the transcript by
+ * meaning. CQ_ONBOARDING_VOICE_CONVERSATION=off returns the guided
+ * interview (every answer delegated) in one variable.
+ */
+const onboardingConversation =
+  config.voice.apiBaseUrl === undefined ||
+  process.env.CQ_ONBOARDING_VOICE_CONVERSATION === "off"
+    ? undefined
+    : createOnboardingConversation({
+        apiBaseUrl: config.voice.apiBaseUrl,
+        reader: createOnboardingTranscriptReader({
+          gateway: modelGateway,
+          logger,
+          dataPosture: demoDataPosture,
+        }),
+        delegation: createQDelegationReader({
+          gateway: modelGateway,
+          logger,
+          dataPosture: demoDataPosture,
+        }),
+        heldWrites: createHeldWritesStore({
+          sql: database.sql,
+          repository: createPostgresPendingWriteRepository(),
+          newKey: randomUUID,
+        }),
+        recommendations: onboardingRecommendations,
+        research: { investor: investorResearch, founder: founderResearch },
+        logger,
+      });
 const interviewAgent = createOnboardingConductor({
+  introduction: onboardingConversation,
   agent: interviewLoop,
   // Multilingual Q: the conductor's own lines in their chosen language.
   languageOf: (actor) =>
@@ -7144,37 +7177,6 @@ const liveConfig = liveConfigFrom(
   process.env,
   config.runtime.deploymentEnvironment,
 );
-/**
- * Owner 2026-10-27: voice onboarding is a conversation first. Q holds the
- * conversation on the live line from the setup's checklist; what is said
- * is kept in the onboarding thread and saved from the transcript by
- * meaning. CQ_ONBOARDING_VOICE_CONVERSATION=off returns the guided
- * interview (every answer delegated) in one variable.
- */
-const onboardingConversation =
-  config.voice.apiBaseUrl === undefined ||
-  process.env.CQ_ONBOARDING_VOICE_CONVERSATION === "off"
-    ? undefined
-    : createOnboardingConversation({
-        apiBaseUrl: config.voice.apiBaseUrl,
-        reader: createOnboardingTranscriptReader({
-          gateway: modelGateway,
-          logger,
-          dataPosture: demoDataPosture,
-        }),
-        delegation: createQDelegationReader({
-          gateway: modelGateway,
-          logger,
-          dataPosture: demoDataPosture,
-        }),
-        heldWrites: createHeldWritesStore({
-          sql: database.sql,
-          repository: createPostgresPendingWriteRepository(),
-          newKey: randomUUID,
-        }),
-        recommendations: onboardingRecommendations,
-        logger,
-      });
 const liveBroker =
   liveConfig.enabled && providerSecrets.openai !== undefined
     ? createLiveBroker({

@@ -43,6 +43,8 @@ import { languageInfo } from "@capital-q/q-core/language";
 
 import { replyLanguageOf } from "./reply-language.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { firstNameOf } from "./onboarding-flow.js";
+import type { OnboardingConversation } from "./onboarding-conversation.js";
 import { HAND_STEP_COPY } from "./step-copy-language.js";
 import {
   answersKnownFromJourney,
@@ -691,6 +693,12 @@ export type ConductorPortFactory = (input: {
 
 export type OnboardingConductorDependencies = {
   readonly agent: InterviewAgent;
+  /**
+   * Owner 2026-10-27: a brand-new conversation opens with Q's own
+   * introduction and first question, built by code (no model, no wait);
+   * research on their firm or company starts with it.
+   */
+  readonly introduction?: Pick<OnboardingConversation, "opening"> | undefined;
   /** Where known answers are recorded and findings held, as the person. */
   readonly portFor: ConductorPortFactory;
   /** Public presence by name; absent means nothing is looked up. */
@@ -1005,11 +1013,89 @@ export function createOnboardingConductor(
     await port.recommendFound?.([item.recommendation]).catch(() => []);
   };
 
+  /** A conversation nobody has spoken in yet: Q introduces itself, by code. */
+  const firstOpening = async (
+    input: InterviewAgentTurnInput,
+  ): Promise<InterviewTurnOutcome | null> => {
+    const introduction = dependencies.introduction;
+    const actor = input.actor;
+    if (introduction === undefined || actor === undefined) return null;
+    const kept = await listOnboardingInterviewTurns(
+      input.session,
+      input.onboardingSessionId,
+    ).catch(() => null);
+    if (
+      kept === null ||
+      kept.items.length > 0 ||
+      input.recentTurns.length > 0
+    ) {
+      return null;
+    }
+    const view = await getOnboardingSession(
+      input.session,
+      input.onboardingSessionId,
+    );
+    if (view.session.status === "COMPLETED") return null;
+    const chosen = nextUnansweredStep(view, input.journeyType);
+    const next =
+      chosen === null ? null : resumeAsk(view, input.journeyType, chosen);
+    const reply = await introduction.opening({
+      actor,
+      accessToken: input.session.accessToken,
+      onboarding: {
+        sessionId: input.onboardingSessionId,
+        journeyType: input.journeyType,
+      },
+      firstName: firstNameOf(
+        input.signup?.displayName ?? null,
+        input.signup?.organisationName ?? null,
+      ),
+      displayName: input.signup?.displayName ?? null,
+      organisationName: input.signup?.organisationName ?? null,
+      askStepKey: next?.stepKey ?? null,
+    });
+    if (reply === null) return null;
+    const asking =
+      next === null ? null : askingFor(next.stepKey, input.journeyType, view);
+    searchByName(input, view);
+    keep(
+      input,
+      reply,
+      asking?.stepKey ?? null,
+      resumeTurnRef(input.onboardingSessionId, `opening|${reply}`),
+    );
+    return {
+      reply,
+      intent: "OPENING",
+      asking,
+      recorded: [],
+      skipped: [],
+      questionForQ: null,
+      researching: null,
+      navigate: null,
+      handoff: null,
+      pronounce: null,
+      warnings: 0,
+      view,
+      degraded: false,
+      reading: null,
+      resume: null,
+      qualitative: [],
+      trace: null,
+      askingAbout: asking === null ? [] : [asking.stepKey],
+    };
+  };
+
   const conduct = async (
     input: InterviewAgentTurnInput,
   ): Promise<InterviewTurnOutcome> => {
     const opening = input.utterance.trim().length === 0;
     if (opening) {
+      const introduced = await firstOpening(input).catch((error: unknown) => {
+        logger.warn({ err: error }, "the code opening was unavailable");
+        return null;
+      });
+      if (introduced !== null) return introduced;
       const resumed = await resumeOpening(input).catch((error: unknown) => {
         logger.warn({ err: error }, "deterministic resume unavailable");
         return null;
