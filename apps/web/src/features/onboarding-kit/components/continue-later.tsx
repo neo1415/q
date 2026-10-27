@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import { useT } from "@/features/i18n/language";
@@ -21,6 +21,37 @@ export const CONTINUE_LATER_LINE =
 
 /** How long the line stays before Home opens: long enough to read it. */
 export const CONTINUE_LATER_PAUSE_MS = 1_600;
+
+/**
+ * The same leaving, for a surface with its own control (the voice stage):
+ * `leave` shows the line, runs `before` (ending a live call, so its last
+ * words are sent), and opens Home once both the pause and `before` are
+ * done. Pressed twice, it leaves once.
+ */
+export function useContinueLater(destination = "/home"): {
+  readonly leaving: boolean;
+  readonly leave: (before?: () => Promise<void>) => void;
+} {
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  const left = useRef(false);
+  const leave = useCallback(
+    (before?: () => Promise<void>) => {
+      if (left.current) return;
+      left.current = true;
+      setLeaving(true);
+      const pause = new Promise<void>((resolve) => {
+        window.setTimeout(resolve, CONTINUE_LATER_PAUSE_MS);
+      });
+      const ended = (before?.() ?? Promise.resolve()).catch(() => undefined);
+      void Promise.all([pause, ended]).then(() => {
+        router.push(destination);
+      });
+    },
+    [router, destination],
+  );
+  return { leaving, leave };
+}
 
 export function ContinueLater({
   className,

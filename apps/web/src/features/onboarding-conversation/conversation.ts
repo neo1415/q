@@ -1067,6 +1067,44 @@ export function nothingNewLine(filename: string): string {
 }
 
 /**
+ * What Q picked up from one uploaded document: the pending suggestions
+ * that cite it, as the confirmation card labels them.
+ */
+export function findingsFromDocument(
+  items: readonly PickedUp[],
+  documentId: string,
+): readonly { readonly label: string; readonly value: string }[] {
+  return items
+    .filter((item) =>
+      (item.suggestion.sourceRefs ?? []).some(
+        (ref) =>
+          ref.sourceType === "EVIDENCE_DOCUMENT" && ref.sourceId === documentId,
+      ),
+    )
+    .map((item) => ({ label: item.label, value: item.value }));
+}
+
+/**
+ * The quiet note handed to a live call when a document's reading lands
+ * (owner 2026-10-27: conversation first). It is data for Q, not the
+ * person's words: what was found, unconfirmed, so Q does not ask for it
+ * again and checks it when it fits. Quotes in names are flattened so the
+ * file name cannot close the quoted span.
+ */
+export function uploadFindingsNote(
+  filename: string,
+  reading: "FOUND" | "NOTHING_NEW",
+  found: readonly { readonly label: string; readonly value: string }[],
+): string {
+  const name = filename.replace(/"/g, "'");
+  if (reading === "NOTHING_NEW" || found.length === 0) {
+    return `The person just uploaded "${name}"; Q read it and found nothing new for their setup.`;
+  }
+  const list = found.map((item) => `${item.label}: ${item.value}`).join("; ");
+  return `The person just uploaded "${name}". Q read it and found: ${list} (not confirmed yet). Don't ask them for these again; when it fits, say briefly what you found and ask if it's right.`;
+}
+
+/**
  * The thread after a reload, in the order things were said: what was said
  * before the absence, then the welcome back said now, then what they sent
  * and Q never confirmed (live 25 Oct e2e: the welcome back sat above the

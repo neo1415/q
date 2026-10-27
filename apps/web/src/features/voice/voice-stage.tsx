@@ -6,6 +6,10 @@ import type { QVoiceChoice, QVoiceTurnState } from "@capital-q/contracts";
 import { ICON_SIZE, MessageSquare, Mic, Upload, X } from "@capital-q/ui/icons";
 
 import { apertureStateFromVoice, QAperture } from "../q-aperture";
+import {
+  DocumentReadingCard,
+  type DocumentReadingCardProps,
+} from "./document-reading-card";
 import type { VoiceSessionClient, VoiceState } from "./session";
 import { VOICE_STATE_LABELS } from "./session";
 import { useT } from "@/features/i18n/language";
@@ -37,6 +41,15 @@ export type VoiceStageProps = {
   /** A tapped option, a set of them, or typed words: said to Q, the same path as speaking. */
   readonly onSay: (text: string) => void;
   readonly onUseForm: (() => void) | undefined;
+  /**
+   * Onboarding only: leave now and pick up later (owner 2026-10-27: it was
+   * in the form and not in the voice). Ends the call so its last words are
+   * sent; every answer is saved on the server. Absent: not offered.
+   */
+  readonly onContinueLater?: (() => void) | undefined;
+  /** The reading line in place of `uploadNote`: set while one is in flight. */
+  readonly uploadCard?:
+    Omit<DocumentReadingCardProps, "reducedMotion"> | null | undefined;
   /** Drop a deck or profile in while talking; Q reads it back next. */
   readonly onUpload?: ((file: File) => Promise<void>) | undefined;
   /** What the surface says about a document in flight, if any. */
@@ -94,8 +107,10 @@ export function VoiceStage({
   asking,
   onSay,
   onUseForm,
+  onContinueLater,
   onUpload,
   uploadNote,
+  uploadCard,
   uploadAction,
   progress,
 }: VoiceStageProps) {
@@ -213,6 +228,18 @@ export function VoiceStage({
               {t("Use the form")}
             </button>
           ) : null}
+          {onContinueLater !== undefined ? (
+            <button
+              type="button"
+              // Always 44 px tall, on a desktop too: the way out of an
+              // onboarding call is a primary need, not a dense extra.
+              className="cq-stage-quiet min-h-11"
+              onClick={onContinueLater}
+              data-voice-continue-later
+            >
+              {t("Continue later")}
+            </button>
+          ) : null}
           <button type="button" className="cq-stage-quiet" onClick={onEnd}>
             <X size={ICON_SIZE.compact} aria-hidden="true" />
             {endLabel}
@@ -304,7 +331,21 @@ export function VoiceStage({
             </ol>
           ) : null}
 
-          {uploadNote !== null && uploadNote !== undefined ? (
+          {uploadCard !== null && uploadCard !== undefined ? (
+            <div className="flex w-full flex-col items-center gap-2">
+              <DocumentReadingCard {...uploadCard} />
+              {uploadAction !== null && uploadAction !== undefined ? (
+                <button
+                  type="button"
+                  className="cq-stage-quiet"
+                  onClick={uploadAction.onPress}
+                  data-voice-upload-action
+                >
+                  {uploadAction.label}
+                </button>
+              ) : null}
+            </div>
+          ) : uploadNote !== null && uploadNote !== undefined ? (
             <span className="flex items-center gap-3">
               <span className="cq-caption text-(--cq-text-secondary)">
                 {uploadNote}

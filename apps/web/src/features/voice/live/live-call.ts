@@ -168,6 +168,8 @@ export function isLiveTrialSpent(error: unknown): boolean {
 const RELAY = "/api/q-voice-live";
 const ICE_TIMEOUT_MS = 10_000;
 const CLOSE_WAIT_MS = 15_000;
+/** How long an end waits for the last transcript segments to be sent. */
+const END_FLUSH_WAIT_MS = 1_500;
 /** How long an end waits for a just-negotiated channel to open, to close it. */
 const CHANNEL_OPEN_WAIT_MS = 5_000;
 /**
@@ -1028,6 +1030,12 @@ export async function startLiveCall(
    * and `session.close` is sent. Waiting for the session's final usage
    * (up to CLOSE_WAIT_MS) goes on in `finished`, never holding the next
    * line back.
+   *
+   * The transcript segments still waiting are sent first, before the close,
+   * and the end resolves once they are in (bounded by END_FLUSH_WAIT_MS):
+   * answers are saved from the transcript on the server, so a person who
+   * presses Continue later right after speaking must not leave with their
+   * last words still in the tab (owner 2026-10-27, conversation first).
    */
   const end = (reason: LiveCallEnd = "ended"): Promise<void> => {
     if (ended) return Promise.resolve();
@@ -1043,6 +1051,7 @@ export async function startLiveCall(
     finishUtterance();
     if (reply !== null) keep("Q", reply.text);
     reply = null;
+    const flushed = flushTranscript();
     const mine = connection;
     if (mine !== null) {
       mine.closeRequested = true;
@@ -1051,7 +1060,13 @@ export async function startLiveCall(
       }
     }
     finished = finish(mine, reason);
-    return Promise.resolve();
+    let waited: ReturnType<typeof setTimeout> | undefined;
+    return Promise.race([
+      flushed,
+      new Promise<void>((resolve) => {
+        waited = setTimeout(resolve, END_FLUSH_WAIT_MS);
+      }),
+    ]).finally(() => clearTimeout(waited));
   };
 
   const finish = async (
