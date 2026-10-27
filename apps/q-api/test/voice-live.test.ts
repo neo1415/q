@@ -13,6 +13,7 @@ import { createLogger } from "@capital-q/observability";
 import { spokenFactsOfAttention } from "@capital-q/q-core";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import {
+  personalActorContext,
   OrganisationIdSchema,
   TenantIdSchema,
   UserIdSchema,
@@ -64,11 +65,14 @@ const logger = createLogger(
   { level: "silent" },
 );
 
-function binding(rehearsal = false): VoiceSessionBinding {
+function binding(
+  rehearsal = false,
+  actor: ActorContext = ACTOR,
+): VoiceSessionBinding {
   return {
     voiceSessionId: SESSION,
     providerConversationId: `dg_${SESSION}`,
-    actor: ACTOR,
+    actor,
     accessToken: "eyPRIVATE.bearer",
     voice: "FEMALE",
     thread: {
@@ -1115,6 +1119,52 @@ describe("GPT-Live line", () => {
     expect(
       broker.end({ actor: STRANGER, voiceSessionId: SESSION, reason: "x" }),
     ).toBe(false);
+  });
+
+  it("follows the person into the organisation onboarding creates mid-call (live 2026-10-27)", async () => {
+    // A new investor opened voice before any organisation existed; naming
+    // their firm created it and moved them to its tenant. Every later
+    // delegation, transcript and usage report was a 404, so nothing they
+    // said after their firm's name reached the interview or was saved.
+    const { broker, runs, runBindings } = setup();
+    const personal = personalActorContext(ACTOR.userId);
+    await broker.open({
+      binding: binding(false, personal),
+      sdp: "v=0 offer",
+    });
+    expect(
+      await ask(broker, "dlg_1", "The Vaultlyne", personal),
+    ).not.toBeNull();
+    const result = await ask(broker, "dlg_2", "Pre-seed to Series A", ACTOR);
+    expect(result).not.toBeNull();
+    expect(runs).toEqual(["The Vaultlyne", "Pre-seed to Series A"]);
+    // The turn after the move runs as the person in their organisation.
+    expect(runBindings[1]?.actor).toEqual(ACTOR);
+    expect(
+      await broker.usage({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        report: { seconds: 30 },
+      }),
+    ).not.toBeNull();
+    // Someone else is still refused after the move.
+    expect(await ask(broker, "dlg_3", "Top three", STRANGER)).toBeNull();
+  });
+
+  it("never carries a line from one organisation into another", async () => {
+    const { broker, runs } = setup();
+    await open(broker);
+    const elsewhere: ActorContext = {
+      ...ACTOR,
+      tenantId: TenantIdSchema.parse("c0000000-0000-4000-8000-000000000002"),
+      organisationId: OrganisationIdSchema.parse(
+        "d0000000-0000-4000-8000-000000000002",
+      ),
+    };
+    expect(await ask(broker, "dlg_1", "Top three", elsewhere)).toBeNull();
+    expect(runs).toEqual([]);
+    // The line is still the original organisation's.
+    expect(await ask(broker, "dlg_2", "Top three", ACTOR)).not.toBeNull();
   });
 
   it("refuses delegations past the hard cap and tells the client to close", async () => {

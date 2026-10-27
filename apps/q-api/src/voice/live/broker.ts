@@ -13,7 +13,10 @@ import type { ArrivalSnapshot } from "@capital-q/contracts";
 import type { ModelUsageRepository } from "@capital-q/model-gateway";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
-import type { ActorContext } from "@capital-q/security";
+import {
+  PERSONAL_BOOTSTRAP_TENANT_ID,
+  type ActorContext,
+} from "@capital-q/security";
 import type { SpokenFacts } from "@capital-q/q-core";
 import { parseNameCorrection } from "@capital-q/q-core/names";
 
@@ -186,8 +189,9 @@ type LiveLine = {
   readonly voiceSessionId: string;
   /** The provider's session (GPT-Live), ended from here if left open. */
   readonly providerSessionId: string;
-  readonly actor: ActorContext;
-  readonly binding: VoiceSessionBinding;
+  /** Re-bound once, when the person's first organisation is created (ownLine). */
+  actor: ActorContext;
+  binding: VoiceSessionBinding;
   readonly openedAt: number;
   lastActivityAt: number;
   /** What Q was asked and verified on this line, oldest first (authority). */
@@ -833,14 +837,22 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   const ownLine = (actor: ActorContext, voiceSessionId: string) => {
     sweep();
     const line = lines.get(voiceSessionId);
+    if (line === undefined || line.actor.userId !== actor.userId) return null;
+    if (line.actor.tenantId === actor.tenantId) return line;
+    // Onboarding creates the person's first organisation mid-call: the line
+    // was opened under the personal bootstrap tenant (which holds nothing of
+    // anyone's), and the same person now acts in their new organisation.
+    // Only that one move is followed; a line opened inside one organisation
+    // never carries over into another (its context was read for that one).
     if (
-      line === undefined ||
-      line.actor.userId !== actor.userId ||
-      line.actor.tenantId !== actor.tenantId
+      line.actor.tenantId === PERSONAL_BOOTSTRAP_TENANT_ID &&
+      actor.organisationId !== undefined
     ) {
-      return null;
+      line.actor = actor;
+      line.binding = { ...line.binding, actor };
+      return line;
     }
-    return line;
+    return null;
   };
 
   /**
