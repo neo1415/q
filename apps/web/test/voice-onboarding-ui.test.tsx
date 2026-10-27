@@ -22,8 +22,12 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 const { VoiceStage } = await import("../src/features/voice/voice-stage");
 const { DocumentReadingCard } =
   await import("../src/features/voice/document-reading-card");
-const { findingsFromDocument, uploadFindingsNote } =
-  await import("../src/features/onboarding-conversation/conversation");
+const {
+  findingsFromDocument,
+  findingsNotFromDocuments,
+  publicFindingsNote,
+  uploadFindingsNote,
+} = await import("../src/features/onboarding-conversation/conversation");
 const { useContinueLater, CONTINUE_LATER_PAUSE_MS } =
   await import("../src/features/onboarding-kit/components/continue-later");
 
@@ -193,6 +197,55 @@ describe("the note a live call gets when a reading lands", () => {
     expect(findingsFromDocument(items, "doc-a")).toEqual([
       { label: "Stage", value: "Seed" },
     ]);
+  });
+});
+
+describe("research on them reaches the live call (owner 2026-10-27)", () => {
+  it("tells Q what public sources gave, unconfirmed, and never a document's findings twice", () => {
+    const suggestion = (
+      n: number,
+      sourceRefs: readonly { sourceType: string; sourceId: string }[],
+    ): OnboardingSuggestionView =>
+      OnboardingSuggestionViewSchema.parse({
+        id: `00000000-0000-4000-8000-00000000000${String(n)}`,
+        stepKey: "I0.website",
+        targetField: "website",
+        suggestedValue: { type: "TEXT", text: "https://vaultlyne.com" },
+        confidence: null,
+        status: "PENDING",
+        createdAt: "2026-10-27T00:00:00.000Z",
+        sourceRefs,
+        rationale: null,
+      });
+    const items = [
+      {
+        suggestion: suggestion(1, [
+          { sourceType: "PUBLIC_WEB", sourceId: "https://vaultlyne.com" },
+        ]),
+        label: "Website",
+        value: "vaultlyne.com",
+        editorId: undefined,
+      },
+      {
+        suggestion: suggestion(2, [
+          { sourceType: "EVIDENCE_DOCUMENT", sourceId: "doc-a" },
+        ]),
+        label: "Stage",
+        value: "Seed",
+        editorId: undefined,
+      },
+    ];
+    const found = findingsNotFromDocuments(items);
+    expect(found).toEqual([
+      {
+        id: "00000000-0000-4000-8000-000000000001",
+        label: "Website",
+        value: "vaultlyne.com",
+      },
+    ]);
+    expect(publicFindingsNote(found)).toBe(
+      "Capital Q found this about them from public sources (not confirmed yet): Website: vaultlyne.com. Don't ask them for these again; when it fits naturally, mention it briefly and ask if it's right.",
+    );
   });
 });
 

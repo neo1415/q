@@ -92,6 +92,8 @@ import {
   contentHashOf,
   nothingNewLine,
   findingsFromDocument,
+  findingsNotFromDocuments,
+  publicFindingsNote,
   uploadFindingsNote,
   publicSourceOf,
   progressLines,
@@ -1619,6 +1621,19 @@ export function QOnboardingWorkspace({
   useEffect(() => {
     briefCall.current = voice.client.brief;
   }, [voice.client.brief]);
+  // Research on them lands while they talk: told to a live call once, as a
+  // quiet note, so Q uses what is solid and never asks for it again.
+  const notedFindings = useRef(new Set<string>());
+  useEffect(() => {
+    if (!voiceActive || view === undefined) return;
+    const fresh = findingsNotFromDocuments(
+      pickedUp(view, vocabulary, labels),
+    ).filter((item) => !notedFindings.current.has(item.id));
+    if (fresh.length === 0) return;
+    if (briefCall.current?.(publicFindingsNote(fresh)) === true) {
+      for (const item of fresh) notedFindings.current.add(item.id);
+    }
+  }, [view, voiceActive, vocabulary, labels]);
   /** What Q picked up from one document, read from the latest session. */
   const findingsOf = useRef<(documentId: string) => readonly DocumentFinding[]>(
     () => [],

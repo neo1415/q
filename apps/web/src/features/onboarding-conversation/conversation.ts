@@ -1085,6 +1085,43 @@ export function findingsFromDocument(
 }
 
 /**
+ * What Q found about them that no uploaded document gave (their own public
+ * pages, read while they talk): the pending suggestions citing no document.
+ */
+export function findingsNotFromDocuments(
+  items: readonly PickedUp[],
+): readonly {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+}[] {
+  return items
+    .filter(
+      (item) =>
+        !(item.suggestion.sourceRefs ?? []).some(
+          (ref) => ref.sourceType === "EVIDENCE_DOCUMENT",
+        ),
+    )
+    .map((item) => ({
+      id: item.suggestion.id,
+      label: item.label,
+      value: item.value,
+    }));
+}
+
+/**
+ * The quiet note handed to a live call when research on them lands
+ * (owner 2026-10-27: research runs in parallel and Q uses what is solid).
+ * Data for Q, unconfirmed: never their answer until they say so.
+ */
+export function publicFindingsNote(
+  found: readonly { readonly label: string; readonly value: string }[],
+): string {
+  const list = found.map((item) => `${item.label}: ${item.value}`).join("; ");
+  return `Capital Q found this about them from public sources (not confirmed yet): ${list}. Don't ask them for these again; when it fits naturally, mention it briefly and ask if it's right.`;
+}
+
+/**
  * The quiet note handed to a live call when a document's reading lands
  * (owner 2026-10-27: conversation first). It is data for Q, not the
  * person's words: what was found, unconfirmed, so Q does not ask for it
