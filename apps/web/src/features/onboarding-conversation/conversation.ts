@@ -1088,9 +1088,7 @@ export function findingsFromDocument(
  * What Q found about them that no uploaded document gave (their own public
  * pages, read while they talk): the pending suggestions citing no document.
  */
-export function findingsNotFromDocuments(
-  items: readonly PickedUp[],
-): readonly {
+export function findingsNotFromDocuments(items: readonly PickedUp[]): readonly {
   readonly id: string;
   readonly label: string;
   readonly value: string;
