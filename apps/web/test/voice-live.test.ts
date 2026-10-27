@@ -557,6 +557,41 @@ describe("the voice preview gate", () => {
   });
 });
 
+describe("the person's words reach the record (live 2026-10-27)", () => {
+  it("relays a transcript batch that carries the line's measured latencies, words intact", async () => {
+    // The batch after someone speaks carries how long Q took to answer.
+    // The relay refused it, so for weeks only Q's side of a live call was
+    // kept: 1 line of theirs against 51 of Q's.
+    const upstream = vi.fn<typeof fetch>(() =>
+      Promise.resolve(Response.json({ recorded: 2 })),
+    );
+    const id = "5f000000-0000-4000-8000-000000000001";
+    const body = {
+      segments: [
+        { role: "USER", text: "I mainly do series A and pre-seed", at: 1 },
+        { role: "Q", text: "Got it.", at: 2 },
+      ],
+      timings: { turnLatencyMs: [840], firstAudioMs: 1_200 },
+    };
+    const response = await relayLive(
+      new Request(`http://web.test/api/q-voice-live/transcript/${id}`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+      { relay: "transcript", voiceSessionId: id },
+      { doFetch: upstream, enabled: () => true },
+    );
+    expect(response.status).toBe(200);
+    const [url, init] = upstream.mock.calls[0] ?? [];
+    expect(url).toBe(
+      `http://q-api.test/v1/q/voice/live/sessions/${id}/transcript`,
+    );
+    expect(
+      JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+    ).toEqual(body);
+  });
+});
+
 describe("GPT-Live requests from the transcript (production 2026-10-09 15:57: '(inaudible)' x3)", () => {
   it("never starts a Q run from '(inaudible)', empty or filler words: the voice checks with them", () => {
     const h = harness();

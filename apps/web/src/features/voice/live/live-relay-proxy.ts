@@ -136,6 +136,20 @@ const TranscriptBody = z
       )
       .min(1)
       .max(12),
+    // The line's measured latencies ride with the transcript (the Q API's
+    // own contract). Live 2026-10-27: without them here every batch that
+    // carried them was refused, and those were the batches holding what
+    // the person had just said: their words never reached the record.
+    timings: z
+      .object({
+        firstAudioMs: z.number().int().min(0).max(120_000).optional(),
+        turnLatencyMs: z
+          .array(z.number().int().min(0).max(120_000))
+          .max(24)
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const TranscriptResult = z.object({ recorded: z.number().int().min(0) });

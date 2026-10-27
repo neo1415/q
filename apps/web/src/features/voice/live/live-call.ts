@@ -579,12 +579,17 @@ export async function startLiveCall(
   let firstOutputSent = false;
   let latenciesSent = 0;
   const pendingTimings = () => {
-    const turnLatencyMs = stats.latenciesMs.slice(
-      latenciesSent,
-      latenciesSent + 24,
-    );
+    // Bounded as the Q API bounds them: one out-of-range number must never
+    // cost the words in the same batch.
+    const bounded = (ms: number) =>
+      Math.min(Math.max(0, Math.round(ms)), 120_000);
+    const turnLatencyMs = stats.latenciesMs
+      .slice(latenciesSent, latenciesSent + 24)
+      .map(bounded);
     const firstAudioMs =
-      firstOutputMs !== null && !firstOutputSent ? firstOutputMs : undefined;
+      firstOutputMs !== null && !firstOutputSent
+        ? bounded(firstOutputMs)
+        : undefined;
     if (turnLatencyMs.length === 0 && firstAudioMs === undefined) return null;
     latenciesSent += turnLatencyMs.length;
     if (firstAudioMs !== undefined) firstOutputSent = true;
