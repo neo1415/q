@@ -159,6 +159,7 @@ async function attempt(
   write: Write,
   utterance: string,
   stated: readonly string[] | null,
+  lookup: string | null = null,
 ) {
   const world = investorSession({
     currentStepKey: "I2.stages",
@@ -170,7 +171,7 @@ async function attempt(
     firewall: firewall(),
     logger,
     recommendations: world.recommendations,
-    delegation: readerOf(stated === null ? null : reading({ stated })),
+    delegation: readerOf(stated === null ? null : reading({ stated, lookup })),
   });
   const outcome = await agent.turn({ ...turn(world, utterance), actor });
   return { world, outcome };
@@ -181,7 +182,14 @@ describe("an answer is recorded only when their latest words state it about them
     for (const utterance of ADVISORY) {
       for (const write of INVENTED) {
         for (const stated of [[], ["I2.stages"], null] as const) {
-          const { world, outcome } = await attempt(write, utterance, stated);
+          // The reading finds these turns asking (a look-up beyond their
+          // setup), by meaning: never by how a sentence opens.
+          const { world, outcome } = await attempt(
+            write,
+            utterance,
+            stated,
+            utterance,
+          );
           const label = `${write.stepKey} <- "${utterance}" stated=${JSON.stringify(stated)}`;
           expect(world.recordedValue(write.stepKey), label).toBeUndefined();
           expect(outcome.recorded, label).not.toContain(write.stepKey);
@@ -190,6 +198,21 @@ describe("an answer is recorded only when their latest words state it about them
     }
     // 72 full turns: a property, not a slow test.
   }, 30_000);
+
+  it("an answer run into a question by speech-to-text is still their answer (live 2026-10-27)", async () => {
+    // No punctuation after the question: one "sentence" that opens with
+    // "What". The reading missed the stages and found no question beyond
+    // the setup; their own words state them, so they are recorded.
+    const utterance =
+      "What do you mean by that question Okay, mm- I- I- I- er- mainly do series A and er pre-seed and seed";
+    const write: Write = {
+      stepKey: "I2.stages",
+      value: ["series_a"],
+      quoteOf: () => "mainly do series A",
+    };
+    const { world } = await attempt(write, utterance, []);
+    expect(world.recordedValue("I2.stages")).toBeDefined();
+  });
 
   it("the same write goes through when the reading finds that step stated", async () => {
     const declarative: readonly [Write, string][] = [

@@ -504,6 +504,8 @@ export function createOnboardingPort(input: {
         readonly handed: ReadonlySet<string>;
         readonly approved: ReadonlySet<string>;
         readonly finishing: boolean;
+        /** A question beyond their setup they asked, read by meaning. */
+        readonly lookup?: string | null;
       } | null>)
     | undefined;
   readonly recommendations?: RecommendationStore | undefined;
@@ -1720,19 +1722,6 @@ export function createOnboardingPort(input: {
     );
   };
 
-  /** Whether every sentence of theirs that holds the quote only asks. */
-  const askedOnly = (quote: string): boolean => {
-    const words = quote.trim().toLowerCase().slice(0, 40);
-    const holding = input.personTurns
-      .filter((said) => quoteOccursIn(quote, said))
-      .flatMap((said) => said.match(/[^.?!]+[.?!]*/gu) ?? [said])
-      .filter((sentence) => sentence.toLowerCase().includes(words));
-    return (
-      holding.length > 0 &&
-      holding.every((sentence) => ASKING.test(sentence.trim()))
-    );
-  };
-
   /**
    * A narrative answer (what the company does, the problem, the solution,
    * the business model, the opportunity, the vision) in Q's words rather
@@ -1748,15 +1737,6 @@ export function createOnboardingPort(input: {
     const question = (
       SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
     ).slice(0, 400);
-    if (askedOnly(quote)) {
-      return {
-        stepKey: step.stepKey,
-        outcome: "REJECTED",
-        question,
-        reason:
-          "Their words there only ask a question, so nothing was held or recorded. A question is never their answer; ask them if you want to know.",
-      };
-    }
     // Already in what this step records (a note kept earlier): nothing to
     // hold for their yes, and never offered to them again (live 25 Oct
     // e2e: "Paying customers: the 210 customers is right" re-offered).
@@ -1931,30 +1911,29 @@ export function createOnboardingPort(input: {
 
   /**
    * Whether their latest words assert this quote: it is in what they just
-   * said, in a sentence that is not a question, and not something they
+   * said, and not something they
    * said they are not ("we are not raising"). Code, not a reading.
    */
-  const assertedNow = (quote: string): boolean => {
+  const assertedNow = (
+    quote: string,
+    reading: { readonly lookup?: string | null } | null,
+  ): boolean => {
     const latest = input.personTurns[0];
     if (
+      // Unread words give nothing, and words the reading found asking
+      // something beyond their setup state nothing about them.
+      reading === null ||
+      (reading.lookup ?? null) !== null ||
       latest === undefined ||
       !(quoteOccursIn(quote, latest) || shortWordIn(quote, latest))
     ) {
       return false;
     }
-    const sentences = latest.match(/[^.?!]+[.?!]*/gu) ?? [latest];
-    const words = quote.trim().toLowerCase();
-    const holding = sentences.filter((sentence) =>
-      sentence.toLowerCase().includes(words.slice(0, 40)),
-    );
-    // A question, however it is punctuated ("what are angels backing these
-    // days", "tell me about...", "هل ..."), asks; it states nothing.
-    if (
-      holding.length > 0 &&
-      holding.every((sentence) => ASKING.test(sentence.trim()))
-    ) {
-      return false;
-    }
+    // Whether their words answer or ask is read by meaning (the reader and
+    // the model that chose to record them), never by how a sentence opens:
+    // speech-to-text runs a question into the answer that follows it
+    // ("What do you mean by that question okay I mainly do series A",
+    // live 2026-10-27), which an opening-word rule refused.
     // What they said they are not ("not raising"), judged on the quote's
     // own opening clause: a later "no outside money" does not negate
     // "bootstrapped so far".
@@ -1974,7 +1953,7 @@ export function createOnboardingPort(input: {
     // Their own words, now, asserting it: saved whether or not the
     // reading noticed (owner 2026-10-16: "US dollars.", "Partner.",
     // "1200000" were refused because a model missed them).
-    if (quote !== undefined && assertedNow(quote)) return null;
+    if (quote !== undefined && assertedNow(quote, authority)) return null;
     return {
       stepKey: stepKey.slice(0, 80),
       outcome: "REJECTED",
@@ -2261,7 +2240,7 @@ export function createOnboardingPort(input: {
     const reading = (await input.authority?.()) ?? null;
     const latestStated =
       verbatimMatch ||
-      assertedNow(answer.quote) ||
+      assertedNow(answer.quote, reading) ||
       (reading !== null && statedIn(reading.stated, resolved.step.stepKey));
     const readerStated =
       latestStated ||
@@ -3469,8 +3448,6 @@ export function createOnboardingPort(input: {
           ? input.personTurns.slice(1)
           : input.personTurns;
       for (const text of turns) {
-        // A question names a currency without stating theirs.
-        if (ASKING.test(text.trim())) continue;
         const named = currencyNamedIn(input.journeyType, step, text);
         if (named === "SEVERAL") return null;
         if (named === null) continue;
@@ -3589,7 +3566,6 @@ export function shortWordIn(quote: string, said: string): boolean {
     .includes(word);
 }
 
-/** A sentence that asks rather than states: by its mark or how it opens. */
 /** Steps whose answer is a narrative Q may summarise for their yes. */
 /** How long a plain read of the session stands in for another (see readAt). */
 const READ_REUSE_MS = 1_500;
@@ -3602,9 +3578,6 @@ const NOT_STATED_REASON =
   "Their latest words do not state this about themselves, so nothing was recorded. A question, advice or a mention is never their answer; ask them if you want to know.";
 
 const PARAPHRASABLE: ReadonlySet<string> = new Set(["long_text", "voice_text"]);
-
-const ASKING =
-  /[?؟]\s*$|^(?:what|which|who|whom|whose|when|where|why|how|is|are|do|does|did|can|could|should|would|will|shall|tell me|curious|i wonder|any idea|هل|ما|ماذا|كيف|لماذا|متى|أين|من)\b/iu;
 
 /** The most answers one transactional save carries (the API's own bound). */
 const BATCH_MAX = 24;
