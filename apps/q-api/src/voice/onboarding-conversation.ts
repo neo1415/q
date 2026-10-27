@@ -118,6 +118,7 @@ export function createOnboardingConversation(dependencies: {
     personTurns: readonly string[],
     stated: ReadonlySet<string> = new Set(),
     declined: ReadonlySet<string> = new Set(),
+    finishing = false,
   ) =>
     createOnboardingPort({
       session: sessionOf(line),
@@ -133,7 +134,7 @@ export function createOnboardingConversation(dependencies: {
           declined,
           handed: new Set<string>(),
           approved: new Set<string>(),
-          finishing: false,
+          finishing,
           lookup: null,
         }),
       recommendations: dependencies.recommendations,
@@ -398,10 +399,15 @@ export function createOnboardingConversation(dependencies: {
         line.onboarding.sessionId,
         THREAD_LIMIT,
       ).catch(() => ({ items: [] }));
-      const personTurns = thread.items
-        .filter((turn) => turn.role === "PERSON")
-        .map((turn) => turn.text)
-        .reverse();
+      // The words the voice passed on are their latest, even when their
+      // transcript has not reached the thread yet.
+      const personTurns = [
+        ...(request.trim().length === 0 ? [] : [request.trim()]),
+        ...thread.items
+          .filter((turn) => turn.role === "PERSON")
+          .map((turn) => turn.text)
+          .reverse(),
+      ];
       const lastQ =
         [...thread.items].reverse().find((turn) => turn.role === "Q")?.text ??
         "";
@@ -427,8 +433,18 @@ export function createOnboardingConversation(dependencies: {
               },
             });
       if (authority?.pausing === true) return pausingNote(state);
-      if (authority?.finishing === true && state.canComplete) {
-        const finished = await port.finish();
+      // Finish decides, not a precheck: it confirms the journey's own review
+      // steps on their word, which no spoken answer fills, and says exactly
+      // what is still missing when it cannot complete.
+      if (authority?.finishing === true) {
+        // Finishing on their word, as the reading of it found.
+        const finished = await portFor(
+          line,
+          personTurns,
+          new Set(),
+          new Set(),
+          true,
+        ).finish();
         if (finished.completed)
           return completedNote(line.onboarding.journeyType);
         return readBack(await port.state());
@@ -648,7 +664,8 @@ function pausingNote(state: OnboardingState): string {
 }
 
 function completedNote(journey: "investor" | "founder"): string {
+  // Nothing here claims what their screen shows: only what is saved.
   return journey === "investor"
-    ? "Their mandate is saved and live: Capital Q can now match companies to it. Tell them warmly in one or two sentences that it's done and that their Discover feed is ready on screen."
-    : "Their company profile is saved. Tell them warmly in one or two sentences that it's done and that their profile is ready on screen, with what investors will see.";
+    ? "Their mandate is saved and live: Capital Q now matches companies to it. Tell them warmly, in one or two sentences, that it's done and that Discover will show them companies matched to it."
+    : "Their company profile is saved. Tell them warmly, in one or two sentences, that it's done and that investors who fit will now be matched to it.";
 }

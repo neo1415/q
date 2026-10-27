@@ -1,4 +1,5 @@
 import type { OnboardingTranscriptReader } from "@capital-q/model-gateway/q";
+import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 import { describe, expect, it } from "vitest";
@@ -11,7 +12,28 @@ import {
   type ConversationLine,
 } from "../src/voice/onboarding-conversation.js";
 import { createOnboardingPort } from "../src/voice/onboarding-port.js";
+import { reading } from "./authority-fixtures.js";
 import { investorSession, type InvestorWorld } from "./interviewer-fixtures.js";
+
+/** Every required spoken answer, valid for its step; reviews left open. */
+const SPOKEN_REQUIRED: Readonly<Record<string, string>> = Object.fromEntries(
+  INVESTOR_DEFINITION_V1.steps
+    .filter(
+      (step) => step.required && step.configuration.stepType !== "confirmation",
+    )
+    .map((step) => {
+      const c = step.configuration;
+      const value =
+        c.stepType === "single_select" || c.stepType === "multi_select"
+          ? (c.options[0]?.optionKey ?? "x")
+          : c.stepType === "range"
+            ? c.min
+            : c.stepType === "reference_select"
+              ? "a0000000-0000-4000-8000-000000000099"
+              : "value";
+      return [step.stepKey, value] as const;
+    }),
+);
 
 /**
  * Owner 2026-10-27: voice onboarding is a conversation first. Q talks;
@@ -273,6 +295,56 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
     expect(said).toMatch(/Saved: .*Accelerator/);
     expect(said).toMatch(/Still needed: .*Which stages do you like to back/);
     expect(readBack(await stateOf(world))).toBe(said);
+  });
+
+  it("finishes on their word once everything needed is in, the reviews confirmed by finish itself", async () => {
+    const world = investorSession({
+      currentStepKey: "I11.review",
+      recorded: SPOKEN_REQUIRED,
+    });
+    const { fetch } = withThread(world);
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch,
+      logger,
+      readAfterMs: 5,
+      reader: readerReturning({ answers: [], declined: [] }),
+      delegation: {
+        read: () => Promise.resolve(reading({ finishing: true })),
+      },
+    });
+    const said = await conversation.settle(
+      line(),
+      "Yes, that's all right, let's finish",
+    );
+    expect(said).toContain("Their mandate is saved and live");
+    expect(said).not.toMatch(/on screen/);
+    expect(world.recordedValue("I11.review")).toEqual({
+      type: "CONFIRMATION",
+      confirmed: true,
+    });
+  });
+
+  it("stopping for now keeps everything and says so", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: { "I0.investor_type": "accelerator" },
+    });
+    const { fetch } = withThread(world);
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch,
+      logger,
+      readAfterMs: 5,
+      reader: readerReturning({ answers: [], declined: [] }),
+      delegation: { read: () => Promise.resolve(reading({ pausing: true })) },
+    });
+    const said = await conversation.settle(
+      line(),
+      "Can we continue this later?",
+    );
+    expect(said).toContain("They want to stop for now");
+    expect(said).toContain("pick up any time");
   });
 
   it("a reading that fails saves nothing and loses nothing: the thread is kept", async () => {
