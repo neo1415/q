@@ -10,9 +10,62 @@
  * just "Website"). Pure data: safe in a browser bundle.
  */
 
-/** The question, for steps whose prompt is a label rather than a question. */
+/** The question as Q asks it, for every step a label or a bare form question would read badly. */
 export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
   "I0.organisation_name": "What's the name of your firm?",
+  // Owner 2026-10-27: every step Q asks out loud, in plain words, never a
+  // form label ("How do you invest?" alone meant nothing spoken).
+  "I0.investor_type":
+    "How do you invest: as an angel, through a fund, a family office, an accelerator, or something else?",
+  "I1.deployment_status":
+    "Are you actively writing cheques at the moment, or being more selective right now?",
+  "I2.stages":
+    "Which stages do you like to back: pre-seed, seed, Series A, or later?",
+  "I2.investment_role":
+    "Do you usually lead rounds, or come in alongside a lead?",
+  "I3.geography": "Where do you invest? Any particular countries or regions?",
+  "I3.geography_strength": "Is that a must for you, or more of a preference?",
+  "I3.sectors": "Which sectors or kinds of products interest you most?",
+  "I3.sector_strength": "Is that a must for you, or more of a preference?",
+  "I5.founder_strength": "Is that a must for you, or more of a preference?",
+  "I6.green_flag_strength": "Are those musts, or more of a preference?",
+  "I6.custom_criteria":
+    "Is there anything else you look for that we haven't covered?",
+  "I9.discovery_mode":
+    "When I show you companies, should I stick closely to what you've told me, or also show you a few interesting ones just outside it?",
+  "I10.inbound_preference":
+    "How open are you to founders reaching out to you: only well-matched ones, anyone, or nobody for now?",
+  "F0.intent":
+    "What brings you to Capital Q: are you raising for a company now, getting ready to raise, or just exploring?",
+  "F1.country": "Where is the company based?",
+  "F1.stage": "What stage is the company at: pre-seed, seed, Series A?",
+  "F1.description": "In a sentence or two, what does the company do?",
+  "F1.categories":
+    "How would you describe the space you're in: the sector or industry?",
+  "F2.materials":
+    "Do you have a pitch deck or anything else I can read? You can upload it right here.",
+  "F4.founder_count": "How many founders are there?",
+  "F4.full_time": "Are the founders all full-time on it?",
+  "F4.team_size": "How many people work on the company today?",
+  "F4.functions":
+    "What does the founding team cover between you: product, engineering, sales, operations?",
+  "F5.signal":
+    "What early traction do you have: pilots, paying customers, a waitlist, signed partners?",
+  "F5.pilots": "How many pilots or design partners do you have?",
+  "F5.revenue_status":
+    "How would you describe your revenue today: recurring and growing, one-off projects, or just your first revenue?",
+  "F5.growth": "How much have you grown over the last six months?",
+  "F5.fin_currency": "Which currency do you report your numbers in?",
+  "F5.monthly_revenue": "Roughly how much did you bill last month?",
+  "F5.revenue_trend": "How has your monthly revenue been moving lately?",
+  "F5.gross_margin": "What's your gross margin, roughly?",
+  "F5.monthly_burn": "How much are you spending beyond revenue each month?",
+  "F5.cash": "How much cash do you have in the bank today?",
+  "F5.runway_months": "How many months of runway does that give you?",
+  "F6.raising": "Are you raising right now?",
+  "F6.timeframe": "When are you hoping to close the round?",
+  "F6.use_of_funds": "What will the money mainly go towards?",
+  "F6.min_cheque": "What's the smallest cheque you'd take?",
   "I0.business_title": "What's your role there?",
   "I0.website": "What's your firm's website?",
   "I1.mandate_context":

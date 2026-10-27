@@ -439,6 +439,7 @@ import { withTestRouting } from "@capital-q/model-gateway";
 import {
   budgetForTaskClass,
   createQDelegationReader,
+  createOnboardingTranscriptReader,
   createWordsReaders,
   CLEAR_QUESTION,
   createQTurnReader,
@@ -653,6 +654,7 @@ import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
 import { createHeldWritesStore } from "./voice/held-writes.js";
+import { createOnboardingConversation } from "./voice/onboarding-conversation.js";
 import { createOnboardingTranscriptPort } from "./composition/onboarding-transcript.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
 import { createOnboardingConductor } from "./voice/onboarding-conductor.js";
@@ -7142,6 +7144,37 @@ const liveConfig = liveConfigFrom(
   process.env,
   config.runtime.deploymentEnvironment,
 );
+/**
+ * Owner 2026-10-27: voice onboarding is a conversation first. Q holds the
+ * conversation on the live line from the setup's checklist; what is said
+ * is kept in the onboarding thread and saved from the transcript by
+ * meaning. CQ_ONBOARDING_VOICE_CONVERSATION=off returns the guided
+ * interview (every answer delegated) in one variable.
+ */
+const onboardingConversation =
+  config.voice.apiBaseUrl === undefined ||
+  process.env.CQ_ONBOARDING_VOICE_CONVERSATION === "off"
+    ? undefined
+    : createOnboardingConversation({
+        apiBaseUrl: config.voice.apiBaseUrl,
+        reader: createOnboardingTranscriptReader({
+          gateway: modelGateway,
+          logger,
+          dataPosture: demoDataPosture,
+        }),
+        delegation: createQDelegationReader({
+          gateway: modelGateway,
+          logger,
+          dataPosture: demoDataPosture,
+        }),
+        heldWrites: createHeldWritesStore({
+          sql: database.sql,
+          repository: createPostgresPendingWriteRepository(),
+          newKey: randomUUID,
+        }),
+        recommendations: onboardingRecommendations,
+        logger,
+      });
 const liveBroker =
   liveConfig.enabled && providerSecrets.openai !== undefined
     ? createLiveBroker({
@@ -7213,6 +7246,7 @@ const liveBroker =
           sql: database.sql,
           mirror: () => Promise.resolve(0),
         }),
+        onboardingConversation,
         usage: createPostgresModelUsageRepository({ sql: database.sql }),
         // ai_ops.providers: openai is UNREVIEWED, as for the duplex line.
         providerCeiling: "PUBLIC",
@@ -7509,6 +7543,7 @@ const { app, logger: appLogger } = createApp(
                 .read(actor.userId, actor.tenantId, new Date())
                 .then((standing) => standing.language),
             interviewAgent,
+            onboardingConversation,
             interviewPresence: presenceTrigger,
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,

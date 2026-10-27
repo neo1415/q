@@ -142,6 +142,9 @@ function setup(
     /** Q says `first`, then waits for `until`, then `rest` (a streamed answer). */
     stream?: { first: string; rest: string; until: Promise<void> };
     rehearsalLine?: Parameters<typeof createLiveBroker>[0]["rehearsalLine"];
+    onboardingConversation?: Parameters<
+      typeof createLiveBroker
+    >[0]["onboardingConversation"];
   } = {},
 ) {
   let clock = 1_000_000;
@@ -212,6 +215,9 @@ function setup(
     ...(options.rehearsalLine === undefined
       ? {}
       : { rehearsalLine: options.rehearsalLine }),
+    ...(options.onboardingConversation === undefined
+      ? {}
+      : { onboardingConversation: options.onboardingConversation }),
   });
   return {
     broker,
@@ -1149,6 +1155,68 @@ describe("GPT-Live line", () => {
     ).not.toBeNull();
     // Someone else is still refused after the move.
     expect(await ask(broker, "dlg_3", "Top three", STRANGER)).toBeNull();
+  });
+
+  it("an onboarding line is a conversation Q holds: checklist in, answers never delegated one by one (owner 2026-10-27)", async () => {
+    const heard: string[] = [];
+    const settled: string[] = [];
+    let ended = 0;
+    const { broker, runs, created } = setup({
+      onboardingConversation: {
+        brief: () =>
+          Promise.resolve("- Needed: How do you invest? [not covered yet]"),
+        heard: (_line, segments) => {
+          heard.push(...segments.map((s) => `${s.role}:${s.text}`));
+        },
+        ended: () => {
+          ended += 1;
+          return Promise.resolve();
+        },
+        settle: (_line, request) => {
+          settled.push(request);
+          return Promise.resolve("From Capital Q's own records: Saved: ...");
+        },
+      },
+    });
+    const onboarding = binding();
+    await broker.open({
+      binding: {
+        ...onboarding,
+        thread: {
+          ...onboarding.thread,
+          onboarding: {
+            sessionId: "f0000000-0000-4000-8000-000000000010",
+            journeyType: "investor",
+          },
+        },
+      },
+      sdp: "v=0 offer",
+    });
+    const instructions = created[0]?.instructions ?? "";
+    expect(instructions).toContain("Setup conversation:");
+    expect(instructions).toContain("introduce yourself properly");
+    expect(instructions).toContain("Needed: How do you invest?");
+    expect(instructions).not.toContain("Delegate every answer");
+    await broker.transcript({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        segments: [
+          { role: "USER", text: "Accelerator", at: 1_000_000 },
+          { role: "Q", text: "Nice.", at: 1_000_001 },
+        ],
+      },
+    });
+    expect(heard).toEqual(["USER:Accelerator", "Q:Nice."]);
+    const result = await ask(broker, "dlg_1", "What do you have so far?");
+    expect(result?.commentary).toContain("From Capital Q's own records");
+    expect(settled).toEqual(["What do you have so far?"]);
+    // The per-turn interview never runs on this line.
+    expect(runs).toEqual([]);
+    expect(
+      broker.end({ actor: ACTOR, voiceSessionId: SESSION, reason: "x" }),
+    ).toBe(true);
+    expect(ended).toBe(1);
   });
 
   it("never carries a line from one organisation into another", async () => {

@@ -552,6 +552,12 @@ export {
   type QDelegationReader,
   type QTurnAuthority,
 } from "./delegation-reader.js";
+export {
+  createOnboardingTranscriptReader,
+  transcriptText,
+  type OnboardingTranscriptReader,
+  type OnboardingTranscriptReading,
+} from "./transcript-reader.js";
 export { mandateStatement, ownProfileFact } from "./own-profile.js";
 export { asksForOwnMandate } from "./own-mandate-answer.js";
 export {

@@ -146,6 +146,15 @@ export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
 export { DELEGATION_READER_V4 } from "./prompts/tasks/delegation-reader.v4.js";
 export { DELEGATION_READER_V5 } from "./prompts/tasks/delegation-reader.v5.js";
+export { ONBOARDING_TRANSCRIPT_READER_V1 } from "./prompts/tasks/onboarding-transcript-reader.v1.js";
+export {
+  ONBOARDING_TRANSCRIPT_READER_SCHEMA_NAME,
+  ONBOARDING_TRANSCRIPT_READER_SCHEMA_VERSION,
+  OnboardingTranscriptReaderResultSchema,
+  OnboardingTranscriptReaderVariablesSchema,
+  type OnboardingTranscriptReaderResult,
+  type OnboardingTranscriptReaderVariables,
+} from "./prompts/schemas/onboarding-transcript-reader.js";
 export {
   DELEGATION_READER_SCHEMA_NAME,
   DELEGATION_READER_SCHEMA_VERSION,

@@ -172,6 +172,7 @@
     "memory-extractor/v2": "03f459f9f9a6f7f199354fc59571d4d25b419e69ae9c88832f45841a187a0145",
     "navigation-chooser/v1": "fa0a4035e4ecdff30761c18d49e29a57333c7e52ecc33ab6095f32e0c8e634e4",
     "onboarding-move-reader/v1": "9617f6a4c1a2f2ad9cddb4a1896766b5f37bdc8057a45cb4324a0f7ab1fcf44a",
+    "onboarding-transcript-reader/v1": "3c09e7a97bcf0dcb9fec03203bb10c0d9c1d0481bc0f88f1a4c21da1e3c5a09a",
     "person-brief-reader/v1": "4db761b3caa47f7ca34a4cc06133c5c1f2857a23a9bebb4f5178ef8303d65aaa",
     "pitch-section-extraction/v1": "8bae363bbcdd26d4219955f825aad22271c613442325fa79be5ac14e826e3460",
     "preference-polarity/v1": "9d254c9abbfd0bffd8b2d794a22c053cc1e20f5039b8fe34779fb0c7f5a4e113",

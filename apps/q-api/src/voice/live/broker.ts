@@ -20,6 +20,10 @@ import {
 import type { SpokenFacts } from "@capital-q/q-core";
 import { parseNameCorrection } from "@capital-q/q-core/names";
 
+import type {
+  ConversationLine,
+  OnboardingConversation,
+} from "../onboarding-conversation.js";
 import type { ExternalRehearsalLatency } from "../../composition/external-rehearsal-latency.js";
 import type { VoiceSessionBinding } from "../bindings.js";
 import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
@@ -192,6 +196,8 @@ type LiveLine = {
   /** Re-bound once, when the person's first organisation is created (ownLine). */
   actor: ActorContext;
   binding: VoiceSessionBinding;
+  /** An onboarding conversation Q holds itself (see onboardingConversation). */
+  readonly conversational: boolean;
   readonly openedAt: number;
   lastActivityAt: number;
   /** What Q was asked and verified on this line, oldest first (authority). */
@@ -361,6 +367,14 @@ export type LiveBrokerDependencies = {
    * line, routed 'live', so what GPT-Live said can be audited.
    */
   readonly transcripts?: Pick<DuplexTranscriptStore, "record"> | undefined;
+  /**
+   * Owner 2026-10-27: an onboarding line is a conversation Q holds itself;
+   * this keeps what is said in the onboarding thread and saves it from the
+   * transcript. Absent: the guided interview (every answer delegated).
+   */
+  readonly onboardingConversation?:
+    | Pick<OnboardingConversation, "brief" | "heard" | "ended" | "settle">
+    | undefined;
   /**
    * Part 6: the person's approved background (side, organisation, declared
    * mandate or company card facts), for the call's context package.
@@ -558,6 +572,24 @@ export function commentaryFor(input: {
   return `${LIVE_SPEAK_GUIDE} ${asked}${approval} Q's answer: ${JSON.stringify(words)}`;
 }
 
+/** The onboarding conversation a line carries, or null for any other line. */
+function conversationLineOf(
+  actor: ActorContext,
+  binding: VoiceSessionBinding,
+): ConversationLine | null {
+  const onboarding = binding.thread.onboarding;
+  if (onboarding === undefined) return null;
+  return {
+    voiceSessionId: binding.voiceSessionId,
+    actor,
+    accessToken: binding.accessToken,
+    onboarding: {
+      sessionId: onboarding.sessionId,
+      journeyType: onboarding.journeyType,
+    },
+  };
+}
+
 export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   const { config, provider, firewall, turn, spend, logger } = deps;
   const now = deps.now ?? Date.now;
@@ -744,6 +776,21 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
 
   const forget = (line: LiveLine, reason: string) => {
     lines.delete(line.voiceSessionId);
+    // Whatever was said last is kept and read once more, on the server:
+    // the person closing the tab loses nothing already heard.
+    if (line.conversational) {
+      const conversationLine = conversationLineOf(line.actor, line.binding);
+      if (conversationLine !== null) {
+        void deps.onboardingConversation
+          ?.ended(conversationLine)
+          .catch((error: unknown) => {
+            logger.warn(
+              { err: error, qVoiceSessionId: line.voiceSessionId },
+              "onboarding conversation could not be kept at the line's end",
+            );
+          });
+      }
+    }
     // Logical removal prevents new work, but the provider can still speak
     // while its asynchronous shutdown is in flight. Keep observation alive
     // until termination is confirmed; otherwise the final ledger is incomplete.
@@ -1167,6 +1214,15 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           return { kind: "REFUSED", reason: "TRIAL_IN_USE" };
         trialUsed = allowance - trialClaim.remainingSeconds;
       }
+      // Owner 2026-10-27: an onboarding call is a conversation Q holds from
+      // the setup's checklist; with no checklist it stays the guided one.
+      const conversationLine = conversationLineOf(actor, binding);
+      const interview =
+        persona !== null ||
+        conversationLine === null ||
+        deps.onboardingConversation === undefined
+          ? null
+          : await deps.onboardingConversation.brief(conversationLine);
       let created;
       try {
         created = await provider.createWebRtcSession({
@@ -1183,6 +1239,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
                     guided:
                       binding.thread.onboarding !== undefined ||
                       binding.thread.welcome === true,
+                    ...(interview === null ? {} : { interview }),
                   }),
             voice: config.voices[binding.voice],
           },
@@ -1227,6 +1284,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         providerSessionId: created.sessionId,
         actor,
         binding,
+        conversational: interview !== null,
         openedAt: at,
         lastActivityAt: at,
         history: carried === null ? [] : [...carried.history],
@@ -1392,6 +1450,42 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           failed: false,
         };
       }
+      // An onboarding conversation: Q holds it, and the backend's part is
+      // to save what was heard and say what is actually on the record.
+      const conversationLine = line.conversational
+        ? conversationLineOf(line.actor, line.binding)
+        : null;
+      if (
+        conversationLine !== null &&
+        deps.onboardingConversation !== undefined
+      ) {
+        try {
+          const commentary = await deps.onboardingConversation.settle(
+            conversationLine,
+            spokenWords(delegation.request).slice(0, 2_000),
+          );
+          return {
+            delegationId: delegation.delegationId,
+            commentary,
+            stale: false,
+            approvalPending: false,
+            failed: false,
+          };
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, qVoiceSessionId: line.voiceSessionId },
+            "onboarding conversation could not be settled",
+          );
+          return {
+            delegationId: delegation.delegationId,
+            commentary:
+              "Capital Q could not read their record back just now. Say plainly you couldn't check it this moment, that what they said is kept, and carry on.",
+            stale: false,
+            approvalPending: false,
+            failed: true,
+          };
+        }
+      }
       // One delegation id, one run: a repeat joins the run in flight.
       let running = line.delegations.get(delegation.delegationId);
       if (running === undefined) {
@@ -1483,6 +1577,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
             report.segments,
           )) ?? 0
         );
+      }
+      if (line.conversational) {
+        const conversationLine = conversationLineOf(line.actor, line.binding);
+        if (conversationLine !== null) {
+          deps.onboardingConversation?.heard(conversationLine, report.segments);
+        }
       }
       const store = deps.transcripts;
       if (store === undefined) return 0;

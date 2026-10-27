@@ -137,6 +137,8 @@ describe("registry", () => {
         "INTERVIEW_AGENT",
         // Which onboarding choices the person just handed to Q.
         "DELEGATION_READER",
+        // Owner 2026-10-27: the whole onboarding conversation, read into answers.
+        "ONBOARDING_TRANSCRIPT_READER",
         // BIZ-009: an investor's own public pages, read into their mandate.
         "INVESTOR_RESEARCH_READER",
         // Founder direction 2026-09-29: Q replying inside an approved errand.

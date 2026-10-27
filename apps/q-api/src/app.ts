@@ -330,6 +330,7 @@ export type QApiModules = {
         | "bindings"
         | "now"
         | "interviewAgent"
+        | "onboardingConversation"
         | "apiBaseUrl"
         | "board"
         | "welcome"
@@ -827,6 +828,7 @@ export function createApp(
       provider: modules.voice.provider,
       bindings: modules.voice.bindings,
       interviewAgent: modules.voice.interviewAgent,
+      onboardingConversation: modules.voice.onboardingConversation,
       apiBaseUrl: modules.voice.apiBaseUrl,
       board: modules.voice.board,
       welcome: modules.voice.welcome,

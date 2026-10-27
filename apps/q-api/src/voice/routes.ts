@@ -29,6 +29,8 @@ import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
 import { signupContextFromToken } from "./interview-steps.js";
+import { firstNameOf } from "./onboarding-flow.js";
+import type { OnboardingConversation } from "./onboarding-conversation.js";
 import { extractBearerToken } from "@capital-q/security/supabase";
 
 import {
@@ -186,6 +188,13 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
    * opening line for an interview session, when present.
    */
   readonly interviewAgent?: InterviewAgent | undefined;
+  /**
+   * Owner 2026-10-27: an onboarding call opens with Q's own introduction
+   * and first question, built by code from the setup's record (no model,
+   * no wait).
+   */
+  readonly onboardingConversation?:
+    Pick<OnboardingConversation, "opening"> | undefined;
   /** The application API origin, needed for the opening line. */
   readonly apiBaseUrl?: string | undefined;
   /** The turn board, for the screen to read what Q is asking. */
@@ -858,32 +867,48 @@ export function registerQVoiceRoutes(
         agent !== undefined &&
         apiBaseUrl !== undefined
       ) {
-        try {
-          const opening = await agent.turn({
-            actor,
-            session: { baseUrl: apiBaseUrl, accessToken },
-            onboardingSessionId: input.onboarding.sessionId,
-            // The opening line is where sign-up context matters most:
-            // greeting somebody by name and offering the organisation
-            // they registered with, rather than asking cold.
-            signup: signupContextFromToken(accessToken),
-            journeyType: input.onboarding.journeyType,
-            ...(input.onboarding.focus === undefined
-              ? {}
-              : { focus: input.onboarding.focus }),
-            channel: "voice",
-            attribution: {
-              tenantId: actor.tenantId,
-              userId: actor.userId,
-              correlationId: createCorrelationId(),
-            },
-            utterance: "",
-            recentTurns: [],
-          });
-          firstMessage = opening.reply;
-        } catch (error: unknown) {
-          request.log.warn({ err: error }, "voice opening line unavailable");
-        }
+        const introduction =
+          dependencies.onboardingConversation === undefined
+            ? null
+            : await dependencies.onboardingConversation.opening({
+                actor,
+                accessToken,
+                onboarding: {
+                  sessionId: input.onboarding.sessionId,
+                  journeyType: input.onboarding.journeyType,
+                },
+                firstName: firstNameOf(
+                  signupContextFromToken(accessToken).displayName,
+                ),
+              });
+        if (introduction !== null) firstMessage = introduction;
+        else
+          try {
+            const opening = await agent.turn({
+              actor,
+              session: { baseUrl: apiBaseUrl, accessToken },
+              onboardingSessionId: input.onboarding.sessionId,
+              // The opening line is where sign-up context matters most:
+              // greeting somebody by name and offering the organisation
+              // they registered with, rather than asking cold.
+              signup: signupContextFromToken(accessToken),
+              journeyType: input.onboarding.journeyType,
+              ...(input.onboarding.focus === undefined
+                ? {}
+                : { focus: input.onboarding.focus }),
+              channel: "voice",
+              attribution: {
+                tenantId: actor.tenantId,
+                userId: actor.userId,
+                correlationId: createCorrelationId(),
+              },
+              utterance: "",
+              recentTurns: [],
+            });
+            firstMessage = opening.reply;
+          } catch (error: unknown) {
+            request.log.warn({ err: error }, "voice opening line unavailable");
+          }
       }
 
       // Q's opening line goes to the speaker like any other, so it gets
