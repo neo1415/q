@@ -57,7 +57,11 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
-import { CONTINUE_LATER_PAUSE_MS } from "../onboarding-kit/components/continue-later";
+import {
+  CONTINUE_LATER_LINE,
+  CONTINUE_LATER_PAUSE_MS,
+  useContinueLater,
+} from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
 import {
   confirmSent,
@@ -71,6 +75,10 @@ import { useFollowTurn } from "../voice/use-follow-turn";
 import { requestMove } from "../q/ui-act-controller";
 import { VoiceHandover } from "../voice/voice-handover";
 import { VoiceStage } from "../voice/voice-stage";
+import type {
+  DocumentFinding,
+  DocumentReadingStage,
+} from "../voice/document-reading-card";
 import {
   acknowledgeValue,
   BRIDGE_LINE,
@@ -83,6 +91,8 @@ import {
   alreadyHaveLine,
   contentHashOf,
   nothingNewLine,
+  findingsFromDocument,
+  uploadFindingsNote,
   publicSourceOf,
   progressLines,
   promptFor,
@@ -1578,6 +1588,52 @@ export function QOnboardingWorkspace({
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   /** A finished upload waiting for the person to hand it to Q. */
   const [heldUpload, setHeldUpload] = useState<string | null>(null);
+  /**
+   * The document in flight, as the voice stage shows it (owner 2026-10-27):
+   * its name, where its reading is, and what it found once it lands.
+   */
+  const [uploadCard, setUploadCard] = useState<{
+    readonly fileName: string;
+    readonly stage: DocumentReadingStage;
+    readonly found: readonly DocumentFinding[];
+  } | null>(null);
+  // A landed reading stays long enough to read, then gives the stage back.
+  useEffect(() => {
+    if (uploadCard === null) return;
+    if (uploadCard.stage !== "DONE" && uploadCard.stage !== "NOTHING_NEW") {
+      return;
+    }
+    const timer = window.setTimeout(() => setUploadCard(null), 12_000);
+    return () => window.clearTimeout(timer);
+  }, [uploadCard]);
+  /**
+   * A quiet note into the live call (conversation first, owner
+   * 2026-10-27): what a reading found reaches Q as standing context, so it
+   * does not ask for it again, and no tap is needed. False where the line
+   * has no such channel (a standard or duplex line): the caller then holds
+   * the words for the person's tap, as before.
+   */
+  /** Continue later from the voice stage: the form's own leaving. */
+  const { leaving: leavingForLater, leave: leaveForLater } = useContinueLater();
+  const briefCall = useRef(voice.client.brief);
+  useEffect(() => {
+    briefCall.current = voice.client.brief;
+  }, [voice.client.brief]);
+  /** What Q picked up from one document, read from the latest session. */
+  const findingsOf = useRef<(documentId: string) => readonly DocumentFinding[]>(
+    () => [],
+  );
+  useEffect(() => {
+    findingsOf.current = (documentId) => {
+      const latest = viewRef.current;
+      return latest === undefined
+        ? []
+        : findingsFromDocument(
+            pickedUp(latest, vocabulary, labels),
+            documentId,
+          );
+    };
+  }, [vocabulary, labels]);
   const companyIdForUpload =
     qSubject !== undefined && "companyId" in qSubject
       ? qSubject.companyId
@@ -1630,6 +1686,7 @@ export function QOnboardingWorkspace({
         return;
       }
       setUploadNote(`Uploading ${file.name}`);
+      setUploadCard({ fileName: file.name, stage: "UPLOADING", found: [] });
       const target = await materialUploadTargetAction({
         ...(companyIdForUpload === undefined
           ? {}
@@ -1641,6 +1698,7 @@ export function QOnboardingWorkspace({
       });
       if (!target.ok) {
         setUploadNote(target.message);
+        setUploadCard(null);
         return;
       }
       try {
@@ -1651,10 +1709,12 @@ export function QOnboardingWorkspace({
         });
         if (!put.ok) {
           setUploadNote("The upload didn't complete. Try again.");
+          setUploadCard(null);
           return;
         }
       } catch {
         setUploadNote("The upload didn't complete. Check your connection.");
+        setUploadCard(null);
         return;
       }
       const done = await materialUploadCompleteAction(
@@ -1662,9 +1722,11 @@ export function QOnboardingWorkspace({
       );
       if (!done.ok) {
         setUploadNote(done.message);
+        setUploadCard(null);
         return;
       }
       setUploadNote(`Reading ${file.name}`);
+      setUploadCard({ fileName: file.name, stage: "READING", found: [] });
       // Wait for the reading to land (bounded), then let Q take it from there.
       const startedAt = Date.now();
       let ready = false;
@@ -1687,6 +1749,7 @@ export function QOnboardingWorkspace({
         }
         if (item !== undefined && item.state === "unreadable") {
           setUploadNote(item.stateLabel);
+          setUploadCard(null);
           return;
         }
       }
@@ -1728,13 +1791,33 @@ export function QOnboardingWorkspace({
           void onboardingThreadKeepAction(sessionId, line);
         }
       };
+      /**
+       * The reading landed: shown on the card, and told to a live call as a
+       * quiet note. True when the call took the note; false when the line
+       * has no such channel and the person's tap must hand it over.
+       */
+      const landedFor = (reading: "FOUND" | "NOTHING_NEW"): boolean => {
+        const found = reading === "FOUND" ? findingsOf.current(documentId) : [];
+        setUploadCard({
+          fileName: file.name,
+          stage: reading === "FOUND" ? "DONE" : "NOTHING_NEW",
+          found,
+        });
+        if (!voiceActive) return false;
+        return (
+          briefCall.current?.(uploadFindingsNote(file.name, reading, found)) ??
+          false
+        );
+      };
       const first =
         ready && readable ? await waitForFindings(60_000) : "READING";
       setUploadNote(null);
       if (first === "NOTHING_NEW") {
+        landedFor("NOTHING_NEW");
         nothingNew();
         return;
       }
+      if (!ready || !readable) setUploadCard(null);
       const found = first === "FOUND";
       const toldRead = `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`;
       const told = !ready
@@ -1751,7 +1834,12 @@ export function QOnboardingWorkspace({
       // Typed or spoken, Q hears about it the same way (founder
       // walkthrough F2): the upload is part of the conversation, not a
       // detour to the company page.
-      if (voiceActive) {
+      if (voiceActive && found && landedFor("FOUND")) {
+        // Conversation first (owner 2026-10-27): the findings went to the
+        // live call as a quiet note; Q takes them up when it fits, and the
+        // card shows them. No tap, no turn started over the person.
+      } else if (voiceActive) {
+        if (found) landedFor("FOUND");
         // But a reading that lands in the background never starts a turn
         // over the line (founder live 2026-10-05: "it interrupts itself"):
         // it is shown in place, and the person's tap hands it to Q.
@@ -1771,10 +1859,18 @@ export function QOnboardingWorkspace({
       const later =
         ready && readable && !found ? await waitForFindings(180_000) : null;
       if (later === "NOTHING_NEW") {
+        if (landedFor("NOTHING_NEW")) {
+          setHeldUpload(null);
+          setUploadNote(null);
+        }
         nothingNew();
       } else if (later === "FOUND") {
         const landed = `I've finished reading ${file.name}. Read back what you found in it and check it with me.`;
-        if (voiceActive) {
+        if (landedFor("FOUND")) {
+          // Told to the live call; the held "still reading" words are moot.
+          setHeldUpload(null);
+          setUploadNote(null);
+        } else if (voiceActive) {
           setUploadNote(`${file.name} is read.`);
           setHeldUpload(landed);
         } else {
@@ -1921,6 +2017,12 @@ export function QOnboardingWorkspace({
           }}
           onUpload={uploadWhileTalking}
           uploadNote={uploadNote}
+          uploadCard={uploadCard}
+          onContinueLater={() => {
+            // Ends the call the way End does, so its last words are sent;
+            // the answers themselves are saved on the server.
+            leaveForLater(() => voice.end());
+          }}
           uploadAction={
             heldUpload === null
               ? null
@@ -1947,6 +2049,17 @@ export function QOnboardingWorkspace({
           }
           progress={progress}
         />
+      ) : null}
+      {leavingForLater ? (
+        // Polite and visible once the call has closed: read out without
+        // taking focus, then Home opens.
+        <p
+          role="status"
+          className="cq-body text-(--cq-text-secondary)"
+          data-continue-later-line
+        >
+          {t(CONTINUE_LATER_LINE)}
+        </p>
       ) : null}
       {!voice.active && voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
