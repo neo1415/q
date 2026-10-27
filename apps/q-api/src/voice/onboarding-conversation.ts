@@ -405,6 +405,19 @@ export function createOnboardingConversation(dependencies: {
     ended: async (line) => {
       await flush(line);
       writes.delete(line.voiceSessionId);
+      // The person's access token is held no longer than their line: once
+      // the last reading is done, nothing of this session is kept here
+      // (a new line, or more words since, keeps it).
+      const reading = readings.get(line.onboarding.sessionId);
+      if (
+        reading !== undefined &&
+        reading.line.voiceSessionId === line.voiceSessionId &&
+        reading.timer === null &&
+        reading.running === null &&
+        !buffers.has(line.voiceSessionId)
+      ) {
+        readings.delete(line.onboarding.sessionId);
+      }
     },
 
     brief: async (line) => {
