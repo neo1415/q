@@ -21,7 +21,7 @@ import {
 } from "./mapping.js";
 import { isAccountHoldersOwn } from "./account-holder.js";
 import { planFollowUpQuestions } from "./planner.js";
-import { draftSuggestions } from "./suggestions.js";
+import { currencyConflicts, draftSuggestions } from "./suggestions.js";
 
 /**
  * The bridge from a processed document to something a founder can review
@@ -358,7 +358,19 @@ export function createFounderReview(dependencies: FounderReviewDependencies): {
           isAccountHoldersOwn(candidate, command.accountName ?? null),
       );
 
-      const suggestions = draftSuggestions(fresh);
+      // The founder's chosen currency (an option key), so a figure the
+      // material states in another one is asked about, never relabelled.
+      const chosenCurrency =
+        facts.known.find((fact) => fact.key === "currency")?.value ?? null;
+      const suggestions = draftSuggestions(fresh, {
+        chosenCurrency,
+        currencyOpen:
+          !facts.answered.has("currency") && !facts.suggested.has("currency"),
+      });
+      const conflicts = [
+        ...outcome.conflicts,
+        ...currencyConflicts(fresh, chosenCurrency),
+      ];
       const suggestedKeys = new Set(
         suggestions.flatMap((draft) => {
           const key = factKeyForStep(draft.stepKey);
@@ -373,7 +385,7 @@ export function createFounderReview(dependencies: FounderReviewDependencies): {
         answered: facts.answered,
         // A fact this reading just proposed is a review, not a question.
         suggested: new Set([...facts.suggested, ...suggestedKeys]),
-        conflicts: outcome.conflicts,
+        conflicts,
         ambiguities: outcome.ambiguities,
         proposed: outcome.proposed,
         shape,

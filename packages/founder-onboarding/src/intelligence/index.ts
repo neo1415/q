@@ -52,7 +52,9 @@ export {
 } from "./planner.js";
 export {
   describeOrigins,
+  currencyConflicts,
   draftSuggestions,
+  statedCurrency,
   FOUNDER_SOURCE_REF_TYPES,
   isDirectlySuggestable,
 } from "./suggestions.js";

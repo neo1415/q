@@ -353,6 +353,77 @@ describe("QFOR-006 · a failed reading does not trap the founder", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The deck's own currency is kept, never relabelled
+// ---------------------------------------------------------------------------
+
+describe("a raise figure keeps the currency its material states", () => {
+  it("proposes ₦450m as the amount and NGN as the currency when none was chosen", async () => {
+    const { plan } = await prepare(
+      outcome({ candidates: [candidate("target_amount", "₦450m")] }),
+      NOTHING_ANSWERED,
+    );
+    expect(plan.suggestions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetField: "target_amount",
+          suggestedValue: { type: "RANGE", value: "450000000" },
+        }),
+        expect.objectContaining({
+          targetField: "currency",
+          suggestedValue: { type: "SINGLE_SELECT", optionKey: "ngn" },
+        }),
+      ]),
+    );
+  });
+
+  it("reads the currency from the quote when the value lost its symbol", async () => {
+    const { plan } = await prepare(
+      outcome({
+        candidates: [
+          candidate("target_amount", "1500000", { quote: "1,5 M€ seed" }),
+        ],
+      }),
+      NOTHING_ANSWERED,
+    );
+    expect(
+      plan.suggestions.find((s) => s.targetField === "currency")
+        ?.suggestedValue,
+    ).toEqual({ type: "SINGLE_SELECT", optionKey: "eur" });
+  });
+
+  it("asks rather than relabels when the founder chose another currency", async () => {
+    const { plan } = await prepare(
+      outcome({ candidates: [candidate("target_amount", "KSh 120 mn")] }),
+      {
+        responses: [
+          { stepKey: FOUNDER_STEPS.currency, value: { optionKey: "usd" } },
+        ],
+        pendingSuggestionSteps: [],
+        narrative: null,
+      },
+    );
+    // No amount offered under USD, and no competing currency proposal.
+    expect(plan.suggestions).toEqual([]);
+    const question = plan.questions.find((q) => q.key === "currency");
+    expect(question?.reason).toBe("CONTRADICTION");
+    expect(question?.readings).toEqual([
+      "KES (KSh 120 mn)",
+      "USD (your answer)",
+    ]);
+  });
+
+  it("proposes no currency from a bare $, which other dollars use too", async () => {
+    const { plan } = await prepare(
+      outcome({ candidates: [candidate("target_amount", "$2m")] }),
+      NOTHING_ANSWERED,
+    );
+    expect(plan.suggestions.map((s) => s.targetField)).toEqual([
+      "target_amount",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // QFOR-007 · provenance the founder can read
 // ---------------------------------------------------------------------------
 
