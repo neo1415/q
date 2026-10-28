@@ -328,10 +328,7 @@ export function comparisonTableBlock(input: {
     {
       label: "Traction",
       cells: columns.map((id) =>
-        tractionCell(
-          input.read.companyFigures.get(id),
-          facts(id)?.description,
-        ),
+        tractionCell(input.read.companyFigures.get(id), facts(id)?.description),
       ),
     },
     { label: "Team", cells: columns.map((id) => teamCell(facts(id)?.team)) },

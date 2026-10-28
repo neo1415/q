@@ -56,7 +56,11 @@ export function briefFacts(brief: RelationshipBrief): readonly string[] {
   // acceptance and a shared deck.
   for (const step of (brief.history ?? []).slice(-6)) {
     const actor =
-      step.by === "YOUR_SIDE" ? "Your side" : step.by === "OTHER_SIDE" ? them : "Someone";
+      step.by === "YOUR_SIDE"
+        ? "Your side"
+        : step.by === "OTHER_SIDE"
+          ? them
+          : "Someone";
     switch (step.kind) {
       case "INTEREST_EXPRESSED":
         facts.push(

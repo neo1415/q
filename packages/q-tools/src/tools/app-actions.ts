@@ -345,8 +345,10 @@ function toolFor(
       const references: Readonly<Record<string, ReferenceKind | undefined>> =
         declared.references;
       /** References nothing of theirs matched: all of them, said once. */
-      const unmatched: { readonly kind: ReferenceKind; readonly said: string }[] =
-        [];
+      const unmatched: {
+        readonly kind: ReferenceKind;
+        readonly said: string;
+      }[] = [];
       for (const [field, kind] of Object.entries(references)) {
         const said = resolved[field];
         if (typeof said !== "string" || kind === undefined) continue;

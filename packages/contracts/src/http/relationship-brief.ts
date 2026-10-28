@@ -212,9 +212,9 @@ export const RelationshipBriefSchema = z
     /**
      * Stress 2026-10-28 (J7): what happened between them, in order, from
      * the history this side may see: the interest with its note, the
-     * answer, documents shared. Absent from older briefs: [].
+     * answer, documents shared. Absent from older briefs.
      */
-    history: z.array(RelationshipBriefHistoryEntrySchema).max(30).default([]),
+    history: z.array(RelationshipBriefHistoryEntrySchema).max(30).optional(),
     sourceVersions: z
       .object({
         projector: z.string().max(64).nullable(),
