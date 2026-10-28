@@ -41,6 +41,7 @@ import {
 import { artifactFileUrl } from "@/features/q/artifact-download";
 import { newIntentKey } from "@/features/q/control/intent-key";
 import { effectShown } from "@/features/q/control/perform";
+import { setReaderUpload } from "@/features/q/screen";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 
 import { DECK_AUDIENCE_OPTIONS, deckAudienceDescription } from "./deck-sharing";
@@ -458,6 +459,9 @@ export function DocumentLibrary({
   const [renaming, setRenaming] = useState<LibraryItem | null>(null);
   const [sharing, setSharing] = useState<LibraryItem | null>(null);
   const [reading, setReading] = useState<ReaderDocument | null>(null);
+  // Stress 2026-10-28 (S08): the upload open in the reader is on screen for
+  // Q ("analyse this" means it); cleared when the reader closes or leaves.
+  useEffect(() => () => setReaderUpload(null), []);
 
   // Per device, read after hydration (the server always draws the grid).
   const view = useSyncExternalStore(
@@ -587,6 +591,7 @@ export function DocumentLibrary({
         void documentFileAction(item.id).then((link) => {
           if (link.ok) {
             setReading({ kind: "pdf", title: item.title, url: link.value.url });
+            setReaderUpload(item.id);
           } else setNotice({ text: link.message });
         });
         return;
@@ -1110,7 +1115,13 @@ export function DocumentLibrary({
         )}
       </DialogRoot>
 
-      <InAppReader document={reading} onClose={() => setReading(null)} />
+      <InAppReader
+        document={reading}
+        onClose={() => {
+          setReading(null);
+          setReaderUpload(null);
+        }}
+      />
     </section>
   );
 }

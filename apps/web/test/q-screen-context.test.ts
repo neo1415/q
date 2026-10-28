@@ -10,6 +10,7 @@ import {
   currentViewing,
   screenOf,
   setOpenDocument,
+  setReaderUpload,
   setScreenFocusSource,
   setViewerDocument,
 } from "../src/features/q/screen";
@@ -167,5 +168,27 @@ describe("the document open on this tab", () => {
     setViewerDocument(DOC);
     setOpenDocument(Q_DOC);
     expect(currentScreen("/home").artifactId).toBe(Q_DOC);
+  });
+});
+
+// Stress 2026-10-28 (S08): the upload open in the Documents reader is what
+// "analyse this" means; it rides with the attachments, and goes when closed.
+describe("an upload open in the Documents reader", () => {
+  const NOTE = "24c6a513-4bc1-4a51-ba69-caf5279e1232";
+  afterEach(() => setReaderUpload(null));
+
+  it("is on screen while open, and gone when closed", () => {
+    setReaderUpload(NOTE);
+    const screen = currentScreen("/documents");
+    expect(screen.route).toBe("DOCUMENTS");
+    expect(screen.attachedDocumentIds).toEqual([NOTE]);
+    expect(QScreenContextSchema.safeParse(screen).success).toBe(true);
+    setReaderUpload(null);
+    expect(currentScreen("/documents").attachedDocumentIds).toBeUndefined();
+  });
+
+  it("a malformed id is ignored", () => {
+    setReaderUpload("not-an-id");
+    expect(currentScreen("/documents").attachedDocumentIds).toBeUndefined();
   });
 });

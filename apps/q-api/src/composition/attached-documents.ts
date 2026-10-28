@@ -40,6 +40,8 @@ type Held = {
     readonly id: string;
     readonly title: string;
     readonly status: string;
+    /** Evidence's own classification; HIGHLY_CONFIDENTIAL is never read. */
+    readonly sensitivityClass?: string | undefined;
   };
   readonly currentVersion: Version | null;
 };
@@ -116,6 +118,10 @@ export function bestByName<T extends Held>(
   }
   return best;
 }
+
+/** Under the tool's 300-character reason; the policy is heldBackFromQ's. */
+const HELD_BACK =
+  "It is classified highly confidential (financial material), so Q never reads its contents or sends them to a model. Its key figures, stated by them, become their own stated figures Q can use.";
 
 export function createAttachedDocumentReads(
   dependencies: AttachedDocumentReadsDependencies,
@@ -265,6 +271,19 @@ export function createAttachedDocumentReads(
       };
       if (version === null) {
         return { document: { ...identity, state: "READING" }, others };
+      }
+      // Stress 2026-10-28 (item 2): a HIGHLY_CONFIDENTIAL document (management
+      // accounts, a financial model) is outside every firewall plan, and no
+      // model provider may receive it. This read handed its pages to the
+      // model for any of their own files; it no longer does, and says why.
+      if (
+        held.document.sensitivityClass === "HIGHLY_CONFIDENTIAL" ||
+        held.document.sensitivityClass === "RESTRICTED"
+      ) {
+        return {
+          document: { ...identity, state: "UNREADABLE", reason: HELD_BACK },
+          others,
+        };
       }
       const reason = unreadableReason(version);
       if (reason !== null) {
