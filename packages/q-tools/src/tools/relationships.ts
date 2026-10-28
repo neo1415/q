@@ -238,7 +238,7 @@ export const GetRelationshipOutputSchema = z
           .object({
             status: z.literal("OK"),
             /** Code-written statements of fact; relay them, do not reinterpret. */
-            facts: z.array(z.string().max(400)).max(16),
+            facts: z.array(z.string().max(400)).max(22),
             detail: RelationshipBriefSchema,
           })
           .strict(),
@@ -1062,6 +1062,8 @@ export const ListMyRelationshipsOutputSchema = z
              * unknown, not absent -- never say no message was sent.
              */
             messagesRead: z.enum(["OK", "UNAVAILABLE"]).default("UNAVAILABLE"),
+            /** What the state, and the answer waiting, mean (code-written). */
+            means: z.string().max(400).optional(),
           })
           .strict(),
       )
@@ -1077,6 +1079,25 @@ export const ListMyRelationshipsOutputSchema = z
 export type ListMyRelationshipsOutput = z.infer<
   typeof ListMyRelationshipsOutputSchema
 >;
+
+/**
+ * Stress 2026-10-28 (J6): asked what accepting Aster's interest changes, Q
+ * said "accepting would not mean investment or a formal match". Accepting
+ * IS the mutual step: both sides agreed, the relationship is CONNECTED.
+ * What a state and the answer waiting mean is said here, by code.
+ */
+export function stateMeans(state: string, nextStep: string): string | null {
+  if (nextStep === "ANSWER_INTEREST") {
+    return "Their interest is one-sided and waits for your answer: not a match yet. Accepting it means both sides have agreed: the relationship becomes CONNECTED (a mutual match), which opens messages and lets documents be shared. Neither interest nor accepting is an investment or a commitment.";
+  }
+  if (state === "INTEREST_EXPRESSED") {
+    return "One-sided interest, waiting for the other side's answer: not a match yet, and not a commitment.";
+  }
+  if (state === "CONNECTED") {
+    return "Both sides agreed: a mutual match (CONNECTED). It is not an investment or a commitment.";
+  }
+  return null;
+}
 
 function createListMyRelationshipsTool(
   own: (actor: ActorContext) => Promise<OwnRelationships | null>,
@@ -1164,6 +1185,10 @@ function createListMyRelationshipsTool(
                       preview: item.lastMessage.preview.slice(0, 240),
                     },
               messagesRead: item.lastMessageRead ?? "UNAVAILABLE",
+              ...((): { means?: string } => {
+                const means = stateMeans(item.state, item.nextStep);
+                return means === null ? {} : { means };
+              })(),
             })),
           saved,
           passed,

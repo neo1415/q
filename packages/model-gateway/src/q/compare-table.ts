@@ -148,8 +148,31 @@ function teamCell(team: ReadCompanyFacts["team"]): string {
   return `${named.join("; ")}${more} (company-stated)`;
 }
 
+/**
+ * Stress 2026-10-28 (I06): Ledgerline published no figures, so the table
+ * said "Not stated" while the answer, spoken from its profile description,
+ * gave 1,140 businesses and ₦38m MRR. With no published figures, the
+ * sentences of the company's own description that state a traction figure
+ * are the cell, so the table and the words share one source.
+ */
+function describedTraction(description: string | null | undefined): string {
+  const said = (description ?? "")
+    .split(/(?<=[.!?])\s+/u)
+    .filter(
+      (sentence) =>
+        /\d/u.test(sentence) &&
+        TRACTION_KEYS.some((pattern) => pattern.test(sentence)),
+    )
+    .slice(0, 2)
+    .map((sentence) => sentence.trim().replace(/[.\s]+$/u, ""))
+    .join("; ")
+    .slice(0, 300);
+  return said.length === 0 ? "" : `${said} (company-stated, profile)`;
+}
+
 function tractionCell(
   figures: readonly ReadCompanyFigure[] | undefined,
+  description?: string | null,
 ): string {
   const stated = (figures ?? [])
     .filter((figure) => Number.isFinite(tractionRank(figure)))
@@ -163,7 +186,9 @@ function tractionCell(
         .slice(0, 140);
       return `${said} (company-stated${when === null ? "" : `, ${when}`})`;
     });
-  return stated.length === 0 ? NOT_STATED : stated.join("; ");
+  if (stated.length > 0) return stated.join("; ");
+  const described = describedTraction(description);
+  return described.length === 0 ? NOT_STATED : described;
 }
 
 function measures(profile: FitProfileDto | null): {
@@ -207,16 +232,26 @@ export function comparisonTableBlock(input: {
   readonly only?: readonly string[] | undefined;
   /** TURN_READER v62: the reader read a comparison; decides over the words. */
   readonly compareAsked?: boolean | undefined;
+  /**
+   * The ranked set this answer shows (its company cards), in order. With no
+   * named subjects, the table is these and only these.
+   */
+  readonly shown?: readonly string[] | undefined;
 }): QResultBlock | null {
   if (!(input.compareAsked ?? asksToCompare(input.question))) return null;
   const fitById = new Map(input.fits.map((fit) => [fit.companyId, fit]));
+  const nameOf = (id: string) =>
+    input.read.companyNames.get(id) ?? fitById.get(id)?.name ?? "Company";
+  // Stress 2026-10-28 (I03): "companies in Capital Q" read Capital Q's own
+  // company record, which then headed the table. The platform's own
+  // organisation is never a comparison subject.
   const ids = [
     ...input.fits.map((fit) => fit.companyId),
     ...input.read.companyFacts.keys(),
-  ].filter((id, index, all) => all.indexOf(id) === index);
-  // In the order the person named them, when they named them.
-  const nameOf = (id: string) =>
-    input.read.companyNames.get(id) ?? fitById.get(id)?.name ?? "Company";
+  ].filter(
+    (id, index, all) =>
+      all.indexOf(id) === index && !isCapitalQName(nameOf(id)),
+  );
   const at = (id: string) => {
     const where = input.question
       .toLowerCase()
@@ -234,20 +269,21 @@ export function comparisonTableBlock(input: {
     })
     // In the order the person named them.
     .sort((a, b) => at(a) - at(b));
+  // Stress 2026-10-28 (J1 Prumo and Railhead Robotics, J4 Ledgerio and
+  // Ledgerly beside LedgerBridge): with no named subjects the table used
+  // every company the run happened to read, name-search look-alikes
+  // included. The table is the asked subjects, else the ranked set this
+  // answer shows, else nothing.
+  const shown = (input.shown ?? []).filter(
+    (id, index, all) => all.indexOf(id) === index && ids.includes(id),
+  );
   const only =
     (input.only ?? []).length >= 2
       ? (input.only ?? [])
       : namedInQuestion.length >= 2
         ? namedInQuestion
-        : [];
-  const columns =
-    only.length >= 2
-      ? only.filter((id) => ids.includes(id))
-      : ids
-          .map((id, index) => ({ id, index }))
-          .sort((a, b) => at(a.id) - at(b.id) || a.index - b.index)
-          .map(({ id }) => id)
-          .slice(0, 8);
+        : shown;
+  const columns = only.filter((id) => ids.includes(id)).slice(0, 8);
   if (columns.length < 2) return null;
 
   const facts = (id: string) => input.read.companyFacts.get(id);
@@ -292,7 +328,7 @@ export function comparisonTableBlock(input: {
     {
       label: "Traction",
       cells: columns.map((id) =>
-        tractionCell(input.read.companyFigures.get(id)),
+        tractionCell(input.read.companyFigures.get(id), facts(id)?.description),
       ),
     },
     { label: "Team", cells: columns.map((id) => teamCell(facts(id)?.team)) },
@@ -406,6 +442,35 @@ export function compareTargets(
     .slice(0, Math.min(Math.max(count, 2), 4));
 }
 
+/** Capital Q's own company record, by its name. */
+function isCapitalQName(name: string): boolean {
+  return /^\s*capital[\s-]?q\s*$/iu.test(name);
+}
+
+/** The company cards in these result blocks, in order. */
+export function answerCardCompanies(
+  blocks: readonly unknown[] | null | undefined,
+): readonly { readonly companyId: string; readonly name: string }[] {
+  return (blocks ?? []).flatMap((block: unknown) => {
+    if (typeof block !== "object" || block === null) return [];
+    if (Reflect.get(block, "kind") !== "ANSWER_CARDS") return [];
+    const list: unknown = Reflect.get(block, "cards");
+    if (!Array.isArray(list)) return [];
+    return list.flatMap((card: unknown) => {
+      if (typeof card !== "object" || card === null) return [];
+      const subject: unknown = Reflect.get(card, "subject");
+      const name: unknown = Reflect.get(card, "name");
+      if (typeof subject !== "object" || subject === null) return [];
+      const id: unknown = Reflect.get(subject, "companyId");
+      return Reflect.get(subject, "kind") === "COMPANY" &&
+        typeof id === "string" &&
+        typeof name === "string"
+        ? [{ companyId: id, name }]
+        : [];
+    });
+  });
+}
+
 /** The cards Q showed in its newest answer, in order. */
 export function newestAnswerCards(
   earlier: readonly {
@@ -415,26 +480,8 @@ export function newestAnswerCards(
 ): readonly { readonly companyId: string; readonly name: string }[] {
   for (const message of [...earlier].reverse()) {
     if (message.role !== "Q") continue;
-    const cards = (message.blocks ?? []).flatMap((block: unknown) => {
-      if (typeof block !== "object" || block === null) return [];
-      if (Reflect.get(block, "kind") !== "ANSWER_CARDS") return [];
-      const list: unknown = Reflect.get(block, "cards");
-      if (!Array.isArray(list)) return [];
-      return list.flatMap((card: unknown) => {
-        if (typeof card !== "object" || card === null) return [];
-        const subject: unknown = Reflect.get(card, "subject");
-        const name: unknown = Reflect.get(card, "name");
-        if (typeof subject !== "object" || subject === null) return [];
-        const id: unknown = Reflect.get(subject, "companyId");
-        return Reflect.get(subject, "kind") === "COMPANY" &&
-          typeof id === "string" &&
-          typeof name === "string"
-          ? [{ companyId: id, name }]
-          : [];
-      });
-    });
     // The newest answer is the one meant; an older list is not "them".
-    return cards;
+    return answerCardCompanies(message.blocks);
   }
   return [];
 }

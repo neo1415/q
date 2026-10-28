@@ -401,6 +401,9 @@ describe("Capital Q as the company, not the platform (owner 2026-10-23)", () => 
     "What can the Capital Q app do?",
     "Capital Q account settings",
     "Tell me about my company",
+    // Stress 2026-10-28 I03: the platform as the place to look.
+    "Find five companies in Capital Q that fit my mandate.",
+    "Which startups on Capital Q are raising?",
   ])("%s keeps the platform reading", (text) => {
     expect(asked(text)).toBe(false);
   });

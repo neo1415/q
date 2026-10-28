@@ -182,6 +182,35 @@ export function setAttachedDocuments(ids: readonly string[]): void {
 }
 
 /**
+ * Stress 2026-10-28 (S08): one of their uploaded files open in the
+ * Documents page's reader. With the market note open, "analyse this deck"
+ * was answered about the seed deck ("You're on your documents page"). It
+ * rides with their attachments, newest last, so the server reads it as the
+ * asker through read_attached_document (their own organisation's evidence,
+ * or nothing) and "this" means it. An id, never authority.
+ */
+let readerUploadId: string | null = null;
+
+export function setReaderUpload(documentId: string | null): void {
+  readerUploadId =
+    documentId !== null && UUID.test(documentId)
+      ? documentId.toLowerCase()
+      : null;
+}
+
+/** The composer's attachments and the open upload, newest last, at most 5. */
+export function onScreenUploads(): readonly string[] {
+  const ids =
+    readerUploadId === null
+      ? attachedDocumentIds
+      : [
+          ...attachedDocumentIds.filter((id) => id !== readerUploadId),
+          readerUploadId,
+        ];
+  return ids.slice(-5);
+}
+
+/**
  * What the page says is in front of the person (R18/R21): the Discover
  * card's company, and its pitch and position when one is playing or
  * paused. Registered by the page (through the global Q moment source) and
@@ -252,8 +281,9 @@ export function currentScreen(
         : { artifactVersion: roomDeck.version }),
     };
   } else if (open !== null) screen = { ...screen, artifactId: open };
-  if (attachedDocumentIds.length > 0) {
-    screen = { ...screen, attachedDocumentIds: [...attachedDocumentIds] };
+  const uploads = onScreenUploads();
+  if (uploads.length > 0) {
+    screen = { ...screen, attachedDocumentIds: [...uploads] };
   }
   // Q room R1: the whole page, as ids and closed kinds only.
   const manifest = currentManifest();

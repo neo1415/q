@@ -849,6 +849,40 @@ describe("access goes through the relationship (2026-10-08)", () => {
     ).not.toBeNull();
   });
 
+  // Stress 2026-10-28 (S02-post): the founder accepted the interest and
+  // shared a document to the relationship, but the company was not (yet)
+  // marketplace-ready, so the pitch rule refused the room and Q said the
+  // deck was "not available". A connected relationship opens the room; each
+  // document still needs its own grant.
+  it("opens the room to a connected investor the pitch rule no longer admits, grants only", async () => {
+    const R3 = "00000000-0000-4000-8000-000000000503";
+    const { service, relationships } = world({
+      connections: new Map<string, RelationshipConnection>([
+        [R1, "CONNECTED"],
+        [R3, "CONNECTED"],
+      ]),
+    });
+    relationships.set("stranger", R3);
+    const view = await service.view(stranger, COMPANY);
+    if (view?.viewer !== "INVESTOR") throw new Error("investor view");
+    expect(view.access).toBe("CONNECTED");
+    // No grant: the shared-only and private documents stay out.
+    expect(titles(view)).toEqual(["One-page summary", "Cap table summary"]);
+  });
+
+  it("still refuses an investor the pitch rule does not admit whose interest only waits", async () => {
+    const R3 = "00000000-0000-4000-8000-000000000503";
+    const { service, relationships } = world({
+      connections: new Map<string, RelationshipConnection>([
+        [R1, "CONNECTED"],
+        [R3, "INTEREST_PENDING"],
+      ]),
+      outline: true,
+    });
+    relationships.set("stranger", R3);
+    expect(await service.view(stranger, COMPANY)).toBeNull();
+  });
+
   it("shows a connected investor the room", async () => {
     const { service } = world();
     const view = await service.view(investorOne, COMPANY);

@@ -76,19 +76,33 @@ function scale(unit: string | undefined): number {
   }
 }
 
-/** The first amount of money in the text, in USD; null: none stated. */
-export function moneyUsd(text: string): number | null {
+/**
+ * The first amount of money in the text: the figure exactly as written
+ * ("₦38m") and an order-of-magnitude USD value used ONLY to place it in a
+ * stage band. The USD value is never shown: a statement quotes `stated`, so
+ * a figure keeps its own currency (stress 2026-10-28 I03: ₦456m became
+ * "$296k").
+ */
+export function moneyOf(
+  text: string,
+): { readonly stated: string; readonly usd: number } | null {
   const before = MONEY_BEFORE.exec(text);
   const after = before === null ? MONEY_AFTER.exec(text) : null;
+  const match = before ?? after;
   const currency = (before?.[1] ?? after?.[3] ?? "").toUpperCase();
   const amount = before?.[2] ?? after?.[1];
   const unit = before?.[3] ?? after?.[2];
-  if (amount === undefined) return null;
+  if (match === null || amount === undefined) return null;
   const rate = FX_USD[currency] ?? FX_USD[currency.toLowerCase()];
   if (rate === undefined) return null;
   const n = Number(amount.replace(/,/gu, ""));
   if (!Number.isFinite(n)) return null;
-  return n * scale(unit) * rate;
+  return { stated: match[0].trim(), usd: n * scale(unit) * rate };
+}
+
+/** The first amount of money in the text, in USD; null: none stated. */
+export function moneyUsd(text: string): number | null {
+  return moneyOf(text)?.usd ?? null;
 }
 
 /** The first plain count in the text ("282,063", "46"); null: none. */
@@ -172,6 +186,9 @@ const REVENUE = /\b(revenue|mrr|arr|sales|gmv|turnover|income|billings)\b/iu;
 const PLAN =
   /\b(forecast|projected|projection|target|plan(?:ned)?|budget|goal|by 20\d\d)\b/iu;
 const MONTHLY = /\b(month|monthly|mrr|per month|\/mo|p\.m\.)\b/iu;
+/** Annual wins over monthly: "Annualised MRR ₦456m" is a year, not a month. */
+const ANNUAL =
+  /\b(annual(?:ised|ized)?|annually|arr|yearly|per (?:year|annum)|a year|p\.a\.|fy\s?\d{2,4})\b/iu;
 const NONE =
   /\b(pre[- ]?revenue|no revenue|none(?: (?:reported|stated|recorded))?(?: yet)?|not yet (?:paying|reported|generating|earning|monetis\w*)|zero revenue)\b/iu;
 const BUSINESS =
@@ -202,16 +219,28 @@ const PRICE =
 
 const text = (f: Fact) => `${f.label} ${f.value}`;
 
-/** Monthly revenue from the facts, or "NONE" when they say there is none. */
-function monthlyRevenue(facts: readonly Fact[]): number | "NONE" | null {
-  let best: number | null = null;
+/**
+ * Monthly revenue from the facts (USD for banding only, with the stated
+ * figure for the statement), or "NONE" when they say there is none.
+ */
+function monthlyRevenue(
+  facts: readonly Fact[],
+): { readonly usd: number; readonly statement: string } | "NONE" | null {
+  let best: { usd: number; statement: string } | null = null;
   for (const f of facts) {
     const t = text(f);
     if (!REVENUE.test(t) || PLAN.test(t)) continue;
-    const usd = moneyUsd(f.value) ?? moneyUsd(t);
-    if (usd === null) continue;
-    const monthly = MONTHLY.test(t) ? usd : usd / 12;
-    best = best === null ? monthly : Math.max(best, monthly);
+    const money = moneyOf(f.value) ?? moneyOf(t);
+    if (money === null) continue;
+    const annual = ANNUAL.test(t) || !MONTHLY.test(t);
+    const monthly = annual ? money.usd / 12 : money.usd;
+    // Equal amounts (MRR and the same MRR annualised): keep the monthly one.
+    if (best === null || monthly > best.usd * 1.001) {
+      best = {
+        usd: monthly,
+        statement: `${money.stated} ${annual ? "a year" : "a month"} in revenue (as stated)`,
+      };
+    }
   }
   if (best !== null) return best;
   return facts.some((f) => REVENUE.test(text(f)) && NONE.test(f.value))
@@ -234,14 +263,13 @@ export function gradeTraction(
       statement: "No revenue yet",
     });
   } else if (revenue !== null) {
-    const k = Math.round(revenue / 1000);
     out.push({
       criterion: "cp.traction",
       anchor:
         stage === null
           ? 2
-          : gradeAgainst(revenue, stage, MONTHLY_REVENUE_BENCHMARK),
-      statement: `About $${String(k)}k a month in revenue`,
+          : gradeAgainst(revenue.usd, stage, MONTHLY_REVENUE_BENCHMARK),
+      statement: revenue.statement,
     });
   }
   let business: number | null = null;
@@ -363,13 +391,17 @@ export function gradePricing(facts: readonly Fact[]): Grade[] {
 
 export function gradeMarket(facts: readonly Fact[]): Grade[] {
   let largest: number | null = null;
+  let stated = "";
   let bottomUp = false;
   for (const f of facts) {
     if (!MARKET_WORDS.test(text(f))) continue;
-    const usd = moneyUsd(f.value) ?? moneyUsd(text(f));
+    const money = moneyOf(f.value) ?? moneyOf(text(f));
     // A market is millions at the least; a smaller figure is a price.
-    if (usd === null || usd < 1e6) continue;
-    largest = Math.max(largest ?? 0, usd);
+    if (money === null || money.usd < 1e6) continue;
+    if (largest === null || money.usd > largest) {
+      largest = money.usd;
+      stated = money.stated;
+    }
     if (BOTTOM_UP.test(text(f))) bottomUp = true;
   }
   if (largest === null) return [];
@@ -382,7 +414,7 @@ export function gradeMarket(facts: readonly Fact[]): Grade[] {
     {
       criterion: "mo.market_size",
       anchor,
-      statement: `Market sized at about ${largest >= 1e9 ? `$${(largest / 1e9).toFixed(1)}bn` : `$${String(Math.round(largest / 1e6))}m`}${bottomUp ? ", with a reachable segment" : ""}`,
+      statement: `Market sized at ${stated} (as stated)${bottomUp ? ", with a reachable segment" : ""}`,
     },
   ];
 }
