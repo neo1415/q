@@ -34,6 +34,13 @@ export const Q_VISIBLE_STAGES = [
   "WAITING_FOR_REPLY",
   "WAITING_FOR_APPROVAL",
   "COMPLETING_APPROVED_ACTION",
+  // Situation-first planning (owner 2026-10-28): a plan's own stages.
+  // Public sources are checked under SEARCHING_PUBLIC_SOURCES ("Looking
+  // into it", R38: no search theatre), so it has no planning twin.
+  "GATHERING_SITUATION",
+  "READING_DOCUMENTS",
+  "DRAFTING_PLAN",
+  "REVIEWING_PLAN",
 ] as const;
 
 export type QVisibleStage = (typeof Q_VISIBLE_STAGES)[number];
@@ -67,6 +74,10 @@ export const Q_VISIBLE_STAGE_LABELS: Readonly<Record<QVisibleStage, string>> = {
   WAITING_FOR_REPLY: "Waiting for your reply",
   WAITING_FOR_APPROVAL: "Waiting for your approval",
   COMPLETING_APPROVED_ACTION: "Completing the approved action",
+  GATHERING_SITUATION: "Gathering your situation",
+  READING_DOCUMENTS: "Reading your documents",
+  DRAFTING_PLAN: "Drafting the plan",
+  REVIEWING_PLAN: "Reviewing the plan",
 };
 
 export function qVisibleStageLabel(stage: QVisibleStage): string {

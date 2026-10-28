@@ -216,6 +216,15 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       readAt: "2026-10-08T09:05:00.000Z",
     },
   },
+  PLAN: {
+    kind: "PLAN",
+    planId: UUID,
+    version: 2,
+    title: "Close the seed round by March",
+    steps: 6,
+    reviewed: false,
+    affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
+  },
   SCHEDULE: {
     kind: "SCHEDULE",
     title: "Your day",

@@ -229,7 +229,7 @@ export const WORKFORCE_LIVE_STATES = [
  * minutes. A document is researched, drafted up to three times with a
  * review after each, then filed (job 9e52faf7: 3 min 25 s).
  */
-export const WORKFORCE_JOB_KINDS = ["DOCUMENT", "RESEARCH"] as const;
+export const WORKFORCE_JOB_KINDS = ["DOCUMENT", "RESEARCH", "PLAN"] as const;
 export type WorkforceJobKind = (typeof WORKFORCE_JOB_KINDS)[number];
 
 export const WORKFORCE_USUAL_MINUTES: Readonly<
@@ -237,6 +237,9 @@ export const WORKFORCE_USUAL_MINUTES: Readonly<
 > = {
   DOCUMENT: { min: 2, max: 4 },
   RESEARCH: { min: 1, max: 2 },
+  // Situation-first planning (2026-10-28): gather, research, draft, two
+  // reviews (40-90 s by design).
+  PLAN: { min: 1, max: 2 },
 };
 
 export const WorkforceLiveExpectedSchema = z

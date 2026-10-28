@@ -13,6 +13,11 @@ import { QArtifactIdSchema } from "./ids.js";
 import { QUncertainConfidenceLevelSchema } from "./confidence.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
 import { QPublicFindingSchema } from "./finding.js";
+import {
+  Q_PLAN_STEPS_MAX,
+  QPlanAffordanceSchema,
+  QPlanIdSchema,
+} from "./plan.js";
 import { QSubjectRefSchema } from "./subject.js";
 import {
   Q_COMPARISON_SUBJECTS_MAX,
@@ -68,6 +73,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "PICTURE",
   // Live 2026-10-28: their day, as list_schedule read it.
   "SCHEDULE",
+  // Situation-first planning (owner 2026-10-28): a plan Q wrote for them.
+  "PLAN",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -672,6 +679,35 @@ export const QScheduleBlockSchema = z
   );
 export type QScheduleBlock = z.infer<typeof QScheduleBlockSchema>;
 
+/**
+ * Situation-first planning (owner 2026-10-28): the plan Q wrote for the
+ * person's goal, as a card with three affordances (Execute / Put on my
+ * board / Change it). A reference, not the plan: the client reads the plan
+ * by id and version under the person's own authority, and an approval
+ * binds to exactly this version. Put on the reply by code once the plan is
+ * stored, never by a model.
+ */
+export const QPlanBlockSchema = z
+  .object({
+    kind: z.literal("PLAN"),
+    planId: QPlanIdSchema,
+    version: z.number().int().min(1).max(1000),
+    /** The goal, in the plan's words. */
+    title: z.string().trim().min(1).max(160),
+    steps: z.number().int().min(1).max(Q_PLAN_STEPS_MAX),
+    /** Both reviews passed; otherwise the card says it is a draft. */
+    reviewed: z.boolean(),
+    affordances: z
+      .array(QPlanAffordanceSchema)
+      .min(1)
+      .max(3)
+      .refine((list) => new Set(list).size === list.length, {
+        message: "each affordance once",
+      }),
+  })
+  .strict();
+export type QPlanBlock = z.infer<typeof QPlanBlockSchema>;
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -696,6 +732,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QPictureBlockSchema,
   QWorkInProgressBlockSchema,
   QScheduleBlockSchema,
+  QPlanBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

@@ -296,6 +296,7 @@ function disclosable(
       case "PICTURE": // L-13: a stock picture's public fields, no record
       case "WORK_IN_PROGRESS": // a job id and the plan's words; read as its owner
       case "SCHEDULE": // their own calls and reminders by id, no evidence
+      case "PLAN": // their own plan by id and version; read as its owner
         return true;
       default: {
         // A new kind fails typecheck here instead of silently vanishing.
