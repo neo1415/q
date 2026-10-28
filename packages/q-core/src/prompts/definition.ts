@@ -139,6 +139,12 @@ export const PROMPT_IDS = [
   "CONVERSATION_RECALL",
   /** Owner 2026-10-23: a call with one named counterpart, prepared in the answer. */
   "CALL_PREP",
+  /** Design 2026-10-28 (S3): a person-level plan from their Situation dossier. */
+  "PLAN_WRITE",
+  /** Design 2026-10-28 (S3): an independent review of that plan (plan-rubric/v1). */
+  "PLAN_REVIEW",
+  /** Design 2026-10-28 (S3): a plan the person uploaded, read into the plan shape. */
+  "PLAN_READ",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -221,6 +227,9 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   TURN_SKIM: "turn-skim",
   PERSON_BRIEF_READER: "person-brief-reader",
   CALL_PREP: "call-prep",
+  PLAN_WRITE: "plan-write",
+  PLAN_REVIEW: "plan-review",
+  PLAN_READ: "plan-read",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
