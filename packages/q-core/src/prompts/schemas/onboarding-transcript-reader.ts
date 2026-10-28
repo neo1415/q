@@ -80,3 +80,47 @@ export const OnboardingTranscriptReaderResultSchema = z
 export type OnboardingTranscriptReaderResult = z.infer<
   typeof OnboardingTranscriptReaderResultSchema
 >;
+
+/**
+ * v2 (owner 2026-10-28): each answer says whether, for a list step, it is
+ * the whole list (a correction or a replacement, read by meaning) or adds
+ * to what is on record. Live, Tiara's "crypto and gambling" exclusions
+ * were replaced by "adult content" said later as one more.
+ */
+export const ONBOARDING_TRANSCRIPT_READER_V2_SCHEMA_VERSION = 2;
+
+export const OnboardingTranscriptReaderV2ResultSchema = z
+  .object({
+    answers: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            value: ValueSchema,
+            quote: z.string().trim().min(1).max(400),
+            ownWords: z.boolean(),
+            /**
+             * List steps: true when they meant this as the whole list
+             * (they corrected or replaced what they said before), false
+             * when it adds to it. Other steps: false.
+             */
+            replaces: z.boolean().default(false),
+          })
+          .strict(),
+      )
+      .max(60),
+    declined: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            quote: z.string().trim().min(1).max(400),
+          })
+          .strict(),
+      )
+      .max(30),
+  })
+  .strict();
+export type OnboardingTranscriptReaderV2Result = z.infer<
+  typeof OnboardingTranscriptReaderV2ResultSchema
+>;

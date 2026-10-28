@@ -71,6 +71,7 @@ import {
   markAttachmentsSent,
   Q_ATTACH_ACCEPT,
   useQAttachments,
+  writtenAnswerNote,
 } from "./q-attachments";
 import { WorkingLine } from "@/components/working/working-line";
 import { CardsControls } from "./cards/cards-controls";
@@ -711,6 +712,7 @@ export function QConversationPanel({
       // invitation); a label only while Q is doing something.
       (presence.label ?? null);
 
+  const turnCount = turns.length;
   const [historyOpen, setHistoryOpen] = useState(false);
   // W7: the sheet's code loads the first time it is opened, then stays.
   const [historyUsed, setHistoryUsed] = useState(false);
@@ -759,6 +761,22 @@ export function QConversationPanel({
     [lineOpen, sendText, qAsk],
   );
 
+  // Owner 2026-10-28: a document sent while the voice line is open is
+  // answered in writing; the line is then told what they asked and what
+  // Capital Q answered, so Q can talk about it (it never knew, live).
+  const briefLine = client.brief;
+  const lineNote = useRef<{ question: string; after: number } | null>(null);
+  useEffect(() => {
+    const waiting = lineNote.current;
+    if (waiting === null || q.working) return;
+    const answer = turns
+      .slice(waiting.after)
+      .findLast((turn) => turn.kind === "Q" && !turn.streaming);
+    if (answer === undefined || answer.kind !== "Q") return;
+    lineNote.current = null;
+    if (lineOpen) briefLine?.(writtenAnswerNote(waiting.question, answer.text));
+  }, [q.working, turns, lineOpen, briefLine]);
+
   // Owner 2026-10-16: Q opens by asking whether to look at what waits or
   // talk about something else. A typed "yes" or "something else" is that
   // answer (it brings the cards up, or moves on) and goes no further; a
@@ -769,6 +787,7 @@ export function QConversationPanel({
       const text = attachmentQuestion(typed);
       if (text.length === 0) return;
       if (text !== typed.trim()) {
+        if (lineOpen) lineNote.current = { question: text, after: turnCount };
         await qAsk(text);
         markAttachmentsSent();
         return;
@@ -784,7 +803,7 @@ export function QConversationPanel({
       await qAsk(text);
       markAttachmentsSent();
     },
-    [lineOpen, end, qAsk],
+    [lineOpen, end, qAsk, turnCount],
   );
 
   // The same answer, said on a voice line: the person's own transcript,

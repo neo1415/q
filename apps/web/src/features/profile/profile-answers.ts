@@ -250,7 +250,12 @@ function currencyOf(
   if (response === undefined) return null;
   const value = response.value;
   if (value.type === "SINGLE_SELECT") return value.optionKey.toUpperCase();
-  if (value.type === "TEXT") return value.text.toUpperCase();
+  // A currency kept in someone's words is not a currency code (live
+  // 2026-10-28: "UH- E-UH I DO THE DOLLARS AND UM, POUNDS 1,000,000"):
+  // only a three-letter code is shown beside an amount.
+  if (value.type === "TEXT" && /^[A-Za-z]{3}$/u.test(value.text.trim())) {
+    return value.text.trim().toUpperCase();
+  }
   return null;
 }
 
