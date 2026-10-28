@@ -16,7 +16,7 @@ import { useUiText } from "../primitives/ui-text.js";
  * drawer is never squeezed onto a phone.
  */
 
-export type SheetSide = "bottom" | "full" | "side";
+export type SheetSide = "bottom" | "full" | "side" | "start";
 
 export function SheetRoot({
   children,
@@ -46,6 +46,10 @@ const sideClass: Record<SheetSide, string> = {
   bottom:
     "inset-x-0 bottom-0 max-h-[85dvh] data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
   full: "inset-0 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
+  // A menu drawer from the reading start edge, on a phone too (owner
+  // 2026-10-28: the phone's navigation lives behind a menu button).
+  start:
+    "inset-y-0 start-0 h-full w-[84vw] max-w-[340px] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full rtl:data-[ending-style]:translate-x-full rtl:data-[starting-style]:translate-x-full",
   side: "inset-x-0 bottom-0 max-h-[85dvh] data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full lg:inset-y-0 lg:end-0 lg:start-auto lg:h-full lg:max-h-none lg:w-[420px] lg:data-[ending-style]:translate-x-full lg:data-[ending-style]:translate-y-0 lg:data-[starting-style]:translate-x-full lg:data-[starting-style]:translate-y-0",
 };
 
