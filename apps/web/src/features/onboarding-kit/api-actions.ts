@@ -17,6 +17,7 @@ import {
   sayToOnboarding,
   getTaxonomyNode,
   goBackInOnboarding,
+  listOnboardingInterviewTurns,
   listTaxonomyNodes,
   skipOnboardingStep,
   startOnboardingSession,
@@ -33,6 +34,7 @@ import {
   TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH,
   TaxonomyVocabularyCodeSchema,
   type OnboardingCoverage,
+  type OnboardingInterviewTurn,
   type OnboardingJourneyType,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
@@ -168,6 +170,27 @@ export async function onboardingGetAction(
 ): Promise<ActionResult<OnboardingSessionView>> {
   const sessionId = Uuid.parse(rawSessionId);
   return run((session) => getOnboardingSession(session, sessionId));
+}
+
+/**
+ * The interview thread as the server keeps it, newest last (D2, live run
+ * 2026-10-28): read when a streamed turn has gone quiet, so Q's reply can
+ * settle the turn from the record instead of a reload. A display record;
+ * any failure is an empty thread, never an error on screen.
+ */
+export async function onboardingThreadTurnsAction(
+  rawSessionId: string,
+): Promise<readonly OnboardingInterviewTurn[]> {
+  const sessionId = Uuid.safeParse(rawSessionId);
+  if (!sessionId.success) return [];
+  const session = await apiSession();
+  if (!isSession(session)) return [];
+  try {
+    return (await listOnboardingInterviewTurns(session, sessionId.data, 50))
+      .items;
+  } catch {
+    return [];
+  }
 }
 
 /**

@@ -60,11 +60,15 @@ import {
 import { VOICE_LEAVE_EVENT } from "../voice/live/live-call";
 import {
   CONTINUE_LATER_LINE,
-  CONTINUE_LATER_PAUSE_MS,
   continueLaterDestination,
+  pausingDestination,
   useContinueLater,
 } from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
+import {
+  appendReplySentence,
+  replyStreamText,
+} from "../onboarding-kit/reply-stream-state";
 import {
   confirmSent,
   holdPending,
@@ -340,7 +344,10 @@ export function QOnboardingWorkspace({
   const [askingQ, setAskingQ] = useState(false);
   const [qStream, setQStream] = useState<QStreamState | null>(null);
   /** Turn latency L9: Q's typed reply, as far as Q has written it. */
-  const [replyStream, setReplyStream] = useState<string | null>(null);
+  // D2: kept as sentences so a replayed sentence is recognised and dropped.
+  const [replyStream, setReplyStream] = useState<readonly string[] | null>(
+    null,
+  );
   /**
    * What Q is doing during a typed turn, when it says something: the step
    * being saved ("Saving your round size") or whom Q is looking up ("Looking
@@ -950,6 +957,8 @@ export function QOnboardingWorkspace({
     [push, qSubject, answerOf, view?.session.id],
   );
 
+  /** The Continue later leaving, declared below; a pausing typed turn uses it. */
+  const leaveLaterRef = useRef<(() => void) | null>(null);
   const sayOne = useCallback(
     async (text: string, typed = false) => {
       const trimmed = text.trim();
@@ -1003,9 +1012,7 @@ export function QOnboardingWorkspace({
           undefined,
           (sentence) => {
             setQThinking(false);
-            setReplyStream((so) =>
-              so === null ? sentence : `${so} ${sentence}`,
-            );
+            setReplyStream((so) => appendReplySentence(so, sentence));
           },
           (stage) => {
             setTurnStage(stage.label);
@@ -1096,14 +1103,16 @@ export function QOnboardingWorkspace({
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"
       // reached this seam and went nowhere.
-      if (turn.navigate === "HOME" && turn.reply !== null) {
-        // "Let's finish this later" (owner 2026-10-16): Q's one-line
-        // acknowledgement stays readable, then they are let into the app.
+      if (pausingDestination(turn.navigate, journeyName) !== null) {
+        // A pause ("I'll continue later"; coordinator 2026-10-28): the
+        // interviewer sends HOME on the typed channel for that alone, never
+        // for a plain reply or for finishing. Q's line joins the thread so
+        // what was saved and what is open can be read, then they leave the
+        // way the Continue later button leaves: the same line, the same
+        // pause, the journey's own destination.
         pendingReply.drop();
-        push("Q", turn.reply);
-        window.setTimeout(() => {
-          router.push("/home");
-        }, CONTINUE_LATER_PAUSE_MS);
+        if (turn.reply !== null) push("Q", turn.reply);
+        leaveLaterRef.current?.();
         return;
       }
       if (turn.navigate === "FORM") {
@@ -1623,6 +1632,9 @@ export function QOnboardingWorkspace({
   const { leaving: leavingForLater, leave: leaveForLater } = useContinueLater(
     continueLaterDestination(journeyName),
   );
+  useEffect(() => {
+    leaveLaterRef.current = () => leaveForLater();
+  }, [leaveForLater]);
   // They told Q they will continue later (owner 2026-10-28): Q has said its
   // goodbye and the call has ended; they are taken into Capital Q, as with
   // the Continue later button.
@@ -2125,7 +2137,12 @@ export function QOnboardingWorkspace({
           />
         ))}
         {replyStream === null ? null : (
-          <QLine id="q-reply-streaming" kind="Q" text={replyStream} streaming />
+          <QLine
+            id="q-reply-streaming"
+            kind="Q"
+            text={replyStreamText(replyStream)}
+            streaming
+          />
         )}
         {qStream?.partial !== null && qStream?.partial !== undefined ? (
           <QLine
@@ -2598,6 +2615,21 @@ export function QOnboardingWorkspace({
             </ul>
           ) : null}
         </section>
+      ) : null}
+
+      {!isFinal && coverage !== null && coverage.summary.canComplete ? (
+        // D3 (live typed run 2026-10-28): "that's all for now" paused the
+        // interview and nothing on screen could finish it. Once coverage
+        // says every essential is in, finishing is one visible tap; the
+        // runtime still decides whether the session may complete.
+        <div className="flex flex-wrap items-center gap-3" data-q-finish-offer>
+          <Button disabled={working} onClick={onFinish} data-q-finish>
+            {t("Finish setup")}
+          </Button>
+          <span className="cq-caption text-(--cq-text-secondary)">
+            {t("Everything essential is in. You can add the rest later.")}
+          </span>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">

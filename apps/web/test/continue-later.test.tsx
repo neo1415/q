@@ -125,3 +125,22 @@ describe("the reminder as one thing waiting on Home arrival", () => {
     ).toBe(0);
   });
 });
+
+describe("a typed turn's navigate (coordinator 2026-10-28)", () => {
+  it("a plain reply, or any other destination, never leaves the screen by itself", async () => {
+    const { pausingDestination } =
+      await import("../src/features/onboarding-kit/components/continue-later");
+    expect(pausingDestination(null, "investor")).toBeNull();
+    expect(pausingDestination(undefined, "founder")).toBeNull();
+    expect(pausingDestination("DISCOVER", "investor")).toBeNull();
+    expect(pausingDestination("PROFILE", "founder")).toBeNull();
+  });
+
+  it("a pausing result leaves to the journey's own destination, as Continue later does", async () => {
+    const { pausingDestination } =
+      await import("../src/features/onboarding-kit/components/continue-later");
+    expect(pausingDestination("HOME", "investor")).toBe("/discover");
+    expect(pausingDestination("HOME", "founder")).toBe("/home");
+    expect(pausingDestination("HOME", undefined)).toBe("/home");
+  });
+});

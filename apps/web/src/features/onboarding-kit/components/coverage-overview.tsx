@@ -170,10 +170,10 @@ function CoverageRow({
         {stateWords(field)}
       </span>
       {field.display !== null ? (
-        <span className="cq-body-sm break-words text-(--cq-text-primary)">
+        <span className="cq-body-sm min-w-0 break-words [overflow-wrap:anywhere] text-(--cq-text-primary)">
           {field.display}
           {field.source === null ? null : (
-            <span className="text-(--cq-text-tertiary)">
+            <span className="break-words text-(--cq-text-tertiary)">
               {" "}
               · from {sourceWords(field.source)}
             </span>

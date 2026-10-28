@@ -30,12 +30,30 @@ export type SayStreamRequest = {
   readonly focus?: string | undefined;
 };
 
+/**
+ * How long the stream may go without an event (a sentence, a stage, the
+ * result) before the thread is read to settle the turn (D2, live run
+ * 2026-10-28). Heartbeat comments keep the connection open but say nothing
+ * about the turn, so they do not count.
+ */
+export const SAY_STREAM_STALL_MS = 15_000;
+/** After this long with no result by any route, the turn is given up on screen. */
+export const SAY_STREAM_MAX_MS = 120_000;
+
+export type SayStreamSettle = {
+  /** Nothing has arrived for `stallMs`: read the thread; a turn settles the stream. */
+  readonly onStall?: (() => Promise<SayOnboardingResponse | null>) | undefined;
+  readonly stallMs?: number | undefined;
+  readonly maxMs?: number | undefined;
+};
+
 export async function sayStreamed(
   request: SayStreamRequest,
   onSentence: (text: string) => void,
   transport: typeof fetch = (input, init) => fetch(input, init),
   /** What Q is doing now (owner 2026-10-21), from real events in the turn. */
   onStage?: (stage: { readonly stage: string; readonly label: string }) => void,
+  settle: SayStreamSettle = {},
 ): Promise<SayOnboardingResponse | null> {
   const { sessionId, ...body } = request;
   let response: Response;
@@ -75,12 +93,40 @@ export async function sayStreamed(
   const parser = createSseParser();
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  const stallMs = settle.stallMs ?? SAY_STREAM_STALL_MS;
+  const maxMs = settle.maxMs ?? SAY_STREAM_MAX_MS;
+  const startedAt = Date.now();
+  let lastEventAt = startedAt;
+  // One read in flight at a time; a stall wakes before it resolves and the
+  // same read is awaited again afterwards.
+  let pending: Promise<ReadableStreamReadResult<Uint8Array>> | null = null;
+  let settled = false;
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      if (Date.now() - startedAt > maxMs) break;
+      pending ??= reader.read();
+      const next = await raceStall(
+        pending,
+        Math.max(0, stallMs - (Date.now() - lastEventAt)),
+      );
+      if (next === STALLED) {
+        // D2: the DB had Q's turn within seconds while the stream sat
+        // silent; the thread settles the turn, and the composer opens.
+        const fromThread = (await settle.onStall?.()) ?? null;
+        if (fromThread !== null) {
+          settled = true;
+          return fromThread;
+        }
+        lastEventAt = Date.now();
+        continue;
+      }
+      pending = null;
+      const { done, value } = next;
       const text =
         value === undefined ? "" : decoder.decode(value, { stream: !done });
-      for (const message of parser.feed(done ? `${text}\n\n` : text)) {
+      const messages = parser.feed(done ? `${text}\n\n` : text);
+      if (messages.length > 0) lastEventAt = Date.now();
+      for (const message of messages) {
         const data = parsed(message.data);
         if (message.event === "sentence") {
           const sentence = QInterviewSentenceSchema.safeParse(data);
@@ -110,6 +156,11 @@ export async function sayStreamed(
   } catch (error) {
     if (error instanceof OnboardingClientError) throw error;
   } finally {
+    if (settled) {
+      // The thread answered first; a result still on its way is not
+      // waited for (it would say the same), and the read is let go.
+      await reader.cancel().catch(() => undefined);
+    }
     reader.releaseLock();
   }
   // The stream opened, so the turn ran on the server: it is never sent
@@ -117,8 +168,24 @@ export async function sayStreamed(
   // shows when the screen re-reads; the line can be sent again by hand.
   throw new OnboardingClientError(
     "NETWORK",
-    "I lost the connection to Q. Try again.",
+    Date.now() - startedAt > maxMs
+      ? "Q is taking longer than usual. Your words were sent; what Q saved shows when you reload."
+      : "I lost the connection to Q. Try again.",
   );
+}
+
+const STALLED = Symbol("stalled");
+
+/** The next read, or STALLED once `waitMs` passes without it. */
+function raceStall<T>(
+  read: Promise<T>,
+  waitMs: number,
+): Promise<T | typeof STALLED> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stall = new Promise<typeof STALLED>((resolve) => {
+    timer = setTimeout(() => resolve(STALLED), waitMs);
+  });
+  return Promise.race([read, stall]).finally(() => clearTimeout(timer));
 }
 
 function parsed(text: string): unknown {

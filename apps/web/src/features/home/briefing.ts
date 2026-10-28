@@ -124,6 +124,8 @@ export type BriefingItem = {
    * off for a few days (the server's policy says how many).
    */
   readonly later?: true | undefined;
+  /** A visible call to action on the card, when the title alone does not say where it leads. */
+  readonly cta?: string | undefined;
 };
 
 export type Briefing = {
@@ -261,7 +263,17 @@ function interestItems(interest: readonly InterestFact[] | undefined) {
   ];
 }
 
-function readinessItems(gaps: readonly ReadinessGapFact[] | undefined) {
+/**
+ * The way back into setup from Home (live typed run 2026-10-28, D6): "3
+ * steps before investors can find you" showed, and nothing on the page
+ * said how to continue; the person needed the URL. While the setup is
+ * still open (the nudge says so), the card is the way back to Q; once it
+ * is finished, it leads to the first outstanding requirement as before.
+ */
+export function readinessItems(
+  gaps: readonly ReadinessGapFact[] | undefined,
+  setupOpen: boolean,
+): BriefingItem[] {
   const outstanding = gaps ?? [];
   const first = outstanding[0];
   if (first === undefined) return [];
@@ -273,9 +285,15 @@ function readinessItems(gaps: readonly ReadinessGapFact[] | undefined) {
           ? "One step before investors can find you"
           : `${String(outstanding.length)} steps before investors can find you`,
       description: first.description,
-      href: first.href,
+      href: setupOpen ? "/onboarding/founder?from=home" : first.href,
+      cta: setupOpen ? "Finish setup with Q" : "Continue",
     },
   ];
+}
+
+/** Whether the setup is still open, as the server's nudge says. */
+export function setupStillOpen(nudge: SetupNudgeFact | undefined): boolean {
+  return nudge !== undefined && nudge.doneCount < nudge.requiredCount;
 }
 
 function pitchItems(facts: InvestorBriefingFacts): BriefingItem[] {
@@ -391,7 +409,7 @@ export function composeBriefing(facts: BriefingFacts): Briefing | null {
     changed.push(...relationshipItems(facts));
     worth.push(
       ...setupNudgeItems(facts.setupNudge),
-      ...readinessItems(facts.readinessGaps),
+      ...readinessItems(facts.readinessGaps, setupStillOpen(facts.setupNudge)),
     );
   } else {
     changed.push(...relationshipItems(facts));
