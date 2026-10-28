@@ -165,6 +165,8 @@ function kindOf(
       case "CLARIFICATION_REQUEST":
       case "UI_INTENT":
         break;
+      case "SCHEDULE":
+        return "Your schedule";
     }
   }
   return "Shown by Q";
