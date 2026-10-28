@@ -75,6 +75,7 @@ const LABELS: Readonly<Record<BoardObject["kind"], string>> = {
   COMPARISON: "Comparison",
   ARTIFACT: "Document",
   INTENT: "Where this lives",
+  PLAN: "Plan",
 };
 
 /** The first slide of a deck, drawn by the Q API, once per deck. */
@@ -300,6 +301,7 @@ function ObjectBody({
     }
     case "COMPARISON":
     case "INTENT":
+    case "PLAN":
       return (
         <QResultBlocks
           blocks={object.blocks}

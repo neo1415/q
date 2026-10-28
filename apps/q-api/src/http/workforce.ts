@@ -6,6 +6,11 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
   PROBLEM_CONTENT_TYPE,
+  Q_PLAN_DECIDE_PATH,
+  Q_PLAN_PATH,
+  QPlanDecisionRequestSchema,
+  QPlanDecisionResultSchema,
+  QPlanViewSchema,
   Q_WORKFORCE_DRAFT_RETRY_PATH,
   WorkforceDraftRetryRequestSchema,
   WorkforceDraftRetryResultDtoSchema,
@@ -22,6 +27,7 @@ import {
 
 import type { HeldRetry } from "../composition/workforce/held-retry.js";
 import type { WorkforcePage } from "../composition/workforce/page.js";
+import type { Plans } from "../composition/workforce/plans.js";
 import {
   getActorContext,
   requireActorContextHook,
@@ -43,7 +49,17 @@ export type WorkforceRoutesDependencies = ActorContextDependencies & {
   readonly page: WorkforcePage;
   /** Absent: the retry route is not offered (404). */
   readonly heldRetry?: Pick<HeldRetry, "retry"> | undefined;
+  /**
+   * Situation-first planning (S5): the plan card's read and its three
+   * affordances. Absent: not offered (404).
+   */
+  readonly plans?: Pick<Plans, "view" | "decide"> | undefined;
 };
+
+const PlanParams = z.object({ planId: z.string().uuid() }).strict();
+const PlanQuery = z
+  .object({ version: z.coerce.number().int().min(1).max(1000).optional() })
+  .strict();
 
 const DraftParams = z.object({ draftId: z.string().uuid() }).strict();
 
@@ -141,6 +157,58 @@ export function registerWorkforceRoutes(
       return WorkforceLiveSchema.parse(live);
     },
   );
+
+  // Situation-first planning (S5): a plan as its owner reads it, and the
+  // card's Execute / Put on my board / Change it. Someone else's plan is
+  // the same 404 as none; a decision on an older version is STALE.
+  const plans = dependencies.plans;
+  if (plans !== undefined) {
+    app.get(Q_PLAN_PATH, { onRequest: withContext }, async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = PlanParams.safeParse(request.params);
+      const query = PlanQuery.safeParse(request.query ?? {});
+      if (!params.success) return problem(request, reply, "RESOURCE_NOT_FOUND");
+      if (!query.success) return problem(request, reply, "VALIDATION_FAILED");
+      const view = await plans.view(
+        { tenantId: actor.tenantId, userId: actor.userId },
+        params.data.planId,
+        query.data.version,
+      );
+      if (view === null) return problem(request, reply, "RESOURCE_NOT_FOUND");
+      void reply.header("Cache-Control", "no-store");
+      return QPlanViewSchema.parse(view);
+    });
+
+    app.post(
+      Q_PLAN_DECIDE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const actor = getActorContext(request);
+        const params = PlanParams.safeParse(request.params);
+        if (!params.success) {
+          return problem(request, reply, "RESOURCE_NOT_FOUND");
+        }
+        const raw = request.headers[IDEMPOTENCY_KEY_HEADER];
+        const key = IdempotencyKeyHeaderSchema.safeParse(
+          typeof raw === "string" ? raw : undefined,
+        );
+        const body = QPlanDecisionRequestSchema.safeParse(request.body ?? {});
+        if (!key.success || !body.success) {
+          return problem(request, reply, "VALIDATION_FAILED");
+        }
+        const decided = await plans.decide(
+          actor,
+          params.data.planId,
+          body.data,
+        );
+        if (decided.outcome === "NOT_FOUND") {
+          return problem(request, reply, "RESOURCE_NOT_FOUND");
+        }
+        void reply.header("Cache-Control", "no-store");
+        return QPlanDecisionResultSchema.parse(decided);
+      },
+    );
+  }
 
   const heldRetry = dependencies.heldRetry;
   if (heldRetry !== undefined) {

@@ -30,6 +30,7 @@ import type {
 } from "./store.js";
 import { expectedOf, progressOf } from "./progress.js";
 import { deliveredDocument } from "./delivery.js";
+import { isPlanJobPayload, planGatheringStage } from "./plan-job.js";
 import { filedDocumentIds } from "./results.js";
 import {
   LIVE_WORK_STATES,
@@ -388,7 +389,13 @@ export function createWorkforcePage(dependencies: {
                 : "FAILED",
         done: plan?.done ?? 0,
         total: plan?.total ?? 0,
-        stage: liveStageOf(work),
+        // A plan job is gathering from the moment it is asked (addendum 4:
+        // the first stage on screen at once, before a worker claims it).
+        stage:
+          liveStageOf(work) ??
+          (isPlanJobPayload(work.plan) && working
+            ? planGatheringStage(work.created_at)
+            : null),
         document:
           filed === null
             ? null

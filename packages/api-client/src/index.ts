@@ -438,6 +438,9 @@ export {
   listWorkforceJobs,
   getWorkforceJob,
   getWorkforceJobLive,
+  // Situation-first planning (S5): the plan card's reads and decisions.
+  getQPlan,
+  decideQPlan,
   retryWorkforceDraft,
   readBriefingCommand,
   getWorkforceOverview,

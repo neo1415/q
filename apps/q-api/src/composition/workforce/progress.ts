@@ -12,6 +12,7 @@ import {
   type StepOutcome,
 } from "@capital-q/q-orchestrator";
 
+import { isPlanJobPayload } from "./plan-job.js";
 import type { WorkRow } from "./queue.js";
 
 /**
@@ -100,6 +101,8 @@ export function expectedOf(
   work: Pick<WorkRow, "plan"> | undefined,
 ): WorkforceLiveExpected | null {
   if (work === undefined) return null;
+  // Situation-first planning: a plan job's usual length (1-2 minutes).
+  if (isPlanJobPayload(work.plan)) return workforceExpected("PLAN");
   const plan = WorkforceJobStartPayloadSchema.safeParse(work.plan);
   if (!plan.success) return null;
   const tools = new Set(plan.data.steps.flatMap((step) => step.tools));

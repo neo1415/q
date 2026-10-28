@@ -39,6 +39,7 @@ import {
 import { subjectHref } from "./blocks/data-block-logic";
 import { useSubjectNames } from "./blocks/use-subject-names";
 import { useWire } from "./use-wire";
+import { PlanCard } from "./plan-card";
 import { WorkInProgressCard } from "./work-canvas";
 import { wireNow } from "./wire";
 import { useT } from "@/features/i18n/language";
@@ -590,6 +591,11 @@ export function QResultBlocks({
                 onAsk={onAsk}
               />
             );
+
+          case "PLAN":
+            // Situation-first planning: the plan, with Execute / Put on
+            // my board / Change it.
+            return <PlanCard key={key} block={block} />;
 
           case "WORK_IN_PROGRESS":
             // Owner 2026-10-24: the document being made, as it is made;

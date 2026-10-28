@@ -6,8 +6,9 @@ import { z } from "zod";
 /**
  * Work handed to Q's team (2026-10-12). The turn reader says so from
  * meaning (TURN_READER v49 teamJob: "get your team to investigate
- * Ledgerfold and prepare me for a meeting"); a sentence naming three kinds
- * of work is a deterministic fast path for the same decision. Code asks
+ * Ledgerfold and prepare me for a meeting"); the keyword fast path that
+ * once stood beside it is gone (situation-first planning, 2026-10-28:
+ * readers decide meaning, code never matches words). Code asks
  * the lead Q to plan it through propose_q_job under the run's own plan --
  * the same tool the answer's model can call, the one orchestration -- so
  * it is never answered as one in-run brief or read as a hand-over.
@@ -79,17 +80,6 @@ export type QTeamJobPort = {
   ) => Promise<TeamJobOutcome>;
 };
 
-// Assessing and naming risks are one kind: "what are the risks? a brief
-// assessment" is a question for Q, not a team job.
-const KINDS: readonly RegExp[] = [
-  /\bresearch/u,
-  /\b(assess|evaluat|analy[sz]|risks?\b|missing information|red flags)/u,
-  /\b(memo|brief|report|one-pager|write-?up)\b/u,
-  /\b(critique|critic|second opinion|review it|second specialist)/u,
-  /\b(revise|revision|rewrite)/u,
-  /\b(diligence|questions for the founder|founder questions)/u,
-];
-
 // The tool's output is checked again here: it crosses a package boundary.
 const ProposedSchema = z.object({
   firstRead: z.string().max(700).nullable().optional(),
@@ -116,18 +106,6 @@ const ProposedSchema = z.object({
     .optional(),
   waiting: z.array(z.string()).optional(),
 });
-
-/** How many distinct kinds of work the words ask for. */
-export function workKindsAsked(text: string): number {
-  const said = text.toLowerCase();
-  return KINDS.filter((kind) => kind.test(said)).length;
-}
-
-/**
- * Three kinds or more is a team's job; one brief is not enough for it. A
- * fast path only: the reading (teamJob) decides the rest, in any words.
- */
-export const TEAM_JOB_KINDS = 3;
 
 export function createToolTeamJobPort(dependencies: {
   readonly tools: QToolPort;
@@ -298,9 +276,15 @@ export const PLAN_ANYWAY_QUESTION = "Shall I plan this one anyway?";
  */
 export function goAheadGoal(
   history: readonly { readonly role: string; readonly content: string }[],
-  latest: string,
+  _latest: string,
+  /**
+   * The reader's reading: whether this turn replies to Q's question. A
+   * turn read as anything else (a new goal of its own) is not the go-ahead.
+   * Absent: not read; Q's stored question and their stored words decide.
+   */
+  repliesToQ?: boolean,
 ): string | null {
-  if (workKindsAsked(latest) > 0) return null;
+  if (repliesToQ === false) return null;
   const before = history.at(-2);
   const asked = history.at(-3);
   if (before === undefined || asked === undefined) return null;

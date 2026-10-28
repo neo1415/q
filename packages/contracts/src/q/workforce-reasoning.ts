@@ -173,8 +173,38 @@ export const WORKFORCE_LIVE_STAGES = [
   "REVIEWING",
   "REVISING",
   "FILING",
+  // Situation-first planning (2026-10-28): a plan job's own stages. Its
+  // public reading reuses SEARCHING, and FILING is the plan being kept.
+  "GATHERING",
+  "READING_DOCUMENTS",
+  "PLANNING",
+  "REVIEWING_PLAN",
 ] as const;
 export type WorkforceLiveStageName = (typeof WORKFORCE_LIVE_STAGES)[number];
+
+/** A document job's step bar, in order. */
+export const WORKFORCE_DOCUMENT_LIVE_STEPS = [
+  "SEARCHING",
+  "READING",
+  "DRAFTING",
+  "REVIEWING",
+  "REVISING",
+  "FILING",
+] as const satisfies readonly WorkforceLiveStageName[];
+
+/**
+ * A plan job's step bar, in order (2026-10-28): gathering the person's
+ * situation, reading their own documents, public sources (when the ask
+ * needs them), drafting, two independent reviews, keeping it.
+ */
+export const WORKFORCE_PLAN_LIVE_STEPS = [
+  "GATHERING",
+  "READING_DOCUMENTS",
+  "SEARCHING",
+  "PLANNING",
+  "REVIEWING_PLAN",
+  "FILING",
+] as const satisfies readonly WorkforceLiveStageName[];
 
 export const WorkforceLiveStageSchema = z
   .object({

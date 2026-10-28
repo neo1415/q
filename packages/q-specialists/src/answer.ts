@@ -14,15 +14,14 @@ import {
   toolFocusOf,
 } from "./tool-focus.js";
 import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
+import { planAskRoutes, type QPlanJobPort } from "./plan-job-port.js";
 import {
-  TEAM_JOB_KINDS,
   goAheadGoal,
   earlierRequestGoal,
   priorAnswerOf,
   teamJobBlocks,
   teamJobLine,
   teamJobOutcomeOf,
-  workKindsAsked,
   type QTeamJobPort,
   type TeamJobAudience,
 } from "./team-job.js";
@@ -836,6 +835,13 @@ export type SpecialistQAnswerDependencies = {
   readonly delegation?: QDelegationPort | undefined;
   /** Several kinds of work at once: the lead Q plans a team job. */
   readonly teamJob?: QTeamJobPort | undefined;
+  /**
+   * Situation-first planning (S5): a plan of their own (the reader's
+   * planAsk) starts the plan job; their words to running work (the
+   * reader's directsWork) are filed as direction. Absent: answered as
+   * before.
+   */
+  readonly plan?: QPlanJobPort | undefined;
   /**
    * Owner 2026-10-23: a call with one named counterpart (TURN_READER v58
    * meetingPrep), prepared in the answer. Absent: answered as before.
@@ -5476,7 +5482,6 @@ export function createSpecialistQAnswer(
       read.addressedToQ !== false &&
       read.workFromEarlier !== true &&
       (read.teamJob === true ||
-        workKindsAsked(latest.content) >= TEAM_JOB_KINDS ||
         // The turn itself asks for the work first ("Write … and save it").
         /^\s*(?:please\s+|can you\s+|could you\s+)?(?:write|draft|make|create|prepare|build|put together)\b/iu.test(
           latest.content,
@@ -5866,22 +5871,92 @@ export function createSpecialistQAnswer(
       );
       if (again !== null) return again;
     }
+    const confident =
+      read !== null && read.confidence !== "LOW" && read.addressedToQ !== false;
+    // Situation-first planning (S6): their words to work already under way
+    // for them (the reader's directsWork) are filed as direction on that
+    // work's thread, once per turn; every running step reads it before its
+    // next action. Nothing running: the turn is answered as any other.
+    if (
+      confident &&
+      read?.directsWork === true &&
+      dependencies.plan?.direct !== undefined
+    ) {
+      const noted = await dependencies.plan
+        .direct(request, latest.content)
+        .catch(() => ({ status: "NONE" as const }));
+      if (noted.status === "NOTED") {
+        speculative.current?.cancel("ACTED");
+        return recordAnswer(
+          request,
+          conversationId,
+          "Noted. I'll work that in from the next step, and anything that changes what goes out to someone comes back to you first.",
+          [],
+        );
+      }
+    }
+    // Situation-first planning (S5): a plan of their own -- read by meaning
+    // (TURN_READER v70 planAsk), never by words -- starts the plan job at
+    // once: one line saying what Q is doing and the card that follows it.
+    // The subject is theirs (their company or mandate), resolved by code.
+    if (
+      confident &&
+      dependencies.plan !== undefined &&
+      planAskRoutes(read?.planAsk ?? null)
+    ) {
+      const planAsk = read?.planAsk ?? null;
+      if (planAsk !== null) {
+        const started = await dependencies.plan
+          .start(request, { ask: latest.content, planAsk })
+          .catch(() => ({ status: "FAILED" as const }));
+        logger?.info(
+          {
+            qRunId: request.runId,
+            planAsk: planAsk.kind,
+            deliverable: planAsk.deliverable,
+            research: planAsk.research,
+            outcome: started.status,
+          },
+          "plan asked for: started",
+        );
+        if (started.status === "STARTED") {
+          speculative.current?.cancel("ACTED");
+          return recordAnswer(request, conversationId, started.line, [
+            {
+              kind: "WORK_IN_PROGRESS",
+              jobId: started.jobId,
+              title: started.title,
+            },
+          ]);
+        }
+        if (started.status === "PLAN_LIMIT") {
+          speculative.current?.cancel("ACTED");
+          return recordAnswer(
+            request,
+            conversationId,
+            started.message ??
+              "Your plan's allowance for Q's work this month is used, so I can't start this now.",
+            [],
+          );
+        }
+        // NOT_OWN (a company they named) and FAILED fall through: the team
+        // job or an ordinary answer, never "nothing has started".
+      }
+    }
     // Work handed to Q's team -- read from meaning (TURN_READER v49
-    // teamJob), or a sentence naming three kinds of work as a fast path --
-    // is planned by the lead and approved as one card: never one in-run
-    // brief, never a hand-over (live 2026-10-12). A plan that could not be
-    // made is said plainly; it is not covered by an ordinary answer.
-    const teamJobBy =
-      read === null || read.confidence === "LOW" || read.addressedToQ === false
-        ? null
-        : read.teamJob === true
-          ? "READING"
-          : workKindsAsked(latest.content) >= TEAM_JOB_KINDS
-            ? "WORDS"
-            : null;
+    // teamJob) -- is planned by the lead and approved as one card: never
+    // one in-run brief, never a hand-over (live 2026-10-12). A plan that
+    // could not be made is said plainly; it is not covered by an ordinary
+    // answer. (The keyword fast path beside it is gone, 2026-10-28.)
+    const teamJobBy = confident && read?.teamJob === true ? "READING" : null;
     if (dependencies.teamJob !== undefined && teamJobBy !== null) {
       const startedAt = Date.now();
-      const goAhead = goAheadGoal(history, latest.content);
+      // The go-ahead is a reply to Q's question, as the reader read it.
+      const goAhead = goAheadGoal(
+        history,
+        latest.content,
+        read?.replyTo?.kind === "Q_QUESTION",
+      );
       // QO-07: "yes" to work asked for or offered just before carries the
       // person's own earlier words as the goal, never the reader's.
       const earlier =

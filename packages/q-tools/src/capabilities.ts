@@ -1434,6 +1434,8 @@ export const Q_CAPABILITY_EXCLUSIONS: Readonly<{
   // replaced by tools generated from the app's action registry; the action
   // types stay composed so an approval already waiting still executes.
   actionTypes: {
+    "q.plan.execute":
+      "Proposed by code when the person presses Execute on a plan card Q wrote for them (situation-first planning): the plan is asked for in conversation and read by the turn reader's planAsk; the approval binds to that exact plan version, and every outward step still gets its own card.",
     "person.profile.update":
       "Proposed by code, not a tool, when they say what to call them (the profile board), and kept for approvals made before ADR 0040; Q's tool for it is update_my_profile (app.person.profile.update).",
     "investor.profile.update":

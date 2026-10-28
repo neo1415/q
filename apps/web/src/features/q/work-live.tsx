@@ -138,6 +138,11 @@ const STAGE_WEIGHT: Readonly<Record<WorkforceLiveStageName, number>> = {
   REVIEWING: 0.7,
   REVISING: 0.82,
   FILING: 0.95,
+  // Situation-first planning: a plan's own stages.
+  GATHERING: 0.1,
+  READING_DOCUMENTS: 0.25,
+  PLANNING: 0.5,
+  REVIEWING_PLAN: 0.75,
 };
 
 /**
@@ -184,6 +189,20 @@ export function liveLine(stage: WorkforceLiveStage | null): string {
         : `Revising: draft ${String(stage.draft)} of ${String(stage.drafts)}`;
     case "FILING":
       return "Filing the document";
+    case "GATHERING":
+      return stage.facts === null || stage.facts === 0
+        ? "Gathering your situation"
+        : `Gathered ${String(stage.facts)} facts about where things stand`;
+    case "READING_DOCUMENTS":
+      return "Reading your documents";
+    case "PLANNING":
+      return stage.draft === null || stage.draft <= 1
+        ? "Drafting the plan"
+        : "Redrafting the plan from the review";
+    case "REVIEWING_PLAN":
+      return stage.draft === null || stage.draft <= 1
+        ? "Reviewing the plan, twice"
+        : "Reviewing the revised plan";
   }
 }
 
@@ -436,7 +455,10 @@ export function WorkLiveProgress({
     stage === null ||
     stage.stage === "SEARCHING" ||
     stage.stage === "READING" ||
-    stage.stage === "DRAFTING";
+    stage.stage === "DRAFTING" ||
+    stage.stage === "GATHERING" ||
+    stage.stage === "READING_DOCUMENTS" ||
+    stage.stage === "PLANNING";
   return (
     <div className="flex flex-col gap-3" data-q-work-progress>
       <div className="flex items-center gap-3">

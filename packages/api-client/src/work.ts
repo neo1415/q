@@ -39,6 +39,11 @@ import {
   BriefingCommandResultDtoSchema,
   type BriefingCommandRequest,
   IDEMPOTENCY_KEY_HEADER,
+  Q_PLAN_DECIDE_PATH,
+  Q_PLAN_PATH,
+  QPlanDecisionResultSchema,
+  QPlanViewSchema,
+  type QPlanDecisionRequest,
   WorkforceDraftRetryResultDtoSchema,
   WorkforceJobDetailDtoSchema,
   WorkforceJobListDtoSchema,
@@ -399,5 +404,43 @@ export function stopWorkforceJob(session: ApiSession, jobId: string) {
     `/v1/q/workforce/jobs/${encodeURIComponent(jobId)}/stop`,
     QWorkAcceptedDtoSchema,
     { body: {} },
+  );
+}
+
+/**
+ * Situation-first planning (S5): `GET /v1/q/plans/:planId[?version=n]`
+ * (Q API), a plan as its owner reads it, with the body hash Execute binds
+ * to and its status lines. Someone else's plan is the same 404 as none.
+ */
+export function getQPlan(
+  session: ApiSession,
+  planId: string,
+  version?: number,
+) {
+  const path = Q_PLAN_PATH.replace(":planId", encodeURIComponent(planId));
+  return call(
+    session,
+    "GET",
+    version === undefined ? path : `${path}?version=${String(version)}`,
+    QPlanViewSchema,
+  );
+}
+
+/** `POST /v1/q/plans/:planId/decide`: Execute, Put on my board, or Change it. */
+export function decideQPlan(
+  session: ApiSession,
+  planId: string,
+  request: QPlanDecisionRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    Q_PLAN_DECIDE_PATH.replace(":planId", encodeURIComponent(planId)),
+    QPlanDecisionResultSchema,
+    {
+      body: request,
+      headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+    },
   );
 }

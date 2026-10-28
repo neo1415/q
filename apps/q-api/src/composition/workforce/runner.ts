@@ -12,6 +12,7 @@ import { z } from "zod";
 import { plannedFrom } from "./job-actions.js";
 import type { WorkforceJobs } from "./jobs.js";
 import { mergeLive, type LiveReport } from "./live.js";
+import { isPlanJobPayload } from "./plan-job.js";
 import {
   liveStageOf,
   type AgentWorkQueue,
@@ -74,6 +75,24 @@ export function createAgentWorkRunner(dependencies: {
    */
   readonly deliver?:
     ((owner: Owner, row: WorkRow) => Promise<unknown>) | undefined;
+  /**
+   * Situation-first planning (S4): a plan job (payload kind PLAN) is run
+   * by the plan job, as the person, on the same queue, lease and delivery.
+   * Its result is kept as the "plan" step so a resumed job is delivered,
+   * never planned twice. Absent: a plan payload is not run here.
+   */
+  readonly plans?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly owner: Owner;
+        readonly row: WorkRow;
+        readonly progress: LiveReport;
+      }) => Promise<{
+        readonly state: EndState;
+        readonly reason: string | null;
+        readonly outputs?: Readonly<Record<string, unknown>> | undefined;
+      }>)
+    | undefined;
   readonly workerId?: string | undefined;
   readonly leaseMs?: number | undefined;
   readonly logger?: Logger | undefined;
@@ -113,6 +132,10 @@ export function createAgentWorkRunner(dependencies: {
         }
       }
     };
+    if (isPlanJobPayload(row.plan) && dependencies.plans !== undefined) {
+      await runPlan(row, owner, finish, dependencies.plans);
+      return;
+    }
     const plan = WorkforceJobStartPayloadSchema.safeParse(row.plan);
     if (!plan.success || plan.data.ownerUserId !== row.user_id) {
       await finish(
@@ -266,6 +289,95 @@ export function createAgentWorkRunner(dependencies: {
       );
       // Back to the queue for the next claim; out of attempts, the sweep
       // ends it FAILED with the reason.
+      await queue.release(
+        row.job_id,
+        workerId,
+        "Something went wrong part-way; Q will try again.",
+      );
+    } finally {
+      clearInterval(beat);
+    }
+  }
+
+  /**
+   * A plan job: as the person, resolved now; its live stages kept on the
+   * row; its result kept as the "plan" step (a resumed job whose plan was
+   * already kept is delivered as it is), then delivered.
+   */
+  async function runPlan(
+    row: WorkRow,
+    owner: Owner,
+    finish: (state: EndState, reason: string | null) => Promise<void>,
+    plans: NonNullable<typeof dependencies.plans>,
+  ): Promise<void> {
+    const ownerOf = (row.plan as { readonly ownerUserId?: unknown })
+      .ownerUserId;
+    if (ownerOf !== row.user_id) {
+      await finish(
+        "FAILED",
+        "The plan's request couldn't be read, so nothing ran.",
+      );
+      return;
+    }
+    const actor = await dependencies
+      .actorFor(owner, row.trace.organisationId ?? null)
+      .catch(() => null);
+    if (actor === null || actor.userId !== row.user_id) {
+      await finish(
+        "BLOCKED",
+        "You can no longer act where this was asked, so Q stopped it.",
+      );
+      return;
+    }
+    const done = PriorSchema.safeParse(row.results["plan"]);
+    if (done.success && done.data.status === "DONE") {
+      await finish("COMPLETED", null);
+      await deliverAfter(owner, row.job_id);
+      return;
+    }
+    let lost = false;
+    const beat = setInterval(
+      () => {
+        void queue
+          .heartbeat(row.job_id, workerId, leaseMs)
+          .then((kept) => {
+            if (!kept) lost = true;
+          })
+          .catch(() => undefined);
+      },
+      Math.max(1_000, Math.floor(leaseMs / 3)),
+    );
+    beat.unref?.();
+    let shown = liveStageOf(row);
+    let writing: Promise<void> = Promise.resolve();
+    const progress: LiveReport = (patch) => {
+      if (lost) return;
+      const next = mergeLive(shown, patch, new Date().toISOString());
+      shown = next;
+      writing = writing
+        .then(() => queue.recordLive?.(row.job_id, workerId, next))
+        .catch(() => undefined);
+    };
+    try {
+      const ended = await plans({ actor, owner, row, progress });
+      await writing;
+      if (ended.state === "COMPLETED") {
+        await queue.recordStep(row.job_id, workerId, "plan", {
+          status: "DONE",
+          summary: "Plan written and reviewed.",
+          ...(ended.outputs === undefined ? {} : { outputs: ended.outputs }),
+        });
+        await store
+          .setJobStatus(owner, row.job_id, "DONE")
+          .catch(() => undefined);
+      }
+      await finish(ended.state, ended.reason);
+      await deliverAfter(owner, row.job_id);
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, jobId: row.job_id, attempt: row.attempts },
+        "plan job threw; it goes back to the queue",
+      );
       await queue.release(
         row.job_id,
         workerId,

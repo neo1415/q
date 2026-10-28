@@ -290,6 +290,48 @@ export const QPlanReviewSummarySchema = z
   });
 export type QPlanReviewSummary = z.infer<typeof QPlanReviewSummarySchema>;
 
+// --- dynamic specialists (addendum 1) ------------------------------------------
+
+/**
+ * Addendum 1 (owner 2026-10-28): when a Q-owned step is work no built-in
+ * role covers, the coordinator defines a specialist for it -- a plain,
+ * addressable name the Team page shows, what it is for, the typed tools it
+ * may use, worked examples and a budget. Its tools are a SUBSET of the
+ * run's context-eligible tools (code intersects them; never wider), it is
+ * created only under the person's approval of the plan version that names
+ * it, kept with that version, and run by the same job runner as any
+ * built-in role. Never arbitrary code, SQL or network access.
+ */
+export const Q_SPECIALIST_TOOLS_MAX = 8;
+export const QSpecialistDefinitionSchema = z
+  .object({
+    /** The step it does (one specialist per step). */
+    stepKey: QPlanStepKeySchema,
+    /** Plain and addressable ("Grant scout"); never an internal role name. */
+    name: z
+      .string()
+      .trim()
+      .min(2)
+      .max(60)
+      .regex(/^[\p{L}\p{N}][\p{L}\p{N} '&-]*$/u, "a plain name"),
+    purpose: z.string().trim().min(1).max(300),
+    /** Typed Q tool names; a subset of the run's eligible tools. */
+    tools: z.array(ToolNameSchema).min(1).max(Q_SPECIALIST_TOOLS_MAX),
+    examples: z.array(z.string().trim().min(1).max(300)).max(3),
+    /** At most this much model spend, in US dollars. */
+    budgetUsd: z.number().min(0).max(0.5),
+    maxModelCalls: z.number().int().min(1).max(6),
+  })
+  .strict()
+  .refine(
+    (definition) => new Set(definition.tools).size === definition.tools.length,
+    {
+      message: "each tool once",
+      path: ["tools"],
+    },
+  );
+export type QSpecialistDefinition = z.infer<typeof QSpecialistDefinitionSchema>;
+
 // --- the plan -----------------------------------------------------------------
 
 export const Q_PLAN_STATUSES = [
@@ -325,9 +367,30 @@ export const QPlanSchema = z
     /** The version this one replaces; null for the first. */
     supersedes: z.number().int().min(1).max(999).nullable(),
     createdAt: UtcTimestampSchema,
+    /**
+     * Addendum 1: specialists this version defines for its Q-owned
+     * WORKFORCE steps no built-in role covers. Approved with the version.
+     * Additive.
+     */
+    specialists: z.array(QSpecialistDefinitionSchema).max(4).optional(),
   })
   .strict()
   .superRefine((plan, ctx) => {
+    const stepKeys = new Set(plan.steps.map((step) => step.key));
+    (plan.specialists ?? []).forEach((specialist, index) => {
+      const step = plan.steps.find((one) => one.key === specialist.stepKey);
+      if (
+        !stepKeys.has(specialist.stepKey) ||
+        step?.owner === "YOU" ||
+        step?.action.kind !== "WORKFORCE"
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "a specialist does a Q-owned WORKFORCE step of the plan",
+          path: ["specialists", index, "stepKey"],
+        });
+      }
+    });
     const keys = new Set<string>();
     const refs = new Set(plan.situationRefs);
     plan.steps.forEach((step, index) => {
@@ -398,6 +461,141 @@ export const Q_PLAN_AFFORDANCES = [
 ] as const;
 export type QPlanAffordance = (typeof Q_PLAN_AFFORDANCES)[number];
 export const QPlanAffordanceSchema = z.enum(Q_PLAN_AFFORDANCES);
+
+const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/u);
+/** The person's words to a plan (a change), bounded as a thread entry is. */
+const Q_TEAM_THREAD_TEXT_MAX_FOR_NOTE = 1_000;
+
+/**
+ * Execute (S5): ONE approval bound to the exact plan version -- its id,
+ * version, the sha-256 of its stored body and the step keys it runs. A
+ * changed plan is a new version with a new body, so an approval of the old
+ * one can never run the new one: Execute is asked again.
+ */
+export const Q_PLAN_EXECUTE = "q.plan.execute" as const;
+export const QPlanExecutePayloadSchema = z
+  .object({
+    ownerUserId: UuidSchema,
+    planId: QPlanIdSchema,
+    version: z.number().int().min(1).max(1000),
+    bodySha256: Sha256Schema,
+    stepKeys: z.array(QPlanStepKeySchema).min(1).max(Q_PLAN_STEPS_MAX),
+    /** For the card: the goal, as the plan states it. */
+    goal: z.string().trim().min(1).max(500),
+    /**
+     * What the card shows and the approval binds to: each step, who does
+     * it, when, and whether it will ask again before anything goes out.
+     */
+    steps: z
+      .array(
+        z
+          .object({
+            key: QPlanStepKeySchema,
+            title: z.string().trim().min(1).max(160),
+            owner: QPlanStepOwnerSchema,
+            due: LocalDateSchema.nullable(),
+            needsApproval: z.boolean(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(Q_PLAN_STEPS_MAX),
+  })
+  .strict()
+  .refine(
+    (payload) =>
+      payload.steps.length === payload.stepKeys.length &&
+      payload.steps.every(
+        (step, index) => step.key === payload.stepKeys[index],
+      ),
+    { message: "the steps shown are the steps run", path: ["steps"] },
+  );
+export type QPlanExecutePayload = z.infer<typeof QPlanExecutePayloadSchema>;
+
+/** `POST /v1/q/plans/:planId/decide`: one of the card's three affordances. */
+export const QPlanDecisionRequestSchema = z.discriminatedUnion("affordance", [
+  z
+    .object({
+      affordance: z.literal("EXECUTE"),
+      version: z.number().int().min(1).max(1000),
+      /** The body the card showed: the approval binds to it. */
+      bodySha256: Sha256Schema,
+    })
+    .strict(),
+  z
+    .object({
+      affordance: z.literal("PUT_ON_BOARD"),
+      version: z.number().int().min(1).max(1000),
+    })
+    .strict(),
+  z
+    .object({
+      affordance: z.literal("CHANGE"),
+      version: z.number().int().min(1).max(1000),
+      /** What to change, in the person's words. */
+      note: z.string().trim().min(1).max(Q_TEAM_THREAD_TEXT_MAX_FOR_NOTE),
+    })
+    .strict(),
+]);
+export type QPlanDecisionRequest = z.infer<typeof QPlanDecisionRequestSchema>;
+
+export const Q_PLAN_DECISION_OUTCOMES = [
+  /** Execute: the one approval card for this exact version is waiting. */
+  "AWAITING_APPROVAL",
+  /** Executed: Q's steps started or prepared, yours on the board. */
+  "EXECUTING",
+  "ON_BOARD",
+  /** The change is being made: a new version follows. */
+  "CHANGING",
+  /** The card showed an older version (or body): nothing was done. */
+  "STALE",
+  "NOT_FOUND",
+  "FAILED",
+] as const;
+export const QPlanDecisionResultSchema = z
+  .object({
+    outcome: z.enum(Q_PLAN_DECISION_OUTCOMES),
+    /** One plain line for the person, code-worded. */
+    message: z.string().trim().min(1).max(600),
+    /** The plan's current version after the decision. */
+    version: z.number().int().min(1).max(1000).nullable(),
+    /** CHANGING: the job writing the next version. */
+    jobId: UuidSchema.nullable(),
+    /** AWAITING_APPROVAL: the approval card's action. Additive. */
+    actionId: UuidSchema.nullable().optional(),
+  })
+  .strict();
+export type QPlanDecisionResult = z.infer<typeof QPlanDecisionResultSchema>;
+
+/**
+ * `GET /v1/q/plans/:planId[?version=n]`: the plan as its owner reads it,
+ * with the body hash an Execute binds to and the team thread's status
+ * lines (code-worded, never an author's role or reasoning).
+ */
+export const QPlanViewSchema = z
+  .object({
+    plan: QPlanSchema,
+    bodySha256: Sha256Schema,
+    /** The newest version: only it can be executed. */
+    current: z.boolean(),
+    headVersion: z.number().int().min(1).max(1000),
+    status: QPlanStatusSchema,
+    lines: z
+      .array(
+        z
+          .object({
+            at: UtcTimestampSchema,
+            text: z.string().trim().min(1).max(Q_TEAM_THREAD_TEXT_MAX_FOR_NOTE),
+          })
+          .strict(),
+      )
+      .max(20),
+  })
+  .strict();
+export type QPlanView = z.infer<typeof QPlanViewSchema>;
+
+export const Q_PLAN_PATH = "/v1/q/plans/:planId" as const;
+export const Q_PLAN_DECIDE_PATH = "/v1/q/plans/:planId/decide" as const;
 
 // --- the team thread -------------------------------------------------------------
 
