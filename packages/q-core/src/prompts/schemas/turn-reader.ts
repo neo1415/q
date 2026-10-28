@@ -1014,3 +1014,66 @@ export const TURN_READER_V68_SCHEMA_VERSION = 68;
 
 /** v69 (run 7b51d28d): the same output, each field only where it belongs. */
 export const TURN_READER_V69_SCHEMA_VERSION = 69;
+
+/**
+ * v70 (situation-first planning, design 2026-10-28 S3): two fields, read
+ * by meaning in any words and any language -- never by keyword.
+ *
+ * planAsk: they ask Q for a plan of their own -- how to improve something
+ * (IMPROVE), what to do for a goal or a period (GOAL), or to rework a plan
+ * they shared (UPLOADED); research says what public reading the plan
+ * needs (their market, themselves, both, none); side is whose plan it is
+ * when the turn makes that plain. Null when no plan is asked; read beside
+ * nextSteps and teamJob, never instead of them.
+ *
+ * directsWork: they redirect work Q's team is already doing for them
+ * ("focus on the fintech ones first", "drop the deck step").
+ *
+ * Additive: every v65 field is kept. Lenient: a malformed value costs
+ * itself (null / false), never the reading.
+ */
+export const TURN_READER_V70_SCHEMA_VERSION = 70;
+export const TURN_PLAN_ASK_KINDS = [
+  "IMPROVE",
+  "GOAL",
+  "UPLOADED",
+  "NONE",
+] as const;
+export const TURN_PLAN_RESEARCH = ["NONE", "MARKET", "SELF", "BOTH"] as const;
+export const TURN_PLAN_SIDES = ["FOUNDER", "INVESTOR"] as const;
+/**
+ * Addendum 3 rule 1: whom the work is about. OWN -- their own company (a
+ * founder) or their own mandate and pipeline (an investor), the default,
+ * resolved by code from the actor and never asked; NAMED -- another
+ * company or person they name (namedOther carries it).
+ */
+export const TURN_PLAN_SUBJECTS = ["OWN", "NAMED"] as const;
+/**
+ * Addendum 3 rule 2: what they want at the end, inferred from the ask.
+ * PLAN: steps to take; DOCUMENT_REVIEW: their own documents read, facts
+ * extracted, contradictions set side by side and what needs their
+ * confirmation shown before their record changes; ANALYSIS: a written
+ * study or recommendation; DOCUMENT: a document of theirs made or reworked.
+ */
+export const TURN_PLAN_DELIVERABLES = [
+  "PLAN",
+  "DOCUMENT_REVIEW",
+  "ANALYSIS",
+  "DOCUMENT",
+] as const;
+export const TurnPlanAskSchema = z
+  .object({
+    kind: z.enum(TURN_PLAN_ASK_KINDS),
+    research: z.enum(TURN_PLAN_RESEARCH).default("NONE"),
+    side: z.enum(TURN_PLAN_SIDES).nullable().default(null),
+    subject: z.enum(TURN_PLAN_SUBJECTS).default("OWN"),
+    deliverable: z.enum(TURN_PLAN_DELIVERABLES).default("PLAN"),
+  })
+  .strict();
+export type TurnPlanAsk = z.infer<typeof TurnPlanAskSchema>;
+
+export const TurnReaderV70ResultSchema = TurnReaderV65ResultSchema.extend({
+  planAsk: TurnPlanAskSchema.nullable().default(null).catch(null),
+  directsWork: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV70Result = z.infer<typeof TurnReaderV70ResultSchema>;

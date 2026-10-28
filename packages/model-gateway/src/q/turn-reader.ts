@@ -4,7 +4,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV65ResultSchema,
+  TurnReaderV70ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -18,6 +18,7 @@ import {
   type TurnReaderV63Result,
   type TurnReaderV64Result,
   type TurnReaderV65Result,
+  type TurnReaderV70Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -155,6 +156,14 @@ export type QTurnReading = Omit<
   readonly replyTo?: TurnReaderV65Result["replyTo"] | undefined;
   /** v65: whom a discovery ask is about (investors or companies). */
   readonly discoverWhom?: TurnReaderV65Result["discoverWhom"] | undefined;
+  /**
+   * v70 (situation-first planning): they ask for a plan of their own --
+   * IMPROVE, GOAL or UPLOADED, the public research it needs, and whose
+   * side -- read by meaning; null when no plan is asked.
+   */
+  readonly planAsk?: TurnReaderV70Result["planAsk"] | undefined;
+  /** v70: they redirect work Q's team is already doing for them. */
+  readonly directsWork?: boolean | undefined;
   /** v55: the page control (a listed id) they ask to open or show now. */
   readonly control?: string | null | undefined;
   /** v54: the turn is answered by this earlier turn of Q's (SHOWN). */
@@ -316,6 +325,9 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   // v65: a malformed reply or discovery target costs itself, never the reading.
   "replyTo",
   "discoverWhom",
+  // v70: a malformed plan ask or direction costs itself, never the reading.
+  "planAsk",
+  "directsWork",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -420,8 +432,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV65Result>> =>
-          gateway.execute<TurnReaderV65Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV70Result>> =>
+          gateway.execute<TurnReaderV70Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -437,7 +449,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV65ResultSchema,
+              schema: TurnReaderV70ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -479,7 +491,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV65ResultSchema.safeParse(
+        const parsed = TurnReaderV70ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         // A comparison is never answered from an earlier turn (lane 4).
