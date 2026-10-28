@@ -5,8 +5,10 @@ import type { Logger } from "@capital-q/observability";
 import {
   admitFacts,
   createDeepResearch,
+  createSearchBudget,
   publicTermsOf,
   searchPhrase,
+  type SearchBudget,
   type AdmittedFact,
   type DeepResearchLaneOutcome,
   type DeepResearchQuestion,
@@ -19,7 +21,12 @@ import { z } from "zod";
 
 import type { ResearchFound } from "./jobs.js";
 import { safeReport } from "./live.js";
-import { subjectLines, type OwnResearchSubject } from "./own-subject.js";
+import {
+  diligenceSubjectLines,
+  subjectLines,
+  type OwnResearchSubject,
+} from "./own-subject.js";
+import { DEFAULT_WORKFORCE_JOB_SEARCH_BUDGET as DEFAULT_JOB_SEARCH_BUDGET } from "./limit.js";
 import type { WorkforceModels } from "./models.js";
 import type { WorkforcePortServices } from "./ports.js";
 
@@ -98,9 +105,17 @@ export const ResearchDossierSchema = z
           .strict(),
       )
       .max(24),
+    /**
+     * The job's search budget left some lines of enquiry unsearched or
+     * narrowed (2026-10-28); the document says so. Absent: an older dossier.
+     */
+    budgetLimited: z.boolean().optional(),
   })
   .strict();
 export type ResearchDossier = z.infer<typeof ResearchDossierSchema>;
+
+/** Jobs whose search budgets are held at once (one process). */
+const JOB_BUDGETS_MAX = 500;
 
 /** A step's spend against its budget, from what each call really cost. */
 export function createSpend(capUsd: number) {
@@ -202,6 +217,19 @@ export function workforceDeepResearch(dependencies: {
    */
   readonly ownSubject?:
     ((actor: ActorContext) => Promise<OwnResearchSubject | null>) | undefined;
+  /**
+   * Diligence (2026-10-28): the company a job names, read as the person
+   * through the Context Firewall -- its name and country only. Null: not
+   * theirs to read, and the research plans from the request alone.
+   */
+  readonly namedSubject?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<OwnResearchSubject | null>)
+    | undefined;
+  /** Searches one job may send, planned ones included (default 8). */
+  readonly jobSearchBudget?: number | undefined;
 }): WorkforcePortServices["research"] {
   const service = dependencies.service;
   if (service === undefined) return undefined;
@@ -212,6 +240,22 @@ export function workforceDeepResearch(dependencies: {
     logger: dependencies.logger,
   });
   const { models, logger } = dependencies;
+  const searchLimit = dependencies.jobSearchBudget ?? DEFAULT_JOB_SEARCH_BUDGET;
+  // One budget per job, across its research steps and their rounds.
+  const budgets = new Map<string, SearchBudget>();
+  const budgetFor = (tenantId: string, jobId: string | undefined) => {
+    if (jobId === undefined) return createSearchBudget(searchLimit);
+    const key = `${tenantId}:${jobId}`;
+    const held = budgets.get(key);
+    if (held !== undefined) return held;
+    if (budgets.size >= JOB_BUDGETS_MAX) {
+      const oldest = budgets.keys().next().value;
+      if (oldest !== undefined) budgets.delete(oldest);
+    }
+    const fresh = createSearchBudget(searchLimit);
+    budgets.set(key, fresh);
+    return fresh;
+  };
 
   return async (input): Promise<ResearchFound> => {
     const started = now();
@@ -226,11 +270,27 @@ export function workforceDeepResearch(dependencies: {
     const today = new Date(started).toISOString().slice(0, 10);
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
 
+    const budget = budgetFor(input.actor.tenantId, input.jobId);
     // 1. The questions, planned by meaning from their request and, for
-    // their own company, its name, country and declared sectors only.
-    const own = subjectLines(
-      (await dependencies.ownSubject?.(input.actor).catch(() => null)) ?? null,
-    );
+    // their own company, its name, country and declared sectors only; for
+    // a company being diligenced, its name and country as they may read it.
+    const named =
+      input.subject === undefined
+        ? null
+        : ((await dependencies
+            .namedSubject?.(input.actor, input.subject.companyId)
+            .catch(() => null)) ?? null);
+    // A named company they may not read is researched from the request
+    // alone -- never as their own company.
+    const own =
+      input.subject !== undefined
+        ? named === null
+          ? subjectLines(null)
+          : diligenceSubjectLines(named)
+        : subjectLines(
+            (await dependencies.ownSubject?.(input.actor).catch(() => null)) ??
+              null,
+          );
     const report = safeReport(input.progress);
     let questions: DeepResearchQuestion[] = [];
     const planned = await models.planResearch(who, trace, {
@@ -263,6 +323,25 @@ export function workforceDeepResearch(dependencies: {
       };
     }
 
+    if (budget.remaining() === 0) {
+      budget.markLimited();
+      return {
+        status: "UNAVAILABLE",
+        message:
+          "This job's public search budget was already spent, so nothing more was searched.",
+        reason: "NO_SOURCES",
+      };
+    }
+    // The job's search budget (2026-10-28): the planner orders questions
+    // by importance; round one keeps two searches back for what its pages
+    // name, when the budget allows a follow-up round at all.
+    const roundOne =
+      budget.remaining() >= 6
+        ? questions.slice(0, budget.remaining() - 2)
+        : questions;
+    if (roundOne.length < questions.length) budget.markLimited();
+    questions = roundOne;
+
     // 2. Round one, side by side.
     report({ stage: "SEARCHING", questions: questions.length });
     const first = await deep.run({
@@ -271,10 +350,12 @@ export function workforceDeepResearch(dependencies: {
       correlationId,
       request,
       questions,
-      // Their own company's identity may travel (their own facts).
+      // Their own company's identity may travel (their own facts), and a
+      // diligenced company's name and country (what they may read of it).
       ...(own.terms.length === 0 ? {} : { publicTerms: own.terms }),
       deadlineAt: started + deadlineMs * 0.55,
       pagesPerQuestion: PAGES_PER_LANE,
+      searchBudget: budget,
     });
     if (first.sources.length === 0) {
       const unavailable = first.lanes.every(
@@ -344,8 +425,10 @@ export function workforceDeepResearch(dependencies: {
         return true;
       })
       .slice(0, FOLLOW_UPS_MAX);
+    if (second.length > 0 && budget.remaining() === 0) budget.markLimited();
     if (
       second.length > 0 &&
+      budget.remaining() > 0 &&
       now() < started + deadlineMs * 0.7 &&
       spend.canAfford(0.05 * second.length)
     ) {
@@ -359,6 +442,7 @@ export function workforceDeepResearch(dependencies: {
         known: first.sources,
         deadlineAt: started + deadlineMs * 0.8,
         pagesPerQuestion: 3,
+        searchBudget: budget,
       });
       const fresh = more.sources.filter(
         (source) =>
@@ -406,6 +490,9 @@ export function workforceDeepResearch(dependencies: {
         proposed: proposed.length,
         admitted: admitted.admitted.length,
         refused: admitted.refused.length,
+        searches: budget.limit - budget.remaining(),
+        searchBudget: budget.limit,
+        budgetLimited: budget.limited(),
         spentUsd: Number(spend.spent().toFixed(4)),
         ms: now() - started,
       },
@@ -439,6 +526,7 @@ export function workforceDeepResearch(dependencies: {
         status: lane.status,
         sources: lane.sources,
       })),
+      ...(budget.limited() ? { budgetLimited: true } : {}),
     };
     return {
       status: "OK",

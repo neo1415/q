@@ -23,6 +23,7 @@ import {
 } from "@capital-q/q-orchestrator";
 import {
   isWorkforceAnalysisRequest,
+  WORKFORCE_DILIGENCE_PROFILE,
   workforceCorrelationId,
   type QAgentRole,
   type WorkforceDocumentRequest,
@@ -219,6 +220,11 @@ export type WorkforcePorts = {
           readonly budgetUsd?: number | undefined;
           /** Where the research stands, for the person watching. */
           readonly progress?: LiveReport | undefined;
+          /**
+           * Diligence (2026-10-28): the company a later diligence document
+           * in this approved plan is about (bound by code, never a model).
+           */
+          readonly subject?: { readonly companyId: string } | undefined;
         },
       ) => Promise<ResearchFound>)
     | undefined;
@@ -353,6 +359,11 @@ export function createWorkforceExecutors(dependencies: {
   readonly scheduling: boolean;
   /** The job in the person's words: research reads it as their request. */
   readonly goal?: string | undefined;
+  /**
+   * The approved plan's steps: a RESEARCH step a diligence document waits
+   * on researches that document's company (2026-10-28).
+   */
+  readonly steps?: readonly BoundStep[] | undefined;
   readonly documentContext?: DocumentExecutionContext | undefined;
   readonly documentPolling?:
     | {
@@ -679,6 +690,7 @@ export function createWorkforceExecutors(dependencies: {
           ) {
             return { status: "HELD", summary: "Not allowed to research." };
           }
+          const subject = diligenceSubjectFor(step.key, dependencies.steps);
           const found = await ports
             .research(owner, {
               jobId: context.jobId,
@@ -687,6 +699,7 @@ export function createWorkforceExecutors(dependencies: {
               query: step.goal.slice(0, 400),
               budgetUsd: step.budgetUsd,
               progress: dependencies.documentContext?.progress,
+              ...(subject === null ? {} : { subject }),
             })
             .catch(() => null);
           // Production 2026-10-25: every research-backed document job failed
@@ -957,6 +970,30 @@ export function documentStepSummary(
   return review.revisedToVersion === null
     ? `Reviewed the document and ${found}; it stands as written.`
     : `Reviewed the document, ${found} and revised it to version ${String(review.revisedToVersion)}.`;
+}
+
+/**
+ * The company a RESEARCH step researches for diligence: a later diligence
+ * document in the approved plan that waits on it names it (bound by code
+ * at planning). Null: an ordinary research step.
+ */
+export function diligenceSubjectFor(
+  stepKey: string,
+  steps: readonly BoundStep[] | undefined,
+): { readonly companyId: string } | null {
+  for (const step of steps ?? []) {
+    const document = step.document;
+    if (
+      document !== undefined &&
+      isWorkforceAnalysisRequest(document) &&
+      document.scope === "NAMED_COMPANY" &&
+      document.profile === WORKFORCE_DILIGENCE_PROFILE &&
+      step.dependsOn.includes(stepKey)
+    ) {
+      return { companyId: document.companyId };
+    }
+  }
+  return null;
 }
 
 /** The timeline's line for an ANALYSIS step, in plain words. */
@@ -1279,6 +1316,7 @@ export function createWorkforceJobs(dependencies: {
             step.tools.includes("schedule.meeting.book"),
           ),
           goal: input.goal,
+          steps: planned.steps,
           documentContext: options.documentContext,
         }),
         options.durable,

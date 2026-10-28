@@ -110,6 +110,8 @@ export type WorkforcePortServices = {
         readonly budgetUsd?: number | undefined;
         /** Where the research stands, for the person watching. */
         readonly progress?: LiveReport | undefined;
+        /** Diligence: the company the job's diligence document is about. */
+        readonly subject?: { readonly companyId: string } | undefined;
       }) => Promise<ResearchFound>)
     | undefined;
   readonly findSlots: (input: {
@@ -314,6 +316,9 @@ export function createWorkforcePorts(
                 jobId: input.jobId,
                 budgetUsd: input.budgetUsd,
                 progress: input.progress,
+                ...(input.subject === undefined
+                  ? {}
+                  : { subject: input.subject }),
               });
             },
           }),

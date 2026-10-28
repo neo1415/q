@@ -23,7 +23,10 @@ import { webOriginFrom } from "./composition/web-origin.js";
 import { namedPictureOf } from "./http/q-approvals.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
-import { createOwnResearchSubject } from "./composition/workforce/own-subject.js";
+import {
+  createNamedResearchSubject,
+  createOwnResearchSubject,
+} from "./composition/workforce/own-subject.js";
 import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
 import { createOwnContextReader } from "./composition/workforce/own-context.js";
 import { withWaitingPlans } from "./composition/workforce/waiting-plans.js";
@@ -216,8 +219,10 @@ import {
   workforceTracker,
 } from "./composition/workforce/jobs.js";
 import {
+  plannedExtractBudgetMs,
   withinMonthlyLimit,
   workforceJobCapUsd,
+  workforceJobSearchBudget,
   workforceMonthlyLimitUsd,
 } from "./composition/workforce/limit.js";
 import {
@@ -1300,6 +1305,8 @@ const researchComposition = composeResearch({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   logger,
+  // A planned job's page reads: nobody waits on its turn (2026-10-28).
+  plannedExtractBudgetMs: plannedExtractBudgetMs(process.env),
 });
 // Rehearsing with a researched external entity (W4): the asker's own
 // researched record and newest brief, or a prepared public seed.
@@ -1927,6 +1934,14 @@ const workforcePortsFor = createWorkforcePorts(
       models: workforceModels,
       // "My company": its name, country and declared sectors, as theirs.
       ownSubject: createOwnResearchSubject(database.sql),
+      // Diligence (2026-10-28): the company a job names, read as the person
+      // through the firewall (composed further down; read when a job runs).
+      namedSubject: (actor, companyId) =>
+        createNamedResearchSubject({
+          firewall,
+          investigate: qIntelligence.companyIntelligence.investigate,
+        })(actor, companyId),
+      jobSearchBudget: workforceJobSearchBudget(process.env),
       logger,
     }),
     writeReply: async (input) =>
@@ -4924,6 +4939,12 @@ const workforceDocuments = createWorkforceDocuments({
     },
     records: ownRecords,
     relationships: errandRelationships.ownRelationships,
+  }),
+  // Diligence (2026-10-28): the data room as the Data room tab authorises
+  // it for this person -- the same reads Q's chat tools use.
+  dataRoom: createMaterialDocumentReads({
+    sql: database.sql,
+    view: (actor, companyId) => profileMaterial.dataRoom.view(actor, companyId),
   }),
   logger,
 });

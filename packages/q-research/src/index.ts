@@ -119,6 +119,8 @@ export {
 } from "./domain/comparison.js";
 export {
   createPublicWebResearchService,
+  EXTRACT_BUDGET_MS,
+  PLANNED_EXTRACT_BUDGET_MS,
   type ExtractCommand,
   type ExtractOutcome,
   type PublicWebResearchService,
@@ -233,9 +235,11 @@ export {
 // dossier's admission rules.
 export {
   createDeepResearch,
+  createSearchBudget,
   DEEP_RESEARCH_BOUNDS,
   mergeSources,
   publicTermsOf,
+  type SearchBudget,
   type DeepResearch,
   type DeepResearchCommand,
   type DeepResearchLaneOutcome,

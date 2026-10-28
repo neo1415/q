@@ -68,3 +68,48 @@ export function workforceJobCapUsd(
   if (!Number.isFinite(value)) return DEFAULT_WORKFORCE_JOB_CAP_USD;
   return Math.min(JOB_CAP_BOUNDS.max, Math.max(JOB_CAP_BOUNDS.min, value));
 }
+
+function boundedInteger(
+  env: Readonly<Record<string, string | undefined>>,
+  name: string,
+  fallback: number,
+  bounds: { readonly min: number; readonly max: number },
+): number {
+  const raw = env[name]?.trim();
+  const value = raw === undefined || raw.length === 0 ? NaN : Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(bounds.max, Math.max(bounds.min, Math.floor(value)));
+}
+
+/**
+ * Searches one job may send to the public-web providers, planned questions
+ * included (diligence audit 2026-10-28: up to ~32 a research step).
+ * `Q_WORKFORCE_JOB_SEARCH_BUDGET`, bounded. A provider's own fail-over or
+ * fan-out behind one search counts as that one search.
+ */
+export const DEFAULT_WORKFORCE_JOB_SEARCH_BUDGET = 8;
+
+export function workforceJobSearchBudget(
+  env: Readonly<Record<string, string | undefined>>,
+): number {
+  return boundedInteger(
+    env,
+    "Q_WORKFORCE_JOB_SEARCH_BUDGET",
+    DEFAULT_WORKFORCE_JOB_SEARCH_BUDGET,
+    { min: 1, max: 40 },
+  );
+}
+
+/** A planned job's page-read budget, ms. `Q_RESEARCH_PLANNED_EXTRACT_MS`. */
+export const DEFAULT_PLANNED_EXTRACT_MS = 8_000;
+
+export function plannedExtractBudgetMs(
+  env: Readonly<Record<string, string | undefined>>,
+): number {
+  return boundedInteger(
+    env,
+    "Q_RESEARCH_PLANNED_EXTRACT_MS",
+    DEFAULT_PLANNED_EXTRACT_MS,
+    { min: 1_000, max: 30_000 },
+  );
+}

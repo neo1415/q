@@ -61,9 +61,50 @@ export type DeepResearchLaneOutcome = {
     | "NOTHING_SAFE_TO_SEND"
     | "PROVIDER_UNAVAILABLE"
     | "SKIPPED_DEADLINE"
+    /** The job's search budget was spent before it started. */
+    | "SKIPPED_BUDGET"
     | "FAILED";
   readonly sources: number;
 };
+
+/**
+ * One job's searches across every provider and research step (diligence
+ * audit 2026-10-28: planned questions bypassed the per-run budget, up to
+ * ~32 searches a step). A question reserves what it may send before it
+ * starts, and gives back what it did not use.
+ */
+export type SearchBudget = {
+  readonly limit: number;
+  readonly remaining: () => number;
+  /** Reserves up to `wanted`; how many were granted (0: none left). */
+  readonly reserve: (wanted: number) => number;
+  readonly refund: (unused: number) => void;
+  /** Whether any question was skipped or narrowed for it. */
+  readonly limited: () => boolean;
+  readonly markLimited: () => void;
+};
+
+export function createSearchBudget(limit: number): SearchBudget {
+  const cap = Math.max(0, Math.floor(limit));
+  let used = 0;
+  let limited = false;
+  return {
+    limit: cap,
+    remaining: () => cap - used,
+    reserve: (wanted) => {
+      const granted = Math.max(0, Math.min(Math.floor(wanted), cap - used));
+      used += granted;
+      return granted;
+    },
+    refund: (unused) => {
+      used = Math.max(0, used - Math.max(0, Math.floor(unused)));
+    },
+    limited: () => limited,
+    markLimited: () => {
+      limited = true;
+    },
+  };
+}
 
 export type DeepResearchResult = {
   readonly sources: readonly DeepResearchSource[];
@@ -90,6 +131,8 @@ export type DeepResearchCommand = {
   readonly maxSources?: number | undefined;
   /** Sources an earlier round already holds: never repeated, numbered on. */
   readonly known?: readonly DeepResearchSource[] | undefined;
+  /** The job's search budget, shared by every round and step of it. */
+  readonly searchBudget?: SearchBudget | undefined;
 };
 
 export const DEEP_RESEARCH_BOUNDS = {
@@ -134,6 +177,11 @@ export function createDeepResearch(dependencies: {
       >(questions.length).fill([]);
       let next = 0;
       const aborted = () => command.signal?.aborted === true;
+      const budget = command.searchBudget;
+      // A budget too tight for two phrasings a question: one each, so more
+      // lines of enquiry are searched rather than fewer twice.
+      const onePhrasing =
+        budget !== undefined && budget.remaining() < questions.length * 2;
 
       const worker = async () => {
         for (;;) {
@@ -150,6 +198,28 @@ export function createDeepResearch(dependencies: {
             };
             continue;
           }
+          const wanted =
+            question.alsoQuery === undefined || onePhrasing ? 1 : 2;
+          const granted =
+            budget === undefined ? wanted : budget.reserve(wanted);
+          if (granted === 0) {
+            budget?.markLimited();
+            outcomes[position] = {
+              lane: question.lane,
+              query: null,
+              status: "SKIPPED_BUDGET",
+              sources: 0,
+            };
+            continue;
+          }
+          if (
+            budget !== undefined &&
+            granted < (question.alsoQuery === undefined ? 1 : 2)
+          ) {
+            budget.markLimited();
+          }
+          // What the call really sent; until it answers, all it was granted.
+          let sent = granted;
           try {
             const freshness: PublicWebFreshness =
               question.recent === true ? "PAST_YEAR" : "ANY";
@@ -158,9 +228,10 @@ export function createDeepResearch(dependencies: {
               runId: command.runId,
               correlationId: command.correlationId,
               requestedQuery: question.query,
-              ...(question.alsoQuery === undefined
+              ...(question.alsoQuery === undefined || granted < 2
                 ? {}
                 : { alsoQueries: [question.alsoQuery] }),
+              ...(budget === undefined ? {} : { maxSearches: granted }),
               userText: command.request,
               subject: null,
               freshness,
@@ -176,6 +247,7 @@ export function createDeepResearch(dependencies: {
                 : { signal: command.signal }),
             });
             if (outcome.status === "OK") {
+              sent = outcome.budget.searchCalls;
               found[position] = outcome.sources;
               outcomes[position] = {
                 lane: question.lane,
@@ -184,6 +256,8 @@ export function createDeepResearch(dependencies: {
                 sources: outcome.sources.length,
               };
             } else {
+              // Nothing safe to send sent nothing; a provider failure did.
+              if (outcome.status === "NO_PUBLIC_IDENTITY") sent = 0;
               outcomes[position] = {
                 lane: question.lane,
                 query: null,
@@ -206,6 +280,8 @@ export function createDeepResearch(dependencies: {
               status: "FAILED",
               sources: 0,
             };
+          } finally {
+            budget?.refund(granted - Math.min(granted, Math.max(0, sent)));
           }
         }
       };

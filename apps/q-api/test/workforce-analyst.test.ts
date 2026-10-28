@@ -1089,6 +1089,7 @@ function analysisWorld(options: {
             evidenceStatus: "SELF_REPORTED",
           },
         ],
+        contradictions: [],
       } as never),
     artifacts: {
       findWorkforceDocument: (input: { workforce: unknown }) => {

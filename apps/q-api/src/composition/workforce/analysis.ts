@@ -50,6 +50,8 @@ export type AnalysisFact = ResearchDossier["facts"][number];
 export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
   readonly sources: readonly AnalysisSource[];
   readonly facts: readonly AnalysisFact[];
+  /** A research step's search budget narrowed what it searched. */
+  readonly budgetLimited: boolean;
 } {
   const sources: AnalysisSource[] = [];
   const facts: AnalysisFact[] = [];
@@ -73,7 +75,11 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
     }
     offset += top;
   }
-  return { sources, facts };
+  return {
+    sources,
+    facts,
+    budgetLimited: dossiers.some((dossier) => dossier.budgetLimited === true),
+  };
 }
 
 export function researchText(
@@ -358,7 +364,7 @@ function findingsFor(
 }
 
 /** Text over a section's limit, as several sections ("(continued)"). */
-function split(
+export function splitSection(
   heading: string,
   body: string,
 ): readonly { heading: string; body: string }[] {
@@ -398,6 +404,12 @@ export function analysisContent(input: {
   readonly seed: string;
   /** The public research it rests on could not be had: stated by code. */
   readonly publicSources?: PublicSourcesGap | null | undefined;
+  /** Text code adds that cites sources (Claims vs evidence): listed too. */
+  readonly alsoCites?: readonly string[] | undefined;
+  /** Gaps code states (a search budget, a data room not open to them). */
+  readonly codeGaps?: readonly string[] | undefined;
+  /** A Sources section even when nothing is cited (a diligence memo's fixed shape). */
+  readonly sourcesAlways?: boolean | undefined;
 }): QArtifactContent {
   const { draft, review } = input;
   const sections = draft.sections.map((section, index) => ({
@@ -412,8 +424,12 @@ export function analysisContent(input: {
     ],
   }));
   const cited = new Set(
-    [draft.summary, ...draft.sections.map((section) => section.body)].flatMap(
-      (body) => [...body.matchAll(CITED)].map((match) => Number(match[1])),
+    [
+      draft.summary,
+      ...draft.sections.map((section) => section.body),
+      ...(input.alsoCites ?? []),
+    ].flatMap((body) =>
+      [...body.matchAll(CITED)].map((match) => Number(match[1])),
     ),
   );
   const listed = input.sources.filter((source) => cited.has(source.index));
@@ -423,8 +439,15 @@ export function analysisContent(input: {
   );
   const sourceSections =
     sourceLines.length === 0
-      ? []
-      : split(
+      ? input.sourcesAlways === true
+        ? [
+            {
+              heading: "Sources",
+              body: "No public source is cited in this document.",
+            },
+          ]
+        : []
+      : splitSection(
           "Sources",
           `Public sources this document cites. A source states what it states; Capital Q has not verified it.\n${sourceLines.join("\n")}`,
         );
@@ -435,6 +458,7 @@ export function analysisContent(input: {
       : input.publicSources === "NONE_FOUND"
         ? [PUBLIC_NONE_FOUND_GAP]
         : []),
+    ...(input.codeGaps ?? []).map((gap) => gap.slice(0, 300)),
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>
@@ -447,7 +471,7 @@ export function analysisContent(input: {
   return {
     sections: [
       ...sections.flatMap((section) =>
-        split(section.heading, section.body).map((part, index) => ({
+        splitSection(section.heading, section.body).map((part, index) => ({
           heading: part.heading.slice(0, 160),
           body: part.body,
           findings: index === 0 ? section.findings : [],

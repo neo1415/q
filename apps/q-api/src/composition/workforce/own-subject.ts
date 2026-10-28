@@ -1,5 +1,14 @@
+import { randomUUID } from "node:crypto";
+
+import { CorrelationIdSchema, QRunIdSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { countryName } from "@capital-q/q-research";
+import type { ContextFirewallPort } from "@capital-q/q-runtime";
+import type {
+  CompanyIntelligenceRequest,
+  CompanyIntelligenceResult,
+  QSpecialistExecutionContext,
+} from "@capital-q/q-specialists";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -66,6 +75,75 @@ export function createOwnResearchSubject(sql: DatabaseExecutor) {
           ? null
           : row.description.trim(),
     };
+  };
+}
+
+/**
+ * Diligence (2026-10-28): the company a job names, as the person may read
+ * it: the Context Firewall decides first, then the company specialist reads
+ * its record in evidence-only mode (no model, no research). Its name alone
+ * is kept: what is being looked up.
+ */
+export function createNamedResearchSubject(dependencies: {
+  readonly firewall: ContextFirewallPort;
+  readonly investigate: (
+    request: CompanyIntelligenceRequest,
+    context: QSpecialistExecutionContext,
+  ) => Promise<CompanyIntelligenceResult>;
+}) {
+  return async (
+    actor: ActorContext,
+    companyId: string,
+  ): Promise<OwnResearchSubject | null> => {
+    const subject = { kind: "COMPANY" as const, companyId };
+    const runId = QRunIdSchema.parse(randomUUID());
+    const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
+    const decision = await dependencies.firewall.plan({
+      actor,
+      runId,
+      correlationId,
+      capability: "ANSWER",
+      subjects: [subject],
+    });
+    if (decision.outcome !== "AUTHORISED") return null;
+    const read = await dependencies.investigate(
+      {
+        company: subject,
+        question: "Who is this company?",
+        preparationMode: "EVIDENCE_ONLY",
+        publicResearch: false,
+      },
+      {
+        actor,
+        runId,
+        correlationId,
+        capability: "ANSWER",
+        plan: decision.plan,
+      },
+    );
+    const name = read.companyName?.trim() ?? "";
+    if (read.blocked !== null || read.companyId !== companyId || name === "")
+      return null;
+    return { name, country: null, sectors: [], description: null };
+  };
+}
+
+/**
+ * Diligence (2026-10-28): a company the person named and may read, as the
+ * research planner reads it. Only its name and country are given, and only
+ * they may travel: they are what is being looked up. Its record's other
+ * words may be founder-shared, so none of them reaches a query.
+ */
+export function diligenceSubjectLines(subject: OwnResearchSubject): {
+  readonly text: string;
+  readonly terms: readonly string[];
+} {
+  const country =
+    subject.country === null ? null : (countryName(subject.country) ?? null);
+  const where = country === null ? "" : ` (${country})`;
+  return {
+    text: `DUE DILIGENCE ON ${subject.name}${where}: an investor is deciding whether to invest in it. Research the company itself first -- its founders and team, customers, litigation and regulatory record, prior funding, reported traction and news -- then its competitors and market.`,
+    terms: [subject.name, country ?? ""].filter((one) => one.length > 0),
   };
 }
 
