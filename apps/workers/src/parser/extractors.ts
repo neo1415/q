@@ -13,6 +13,7 @@ import {
   type XmlNode,
   type ZipLimits,
 } from "./ooxml.js";
+import { pageBlocks, type PdfTextItem } from "./pdf-layout.js";
 
 /**
  * Content extractors (doc 14 §9.2).
@@ -408,40 +409,13 @@ export function createPptxExtractor(): ContentExtractor {
 // PDF
 // ---------------------------------------------------------------------------
 
-export const PDF_EXTRACTOR_VERSION = "1.0.0";
-
-type PdfTextItem = { readonly str?: unknown; readonly transform?: unknown };
-
-/** Groups a page's text items into lines by vertical position, then paragraphs. */
-function pageParagraphs(items: readonly PdfTextItem[]): readonly string[] {
-  const lines = new Map<number, string[]>();
-  for (const item of items) {
-    if (typeof item.str !== "string" || item.str.length === 0) continue;
-    const transform = Array.isArray(item.transform) ? item.transform : [];
-    const y = typeof transform[5] === "number" ? Math.round(transform[5]) : 0;
-    const existing = lines.get(y);
-    if (existing === undefined) lines.set(y, [item.str]);
-    else existing.push(item.str);
-  }
-  const ordered = [...lines.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([, parts]) => normaliseWhitespace(parts.join(" ")))
-    .filter((line) => line.length > 0);
-
-  const paragraphs: string[] = [];
-  let current: string[] = [];
-  for (const line of ordered) {
-    current.push(line);
-    // A short line that ends a sentence closes the paragraph; anything more
-    // clever would be guessing at layout we cannot see.
-    if (/[.!?:]$/.test(line) && current.join(" ").length > 120) {
-      paragraphs.push(current.join(" "));
-      current = [];
-    }
-  }
-  if (current.length > 0) paragraphs.push(current.join(" "));
-  return paragraphs;
-}
+/**
+ * 2.0.0: reading order rebuilt from geometry (pdf-layout.ts): lines sorted
+ * left to right (right to left for RTL scripts), table cells kept apart,
+ * columns read one at a time, paragraphs split on vertical gaps, larger
+ * short lines emitted as headings.
+ */
+export const PDF_EXTRACTOR_VERSION = "2.0.0";
 
 export function createPdfExtractor(
   loadPdf: (bytes: Uint8Array) => Promise<{
@@ -467,14 +441,21 @@ export function createPdfExtractor(
         for (let page = 1; page <= pageCount; page += 1) {
           const loaded = await document.getPage(page);
           const content = await loaded.getTextContent();
-          for (const paragraph of pageParagraphs(content.items)) {
-            const clipped = builder.clip(paragraph);
+          for (const block of pageBlocks(content.items)) {
+            const clipped = builder.clip(block.text);
             builder.add(
-              {
-                kind: "paragraph",
-                text: clipped,
-                locator: { index: builder.index, page },
-              },
+              block.kind === "heading"
+                ? {
+                    kind: "heading",
+                    level: 1,
+                    text: clipped,
+                    locator: { index: builder.index, page },
+                  }
+                : {
+                    kind: "paragraph",
+                    text: clipped,
+                    locator: { index: builder.index, page },
+                  },
               clipped.length,
             );
           }

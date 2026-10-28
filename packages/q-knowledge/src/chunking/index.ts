@@ -280,17 +280,37 @@ function unitsOf(block: ExtractedBlock): readonly Unit[] {
   }
 }
 
-function sectionsOf(blocks: readonly ExtractedBlock[]): readonly Section[] {
+/**
+ * The heading a page continues under. Carried from one page run to the
+ * next so a section that runs over a page break still reads as its
+ * section; the heading's text is repeated, its block is not (the block
+ * belongs to the page it is on).
+ */
+type HeadingCarry = { path: string[]; text: string | null };
+
+function sectionsOf(
+  blocks: readonly ExtractedBlock[],
+  carry: HeadingCarry = { path: [], text: null },
+): readonly Section[] {
   const sections: Section[] = [];
-  const path: string[] = [];
+  const path: string[] = carry.path;
   let current: {
     headingPath: string[];
     headingText: string | null;
     headingBlock: ExtractedBlock | null;
     units: Unit[];
-  } = { headingPath: [], headingText: null, headingBlock: null, units: [] };
+  } = {
+    headingPath: path.filter((h) => h.length > 0),
+    headingText: carry.text,
+    headingBlock: null,
+    units: [],
+  };
   const close = (): void => {
-    if (current.units.length > 0 || current.headingText !== null) {
+    // A carried heading with nothing under it on this page is no section.
+    if (
+      current.units.length > 0 ||
+      (current.headingText !== null && current.headingBlock !== null)
+    ) {
       sections.push({ ...current, units: [...current.units] });
     }
   };
@@ -312,6 +332,7 @@ function sectionsOf(blocks: readonly ExtractedBlock[]): readonly Section[] {
     current.units.push(...unitsOf(block));
   }
   close();
+  carry.text = current.headingText;
   return sections;
 }
 
@@ -324,11 +345,48 @@ function kindOf(units: readonly Unit[]): ChunkKind {
   return "passage";
 }
 
+/**
+ * Paged prose (a PDF) is chunked page by page, the way a deck is chunked
+ * slide by slide: no chunk spans two pages, so every chunk's page locator
+ * names the one page its text is on and a citation can be believed.
+ * Unpaged prose (DOCX, text) is one run, as before.
+ */
+function pageRuns(
+  blocks: readonly ExtractedBlock[],
+): readonly (readonly ExtractedBlock[])[] {
+  const runs: ExtractedBlock[][] = [];
+  let page: number | undefined;
+  for (const block of blocks) {
+    if (block.kind === "page_break") continue;
+    const here = block.locator.page;
+    const open = runs[runs.length - 1];
+    if (
+      open === undefined ||
+      (here !== undefined && page !== undefined && here !== page)
+    ) {
+      runs.push([block]);
+    } else {
+      open.push(block);
+    }
+    if (here !== undefined) page = here;
+  }
+  return runs;
+}
+
 function planNarrative(
   blocks: readonly ExtractedBlock[],
   builder: PlanBuilder,
 ): void {
-  for (const section of sectionsOf(blocks)) {
+  const carry: HeadingCarry = { path: [], text: null };
+  for (const run of pageRuns(blocks)) planNarrativeRun(run, builder, carry);
+}
+
+function planNarrativeRun(
+  blocks: readonly ExtractedBlock[],
+  builder: PlanBuilder,
+  carry: HeadingCarry,
+): void {
+  for (const section of sectionsOf(blocks, carry)) {
     const headingLine = section.headingText ?? "";
     const headingTokens = estimateTokens(headingLine);
     const total =
