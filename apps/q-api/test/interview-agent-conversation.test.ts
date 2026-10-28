@@ -207,7 +207,7 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
 });
 
 describe("a pause, read as a concept", () => {
-  it("asks nothing, and the loop is told to acknowledge and keep their answers", async () => {
+  it("on the typed channel is finishing: what is still needed is said and asked, and nobody is moved to Home (D3, 2026-10-28)", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       recorded: SO_FAR,
@@ -220,10 +220,32 @@ describe("a pause, read as a concept", () => {
       recommendations: world.recommendations,
       delegation: readerOf(reading({ pausing: true })),
     }).turn({ ...turn(world, "Let's pick this up tomorrow."), actor });
-    expect(outcome.asking).toBeNull();
+    expect(outcome.asking).not.toBeNull();
     expect(outcome.questionForQ).toBeNull();
+    expect(seen[0]).toContain("They want to finish now");
+    expect(outcome.reply).toMatch(/^Before I can finish, I still need /u);
+    expect(outcome.navigate).toBeNull();
+  });
+
+  it("on the spoken guided interview stays a pause: asks nothing, and they are let into the app (owner 2026-10-16)", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: SO_FAR,
+    });
+    const { gateway, seen } = replying("I2.stages");
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ pausing: true })),
+    }).turn({
+      ...turn(world, "Let's pick this up tomorrow."),
+      channel: "voice",
+      actor,
+    });
+    expect(outcome.asking).toBeNull();
     expect(seen[0]).toContain("They want to pause");
-    // Owner 2026-10-16, "continue later": they are let into the app.
     expect(outcome.navigate).toBe("HOME");
   });
 

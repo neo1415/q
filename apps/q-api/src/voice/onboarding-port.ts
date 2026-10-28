@@ -98,6 +98,17 @@ const HELD_FOR_FIRM_REASON =
   "Kept, and saved automatically as soon as their firm or company is set up (for an investor: the firm's name and how they invest; for a founder: the company's name). Nothing is lost and it need not be asked again. Say it is kept, never mention 'context' or a record not being active, and ask for whichever of those is still missing.";
 
 /**
+ * Steps the journey saves only as one of their options, because it sets
+ * the person up from the option key (`bootstrapInvestor` reads how they
+ * invest to create the firm). Their words outside the options are never
+ * kept as the answer here: nothing would be set up, and every other
+ * answer would wait on it (live 2026-10-28).
+ */
+const OPTION_ONLY_STEPS: ReadonlySet<string> = new Set([
+  INVESTOR_STEPS.investorType,
+]);
+
+/**
  * What the loop is told when it tries to fill an upload step with words.
  * It answers the loop's real question (what now?) so it stops retrying:
  * nothing is wrong, nothing more is needed this turn.
@@ -748,7 +759,11 @@ export function createOnboardingPort(input: {
       );
       return names.filter((name): name is string => name !== null).join(", ");
     }
-    return describeValue(step, value, recordedCurrency(view, steps)).trim();
+    return describeValue(
+      step,
+      value,
+      recordedCurrency(view, steps, step.stepKey),
+    ).trim();
   };
 
   /**
@@ -1128,6 +1143,26 @@ export function createOnboardingPort(input: {
       ok: false,
       result,
     });
+    /** Words naming none of a choice step's options: the options, to read against. */
+    const unmatchedResult = (
+      step: OnboardingStepManifest,
+    ): OnboardingRecordResult => {
+      const options = optionsOf(step);
+      return {
+        stepKey: step.stepKey,
+        outcome: "UNMATCHED",
+        reason: OPTION_ONLY_STEPS.has(step.stepKey)
+          ? "That names none of this step's options, and this step is saved only as one of them (it sets them up). Choose the option below that means what they said and record it by its key; if their words leave it open, ask them which."
+          : options.some((o) => o.key === "other")
+            ? "That names none of this step's options. Choose the option below that means what they said and record it by its key. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them."
+            : // No catch-all to keep their words in (live 2026-10-01:
+              // "a few paying customers" asked for six turns running).
+              "That names none of this step's options, and this step cannot keep other words. If one option plainly means what they said, record it by its key. Otherwise say so once in a few words, recommend the closest option with recommend and ask if it will do; never put the same choice to them again after that.",
+        candidates: options
+          .slice(0, 40)
+          .map((o) => `${o.label} (${o.key})`.slice(0, 160)),
+      };
+    };
     const step = steps.get(answer.stepKey);
     if (step === undefined) {
       return refuse({
@@ -1322,6 +1357,19 @@ export function createOnboardingPort(input: {
       ) {
         // The options they named, with their other words beside them.
         otherWords = unnamed.join(", ").slice(0, 200);
+      } else if (
+        unnamed.length > 0 &&
+        keys.length === 0 &&
+        OPTION_ONLY_STEPS.has(step.stepKey)
+      ) {
+        // Live 2026-10-28 (investor ca3626ab): "I'm an angel, also run a
+        // small syndicate called Harmattan Angels" was recorded as the
+        // investor type's free text. The journey sets the firm up from
+        // that step's option key, so no firm existed and every other
+        // answer of the sentence waited on it. A step the journey can
+        // only save as one of its options is handed back with them: the
+        // model reads which one is meant, or asks.
+        return refuse(unmatchedResult(step));
       } else if (unnamed.length > 0 && keys.length === 0) {
         // None of the options: their words are the answer ("Other: ...").
         return {
@@ -1365,7 +1413,8 @@ export function createOnboardingPort(input: {
     }
     if (
       value === null &&
-      (c.stepType === "single_select" || c.stepType === "multi_select")
+      (c.stepType === "single_select" || c.stepType === "multi_select") &&
+      !OPTION_ONLY_STEPS.has(step.stepKey)
     ) {
       // More than one option named for a one-choice question: their words,
       // as said, rather than a guess between them.
@@ -1383,18 +1432,7 @@ export function createOnboardingPort(input: {
       const options = optionsOf(step);
       return refuse(
         options.length > 0
-          ? {
-              stepKey: step.stepKey,
-              outcome: "UNMATCHED",
-              reason: options.some((o) => o.key === "other")
-                ? "That names none of this step's options. Choose the option below that means what they said and record it by its key. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them."
-                : // No catch-all to keep their words in (live 2026-10-01:
-                  // "a few paying customers" asked for six turns running).
-                  "That names none of this step's options, and this step cannot keep other words. If one option plainly means what they said, record it by its key. Otherwise say so once in a few words, recommend the closest option with recommend and ask if it will do; never put the same choice to them again after that.",
-              candidates: options
-                .slice(0, 40)
-                .map((o) => `${o.label} (${o.key})`.slice(0, 160)),
-            }
+          ? unmatchedResult(step)
           : {
               stepKey: step.stepKey,
               outcome: "REJECTED",
@@ -2458,6 +2496,8 @@ export function createOnboardingPort(input: {
         400,
       );
     const settled: OnboardingRecordResult[] = [];
+    /** Indices of `ready` held because their step was not open yet. */
+    const waitingOnStep = new Set<number>();
     if (ready.length > 0) {
       trusted = false;
       readAt = null;
@@ -2519,6 +2559,7 @@ export function createOnboardingPort(input: {
             }
             if (offPath({ problem })) {
               await holdUntilOpen(stepKey, item.value, item.plan.note);
+              waitingOnStep.add(index);
               const kept = await keepOffPath(
                 item.plan.step,
                 fieldWordsOf(
@@ -2552,6 +2593,41 @@ export function createOnboardingPort(input: {
         };
         for (const [index, item] of ready.entries()) {
           settled.push(await settleOne(item, index));
+        }
+        // A fact whose step opened with another answer of the same batch
+        // ("raising 400k": the amount before "raising", live 2026-10-28)
+        // lands this turn, not the next: what the batch held is replayed
+        // once now that the batch is on the record.
+        if (waitingOnStep.size > 0 && written.length > 0) {
+          const drained = await replayHeldWrites().catch(() => null);
+          if (drained !== null && drained.applied.length > 0) {
+            const now = await current();
+            for (const index of waitingOnStep) {
+              const item = ready[index];
+              const stepKey = item?.plan.step.stepKey;
+              if (
+                item === undefined ||
+                stepKey === undefined ||
+                !drained.applied.includes(stepKey)
+              ) {
+                continue;
+              }
+              settled[index] = {
+                stepKey,
+                outcome: "COMMITTED",
+                question: questionOf(item.plan.step),
+                recorded: (
+                  await recordedLine(
+                    item.plan.step,
+                    item.value,
+                    item.plan.note,
+                    now,
+                  )
+                ).slice(0, 600),
+                ...keptInWordsOf(item.value, item.plan.note),
+              };
+            }
+          }
         }
       } catch (error: unknown) {
         const status = (error as { readonly status?: unknown }).status;
@@ -3073,7 +3149,7 @@ export function createOnboardingPort(input: {
             outcome: "REJECTED",
             question,
             reason:
-              "This one is needed to set them up, so it cannot be set aside. Say briefly why it matters and ask it plainly.",
+              "This one is needed to set them up, so it cannot be set aside on the record. If they declined it for now, leave it: do not ask it again in this conversation (it is listed when they finish) and move on. Otherwise say briefly why it matters and ask it plainly.",
           });
           continue;
         }
@@ -3729,7 +3805,14 @@ export function fieldClausesOf(quote: string, reading: string): string | null {
   if (wanted.size === 0) return null;
   const carries = (text: string) =>
     contentWords(text).some((word) => wanted.has(word));
-  const sentences = said.match(/[^.!?;]+[.!?;]*/gu) ?? [said];
+  // A point between two digits is a decimal, not a sentence's end (live
+  // 2026-10-28: "KSh 2.1m a month" was kept as "KSh 2.; 1m a month").
+  const DECIMAL = "\u0000";
+  const sentences = (
+    said
+      .replace(/(\d)\.(\d)/gu, `$1${DECIMAL}$2`)
+      .match(/[^.!?;]+[.!?;]*/gu) ?? [said]
+  ).map((sentence) => sentence.replaceAll(DECIMAL, "."));
   const parts: string[] = [];
   for (const sentence of sentences) {
     if (!carries(sentence)) continue;

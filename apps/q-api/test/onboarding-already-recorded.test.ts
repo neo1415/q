@@ -53,7 +53,7 @@ function firewall(): ContextFirewallPort {
 
 const NOTE = "Paying customers: the 210 customers is right";
 const RESTATED =
-  "Thanks, I've noted the 210 customers is right (in your notes on paying customers). What early signal do you have?";
+  "Thanks, I've noted paying customers kept in your notes. What early signal do you have?";
 
 describe("what is already on the record is never said or offered again (live e2e 25 Oct)", () => {
   it("a summary already in that step's notes is not held as a new offer, and the reply does not restate it", async () => {

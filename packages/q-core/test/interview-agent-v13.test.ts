@@ -43,11 +43,7 @@ describe("INTERVIEW_AGENT v13", () => {
 });
 
 describe("DELEGATION_READER v5", () => {
-  it("is active and adds the short-answer rule to every v4 rule", () => {
-    expect(
-      createDefaultPromptRegistry().getActive("DELEGATION_READER").definition
-        .version,
-    ).toBe(5);
+  it("adds the short-answer rule to every v4 rule", () => {
     for (const line of DELEGATION_READER_V4.template
       .split("\n")
       .filter((l) => l.startsWith("- "))) {
@@ -56,6 +52,26 @@ describe("DELEGATION_READER v5", () => {
     expect(DELEGATION_READER_V5.template).toContain(
       "A short answer states only what it names or plainly means.",
     );
+  });
+});
+
+describe("DELEGATION_READER v6 (typed onboarding 2026-10-28, D5)", () => {
+  it("is active and reads a decline of a required step too; every other v5 rule stands", async () => {
+    const { DELEGATION_READER_V6 } = await import("../src/index.js");
+    expect(
+      createDefaultPromptRegistry().getActive("DELEGATION_READER").definition
+        .version,
+    ).toBe(6);
+    expect(DELEGATION_READER_V6.template).not.toContain(
+      "Required steps are never declined.",
+    );
+    expect(DELEGATION_READER_V6.template).toContain(
+      "A required step can be declined for now too",
+    );
+    const v5 = DELEGATION_READER_V5.template.split("\n");
+    const v6 = DELEGATION_READER_V6.template.split("\n");
+    expect(v6).toHaveLength(v5.length);
+    expect(v6.filter((line) => !v5.includes(line))).toHaveLength(1);
   });
 });
 

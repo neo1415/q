@@ -1031,10 +1031,31 @@ export function createOnboardingConductor(
     ) {
       return null;
     }
-    const view = await getOnboardingSession(
-      input.session,
-      input.onboardingSessionId,
-    );
+    // What the platform already holds is on the record before the first
+    // question is chosen (live 2026-10-28, founder 7982610e: "What's your
+    // company called?" asked for the name typed at sign-up two screens
+    // earlier): the journey's choice, and the company or firm they named.
+    const port = dependencies.portFor({
+      actor,
+      session: input.session,
+      onboardingSessionId: input.onboardingSessionId,
+      journeyType: input.journeyType,
+    });
+    await settleKnownAnswers(port, input.journeyType);
+    const signupName = input.signup?.organisationName?.trim() ?? "";
+    if (signupName.length > 0) {
+      await port
+        .recordKnown(
+          input.journeyType === "founder"
+            ? FOUNDER_STEPS.companyName
+            : INVESTOR_STEPS.organisationName,
+          signupName,
+        )
+        .catch(() => false);
+    }
+    const view =
+      port.view() ??
+      (await getOnboardingSession(input.session, input.onboardingSessionId));
     if (view.session.status === "COMPLETED") return null;
     const chosen = nextUnansweredStep(view, input.journeyType);
     const next =
