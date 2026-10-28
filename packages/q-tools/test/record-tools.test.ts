@@ -852,10 +852,10 @@ describe("figures read locally from a held-back document", () => {
   it("carries the founder's confirmed figures, set against the deck", async () => {
     const line =
       "CONTRADICTED | Monthly revenue, September 2026 | Your figure: USD 51,000 (you confirmed it from your financial document) | Your deck: MRR: $65K (traction, as of Sep 2026) | Both stay on record; neither is picked.";
-    const outcome = await executorWith({ pending: 0, confirmed: [line] }).execute(
-      call("list_uploaded_documents", {}),
-      contextFor(actorA, plan()),
-    );
+    const outcome = await executorWith({
+      pending: 0,
+      confirmed: [line],
+    }).execute(call("list_uploaded_documents", {}), contextFor(actorA, plan()));
     const [item] = dataOf(outcome).items as {
       qUse?: string;
       confirmedFigures?: string[];

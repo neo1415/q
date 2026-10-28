@@ -55,7 +55,11 @@ export type LocalFigureOfferResult =
       readonly alreadyOffered: number;
       readonly notOffered: number;
     }
-  | { readonly kind: "SKIPPED"; readonly reason: LocalFigureSkipReason; readonly read: number };
+  | {
+      readonly kind: "SKIPPED";
+      readonly reason: LocalFigureSkipReason;
+      readonly read: number;
+    };
 
 export type LocalFigureOfferDependencies = {
   readonly sql: DatabaseExecutor;
@@ -216,7 +220,10 @@ export function createLocalFigureOffers(
         }
         const suggestedValue = valueFor(candidate);
         const answered = values.get(stepKey);
-        if (answered !== undefined && sameResponseValue(answered, suggestedValue)) {
+        if (
+          answered !== undefined &&
+          sameResponseValue(answered, suggestedValue)
+        ) {
           alreadyOffered += 1;
           continue;
         }
@@ -239,7 +246,10 @@ export function createLocalFigureOffers(
               notOffered += 1;
               continue;
             }
-            if (!currencyProposed && !offered.has(FOUNDER_FINANCIAL_STEPS.currency)) {
+            if (
+              !currencyProposed &&
+              !offered.has(FOUNDER_FINANCIAL_STEPS.currency)
+            ) {
               currencyProposed = await create(
                 FOUNDER_FINANCIAL_STEPS.currency,
                 "financial.currency",

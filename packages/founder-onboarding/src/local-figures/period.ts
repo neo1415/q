@@ -77,16 +77,18 @@ function month(
  * its period. The qualifier itself is judged by the caller.
  */
 function core(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[’]/gu, "'")
-    // A bracketed qualifier is a unit or currency ("Sep 2026 (USD)").
-    .replace(/\([^)]*\)|\[[^\]]*\]/gu, " ")
-    .replace(/\b(?:as\s+(?:of|at)|at|for|period|month|ended|ending)\b/gu, " ")
-    .replace(/\b(?:actuals?|act|unaudited|audited|mgmt|management)\b/gu, " ")
-    .replace(/[,()]/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
+  return (
+    text
+      .toLowerCase()
+      .replace(/[’]/gu, "'")
+      // A bracketed qualifier is a unit or currency ("Sep 2026 (USD)").
+      .replace(/\([^)]*\)|\[[^\]]*\]/gu, " ")
+      .replace(/\b(?:as\s+(?:of|at)|at|for|period|month|ended|ending)\b/gu, " ")
+      .replace(/\b(?:actuals?|act|unaudited|audited|mgmt|management)\b/gu, " ")
+      .replace(/[,()]/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim()
+  );
 }
 
 /** The period one cell or heading states on its own, or null. */

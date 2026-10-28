@@ -34,6 +34,8 @@ export const MEASURE_TARGET_FIELDS: Readonly<
 };
 
 export function measureOfStep(stepKey: string): FinancialMeasureKey | null {
-  const found = Object.entries(MEASURE_STEPS).find(([, step]) => step === stepKey);
+  const found = Object.entries(MEASURE_STEPS).find(
+    ([, step]) => step === stepKey,
+  );
   return found === undefined ? null : (found[0] as FinancialMeasureKey);
 }

@@ -36,9 +36,18 @@ const StructuredSchema = z
   .object({
     origin: z.literal("DOCUMENT_FIGURE"),
     kind: z.enum(["MONEY", "PERCENTAGE", "DURATION"]),
-    amount: z.string().regex(/^\d+(?:\.\d+)?$/u).optional(),
-    currency: z.string().regex(/^[A-Z]{3}$/u).optional(),
-    value: z.string().regex(/^-?\d+(?:\.\d+)?$/u).optional(),
+    amount: z
+      .string()
+      .regex(/^\d+(?:\.\d+)?$/u)
+      .optional(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/u)
+      .optional(),
+    value: z
+      .string()
+      .regex(/^-?\d+(?:\.\d+)?$/u)
+      .optional(),
     measure: z.enum(FINANCIAL_MEASURE_KEYS),
     periodGranularity: z.enum(["MONTH", "QUARTER", "YEAR"]),
     period: z.string().regex(/^\d{4}(?:-\d{2}|-Q[1-4])?$/u),
@@ -72,7 +81,10 @@ function confirmedOf(
   const period: FigurePeriod = {
     granularity: v.periodGranularity,
     key: v.period,
-    asOf: v.asOf !== undefined && /^\d{4}-\d{2}-\d{2}$/u.test(v.asOf) ? v.asOf : null,
+    asOf:
+      v.asOf !== undefined && /^\d{4}-\d{2}-\d{2}$/u.test(v.asOf)
+        ? v.asOf
+        : null,
     label: v.period,
   };
   const value: ConfirmedFigure["value"] | null =
@@ -82,7 +94,10 @@ function confirmedOf(
         : { kind: "MONEY", amount: v.amount, currency: v.currency }
       : v.value === undefined
         ? null
-        : { kind: v.kind === "PERCENTAGE" ? "PERCENT" : "MONTHS", value: v.value };
+        : {
+            kind: v.kind === "PERCENTAGE" ? "PERCENT" : "MONTHS",
+            value: v.value,
+          };
   if (value === null) return null;
   const title =
     v.documentId === undefined ? undefined : titles.get(v.documentId);
@@ -210,7 +225,8 @@ export function createLocalFigureStatus(sql: DatabaseExecutor) {
     };
     for (const row of pending) entry(row.document_id).pending = row.pending;
     for (const row of rows) {
-      if (row.documentId !== null) entry(row.documentId).confirmed.push(row.line);
+      if (row.documentId !== null)
+        entry(row.documentId).confirmed.push(row.line);
     }
     return out;
   };

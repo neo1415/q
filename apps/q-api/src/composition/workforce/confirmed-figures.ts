@@ -157,7 +157,9 @@ export function matchConfirmedFigures(
         continue;
       }
       const mine = Number(
-        figure.value.kind === "MONEY" ? figure.value.amount : figure.value.value,
+        figure.value.kind === "MONEY"
+          ? figure.value.amount
+          : figure.value.value,
       );
       const high = Math.max(mine, number.amount);
       const low = Math.min(mine, number.amount);

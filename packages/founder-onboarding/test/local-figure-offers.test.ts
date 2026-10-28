@@ -33,14 +33,19 @@ const DOC = "44444444-4444-4444-8444-444444444444";
 const VERSION = "55555555-5555-4555-8555-555555555555";
 const USER = "66666666-6666-4666-8666-666666666666";
 
-let index = 0;
-const block = (b: Omit<ExtractedBlock, "locator">): ExtractedBlock =>
-  ({ ...b, locator: { page: 1, index: index++ } }) as ExtractedBlock;
-
 const ACCOUNTS: readonly ExtractedBlock[] = [
-  block({ kind: "heading", level: 1, text: "Management accounts — September 2026" }),
-  block({ kind: "paragraph", text: "All figures in USD." }),
-  block({
+  {
+    kind: "heading",
+    level: 1,
+    text: "Management accounts — September 2026",
+    locator: { page: 1, index: 0 },
+  },
+  {
+    kind: "paragraph",
+    text: "All figures in USD.",
+    locator: { page: 1, index: 1 },
+  },
+  {
     kind: "table",
     rows: [
       ["Metric", "Aug 2026", "Sep 2026"],
@@ -49,7 +54,8 @@ const ACCOUNTS: readonly ExtractedBlock[] = [
       ["Net burn", "(61,000)", "(65,000)"],
       ["Closing cash", "375,000", "310,000"],
     ],
-  }),
+    locator: { page: 1, index: 2 },
+  },
 ];
 
 const document = {
@@ -78,7 +84,10 @@ function harness(
     responses: {
       listCurrent: () =>
         Promise.resolve(
-          Object.entries(answers).map(([stepKey, value]) => ({ stepKey, value })),
+          Object.entries(answers).map(([stepKey, value]) => ({
+            stepKey,
+            value,
+          })),
         ),
     },
     offeredFromVersion: () => Promise.resolve(new Set(offered)),
@@ -169,10 +178,10 @@ describe("confirmation becomes the founder's own claim", () => {
   const candidate = extractLocalFigures(ACCOUNTS).candidates.find(
     (c) => c.measure === "monthly_revenue",
   );
-  const refs = localFigureRefs(
-    candidate ?? (undefined as never),
-    { documentId: DOC, documentVersionId: VERSION },
-  );
+  const refs = localFigureRefs(candidate ?? (undefined as never), {
+    documentId: DOC,
+    documentVersionId: VERSION,
+  });
 
   async function keep(
     value: string,
@@ -282,11 +291,15 @@ describe("confirmation becomes the founder's own claim", () => {
       evidence: {
         registerEvidenceSource: (command: never) => {
           sources.push(command);
-          return Promise.resolve({ id: "88888888-8888-4888-8888-888888888888" });
+          return Promise.resolve({
+            id: "88888888-8888-4888-8888-888888888888",
+          });
         },
         createEvidenceItem: (command: never) => {
           items.push(command);
-          return Promise.resolve({ id: "99999999-9999-4999-8999-999999999999" });
+          return Promise.resolve({
+            id: "99999999-9999-4999-8999-999999999999",
+          });
         },
       } as never,
       gate: {
@@ -299,7 +312,7 @@ describe("confirmation becomes the founder's own claim", () => {
       actor: { userId: USER } as never,
       companyId: COMPANY as never,
       sessionId: SESSION,
-      correlationId: "cor_test_local_figures" as never,
+      correlationId: "cor_test_local_figures",
       claim: claim ?? (undefined as never),
     });
     expect(sources[0]?.input).toMatchObject({

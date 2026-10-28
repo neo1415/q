@@ -24,10 +24,7 @@ export function localFigureProvenance(suggestion: {
   return localFigureOf(suggestion.sourceRefs);
 }
 
-function periodWords(
-  figure: LocalFigureProvenance,
-  language: string,
-): string {
+function periodWords(figure: LocalFigureProvenance, language: string): string {
   const { period } = figure;
   if (period.granularity === "MONTH") {
     const [year = 0, month = 1] = period.key.split("-").map(Number);

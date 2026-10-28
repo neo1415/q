@@ -253,25 +253,27 @@ export function createOnboardingQRecommendations(options: {
         // says is held the same way, for Q to put to them and their
         // approval to accept: a deck read mid-conversation could be
         // neither said nor confirmed in the conversation.
-        return (await suggestions.listPending(tx.sql, sessionId))
-          // A figure from their highly confidential accounts is confirmed
-          // on screen only: never read back or accepted in a conversation
-          // a model writes (owner 2026-10-28).
-          .filter((s) => !isLocalFigureProposal(s.sourceRefs))
-          .filter((s) => isQ(s.sourceRefs) || fromDocument(s.sourceRefs))
-          .map((s) => ({
-            id: s.id,
-            stepKey: s.stepKey,
-            value: s.suggestedValue,
-            rationale:
-              s.rationale ??
-              (fromDocument(s.sourceRefs)
-                ? "found in their uploaded document"
-                : null),
-            payloadSha256: payloadSha256(s.suggestedValue),
-            sources: publicOf(s.sourceRefs),
-            fromDocument: fromDocument(s.sourceRefs),
-          }));
+        return (
+          (await suggestions.listPending(tx.sql, sessionId))
+            // A figure from their highly confidential accounts is confirmed
+            // on screen only: never read back or accepted in a conversation
+            // a model writes (owner 2026-10-28).
+            .filter((s) => !isLocalFigureProposal(s.sourceRefs))
+            .filter((s) => isQ(s.sourceRefs) || fromDocument(s.sourceRefs))
+            .map((s) => ({
+              id: s.id,
+              stepKey: s.stepKey,
+              value: s.suggestedValue,
+              rationale:
+                s.rationale ??
+                (fromDocument(s.sourceRefs)
+                  ? "found in their uploaded document"
+                  : null),
+              payloadSha256: payloadSha256(s.suggestedValue),
+              sources: publicOf(s.sourceRefs),
+              fromDocument: fromDocument(s.sourceRefs),
+            }))
+        );
       }),
   };
 }

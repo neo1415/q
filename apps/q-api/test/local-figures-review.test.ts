@@ -131,10 +131,7 @@ describe("F03: 'review my documents' shows the contradiction, never the accounts
         const rows = matchConfirmedFigures([confirmedMrr], [deckMrr]);
         return Promise.resolve(
           new Map([
-            [
-              REPORT,
-              { pending: 0, confirmed: rows.map((row) => row.line) },
-            ],
+            [REPORT, { pending: 0, confirmed: rows.map((row) => row.line) }],
           ]),
         );
       },

@@ -97,7 +97,11 @@ export function localFigureRefs(
   ];
 }
 
-const GRANULARITIES: readonly PeriodGranularity[] = ["MONTH", "QUARTER", "YEAR"];
+const GRANULARITIES: readonly PeriodGranularity[] = [
+  "MONTH",
+  "QUARTER",
+  "YEAR",
+];
 
 function whereOf(cell: string | undefined): string | null {
   if (cell === undefined) return null;
@@ -119,8 +123,14 @@ export function localFigureOf(
 ): LocalFigureProvenance | null {
   const figure = refs.find((ref) => ref.sourceType === LOCAL_FIGURE_SOURCE);
   if (figure === undefined) return null;
-  const [version = "", measure = "", period = "", asOf = "", currency = "", confidence = ""] =
-    figure.sourceId.split("|");
+  const [
+    version = "",
+    measure = "",
+    period = "",
+    asOf = "",
+    currency = "",
+    confidence = "",
+  ] = figure.sourceId.split("|");
   if (version !== FINANCIAL_MEASURES_VERSION) return null;
   if (!(FINANCIAL_MEASURE_KEYS as readonly string[]).includes(measure)) {
     return null;
@@ -147,8 +157,7 @@ export function localFigureOf(
       refs.find((ref) => ref.sourceType === "EVIDENCE_DOCUMENT_VERSION")
         ?.sourceId ?? null,
     where: whereOf(
-      refs.find((ref) => ref.sourceType === LOCAL_FIGURE_CELL_SOURCE)
-        ?.sourceId,
+      refs.find((ref) => ref.sourceType === LOCAL_FIGURE_CELL_SOURCE)?.sourceId,
     ),
   };
 }

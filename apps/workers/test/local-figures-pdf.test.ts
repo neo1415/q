@@ -197,7 +197,9 @@ function storage(sizeBytes: number): PrivateDocumentStorageProvider {
     statObject: () =>
       Promise.resolve({ sizeBytes, declaredContentType: "application/pdf" }),
     openObjectStream: () =>
-      Promise.resolve({ body: Readable.from([new TextEncoder().encode("%PDF")]) }),
+      Promise.resolve({
+        body: Readable.from([new TextEncoder().encode("%PDF")]),
+      }),
     putObject: () => Promise.resolve(),
     deleteObject: () => Promise.resolve(),
   };
@@ -324,11 +326,13 @@ describe("the worker hook", () => {
     const { run } = await harness();
     const failed = await run(() => Promise.reject(new Error("db down")));
     expect(failed.outcome).toEqual({ kind: "DONE" });
+    expect(failed.evidence.calls.map((c) => c.name)).toContain(
+      "completeDocumentProcessing",
+    );
     expect(
-      failed.evidence.calls.map((c) => c.name),
-    ).toContain("completeDocumentProcessing");
-    expect(
-      failed.logger.lines.some((l) => l.message === "local figures not offered"),
+      failed.logger.lines.some(
+        (l) => l.message === "local figures not offered",
+      ),
     ).toBe(true);
   });
 });

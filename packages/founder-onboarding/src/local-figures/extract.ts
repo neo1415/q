@@ -235,10 +235,9 @@ function normaliseNumber(cell: string, style: NumberStyle): string | null {
   if (style === "DECIMAL_COMMA") {
     // "1,500" in a decimal-comma table could be 1.5 or 1500: not offered.
     if (/(?<![\d.,])\d{1,3},\d{3}(?![\d.,])/u.test(text)) return null;
-    return text.replace(/(\d)\.(?=\d{3}(?!\d))/gu, "$1").replace(
-      /(\d),(?=\d)/gu,
-      "$1.",
-    );
+    return text
+      .replace(/(\d)\.(?=\d{3}(?!\d))/gu, "$1")
+      .replace(/(\d),(?=\d)/gu, "$1.");
   }
   // "1.500" in a decimal-point table could be 1.5 or 1500: not offered.
   if (/(?<![\d.,])\d{1,3}\.\d{3}(?![\d.,])/u.test(text)) return null;
@@ -246,7 +245,10 @@ function normaliseNumber(cell: string, style: NumberStyle): string | null {
 }
 
 /** A sign taken off "(65,000)", "-65,000" or "−65,000". */
-function signed(cell: string): { readonly text: string; readonly negative: boolean } {
+function signed(cell: string): {
+  readonly text: string;
+  readonly negative: boolean;
+} {
   const trimmed = cell.trim();
   const bracketed = /^\((.+)\)$/u.exec(trimmed);
   if (bracketed !== null) return { text: bracketed[1] ?? "", negative: true };
@@ -277,7 +279,10 @@ type ValueContext = {
   readonly percentContext: boolean;
 };
 
-function readValue(raw: string, context: ValueContext): LocalFigureValue | null {
+function readValue(
+  raw: string,
+  context: ValueContext,
+): LocalFigureValue | null {
   if (EMPTY_CELL.test(raw.trim())) return null;
   const { text, negative } = signed(raw);
   const number = normaliseNumber(text, context.style);
@@ -310,12 +315,20 @@ function readValue(raw: string, context: ValueContext): LocalFigureValue | null 
           continue;
         }
         if (hint.code === currency.code) {
-          currency = { code: currency.code, certain: currency.certain || hint.certain };
+          currency = {
+            code: currency.code,
+            certain: currency.certain || hint.certain,
+          };
           continue;
         }
         // "$" beside a stated dollar currency is that currency; any other
         // difference is two currencies, and neither is picked.
-        if (!currency.certain && hint.certain && ["CAD", "AUD", "SGD"].includes(hint.code) && currency.code === "USD") {
+        if (
+          !currency.certain &&
+          hint.certain &&
+          ["CAD", "AUD", "SGD"].includes(hint.code) &&
+          currency.code === "USD"
+        ) {
           currency = hint;
           continue;
         }
@@ -345,8 +358,9 @@ function readValue(raw: string, context: ValueContext): LocalFigureValue | null 
     }
     case "MONTHS": {
       if (negative) return null;
-      const match =
-        /^(\d+(?:\.\d+)?)(?:\s*(?:months?|mos?|mths?))?$/iu.exec(number);
+      const match = /^(\d+(?:\.\d+)?)(?:\s*(?:months?|mos?|mths?))?$/iu.exec(
+        number,
+      );
       if (match === null) return null;
       const value = Number(match[1]);
       const range = measure.range ?? { min: 0, max: 240 };
@@ -356,7 +370,9 @@ function readValue(raw: string, context: ValueContext): LocalFigureValue | null 
     case "COUNT": {
       if (negative) return null;
       const compact =
-        context.style === "DEFAULT" ? number.replace(/(\d),(?=\d{3})/gu, "$1") : number;
+        context.style === "DEFAULT"
+          ? number.replace(/(\d),(?=\d{3})/gu, "$1")
+          : number;
       if (!/^\d+$/u.test(compact)) return null;
       const value = compact.replace(/^0+(?=\d)/u, "");
       return Number(value) > 0 ? { kind: "COUNT", value } : null;
@@ -421,7 +437,9 @@ function chosenColumn(
   header: readonly string[],
   subheader: readonly string[] | null,
 ): PeriodColumn | null {
-  const columns: (PeriodColumn & { qualifier: "ACTUAL" | "NOT_ACTUAL" | null })[] = [];
+  const columns: (PeriodColumn & {
+    qualifier: "ACTUAL" | "NOT_ACTUAL" | null;
+  })[] = [];
   for (let column = 1; column < header.length; column += 1) {
     const cell = header[column] ?? "";
     const period = parsePeriod(cell);
@@ -434,7 +452,9 @@ function chosenColumn(
   for (const granularity of ["MONTH", "QUARTER", "YEAR"] as const) {
     const same = columns.filter((c) => c.period.granularity === granularity);
     if (same.length === 0) continue;
-    const latest = same.toSorted((a, b) => comparePeriods(b.period, a.period))[0];
+    const latest = same.toSorted((a, b) =>
+      comparePeriods(b.period, a.period),
+    )[0];
     if (latest === undefined) return null;
     const tied = same.filter((c) => c.period.key === latest.period.key);
     if (tied.length === 1) return latest;
@@ -472,7 +492,9 @@ function readTable(
     const head = scaleHint(rows[0]?.[0] ?? null);
     const values = [own, head, declaredScale].filter((s) => s !== 0);
     if (values.includes("CONFLICT")) return "CONFLICT" as const;
-    return new Set(values).size > 1 ? ("CONFLICT" as const) : ((values[0] ?? 0) as number);
+    return new Set(values).size > 1
+      ? ("CONFLICT" as const)
+      : ((values[0] ?? 0) as number);
   })();
   const tableCurrency = (() => {
     const own = currencyHint(caption);
@@ -494,7 +516,9 @@ function readTable(
   // Layout 1: labels down the first column, periods across the header.
   const headerAt = rows
     .slice(0, 3)
-    .findIndex((row) => row.slice(1).some((cell) => parsePeriod(cell) !== null));
+    .findIndex((row) =>
+      row.slice(1).some((cell) => parsePeriod(cell) !== null),
+    );
   if (headerAt >= 0) {
     const header = rows[headerAt] ?? [];
     const next = rows[headerAt + 1] ?? null;
@@ -517,7 +541,9 @@ function readTable(
       const cell = row[chosen.column] ?? "";
       const labelScale = scaleHint(label);
       const columnScale = scaleHint(headerCell);
-      const scales = [labelScale, columnScale, tableScale].filter((s) => s !== 0);
+      const scales = [labelScale, columnScale, tableScale].filter(
+        (s) => s !== 0,
+      );
       const scale = scales.includes("CONFLICT")
         ? ("CONFLICT" as const)
         : new Set(scales).size > 1
@@ -564,7 +590,9 @@ function readTable(
       periodRows.some((entry) => entry.period.granularity === g),
     );
     const same = periodRows.filter((e) => e.period.granularity === granularity);
-    const latest = same.toSorted((a, b) => comparePeriods(b.period, a.period))[0];
+    const latest = same.toSorted((a, b) =>
+      comparePeriods(b.period, a.period),
+    )[0];
     if (latest === undefined) return [];
     if (same.filter((e) => e.period.key === latest.period.key).length > 1) {
       return [];
@@ -656,7 +684,9 @@ function readLine(
   const cell = match[2] ?? "";
   const measure = measureFor(label, context.period.granularity);
   if (measure === null) return null;
-  const scales = [scaleHint(label), context.declaredScale].filter((s) => s !== 0);
+  const scales = [scaleHint(label), context.declaredScale].filter(
+    (s) => s !== 0,
+  );
   const scale = scales.includes("CONFLICT")
     ? ("CONFLICT" as const)
     : new Set(scales).size > 1
@@ -702,12 +732,15 @@ function textOf(block: ExtractedBlock): string | null {
       return [block.title ?? "", block.text].join("\n");
     case "list":
       return block.items.join("\n");
-    default:
+    case "table":
+    case "spreadsheet_range":
+    case "page_break":
       return null;
   }
 }
 
-const isPipeRow = (text: string) => text.includes(" | ") && !text.includes("\n");
+const isPipeRow = (text: string) =>
+  text.includes(" | ") && !text.includes("\n");
 
 function sameValue(a: LocalFigureValue, b: LocalFigureValue): boolean {
   if (a.kind !== b.kind) return false;
@@ -735,9 +768,21 @@ export function extractLocalFigures(
   const scaleDeclarations: (number | "CONFLICT")[] = [];
   let contextPeriod: FigurePeriod | null = null;
   let caption: string | null = null;
-  let pipe: { rows: string[][]; page: number | null; caption: string | null; period: FigurePeriod | null } | null = null;
+  let pipe: {
+    rows: string[][];
+    page: number | null;
+    caption: string | null;
+    period: FigurePeriod | null;
+  } | null = null;
 
-  const pushTable = (rows: string[][], page: number | null, slide: number | null, sheet: string | null, tableCaption: string | null, period: FigurePeriod | null) => {
+  const pushTable = (
+    rows: string[][],
+    page: number | null,
+    slide: number | null,
+    sheet: string | null,
+    tableCaption: string | null,
+    period: FigurePeriod | null,
+  ) => {
     if (tables.length >= LOCAL_FIGURE_LIMITS.maxTables) return;
     tables.push({
       ordinal: tables.length + 1,
@@ -769,7 +814,9 @@ export function extractLocalFigures(
         block.rows.map((row) => [...row]),
         page,
         slide,
-        block.kind === "spreadsheet_range" ? (block.sheet ?? block.locator.sheet ?? null) : (block.locator.sheet ?? null),
+        block.kind === "spreadsheet_range"
+          ? (block.sheet ?? block.locator.sheet ?? null)
+          : (block.locator.sheet ?? null),
         caption,
         contextPeriod,
       );
@@ -813,7 +860,8 @@ export function extractLocalFigures(
   const declaredScale =
     scaleDeclarations.length === 0
       ? 0
-      : new Set(scaleDeclarations).size > 1 || scaleDeclarations.includes("CONFLICT")
+      : new Set(scaleDeclarations).size > 1 ||
+          scaleDeclarations.includes("CONFLICT")
         ? ("CONFLICT" as const)
         : (scaleDeclarations[0] ?? 0);
 
@@ -850,14 +898,19 @@ export function extractLocalFigures(
   const latest = new Map<FinancialMeasureKey, LocalFigureCandidate>();
   for (const candidate of kept) {
     const held = latest.get(candidate.measure);
-    if (held === undefined || comparePeriods(candidate.period, held.period) > 0) {
+    if (
+      held === undefined ||
+      comparePeriods(candidate.period, held.period) > 0
+    ) {
       latest.set(candidate.measure, candidate);
     }
   }
   return {
-    candidates: [...latest.values()].slice(0, LOCAL_FIGURE_LIMITS.maxCandidates),
+    candidates: [...latest.values()].slice(
+      0,
+      LOCAL_FIGURE_LIMITS.maxCandidates,
+    ),
     tablesRead: tables.length,
     ambiguousDropped,
   };
 }
-

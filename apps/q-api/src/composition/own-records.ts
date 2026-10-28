@@ -159,6 +159,11 @@ export function createOwnRecordsPort(
   };
 }
 
+type DocumentFigureState = {
+  readonly pending: number;
+  readonly confirmed: readonly string[];
+};
+
 /** Their organisation's uploaded documents: metadata, as document.view allows. */
 export function createEvidenceDocumentsPort(
   evidence: Pick<EvidenceService, "listDocumentsWithVersions">,
@@ -190,11 +195,10 @@ export function createEvidenceDocumentsPort(
         documents.some(
           (entry) => entry.document.sensitivityClass === "HIGHLY_CONFIDENTIAL",
         )
-          ? await figures(actor, companyId).catch(() => new Map())
-          : new Map<
-              string,
-              { readonly pending: number; readonly confirmed: readonly string[] }
-            >();
+          ? await figures(actor, companyId).catch(
+              (): ReadonlyMap<string, DocumentFigureState> => new Map(),
+            )
+          : new Map<string, DocumentFigureState>();
       return documents.map((entry) => ({
         ...(byDocument.has(entry.document.id)
           ? { figures: byDocument.get(entry.document.id) }

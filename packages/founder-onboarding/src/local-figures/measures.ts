@@ -40,11 +40,7 @@ export const FINANCIAL_MEASURE_KEYS = [
 export type FinancialMeasureKey = (typeof FINANCIAL_MEASURE_KEYS)[number];
 
 export type MeasureUnit = "MONEY" | "PERCENT" | "MONTHS" | "COUNT";
-export type MeasureCadence =
-  | "MONTHLY"
-  | "ANNUAL"
-  | "POINT_IN_TIME"
-  | "RATE";
+export type MeasureCadence = "MONTHLY" | "ANNUAL" | "POINT_IN_TIME" | "RATE";
 
 export type FinancialMeasure = {
   readonly key: FinancialMeasureKey;
@@ -101,7 +97,12 @@ export const FINANCIAL_MEASURES: readonly FinancialMeasure[] = [
     unit: "PERCENT",
     cadence: "RATE",
     label: "gross margin",
-    synonyms: ["gross margin", "gross margin %", "gross margin percent", "gm %"],
+    synonyms: [
+      "gross margin",
+      "gross margin %",
+      "gross margin percent",
+      "gm %",
+    ],
     range: { min: -100, max: 100 },
   },
   {
@@ -252,7 +253,11 @@ export const NON_ACTUAL_QUALIFIERS: readonly string[] = [
   "mom",
   "yoy",
 ];
-export const ACTUAL_QUALIFIERS: readonly string[] = ["actual", "actuals", "act"];
+export const ACTUAL_QUALIFIERS: readonly string[] = [
+  "actual",
+  "actuals",
+  "act",
+];
 
 /** Words a document uses to declare its figures' currency for every table. */
 export const CURRENCY_DECLARATIONS: readonly string[] = [
