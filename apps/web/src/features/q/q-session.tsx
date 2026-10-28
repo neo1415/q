@@ -43,7 +43,7 @@ import {
   type VoiceInterview,
 } from "../voice/use-voice-interview";
 import {
-  readActiveConversation,
+  initialConversationFor,
   rememberActiveConversation,
 } from "./active-conversation";
 import { resumeQAction } from "./actions";
@@ -222,16 +222,14 @@ function writeToQPageUrl(conversationId: string): void {
   );
 }
 
-/** Where a fresh load starts: the Q page's own URL, else this tab's last. */
+/**
+ * Where a fresh load starts: the Q page's own URL when it names one,
+ * else this tab's last (initialConversationFor: a bare /home loaded
+ * afresh keeps the tab's conversation; only "New chat" starts over).
+ */
 function initialConversation(): string | null {
   if (typeof window === "undefined") return null;
-  if (window.location.pathname === Q_PAGE) {
-    const named = new URLSearchParams(window.location.search).get(
-      Q_CONVERSATION_PARAM,
-    );
-    return conversationIdOf(named) ?? null;
-  }
-  return readActiveConversation("home");
+  return initialConversationFor(window.location);
 }
 
 export function QSessionProvider({

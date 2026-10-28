@@ -129,6 +129,14 @@ export type QActionServiceDependencies = {
   readonly clock?: QActionClock | undefined;
   readonly policy?: QApprovalPolicy | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * An approved action has executed for this person: whatever was read
+   * for them before it is no longer current (Q's read cache forgets it).
+   * Best effort and never awaited past the gate's own outcome.
+   */
+  readonly onExecuted?:
+    | ((actor: { readonly tenantId: string; readonly userId: string }) => void)
+    | undefined;
 };
 
 export type ProposeQActionCommand = {
@@ -1733,6 +1741,19 @@ export function createQActionService(
             },
             "q action execution gate returned",
           );
+          if (outcome.kind === "EXECUTED") {
+            try {
+              dependencies.onExecuted?.({
+                tenantId: actor.tenantId,
+                userId: actor.userId,
+              });
+            } catch (error: unknown) {
+              logger?.warn(
+                { err: error, actionId: context.actionId, correlationId },
+                "the executed-action hook failed; the action stands",
+              );
+            }
+          }
           return outcome;
         };
         try {

@@ -316,7 +316,14 @@ export function createConversationApprovalPort(
           block.proposal.proposalId === view.action.actionId,
       ),
     );
-    const shownAt = Date.parse(shownIn?.createdAt ?? view.requestedAt);
+    // The card stands from the moment its approval was requested, or its
+    // message was stored, whichever came first (live 2026-10-28: a yes
+    // typed as the card lands may be stored before the card's own message
+    // is; the approval was requested before either, so the yes is after).
+    const shownAt = Math.min(
+      Date.parse(view.requestedAt),
+      shownIn === undefined ? Infinity : Date.parse(shownIn.createdAt),
+    );
     const latest = messages.findLast((message) => message.role === "USER");
     if (
       latest === undefined ||

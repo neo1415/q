@@ -244,6 +244,7 @@ import {
   type HeldIdentity,
   type SearchEvidence,
 } from "./picture-corroboration.js";
+import { boundedCompletedMessage } from "./completed-event.js";
 import {
   asksForFresh,
   canonical,
@@ -251,6 +252,10 @@ import {
   type ReadCache,
 } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
+// The seam's read cache, for the composition that must forget a person's
+// reads when an approved action of theirs executes outside any run.
+export { createReadCache, type ReadCache } from "./read-cache.js";
+export { boundedCompletedMessage } from "./completed-event.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
   runInvestorDiscovery,
@@ -4651,10 +4656,10 @@ export function createModelGatewayQAnswer(
         {
           type: "q.message.completed",
           data: {
-            message: {
+            message: boundedCompletedMessage({
               ...(toQMessage(stored) as QResponseMessage),
               ...(blocks === undefined ? {} : { blocks }),
-            },
+            }).message,
           },
         },
       );
@@ -6662,21 +6667,28 @@ export function createModelGatewayQAnswer(
             // refresh, a reopened conversation and the chats list read.
             ...(blocks === undefined ? {} : { blocks }),
           });
+          // The record holds everything; the event is bounded (the run
+          // failed on a ten-card answer, production 2026-10-28).
+          const bounded = boundedCompletedMessage({
+            ...(toQMessage(stored) as QResponseMessage),
+            ...(blocks === undefined ? {} : { blocks }),
+            ...(gestures === undefined || gestures.length === 0
+              ? {}
+              : { gestures: [...gestures] }),
+          });
+          if (bounded.trimmed !== "NONE") {
+            logger?.warn(
+              { qRunId: request.runId, trimmed: bounded.trimmed },
+              "completed-message event over the run-event bound; the record keeps what the event leaves",
+            );
+          }
           await appendRunEvent(
             repositories,
             tx,
             { id: request.runId, tenantId: request.tenantId },
             {
               type: "q.message.completed",
-              data: {
-                message: {
-                  ...(toQMessage(stored) as QResponseMessage),
-                  ...(blocks === undefined ? {} : { blocks }),
-                  ...(gestures === undefined || gestures.length === 0
-                    ? {}
-                    : { gestures: [...gestures] }),
-                },
-              },
+              data: { message: bounded.message },
             },
           );
           return stored;

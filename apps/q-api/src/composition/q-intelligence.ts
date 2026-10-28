@@ -5,6 +5,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import { createPostgresCompanyKnowledge } from "@capital-q/discovery";
 import { createPostgresContextEpochReader } from "@capital-q/security/postgres";
 import type { ModelGateway } from "@capital-q/model-gateway";
+import type { ReadCache } from "@capital-q/model-gateway/q";
 import {
   createModelGatewayQAnswer,
   createConversationRecall,
@@ -124,6 +125,13 @@ import { createCallPrepPort, type CallPrepSources } from "./call-prep.js";
 
 export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
+  /**
+   * The answer seam's read cache, shared with the Approval Engine so an
+   * approved action that executes for a person (the card's Approve, a
+   * continuation) forgets what was read for them (live 2026-10-28: a
+   * mandate re-read 7 s after its approved change said the old range).
+   */
+  readonly readCache?: ReadCache | undefined;
   /**
    * Owner 2026-10-23: what a call with one named counterpart is prepared
    * from (the rehearsal's material, read as them). Absent: such a turn is
@@ -402,6 +410,9 @@ export function composeQIntelligence(
     sql,
     transactions,
     tools,
+    ...(dependencies.readCache === undefined
+      ? {}
+      : { readCache: dependencies.readCache }),
     ...(dependencies.pictures === undefined
       ? {}
       : { pictures: dependencies.pictures }),

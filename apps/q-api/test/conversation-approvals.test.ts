@@ -66,6 +66,8 @@ type Said = {
   readonly utteranceRef?: string;
   /** Before the card was shown, instead of after. */
   readonly beforeCard?: boolean;
+  /** When it was stored (ISO); default: well after the card. */
+  readonly at?: string;
 };
 
 function viewOf(row: Row): QApprovalView {
@@ -97,6 +99,8 @@ function harness(
     /** Null: nothing said since the cards. Default: "yes, go ahead". */
     readonly said?: Said | null;
     readonly relay?: DecisionRelay;
+    /** When the cards' messages were stored (ISO); default 10:00:01. */
+    readonly cardStoredAt?: string;
   } = {},
 ) {
   const said =
@@ -118,7 +122,7 @@ function harness(
           role: "Q",
           runId: RUN_EARLIER,
           content: row.summary,
-          createdAt: "2026-09-27T10:00:01.000Z",
+          createdAt: options.cardStoredAt ?? "2026-09-27T10:00:01.000Z",
           blocks: [
             {
               kind: "ACTION_PROPOSAL",
@@ -136,9 +140,10 @@ function harness(
                   runId: said.runId ?? RUN_NOW,
                   content: said.text,
                   createdAt:
-                    said.beforeCard === true
+                    said.at ??
+                    (said.beforeCard === true
                       ? "2026-09-27T09:59:00.000Z"
-                      : "2026-09-27T10:05:00.000Z",
+                      : "2026-09-27T10:05:00.000Z"),
                   ...(said.utteranceRef === undefined
                     ? {}
                     : { utteranceRef: said.utteranceRef }),
@@ -555,6 +560,27 @@ describe("approval by the person's own words (owner 2026-10-16)", () => {
       expect(approvals).toEqual([]);
       expect(commands).toEqual([]);
     }
+  });
+
+  it("a yes stored before the card's own message, after its approval was requested, still approves it (live 2026-10-28)", async () => {
+    // The card's approval was requested at 10:00:00 (its view); the person
+    // typed "yes" 1.5 s later, while the card's message was still being
+    // stored (10:00:02). Their words came after the card was asked for.
+    const row = pending();
+    const { port, approvals, commands } = harness([row], {
+      said: { text: "yes", at: "2026-09-27T10:00:01.500Z" },
+      cardStoredAt: "2026-09-27T10:00:02.000Z",
+    });
+    expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+      status: "SAVED",
+    });
+    expect(approvals).toEqual([row.proposalId]);
+    expect(commands).toEqual([
+      {
+        approvalId: row.approvalId,
+        via: { channel: "TEXT", evidenceRef: SAID_MESSAGE },
+      },
+    ]);
   });
 
   it("a change asked for, or a no, never stands as approval, whoever asks (the model's tool included)", async () => {
