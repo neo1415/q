@@ -571,6 +571,7 @@ export {
   ReadMyInputSchema,
   ReadMyOutputSchema,
   referenceCandidates,
+  unmatchedWords,
   type AppApprovalPort,
   type AppToolOutput,
 } from "./tools/app-actions.js";
