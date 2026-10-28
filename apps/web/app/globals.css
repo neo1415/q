@@ -835,6 +835,14 @@
     height: auto;
   }
   /*
+   * The install hint is a row in main's own flow, never laid over the
+   * composer (live run 2026-10-28). Under the header on the Q page, where
+   * main is the column the stage fills; after the content elsewhere.
+   */
+  .cq-shell:has(.cq-q-home) .cq-shell-main .cq-install-row {
+    order: -1;
+  }
+  /*
    * The composer's strip. On a phone the bottom navigation beneath it
    * already clears the home indicator; on a wide screen nothing does, so
    * the strip keeps the safe-area inset itself.

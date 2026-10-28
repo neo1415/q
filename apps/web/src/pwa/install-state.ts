@@ -3,7 +3,10 @@
  * so every rule is a test; the component only reads the browser facts.
  *
  * - Already installed (standalone): never.
- * - Dismissed once: never again on this device.
+ * - Dismissed: not again on this device for 14 days (live run
+ *   2026-10-28: once for ever hid it from a person who had meant "later").
+ * - The Q page while a conversation is in progress: never; it is a hint,
+ *   not something to read around while talking to Q.
  * - Chrome / Android / desktop Chromium: only once the browser itself has
  *   said the app is installable (`beforeinstallprompt`), and the offer
  *   calls the browser's own prompt.
@@ -16,6 +19,8 @@
  */
 
 export const INSTALL_DISMISSED_KEY = "cq.install-prompt.dismissed";
+/** How long a dismissal holds before the hint may show once more. */
+export const INSTALL_DISMISSED_FOR_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type InstallFacts = {
   readonly standalone: boolean;
@@ -26,6 +31,8 @@ export type InstallFacts = {
   /** iPadOS reports a Mac user agent; touch points tell them apart. */
   readonly maxTouchPoints: number;
   readonly pathname: string;
+  /** The Q page has a conversation going (turns, or Q at work). */
+  readonly conversing?: boolean | undefined;
 };
 
 export type InstallOffer = "NONE" | "PROMPT" | "IOS_HINT";
@@ -49,23 +56,39 @@ export function installOffer(facts: InstallFacts): InstallOffer {
   ) {
     return "NONE";
   }
+  if (facts.conversing === true && facts.pathname === "/home") return "NONE";
   if (facts.deferredPrompt) return "PROMPT";
   if (isIosSafari(facts.userAgent, facts.maxTouchPoints)) return "IOS_HINT";
   return "NONE";
 }
 
-/** Storage can be absent or throw (private mode, blocked site data). */
-export function readDismissed(storage: Storage | undefined): boolean {
+/**
+ * Dismissed within the last 14 days. Storage can be absent or throw
+ * (private mode, blocked site data). The value is the dismissal's time
+ * in ms; the older "1" (dismissed for ever) still counts as dismissed.
+ */
+export function readDismissed(
+  storage: Storage | undefined,
+  now: number = Date.now(),
+): boolean {
   try {
-    return storage?.getItem(INSTALL_DISMISSED_KEY) === "1";
+    const raw = storage?.getItem(INSTALL_DISMISSED_KEY);
+    if (raw === null || raw === undefined) return false;
+    if (raw === "1") return true;
+    const at = Number(raw);
+    if (!Number.isFinite(at)) return false;
+    return now - at < INSTALL_DISMISSED_FOR_MS;
   } catch {
     return false;
   }
 }
 
-export function rememberDismissed(storage: Storage | undefined): void {
+export function rememberDismissed(
+  storage: Storage | undefined,
+  now: number = Date.now(),
+): void {
   try {
-    storage?.setItem(INSTALL_DISMISSED_KEY, "1");
+    storage?.setItem(INSTALL_DISMISSED_KEY, String(now));
   } catch {
     // Not remembered on this device; it is still dismissed for this visit.
   }
