@@ -917,6 +917,7 @@ export {
 } from "./prompts/schemas/artifact-revision.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
+export { FOUNDER_ONBOARDING_EXTRACTION_V3 } from "./prompts/tasks/founder-onboarding-extraction.v3.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-synthesis.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
