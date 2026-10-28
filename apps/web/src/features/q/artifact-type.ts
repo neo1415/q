@@ -13,6 +13,8 @@ const ARTIFACT_TYPE_LABELS: Readonly<Record<string, string>> = {
   PITCH_DECK: "Investor deck",
   INVESTOR_MANDATE: "Investment mandate",
   Q_REPORT: "Report",
+  // XLSX-001.
+  SPREADSHEET: "Spreadsheet",
 };
 
 export function artifactTypeLabel(type: string): string {

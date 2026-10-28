@@ -38,6 +38,8 @@ export type LibraryItem = {
   readonly documentType: DocumentType | null;
   readonly downloadAudience: "ORGANISATION" | "INVESTORS" | null;
   readonly fileName: string | null;
+  /** XLSX-001: what Q made, by type code, so its download is its own file. */
+  readonly artifactType?: string | undefined;
 };
 
 export type LibraryPage = {
@@ -126,6 +128,7 @@ export function fromArtifact(artifact: QArtifactSummary): LibraryItem {
     id: artifact.artifactId,
     title: artifact.title,
     typeLabel: artifactTypeLabel(artifact.type),
+    artifactType: artifact.type,
     group: deck
       ? "DECK"
       : /FINANC|MODEL/u.test(artifact.type)

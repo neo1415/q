@@ -6,6 +6,7 @@ import { UtcTimestampSchema } from "../common/time.js";
 import { QArtifactIdSchema, QMessageIdSchema, QRunIdSchema } from "./ids.js";
 import { QArtifactFindingSchema } from "./finding.js";
 import { QSubjectRefSchema } from "./subject.js";
+import { QWorkbookSchema } from "./spreadsheet.js";
 
 /**
  * What Q prepares for somebody to read, keep and change (QX-003).
@@ -44,6 +45,8 @@ export const Q_ARTIFACT_TYPES = [
   // Q room W5 (R8): general documents through the same pipeline.
   "ONE_PAGER",
   "MEMO",
+  // XLSX-001: a typed workbook (content.workbook), downloaded as .xlsx/.csv.
+  "SPREADSHEET",
 ] as const;
 export type QArtifactType = (typeof Q_ARTIFACT_TYPES)[number];
 export const QArtifactTypeSchema = z
@@ -615,6 +618,12 @@ export const QArtifactContentSchema = z
      * the company.
      */
     audit: QDocumentAuditSchema.optional(),
+    /**
+     * XLSX-001: present when this artifact is a spreadsheet. Like a deck,
+     * the sections stay (a short account of what is in it and what is
+     * not known); the workbook is the typed data its files are drawn from.
+     */
+    workbook: QWorkbookSchema.optional(),
   })
   .strict();
 export type QArtifactContent = z.infer<typeof QArtifactContentSchema>;
@@ -922,15 +931,22 @@ export type ListQArtifactsResponse = z.infer<
 >;
 
 /**
- * The files an artifact can be downloaded as (BIZ-001).
+ * The files an artifact can be downloaded as (BIZ-001; XLSX-001).
  *
- * Every artifact type exports as a PDF: a deck as one page per slide,
- * everything else as a printed document. PowerPoint is for types whose
- * content is slides. The set is closed on purpose — a route that takes a
- * format from the URL must be able to refuse anything else before it
- * opens a socket.
+ * A document exports as a PDF: a deck as one page per slide, everything
+ * else as a printed document. PowerPoint is for types whose content is
+ * slides. A spreadsheet is data, not a page: it downloads as Excel (.xlsx)
+ * and as CSV (its first sheet), and not as a PDF of its summary, which
+ * would look like the spreadsheet and hold none of it. The set is closed
+ * on purpose -- a route that takes a format from the URL must be able to
+ * refuse anything else before it opens a socket.
  */
-export const Q_ARTIFACT_EXPORT_FORMATS = ["pdf", "pptx"] as const;
+export const Q_ARTIFACT_EXPORT_FORMATS = [
+  "pdf",
+  "pptx",
+  "xlsx",
+  "csv",
+] as const;
 export type QArtifactExportFormat = (typeof Q_ARTIFACT_EXPORT_FORMATS)[number];
 export const QArtifactExportFormatSchema = z.enum(Q_ARTIFACT_EXPORT_FORMATS);
 export const Q_ARTIFACT_EXPORT_SUFFIX = "/export" as const;
@@ -940,6 +956,11 @@ const Q_ARTIFACT_TYPES_WITH_SLIDES: ReadonlySet<string> = new Set([
   "PITCH_DECK",
 ]);
 
+/** XLSX-001: types whose content is a workbook. */
+export const Q_ARTIFACT_TYPES_WITH_SHEETS: ReadonlySet<string> = new Set([
+  "SPREADSHEET",
+]);
+
 /**
  * What a card may offer for a type it knows only by code. The Q API still
  * decides from the stored content, and says so plainly if they disagree.
@@ -947,6 +968,7 @@ const Q_ARTIFACT_TYPES_WITH_SLIDES: ReadonlySet<string> = new Set([
 export function qArtifactExportFormats(
   type: string,
 ): readonly QArtifactExportFormat[] {
+  if (Q_ARTIFACT_TYPES_WITH_SHEETS.has(type)) return ["xlsx", "csv"];
   return Q_ARTIFACT_TYPES_WITH_SLIDES.has(type) ? ["pdf", "pptx"] : ["pdf"];
 }
 

@@ -31,6 +31,7 @@ export const Q_CONFIDENCE_LABELS: Readonly<Record<QConfidenceLevel, string>> = {
 export function qArtifactExportFormats(
   type: string,
 ): readonly QArtifactExportFormat[] {
+  if (type === "SPREADSHEET") return ["xlsx", "csv"];
   return type === "PITCH_DECK" ? ["pdf", "pptx"] : ["pdf"];
 }
 

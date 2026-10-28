@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  FileSpreadsheet,
   FileText,
   ICON_SIZE,
   ICON_STROKE,
@@ -33,6 +34,7 @@ import {
   type SlidePicture,
 } from "./slide-pictures";
 import { slideSource } from "./slide-source";
+import { SpreadsheetPreview } from "./spreadsheet-preview";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -248,6 +250,8 @@ export function ArtifactViewer({
 
   const current = detail?.current;
   const isDeck = current?.content.deck !== undefined;
+  // XLSX-001: a spreadsheet previews its first sheet and downloads as a sheet.
+  const workbook = current?.content.workbook;
   const version = current?.version ?? null;
 
   useEffect(() => {
@@ -355,6 +359,11 @@ export function ArtifactViewer({
         >
           {isDeck ? (
             <Presentation size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
+          ) : workbook !== undefined ? (
+            <FileSpreadsheet
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
           ) : (
             <FileText size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
           )}
@@ -440,13 +449,20 @@ export function ArtifactViewer({
             {version === null ? null : (
               /*
                 Every document downloads as a PDF, and a deck as PowerPoint
-                too (BIZ-001), for the version on screen. Decided by what
-                this version holds rather than by its type code, so the
-                offer and the file cannot disagree.
+                too (BIZ-001), for the version on screen; a spreadsheet as
+                Excel and CSV (XLSX-001). Decided by what this version holds
+                rather than by its type code, so the offer and the file
+                cannot disagree.
               */
               <ArtifactDownloads
                 artifactId={artifactId}
-                formats={isDeck ? ["pdf", "pptx"] : ["pdf"]}
+                formats={
+                  workbook !== undefined
+                    ? ["xlsx", "csv"]
+                    : isDeck
+                      ? ["pdf", "pptx"]
+                      : ["pdf"]
+                }
                 version={version}
                 layer="modal"
               />
@@ -623,6 +639,10 @@ export function ArtifactViewer({
               {t("Use the left and right arrow keys to turn slides.")}
             </p>
           </section>
+        )}
+
+        {workbook === undefined ? null : (
+          <SpreadsheetPreview workbook={workbook} />
         )}
 
         {current === undefined ? null : (

@@ -73,6 +73,7 @@ import {
   ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
+import { createSpreadsheetPort } from "./composition/spreadsheets.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
 import { hkdfSync, randomUUID } from "node:crypto";
 
@@ -338,6 +339,7 @@ import {
 import {
   CorrelationIdSchema,
   QApprovalIdSchema,
+  QConversationIdSchema,
   QRunIdSchema,
   qRehearsalVideoBridgeBasePath,
   qRehearsalVideoEventsBasePath,
@@ -3571,6 +3573,42 @@ const qTools = createQTools({
       applyBrand: (input) => documentStudioPort().applyBrand(input),
       illustrate: (input) => documentStudioPort().illustrate(input),
     },
+    // XLSX-001: make_spreadsheet. Q's earlier answers read as the run's
+    // owner; subjects named as an approval card names them; the workbook
+    // filed as their own private document (a closure: qArtifacts is
+    // composed further down and only called once a run is under way).
+    spreadsheets: createSpreadsheetPort({
+      conversationOf: async (actor, runId) =>
+        (await qRuntime.getRun({ actor, runId: QRunIdSchema.parse(runId) })).run
+          .conversationId,
+      conversationMessages: async (actor, conversationId) =>
+        (
+          await qRuntime.getConversation({
+            actor,
+            conversationId: QConversationIdSchema.parse(conversationId),
+          })
+        ).detail.messages,
+      nameOf: async (_actor, subject) => {
+        if (subject.kind === "INVESTOR_ORGANISATION") {
+          return (
+            (
+              await emailInvestorNames.findCanonicalInvestorProfile(
+                subject.investorOrganisationId,
+              )
+            )?.displayName ?? null
+          );
+        }
+        if (subject.kind !== "COMPANY") return null;
+        const companyId = CompanyIdSchema.safeParse(subject.companyId);
+        return companyId.success
+          ? ((await companies.findCanonicalCompanyProfile(companyId.data))
+              ?.canonicalName ?? null)
+          : null;
+      },
+      artifacts: {
+        fileOwnAnswer: (input) => qArtifacts.service.fileOwnAnswer(input),
+      },
+    }),
     // R33: Save / Unsave / Pass, recorded by the interaction service the
     // Discover buttons call, with the feed's own eligibility re-run.
     // R33: the record forms as Prepare -> Approve (the board is composed

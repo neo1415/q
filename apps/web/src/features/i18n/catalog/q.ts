@@ -198,4 +198,14 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "Times are in UTC; tell Q your city for local times.":
     "الأوقات بالتوقيت العالمي (UTC)؛ أخبر Q بمدينتك لعرض التوقيت المحلي.",
   "Times in": "الأوقات بتوقيت",
+  // XLSX-001: a spreadsheet Q prepared.
+  Spreadsheet: "جدول بيانات",
+  "Spreadsheet preview": "معاينة جدول البيانات",
+  "Download the Excel file for every row, its totals and its sources.":
+    "نزّل ملف Excel لترى كل الصفوف ومجاميعها ومصادرها.",
+  "Showing the first {n} rows.": "تُعرض أول {n} صفاً.",
+  "One more sheet is in the file.": "في الملف ورقة أخرى.",
+  "{n} more sheets are in the file.": "في الملف {n} أوراق أخرى.",
+  "Excel (.xlsx)": "Excel ‏(.xlsx)",
+  "CSV (.csv)": "CSV ‏(.csv)",
 };

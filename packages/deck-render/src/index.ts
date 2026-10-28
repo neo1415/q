@@ -61,6 +61,13 @@ export {
   EXPORT_CONTENT_TYPES,
   type ArtifactFile,
 } from "./export.js";
+// XLSX-001: a spreadsheet artifact as .xlsx and .csv.
+export {
+  columnLetter,
+  workbookToCsv,
+  workbookToXlsx,
+  type SpreadsheetMeta,
+} from "./spreadsheet.js";
 
 export {
   themeFor,
