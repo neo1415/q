@@ -11,6 +11,7 @@ import { agentNodes, sinceWords, type AgentNode } from "./workforce-agents";
 import { loadWorkforceAction, type WorkforceView } from "./workforce-actions";
 import { freshness, useLive, type LiveStatus } from "./workforce-live";
 import { WorkforceTeam } from "./workforce-map";
+import { WorkforceSpecialists } from "./workforce-specialists";
 import { ApproveButton, DraftSheet } from "./workforce-panel";
 import { useT } from "@/features/i18n/language";
 
@@ -165,6 +166,7 @@ export function WorkforceTeamView({
           )
         }
       />
+      <WorkforceSpecialists specialists={view.overview.specialists ?? []} />
       <AgentSheet
         node={node}
         job={job}

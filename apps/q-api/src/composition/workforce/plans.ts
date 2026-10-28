@@ -24,7 +24,6 @@ import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
-import type { OwnWorkStart } from "./job-actions.js";
 import type { WorkforceJobs } from "./jobs.js";
 import type { LiveReport } from "./live.js";
 import {
@@ -139,18 +138,9 @@ export type PlansDependencies = {
     | undefined;
   /** An approval card on a new run in the plan's conversation. */
   readonly ask?: PlanCardAsk | undefined;
-  /** Own-account work (research, a document of theirs), started at once. */
-  readonly startOwnWork?:
-    | ((
-        actor: ActorContext,
-        runId: string,
-        payload: WorkforceJobStartPayload,
-      ) => Promise<OwnWorkStart | null>)
-    | undefined;
-  /** S6: the situation cache is dropped when the person's records change. */
-  readonly invalidate?:
-    | ((owner: { readonly tenantId: string; readonly userId: string }) => void)
-    | undefined;
+
+  /** S6: the tenant's cached situations are dropped when its records change. */
+  readonly invalidate?: ((tenantId: string) => void) | undefined;
   /** S6: the person, resolved now, for a condition that fires a step. */
   readonly actorFor?:
     ((owner: Owner) => Promise<ActorContext | null>) | undefined;
@@ -610,6 +600,50 @@ export function createPlans(dependencies: PlansDependencies) {
     return true;
   };
 
+  /** A Q-owned step's own-account job on the durable queue (one per step and version). */
+  const enqueueStepJob = async (
+    actor: ActorContext,
+    plan: QPlan,
+    step: QPlanStep,
+    payload: WorkforceJobStartPayload,
+    trace: { readonly runId: string | null },
+  ): Promise<string> => {
+    const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const key = `plan-step:${plan.planId}:${String(plan.version)}:${step.key}`;
+    const filed = await dependencies.jobsFor(actor).file(owner, {
+      goal: payload.goal,
+      budgetUsd: Number(payload.budgetUsd),
+      source: { kind: "JOB", id: key },
+    });
+    await dependencies.queue().enqueue(owner, {
+      jobId: filed.jobId,
+      plan: payload,
+      trace: {
+        actionId: key,
+        ...(trace.runId === null ? {} : { runId: trace.runId }),
+        organisationId: actor.organisationId ?? undefined,
+        planId: plan.planId,
+      },
+    });
+    dependencies.kick?.();
+    return filed.jobId;
+  };
+
+  /** S6: the person's direction to a plan's work since `since`, bounded. */
+  const directions = async (
+    owner: Owner,
+    planId: string,
+    since: Date,
+  ): Promise<string | null> => {
+    const entries = await thread.directions(owner, { planId });
+    const after = entries.filter(
+      (entry) => Date.parse(entry.createdAt) >= since.getTime(),
+    );
+    return after.length === 0
+      ? null
+      : after.map((entry) => entry.text).join(" / ");
+  };
+
   /** One step, fired: by its owner and its action's class. */
   const fireStep = async (
     actor: ActorContext,
@@ -625,7 +659,25 @@ export function createPlans(dependencies: PlansDependencies) {
       await boardTask(actor, plan, step);
       return;
     }
-    if (step.owner === "TOGETHER") await boardTask(actor, plan, step);
+    if (step.owner === "TOGETHER") {
+      await boardTask(actor, plan, step);
+      // Their part, asked of them once (the card asks; the thread keeps it).
+      await store
+        .appendThread(owner, {
+          planId: plan.planId,
+          jobId: null,
+          kind: "QUESTION",
+          author: "LIAISON",
+          stepKey: step.key,
+          factRef: null,
+          text: `Your part of "${step.title}": ${step.evidenceNeeded[0] ?? "finish it once Q has prepared it"}`.slice(
+            0,
+            1_000,
+          ),
+          idempotencyKey: `plan-question:${plan.planId}:${String(plan.version)}:${step.key}`,
+        })
+        .catch(() => null);
+    }
     const action = step.action;
     if (action.kind === "WORKFORCE") {
       const outward = action.roles.some(
@@ -636,12 +688,26 @@ export function createPlans(dependencies: PlansDependencies) {
         await thread.move(owner, plan, step, "PROPOSED");
         return;
       }
-      if (!outward && dependencies.startOwnWork !== undefined) {
-        const started = await dependencies
-          .startOwnWork(actor, `${plan.planId}:${step.key}`, payload)
-          .catch(() => null);
-        if (started?.outcome === "STARTED") {
-          await thread.link(owner, plan, step.key, "job", started.jobId);
+      if (!outward) {
+        // Their own work (research, a document of theirs, a specialist's
+        // public reading), approved with the plan: it starts now, on the
+        // durable queue, carrying the plan so it reads the person's
+        // direction from the plan's thread before each step.
+        const jobId = await enqueueStepJob(
+          actor,
+          plan,
+          step,
+          payload,
+          trace,
+        ).catch((error: unknown) => {
+          logger?.warn(
+            { err: error, planId: plan.planId },
+            "plan step not started",
+          );
+          return null;
+        });
+        if (jobId !== null) {
+          await thread.link(owner, plan, step.key, "job", jobId);
           await thread.move(owner, plan, step, "DOING");
           return;
         }
@@ -745,7 +811,15 @@ export function createPlans(dependencies: PlansDependencies) {
                 : "";
             return `${String(index + 1)}. ${who}: ${step.title}${when}${asks}`;
           })
-          .join("\n"),
+          .join("\n")
+          .concat(
+            (payload.specialists ?? [])
+              .map(
+                (one) =>
+                  `\nQ sets up "${one.name}" for this, able only to read public sources.`,
+              )
+              .join(""),
+          ),
       }),
       confirm: () =>
         "On it. My steps are starting, yours are on your board, and anything that goes out comes to you first.",
@@ -834,16 +908,11 @@ export function createPlans(dependencies: PlansDependencies) {
    * make a replayed event write nothing.
    */
   const wakeTenant = async (tenantId: string): Promise<number> => {
+    dependencies.invalidate?.(tenantId);
     const live = await store.livePlans(tenantId);
     let moved = 0;
-    const seen = new Set<string>();
     for (const row of live) {
       const owner: Owner = { tenantId: row.tenantId, userId: row.userId };
-      const key = `${row.tenantId}:${row.userId}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        dependencies.invalidate?.(owner);
-      }
       moved += await evaluatePlan(owner, row.planId).catch((error: unknown) => {
         logger?.warn(
           { err: error, planId: row.planId },
@@ -852,6 +921,20 @@ export function createPlans(dependencies: PlansDependencies) {
         return 0;
       });
     }
+    return moved;
+  };
+
+  /**
+   * The safety net beside the wake channel: every tenant with a plan under
+   * way, re-evaluated (a date reached; a wake missed during a deploy).
+   */
+  const sweep = async (): Promise<number> => {
+    const tenants = await sql<{ tenant_id: string }[]>`
+      select distinct tenant_id from q_runtime.q_plans
+       where status in ('ACCEPTED', 'ON_BOARD', 'EXECUTING')
+       limit 200`;
+    let moved = 0;
+    for (const row of tenants) moved += await wakeTenant(row.tenant_id);
     return moved;
   };
 
@@ -957,7 +1040,9 @@ export function createPlans(dependencies: PlansDependencies) {
     execute,
     executeAction,
     direct,
+    directions,
     wakeTenant,
+    sweep,
     evaluatePlan,
   };
 }
@@ -1045,6 +1130,15 @@ export function executePayloadOf(
       due: step.due,
       needsApproval: step.needsApproval,
     })),
+    ...(plan.specialists === undefined || plan.specialists.length === 0
+      ? {}
+      : {
+          specialists: plan.specialists.map((one) => ({
+            stepKey: one.stepKey,
+            name: one.name,
+            tools: [...one.tools],
+          })),
+        }),
   });
 }
 

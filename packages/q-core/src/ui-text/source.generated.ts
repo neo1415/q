@@ -4102,6 +4102,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Set up",
   "Set up as a founder",
   "Set up as a founder first. Until then there is nothing investors could see.",
+  "Set up for your plans",
   "Set up when Q onboards you",
   "Set up when Q onboards you.",
   "Set up with Q",

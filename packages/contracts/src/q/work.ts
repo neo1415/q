@@ -62,6 +62,14 @@ export const Q_INSTRUCTION_WAKE_CHANNEL = "q_instruction_wake" as const;
 export const Q_INSTRUCTION_NEW_COMPANY_CHANNEL =
   "q_instruction_new_company" as const;
 
+/**
+ * Situation-first planning, S6 (addendum 2): ANY domain event of a tenant
+ * announces the tenant here; the Q API re-evaluates that tenant's open
+ * plans' conditions as each plan's owner and drops their cached
+ * situations. The payload is the tenant id only.
+ */
+export const Q_PLAN_WAKE_CHANNEL = "q_plan_wake" as const;
+
 export const Q_WORK_KINDS = [
   "INVESTOR_OUTREACH",
   "FOUNDER_STAND_IN",

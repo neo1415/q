@@ -1042,7 +1042,24 @@ export type DurableSteps = {
     result: StepResult,
     runId: string,
   ) => Promise<void>;
+  /**
+   * Situation-first planning, S6: the person's direction to this work
+   * since it began, re-read from the team thread before each step acts
+   * (bounded by the thread's reading bound). Null: none.
+   */
+  readonly direction?: (() => Promise<string | null>) | undefined;
 };
+
+/** A step's goal with the person's direction since the work began (theirs, as data). */
+export function withDirection(goal: string, direction: string | null): string {
+  if (direction === null || direction.trim().length === 0) return goal;
+  // First, so a step that reads only the start of its goal still sees it.
+  const said = direction.trim().slice(0, 1_000);
+  return `The person's direction since this work began (their words; follow it where it applies to this step): ${said}\n\n${goal}`.slice(
+    0,
+    4_000,
+  );
+}
 
 /** Why code refused a step, in words the lead reads when it replans. */
 const REFUSAL_WORDS: Readonly<Record<StepRefusal, string>> = {
@@ -1527,7 +1544,16 @@ function withDurableResults(
     Object.entries(executors).map(([role, executor]) => [
       role,
       async (step: BoundStep, context: Parameters<AgentExecutor>[1]) => {
-        const result = await executor(step, context);
+        // S6: the thread is re-read before the step's next action.
+        const direction = await (
+          durable.direction?.() ?? Promise.resolve(null)
+        ).catch(() => null);
+        const result = await executor(
+          direction === null
+            ? step
+            : { ...step, goal: withDirection(step.goal, direction) },
+          context,
+        );
         await durable.record(step.key, result, context.runId);
         return result;
       },

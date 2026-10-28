@@ -160,6 +160,11 @@ export type SituationAssembler = {
   readonly invalidate: (
     actor: Pick<ActorContext, "tenantId" | "userId">,
   ) => void;
+  /**
+   * S6 (lane C, additive): drops every cached section of everyone in this
+   * tenant -- a domain event of the tenant may touch any of their records.
+   */
+  readonly invalidateTenant?: ((tenantId: string) => void) | undefined;
 };
 
 type SectionResult = {
@@ -532,6 +537,12 @@ export function createSituationAssembler(
     research,
     invalidate: (actor) => {
       const prefix = actorPrefix(actor);
+      for (const key of cache.keys()) {
+        if (key.startsWith(prefix)) cache.delete(key);
+      }
+    },
+    invalidateTenant: (tenantId) => {
+      const prefix = `${tenantId}\u0000`;
       for (const key of cache.keys()) {
         if (key.startsWith(prefix)) cache.delete(key);
       }

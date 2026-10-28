@@ -32,6 +32,8 @@ export type WorkTrace = {
   readonly runId?: string | undefined;
   readonly conversationId?: string | undefined;
   readonly organisationId?: string | undefined;
+  /** S6: the plan this job carries out a step of (its team thread). */
+  readonly planId?: string | undefined;
 };
 
 export type WorkRow = {
@@ -183,6 +185,7 @@ export function createPostgresAgentWorkQueue(
                   'actionId', ${input.trace.actionId ?? null}::text,
                   'runId', ${input.trace.runId ?? null}::text,
                   'organisationId', ${input.trace.organisationId ?? null}::text,
+                  'planId', ${input.trace.planId ?? null}::text,
                   'conversationId', coalesce(${input.trace.conversationId ?? null}::text, (
                     select r.conversation_id::text from q_runtime.runs r
                      where r.id::text = ${input.trace.runId ?? null}::text

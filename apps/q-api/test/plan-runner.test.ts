@@ -150,13 +150,6 @@ function world(
         qActionId: "5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a",
       });
     },
-    startOwnWork: (_actor, runId) => {
-      own.push(runId);
-      return Promise.resolve({
-        outcome: "STARTED",
-        jobId: "6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b",
-      });
-    },
   });
   const delivered: unknown[] = [];
   const runner = createAgentWorkRunner({

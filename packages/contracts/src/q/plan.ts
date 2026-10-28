@@ -500,6 +500,22 @@ export const QPlanExecutePayloadSchema = z
       )
       .min(1)
       .max(Q_PLAN_STEPS_MAX),
+    /**
+     * Addendum 1: the specialists this approval creates, by name, with the
+     * only tools each may use. Part of the binding. Additive.
+     */
+    specialists: z
+      .array(
+        z
+          .object({
+            stepKey: QPlanStepKeySchema,
+            name: z.string().trim().min(2).max(60),
+            tools: z.array(ToolNameSchema).min(1).max(Q_SPECIALIST_TOOLS_MAX),
+          })
+          .strict(),
+      )
+      .max(4)
+      .optional(),
   })
   .strict()
   .refine(

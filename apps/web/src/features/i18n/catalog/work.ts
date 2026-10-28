@@ -660,4 +660,5 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   Gathered: "تم الجمع",
   "{n} facts": "{n} حقائق",
   "Two reviews": "مراجعتان",
+  "Set up for your plans": "أُعدّت لخططك",
 };

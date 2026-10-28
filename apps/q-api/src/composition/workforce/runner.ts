@@ -93,6 +93,13 @@ export function createAgentWorkRunner(dependencies: {
         readonly outputs?: Readonly<Record<string, unknown>> | undefined;
       }>)
     | undefined;
+  /**
+   * S6: the person's direction to work a plan started, from the plan's
+   * team thread (entries after the job began), bounded. Absent: none.
+   */
+  readonly directions?:
+    | ((owner: Owner, planId: string, since: Date) => Promise<string | null>)
+    | undefined;
   readonly workerId?: string | undefined;
   readonly leaseMs?: number | undefined;
   readonly logger?: Logger | undefined;
@@ -250,6 +257,17 @@ export function createAgentWorkRunner(dependencies: {
             },
             record: (key, step, runId) =>
               queue.recordStep(row.job_id, workerId, key, step, runId),
+            ...(row.trace.planId === undefined ||
+            dependencies.directions === undefined
+              ? {}
+              : {
+                  direction: () =>
+                    dependencies.directions?.(
+                      owner,
+                      row.trace.planId ?? "",
+                      row.created_at,
+                    ) ?? Promise.resolve(null),
+                }),
           },
         },
       );

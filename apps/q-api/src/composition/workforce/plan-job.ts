@@ -1072,10 +1072,25 @@ export async function runPlanJob(
         )
       : null;
 
+  // S6: what the person said to this work while it ran (DIRECTION on the
+  // job's thread), re-read before each draft; their own words, as data.
+  const directionsNow = async (): Promise<readonly string[]> =>
+    (
+      await dependencies.store
+        .readThread(owner, { jobId: input.jobId }, { kinds: ["DIRECTION"] })
+        .catch(() => [])
+    ).map((entry) => entry.text);
+  const heard = await directionsNow();
   const base: Omit<PlanWriteInput, "mode" | "priorPlan" | "fixes"> = {
     side,
     today: todayOf(now()),
-    ask: payload.ask,
+    ask:
+      heard.length === 0
+        ? payload.ask
+        : `${payload.ask}\n\nThey added since: ${heard.join(" / ")}`.slice(
+            0,
+            2_000,
+          ),
     situation,
     publicFindings,
     allowedActions,
@@ -1171,7 +1186,14 @@ export async function runPlanJob(
     )
       break;
     // A redraft with the numbered defects (the reviewers' and code's).
-    const fixes = [...reviews.flatMap((review) => review.fixes), ...code];
+    const said = await directionsNow();
+    const fixes = [
+      ...said
+        .filter((text) => !heard.includes(text))
+        .map((text) => `The person asked for this change: ${text}`),
+      ...reviews.flatMap((review) => review.fixes),
+      ...code,
+    ];
     if (fixes.length === 0) break;
     redrafts += 1;
     progress({
@@ -1332,12 +1354,9 @@ async function eligibleToolsOf(
   if (tools === undefined) return undefined;
   const offered = await tools.offer(context).catch(() => null);
   if (offered === null) return new Set();
-  return new Set(
-    offered.flatMap((tool) => {
-      const name = (tool as { readonly name?: unknown }).name;
-      return typeof name === "string" ? [name] : [];
-    }),
-  );
+  // The tool as the model names it (research_public_web): what a
+  // specialist's definition lists, checked against what this context offers.
+  return new Set(offered.map((tool) => tool.definition.name));
 }
 
 async function directionText(

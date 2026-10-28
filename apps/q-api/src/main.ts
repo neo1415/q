@@ -435,6 +435,7 @@ import {
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  Q_PLAN_WAKE_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -569,7 +570,6 @@ import {
   AuthUserIdSchema,
   OrganisationIdSchema,
   TenantIdSchema,
-  UserIdSchema,
   createAuthorizationService,
   type ActorContext,
 } from "@capital-q/security";
@@ -4041,21 +4041,7 @@ const plans = createPlans({
     orchestration: () => orchestrationRuntime,
     actions: () => qActions,
   }),
-  startOwnWork: createOwnWorkStarter({
-    jobsFor: workforceJobsFor,
-    queue: () => agentWorkQueue,
-    kick: () => {
-      void agentWorkRunner.pass().catch((error: unknown) => {
-        logger.warn({ err: error }, "workforce job runner pass failed");
-      });
-    },
-    logger,
-  }),
-  invalidate: (owner) =>
-    situationAssembler.invalidate({
-      tenantId: TenantIdSchema.parse(owner.tenantId),
-      userId: UserIdSchema.parse(owner.userId),
-    }),
+  invalidate: (tenantId) => situationAssembler.invalidateTenant?.(tenantId),
   actorFor: (owner) => planOwnerActor(owner.userId, null),
   logger,
 });
@@ -5307,6 +5293,8 @@ const agentWorkRunner = createAgentWorkRunner({
   jobsFor: workforceJobsFor,
   // Situation-first planning (S4): plan jobs on the same queue and lease.
   plans: (input) => plans.run(input),
+  // S6: a plan's running steps re-read the person's direction.
+  directions: (owner, planId, since) => plans.directions(owner, planId, since),
   // Owner 2026-10-23: the finished document lands in the conversation.
   deliver: createWorkforceDelivery({
     // A plain (non-analysis) document's line, read as its owner.
@@ -6184,6 +6172,33 @@ void createWorkWakeListener({
     // The sweep still fires each instruction on its cadence.
     logger.warn({ err: error }, "instruction wake listener not started");
   });
+// Situation-first planning (S6, addendum 2): ANY domain event of a tenant
+// re-evaluates its open plans' conditions (the workers announce the tenant
+// from the outbox); no per-feature watchers. The sweep is the safety net
+// (a date reached, a wake missed during a deploy).
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_PLAN_WAKE_CHANNEL,
+  catchUp: () => {
+    void plans.sweep().catch(() => undefined);
+  },
+  targets: [{ name: "plans", wake: (tenantId) => plans.wakeTenant(tenantId) }],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "plan wake listener started"))
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "plan wake listener not started");
+  });
+setInterval(
+  () => {
+    void plans.sweep().catch((error: unknown) => {
+      logger.warn({ err: error }, "plan conditions sweep failed");
+    });
+  },
+  10 * 60 * 1000,
+).unref();
 // A company became marketplace-ready (founder 2026-10-05): standing
 // instructions open to new companies run within minutes, not hours.
 void createWorkWakeListener({
