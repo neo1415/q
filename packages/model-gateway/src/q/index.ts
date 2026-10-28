@@ -182,6 +182,7 @@ import {
   companyNameCandidates,
   isCapitalQCompanyRead,
   itemsOf,
+  nameKey,
   lowercaseNameCandidates,
   namesOnlyCompany,
   profileOf,
@@ -190,6 +191,7 @@ import {
   type CompanyFactAnswer,
   type CompanyFactAsk,
 } from "./named-company-fact.js";
+import { namedCompanyFitLine } from "./named-fit-line.js";
 import {
   FIRST_CONTACT_TOOL,
   FIRST_CONTACT_REPLY,
@@ -417,6 +419,7 @@ import {
   compareTargets,
   namesToCompare,
   newestAnswerCards,
+  answerCardCompanies,
 } from "./compare-table.js";
 import {
   attachedDocumentIntent,
@@ -7388,8 +7391,25 @@ export function createModelGatewayQAnswer(
         const discoverStarted = Date.now();
         const found = await discoverFor(catalogAsk);
         if (found !== null) {
+          // Stress 2026-10-28 (J3): the question also named a company the
+          // list does not hold ("…and whether LedgerBridge qualifies");
+          // that half is answered too, from Capital Q's fit for it.
+          const named = request.namedOther?.name.trim() ?? "";
+          const onCards = answerCardCompanies(
+            found.block === null ? [] : [found.block],
+          ).some((card) => nameKey(card.name) === nameKey(named));
+          const namedLine =
+            investorAsking && named.length > 0 && !onCards
+              ? await namedCompanyFitLine({
+                  name: named,
+                  tools,
+                  context: toolContext,
+                  // The executor authorises each read under this run's plan.
+                  available: new Set(["search_companies", "fit_profile"]),
+                }).catch(() => null)
+              : null;
           const message = await persistCodeAnswer(
-            found.text,
+            namedLine === null ? found.text : `${found.text}\n\n${namedLine}`,
             found.block === null ? [] : [found.block],
           );
           logger?.info(
@@ -10171,6 +10191,10 @@ export function createModelGatewayQAnswer(
               fits: fitsRead,
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
               ...(request.compare === undefined ? {} : { compareAsked: true }),
+              shown: answerCardCompanies([
+                ...(modelBlocks ?? []),
+                ...(builtCards === null ? [] : [builtCards]),
+              ]).map((card) => card.companyId),
             });
         if (answerVerdict === null && comparedTable !== null) {
           answerVerdict = comparisonVerdict(comparedTable, fitsRead);

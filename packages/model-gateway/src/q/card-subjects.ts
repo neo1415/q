@@ -334,6 +334,8 @@ function externalOf(data: unknown): ReadExternal | null {
 /** A company's own declared profile facts, as get_company returned them. */
 export type ReadCompanyFacts = {
   readonly about: string | null;
+  /** The company's own longer description, as its profile states it. */
+  readonly description?: string | null | undefined;
   readonly stageCode: string | null;
   readonly city: string | null;
   readonly country: string | null;
@@ -428,6 +430,7 @@ export function createRunCompanies(limit = 200) {
         known.profiles.set(profile.data.companyId, profile.data.canonicalName);
         known.companyFacts.set(profile.data.companyId, {
           about: profile.data.shortDescription,
+          description: profile.data.primaryDescription,
           stageCode: profile.data.currentStageCode,
           city: profile.data.headquartersCity,
           country: profile.data.headquartersCountry,

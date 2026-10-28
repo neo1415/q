@@ -649,8 +649,11 @@ const CAPITAL_Q_NAMED = /\bcapital[\s-]?q\b/iu;
  * Words that ask how to use the platform itself: those keep the platform
  * reading, whoever asks ("how does Capital Q work", "Capital Q's app").
  */
+// Stress 2026-10-28 (I03): "find five companies in Capital Q" named the
+// platform as the place to look, and Capital Q's own company record was
+// read and compared. "in / on / across Capital Q" is the platform.
 const PLATFORM_USE =
-  /\b(?:how (?:do|does|can|should) (?:i|we|you|it|capital[\s-]?q)\b|work(?:s|ing)?\b|use|using|platform|app|feature|features|setting|settings|account|sign (?:in|up)|log ?in|subscription|pricing|help|support|onboard\w*)/iu;
+  /\b(?:how (?:do|does|can|should) (?:i|we|you|it|capital[\s-]?q)\b|(?:in|on|across|within|inside|through) capital[\s-]?q\b|work(?:s|ing)?\b|use|using|platform|app|feature|features|setting|settings|account|sign (?:in|up)|log ?in|subscription|pricing|help|support|onboard\w*)/iu;
 
 /**
  * Owner 2026-10-23 (coordinator-approved disambiguation): Capital Q is also

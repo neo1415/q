@@ -253,6 +253,7 @@ describe("a comparison asked for is done, never offered", () => {
       question: "Compare the top two side by side",
       read,
       fits,
+      shown: [MIZAN, SILO],
     });
     if (block === null) throw new Error("no table");
     const line = comparisonSpokenLine(block) ?? "";
@@ -512,5 +513,84 @@ describe("fact rows are the company's facts (F-126)", () => {
     }
     // "Not stated" is not said aloud as a figure.
     expect(comparisonSpokenLine(block)).not.toMatch(/traction: Not stated/u);
+  });
+});
+
+// Stress 2026-10-28: J1 showed Prumo and Railhead Robotics, J4 Ledgerio and
+// Ledgerly beside LedgerBridge, I03 Capital Q's own record. The table is
+// the asked subjects or the ranked set shown, never a look-alike the run
+// happened to read and never Capital Q itself.
+describe("the table never holds strangers", () => {
+  const LEDGERIO = "0c1f2a8e-6d3b-4a9e-9d7a-1b2c3d4e5f60";
+  const CAPITAL_Q = "ee75a7d8-d457-4b59-9ad8-0d64b3026a3d";
+  function withStrangers() {
+    const { read, fits } = run();
+    for (const [id, name] of [
+      [LEDGERIO, "Ledgerio Works"],
+      [CAPITAL_Q, "Capital Q"],
+    ] as const) {
+      read.companyNames.set(id, name);
+      read.companyFacts.set(id, {
+        about: "Something else.",
+        stageCode: "SEED",
+        city: null,
+        country: "NG",
+        founded: null,
+        website: null,
+      });
+    }
+    return { read, fits };
+  }
+
+  it("no named subjects and no ranked set: no table at all", () => {
+    const { read, fits } = withStrangers();
+    expect(
+      comparisonTableBlock({
+        question: "Challenge LedgerBridge's metrics and identify the risks",
+        read,
+        fits,
+        compareAsked: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("traction with no published figures comes from the company's own description (I06)", () => {
+    const { read, fits } = run();
+    read.companyFacts.set(MIZAN, {
+      about: "VAT compliance software.",
+      description:
+        "Ledgerline is VAT compliance software. Ledgerline charges a monthly subscription per legal entity and serves 1,140 paying businesses at about ₦38m in monthly recurring revenue. Six-month logo retention is 96%.",
+      stageCode: "SEED",
+      city: "Lagos",
+      country: "NG",
+      founded: null,
+      website: null,
+    });
+    const block = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit",
+      read,
+      fits,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    const traction = block.rows.find((row) => row.label === "Traction");
+    expect(traction?.cells[0]).toContain("₦38m in monthly recurring revenue");
+    expect(traction?.cells[0]).toContain("(company-stated, profile)");
+    expect(traction?.cells[1]).toBe("Not stated");
+  });
+
+  it("with a ranked set shown: only those, never Capital Q", () => {
+    const { read, fits } = withStrangers();
+    const block = comparisonTableBlock({
+      question: "Find five companies in Capital Q that fit my mandate",
+      read,
+      fits,
+      compareAsked: true,
+      shown: [CAPITAL_Q, MIZAN, SILO],
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    expect(block.columns.map((column) => column.label)).toEqual([
+      "Mizan",
+      "Silo Credit",
+    ]);
   });
 });

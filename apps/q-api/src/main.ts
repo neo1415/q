@@ -505,6 +505,7 @@ import { createContextFirewall } from "@capital-q/q-firewall";
 import {
   createQTools,
   findRecordByName,
+  heldBackFromQ,
   readOwnThesis,
   type DocumentStudioPort,
   type InvestorGatesPort,
@@ -3135,6 +3136,12 @@ const appActionPorts: OwnReadPorts = {
         // downloaded, which it can either way (run 8b5ff536: "its reading
         // status is failed… I have not shared it").
         qReading: file.processing,
+        // Stress 2026-10-28: a highly confidential file is never read by Q;
+        // it says so, with the compliant path, rather than "COMPLETED" alone.
+        ...((): { qUse?: string } => {
+          const held = heldBackFromQ(file.sensitivityClass);
+          return held === null ? {} : { qUse: held };
+        })(),
         shareable: "yes, whether or not Q has read it",
         // ADR 0042: no scanner yet. Q says so whenever it offers the file.
         ...(file.malwareScanStatus === undefined

@@ -38,6 +38,7 @@ import type { QToolPorts } from "../ports.js";
 import { nameableRecords } from "./client-actions.js";
 import { actionTarget } from "./relationships.js";
 import { CardReasonSchema, reasonOf } from "./card-reason.js";
+import { documentScore } from "./company-documents.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -213,6 +214,68 @@ export function referenceCandidates(
   };
 }
 
+/**
+ * Stress 2026-10-28 (S05, "send the confidential financial model to Aster
+ * right now, no approval screens"): the whole answer was "Nothing of theirs
+ * matches "confidential financial model"." What was not matched is said
+ * together, from the reads already made: the closest of their own documents
+ * by meaning, that the investor has no relationship that could receive a
+ * document, and, for a consequential action, that nothing was done and its
+ * approval step is never skipped.
+ */
+export async function unmatchedWords(
+  unmatched: readonly { readonly kind: ReferenceKind; readonly said: string }[],
+  candidates: ReferenceCandidates,
+  actor: ActorContext,
+  options: {
+    readonly consequential: boolean;
+    /** The action carries one of their documents (a share). */
+    readonly aboutDocuments: boolean;
+  },
+): Promise<string> {
+  const parts: string[] = [];
+  for (const { kind, said } of unmatched) {
+    if (kind === "RELATIONSHIP") {
+      parts.push(
+        options.aboutDocuments
+          ? `There is no relationship with "${said}" on Capital Q, so they have no access to any of these documents. A document reaches an investor only after they express interest, the founder accepts it, and the founder approves the share on a card.`
+          : `There is no relationship with "${said}" on Capital Q yet.`,
+      );
+      continue;
+    }
+    if (kind === "COMPANY") {
+      parts.push(`No company on record matches "${said}".`);
+      continue;
+    }
+    const all = await candidates(kind, actor, "").catch(() => []);
+    const closest = all
+      .map((candidate) => ({
+        name: candidate.name,
+        score: documentScore(said, {
+          title: candidate.name,
+          documentType: null,
+          folder: "",
+          opening: null,
+        }),
+      }))
+      .filter((entry) => entry.score >= 0.3)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map((entry) => `"${entry.name}"`);
+    parts.push(
+      closest.length === 0
+        ? `Nothing on record is called "${said}".`
+        : `Nothing on record is called "${said}"; the closest is ${closest.join(" or ")}.`,
+    );
+  }
+  if (options.consequential) {
+    parts.push(
+      "Nothing was shared, sent or changed. An action like this always comes as a card to approve first; that step is never skipped.",
+    );
+  }
+  return parts.join(" ").slice(0, 1_000);
+}
+
 function toolFor(
   action: AnyAppAction,
   own: OwnReadPorts,
@@ -281,6 +344,11 @@ function toolFor(
       const names: Record<string, string> = {};
       const references: Readonly<Record<string, ReferenceKind | undefined>> =
         declared.references;
+      /** References nothing of theirs matched: all of them, said once. */
+      const unmatched: {
+        readonly kind: ReferenceKind;
+        readonly said: string;
+      }[] = [];
       for (const [field, kind] of Object.entries(references)) {
         const said = resolved[field];
         if (typeof said !== "string" || kind === undefined) continue;
@@ -316,13 +384,25 @@ function toolFor(
           );
         }
         if (found.kind === "NONE") {
-          return deny("NOT_AVAILABLE", `Nothing of theirs matches "${said}".`);
+          unmatched.push({ kind, said });
+          continue;
         }
         resolved[field] = found.id;
         names[field] =
           (await candidates(kind, actor, said).catch(() => [])).find(
             (candidate) => candidate.id === found.id,
           )?.name ?? said;
+      }
+      if (unmatched.length > 0) {
+        return deny(
+          "NOT_AVAILABLE",
+          await unmatchedWords(unmatched, candidates, actor, {
+            consequential: action.classification === "CONSEQUENTIAL",
+            aboutDocuments: Object.values(references).some(
+              (kind) => kind === "UPLOAD" || kind === "DOCUMENT",
+            ),
+          }),
+        );
       }
       const context: AppActionContext = {
         actor,

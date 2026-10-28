@@ -1088,6 +1088,8 @@ export type EvidenceDocumentsPort = {
       readonly downloadAudience?: string | undefined;
       /** Its current version's malware scan state (ADR 0042). */
       readonly malwareScanStatus?: string | undefined;
+      /** Evidence's own classification (HIGHLY_CONFIDENTIAL is never read by Q). */
+      readonly sensitivityClass?: string | undefined;
     }[]
   >;
 };

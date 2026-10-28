@@ -202,6 +202,7 @@ export {
 } from "./tools/own-work.js";
 export {
   createListUploadedDocumentsTool,
+  heldBackFromQ,
   createOwnRecordTools,
   createReadMyRecordTool,
   createReadRelationshipEmailTool,
@@ -594,6 +595,7 @@ export {
   ReadMyInputSchema,
   ReadMyOutputSchema,
   referenceCandidates,
+  unmatchedWords,
   type AppApprovalPort,
   type AppToolOutput,
 } from "./tools/app-actions.js";

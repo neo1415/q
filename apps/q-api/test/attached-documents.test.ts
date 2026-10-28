@@ -99,6 +99,32 @@ describe("attached document reads", () => {
     expect(calls[0]?.slice(0, 3)).toEqual([TENANT_A, DOC, VERSION]);
   });
 
+  // Stress 2026-10-28 (item 2): management accounts are HIGHLY_CONFIDENTIAL,
+  // outside every firewall plan; their pages never reach a model.
+  it("never reads a highly confidential document's pages, and says why", async () => {
+    const { sql, calls } = fakeSql([]);
+    const reads = createAttachedDocumentReads({
+      sql,
+      get: () =>
+        Promise.resolve({
+          document: {
+            id: DOC,
+            title: "LedgerBridge financial report Sept 2026",
+            status: "ACTIVE",
+            sensitivityClass: "HIGHLY_CONFIDENTIAL",
+          },
+          currentVersion: version(),
+        }),
+      list: () => Promise.resolve([]),
+    });
+    const out = await reads.read(actorA, { documentId: DOC });
+    expect(out?.document).toMatchObject({
+      state: "UNREADABLE",
+      reason: expect.stringMatching(/highly confidential/u) as unknown,
+    });
+    expect(calls).toHaveLength(0);
+  });
+
   it("another tenant's person gets nothing, and no page is read", async () => {
     const { sql, calls } = fakeSql([]);
     const reads = createAttachedDocumentReads({

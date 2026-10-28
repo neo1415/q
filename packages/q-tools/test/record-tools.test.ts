@@ -160,6 +160,64 @@ describe("reading their own records", () => {
   });
 });
 
+// Stress 2026-10-28 (F02, J1, S02-F): the founder's management accounts are
+// HIGHLY_CONFIDENTIAL, outside every plan by design. Q now says so when it
+// lists them, with the compliant path, instead of "read: COMPLETED" alone.
+describe("a document held back by its classification", () => {
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry(
+      createOwnRecordTools({
+        ...fakePorts(),
+        evidenceDocuments: {
+          list: () =>
+            Promise.resolve([
+              {
+                documentId: "715b9d70-d70e-417e-8677-7b971a147eb4",
+                title: "LedgerBridge financial report Sept 2026",
+                documentType: "MANAGEMENT_ACCOUNTS",
+                status: "ACTIVE",
+                processing: "COMPLETED",
+                updatedAt: "2026-10-28T15:35:56.664Z",
+                downloadAudience: "ORGANISATION",
+                sensitivityClass: "HIGHLY_CONFIDENTIAL",
+              },
+              {
+                documentId: "4cfdc5e3-cd9b-4926-9558-b1ca6c714375",
+                title: "LedgerBridge seed deck",
+                documentType: "PITCH_DECK",
+                status: "ACTIVE",
+                processing: "COMPLETED",
+                updatedAt: "2026-10-28T15:35:29.817Z",
+                sensitivityClass: "CONFIDENTIAL",
+              },
+            ]),
+        },
+      }),
+    ),
+  });
+  const plan = (): PermittedContextPlan => {
+    const base = ownPlan();
+    const evidence = planFor(actorA, "GENERAL_QUESTION", [
+      { kind: "EVIDENCE_DOCUMENTS", sensitivity: "CONFIDENTIAL" },
+    ]).scopes;
+    return { ...base, scopes: [...base.scopes, ...evidence] };
+  };
+
+  it("says the report is held back and how its figures can be used; the deck is not flagged", async () => {
+    const outcome = await executor.execute(
+      call("list_uploaded_documents", {}),
+      contextFor(actorA, plan()),
+    );
+    const items = dataOf(outcome).items as {
+      title: string;
+      qUse?: string;
+    }[];
+    expect(items[0]?.qUse).toMatch(/Held back from Q by its classification/u);
+    expect(items[0]?.qUse).toMatch(/USER_CLAIM/u);
+    expect(items[1]?.qUse).toBeUndefined();
+  });
+});
+
 describe("opening a record's page", () => {
   const executor = createQToolExecutor({
     registry: createQToolRegistry([createOpenPageTool(fakePorts())]),

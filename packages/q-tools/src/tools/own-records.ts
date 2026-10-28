@@ -230,12 +230,33 @@ export const ListUploadedDocumentsOutputSchema = z
             status: z.string().max(64),
             processing: z.string().max(64).nullable(),
             updatedAt: z.string().max(40),
+            /** Present when Q may not read it: why, and the compliant path. */
+            qUse: z.string().max(600).optional(),
           })
           .strict(),
       )
       .max(50),
   })
   .strict();
+
+/**
+ * Stress 2026-10-28 (F02, J1, S02-F): the founder's management accounts
+ * ($51K recognised MRR against the deck's $65K) are HIGHLY_CONFIDENTIAL by
+ * Evidence's classification, so no firewall plan admits their chunks and no
+ * model provider may receive them (EVIDENCE_DOCUMENTS ceiling CONFIDENTIAL;
+ * model-gateway providerJustifiedCeiling). That is by design. What was
+ * wrong is silence: Q listed the report as read ("COMPLETED") and then
+ * reasoned as if it held nothing else. A held-back document now says so,
+ * with the compliant path, wherever Q lists it.
+ */
+export function heldBackFromQ(
+  sensitivityClass: string | null | undefined,
+): string | null {
+  return sensitivityClass === "HIGHLY_CONFIDENTIAL" ||
+    sensitivityClass === "RESTRICTED"
+    ? "Held back from Q by its classification (highly confidential, e.g. management accounts or a financial model): Q does not read its contents and never sends them to a model, so nothing in it is in Q's answers. Say so plainly whenever their figures or contradictions come up. The compliant path: the founder states the key figures themselves (for example monthly revenue and its month), which become their own stated figures (USER_CLAIM) Q can use and set beside the deck's."
+    : null;
+}
 export type ListUploadedDocumentsOutput = z.infer<
   typeof ListUploadedDocumentsOutputSchema
 >;
@@ -276,7 +297,18 @@ export function createListUploadedDocumentsTool(
     execute: async (_input, context, grant) => ({
       items: (await documents.list(context.actor, grant.subjectId))
         .slice(0, 50)
-        .map((item) => ({ ...item, title: item.title.slice(0, 300) })),
+        .map((item) => {
+          const held = heldBackFromQ(item.sensitivityClass);
+          return {
+            documentId: item.documentId,
+            title: item.title.slice(0, 300),
+            documentType: item.documentType,
+            status: item.status,
+            processing: item.processing,
+            updatedAt: item.updatedAt,
+            ...(held === null ? {} : { qUse: held }),
+          };
+        }),
     }),
   });
 }

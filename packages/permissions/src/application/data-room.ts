@@ -520,14 +520,16 @@ export function createDataRoomService(dependencies: {
     }
     const investor = await quietly(dependencies.investorOf(actor), null);
     if (investor === null) return null;
-    if (
-      !(await quietly(dependencies.investorMayFind(actor, company.id), false))
-    )
-      return null;
-    const relationshipId = await quietly(
-      dependencies.relationshipOf(company.id, investor.investorOrganisationId),
-      null,
-    );
+    const [mayFind, relationshipId] = await Promise.all([
+      quietly(dependencies.investorMayFind(actor, company.id), false),
+      quietly(
+        dependencies.relationshipOf(
+          company.id,
+          investor.investorOrganisationId,
+        ),
+        null,
+      ),
+    ]);
     // Unknown is not connected: a failed read locks, never opens.
     const connection: RelationshipConnection =
       relationshipId === null
@@ -536,6 +538,15 @@ export function createDataRoomService(dependencies: {
             dependencies.connectionOf(relationshipId),
             "NOT_CONNECTED" as const,
           );
+    // Stress 2026-10-28 (S02-post): the founder accepted Aster's interest
+    // and shared the deck to that relationship, yet the room was refused
+    // because the pitch rule (Discover eligibility: LedgerBridge is not yet
+    // marketplace-ready) no longer admitted the company. Discoverability
+    // governs who may FIND a company; a relationship the founder accepted
+    // is the room's own basis. Only a CONNECTED relationship opens it this
+    // way, and each document still needs its own unrevoked grant
+    // (projectForInvestor); the locked outline still needs the pitch rule.
+    if (!mayFind && connection !== "CONNECTED") return null;
     return {
       kind: "INVESTOR",
       company,
