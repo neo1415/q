@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   appendOnboardingInterviewTurns,
+  getOnboardingSession,
   listOnboardingInterviewTurns,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -15,8 +16,10 @@ import type { ActorContext } from "@capital-q/security";
 
 import type { HeldWritesStore } from "./held-writes.js";
 import type { InvestorResearch } from "./investor-research.js";
+import { definitionFor, toResponseValue } from "./interview-steps.js";
 import {
   createOnboardingPort,
+  sameValue,
   type RecommendationStore,
 } from "./onboarding-port.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
@@ -255,8 +258,37 @@ export function createOnboardingConversation(dependencies: {
       },
     });
     if (reading === null) return;
-    const answers = reading.answers.filter((answer) =>
-      isAnswerable(state, answer.stepKey),
+    // What is already on record, unchanged, is never written again: every
+    // reading sees the whole conversation (live 2026-10-28: one answer
+    // rewritten on each reading, a new version each time).
+    const onRecord = await getOnboardingSession(
+      session,
+      line.onboarding.sessionId,
+    ).then(
+      (view) => view.responses,
+      () => [],
+    );
+    const manifests = new Map(
+      definitionFor(line.onboarding.journeyType).steps.map(
+        (step) => [step.stepKey, step] as const,
+      ),
+    );
+    const unchanged = (stepKey: string, raw: unknown): boolean => {
+      const manifest = manifests.get(stepKey);
+      const current = onRecord.find((r) => r.stepKey === stepKey);
+      if (manifest === undefined || current === undefined) return false;
+      const value =
+        typeof raw === "string" || typeof raw === "boolean" || isWords(raw)
+          ? toResponseValue(manifest, raw)
+          : typeof raw === "number"
+            ? toResponseValue(manifest, String(raw))
+            : null;
+      return value !== null && sameValue(current.value, value);
+    };
+    const answers = reading.answers.filter(
+      (answer) =>
+        isAnswerable(state, answer.stepKey) &&
+        !unchanged(answer.stepKey, answer.value),
     );
     const declined = reading.declined.filter(
       (item) => stepOf(state, item.stepKey)?.status === "OPEN",
@@ -527,6 +559,12 @@ export function createOnboardingConversation(dependencies: {
   };
 }
 
+function isWords(value: unknown): value is readonly string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* What the steps mean, in words a person uses (pure; tested).         */
 /* ------------------------------------------------------------------ */
@@ -712,13 +750,21 @@ function identityOf(state: OnboardingState): {
   };
 }
 
+/** The journey's own short label for a step ("Typical cheque"), for a read-back. */
+function labelOf(state: OnboardingState, step: OnboardingStepState): string {
+  const manifest = definitionFor(state.journey).steps.find(
+    (candidate) => candidate.stepKey === step.stepKey,
+  );
+  return (manifest?.configuration.prompt ?? step.question).replace(
+    /[?.]$/u,
+    "",
+  );
+}
+
 function savedLines(state: OnboardingState): string[] {
-  const topics = topicsOf(state.steps);
   return state.steps
     .filter((step) => isConversational(step) && step.status === "ANSWERED")
-    .map((step) =>
-      `${topics.get(step.stepKey) ?? step.question} ${step.value ?? ""}`.trim(),
-    );
+    .map((step) => `${labelOf(state, step)}: ${step.value ?? "answered"}`);
 }
 
 export function readBack(state: OnboardingState): string {

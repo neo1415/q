@@ -244,6 +244,49 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
     });
   });
 
+  it("re-reading an answer already on record writes nothing (live 2026-10-28: rewritten on every reading)", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: { "I0.investor_type": "accelerator" },
+    });
+    world.record("I2.stages", {
+      type: "MULTI_SELECT",
+      optionKeys: ["pre_seed", "seed"],
+    });
+    const { fetch } = withThread(world);
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch,
+      logger,
+      readAfterMs: 5,
+      reader: readerReturning({
+        answers: [
+          {
+            stepKey: "I0.investor_type",
+            value: "accelerator",
+            quote: "We're an accelerator",
+            ownWords: false,
+          },
+          {
+            stepKey: "I2.stages",
+            value: ["seed", "pre_seed"],
+            quote: "Just pre-seed and seed",
+            ownWords: false,
+          },
+        ],
+        declined: [],
+      }),
+    });
+    const call = line();
+    conversation.heard(call, [
+      { role: "USER", text: "We're an accelerator" },
+      { role: "Q", text: "Got it." },
+      { role: "USER", text: "Just pre-seed and seed" },
+    ]);
+    await conversation.ended(call);
+    expect(world.attempts()).toEqual([]);
+  });
+
   it("never saves words the person did not say, whatever the reading claims", async () => {
     const world = investorSession({
       currentStepKey: "I0.investor_type",

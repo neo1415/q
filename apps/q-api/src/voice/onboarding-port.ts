@@ -207,7 +207,7 @@ export type FoundRecommendationPort = {
 };
 
 /** One value, whatever order a list was given in. */
-function sameValue(
+export function sameValue(
   a: OnboardingResponseValue,
   b: OnboardingResponseValue,
 ): boolean {
