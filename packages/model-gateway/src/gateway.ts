@@ -81,6 +81,21 @@ export type ModelGatewayDependencies = {
    */
   readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
   /**
+   * Owner 2026-10-28: one deployment holds both the seeded demo world and
+   * the first real people signing up. The attestation says the deployment
+   * MAY hold synthetic material; this says whether THIS request's tenant
+   * and person are synthetic (service-role `app_metadata.synthetic`, never
+   * anything a person can set). Anything else is a real customer and is
+   * routed by the reviewed ceilings alone. A failed read counts as real.
+   * Absent: the attestation alone decides, as before.
+   */
+  readonly syntheticSubject?:
+    | ((who: {
+        readonly tenantId: string;
+        readonly userId?: string | undefined;
+      }) => Promise<boolean>)
+    | undefined;
+  /**
    * The aggregate daily spend cap (audit F-D8; policy/spend-cap.ts).
    * Absent: no aggregate cap, only the per-request and per-feature ones.
    */
@@ -692,6 +707,27 @@ export function createModelGateway(
     );
   }
 
+  /** The attestation, kept only when this request's subject is synthetic. */
+  async function allowanceFor(
+    request: ModelGatewayRequest,
+  ): Promise<SyntheticDemoRoutingAllowance | null | undefined> {
+    const allowance = dependencies.syntheticDemo;
+    if (
+      allowance?.permitted !== true ||
+      request.dataPosture !== "SYNTHETIC_DEMO" ||
+      dependencies.syntheticSubject === undefined
+    ) {
+      return allowance;
+    }
+    const synthetic = await dependencies
+      .syntheticSubject({
+        tenantId: request.attribution.tenantId,
+        userId: request.attribution.userId,
+      })
+      .catch(() => false);
+    return synthetic ? allowance : null;
+  }
+
   async function execute<T>(
     input: ModelGatewayRequestInput,
     options: ModelGatewayExecuteOptions<T> = {},
@@ -821,6 +857,12 @@ export function createModelGateway(
     const tenantPolicy =
       request.tenantPolicy ??
       (await tenantPolicies.policyFor(request.attribution.tenantId));
+    const syntheticDemo = await allowanceFor(request);
+    span.setAttribute(
+      "q.model.synthetic_demo",
+      syntheticDemo?.permitted === true &&
+        request.dataPosture === "SYNTHETIC_DEMO",
+    );
     const plan = planRoute(
       {
         catalog,
@@ -839,7 +881,7 @@ export function createModelGateway(
           request.tools,
         ),
         tenantPolicy,
-        syntheticDemo: dependencies.syntheticDemo,
+        syntheticDemo,
         now,
       },
       policy,

@@ -751,6 +751,7 @@ import {
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
+  createPostgresSyntheticSubjectReader,
   createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
   VERIFICATION_EVENTS,
@@ -1232,6 +1233,11 @@ const modelGateway = timedModelGateway(
     usage: createPostgresModelUsageRepository({ sql: database.sql }),
     health: createProcessLocalProviderHealth(),
     syntheticDemo,
+    // Owner 2026-10-28: the demo posture covers the seeded world only; a
+    // person who signed up for real is routed as a customer.
+    syntheticSubject: createPostgresSyntheticSubjectReader({
+      sql: database.sql,
+    }),
     // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
     // counts, shared with the workers' gateway; unset means no cap.
     spendCap: (() => {

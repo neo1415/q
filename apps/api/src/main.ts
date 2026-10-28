@@ -298,6 +298,7 @@ import {
   closeKybForClaim,
   createDecideByOperator,
   createKybService,
+  createPostgresSyntheticSubjectReader,
   createPostgresVerificationClaimRepository,
   createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
@@ -393,6 +394,11 @@ await telemetry.start();
 // through ActorContext and AuthorizationService.
 const databaseConfig = loadDatabaseConfig();
 const database = createRequestDatabaseClient(databaseConfig);
+// Owner 2026-10-28: GateQ's demo posture covers the seeded world only; a
+// person who signed up for real is routed as a customer.
+const gatewaySyntheticSubject = createPostgresSyntheticSubjectReader({
+  sql: database.sql,
+});
 
 // Lead 2026-10-03: what Q cost this month, for the admin console. Names
 // are read for display only; the ledger itself is read-only.
@@ -751,6 +757,7 @@ const wordsReaders =
           usage: createPostgresModelUsageRepository({ sql: database.sql }),
           health: createProcessLocalProviderHealth(),
           spendCap: gateqSpendCap,
+          syntheticSubject: gatewaySyntheticSubject,
           syntheticDemo: createSyntheticDemoRoutingAllowance({
             operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
             environment: config.runtime.deploymentEnvironment,
@@ -798,6 +805,7 @@ if (
       usage: createPostgresModelUsageRepository({ sql: database.sql }),
       health: createProcessLocalProviderHealth(),
       spendCap: gateqSpendCap,
+      syntheticSubject: gatewaySyntheticSubject,
       syntheticDemo: createSyntheticDemoRoutingAllowance({
         operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
         environment: config.runtime.deploymentEnvironment,
@@ -1019,6 +1027,7 @@ const gateqApply =
               // Doc 15 §62: an attestation about the whole deployment,
               // re-checked against environment and database. Never
               // something a request, a header or a hostname can claim.
+              syntheticSubject: gatewaySyntheticSubject,
               syntheticDemo: createSyntheticDemoRoutingAllowance({
                 operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
                 environment: config.runtime.deploymentEnvironment,

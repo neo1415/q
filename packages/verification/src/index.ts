@@ -104,6 +104,12 @@ export {
   createPostgresVerificationClaimRepository,
 } from "./infrastructure/postgres-verification-repository.js";
 export {
+  createPostgresSyntheticSubjectReader,
+  isSyntheticSubject,
+  type SyntheticSubject,
+  type SyntheticSubjectFacts,
+} from "./infrastructure/synthetic-subject.js";
+export {
   createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
   type PublicClaimStanding,

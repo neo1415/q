@@ -19,6 +19,7 @@ import {
 } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
+import { createPostgresSyntheticSubjectReader } from "@capital-q/verification";
 
 type WorkerConfig = ReturnType<typeof loadWorkerConfig>;
 
@@ -126,6 +127,11 @@ export function composeWorkerModelGateway(options: {
     usage: createPostgresModelUsageRepository({ sql: options.sql }),
     health: createProcessLocalProviderHealth(),
     syntheticDemo,
+    // Owner 2026-10-28: the demo posture covers the seeded world only; a
+    // job for a person who signed up for real is routed as a customer's.
+    syntheticSubject: createPostgresSyntheticSubjectReader({
+      sql: options.sql,
+    }),
     spendCap,
     logger: options.logger,
   });

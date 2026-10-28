@@ -52,6 +52,12 @@ function build(
     readonly alpha?: readonly FakeBehaviour[] | undefined;
     readonly beta?: readonly FakeBehaviour[] | undefined;
     readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
+    readonly syntheticSubject?:
+      | ((who: {
+          readonly tenantId: string;
+          readonly userId?: string | undefined;
+        }) => Promise<boolean>)
+      | undefined;
   } = {},
 ) {
   const alpha = createFakeModelProvider({
@@ -67,6 +73,7 @@ function build(
     registry: createModelProviderRegistry([alpha, beta]),
     usage: createInMemoryModelUsageRepository(),
     syntheticDemo: options.syntheticDemo ?? null,
+    syntheticSubject: options.syntheticSubject,
     sleep: noSleep,
     random: () => 0.5,
   });
@@ -172,6 +179,57 @@ describe("synthetic-demo routing (CQ-REC-007)", () => {
     expect(result.providerCode).toBe("alpha");
     expect(beta.calls).toHaveLength(0);
     expect(alpha.calls).toHaveLength(1);
+  });
+
+  // ----------------------------------------------------------------- F2
+  // Owner 2026-10-28: one deployment, seeded demo world AND real sign-ups.
+
+  it("F2: an attested deployment routes a real person's request as a customer's", async () => {
+    const asked: { tenantId: string; userId?: string | undefined }[] = [];
+    const { gateway, alpha, beta } = build({
+      syntheticDemo: demoAllowance(),
+      syntheticSubject: (who) => {
+        asked.push(who);
+        return Promise.resolve(false);
+      },
+    });
+    const result = await gateway.execute(
+      demoRequest("CONFIDENTIAL", "SYNTHETIC_DEMO"),
+    );
+    expect(result.providerCode).toBe("alpha");
+    expect(beta.calls).toHaveLength(0);
+    expect(alpha.calls).toHaveLength(1);
+    expect(
+      result.route.candidates.find((c) => c.providerCode === "beta")?.reason,
+    ).toBe("SENSITIVITY_EXCEEDS_CEILING");
+    expect(asked).toHaveLength(1);
+  });
+
+  it("F2: a seeded synthetic person keeps the demo route; a failed read is a customer", async () => {
+    const seeded = build({
+      syntheticDemo: demoAllowance(),
+      syntheticSubject: () => Promise.resolve(true),
+    });
+    expect(
+      (
+        await seeded.gateway.execute(
+          demoRequest("CONFIDENTIAL", "SYNTHETIC_DEMO"),
+        )
+      ).providerCode,
+    ).toBe("beta");
+
+    const unread = build({
+      syntheticDemo: demoAllowance(),
+      syntheticSubject: () => Promise.reject(new Error("db down")),
+    });
+    expect(
+      (
+        await unread.gateway.execute(
+          demoRequest("CONFIDENTIAL", "SYNTHETIC_DEMO"),
+        )
+      ).providerCode,
+    ).toBe("alpha");
+    expect(unread.beta.calls).toHaveLength(0);
   });
 
   // ------------------------------------------------------------------ G
