@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -81,6 +83,17 @@ function pngBytes(width: number, height: number): Buffer {
   ctx.fillRect(0, 0, width, height);
   return drawn.toBuffer("image/png");
 }
+
+describe("pdf.js reads CID fonts from the installed package, never the network", () => {
+  it("points at the shipped CMaps and standard font data", () => {
+    const assets = pdfjsAssetOptions();
+    expect(existsSync(join(assets.cMapUrl, "UniJIS-UTF16-H.bcmap"))).toBe(true);
+    expect(existsSync(join(assets.standardFontDataUrl, "FoxitSerif.pfb"))).toBe(
+      true,
+    );
+    expect(assets.cMapUrl.startsWith("http")).toBe(false);
+  });
+});
 
 describe("low-text pages are named by the extractor", () => {
   it("records the pages whose text layer is (nearly) empty", async () => {
