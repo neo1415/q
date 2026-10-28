@@ -216,6 +216,32 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       readAt: "2026-10-08T09:05:00.000Z",
     },
   },
+  SCHEDULE: {
+    kind: "SCHEDULE",
+    title: "Your day",
+    span: "TODAY",
+    timeZone: null,
+    calls: [
+      {
+        meetingId: "m1",
+        relationshipId: UUID,
+        purpose: "Intro call",
+        startsAt: "2026-10-28T13:00:00.000Z",
+        with: ["Ada Obi"],
+        organisedByYou: true,
+        briefReady: true,
+      },
+    ],
+    reminders: [
+      {
+        reminderId: "r1",
+        title: "Send the deck",
+        dueAt: "2026-10-28T16:00:00.000Z",
+        relationshipId: null,
+      },
+    ],
+    approvals: ["Message Apex Capital"],
+  },
   TIMELINE: {
     kind: "TIMELINE",
     title: "Your relationship",

@@ -106,6 +106,7 @@ export function QRoomStage({
   load = loadRoomCardAction,
   turns = [],
   deckLoaders,
+  onAsk,
 }: {
   readonly open: RoomCard | null;
   readonly note: RoomNote | null;
@@ -114,6 +115,8 @@ export function QRoomStage({
   /** Q room W5: the conversation, for the deck surface's paging. */
   readonly turns?: readonly QTurn[] | undefined;
   readonly deckLoaders?: DeckLoaders | undefined;
+  /** Ask Q from the card ("Reply" on a chat drafts one for approval). */
+  readonly onAsk?: ((text: string) => void) | undefined;
 }) {
   const reduced = useReducedMotion() === true;
   // The note shows once per moving on, for a few seconds.
@@ -146,6 +149,7 @@ export function QRoomStage({
               turns={turns}
               deckLoaders={deckLoaders}
               onClose={() => onClose(open)}
+              onAsk={onAsk}
             />
           </m.section>
         )}
@@ -185,12 +189,14 @@ function RoomCardBody({
   turns,
   deckLoaders,
   onClose,
+  onAsk,
 }: {
   readonly card: RoomCard;
   readonly load: RoomCardLoader;
   readonly turns: readonly QTurn[];
   readonly deckLoaders?: DeckLoaders | undefined;
   readonly onClose: () => void;
+  readonly onAsk?: ((text: string) => void) | undefined;
 }) {
   const deck = card.intent.object === "Q_DOCUMENT";
   const { read, retry } = useCardView(card, load);
@@ -264,7 +270,16 @@ function RoomCardBody({
             <div className="h-4 w-3/5 rounded bg-(--cq-surface-subtle)" />
           </div>
         ) : result.ok ? (
-          <CardView view={result.view} />
+          <CardView
+            view={result.view}
+            reply={
+              onAsk !== undefined &&
+              (card.intent.object === "CHAT_WITH_COMPANY" ||
+                card.intent.object === "CHAT_WITH_INVESTOR")
+                ? () => onAsk(`Draft a reply to ${card.intent.title}.`)
+                : undefined
+            }
+          />
         ) : (
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {result.message}
@@ -317,7 +332,15 @@ function cardRef(intent: QShowInQRoomIntent): QManifestRef | null {
   }
 }
 
-function CardView({ view }: { readonly view: RoomCardView }) {
+function CardView({
+  view,
+  reply,
+}: {
+  readonly view: RoomCardView;
+  /** A chat card: ask Q to draft the reply (approved before it is sent). */
+  readonly reply?: (() => void) | undefined;
+}) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
       {view.lead === null ? null : (
@@ -358,13 +381,25 @@ function CardView({ view }: { readonly view: RoomCardView }) {
           and {String(view.more)} more
         </p>
       ) : null}
-      <Link
-        href={view.href}
-        className="cq-label inline-flex min-h-11 items-center self-start text-(--cq-accent) underline-offset-2 hover:underline"
-        data-q-room-open
-      >
-        {view.open}
-      </Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href={view.href}
+          className="cq-label inline-flex min-h-11 items-center self-start text-(--cq-accent) underline-offset-2 hover:underline"
+          data-q-room-open
+        >
+          {view.open}
+        </Link>
+        {reply === undefined ? null : (
+          <button
+            type="button"
+            className="cq-stage-control"
+            onClick={reply}
+            data-q-room-reply
+          >
+            {t("Reply")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

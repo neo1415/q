@@ -3448,9 +3448,12 @@ const qTools = createQTools({
       // of preparing a second card (QA 2026-10-01).
       activeErrand: (actor, ref) =>
         errandStore.activeFor?.(actor, ref) ?? Promise.resolve(null),
-      counterpartName: async (actor, relationshipId) =>
-        (await relationshipCounterparts.of(actor, relationshipId))?.name ??
-        null,
+      counterpart: async (actor, relationshipId) => {
+        const other = await relationshipCounterparts.of(actor, relationshipId);
+        return other === null
+          ? null
+          : { kind: other.kind, id: other.id, name: other.name };
+      },
     }),
     // BIZ-008: calls and reminders, prepared on the chat board.
     schedule: {

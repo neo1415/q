@@ -1,5 +1,8 @@
 import {
+  ChatDraftDtoSchema,
   EmailDraftDtoSchema,
+  Q_APPROVAL_CHAT_DRAFT_SUFFIX,
+  type ReviseChatDraftRequest,
   GOOGLE_CONNECT_PATH,
   GOOGLE_INTEGRATION_PATH,
   GOOGLE_RELATIONSHIP_MAIL_PATH,
@@ -90,6 +93,25 @@ export function reviseEmailDraft(
   input: ReviseEmailDraftRequest,
 ) {
   return call(session, "POST", draftPath(approvalId), QApprovalViewSchema, {
+    body: input,
+  });
+}
+
+const chatDraftPath = (approvalId: string) =>
+  `${Q_APPROVALS_PATH}/${encodeURIComponent(approvalId)}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`;
+
+/** Q API: the message behind a `chat.message.send` approval, for its approver. */
+export function getChatDraft(session: ApiSession, approvalId: string) {
+  return call(session, "GET", chatDraftPath(approvalId), ChatDraftDtoSchema);
+}
+
+/** Q API: the person's edit; the old approval is void, a new one is returned. */
+export function reviseChatDraft(
+  session: ApiSession,
+  approvalId: string,
+  input: ReviseChatDraftRequest,
+) {
+  return call(session, "POST", chatDraftPath(approvalId), QApprovalViewSchema, {
     body: input,
   });
 }

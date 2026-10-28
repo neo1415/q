@@ -66,6 +66,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "SUMMARY",
   // L-13 (2026-10-20): a picture of something visual, credited.
   "PICTURE",
+  // Live 2026-10-28: their day, as list_schedule read it.
+  "SCHEDULE",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -602,6 +604,74 @@ export const QWorkInProgressBlockSchema = z
   })
   .strict();
 
+/**
+ * Live 2026-10-28 ("what's on my schedule today?" answered in words
+ * alone): their day as a card, built by code from the `list_schedule`
+ * tool's own authorised result -- their calls (each with whether its prep
+ * brief is ready), their open reminders, and what waits for their
+ * approval. Times are ISO instants; `timeZone` is the IANA zone the screen
+ * shows them in, null when the person's zone is not known (the screen
+ * says UTC then, as the words do). Nothing here is a model's.
+ */
+export const Q_SCHEDULE_CALLS_MAX = 8;
+export const Q_SCHEDULE_REMINDERS_MAX = 8;
+export const Q_SCHEDULE_APPROVALS_MAX = 5;
+const SCHEDULE_AT = z.string().datetime({ offset: true });
+
+export const QScheduleBlockSchema = z
+  .object({
+    kind: z.literal("SCHEDULE"),
+    title: z.string().trim().min(1).max(120),
+    /** "TODAY": the day; "WEEK": the next seven days. */
+    span: z.enum(["TODAY", "WEEK"]),
+    timeZone: z.string().trim().min(1).max(64).nullable(),
+    calls: z
+      .array(
+        z
+          .object({
+            meetingId: z.string().trim().min(1).max(64),
+            relationshipId: UuidSchema.nullable(),
+            purpose: z.string().trim().min(1).max(160),
+            startsAt: SCHEDULE_AT,
+            with: z.array(z.string().trim().min(1).max(120)).max(6),
+            organisedByYou: z.boolean(),
+            /** The prep brief is ready (24 hours before the call). */
+            briefReady: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(Q_SCHEDULE_CALLS_MAX),
+    reminders: z
+      .array(
+        z
+          .object({
+            reminderId: z.string().trim().min(1).max(64),
+            title: z.string().trim().min(1).max(200),
+            dueAt: SCHEDULE_AT,
+            relationshipId: UuidSchema.nullable(),
+          })
+          .strict(),
+      )
+      .max(Q_SCHEDULE_REMINDERS_MAX),
+    /** What waits for their approval, in the engine's own summary words. */
+    approvals: z
+      .array(z.string().trim().min(1).max(200))
+      .max(Q_SCHEDULE_APPROVALS_MAX),
+  })
+  .strict()
+  .refine(
+    (block) =>
+      block.calls.every((call, index) => {
+        const before = block.calls[index - 1];
+        return (
+          before === undefined ||
+          Date.parse(before.startsAt) <= Date.parse(call.startsAt)
+        );
+      }),
+    { message: "calls are in time order, soonest first", path: ["calls"] },
+  );
+export type QScheduleBlock = z.infer<typeof QScheduleBlockSchema>;
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -625,6 +695,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QSummaryBlockSchema,
   QPictureBlockSchema,
   QWorkInProgressBlockSchema,
+  QScheduleBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

@@ -638,6 +638,7 @@ export function QPresenceStage({
             load={loadRoomCard}
             turns={turns}
             deckLoaders={deckLoaders}
+            onAsk={onAsk}
           />
         </Suspense>
       ) : null}

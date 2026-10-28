@@ -198,6 +198,76 @@ describe("opening a record's page", () => {
     });
   });
 
+  // Live 2026-10-28: "open my pitch deck" left the Q page for the deck
+  // tab, with no Download. The deck opens where they are, as the
+  // data-room document it is; with no deck this reader may see, the tab.
+  it("opens the deck in the material viewer where they are, else the deck tab", async () => {
+    const DECK = "d0000000-0000-4000-8000-00000000000d";
+    const withDeck = (deck: boolean) =>
+      createQToolExecutor({
+        registry: createQToolRegistry([
+          createOpenPageTool(
+            fakePorts({
+              profileMaterial: {
+                dataRoom: () => Promise.resolve(null),
+                ownCompanyId: () => Promise.resolve(COMPANY_A),
+                deck: (_actor, companyId) =>
+                  Promise.resolve(
+                    deck
+                      ? {
+                          viewer: "OWNER" as const,
+                          companyId,
+                          deck: {
+                            documentId: DECK,
+                            title: "Ajopot investor deck",
+                            versionNumber: 1,
+                            pageCount: 9,
+                            uploadedAt: "2026-10-15T09:00:00.000Z",
+                            downloadable: true,
+                            scanned: false,
+                          },
+                          extraction: null,
+                          coaching: null,
+                        }
+                      : {
+                          viewer: "OWNER" as const,
+                          companyId,
+                          deck: null,
+                          extraction: null,
+                          coaching: null,
+                        },
+                  ),
+              },
+            }),
+          ),
+        ]),
+      });
+    const opened = await withDeck(true).execute(
+      call("open_page", { page: "COMPANY_DECK", id: COMPANY_A }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(opened)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "DATA_ROOM_DOCUMENT",
+      id: DECK,
+      companyId: COMPANY_A,
+      title: "Ajopot investor deck",
+    });
+    const noDeck = await withDeck(false).execute(
+      call("open_page", { page: "COMPANY_DECK", id: COMPANY_A }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(noDeck)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY_DECK",
+      id: COMPANY_A,
+    });
+  });
+
   it("drops a tab the page does not have, and opens nothing the page would not (N2)", async () => {
     const wrongTab = await executor.execute(
       call("open_page", { page: "COMPANY", id: COMPANY_A, tab: "calls" }),

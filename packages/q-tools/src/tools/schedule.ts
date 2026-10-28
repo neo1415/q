@@ -1310,7 +1310,7 @@ export function createScheduleTools(
       status: "ACTIVE",
       providerName: "list_schedule",
       description:
-        "Reads the person's own upcoming calls (with whom, when, whether they organised it, and the prep brief once it is ready, 24 hours before) and their open reminders; plus byRelationship: the calls on each of their relationships, including ones a colleague booked and past calls that did not take place. A relationship whose calls are UNAVAILABLE is unknown right now: never say no call was booked for it.",
+        "Reads the person's own upcoming calls (with whom, when, whether they organised it, and the prep brief once it is ready, 24 hours before) and their open reminders; the result is also shown to them as their schedule card, so call it whenever they ask what is on their day, their schedule, their calls or their reminders, even when their day is already in your context. Plus byRelationship: the calls on each of their relationships, including ones a colleague booked and past calls that did not take place. A relationship whose calls are UNAVAILABLE is unknown right now: never say no call was booked for it.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       requiredCapabilities: [],

@@ -1,6 +1,8 @@
 import { answerCardsBlock, type ModelAnswerCardsLike } from "./answer-cards.js";
 import { randomUUID } from "node:crypto";
 
+import { z } from "zod";
+
 import { asksForSummary } from "./artifact-preview.js";
 import { RunRead, type ReadInvestor } from "./card-subjects.js";
 import {
@@ -801,6 +803,146 @@ export function chartBlock(input: {
     })),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Live 2026-10-28: their day as a card, from list_schedule's own result.
+
+const ScheduleReadSchema = z
+  .object({
+    meetings: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            relationshipId: z.string(),
+            purpose: z.string(),
+            startsAt: z.string(),
+            organisedByYou: z.boolean(),
+            with: z.array(z.string()),
+            brief: z.string().nullable(),
+          })
+          .passthrough(),
+      )
+      .default([]),
+    reminders: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            title: z.string(),
+            dueAt: z.string(),
+            relationshipId: z.string().nullable(),
+          })
+          .passthrough(),
+      )
+      .default([]),
+  })
+  .passthrough();
+
+const ApprovalsReadSchema = z
+  .object({
+    items: z.array(z.object({ summary: z.string() }).passthrough()).default([]),
+  })
+  .passthrough();
+
+function dayKeyIn(at: Date, zone: string): string | null {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(at);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Their day, built only from the `list_schedule` tool's authorised result
+ * (and the pending-approvals read beside it): today's calls and reminders
+ * when there are any, else the next seven days', each in time order. A
+ * reminder past due still shows (it is open). Null when the read did not
+ * parse: nothing is drawn from a guess.
+ */
+export function scheduleBlock(input: {
+  readonly schedule: unknown;
+  readonly approvals?: unknown;
+  readonly now: Date;
+  /** Their zone; null when not known (the card then says UTC). */
+  readonly timeZone: string | null;
+}): QResultBlock | null {
+  const read = ScheduleReadSchema.safeParse(input.schedule);
+  if (!read.success) return null;
+  const zone = input.timeZone ?? "UTC";
+  const today = dayKeyIn(input.now, zone);
+  const nowMs = input.now.getTime();
+  const horizon = nowMs + 7 * 24 * 3_600_000;
+  const parsed = (iso: string) => {
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? ms : null;
+  };
+  const isToday = (iso: string) =>
+    today !== null && dayKeyIn(new Date(iso), zone) === today;
+  const calls = read.data.meetings
+    .filter((meeting) => {
+      const ms = parsed(meeting.startsAt);
+      return ms !== null && ms >= nowMs - 3_600_000 && ms <= horizon;
+    })
+    .toSorted((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  const reminders = read.data.reminders
+    .filter((reminder) => {
+      const ms = parsed(reminder.dueAt);
+      return ms !== null && ms <= horizon;
+    })
+    .toSorted((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  const todayCalls = calls.filter((call) => isToday(call.startsAt));
+  const todayReminders = reminders.filter((reminder) =>
+    isToday(reminder.dueAt),
+  );
+  const span: "TODAY" | "WEEK" =
+    todayCalls.length > 0 || todayReminders.length > 0 ? "TODAY" : "WEEK";
+  const shownCalls = (span === "TODAY" ? todayCalls : calls).slice(0, 8);
+  const shownReminders = (span === "TODAY" ? todayReminders : reminders).slice(
+    0,
+    8,
+  );
+  const approvals = ApprovalsReadSchema.safeParse(input.approvals ?? {});
+  const uuid = (value: string | null): string | null =>
+    value !== null && UUID_RE.test(value) ? value.toLowerCase() : null;
+  const block = {
+    kind: "SCHEDULE" as const,
+    title: span === "TODAY" ? "Your day" : "Your next seven days",
+    span,
+    timeZone: input.timeZone,
+    calls: shownCalls.map((call) => ({
+      meetingId: call.id.slice(0, 64),
+      relationshipId: uuid(call.relationshipId),
+      purpose: call.purpose.trim().slice(0, 160) || "Call",
+      startsAt: new Date(call.startsAt).toISOString(),
+      with: call.with
+        .map((name) => name.trim().slice(0, 120))
+        .filter((name) => name.length > 0)
+        .slice(0, 6),
+      organisedByYou: call.organisedByYou,
+      briefReady: call.brief !== null && call.brief.trim().length > 0,
+    })),
+    reminders: shownReminders.map((reminder) => ({
+      reminderId: reminder.id.slice(0, 64),
+      title: reminder.title.trim().slice(0, 200) || "Reminder",
+      dueAt: new Date(reminder.dueAt).toISOString(),
+      relationshipId: uuid(reminder.relationshipId),
+    })),
+    approvals: (approvals.success ? approvals.data.items : [])
+      .map((item) => item.summary.trim().slice(0, 200))
+      .filter((summary) => summary.length > 0)
+      .slice(0, 5),
+  };
+  return parseQResultBlocks([block]).blocks[0] ?? null;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 /** The block the model asked for, from what the run read; null when none fits. */
 function visualBlock(
