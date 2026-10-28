@@ -31,7 +31,7 @@ export const DELEGATION_READER_V5: PromptDefinition<
 > = {
   ...DELEGATION_READER_V4,
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "HANDOVER §5.3: a short answer states only what it names or plainly means; a word repeating the question's topic or answering another question chooses nothing.",
   effectiveFrom: "2026-10-01",

@@ -168,14 +168,17 @@ export function acknowledgementParts(
  * "saved: stage: Seed; raising now: Yes…" read as a key:value dump). What
  * was recorded comes first, its field after it in brackets: "Seed
  * (stage)", "Yes, actively (raising now)"; a fact kept with their notes
- * reads "first revenue only (in your notes on revenue)".
+ * names the field only, "growth kept in your notes", never their words
+ * read back to them (live 2026-10-28: "I've noted 61 (gross margin) and
+ * our gross margin is about 61 percent and we grow around 18 percent
+ * month (in your notes on growth)").
  */
 export function acknowledgedLine(item: AcknowledgedItem): string {
   if (item.kind === "KEPT") {
     const kept = keptParts(item.text);
     return kept === null
       ? item.text
-      : `${kept.words} (in your notes on ${kept.label})`;
+      : `${kept.label.toLowerCase()} kept in your notes`;
   }
   return `${item.value} (${item.label.toLowerCase()})`;
 }

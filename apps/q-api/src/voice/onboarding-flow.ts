@@ -452,20 +452,83 @@ export function withoutUnbackedFieldClaims(
   return kept.join("").trim();
 }
 
+/** "a", "a and b", "a, b and c". */
+function spokenList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+}
+
 /**
- * Their words ask to leave the interview for now: to finish here, stop for
- * now, come back later or go to their home page (live 25 Oct e2e: "I would
- * like to finish and go to my home page"). Narrow on purpose: a stated
- * fact that only mentions finishing ("we finish payroll runs on Friday")
- * names no leaving.
+ * What code says when they pause ("I'll continue this later"; owner
+ * 2026-10-28): one short line, what is saved and what is still open, and
+ * that Q carries on from here. No question: the screen then takes them
+ * into the app, as the Continue later button does.
  */
-const LEAVING = [
-  /\b(?:go|take me|send me|back) (?:to|back to) (?:my |the )?(?:home|dashboard)(?: ?page)?\b/iu,
-  /\b(?:continue|carry on|pick (?:this|it) up|come back|finish(?: this)?|do the rest|answer the rest)\b[^.?!]{0,40}\blater\b/iu,
-  /\b(?:that'?s|that is) (?:all|everything|enough) for (?:now|today)\b/iu,
-  /\b(?:stop|pause|leave it|leave this) (?:here|there|for now|for today)\b/iu,
-  /\bi(?:'d| would) like to (?:finish|stop|leave) (?:now|here|for now)\b/iu,
-];
-export function asksToLeave(utterance: string): boolean {
-  return LEAVING.some((pattern) => pattern.test(utterance));
+export function pausingLine(
+  journey: "founder" | "investor",
+  state: OnboardingState,
+  labelOf: (stepKey: string) => string | undefined,
+): string {
+  const saved = state.steps.filter((s) => s.status === "ANSWERED").length;
+  const open = state.steps
+    .filter((s) => s.status === "OPEN" && s.required && s.kind !== "YES_NO")
+    .map((s) => labelOf(s.stepKey)?.toLowerCase() ?? s.question);
+  const named = open.slice(0, 4);
+  const more = open.length - named.length;
+  const stillOpen =
+    open.length === 0
+      ? "nothing required is still open"
+      : `still open: ${spokenList(named)}${more > 0 ? ` and ${String(more)} more` : ""}`;
+  const into =
+    journey === "investor"
+      ? "Discover already works from what you've told me"
+      : "your home page is ready";
+  return `Of course. ${saved === 1 ? "One thing" : `${String(saved)} things`} you've told me ${saved === 1 ? "is" : "are"} saved, and ${stillOpen}. Pick this up whenever you like; I'll carry on from here, and ${into}.`;
+}
+
+/**
+ * What code says when they asked to finish (typed, live 2026-10-28, D3).
+ * Finished: one line that it is done. Not yet: one line naming exactly
+ * which required things are still open, then the first of them asked.
+ * Null when the port could not say what is missing: the model's reply
+ * stands. No "we'll pause here", and nothing about leaving.
+ */
+export function finishingLine(
+  journey: "founder" | "investor",
+  finished: {
+    readonly completed: boolean;
+    readonly missing: readonly {
+      readonly stepKey: string;
+      readonly question: string;
+    }[];
+  },
+  copy: {
+    readonly labelOf: (stepKey: string) => string | undefined;
+    readonly questionOf: (stepKey: string) => string | null;
+  },
+): { readonly reply: string; readonly asking: string | null } | null {
+  if (finished.completed) {
+    return {
+      reply:
+        journey === "investor"
+          ? "That's everything I need. Your mandate is saved and live: Discover will show you companies matched to it."
+          : "That's everything I need. Your company profile is saved, and investors who fit will now be matched to it.",
+      asking: null,
+    };
+  }
+  const [first] = finished.missing;
+  if (first === undefined) return null;
+  const names = finished.missing
+    .slice(0, 8)
+    .map((item) => copy.labelOf(item.stepKey)?.toLowerCase() ?? item.question);
+  const more = finished.missing.length - names.length;
+  const count =
+    finished.missing.length === 1
+      ? "one thing"
+      : `${String(finished.missing.length)} things`;
+  const question = (copy.questionOf(first.stepKey) ?? first.question).trim();
+  return {
+    reply: `Before I can finish, I still need ${count}: ${spokenList(names)}${more > 0 ? ` and ${String(more)} more` : ""}. ${question.endsWith("?") ? question : `${question}?`}`,
+    asking: first.stepKey,
+  };
 }
