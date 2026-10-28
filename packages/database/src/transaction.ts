@@ -2,16 +2,25 @@ import type { Sql } from "postgres";
 
 import { DatabaseError, toDatabaseError } from "./errors.js";
 
-/** Postgres.js and socket errors carry a `code`; application errors do not. */
+/**
+ * Postgres.js and socket errors carry a `code`: a SQLSTATE ("23505"), a
+ * Node errno ("ECONNRESET") or a driver code ("CONNECTION_CLOSED"), always
+ * upper case. An application error may carry its own lower-case code
+ * ("onboarding_context_required"): it is the caller's, and propagates
+ * unchanged. Live 2026-10-28: an investor's website answer, held until the
+ * firm exists, was wrapped as an UNEXPECTED database failure and answered
+ * 500 seven times, so the held queue read it as the service being down
+ * and nothing behind it was saved.
+ */
 function isDriverFailure(error: unknown): boolean {
   if (error instanceof DatabaseError) {
     return true;
   }
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    ("code" in error || "errno" in error)
-  );
+  if (typeof error !== "object" || error === null) return false;
+  if ("errno" in error) return true;
+  if (!("code" in error)) return false;
+  const code: unknown = error.code;
+  return typeof code !== "string" || /^[0-9A-Z_]+$/u.test(code);
 }
 import type { TransactionContext, TransactionManager } from "./types.js";
 

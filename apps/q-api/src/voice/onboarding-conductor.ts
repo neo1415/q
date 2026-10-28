@@ -44,6 +44,7 @@ import { languageInfo } from "@capital-q/q-core/language";
 import { replyLanguageOf } from "./reply-language.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 import { firstNameOf } from "./onboarding-flow.js";
+import type { TypedOnboarding } from "./typed-onboarding.js";
 import type { OnboardingConversation } from "./onboarding-conversation.js";
 import { HAND_STEP_COPY } from "./step-copy-language.js";
 import {
@@ -699,6 +700,12 @@ export type OnboardingConductorDependencies = {
    * research on their firm or company starts with it.
    */
   readonly introduction?: Pick<OnboardingConversation, "opening"> | undefined;
+  /**
+   * Owner 2026-10-28: a typed turn is the voice line's conversation (kept
+   * in the thread, read and saved in the background, one reply). Absent
+   * (CQ_ONBOARDING_VOICE_CONVERSATION=off): the guided interview answers.
+   */
+  readonly typed?: TypedOnboarding | undefined;
   /** Where known answers are recorded and findings held, as the person. */
   readonly portFor: ConductorPortFactory;
   /** Public presence by name; absent means nothing is looked up. */
@@ -1122,6 +1129,19 @@ export function createOnboardingConductor(
         return null;
       });
       if (resumed !== null) return resumed;
+    }
+    if (
+      !opening &&
+      input.channel === "text" &&
+      dependencies.typed !== undefined
+    ) {
+      const typed = await dependencies.typed
+        .turn(input)
+        .catch((error: unknown) => {
+          logger.warn({ err: error }, "typed onboarding conversation failed");
+          return null;
+        });
+      if (typed !== null) return typed;
     }
     const outcome = await agent.turn(input);
     if (input.signal?.aborted === true) return outcome;

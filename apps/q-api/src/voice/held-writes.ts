@@ -5,6 +5,7 @@ import {
   isTransientOnboardingFailure,
   waitsForContext,
   waitsForStep,
+  WAITING_CODE_PREFIX,
   type DrainResult,
   type PendingWrite,
   type PendingWriteRepository,
@@ -74,7 +75,11 @@ export function createHeldWritesStore(dependencies: {
           submit: ports.submit,
           classify: (error) =>
             waitsForContext(error) || waitsForStep(error)
-              ? { kind: "WAITING", code: failureCode(error) }
+              ? {
+                  kind: "WAITING",
+                  // Marked as waiting, so its retries are not backed off.
+                  code: `${WAITING_CODE_PREFIX}${failureCode(error)}`,
+                }
               : isTransientOnboardingFailure(error)
                 ? { kind: "TRANSIENT", code: failureCode(error) }
                 : { kind: "REFUSED", code: failureCode(error) },

@@ -56,12 +56,8 @@ describe("DELEGATION_READER v5", () => {
 });
 
 describe("DELEGATION_READER v6 (typed onboarding 2026-10-28, D5)", () => {
-  it("is active and reads a decline of a required step too; every other v5 rule stands", async () => {
+  it("reads a decline of a required step too; every other v5 rule stands", async () => {
     const { DELEGATION_READER_V6 } = await import("../src/index.js");
-    expect(
-      createDefaultPromptRegistry().getActive("DELEGATION_READER").definition
-        .version,
-    ).toBe(6);
     expect(DELEGATION_READER_V6.template).not.toContain(
       "Required steps are never declined.",
     );
@@ -72,6 +68,23 @@ describe("DELEGATION_READER v6 (typed onboarding 2026-10-28, D5)", () => {
     const v6 = DELEGATION_READER_V6.template.split("\n");
     expect(v6).toHaveLength(v5.length);
     expect(v6.filter((line) => !v5.includes(line))).toHaveLength(1);
+  });
+});
+
+describe("DELEGATION_READER v7 (production re-test 2026-10-28)", () => {
+  it("is active, reads that's all as finishing, and changes only the finishing rule", async () => {
+    const { DELEGATION_READER_V6, DELEGATION_READER_V7 } =
+      await import("../src/index.js");
+    expect(
+      createDefaultPromptRegistry().getActive("DELEGATION_READER").definition
+        .version,
+    ).toBe(7);
+    expect(DELEGATION_READER_V7.template).toContain("that's all");
+    expect(DELEGATION_READER_V7.template).toContain("Finishing is not pausing");
+    const v6 = DELEGATION_READER_V6.template.split("\n");
+    const v7 = DELEGATION_READER_V7.template.split("\n");
+    expect(v7).toHaveLength(v6.length);
+    expect(v7.filter((line) => !v6.includes(line))).toHaveLength(1);
   });
 });
 

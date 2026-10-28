@@ -223,7 +223,9 @@ export function withoutAnsweredQuestions(
 ): string {
   const cores: string[] = [];
   for (const step of state.steps) {
-    if (step.status !== "ANSWERED") continue;
+    // An answer still saving is answered (live f46ddb69: the website was
+    // asked again while its save was queued).
+    if (step.status !== "ANSWERED" && step.savePending !== true) continue;
     for (const wording of [spoken[step.stepKey], step.question]) {
       const core = questionCore(wording);
       if (core !== null) cores.push(core);
@@ -452,6 +454,54 @@ export function withoutUnbackedFieldClaims(
   return kept.join("").trim();
 }
 
+/** A sentence of Q's saying something is saved, kept or set up. */
+const KEPT_CLAIM =
+  /\b(saved|recorded|on (?:your|the) record|noted|captured|logged|stored|kept|set up|locked in|all set)\b/iu;
+
+/**
+ * Only what COMMITTED is confirmed (live 2026-10-28: "Your $50k–$100k cheque
+ * range is kept." for a change that was only queued, and "Harmattan Angels
+ * is set up" with no firm). Each of Q's sentences claiming a save that names
+ * a field still being saved is taken out, and one line of code's own says
+ * what is still saving; the next turn confirms it. A question is kept. The
+ * labels are the journey's own; the sentences are Q's, never the person's.
+ */
+export function withStillSaving(
+  reply: string,
+  /** Labels of fields whose save is queued, not committed. */
+  savingLabels: readonly string[],
+): string {
+  const labels = [
+    ...new Set(savingLabels.map((l) => l.trim()).filter((l) => l.length > 0)),
+  ];
+  if (labels.length === 0) return reply;
+  const terms = labels.flatMap((label) => {
+    const lower = label.toLowerCase();
+    const head = lower.split(/\s+/u).at(-1) ?? lower;
+    return head.length >= 4 && head !== lower ? [lower, head] : [lower];
+  });
+  const names = (sentence: string) => {
+    const lower = sentence.toLowerCase();
+    return terms.some((term) => lower.includes(term));
+  };
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  const kept = sentences.filter(
+    (sentence) =>
+      sentence.includes("?") || !(KEPT_CLAIM.test(sentence) && names(sentence)),
+  );
+  const line = `Still saving your ${spokenList(labels.map((l) => l.toLowerCase()))}; I'll confirm once ${labels.length === 1 ? "it's" : "they're"} in.`;
+  // Before the closing question, so the reply still ends by asking it.
+  const last = kept.at(-1);
+  const body =
+    last !== undefined && last.includes("?")
+      ? [...kept.slice(0, -1), ` ${line} `, last]
+      : [...kept, ` ${line}`];
+  return body
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** "a", "a and b", "a, b and c". */
 function spokenList(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? "";
@@ -486,6 +536,17 @@ export function pausingLine(
   return `Of course. ${saved === 1 ? "One thing" : `${String(saved)} things`} you've told me ${saved === 1 ? "is" : "are"} saved, and ${stillOpen}. Pick this up whenever you like; I'll carry on from here, and ${into}.`;
 }
 
+/** Why finishing waits: what is left is answered and still being saved. */
+export const STILL_SAVING_FINISH_REASON =
+  "Everything needed is answered, and some of it is still being saved; finishing waits until it is.";
+
+/**
+ * Why finishing stopped short of a review step: its read-back has not been
+ * shown. The caller reads back what is saved and asks for their yes.
+ */
+export const REVIEW_NOT_SHOWN_REASON =
+  "The review has not been shown to them yet: read back what is saved and ask if it is right; finish on their yes.";
+
 /**
  * What code says when they asked to finish (typed, live 2026-10-28, D3).
  * Finished: one line that it is done. Not yet: one line naming exactly
@@ -501,12 +562,38 @@ export function finishingLine(
       readonly stepKey: string;
       readonly question: string;
     }[];
+    readonly reason?: string | undefined;
   },
   copy: {
     readonly labelOf: (stepKey: string) => string | undefined;
     readonly questionOf: (stepKey: string) => string | null;
+    /**
+     * What is saved, "Label: value" each, and the review step to ask: for a
+     * review not shown yet, the read-back the person says yes to.
+     */
+    readonly review?:
+      | { readonly saved: readonly string[]; readonly stepKey: string }
+      | undefined;
   },
 ): { readonly reply: string; readonly asking: string | null } | null {
+  if (
+    !finished.completed &&
+    finished.reason === REVIEW_NOT_SHOWN_REASON &&
+    copy.review !== undefined
+  ) {
+    const saved = copy.review.saved.slice(0, 14);
+    return {
+      reply: `Here's what I have saved: ${saved.length === 0 ? "nothing yet" : saved.join("; ")}. Is that all right? Say yes and I'll finish, or tell me what to change.`,
+      asking: copy.review.stepKey,
+    };
+  }
+  if (!finished.completed && finished.reason === STILL_SAVING_FINISH_REASON) {
+    return {
+      reply:
+        "That's everything I need from you. A few of your answers are still being saved; I'll finish your setup as soon as they're in.",
+      asking: null,
+    };
+  }
   if (finished.completed) {
     return {
       reply:

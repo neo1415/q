@@ -95,6 +95,8 @@ export type FounderBriefingFacts = {
   readonly interest?: readonly InterestFact[] | undefined;
   readonly readinessGaps?: readonly ReadinessGapFact[] | undefined;
   readonly setupNudge?: SetupNudgeFact | undefined;
+  /** Their founder setup is started and not finished (from the session). */
+  readonly setupOpen?: boolean | undefined;
   readonly upcomingCalls?: readonly UpcomingCallFact[] | undefined;
 };
 
@@ -409,7 +411,10 @@ export function composeBriefing(facts: BriefingFacts): Briefing | null {
     changed.push(...relationshipItems(facts));
     worth.push(
       ...setupNudgeItems(facts.setupNudge),
-      ...readinessItems(facts.readinessGaps, setupStillOpen(facts.setupNudge)),
+      ...readinessItems(
+        facts.readinessGaps,
+        facts.setupOpen === true || setupStillOpen(facts.setupNudge),
+      ),
     );
   } else {
     changed.push(...relationshipItems(facts));

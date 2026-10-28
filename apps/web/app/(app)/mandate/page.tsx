@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { resolveOwnContext } from "@/features/q/context";
+import { resolveOwnContext, resolveOwnJourney } from "@/features/q/context";
 import { mandateLandingPath } from "@/features/q/own-paths";
 
 export const dynamic = "force-dynamic";
@@ -11,5 +11,9 @@ export const dynamic = "force-dynamic";
  * setup that defines it. Decided on the server from the session's context.
  */
 export default async function MandatePage(): Promise<never> {
-  redirect(mandateLandingPath(await resolveOwnContext()));
+  const [context, journey] = await Promise.all([
+    resolveOwnContext(),
+    resolveOwnJourney(),
+  ]);
+  redirect(mandateLandingPath(context, journey));
 }

@@ -85,6 +85,18 @@ export type OnboardingConversation = {
     line: ConversationLine,
     request: string,
   ) => Promise<{ readonly commentary: string; readonly leave?: true }>;
+  /**
+   * Typed onboarding (production re-test 2026-10-28): one whole typed line,
+   * kept in the thread now (channel TEXT), then read by meaning in the
+   * background exactly as a spoken one is.
+   */
+  readonly said?: (
+    line: ConversationLine,
+    role: "PERSON" | "Q",
+    text: string,
+  ) => Promise<void>;
+  /** Everything said is read and saved now, waited for (bounded). */
+  readonly flush?: (line: ConversationLine) => Promise<void>;
 };
 
 /** Quiet after something they said before it is read (coalesced). */
@@ -197,7 +209,12 @@ export function createOnboardingConversation(dependencies: {
     });
   };
 
-  const keep = (line: ConversationLine, role: "PERSON" | "Q", text: string) => {
+  const keep = (
+    line: ConversationLine,
+    role: "PERSON" | "Q",
+    text: string,
+    channel: "VOICE" | "TEXT" = "VOICE",
+  ) => {
     const words = text.replace(/\s+/g, " ").trim();
     if (words.length === 0) return;
     const before = writes.get(line.voiceSessionId) ?? Promise.resolve();
@@ -208,7 +225,7 @@ export function createOnboardingConversation(dependencies: {
           line.onboarding.sessionId,
           {
             turnRef: randomUUID(),
-            turns: [{ role, text: words.slice(0, 4_000), channel: "VOICE" }],
+            turns: [{ role, text: words.slice(0, 4_000), channel }],
           },
         ),
       )
@@ -450,6 +467,15 @@ export function createOnboardingConversation(dependencies: {
         buffers.set(line.voiceSessionId, { role, parts: [text] });
       }
     },
+
+    said: async (line, role, text) => {
+      finishUtterance(line);
+      keep(line, role, text, "TEXT");
+      if (role === "PERSON") schedule(line);
+      await (writes.get(line.voiceSessionId) ?? Promise.resolve());
+    },
+
+    flush: (line) => flush(line),
 
     ended: async (line) => {
       await flush(line);

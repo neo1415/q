@@ -118,9 +118,6 @@ export function createQDelegationReader(dependencies: {
         recommended: item.recommended.slice(0, 600),
       }));
       const known = new Set(steps.map((step) => step.stepKey));
-      const optional = new Set(
-        steps.filter((step) => !step.required).map((step) => step.stepKey),
-      );
       const recommended = new Set(pending.map((item) => item.stepKey));
       try {
         const rendered = renderPrompt<DelegationReaderV4Variables>(registry, {
@@ -173,8 +170,12 @@ export function createQDelegationReader(dependencies: {
           );
         return {
           stated: keys(parsed.data.stated, known),
-          // A required step is never declined, whatever the reading says.
-          declined: keys(parsed.data.declined, optional),
+          // A required step may be declined for now (DELEGATION_READER v6;
+          // live 2026-10-28: "skip that" to the team size and to how an
+          // investor invests was dropped here, and the same question came
+          // straight back). The journey decides what it means: it stays
+          // open on the record and is not asked again this conversation.
+          declined: keys(parsed.data.declined, known),
           finishing: parsed.data.finishing,
           lookup: parsed.data.lookup,
           pausing: parsed.data.pausing,

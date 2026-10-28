@@ -82,6 +82,10 @@ import {
   toResponseValue,
   MONEY_STEP,
 } from "./interview-steps.js";
+import {
+  REVIEW_NOT_SHOWN_REASON,
+  STILL_SAVING_FINISH_REASON,
+} from "./onboarding-flow.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 import {
   heardBack,
@@ -95,7 +99,35 @@ import {
  * exists ("firm context isn't active yet" was said to a new investor).
  */
 const HELD_FOR_FIRM_REASON =
-  "Kept, and saved automatically as soon as their firm or company is set up (for an investor: the firm's name and how they invest; for a founder: the company's name). Nothing is lost and it need not be asked again. Say it is kept, never mention 'context' or a record not being active, and ask for whichever of those is still missing.";
+  "NOT saved yet; saved automatically once their firm or company is set up (investor: firm name and how they invest; founder: company name). Nothing is lost; do not ask it again. Say it will be saved once that is in, never that it is saved, kept or set up; never mention 'context'. Ask for whichever of those is still missing.";
+
+/**
+ * What Q is told about an answer held because its save failed for a reason
+ * no answer explains (live 2026-10-28: "Your cheque range is kept" for a
+ * change that was only queued). The confirmation is for committed writes.
+ */
+const STILL_SAVING_REASON =
+  'Not saved yet: it is still being saved and is confirmed next turn; nothing is lost. Say it is still saving ("saving…"), never that it is saved or kept, do not ask it again, and carry on.';
+
+/**
+ * The review steps that read the whole record back for their yes (the
+ * company snapshot, the mandate review): confirmed only once shown.
+ */
+const RECORD_REVIEWS: ReadonlySet<string> = new Set([
+  FOUNDER_STEPS.snapshot,
+  INVESTOR_STEPS.review,
+]);
+
+/**
+ * Choices that describe how someone works, not things they list by name:
+ * no option's label is the words people use for it, so the reading's
+ * choice is never cut back to the options whose labels their words repeat
+ * (live 2026-10-28: "we like to lead sometimes but mostly follow" was
+ * saved as lead only; following a lead is "Co-invest alongside a lead").
+ */
+const MEANING_ONLY_CHOICES: ReadonlySet<string> = new Set([
+  INVESTOR_STEPS.investmentRole,
+]);
 
 /**
  * Steps the journey saves only as one of their options, because it sets
@@ -599,6 +631,8 @@ export function createOnboardingPort(input: {
         readonly finishing: boolean;
         /** A question beyond their setup they asked, read by meaning. */
         readonly lookup?: string | null;
+        /** They want to stop for now and come back later. */
+        readonly pausing?: boolean;
       } | null>)
     | undefined;
   readonly recommendations?: RecommendationStore | undefined;
@@ -638,6 +672,14 @@ export function createOnboardingPort(input: {
    * the whole list. Absent: an answer replaces, as a typed one does.
    */
   readonly addsTo?: ReadonlySet<string> | undefined;
+  /**
+   * Whether the person has been shown what this review step confirms (Q
+   * asked it, or read back the whole record). A review is confirmed only
+   * after its read-back was shown (production re-test 2026-10-28: the
+   * company snapshot was confirmed in the same second as the raise, never
+   * shown). Absent: every review counts as shown, as before.
+   */
+  readonly reviewShown?: ((stepKey: string) => boolean) | undefined;
 }): BoundOnboardingPort {
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
@@ -1165,6 +1207,7 @@ export function createOnboardingPort(input: {
   ): Extract<Resolved, { ok: true }> => {
     if (
       resolved.value.type !== "MULTI_SELECT" ||
+      MEANING_ONLY_CHOICES.has(resolved.step.stepKey) ||
       resolved.note !== undefined ||
       answer.basis === "DELEGATED" ||
       !turnIsEnglish(answer.quote)
@@ -1851,7 +1894,7 @@ export function createOnboardingPort(input: {
             ).slice(0, 400),
             reason: waitsForContext(error)
               ? HELD_FOR_FIRM_REASON
-              : "Not saved yet: the service is briefly unavailable. Their answer is held and will be saved automatically; nothing is lost. Tell them plainly it is not saved yet, do not ask it again, and carry on.",
+              : STILL_SAVING_REASON,
           };
         } catch {
           // The hold itself failed: report the original failure honestly.
@@ -2193,6 +2236,7 @@ export function createOnboardingPort(input: {
           e.required &&
           steps.get(e.stepKey)?.configuration.stepType !== "confirmation",
       );
+      let unshownReview = false;
       if (!answersLeft) {
         for (let guard = 0; guard < 4; guard += 1) {
           const open = view.progress.eligibleSteps.find(
@@ -2201,6 +2245,13 @@ export function createOnboardingPort(input: {
               steps.get(e.stepKey)?.configuration.stepType === "confirmation",
           );
           if (open === undefined) break;
+          if (
+            RECORD_REVIEWS.has(open.stepKey) &&
+            input.reviewShown?.(open.stepKey) === false
+          ) {
+            unshownReview = true;
+            break;
+          }
           await submit(open.stepKey, { type: "CONFIRMATION", confirmed: true });
           written.push(open.stepKey);
           view = await current();
@@ -2223,7 +2274,9 @@ export function createOnboardingPort(input: {
         recorded:
           view.session.status === "COMPLETED"
             ? "Confirmed, and their setup is complete. Close warmly in a sentence or two and ask nothing more."
-            : "Confirmed.",
+            : unshownReview
+              ? "Confirmed. The last review has not been shown to them yet: read back what is saved, from the state, in a few plain sentences, and ask if it is right before anything is finished."
+              : "Confirmed.",
       };
     } catch (error: unknown) {
       return refused(step.stepKey, error);
@@ -2783,8 +2836,7 @@ export function createOnboardingPort(input: {
                 stepKey,
                 outcome: "HELD_FOR_RETRY",
                 question: questionOf(item.plan.step),
-                reason:
-                  "Not saved yet: the service is briefly unavailable. Their answer is held and will be saved automatically; nothing is lost. Tell them plainly it is not saved yet, do not ask it again, and carry on.",
+                reason: STILL_SAVING_REASON,
               });
               continue;
             } catch {
@@ -2792,6 +2844,41 @@ export function createOnboardingPort(input: {
             }
           }
           settled.push(refused(stepKey, error));
+        }
+        // One answer the service failed on takes the whole batch down with
+        // it (one transaction). Each held answer is tried again on its own
+        // now, so the others land this turn and only the failing one waits
+        // (live 2026-10-28: nine mandate answers queued behind a website).
+        const heldNow = settled.filter((r) => r.outcome === "HELD_FOR_RETRY");
+        if (heldNow.length > 1) {
+          const drained = await replayHeldWrites().catch(() => null);
+          if (drained !== null && drained.applied.length > 0) {
+            const now = await current();
+            for (const [index, item] of ready.entries()) {
+              const stepKey = item.plan.step.stepKey;
+              if (
+                settled[index]?.outcome !== "HELD_FOR_RETRY" ||
+                !drained.applied.includes(stepKey)
+              ) {
+                continue;
+              }
+              noteFigure(item.plan.step, item.value, item.plan.quote);
+              settled[index] = {
+                stepKey,
+                outcome: "COMMITTED",
+                question: questionOf(item.plan.step),
+                recorded: (
+                  await recordedLine(
+                    item.plan.step,
+                    item.value,
+                    item.plan.note,
+                    now,
+                  )
+                ).slice(0, 600),
+                ...keptInWordsOf(item.value, item.plan.note),
+              };
+            }
+          }
         }
       }
     }
@@ -3438,8 +3525,22 @@ export function createOnboardingPort(input: {
           break;
         }
       }
-      const gaps = missing(view);
+      // An answer still saving is answered, not missing (live f46ddb69:
+      // nine mandate answers queued, and "that's all" named none of them).
+      const saving =
+        input.held === undefined
+          ? new Set<string>()
+          : await input.held.pendingSteps().catch(() => new Set<string>());
+      const open = missing(view);
+      const gaps = open.filter((gap) => !saving.has(gap.stepKey));
       if (gaps.length > 0) return { completed: false, missing: gaps };
+      if (open.length > 0) {
+        return {
+          completed: false,
+          missing: [],
+          reason: STILL_SAVING_FINISH_REASON,
+        };
+      }
       // The journey's own review steps, confirmed on the person's word —
       // one after another, since the next becomes eligible after the last.
       for (let guard = 0; guard < 4; guard += 1) {
@@ -3449,6 +3550,17 @@ export function createOnboardingPort(input: {
             steps.get(e.stepKey)?.configuration.stepType === "confirmation",
         );
         if (open === undefined) break;
+        // Shown first, then confirmed on their yes (the voice path's rule).
+        if (
+          RECORD_REVIEWS.has(open.stepKey) &&
+          input.reviewShown?.(open.stepKey) === false
+        ) {
+          return {
+            completed: false,
+            missing: [],
+            reason: REVIEW_NOT_SHOWN_REASON,
+          };
+        }
         try {
           await submit(open.stepKey, { type: "CONFIRMATION", confirmed: true });
           written.push(open.stepKey);
