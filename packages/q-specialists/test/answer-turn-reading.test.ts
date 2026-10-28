@@ -49,7 +49,6 @@ import {
 import {
   teamJobLine,
   teamJobOutcomeOf,
-  workKindsAsked,
   type QTeamJobPort,
   type TeamJobPriorAnswer,
 } from "../src/team-job.js";
@@ -142,6 +141,8 @@ function seam(options: {
   readonly delegation?: QDelegationPort;
   /** Several kinds of work at once: a team job (live 2026-10-12). */
   readonly teamJob?: QTeamJobPort;
+  /** Situation-first planning (S5): a plan of their own. */
+  readonly plan?: import("../src/plan-job-port.js").QPlanJobPort;
   /** A call with one named counterpart, prepared in the answer (v58). */
   readonly callPrep?: QCallPrepPort;
   /** A follow-up answered from what Q already showed (v54 fromShown). */
@@ -386,6 +387,7 @@ function seam(options: {
       ? {}
       : { delegation: options.delegation }),
     ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
+    ...(options.plan === undefined ? {} : { plan: options.plan }),
     ...(options.callPrep === undefined ? {} : { callPrep: options.callPrep }),
     ...(options.conversationRecall === undefined
       ? {}
@@ -2438,7 +2440,8 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
       "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.";
     const { answer, delegated, stored } = seam({
       said,
-      reading: reading("Ledgerfold"),
+      // The reader reads it as team work (no keyword path, 2026-10-28).
+      reading: { ...reading("Ledgerfold"), teamJob: true } as TurnReaderResult,
       outcomes: [],
       handOver: value,
       teamJob,
@@ -2459,7 +2462,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     };
     const { answer, delegated, stored } = seam({
       said: "Research Ledgerfold, write a memo and have it critiqued",
-      reading: reading(null),
+      reading: { ...reading(null), teamJob: true } as TurnReaderResult,
       outcomes: [],
       teamJob,
     });
@@ -2494,6 +2497,8 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
         ...reading(null),
         handOver: null,
         teamJob: true,
+        // The reader reads "Yes, plan this one anyway." as the reply to Q's question.
+        replyTo: { kind: "Q_QUESTION", card: null },
       } as TurnReaderResult,
       outcomes: [],
       teamJob,
@@ -2539,7 +2544,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     };
     const { answer, delegated, stored } = seam({
       said: "Research Ledgerfold, write a memo and have it critiqued",
-      reading: reading(null),
+      reading: { ...reading(null), teamJob: true } as TurnReaderResult,
       outcomes: [],
       teamJob,
     });
@@ -2772,18 +2777,6 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     await answer.answer(request());
     expect(proposed).toBe(0);
     expect(delegated()).toBe(1);
-  });
-
-  it("counts the kinds of work: assessing and naming risks are one kind", () => {
-    expect(
-      workKindsAsked("What are the main risks? Give me a brief assessment."),
-    ).toBe(2);
-    expect(
-      workKindsAsked(
-        "Research them, prepare an investment memo, get it critiqued, revise it and draft founder diligence questions",
-      ),
-    ).toBe(5);
-    expect(workKindsAsked("handle it")).toBe(0);
   });
 
   it("names the work kinds: two or more is a work request, a hand-over names none", () => {
@@ -6003,5 +5996,133 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
     });
     await answer.answer(request()).catch(() => undefined);
     expect(asked).toEqual([]);
+  });
+});
+
+describe("situation-first planning: the reader's planAsk starts the plan job (S5)", () => {
+  const reading = (_named: string | null) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+    }) as TurnReaderResult;
+  const F03 =
+    "Review the pitch deck and financial documents I've uploaded. Extract material company facts, identify contradictions and show me what needs my confirmation before updating the company record.";
+
+  function planPort() {
+    const started: { ask: string; deliverable: string }[] = [];
+    const directed: string[] = [];
+    const plan: import("../src/plan-job-port.js").QPlanJobPort = {
+      start: (_request, input) => {
+        started.push({
+          ask: input.ask,
+          deliverable: input.planAsk.deliverable,
+        });
+        return Promise.resolve({
+          status: "STARTED",
+          jobId: "70000000-0000-4000-8000-000000000001",
+          title: "Your plan",
+          line: "I'm on it: gathering where things stand for you now.",
+        });
+      },
+      direct: (_request, text) => {
+        directed.push(text);
+        return Promise.resolve({ status: "NOTED" });
+      },
+    };
+    return { plan, started, directed };
+  }
+
+  it("the F03 ask starts at once with the work card, never 'nothing has started'", async () => {
+    const { plan, started } = planPort();
+    let proposed = 0;
+    const { answer, stored } = seam({
+      said: F03,
+      reading: {
+        ...reading(null),
+        teamJob: true,
+        planAsk: {
+          kind: "GOAL",
+          research: "NONE",
+          side: "FOUNDER",
+          subject: "OWN",
+          deliverable: "DOCUMENT_REVIEW",
+        },
+        directsWork: false,
+      } as TurnReaderResult,
+      outcomes: [],
+      plan,
+      teamJob: {
+        propose: () => {
+          proposed += 1;
+          return Promise.resolve({ status: "NOT_PLANNED" });
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(started).toEqual([{ ask: F03, deliverable: "DOCUMENT_REVIEW" }]);
+    expect(proposed).toBe(0);
+    const last = stored.at(-1);
+    expect(last?.content).toBe(
+      "I'm on it: gathering where things stand for you now.",
+    );
+    expect(last?.content).not.toMatch(/nothing has started/u);
+    expect(last?.blocks).toEqual([
+      {
+        kind: "WORK_IN_PROGRESS",
+        jobId: "70000000-0000-4000-8000-000000000001",
+        title: "Your plan",
+      },
+    ]);
+  });
+
+  it("an ask about a company they name is not a plan of their own: the team job takes it", async () => {
+    const { plan, started } = planPort();
+    let proposed = 0;
+    const { answer } = seam({
+      said: "Make me a diligence plan for Ledgerfold",
+      reading: {
+        ...reading("Ledgerfold"),
+        teamJob: true,
+        planAsk: {
+          kind: "GOAL",
+          research: "NONE",
+          side: "INVESTOR",
+          subject: "NAMED",
+          deliverable: "PLAN",
+        },
+      } as TurnReaderResult,
+      outcomes: [],
+      plan,
+      teamJob: {
+        propose: () => {
+          proposed += 1;
+          return Promise.resolve({ status: "UNAVAILABLE" });
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(started).toEqual([]);
+    expect(proposed).toBe(1);
+  });
+
+  it("words to running work are filed as direction (the reader's directsWork), once", async () => {
+    const { plan, directed, started } = planPort();
+    const { answer, stored } = seam({
+      said: "Focus on the fintech investors first",
+      reading: { ...reading(null), directsWork: true } as TurnReaderResult,
+      outcomes: [],
+      plan,
+    });
+    await answer.answer(request());
+    expect(directed).toEqual(["Focus on the fintech investors first"]);
+    expect(started).toEqual([]);
+    expect(stored.at(-1)?.content).toMatch(
+      /^Noted\. I'll work that in from the next step/u,
+    );
   });
 });

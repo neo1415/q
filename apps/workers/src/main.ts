@@ -46,6 +46,7 @@ import {
   CorrelationIdSchema,
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  Q_PLAN_WAKE_CHANNEL,
   Q_WORK_WAKE_CHANNEL,
   WORKERS_WAKE_CHANNEL,
 } from "@capital-q/contracts";
@@ -171,6 +172,7 @@ import { rebuildRelationshipStatesAtStart } from "./network/relationship-rebuild
 import { redriveBlockedDocumentsAtStart } from "./documents/redrive.js";
 import { backfillDocumentPagesAtStart } from "./documents/page-backfill.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
+import { withPlanWake } from "./network/plan-wake-handler.js";
 import { withChatMessageEvents } from "./network/chat-message-handler.js";
 import { withInterestNotices } from "./network/interest-notice-handler.js";
 import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
@@ -970,110 +972,121 @@ const documentEvents = createQueueRunner({
         // AUTO block (founder direction 2026-10-01): acceptance wakes Q's
         // waiting work at once, after the state above is projected.
         withQWorkWake(
-          withCommitmentNotices(
-            withOutcomeNotices(
-              withDocumentReadings(
-                withInterestNotices(
-                  withReadinessAfterVerification(
-                    withVerificationDecisions(
-                      createDomainEventHandler({
-                        registry,
-                        queues,
-                        pipelineVersion: config.documents.pipelineVersion,
-                        mediaModeration: {
-                          onReady: (event) => {
-                            // The message names the asset; the decision re-reads it. An id that
-                            // is not one is archived by the handler's own outcome, not thrown.
-                            const mediaAssetId = MediaAssetIdSchema.safeParse(
-                              event.mediaAssetId,
-                            );
-                            if (!mediaAssetId.success) {
-                              return Promise.resolve({ kind: "SKIPPED" });
-                            }
-                            return mediaModeration({
-                              tenantId: event.tenantId,
-                              mediaAssetId: mediaAssetId.data,
-                              correlationId: CorrelationIdSchema.parse(
-                                event.correlationId ?? `cor_${randomUUID()}`,
-                              ),
-                            });
+          // Situation-first planning (S6): any event of a tenant wakes its
+          // open plans' conditions (no per-feature watchers).
+          withPlanWake(
+            withCommitmentNotices(
+              withOutcomeNotices(
+                withDocumentReadings(
+                  withInterestNotices(
+                    withReadinessAfterVerification(
+                      withVerificationDecisions(
+                        createDomainEventHandler({
+                          registry,
+                          queues,
+                          pipelineVersion: config.documents.pipelineVersion,
+                          mediaModeration: {
+                            onReady: (event) => {
+                              // The message names the asset; the decision re-reads it. An id that
+                              // is not one is archived by the handler's own outcome, not thrown.
+                              const mediaAssetId = MediaAssetIdSchema.safeParse(
+                                event.mediaAssetId,
+                              );
+                              if (!mediaAssetId.success) {
+                                return Promise.resolve({ kind: "SKIPPED" });
+                              }
+                              return mediaModeration({
+                                tenantId: event.tenantId,
+                                mediaAssetId: mediaAssetId.data,
+                                correlationId: CorrelationIdSchema.parse(
+                                  event.correlationId ?? `cor_${randomUUID()}`,
+                                ),
+                              });
+                            },
                           },
-                        },
-                        ...(founderReview === undefined
-                          ? {}
-                          : { founderReview }),
-                        founderFinancialCheck,
-                        ...(mandateReview === undefined
-                          ? {}
-                          : { mandateReview }),
-                        ...(presenceResearch === undefined
-                          ? {}
-                          : { presenceResearch }),
-                        recommendations: {
-                          onEvent: async (event) => {
-                            const applied = await slateInvalidation.apply(
-                              refreshDirectiveFor(event),
-                              {
-                                correlationId: event.correlationId,
-                                causationId: `cau_${event.id}`,
-                              },
-                            );
-                            // A company that became ready wakes standing
-                            // instructions open to new companies (founder
-                            // 2026-10-05). The id only; q-api re-reads all.
-                            const ready = newlyReadyCompanyOf(event);
-                            if (ready !== null) {
-                              await database.sql`select pg_notify(${Q_INSTRUCTION_NEW_COMPANY_CHANNEL}, ${ready})`;
-                              // P14: saved startup alerts it matches tell
-                              // their investors (notice, pushed and emailed
-                              // by the delivery ticker). Never fails the event.
-                              await startupAlertWatcher(ready)
-                                .then((told) => {
-                                  if (told > 0) {
-                                    logger.info(
-                                      { event: "gateq.startup_alert", told },
-                                      "startup alert notices created",
+                          ...(founderReview === undefined
+                            ? {}
+                            : { founderReview }),
+                          founderFinancialCheck,
+                          ...(mandateReview === undefined
+                            ? {}
+                            : { mandateReview }),
+                          ...(presenceResearch === undefined
+                            ? {}
+                            : { presenceResearch }),
+                          recommendations: {
+                            onEvent: async (event) => {
+                              const applied = await slateInvalidation.apply(
+                                refreshDirectiveFor(event),
+                                {
+                                  correlationId: event.correlationId,
+                                  causationId: `cau_${event.id}`,
+                                },
+                              );
+                              // A company that became ready wakes standing
+                              // instructions open to new companies (founder
+                              // 2026-10-05). The id only; q-api re-reads all.
+                              const ready = newlyReadyCompanyOf(event);
+                              if (ready !== null) {
+                                await database.sql`select pg_notify(${Q_INSTRUCTION_NEW_COMPANY_CHANNEL}, ${ready})`;
+                                // P14: saved startup alerts it matches tell
+                                // their investors (notice, pushed and emailed
+                                // by the delivery ticker). Never fails the event.
+                                await startupAlertWatcher(ready)
+                                  .then((told) => {
+                                    if (told > 0) {
+                                      logger.info(
+                                        { event: "gateq.startup_alert", told },
+                                        "startup alert notices created",
+                                      );
+                                    }
+                                  })
+                                  .catch((error: unknown) => {
+                                    logger.warn(
+                                      {
+                                        event: "gateq.startup_alert",
+                                        errorName:
+                                          error instanceof Error
+                                            ? error.name
+                                            : "unknown",
+                                      },
+                                      "startup alert matching failed",
                                     );
-                                  }
-                                })
-                                .catch((error: unknown) => {
-                                  logger.warn(
-                                    {
-                                      event: "gateq.startup_alert",
-                                      errorName:
-                                        error instanceof Error
-                                          ? error.name
-                                          : "unknown",
-                                    },
-                                    "startup alert matching failed",
-                                  );
-                                });
-                            }
-                            return applied;
+                                  });
+                              }
+                              return applied;
+                            },
                           },
-                        },
+                          logger,
+                        }),
+                        { registry, decide: verificationDecider, logger },
+                      ),
+                      {
+                        registry,
+                        ownerOf: createDecidedClaimOwnerLookup({
+                          sql: database.sql,
+                        }),
+                        reconcile:
+                          readinessCompanies.reconcileMarketplaceReadinessAsSystem,
                         logger,
-                      }),
-                      { registry, decide: verificationDecider, logger },
+                      },
                     ),
                     {
                       registry,
-                      ownerOf: createDecidedClaimOwnerLookup({
-                        sql: database.sql,
-                      }),
-                      reconcile:
-                        readinessCompanies.reconcileMarketplaceReadinessAsSystem,
+                      sql: database.sql,
+                      notices: createCounterpartNotices(database.sql),
                       logger,
                     },
                   ),
-                  {
-                    registry,
-                    sql: database.sql,
-                    notices: createCounterpartNotices(database.sql),
-                    logger,
-                  },
                 ),
+                {
+                  registry,
+                  sql: database.sql,
+                  notices: createCounterpartNotices(database.sql),
+                  logger,
+                },
               ),
+              // 2026-10-04: each commitment step, told to the other side.
               {
                 registry,
                 sql: database.sql,
@@ -1081,11 +1094,11 @@ const documentEvents = createQueueRunner({
                 logger,
               },
             ),
-            // 2026-10-04: each commitment step, told to the other side.
             {
-              registry,
-              sql: database.sql,
-              notices: createCounterpartNotices(database.sql),
+              channel: Q_PLAN_WAKE_CHANNEL,
+              notify: async (channel, payload) => {
+                await database.sql`select pg_notify(${channel}, ${payload})`;
+              },
               logger,
             },
           ),

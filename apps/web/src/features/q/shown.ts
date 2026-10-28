@@ -74,6 +74,7 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
       case "SUMMARY":
       case "WORK_IN_PROGRESS":
       case "SCHEDULE":
+      case "PLAN":
         return block.title;
       case "COMPARISON_CARDS":
         if (block.title !== null && block.title.length > 0) return block.title;
@@ -294,6 +295,7 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
         break;
       case "ARTIFACT_REFERENCE":
       case "WORK_IN_PROGRESS":
+      case "PLAN":
         name(block.title);
         break;
       case "CLARIFICATION_REQUEST":

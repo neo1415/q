@@ -520,6 +520,9 @@ export {
   Q_SCHEDULE_APPROVALS_MAX,
   QScheduleBlockSchema,
   type QScheduleBlock,
+  // Situation-first planning (2026-10-28): the plan card.
+  QPlanBlockSchema,
+  type QPlanBlock,
   type QPictureSource,
   chartableSeries,
   parseQResultBlocks,
@@ -1133,6 +1136,7 @@ export {
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  Q_PLAN_WAKE_CHANNEL,
   Q_WORK_LANE_ANSWER_PATH,
   Q_WORK_LANE_PATH,
   Q_WORK_LANE_STAGES,
@@ -1333,6 +1337,9 @@ export * from "./ui-act.js";
 export * from "./attention.js";
 export * from "./agent-capability.js";
 export * from "./workforce-reasoning.js";
+// Situation-first planning (2026-10-28): the situation dossier and the plan.
+export * from "./situation.js";
+export * from "./plan.js";
 // RECOVERY-2026-10 workstream C: UI act receipts (export requested of the lead).
 export * from "./ui-act-receipts.js";
 // RECOVERY-2026-10 workstream C: navigation at the end of the utterance.

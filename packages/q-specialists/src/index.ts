@@ -323,13 +323,11 @@ export {
 } from "./call-prep.js";
 export {
   createToolTeamJobPort,
-  TEAM_JOB_KINDS,
   earlierRequestGoal,
   priorAnswerOf,
   teamJobBlocks,
   ownWorkSummary,
   teamJobLine,
-  workKindsAsked,
   type QTeamJobPort,
   type TeamJobAudience,
   type TeamJobOutcome,
@@ -442,3 +440,13 @@ export {
   type PreparedFollowUpPort,
 } from "./fast-lane.js";
 export { pipelineSummaryLine, type PipelineRow } from "./pipeline-summary.js";
+
+// Situation-first planning (2026-10-28): the situation dossier, read as the asker.
+export * from "./situation/index.js";
+// Situation-first planning (S5, S6): the answer's port to the plan job.
+export {
+  planAskRoutes,
+  type QPlanAskReading,
+  type QPlanJobPort,
+  type QPlanStartOutcome,
+} from "./plan-job-port.js";

@@ -428,6 +428,24 @@ export const WorkforceOverviewDtoSchema = z
       .optional(),
     /** Live standing instructions. Absent from an older server. */
     instructions: z.array(WorkforceInstructionDtoSchema).max(20).optional(),
+    /**
+     * Situation-first planning, addendum 1: the specialists Q set up for
+     * their plans (approved with a plan version), by their plain names,
+     * with what each did last. Absent from an older server.
+     */
+    specialists: z
+      .array(
+        z
+          .object({
+            name: z.string().trim().min(1).max(60),
+            state: z.enum(WORKFORCE_TEAM_STATES),
+            runs: z.number().int().min(0),
+            latest: z.string().max(500).nullable(),
+          })
+          .strict(),
+      )
+      .max(12)
+      .optional(),
   })
   .strict();
 export type WorkforceOverviewDto = z.infer<typeof WorkforceOverviewDtoSchema>;

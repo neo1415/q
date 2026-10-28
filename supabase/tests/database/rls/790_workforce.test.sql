@@ -20,15 +20,16 @@ select pg_temp.rls_setup();
 select plan(31);
 
 -- Shape ------------------------------------------------------------------------
+-- Eight since 20261231150000_q_plans added workforce_thread (suite 994).
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'q_runtime' and c.relname like 'workforce\_%' and c.relkind = 'r'
       and c.relrowsecurity and c.relforcerowsecurity),
-  7, 'all seven workforce tables have RLS on and forced');
+  8, 'all eight workforce tables have RLS on and forced');
 select is(
   (select count(*)::int from pg_policies where schemaname = 'q_runtime' and tablename like 'workforce\_%'
      and cmd = 'SELECT' and qual like '%current_app_user_id%is_tenant_member%'),
-  7, 'each has the owner''s-rows select policy');
+  8, 'each has the owner''s-rows select policy');
 select is(
   (select count(*)::int from pg_policies where schemaname = 'q_runtime' and tablename like 'workforce\_%'
      and cmd <> 'SELECT'),

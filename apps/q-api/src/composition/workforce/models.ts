@@ -44,6 +44,12 @@ import {
   type DiligenceQuestionsShortenResult,
   type DiligenceQuestionsShortenVariables,
   ReplyReaderResultSchema,
+  PlanReviewResultSchema,
+  PlanWriteResultSchema,
+  type PlanReviewResult,
+  type PlanReviewVariables,
+  type PlanWriteResult,
+  type PlanWriteVariables,
   type DraftRedraftResult,
   type DraftRedraftVariables,
   type DraftReviewResultV2,
@@ -88,6 +94,9 @@ export type ResearchPlanInput = Omit<ResearchPlanVariables, Frame>;
 export type ResearchFactsInput = Omit<ResearchFactsVariables, Frame>;
 export type AnalysisWriteInput = Omit<AnalysisWriteVariables, Frame>;
 export type AnalysisCritiqueInput = Omit<AnalysisCritiqueVariables, Frame>;
+/** Situation-first planning (S4): PLAN_WRITE v1 and PLAN_REVIEW v1. */
+export type PlanWriteInput = Omit<PlanWriteVariables, Frame>;
+export type PlanReviewInput = Omit<PlanReviewVariables, Frame>;
 
 /** A deep-work call's result and what it cost (null cost: unpriced). */
 export type Priced<O> = {
@@ -171,6 +180,23 @@ export const PLAN_BUDGET = {
   attemptTimeoutMs: 60_000,
 } as const;
 const PLAN = PLAN_BUDGET;
+/**
+ * Situation-first planning (S4): a whole plan of up to 12 cited steps in
+ * one structured object, and one reviewer's rubric with its defects. Each
+ * bounded on its own; the plan job makes at most six such calls.
+ */
+export const PLAN_WRITE_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.12,
+  maxOutputTokens: 5_000,
+  attemptTimeoutMs: 60_000,
+} as const;
+export const PLAN_REVIEW_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.06,
+  maxOutputTokens: 2_400,
+  attemptTimeoutMs: 45_000,
+} as const;
 
 export type WorkforceModels = {
   readonly review: (
@@ -238,6 +264,18 @@ export type WorkforceModels = {
     trace: Trace,
     input: AnalysisCritiqueInput,
   ) => Promise<Priced<AnalysisCritiqueResult> | null>;
+  /** Situation-first planning: the person's plan from their situation. */
+  readonly writePlan?: (
+    who: Who,
+    trace: Trace,
+    input: PlanWriteInput,
+  ) => Promise<PlanWriteResult | null>;
+  /** One independent review of it, against plan-rubric/v1. */
+  readonly reviewPlan?: (
+    who: Who,
+    trace: Trace,
+    input: PlanReviewInput,
+  ) => Promise<PlanReviewResult | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -262,7 +300,9 @@ export function createWorkforceModels(dependencies: {
       | "RESEARCH_PLAN"
       | "RESEARCH_FACTS"
       | "ANALYSIS_WRITE"
-      | "ANALYSIS_CRITIQUE";
+      | "ANALYSIS_CRITIQUE"
+      | "PLAN_WRITE"
+      | "PLAN_REVIEW";
     readonly taskClass: ModelTextTaskClass;
     readonly who: Who;
     readonly trace: Trace;
@@ -273,6 +313,8 @@ export function createWorkforceModels(dependencies: {
       | typeof CLASSIFY
       | typeof PLAN
       | typeof CRITIQUE
+      | typeof PLAN_WRITE_BUDGET
+      | typeof PLAN_REVIEW_BUDGET
       | DeepBudget;
     readonly environmentNotes: string;
     readonly etiquette: EtiquettePurpose | null;
@@ -604,6 +646,32 @@ export function createWorkforceModels(dependencies: {
         },
       };
     },
+    writePlan: (who, trace, input) =>
+      call<PlanWriteInput, PlanWriteResult>({
+        task: "PLAN_WRITE",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables: input,
+        schema: PlanWriteResultSchema,
+        budget: PLAN_WRITE_BUDGET,
+        environmentNotes:
+          "You plan; nothing runs from your plan until the person accepts it, and every outward or consequential step is approved by them first.",
+        etiquette: null,
+      }),
+    reviewPlan: (who, trace, input) =>
+      call<PlanReviewInput, PlanReviewResult>({
+        task: "PLAN_REVIEW",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables: input,
+        schema: PlanReviewResultSchema,
+        budget: PLAN_REVIEW_BUDGET,
+        environmentNotes:
+          "You are reviewing, not writing. Code recomputes your score and decides whether the plan is redrafted.",
+        etiquette: null,
+      }),
     shortenDiligenceQuestions: async (who, trace, input) => {
       const count = input.questions.length;
       if (count < 1 || count > 5) return null;

@@ -463,6 +463,16 @@ export {
   TURN_READER_V67_SCHEMA_VERSION,
   TURN_READER_V68_SCHEMA_VERSION,
   TURN_READER_V69_SCHEMA_VERSION,
+  TURN_READER_V70_SCHEMA_VERSION,
+  TURN_PLAN_ASK_KINDS,
+  TURN_PLAN_RESEARCH,
+  TURN_PLAN_SIDES,
+  TURN_PLAN_SUBJECTS,
+  TURN_PLAN_DELIVERABLES,
+  TurnPlanAskSchema,
+  type TurnPlanAsk,
+  TurnReaderV70ResultSchema,
+  type TurnReaderV70Result,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -1912,6 +1922,22 @@ export {
   TURN_READER_V69,
   V69_FIELDS_WHERE_THEY_BELONG,
 } from "./prompts/tasks/turn-reader.v69.js";
+export {
+  TURN_READER_V70,
+  V70_DIRECTS_WORK,
+  V70_PLAN_ASK,
+} from "./prompts/tasks/turn-reader.v70.js";
+// Situation-first planning (design 2026-10-28, S3).
+export * from "./prompts/schemas/plan.js";
+export {
+  PLAN_F03_ASK,
+  PLAN_READ_V1,
+  PLAN_REVIEW_V1,
+  PLAN_WRITE_PERSON_SIDE,
+  PLAN_WRITE_FOUNDER_EXAMPLE,
+  PLAN_WRITE_INVESTOR_EXAMPLE,
+  PLAN_WRITE_V1,
+} from "./prompts/tasks/plan.v1.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";

@@ -18,7 +18,7 @@ import {
 describe("TURN_READER v64: a rehearsal they ask for is opened, not prepared", () => {
   it("is the active reader: v63 plus REHEARSAL and the meetingPrep exception", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(69);
+    expect(active.definition.version).toBe(70);
     expect(TURN_READER_V63.status).toBe("DEPRECATED");
     expect(TURN_READER_V64.template).toContain(V64_REHEARSAL_OPEN);
     expect(TURN_READER_V64.template).toContain(V64_REHEARSE_IS_NOT_PREP);

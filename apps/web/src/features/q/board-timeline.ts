@@ -153,6 +153,8 @@ function kindOf(
         return "File Q made for you";
       case "WORK_IN_PROGRESS":
         return "Work Q is doing for you";
+      case "PLAN":
+        return "A plan Q wrote for you";
       case "TABLE":
       case "CHART":
       case "MAP":

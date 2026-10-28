@@ -643,4 +643,22 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "Usually {n} minutes": "يستغرق عادةً {n} دقائق",
   "Usually about a minute": "يستغرق عادةً نحو دقيقة",
   "Next: {step}": "التالي: {step}",
+  // Situation-first planning (2026-10-28): a plan being made.
+  "Gathering your situation": "جمع صورة وضعك الحالي",
+  "Gathered {n} facts about where things stand":
+    "جُمعت {n} حقائق عن وضعك الحالي",
+  "Reading your documents": "قراءة مستنداتك",
+  "Drafting the plan": "صياغة الخطة",
+  "Redrafting the plan from the review": "إعادة صياغة الخطة بناءً على المراجعة",
+  "Reviewing the plan, twice": "مراجعة الخطة مرتين",
+  "Reviewing the revised plan": "مراجعة الخطة المعدّلة",
+  "Your situation": "وضعك",
+  "Your documents": "مستنداتك",
+  "Public sources": "المصادر العامة",
+  Drafting: "الصياغة",
+  Gathering: "قيد الجمع",
+  Gathered: "تم الجمع",
+  "{n} facts": "{n} حقائق",
+  "Two reviews": "مراجعتان",
+  "Set up for your plans": "أُعدّت لخططك",
 };

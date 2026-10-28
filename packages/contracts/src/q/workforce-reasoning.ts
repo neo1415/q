@@ -173,8 +173,38 @@ export const WORKFORCE_LIVE_STAGES = [
   "REVIEWING",
   "REVISING",
   "FILING",
+  // Situation-first planning (2026-10-28): a plan job's own stages. Its
+  // public reading reuses SEARCHING, and FILING is the plan being kept.
+  "GATHERING",
+  "READING_DOCUMENTS",
+  "PLANNING",
+  "REVIEWING_PLAN",
 ] as const;
 export type WorkforceLiveStageName = (typeof WORKFORCE_LIVE_STAGES)[number];
+
+/** A document job's step bar, in order. */
+export const WORKFORCE_DOCUMENT_LIVE_STEPS = [
+  "SEARCHING",
+  "READING",
+  "DRAFTING",
+  "REVIEWING",
+  "REVISING",
+  "FILING",
+] as const satisfies readonly WorkforceLiveStageName[];
+
+/**
+ * A plan job's step bar, in order (2026-10-28): gathering the person's
+ * situation, reading their own documents, public sources (when the ask
+ * needs them), drafting, two independent reviews, keeping it.
+ */
+export const WORKFORCE_PLAN_LIVE_STEPS = [
+  "GATHERING",
+  "READING_DOCUMENTS",
+  "SEARCHING",
+  "PLANNING",
+  "REVIEWING_PLAN",
+  "FILING",
+] as const satisfies readonly WorkforceLiveStageName[];
 
 export const WorkforceLiveStageSchema = z
   .object({
@@ -229,7 +259,7 @@ export const WORKFORCE_LIVE_STATES = [
  * minutes. A document is researched, drafted up to three times with a
  * review after each, then filed (job 9e52faf7: 3 min 25 s).
  */
-export const WORKFORCE_JOB_KINDS = ["DOCUMENT", "RESEARCH"] as const;
+export const WORKFORCE_JOB_KINDS = ["DOCUMENT", "RESEARCH", "PLAN"] as const;
 export type WorkforceJobKind = (typeof WORKFORCE_JOB_KINDS)[number];
 
 export const WORKFORCE_USUAL_MINUTES: Readonly<
@@ -237,6 +267,9 @@ export const WORKFORCE_USUAL_MINUTES: Readonly<
 > = {
   DOCUMENT: { min: 2, max: 4 },
   RESEARCH: { min: 1, max: 2 },
+  // Situation-first planning (2026-10-28): gather, research, draft, two
+  // reviews (40-90 s by design).
+  PLAN: { min: 1, max: 2 },
 };
 
 export const WorkforceLiveExpectedSchema = z

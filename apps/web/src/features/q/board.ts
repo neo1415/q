@@ -15,7 +15,14 @@ import type { QTurn, QTurnObjectBlock } from "./conversation";
  */
 
 export type BoardObjectKind =
-  "NOTE" | "COMPANIES" | "INVESTORS" | "COMPARISON" | "ARTIFACT" | "INTENT";
+  | "NOTE"
+  | "COMPANIES"
+  | "INVESTORS"
+  | "COMPARISON"
+  | "ARTIFACT"
+  | "INTENT"
+  // Situation-first planning: a plan Q wrote for them, kept on the Board.
+  | "PLAN";
 
 export type BoardObject = {
   /** Stable across renders: the turn and the object's place in it. */
@@ -69,6 +76,9 @@ export function boardObjects(turns: readonly QTurn[]): BoardObject[] {
         add("ARTIFACT", `artifact-${block.artifactId}`, [block]);
       } else if (block.kind === "UI_INTENT") {
         add("INTENT", `intent-${String(index)}`, [block]);
+      } else if (block.kind === "PLAN") {
+        // One object per plan version: a later version is its own card.
+        add("PLAN", `plan-${block.planId}-${String(block.version)}`, [block]);
       }
     });
     // Newest first: this answer's objects go ahead of the earlier ones,

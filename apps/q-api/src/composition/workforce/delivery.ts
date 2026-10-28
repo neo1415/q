@@ -4,6 +4,7 @@ import {
   QArtifactIdSchema,
   QArtifactTypeSchema,
   QMessageIdSchema,
+  QPlanBlockSchema,
   QRunIdSchema,
   type QResponseMessage,
   type QResultBlock,
@@ -54,6 +55,34 @@ export function deliveredDocument(
 ): DeliveredDocument | null {
   for (const outputs of doneOutputs(row)) {
     const parsed = DeliverySchema.safeParse(outputs);
+    if (parsed.success) return parsed.data;
+  }
+  return null;
+}
+
+/**
+ * Situation-first planning (S4): a finished plan job's result -- the plan
+ * card and Q's line (code's words), or, when planning failed, the answer
+ * Q gave from what it holds.
+ */
+const PlanDeliverySchema = z.union([
+  z.object({
+    plan: z.object({
+      block: QPlanBlockSchema,
+      line: z.string().min(1).max(2_000),
+    }),
+  }),
+  z.object({
+    answer: z.object({ line: z.string().min(1).max(4_000) }),
+  }),
+]);
+export type DeliveredPlan = z.infer<typeof PlanDeliverySchema>;
+
+export function deliveredPlan(
+  row: Pick<WorkRow, "results">,
+): DeliveredPlan | null {
+  for (const outputs of doneOutputs(row)) {
+    const parsed = PlanDeliverySchema.safeParse(outputs);
     if (parsed.success) return parsed.data;
   }
   return null;
@@ -268,7 +297,46 @@ export function createWorkforceDelivery(dependencies: {
     return posted;
   };
 
+  /** A plan job's card (or its answer from what Q holds), said once. */
+  const announcePlan = async (
+    owner: Owner,
+    row: WorkRow,
+    delivered: DeliveredPlan,
+  ): Promise<boolean> => {
+    const title =
+      "plan" in delivered ? delivered.plan.block.title : "Where things stand";
+    const text =
+      "plan" in delivered ? delivered.plan.line : delivered.answer.line;
+    const blocks: QResultBlock[] = [
+      ...("plan" in delivered ? [delivered.plan.block] : []),
+      {
+        kind: "WORK_IN_PROGRESS",
+        jobId: row.job_id,
+        title: title.slice(0, 160),
+      },
+    ];
+    const posted = await post(
+      owner,
+      row,
+      messageIdFor(row.job_id),
+      text,
+      blocks,
+    );
+    await dependencies
+      .notify(owner, {
+        key: `wf:${row.job_id}:delivered`,
+        title:
+          "plan" in delivered ? "Your plan is ready" : "Q's answer is ready",
+        body: text.slice(0, 600),
+      })
+      .catch(() => undefined);
+    dependencies.logger?.info({ jobId: row.job_id, posted }, "plan delivered");
+    return posted;
+  };
+
   return async (owner: Owner, row: WorkRow): Promise<boolean> => {
+    const plan = row.state === "COMPLETED" ? deliveredPlan(row) : null;
+    if (plan !== null) return announcePlan(owner, row, plan);
     const document = deliveredDocument(row);
     if (document === null && row.state === "COMPLETED") {
       return announceFiled(owner, row);

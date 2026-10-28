@@ -63,6 +63,7 @@ import {
   createToolHandOverPort,
   createToolDelegationPort,
   createToolTeamJobPort,
+  type QPlanJobPort,
   createToolReadinessLead,
   createToolAppActionPort,
   createToolOpenRecordPort,
@@ -138,6 +139,12 @@ export type QIntelligenceDependencies = {
    * answered as before.
    */
   readonly callPrep?: Omit<CallPrepSources, "write"> | undefined;
+  /**
+   * Situation-first planning (S5, S6): a plan of their own starts the plan
+   * job; their words to running work are filed as direction. Absent: such
+   * a turn is answered as before.
+   */
+  readonly plan?: QPlanJobPort | undefined;
   /** W1: what Q told them on arrival, prepared for every turn of theirs. */
   readonly arrivalSnapshot?:
     | ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
@@ -690,6 +697,7 @@ export function composeQIntelligence(
       tools,
       ...(logger === undefined ? {} : { logger }),
     }),
+    ...(dependencies.plan === undefined ? {} : { plan: dependencies.plan }),
     handOver: createToolHandOverPort({
       tools,
       ...(dependencies.firewall === undefined

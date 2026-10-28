@@ -360,5 +360,13 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
       return "Q is waiting for your approval.";
     case "COMPLETING_APPROVED_ACTION":
       return "Completing the approved action";
+    case "GATHERING_SITUATION":
+      return "Gathering your situation";
+    case "READING_DOCUMENTS":
+      return "Reading your documents";
+    case "DRAFTING_PLAN":
+      return "Drafting the plan";
+    case "REVIEWING_PLAN":
+      return "Reviewing the plan";
   }
 }

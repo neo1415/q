@@ -30,6 +30,7 @@ import type {
 } from "./store.js";
 import { expectedOf, progressOf } from "./progress.js";
 import { deliveredDocument } from "./delivery.js";
+import { isPlanJobPayload, planGatheringStage } from "./plan-job.js";
 import { filedDocumentIds } from "./results.js";
 import {
   LIVE_WORK_STATES,
@@ -388,7 +389,13 @@ export function createWorkforcePage(dependencies: {
                 : "FAILED",
         done: plan?.done ?? 0,
         total: plan?.total ?? 0,
-        stage: liveStageOf(work),
+        // A plan job is gathering from the moment it is asked (addendum 4:
+        // the first stage on screen at once, before a worker claims it).
+        stage:
+          liveStageOf(work) ??
+          (isPlanJobPayload(work.plan) && working
+            ? planGatheringStage(work.created_at)
+            : null),
         document:
           filed === null
             ? null
@@ -678,21 +685,27 @@ export function createWorkforcePage(dependencies: {
       const today = new Date(
         Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
       );
-      const [read, limit, team, jobs, instructions] = await Promise.all([
-        (dependencies.monthCosts?.(owner, at) ?? Promise.resolve(null)).catch(
-          () => null,
-        ),
-        (dependencies.monthlyLimitUsd?.(owner) ?? Promise.resolve(null)).catch(
-          () => null,
-        ),
-        store.team(owner, today),
-        store.openJobs(owner),
-        // A failed read shows no instructions rather than failing the page.
-        (
-          store.instructions?.(owner, new Date(at.getTime() - DAY_MS)) ??
-          Promise.resolve([])
-        ).catch(() => []),
-      ]);
+      const [read, limit, team, jobs, instructions, specialists] =
+        await Promise.all([
+          (dependencies.monthCosts?.(owner, at) ?? Promise.resolve(null)).catch(
+            () => null,
+          ),
+          (
+            dependencies.monthlyLimitUsd?.(owner) ?? Promise.resolve(null)
+          ).catch(() => null),
+          store.team(owner, today),
+          store.openJobs(owner),
+          // A failed read shows no instructions rather than failing the page.
+          (
+            store.instructions?.(owner, new Date(at.getTime() - DAY_MS)) ??
+            Promise.resolve([])
+          ).catch(() => []),
+          // Addendum 1: specialists set up for their plans, this month.
+          (
+            store.specialists?.(owner, new Date(at.getTime() - 30 * DAY_MS)) ??
+            Promise.resolve([])
+          ).catch(() => []),
+        ]);
       // A ledger that cannot be read shows nothing spent (as before), but
       // its days stay unknown rather than reading as a month of zeros.
       const month = read ?? [];
@@ -781,6 +794,24 @@ export function createWorkforcePage(dependencies: {
           latest: row.latest?.slice(0, 500) ?? null,
         })),
         jobs,
+        ...(specialists.length === 0
+          ? {}
+          : {
+              specialists: specialists.map((row) => ({
+                name: row.name.slice(0, 60),
+                state: oneOf(
+                  WORKFORCE_TEAM_STATES,
+                  row.needs_you > 0
+                    ? "NEEDS_YOU"
+                    : row.running > 0
+                      ? "WORKING"
+                      : "IDLE",
+                  "IDLE",
+                ),
+                runs: row.runs,
+                latest: row.latest?.slice(0, 500) ?? null,
+              })),
+            }),
         instructions: instructions.map((one) => ({
           id: one.id,
           goal: one.goal_text.trim().slice(0, 300),

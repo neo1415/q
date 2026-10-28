@@ -11,7 +11,9 @@ import { createPortal } from "react-dom";
 import {
   QArtifactIdSchema,
   QArtifactTypeSchema,
+  WORKFORCE_DOCUMENT_LIVE_STEPS,
   WORKFORCE_LIVE_STAGES,
+  WORKFORCE_PLAN_LIVE_STEPS,
   type WorkforceLive,
   type WorkforceLiveStage,
   type WorkforceLiveStageName,
@@ -31,6 +33,7 @@ import {
   Pencil,
   RotateCw,
   Search,
+  Users,
 } from "@capital-q/ui/icons";
 
 import { useT } from "@/features/i18n/language";
@@ -89,20 +92,63 @@ const STEPS: readonly Step[] = [
   { stage: "FILING", label: "Filing", Icon: Folder },
 ];
 
-if (STEPS.length !== WORKFORCE_LIVE_STAGES.length) {
+/**
+ * Situation-first planning (2026-10-28): a plan's own step bar --
+ * gathering where things stand, their documents, public sources, drafting,
+ * two reviews, ready. Approved stage labels only.
+ */
+export const PLAN_STEPS: readonly Step[] = [
+  { stage: "GATHERING", label: "Your situation", Icon: Users },
+  { stage: "READING_DOCUMENTS", label: "Your documents", Icon: FileText },
+  { stage: "SEARCHING", label: "Public sources", Icon: Search },
+  { stage: "PLANNING", label: "Drafting", Icon: Pencil },
+  { stage: "REVIEWING_PLAN", label: "Reviewing", Icon: ListChecks },
+  { stage: "FILING", label: "Ready", Icon: Folder },
+];
+
+if (
+  STEPS.map((step) => step.stage).join() !==
+    WORKFORCE_DOCUMENT_LIVE_STEPS.join() ||
+  PLAN_STEPS.map((step) => step.stage).join() !==
+    WORKFORCE_PLAN_LIVE_STEPS.join() ||
+  !WORKFORCE_LIVE_STAGES.every((stage) =>
+    [...STEPS, ...PLAN_STEPS].some((step) => step.stage === stage),
+  )
+) {
   throw new Error("the work canvas names every live stage");
+}
+
+/** The step bar for this job: a plan's, or a document's. */
+export function stepsFor(live: WorkforceLive | null): readonly Step[] {
+  return live?.expected?.kind === "PLAN" ||
+    (live?.stage !== null &&
+      live?.stage !== undefined &&
+      PLAN_STEPS.some(
+        (step) =>
+          step.stage === live.stage?.stage &&
+          step.stage !== "SEARCHING" &&
+          step.stage !== "FILING",
+      ))
+    ? PLAN_STEPS
+    : STEPS;
 }
 
 export type StepState = "DONE" | "CURRENT" | "LATER" | "FAILED" | "SKIPPED";
 
 /** Where the work really is, as a step index; all done is STEPS.length. */
-export function targetStep(live: WorkforceLive | null): number {
+export function targetStep(
+  live: WorkforceLive | null,
+  steps: readonly Step[] = STEPS,
+): number {
   if (live === null) return 0;
-  if (live.state === "DONE") return STEPS.length;
+  if (live.state === "DONE") return steps.length;
   const stage = live.stage?.stage;
   return stage === undefined
     ? 0
-    : STEPS.findIndex((step) => step.stage === stage);
+    : Math.max(
+        0,
+        steps.findIndex((step) => step.stage === stage),
+      );
 }
 
 /**
@@ -115,6 +161,7 @@ export function useDwelling(
   target: number | null,
   /** A step the work did not need (revising, when one draft passed). */
   skipped: (index: number) => boolean = () => false,
+  count: number = STEPS.length,
 ): number {
   const [shown, setShown] = useState<number | null>(null);
   // The first reading is shown as it is: adjusted while rendering, the
@@ -135,23 +182,41 @@ export function useDwelling(
     // `skipped` reads the same job each render; the step moves on its own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown, target]);
-  return Math.min(Math.max(shown ?? target ?? 0, 0), STEPS.length);
+  return Math.min(Math.max(shown ?? target ?? 0, 0), count);
 }
 
 export function stepStates(
   shown: number,
   live: WorkforceLive | null,
+  steps: readonly Step[] = STEPS,
 ): readonly StepState[] {
   const failed =
     live !== null && (live.state === "FAILED" || live.state === "STOPPED");
   // No second draft was needed: revising was skipped, not done.
   const revised = (live?.stage?.draft ?? 1) > 1;
-  return STEPS.map((step, index) => {
+  return steps.map((step, index) => {
     if (index < shown)
-      return step.stage === "REVISING" && !revised ? "SKIPPED" : "DONE";
+      return (step.stage === "REVISING" && !revised) ||
+        (steps === PLAN_STEPS && planStepSkipped(step.stage, live))
+        ? "SKIPPED"
+        : "DONE";
     if (index === shown) return failed ? "FAILED" : "CURRENT";
     return "LATER";
   });
+}
+
+/**
+ * Whether a plan's optional step was not needed: public sources when the
+ * job reported no public reading, their documents on the investor side.
+ * Read from what the job recorded (its facts count), never guessed.
+ */
+function planStepSkipped(
+  stage: WorkforceLiveStageName,
+  live: WorkforceLive | null,
+): boolean {
+  if (live === null || live.stage === null) return false;
+  if (stage === "SEARCHING") return live.stage.questions === null;
+  return false;
 }
 
 /** Each step's own short line, from what the work recorded. */
@@ -183,17 +248,34 @@ export function stepLine(
         : `Draft ${String(stage.draft)} of ${String(stage.drafts)}`;
     case "FILING":
       return state === "DONE" ? "Filed" : "Filing";
+    case "GATHERING":
+      return stage?.facts == null || stage.stage !== "GATHERING"
+        ? state === "DONE"
+          ? "Gathered"
+          : "Gathering"
+        : `${String(stage.facts)} facts`;
+    case "READING_DOCUMENTS":
+      return state === "DONE" ? "Read" : "Reading";
+    case "PLANNING":
+      return stage?.draft == null || stage.draft <= 1
+        ? "First draft"
+        : `Draft ${String(stage.draft)}`;
+    case "REVIEWING_PLAN":
+      return "Two reviews";
   }
 }
 
 /** The plan's next step after the one running, in its approved label. */
-export function nextStep(states: readonly StepState[]): string | null {
+export function nextStep(
+  states: readonly StepState[],
+  steps: readonly Step[] = STEPS,
+): string | null {
   const current = states.indexOf("CURRENT");
   if (current === -1) return null;
   const later = states.findIndex(
     (state, index) => index > current && state === "LATER",
   );
-  return later === -1 ? null : (STEPS[later]?.label ?? null);
+  return later === -1 ? null : (steps[later]?.label ?? null);
 }
 
 /** Seconds, while something is running; the clock is still otherwise. */
@@ -381,9 +463,11 @@ const STEP_TONE: Readonly<Record<StepState, string>> = {
 function StepBar({
   states,
   stage,
+  steps = STEPS,
 }: {
   readonly states: readonly StepState[];
   readonly stage: WorkforceLiveStage | null;
+  readonly steps?: readonly Step[];
 }) {
   const t = useT();
   return (
@@ -392,7 +476,7 @@ function StepBar({
       aria-label={t("The plan")}
       data-q-work-steps
     >
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const state = states[index] ?? "LATER";
         const { Icon } = step;
         const line = stepLine(step.stage, state, stage);
@@ -508,6 +592,10 @@ function StepInView({
   switch (step) {
     case "SEARCHING":
     case "DRAFTING":
+    case "GATHERING":
+    case "READING_DOCUMENTS":
+    case "PLANNING":
+    case "REVIEWING_PLAN":
       body = skeleton;
       break;
     case "READING":
@@ -599,9 +687,11 @@ export function WorkInProgressCard({
   const t = useT();
   const { live, missing } = useWorkLive(block.jobId);
   const revised = (live?.stage?.draft ?? 1) > 1;
+  const steps = stepsFor(live);
   const shown = useDwelling(
-    live === null ? null : targetStep(live),
-    (index) => STEPS[index]?.stage === "REVISING" && !revised,
+    live === null ? null : targetStep(live, steps),
+    (index) => steps[index]?.stage === "REVISING" && !revised,
+    steps.length,
   );
   const [aside, setAside] = useAside(block.jobId);
 
@@ -611,12 +701,12 @@ export function WorkInProgressCard({
   const status: Status =
     live === null
       ? "WORKING"
-      : live.state === "DONE" && shown < STEPS.length
+      : live.state === "DONE" && shown < steps.length
         ? "WORKING"
         : live.state;
   const title = live?.document?.title ?? live?.stage?.title ?? block.title;
-  const states = stepStates(shown, live);
-  const inView = STEPS[Math.min(shown, STEPS.length - 1)]?.stage ?? "SEARCHING";
+  const states = stepStates(shown, live, steps);
+  const inView = steps[Math.min(shown, steps.length - 1)]?.stage ?? "SEARCHING";
 
   if (aside) {
     return (
@@ -625,7 +715,7 @@ export function WorkInProgressCard({
         status={status}
         line={
           status === "WORKING"
-            ? t(STEPS[Math.min(shown, STEPS.length - 1)]?.label ?? "Working")
+            ? t(steps[Math.min(shown, steps.length - 1)]?.label ?? "Working")
             : title
         }
         onBack={() => setAside(false)}
@@ -637,7 +727,7 @@ export function WorkInProgressCard({
   if (
     live?.state === "DONE" &&
     live.document !== null &&
-    shown >= STEPS.length
+    shown >= steps.length
   ) {
     const type = QArtifactTypeSchema.safeParse(live.document.type);
     const artifactId = QArtifactIdSchema.safeParse(live.document.artifactId);
@@ -661,7 +751,7 @@ export function WorkInProgressCard({
   // QA 25 Oct (job 4d1a8b04): finished with no document to show, the card
   // said "Done" over "Planning the work". Done is said by the status; the
   // steps stand as they ended.
-  const finishedBare = live?.state === "DONE" && shown >= STEPS.length;
+  const finishedBare = live?.state === "DONE" && shown >= steps.length;
   const ended =
     live !== null &&
     (live.state === "FAILED" ||
@@ -687,7 +777,7 @@ export function WorkInProgressCard({
           </p>
           <StatusDot status={status} />
           {status === "WORKING" ? (
-            <WorkTiming live={live} next={nextStep(states)} />
+            <WorkTiming live={live} next={nextStep(states, steps)} />
           ) : null}
         </div>
         <button
@@ -706,7 +796,7 @@ export function WorkInProgressCard({
         </button>
       </div>
 
-      <StepBar states={states} stage={live?.stage ?? null} />
+      <StepBar states={states} stage={live?.stage ?? null} steps={steps} />
 
       {ended && live !== null ? (
         <div className="flex flex-col gap-2" data-q-work-stopped={live.state}>

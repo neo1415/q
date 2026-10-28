@@ -30,7 +30,7 @@ export const TURN_READER_V69: PromptDefinition<
 > = {
   ...TURN_READER_V68,
   version: 69,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Coordinator 2026-10-26 (run 7b51d28d): v68 plus FIELDS WHERE THEY BELONG -- question holds only its own fields, and the reading's own fields (nextSteps, fromShown, compare and the rest) are written at the top level, never nested; nextSteps inside question was refused twice by the schema. Same output schema, strict as before.",
   effectiveFrom: "2026-10-26",

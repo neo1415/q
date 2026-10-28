@@ -306,6 +306,22 @@ export type WorkforceStore = {
         since: Date,
       ) => Promise<readonly InstructionActivityRow[]>)
     | undefined;
+  /**
+   * Addendum 1: the specialists set up for their plans (helper runs of a
+   * plan step, by name) since `since`. Absent: a store without them.
+   */
+  readonly specialists?:
+    | ((owner: Owner, since: Date) => Promise<readonly SpecialistRow[]>)
+    | undefined;
+};
+
+/** One named specialist's runs (addendum 1), read by code. */
+export type SpecialistRow = {
+  readonly name: string;
+  readonly runs: number;
+  readonly running: number;
+  readonly needs_you: number;
+  readonly latest: string | null;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -644,6 +660,23 @@ export function createPostgresWorkforceStore(
          where r.tenant_id = ${owner.tenantId} and r.user_id = ${owner.userId}
            and (r.started_at >= ${since} or r.status = 'RUNNING')
          group by r.role`,
+
+    specialists: (owner, since) =>
+      sql<SpecialistRow[]>`
+        select r.agent_name as name,
+               count(*)::int as runs,
+               count(*) filter (where r.status = 'RUNNING')::int as running,
+               count(*) filter (where r.status = 'HELD')::int as needs_you,
+               (array_agg(r.summary order by r.started_at desc) filter (where r.summary is not null))[1] as latest
+          from q_runtime.workforce_agent_runs r
+         where r.tenant_id = ${owner.tenantId} and r.user_id = ${owner.userId}
+           and r.role = 'AD_HOC' and r.spawned_by_run_id is not null
+           -- Diligence is stored as AD_HOC (the tables predate it): a built-in role.
+           and r.agent_name <> 'Diligence'
+           and (r.started_at >= ${since} or r.status = 'RUNNING')
+         group by r.agent_name
+         order by max(r.started_at) desc
+         limit 12`,
 
     openJobs: async (owner) => {
       const rows = await sql<{ open: number; needs_you: number }[]>`

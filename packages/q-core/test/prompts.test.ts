@@ -160,6 +160,10 @@ describe("registry", () => {
         "CONVERSATION_RECALL",
         // Owner 2026-10-23: a call with one named counterpart, prepared in the answer.
         "CALL_PREP",
+        // Design 2026-10-28 (S3): situation-first planning.
+        "PLAN_WRITE",
+        "PLAN_REVIEW",
+        "PLAN_READ",
         // Founder brief K: the fast lane's short first read.
         "TURN_SKIM",
         // W2: public pages about a person or organisation, read into a quoted brief.

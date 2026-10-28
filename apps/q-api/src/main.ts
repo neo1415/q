@@ -235,6 +235,15 @@ import {
   workforceJobStopPort,
 } from "./composition/workforce/queue.js";
 import { createAgentWorkRunner } from "./composition/workforce/runner.js";
+// Situation-first planning (S4-S6): the plan job, its card and its thread.
+import { createActivityRead } from "./composition/workforce/activity.js";
+import { createPlanCardAsk } from "./composition/workforce/plan-ask.js";
+import {
+  createDeckRead,
+  planStartLine,
+} from "./composition/workforce/plan-job.js";
+import { createPostgresPlanStore } from "./composition/workforce/plan-store.js";
+import { createPlans } from "./composition/workforce/plans.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createWorkforceJobResults } from "./composition/workforce/results.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
@@ -426,6 +435,7 @@ import {
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  Q_PLAN_WAKE_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -477,6 +487,7 @@ import {
 import {
   createFitQViewer,
   createRecommendationNarrator,
+  createSituationAssembler,
   pipelineSummaryLine,
 } from "@capital-q/q-specialists";
 import {
@@ -3903,6 +3914,162 @@ const actorContextResolver = withSuspension(
 );
 const killSwitches = createFlagReader(database.sql);
 // end ADMIN block
+// Situation-first planning (owner 2026-10-28, S4-S6): "how do I improve
+// my chances" gathers the person's situation as them, drafts a plan from
+// it, has it reviewed twice and offers it with Execute / Put on my board /
+// Change it. The situation is read through Q's own typed tools as the
+// asker; it is cached per person for minutes and dropped when any of their
+// tenant's domain events lands (plans' wake, below).
+const situationAssembler = createSituationAssembler({
+  tools: qTools.port,
+  memory: async ({ actor, runId, ask, signal }) =>
+    (
+      await memoryLearner.recall.recall({
+        actor,
+        runId,
+        subjects: [],
+        utterance: ask,
+        signal,
+      })
+    )
+      .split("\n")
+      .map((line) => line.replace(/^[-*\s]+/u, "").trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 12),
+  // Addendum 2: what they did recently, from their own domain events.
+  activity: createActivityRead(database.sql),
+});
+const planStore = createPostgresPlanStore({
+  sql: database.sql,
+  transactions: database.transactions,
+});
+const planOwnerActor = createOwnerActor({
+  resolver: actorContextResolver,
+  authUserOf: async (userId) =>
+    (
+      await database.sql<{ auth_user_id: string | null }[]>`
+        select auth_user_id from identity.user_profiles where id = ${userId}`
+    )[0]?.auth_user_id ?? null,
+});
+const plans = createPlans({
+  sql: database.sql,
+  store: planStore,
+  jobsFor: workforceJobsFor,
+  queue: () => agentWorkQueue,
+  kick: () => {
+    void agentWorkRunner.pass().catch((error: unknown) => {
+      logger.warn({ err: error }, "workforce job runner pass failed");
+    });
+  },
+  // The plan's agent-work allowance, as own work consumes it.
+  allowed: async (actor, idempotencyKey) => {
+    const decision = await entitlements.consume({
+      account: billingAccountOf(actor),
+      feature: FEATURE_DELEGATIONS,
+      idempotencyKey,
+      actorUserId: actor.userId,
+      surface: "Q_ACTION",
+    });
+    return decision.allowed
+      ? { allowed: true }
+      : { allowed: false, message: decision.refusal.message };
+  },
+  release: async (actor, idempotencyKey) => {
+    await entitlements.release({
+      account: billingAccountOf(actor),
+      feature: FEATURE_DELEGATIONS,
+      idempotencyKey,
+      reason: "plan work could not be filed",
+    });
+  },
+  planJob: {
+    assembler: situationAssembler,
+    // As the asker, now: their own firewall plan for the run they asked in.
+    toolContext: async (actor, runId) => {
+      const run = QRunIdSchema.safeParse(runId);
+      if (!run.success) return null;
+      const correlationId = CorrelationIdSchema.parse(createCorrelationId());
+      const decision = await firewall.plan({
+        actor,
+        runId: run.data,
+        correlationId,
+        capability: "ANSWER",
+        subjects: [],
+      });
+      return decision.outcome === "DENIED"
+        ? null
+        : {
+            actor,
+            runId: run.data,
+            correlationId,
+            capability: "ANSWER",
+            plan: decision.plan,
+          };
+    },
+    models: workforceModels,
+    documents: createDeckRead(qTools.port),
+    // Public reading from public-safe topics only (never their records),
+    // under the job's own search budget.
+    research: ({ actor, jobId, runId, progress }) => {
+      const research = workforcePortsFor(actor).research;
+      if (research === undefined) return undefined;
+      return async ({ topics, ask }) => {
+        const about = topics.length === 0 ? ask : topics.join("; ");
+        const found = await research(
+          { tenantId: actor.tenantId, userId: actor.userId },
+          {
+            runId,
+            request: `Public context: ${about}`.slice(0, 2_000),
+            query: about.slice(0, 400),
+            jobId,
+            budgetUsd: 0.3,
+            progress,
+          },
+        );
+        if (found.status !== "OK") return [];
+        return (found.dossier?.facts ?? []).slice(0, 12).map((fact) => ({
+          statement: fact.statement,
+          url: fact.url,
+          publishedOn: fact.publishedAt,
+          truthClass: "USER_CLAIM" as const,
+          evidenceStatus: "DOCUMENT_SUPPORTED" as const,
+        }));
+      };
+    },
+    publicProfile: async (actor) => {
+      const own = await createOwnResearchSubject(database.sql)(actor);
+      return own === null
+        ? null
+        : {
+            name: own.name,
+            country: own.country ?? undefined,
+            sectors: own.sectors,
+          };
+    },
+    tools: qTools.port,
+    logger,
+  },
+  board: qBoard,
+  reminder: async (input) => {
+    const created = await schedule.createReminder({
+      actor: input.actor,
+      title: input.title,
+      dueAt: input.dueAt,
+      note: input.note,
+      channel: "IN_APP",
+      idempotencyKey: input.idempotencyKey,
+    });
+    return created.outcome === "OK" ? created.reminder.id : null;
+  },
+  ask: createPlanCardAsk({
+    runtime: () => qRuntime,
+    orchestration: () => orchestrationRuntime,
+    actions: () => qActions,
+  }),
+  invalidate: (tenantId) => situationAssembler.invalidateTenant?.(tenantId),
+  actorFor: (owner) => planOwnerActor(owner.userId, null),
+  logger,
+});
 const qActionRegistry = createQActionRegistry([
   createCompanyProfileUpdateAction({
     profiles: companies,
@@ -4058,6 +4225,8 @@ const qActionRegistry = createQActionRegistry([
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // WORKFORCE block (J1, J4): a job the lead Q planned, run as approved.
+  // Situation-first planning (S5): Execute, one approval per plan version.
+  plans.executeAction(),
   ...createWorkforceJobActions({
     jobsFor: workforceJobsFor,
     // Recovery D3: approved jobs are durable work, claimed under a lease.
@@ -4518,6 +4687,24 @@ const arrivalSnapshots = createArrivalSnapshots({
 });
 const qIntelligence = composeQIntelligence({
   readCache: qReadCache,
+  // Situation-first planning (S5, S6): the reader's planAsk starts the plan
+  // job at once (the reply carries its card); directsWork files their
+  // words as direction on what runs for them.
+  plan: {
+    start: async (request, input) => {
+      const started = await plans.start(request.actor, request.runId, input);
+      return started.status === "STARTED"
+        ? {
+            ...started,
+            line: planStartLine(
+              input.planAsk.deliverable,
+              input.planAsk.research,
+            ),
+          }
+        : started;
+    },
+    direct: (request, text) => plans.direct(request.actor, request.runId, text),
+  },
   // Owner 2026-10-23: a call with one named counterpart, prepared in the
   // answer from the rehearsal's own material (read as them); the name is
   // matched only among records they may already see, as open_page does.
@@ -5132,6 +5319,10 @@ const agentWorkRunner = createAgentWorkRunner({
         )[0]?.auth_user_id ?? null,
     })(owner.userId, organisationId),
   jobsFor: workforceJobsFor,
+  // Situation-first planning (S4): plan jobs on the same queue and lease.
+  plans: (input) => plans.run(input),
+  // S6: a plan's running steps re-read the person's direction.
+  directions: (owner, planId, since) => plans.directions(owner, planId, since),
   // Owner 2026-10-23: the finished document lands in the conversation.
   deliver: createWorkforceDelivery({
     // A plain (non-analysis) document's line, read as its owner.
@@ -6009,6 +6200,33 @@ void createWorkWakeListener({
     // The sweep still fires each instruction on its cadence.
     logger.warn({ err: error }, "instruction wake listener not started");
   });
+// Situation-first planning (S6, addendum 2): ANY domain event of a tenant
+// re-evaluates its open plans' conditions (the workers announce the tenant
+// from the outbox); no per-feature watchers. The sweep is the safety net
+// (a date reached, a wake missed during a deploy).
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_PLAN_WAKE_CHANNEL,
+  catchUp: () => {
+    void plans.sweep().catch(() => undefined);
+  },
+  targets: [{ name: "plans", wake: (tenantId) => plans.wakeTenant(tenantId) }],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "plan wake listener started"))
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "plan wake listener not started");
+  });
+setInterval(
+  () => {
+    void plans.sweep().catch((error: unknown) => {
+      logger.warn({ err: error }, "plan conditions sweep failed");
+    });
+  },
+  10 * 60 * 1000,
+).unref();
 // A company became marketplace-ready (founder 2026-10-05): standing
 // instructions open to new companies run within minutes, not hours.
 void createWorkWakeListener({
@@ -7527,6 +7745,8 @@ const { app, logger: appLogger } = createApp(
     work: workPort,
     // WORKFORCE block (founder brief J5, J3, J6)
     workforce: {
+      // Situation-first planning (S5): the plan card's read and decisions.
+      plans,
       page: createWorkforcePage({
         store: workforceStore,
         // Recovery D6: each job's durable work state, why it stopped, trace.

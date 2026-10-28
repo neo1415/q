@@ -717,6 +717,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_PATH": exempt(
     "one job's agent record (runs, hand-offs, drafts, grades, timeline) for the workforce page; Q reports its work through list_q_work",
   ),
+  // Situation-first planning (S5): the plan card Q put in the conversation.
+  "q-api/http/workforce.ts GET Q_PLAN_PATH": exempt(
+    "the plan card's own read of a plan Q wrote for the person; Q asks for, writes and talks about plans in conversation (the turn reader's planAsk)",
+  ),
+  "q-api/http/workforce.ts POST Q_PLAN_DECIDE_PATH": exempt(
+    "the plan card's Execute / Put on my board / Change it on a plan Q wrote; in conversation the person directs the plan in their own words (directsWork) and Execute is its own approval card",
+  ),
   "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_LIVE_PATH": exempt(
     "the conversation card's own read of where a document Q is making stands (stage, steps done, the filed document); it changes nothing, and Q reports its work through list_q_work",
   ),
