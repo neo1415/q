@@ -202,6 +202,7 @@ export {
 } from "./tools/own-work.js";
 export {
   createListUploadedDocumentsTool,
+  heldBackFromQ,
   createOwnRecordTools,
   createReadMyRecordTool,
   createReadRelationshipEmailTool,
