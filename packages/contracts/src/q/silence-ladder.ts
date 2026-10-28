@@ -266,6 +266,26 @@ function phraseFor(
         verbs: ["checking", "going over", "proofing"],
         object: "every page",
       };
+    case "GATHERING_SITUATION":
+      return {
+        verbs: ["gathering", "pulling together", "going over"],
+        object: "where things stand for you",
+      };
+    case "READING_DOCUMENTS":
+      return {
+        verbs: ["reading", "going through", "looking through"],
+        object: "your documents",
+      };
+    case "DRAFTING_PLAN":
+      return {
+        verbs: ["drafting", "writing", "putting together"],
+        object: "your plan",
+      };
+    case "REVIEWING_PLAN":
+      return {
+        verbs: ["reviewing", "checking", "going over"],
+        object: "the plan",
+      };
     case "COMPLETING_APPROVED_ACTION":
       return {
         verbs: ["finishing", "wrapping up", "completing"],

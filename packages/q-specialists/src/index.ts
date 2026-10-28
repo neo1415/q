@@ -442,3 +442,6 @@ export {
   type PreparedFollowUpPort,
 } from "./fast-lane.js";
 export { pipelineSummaryLine, type PipelineRow } from "./pipeline-summary.js";
+
+// Situation-first planning (2026-10-28): the situation dossier, read as the asker.
+export * from "./situation/index.js";

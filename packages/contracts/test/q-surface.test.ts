@@ -252,6 +252,15 @@ const completedRun = {
       approvals: [],
     },
     {
+      kind: "PLAN",
+      planId: "7f0c3a52-2c55-4c71-9a4a-6f1e2d3c4b5a",
+      version: 1,
+      title: "Close the seed round by March",
+      steps: 5,
+      reviewed: true,
+      affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
+    },
+    {
       kind: "TIMELINE",
       title: "Your relationship",
       events: [
@@ -428,6 +437,8 @@ describe("type-level guarantees", () => {
           return block.credit.name;
         case "WORK_IN_PROGRESS":
           return block.jobId;
+        case "PLAN":
+          return block.planId;
         default: {
           const unreachable: never = block;
           return unreachable;
