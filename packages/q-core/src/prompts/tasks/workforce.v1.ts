@@ -825,6 +825,41 @@ export const JOB_PLAN_V13: PromptDefinition<
   ),
 };
 
+/**
+ * v14 (diligence audit, 2026-10-28): "do due diligence on Ledgerfold, give
+ * me a memo" was planned as a NAMED_COMPANY MEMO with no research, and that
+ * path assembled the record's facts with no writer. Diligence, an
+ * investment memo or a brief about the named company is now research first,
+ * then the memo (code writes it as a diligence analysis with fixed
+ * sections, and adds the research itself if the plan leaves it out).
+ */
+export const V13_NAMED_COMPANY_KINDS =
+  "or scope NAMED_COMPANY with kind MEMO, ONE_PAGER or INVESTMENT_BRIEF (about the one company the job names).";
+export const V14_NAMED_COMPANY_KINDS =
+  "or scope NAMED_COMPANY with kind MEMO, ONE_PAGER or INVESTMENT_BRIEF (about the one company the job names).\n- DUE DILIGENCE: due diligence on, an investment memo about or a brief on the one company the job names is two steps: a RESEARCH step whose goal says what must be learned about that company (its founders and team, named customers and partners, litigation and regulatory actions, prior funding and investors, reported traction, competitors and market), then a DOCUMENTS step with operation PREPARE, kind MEMO and scope NAMED_COMPANY that lists the RESEARCH step in dependsOn. Capital Q writes that memo as a diligence analysis with fixed sections, reads the company's data room as the person may, sets the company's claims against the evidence, and has it critiqued and revised before it is filed: never add a CRITIQUE_AND_REVISE step after it. ONE_PAGER is only for a one-page summary they ask for by name.";
+
+if (JOB_PLAN_V13.template.split(V13_NAMED_COMPANY_KINDS).length !== 2) {
+  throw new Error(
+    "JOB_PLAN v14 rewrites v13's NAMED_COMPANY kinds, which changed",
+  );
+}
+
+export const JOB_PLAN_V14: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V13,
+  version: 14,
+  status: "ACTIVE",
+  changeDescription:
+    "Diligence audit 2026-10-28: v13 plus DUE DILIGENCE -- diligence, an investment memo or a brief on the named company is a RESEARCH step (founders and team, customers, litigation and regulatory, prior funding, traction, competitors, market) then a NAMED_COMPANY MEMO that waits on it; code writes it as a diligence analysis and never after a CRITIQUE_AND_REVISE step.",
+  effectiveFrom: "2026-10-28",
+  template: JOB_PLAN_V13.template.replace(
+    V13_NAMED_COMPANY_KINDS,
+    V14_NAMED_COMPANY_KINDS,
+  ),
+};
+
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
 You are a second, independent specialist reviewing a {{documentKind}} another agent prepared for {{principalName}} about {{companyName}}. You did not write it. Your job is to find what is wrong with it, not to praise it. Code decides from your verdict whether it is revised.
 

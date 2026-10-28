@@ -135,9 +135,20 @@ export type ResearchCommand = {
   readonly focused?: boolean | undefined;
   /**
    * One of a planned job's own questions (deep research): bounded by its
-   * plan, so not by the per-run budget that holds a turn to what it needs.
+   * plan and its job's search budget (`maxSearches`), so not by the per-run
+   * budget that holds a turn to what it needs. Its page reads get the
+   * longer background budget (`plannedExtractBudgetMs`): nobody is waiting
+   * on a turn.
    */
   readonly planned?: boolean | undefined;
+  /**
+   * The most searches this call may send to the providers, its refinement
+   * included (diligence audit 2026-10-28: a planned job's questions went
+   * unbounded, up to ~32 searches a step). The caller's job budget grants
+   * it, at least one (a caller with none left does not call). Absent: the
+   * service's own bounds.
+   */
+  readonly maxSearches?: number | undefined;
   /** Deep research: words from public pages this run already read (egress.ts). */
   readonly publicTerms?: readonly string[] | undefined;
   /** Deep research: research vocabulary may travel (egress.ts). */
@@ -287,7 +298,16 @@ export type PublicWebResearchServiceDependencies = {
   readonly logger?: Logger | undefined;
   /** How long the page reads may hold the answer (EXTRACT_BUDGET_MS). */
   readonly extractBudgetMs?: number | undefined;
+  /** A planned (background) call's page reads (PLANNED_EXTRACT_BUDGET_MS). */
+  readonly plannedExtractBudgetMs?: number | undefined;
 };
+
+/**
+ * A planned job's page reads (diligence audit 2026-10-28): 3 s is a turn's
+ * budget, and a background job's pages were cut off at it, so its facts
+ * came from search snippets. Nobody waits on a job's turn.
+ */
+export const PLANNED_EXTRACT_BUDGET_MS = 8_000;
 
 /**
  * How long the page reads may hold the answer once the searches have
@@ -410,7 +430,9 @@ export function createPublicWebResearchService(
   dependencies: PublicWebResearchServiceDependencies,
 ): PublicWebResearchService {
   const { provider, evidence, logger } = dependencies;
-  const extractBudgetMs = dependencies.extractBudgetMs ?? EXTRACT_BUDGET_MS;
+  const turnExtractBudgetMs = dependencies.extractBudgetMs ?? EXTRACT_BUDGET_MS;
+  const plannedExtractBudgetMs =
+    dependencies.plannedExtractBudgetMs ?? PLANNED_EXTRACT_BUDGET_MS;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/q-research");
   const metrics = {
@@ -768,6 +790,13 @@ export function createPublicWebResearchService(
         );
         return reused;
       }
+      // The job's grant, refinement included; at least the one search.
+      const searchCap =
+        command.maxSearches === undefined
+          ? Number.POSITIVE_INFINITY
+          : Math.max(1, Math.floor(command.maxSearches));
+      const extractBudgetMs =
+        command.planned === true ? plannedExtractBudgetMs : turnExtractBudgetMs;
       const extractCount = Math.min(
         Math.max(
           1,
@@ -834,7 +863,7 @@ export function createPublicWebResearchService(
         ...lane,
         ...planned.slice(1).map(search),
         ...news,
-      ].slice(0, RESEARCH_BOUNDS.searchesPerResearch);
+      ].slice(0, Math.min(RESEARCH_BOUNDS.searchesPerResearch, searchCap));
       let searchCalls = requests.length;
       const settled = await Promise.allSettled(
         requests.map((request) => provider.search(request, context)),
@@ -869,7 +898,7 @@ export function createPublicWebResearchService(
         hits.length === 0 &&
         identityQuery.length > 0 &&
         !planned.includes(identityQuery) &&
-        searchCalls < RESEARCH_BOUNDS.maxSearchCalls
+        searchCalls < Math.min(RESEARCH_BOUNDS.maxSearchCalls, searchCap)
       ) {
         searchCalls += 1;
         try {

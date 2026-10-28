@@ -1227,6 +1227,7 @@ export {
   WorkforceAnalysisRequestSchema,
   WorkforceNamedCompanyAnalysisRequestSchema,
   WORKFORCE_ANALYSIS_KIND,
+  WORKFORCE_DILIGENCE_PROFILE,
   isWorkforceAnalysisRequest,
   type WorkforceAnalysisRequest,
   type WorkforceDocumentRequest,

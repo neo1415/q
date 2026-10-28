@@ -206,9 +206,11 @@ const DILIGENCE_PREP: WorkforceScenario = {
       {
         key: "memo",
         role: "DOCUMENTS",
-        goal: "Investment memo on Harbourline Cargo from the material shared",
+        goal: "Diligence memo on Harbourline Cargo from the research and the material shared",
         tools: ["documents.own.prepare"],
-        dependsOn: [],
+        // Diligence audit 2026-10-28: the memo is written from the research,
+        // so it waits on it; it critiques and revises itself (no review step).
+        dependsOn: ["market"],
         document: {
           operation: "PREPARE",
           kind: "MEMO",
@@ -219,22 +221,11 @@ const DILIGENCE_PREP: WorkforceScenario = {
         fallbackFor: null,
       },
       {
-        key: "review",
-        role: "DOCUMENTS",
-        goal: "Second specialist critiques and revises the memo",
-        tools: ["documents.own.prepare"],
-        dependsOn: ["memo"],
-        document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
-        why: "Diligence will rely on it, so it is checked before use.",
-        evidence: [],
-        fallbackFor: null,
-      },
-      {
         key: "questions",
         role: "DILIGENCE",
         goal: "Founder questions on unit economics, concentration and the memo's gaps",
         tools: ["diligence.questions.prepare"],
-        dependsOn: ["review"],
+        dependsOn: ["memo"],
         why: "Two diligence requests are still open.",
         evidence: ["F4", "F5"],
         fallbackFor: null,
@@ -257,25 +248,30 @@ const DILIGENCE_PREP: WorkforceScenario = {
     cannot: [],
   },
   behaviour: {
-    review: {
+    memo: {
       status: "DONE",
       summary:
-        "Reviewed the document, found 2 issues and revised it to version 2.",
+        'Wrote "Harbourline Cargo: diligence memo"; 1 reviewer point is still open and noted in it.',
       outputs: {
+        artifactId: "artifact-memo",
+        companyId: "company",
         signals: [
           {
             kind: "MISSING_INFORMATION",
             note: "Unit economics: margin by lane is not known",
-            stepKey: "review",
+            stepKey: "memo",
           },
         ],
       },
     },
   },
   expect: {
-    roles: ["DOCUMENTS", "DILIGENCE"],
-    order: [["DOCUMENTS", "DILIGENCE"]],
-    parallel: [["RESEARCH", "DOCUMENTS"]],
+    roles: ["RESEARCH", "DOCUMENTS", "DILIGENCE"],
+    order: [
+      ["RESEARCH", "DOCUMENTS"],
+      ["DOCUMENTS", "DILIGENCE"],
+    ],
+    parallel: [],
     gaps: [/unit economics|margin/iu, /customer|concentration/iu],
     next: [/decide|diligence/iu],
     approvalFor: ["diligence.questions.prepare"],
@@ -601,7 +597,7 @@ const CONTRADICTION: WorkforceScenario = {
   permitted: ALL_TOOLS,
   scripted: {
     summary:
-      "A memo critiqued by a second specialist, founder questions from its gaps, then a thank-you to the founder.",
+      "Research Ledgerfold, write a diligence memo that checks its claims, founder questions from its gaps, then a thank-you to the founder.",
     outcome:
       "The partners get a memo they can rely on, and the founder is thanked with the questions that remain.",
     prerequisites: [
@@ -614,12 +610,24 @@ const CONTRADICTION: WorkforceScenario = {
       },
     ],
     steps: [
+      // Diligence audit 2026-10-28: research first, then the memo, which
+      // critiques and revises itself (no CRITIQUE_AND_REVISE step).
+      {
+        key: "dig",
+        role: "RESEARCH",
+        goal: "Ledgerfold's founders and team, customers, litigation and regulatory record, prior funding, reported revenue, competitors and market",
+        tools: ["public_web.search"],
+        dependsOn: [],
+        why: "The memo must test Ledgerfold's figures against public evidence.",
+        evidence: [],
+        fallbackFor: null,
+      },
       {
         key: "memo",
         role: "DOCUMENTS",
-        goal: "Investment memo on Ledgerfold",
+        goal: "Diligence memo on Ledgerfold",
         tools: ["documents.own.prepare"],
-        dependsOn: [],
+        dependsOn: ["dig"],
         document: {
           operation: "PREPARE",
           kind: "MEMO",
@@ -630,22 +638,11 @@ const CONTRADICTION: WorkforceScenario = {
         fallbackFor: null,
       },
       {
-        key: "check",
-        role: "DOCUMENTS",
-        goal: "Second specialist checks the memo against the evidence",
-        tools: ["documents.own.prepare"],
-        dependsOn: ["memo"],
-        document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
-        why: "They will rely on its figures.",
-        evidence: [],
-        fallbackFor: null,
-      },
-      {
         key: "questions",
         role: "DILIGENCE",
         goal: "Founder questions from the memo's gaps",
         tools: ["diligence.questions.prepare"],
-        dependsOn: ["check"],
+        dependsOn: ["memo"],
         why: "What is not known should be asked, not guessed.",
         evidence: [],
         fallbackFor: null,
@@ -655,7 +652,7 @@ const CONTRADICTION: WorkforceScenario = {
         role: "CONVERSATION",
         goal: "Thank the founder and say questions follow",
         tools: ["list_messages", "chat.message.send"],
-        dependsOn: ["check"],
+        dependsOn: ["memo"],
         why: "The person asked for it.",
         evidence: [],
         fallbackFor: null,
@@ -672,23 +669,27 @@ const CONTRADICTION: WorkforceScenario = {
     cannot: ["Sharing the memo with the partners outside Capital Q."],
   },
   behaviour: {
-    check: {
+    memo: {
       status: "DONE",
-      summary: "Reviewed the document, found 1 issue; it stands as written.",
+      summary:
+        'Wrote "Ledgerfold: diligence memo"; a second analyst reviewed it and it passed.',
       outputs: {
+        artifactId: "artifact-memo",
+        companyId: "company",
         signals: [
           {
             kind: "CONTRADICTION",
             note: "Revenue: the deck says $1.2M ARR, the FY26 model says $0.8M",
-            stepKey: "check",
+            stepKey: "memo",
           },
         ],
       },
     },
   },
   expect: {
-    roles: ["DOCUMENTS", "DILIGENCE", "CONVERSATION"],
+    roles: ["RESEARCH", "DOCUMENTS", "DILIGENCE", "CONVERSATION"],
     order: [
+      ["RESEARCH", "DOCUMENTS"],
       ["DOCUMENTS", "DILIGENCE"],
       ["DOCUMENTS", "CONVERSATION"],
     ],

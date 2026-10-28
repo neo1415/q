@@ -1,5 +1,15 @@
 # Agent execution matrix — the agent architecture as built (audited 2026-10-11 at `b021d53b`)
 
+## Diligence correction — 2026-10-28 (branch `fix/diligence`, LOCAL TESTED, not deployed)
+
+DOCUMENTS and DILIGENCE are registered executors (see section 2). "Do due diligence on X / a memo on X" no longer takes the model-free MEMO assembly:
+
+- Plan validation (`withDiligenceResearch`, q-orchestrator plan.ts) turns an unbound NAMED_COMPANY MEMO or INVESTMENT_BRIEF into a diligence ANALYSIS (`profile: "DILIGENCE"`) and makes it wait on a RESEARCH step. It uses one the plan already has, or adds one when research runs and is permitted. JOB_PLAN v14 teaches that shape.
+- The RESEARCH step researches the named company. RESEARCH_PLAN v3 adds founders and team, customers, litigation and regulatory, funding and traction.
+- The writer (ANALYSIS_WRITE v4) writes fixed sections. Code adds three of its own: Claims vs evidence, Sources and Not known.
+- The memo reads the data room through the Data room tab's own view, as the person (OPEN/OWNER documents only, bounded). It also sets stated figures against public facts deterministically (claims.ts): CORROBORATED / CONTRADICTED / UNVERIFIED.
+- Per-job search budget: `Q_WORKFORCE_JOB_SEARCH_BUDGET`, default 8, planned calls included. Planned page reads: `Q_RESEARCH_PLANNED_EXTRACT_MS`, default 8 s.
+
 ## Current evidence checkpoint — 2026-10-11 20:56 UTC
 
 The live baseline is exact green `9261cdc4`, all four Railway services SUCCESS. The monthly start guard is deployed and fails closed for an unavailable/malformed spend ledger; durable aggregate job reservations remain missing. The existing workforce document bridge has produced a real READY ONE_PAGER, preserved version 1 through same-artifact conversational revision to version 2, rendered the viewer and exported a changed valid one-page PDF. All three canonical findings and nine gaps remain intact; the viewer's dedicated “Evidence gaps” section was verified after a warm retry. Cold document opening still needs a readiness correction.
@@ -53,20 +63,20 @@ Consequence [INF]: a fix to the workforce executors does not change standing-ins
 Advertised roster: 10 stored roles, `LEAD, OUTREACH, MANDATE_WATCHER, CONVERSATION, WRITER, REVIEWER, SCHEDULER, DOCUMENTS, RESEARCH, AD_HOC`. [CO] registry.ts:17-28; mirrored in contracts packages/contracts/src/q/workforce.ts:31-42.
 The lead contract has a different 8-role set (`QAgentRole`, includes DILIGENCE, SCHEDULING, DISCOVERY). [CO] executors.ts:128-138 maps between them (SCHEDULING->SCHEDULER, DISCOVERY->MANDATE_WATCHER, DILIGENCE->AD_HOC "never stored").
 
-| Role (executor name)               | Executor?                                                         | Evidence                                                                      |
-| ---------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| CONVERSATION                       | YES                                                               | executors.ts:27-33; impl jobs.ts:321-487 (`conversation("REPLY")`)            |
-| OUTREACH                           | YES                                                               | executors.ts:36-42; impl jobs.ts:219-266                                      |
-| SCHEDULING (stored SCHEDULER)      | YES                                                               | executors.ts:45-51; impl jobs.ts:321-487 (`conversation("SCHEDULE")`)         |
-| DISCOVERY (stored MANDATE_WATCHER) | YES                                                               | executors.ts:54-60; impl jobs.ts:198-213                                      |
-| RESEARCH                           | CONDITIONAL, only when a research provider is composed            | executors.ts:67-73, 105; jobs.ts:274-314, 494                                 |
-| DOCUMENTS                          | NO                                                                | executors.ts:86-87 (UNREGISTERED), no entry in `registeredExecutors` (97-107) |
-| DILIGENCE                          | NO                                                                | executors.ts:88                                                               |
-| WRITER, REVIEWER                   | NO as roles; run inside CONVERSATION/OUTREACH via `OutwardReview` | executors.ts:15-21; plan.ts:114-122 refuses them with NO_EXECUTOR             |
-| AD_HOC                             | NO (spawning not implemented; `spawned: false` always)            | plan.ts:164; registry.ts:123-130                                              |
-| LEAD                               | not a step                                                        | plan.ts:110-113                                                               |
+| Role (executor name)               | Executor?                                                         | Evidence                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| CONVERSATION                       | YES                                                               | executors.ts:27-33; impl jobs.ts:321-487 (`conversation("REPLY")`)          |
+| OUTREACH                           | YES                                                               | executors.ts:36-42; impl jobs.ts:219-266                                    |
+| SCHEDULING (stored SCHEDULER)      | YES                                                               | executors.ts:45-51; impl jobs.ts:321-487 (`conversation("SCHEDULE")`)       |
+| DISCOVERY (stored MANDATE_WATCHER) | YES                                                               | executors.ts:54-60; impl jobs.ts:198-213                                    |
+| RESEARCH                           | CONDITIONAL, only when a research provider is composed            | executors.ts:67-73, 105; jobs.ts:274-314, 494                               |
+| DOCUMENTS                          | YES where the document pipeline runs in JOB mode (2026-10-28)     | executors.ts `registeredExecutors` (`availability.documents`); jobs.ts      |
+| DILIGENCE                          | YES, composed with DOCUMENTS (questions filed for approval)       | executors.ts `registeredExecutors` (`availability.diligence`); diligence.ts |
+| WRITER, REVIEWER                   | NO as roles; run inside CONVERSATION/OUTREACH via `OutwardReview` | executors.ts:15-21; plan.ts:114-122 refuses them with NO_EXECUTOR           |
+| AD_HOC                             | NO (spawning not implemented; `spawned: false` always)            | plan.ts:164; registry.ts:123-130                                            |
+| LEAD                               | not a step                                                        | plan.ts:110-113                                                             |
 
-The prior note ("only CONVERSATION, OUTREACH, SCHEDULING, DISCOVERY, RESEARCH; DOCUMENTS and DILIGENCE unregistered") is CORRECT. [CO]
+STALE since the 2026-10-11 audit: "DOCUMENTS and DILIGENCE unregistered" no longer holds. Both are registered where q-api composes the document pipeline in JOB mode (main.ts `documents` / `diligence` getters). [CO 2026-10-28]
 Not agents: executors are fixed code procedures, not LLM tool-use loops. Models are called only for plan, reply-read, review and redraft. [CO] models.ts:175-231. `step.tools` is only a gate (`has(step.tools, ...)`, jobs.ts:220, 325-331); the tool names do not drive any model tool call. [CO]
 Agent "tools" are NOT q-tools ids. They are labels (`search_companies`, `list_messages`...) backed by the `WorkforcePorts` bag. [CO] jobs.ts:56-129; ports.ts:137-338. The only things a plan can ever permit are the 8 (9 with research) names in `EXECUTABLE_JOB_TOOLS`. [CO] jobs.ts:524-539.
 Registry/executor drift: SCHEDULER role lists `schedule.reminder.create` and `email.send` (registry.ts:95-101) but the executor has only 3 tools (executors.ts:48). DOCUMENTS lists 4 tools that no plan can permit (not in jobs.ts:524-533). [CO]
@@ -99,6 +109,7 @@ Registry/executor drift: SCHEDULER role lists `schedule.reminder.create` and `em
 - Document Studio is real and substantial: `runDocumentPipeline` (write, design, find assets, check, fix twice, ready) in packages/q-specialists/src/company/document-pipeline.ts:617; studio helpers document-studio.ts; versioned artifacts and a Postgres document-job repo in packages/q-artifacts (index.ts:1-25; infrastructure/postgres-document-jobs.ts:40); PDF/PPTX export in packages/deck-render/src/export.ts:13-45. [CO]
 - Wired ONLY to Q Brain tools (`documents.own.*`, q-tools/src/tools/documents.ts:35-39, 421; composed in apps/q-api/src/composition/artifacts.ts and documents.ts). The workforce has zero references: grep for document/artifact/diligence in apps/q-api/src/composition/workforce/_.ts and q-orchestrator/src/workforce/_.ts finds only comments, a `DOCUMENT` ask-kind in thread-consistency.ts:19-109 and a subject key (job-actions.ts:162). [CO]
 - The reason text for DOCUMENTS ("nothing produces a durable, checkable file", executors.ts:86-87) looks STALE given the artifact service above. [INF]
+- 2026-10-28: the two bullets above are stale. The workforce composes documents (documents.ts), analyses (analysis.ts), diligence memos (diligence-memo.ts, claims.ts) and diligence questions (diligence.ts). A diligence memo reads the data room through the same authorised view the chat tools use (material-documents.ts). [CO]
 - Diligence actions exist as app-actions (diligence.document.share/revoke/request, request.fulfil/upload_fulfil, packages/app-actions/src/actions/diligence.ts:93-330), reachable by Q Brain (generated tools) and by meeting follow-up cards (apps/q-api/src/composition/meeting-follow-up-cards.ts:221), not by any workforce executor. [CO]
 
 ## 7. Proactive triggers

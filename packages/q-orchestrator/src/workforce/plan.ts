@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import {
   isWorkforceAnalysisRequest,
+  WORKFORCE_ANALYSIS_KIND,
+  WORKFORCE_DILIGENCE_PROFILE,
   WorkforceDocumentRequestSchema,
   type WorkforceDocumentRequest,
   type QAgentExecutor,
@@ -161,8 +163,107 @@ const PlannedNamedCompany = z
     operation: z.literal("PREPARE"),
     kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF", "ANALYSIS"]),
     scope: z.literal("NAMED_COMPANY"),
+    /** Set by code (`withDiligenceResearch`), never by the planner. */
+    profile: z.literal(WORKFORCE_DILIGENCE_PROFILE).optional(),
   })
   .strict();
+
+/** The goal of the research step code adds before a diligence document. */
+export const DILIGENCE_RESEARCH_GOAL =
+  "What an investor must know about the company before investing: its founders and team, named customers and partners, litigation and regulatory actions, prior funding and investors, reported traction, competitors and market.";
+
+/**
+ * Diligence safety net (2026-10-28): a memo or brief about the one company
+ * the job names was assembled from record facts alone -- no research, no
+ * writer. Code, not the planner, decides its shape: an unbound NAMED_COMPANY
+ * MEMO or INVESTMENT_BRIEF becomes a diligence ANALYSIS, and a diligence
+ * document that waits on no RESEARCH step waits on one: an earlier one in
+ * the plan, or one code adds (when research runs here and is permitted).
+ * Already-bound (approved) requests are never rewritten: an approved plan
+ * runs as approved.
+ */
+export function withDiligenceResearch(
+  steps: readonly ProposedStep[],
+  bounds: Pick<PlanBounds, "permitted" | "executors">,
+): readonly ProposedStep[] {
+  const executors =
+    bounds.executors ?? registeredExecutors({ research: false });
+  const canResearch =
+    executors.RESEARCH !== undefined &&
+    bounds.permitted.has("public_web.search");
+  const keys = new Set(steps.map((step) => step.key));
+  const out: ProposedStep[] = [];
+  for (const step of steps) {
+    if (step.role !== "DOCUMENTS") {
+      out.push(step);
+      continue;
+    }
+    const planned = PlannedNamedCompany.safeParse(step.document);
+    const converted =
+      planned.success &&
+      (planned.data.kind === "MEMO" ||
+        planned.data.kind === "INVESTMENT_BRIEF" ||
+        planned.data.profile === WORKFORCE_DILIGENCE_PROFILE)
+        ? {
+            operation: "PREPARE" as const,
+            kind: WORKFORCE_ANALYSIS_KIND,
+            scope: "NAMED_COMPANY" as const,
+            profile: WORKFORCE_DILIGENCE_PROFILE,
+          }
+        : null;
+    const bound = WorkforceDocumentRequestSchema.safeParse(step.document);
+    const diligence =
+      converted !== null ||
+      (bound.success &&
+        isWorkforceAnalysisRequest(bound.data) &&
+        bound.data.scope === "NAMED_COMPANY" &&
+        bound.data.profile === WORKFORCE_DILIGENCE_PROFILE);
+    if (!diligence) {
+      out.push(step);
+      continue;
+    }
+    const document = converted ?? step.document;
+    const waitsOnResearch = step.dependsOn.some((key) =>
+      out.some((one) => one.key === key && one.role === "RESEARCH"),
+    );
+    if (waitsOnResearch || converted === null) {
+      // Bound (approved) requests keep their approved dependencies.
+      out.push({ ...step, document });
+      continue;
+    }
+    const earlier = out.find(
+      (one) => one.role === "RESEARCH" && one.fallbackFor === undefined,
+    );
+    if (earlier !== undefined) {
+      out.push({
+        ...step,
+        document,
+        dependsOn: [...step.dependsOn, earlier.key],
+      });
+      continue;
+    }
+    if (!canResearch) {
+      // Nothing to research with here: the document states that no public
+      // research was available rather than pretending to diligence.
+      out.push({ ...step, document });
+      continue;
+    }
+    let key = "diligence_research";
+    for (let n = 2; keys.has(key); n += 1) key = `diligence_research_${n}`;
+    keys.add(key);
+    out.push({
+      key,
+      role: "RESEARCH",
+      agentName: null,
+      goal: DILIGENCE_RESEARCH_GOAL,
+      tools: ["public_web.search"],
+      dependsOn: [],
+      why: "Diligence rests on public evidence about the company, not only its own record.",
+    });
+    out.push({ ...step, document, dependsOn: [...step.dependsOn, key] });
+  }
+  return out;
+}
 
 function bindDocument(
   raw: unknown,
@@ -172,12 +273,16 @@ function bindDocument(
   | { readonly ok: false; readonly reason: StepRefusal } {
   const planned = PlannedNamedCompany.safeParse(raw);
   if (planned.success) {
-    return namedCompanyId === null
-      ? { ok: false, reason: "NO_NAMED_COMPANY" }
-      : {
-          ok: true,
-          document: { ...planned.data, companyId: namedCompanyId },
-        };
+    if (namedCompanyId === null)
+      return { ok: false, reason: "NO_NAMED_COMPANY" };
+    // Bound by the one schema every stored request is read with.
+    const bound = WorkforceDocumentRequestSchema.safeParse({
+      ...planned.data,
+      companyId: namedCompanyId,
+    });
+    return bound.success
+      ? { ok: true, document: bound.data }
+      : { ok: false, reason: "INVALID_DOCUMENT_REQUEST" };
   }
   const parsed = WorkforceDocumentRequestSchema.safeParse(raw);
   return parsed.success
@@ -188,7 +293,7 @@ function bindDocument(
 export const MAX_JOB_STEPS = 12;
 
 export function boundPlan(
-  steps: readonly ProposedStep[],
+  proposed: readonly ProposedStep[],
   bounds: PlanBounds,
 ): {
   readonly steps: readonly BoundStep[];
@@ -200,6 +305,8 @@ export function boundPlan(
 } {
   const executors =
     bounds.executors ?? registeredExecutors({ research: false });
+  // A memo about a named company never ships without research (2026-10-28).
+  const steps = withDiligenceResearch(proposed, bounds);
   const kept: BoundStep[] = [];
   const refused: { key: string; reason: StepRefusal }[] = [];
   const keys = new Set<string>();

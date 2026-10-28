@@ -22,9 +22,11 @@ export {
 } from "./executors.js";
 export {
   DEEP_WORK_STEP_BUDGETS_USD,
+  DILIGENCE_RESEARCH_GOAL,
   MAX_JOB_STEPS,
   STEP_REFUSALS,
   boundPlan,
+  withDiligenceResearch,
   stepBudgetUsd,
   type DeepWorkStepBudgets,
   planIsValid,
