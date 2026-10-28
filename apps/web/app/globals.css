@@ -5520,6 +5520,29 @@
   --cq-bottom-nav-height: 0px;
 }
 
+/*
+ * Owner 2026-10-28: no bottom navigation on a phone (the sections open
+ * from the header's menu). Nothing reserves its height any more, so every
+ * dock, composer and strip that sat above it settles at the bottom edge.
+ */
+:root {
+  --cq-bottom-nav-height: 0px;
+}
+
+/*
+ * Owner 2026-10-28: on a phone Q's page is a plain conversation, like
+ * ChatGPT: the welcome, the way to talk and the composer. Q's large
+ * presence, its particle field, the moving light and the animated corner
+ * mark are for the wide screen. The Presence view is still a tap away.
+ */
+@media (max-width: 1023px) {
+  .cq-q-home [data-q-room-presence],
+  .cq-q-home [data-q-lumen],
+  .cq-q-home [data-q-presence="corner"] {
+    display: none;
+  }
+}
+
 [data-q-quick-controls] button {
   height: auto;
   min-height: 44px;

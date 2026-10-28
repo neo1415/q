@@ -8,7 +8,12 @@ import { useState } from "react";
 import { IntentLink } from "./intent-link";
 
 import { cx } from "@capital-q/ui";
-import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
+import {
+  ChevronRight,
+  ICON_SIZE,
+  ICON_STROKE,
+  PanelLeft,
+} from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import type { MyOrganisationDto } from "@capital-q/contracts";
 import type { ContextScope } from "@capital-q/ui/tokens";
@@ -125,6 +130,96 @@ export function MobileNavigation() {
         })}
       </ul>
     </nav>
+  );
+}
+
+/**
+ * Owner 2026-10-28 (founder's direction): on a phone Capital Q opens like
+ * ChatGPT. The conversation with Q owns the screen; there is no tab bar.
+ * Discover, Explore, Q, CRM and Work open from this menu button at the
+ * header's start, in a drawer from that edge. What You holds is unchanged.
+ */
+export function MobileMenu() {
+  const pathname = usePathname();
+  const home = useHomeHref();
+  const t = useT();
+  const needsYou = useNeedsYou();
+  const [open, setOpen] = useState(false);
+  return (
+    <SheetRoot open={open} onOpenChange={setOpen}>
+      <SheetTrigger>
+        <button
+          type="button"
+          aria-label={
+            needsYou === 0
+              ? t("Menu")
+              : `${t("Menu")}, ${t(`${String(needsYou)} waiting for you`)}`
+          }
+          data-nav-menu
+          className="relative inline-flex size-11 shrink-0 items-center justify-center rounded-full text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        >
+          <PanelLeft
+            aria-hidden="true"
+            size={ICON_SIZE.prominent + 2}
+            strokeWidth={ICON_STROKE}
+          />
+          {needsYou === 0 ? null : (
+            <span
+              aria-hidden="true"
+              className="absolute end-2 top-2 size-2 rounded-full bg-(--cq-accent)"
+            />
+          )}
+        </button>
+      </SheetTrigger>
+      <SheetContent title="Capital Q" side="start">
+        <nav aria-label={t("Primary")}>
+          <ul className="flex flex-col">
+            {MOBILE_NAVIGATION.map((item) => {
+              const active = isActiveRoute(pathname, item.href);
+              const Icon = item.icon;
+              const waiting =
+                item.href === WORK_NAVIGATION.href ? needsYou : 0;
+              return (
+                <li key={item.href}>
+                  <IntentLink
+                    href={item.href === "/home" ? home : item.href}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => {
+                      setOpen(false);
+                    }}
+                    className={cx(
+                      "flex min-h-12 items-center gap-3 rounded-md px-3 cq-body transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+                      active
+                        ? "bg-(--cq-accent-soft) font-semibold text-(--cq-text-primary)"
+                        : "text-(--cq-text-primary)",
+                    )}
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      size={ICON_SIZE.prominent}
+                      strokeWidth={active ? 2 : ICON_STROKE}
+                      className={
+                        active
+                          ? "text-(--cq-accent)"
+                          : "text-(--cq-text-secondary)"
+                      }
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                      {t(item.label)}
+                    </span>
+                    {waiting === 0 ? null : (
+                      <span className="cq-numeric cq-caption rounded-full bg-(--cq-accent) px-2 font-semibold text-(--cq-text-inverse)">
+                        {waiting}
+                      </span>
+                    )}
+                  </IntentLink>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </SheetContent>
+    </SheetRoot>
   );
 }
 

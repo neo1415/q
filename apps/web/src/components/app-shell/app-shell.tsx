@@ -17,7 +17,6 @@ import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
 import { FictionalNames } from "./fictional-names";
 import { GlobalQProvider } from "./global-q";
-import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
 import { Words } from "@/features/i18n/language";
 
@@ -47,7 +46,8 @@ const UNSET: ShellContext = { scope: "unset" };
  * The application shell. Server-rendered structure; only the pieces that
  * need the browser (current route, network state) are client components.
  *
- * Mobile: header → main → bottom navigation. Desktop: sidebar + workspace.
+ * Mobile: header (with the menu) → main, like ChatGPT (owner 2026-10-28:
+ * no bottom navigation). Desktop: sidebar + workspace.
  * `main` carries the id the skip link targets.
  */
 export function AppShell({
@@ -119,7 +119,6 @@ export function AppShell({
             {children}
             <FictionalNames />
           </main>
-          <MobileNavigation />
         </div>
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}

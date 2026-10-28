@@ -1601,19 +1601,21 @@ export function QConversationPanel({
               >
                 <ArrivalRoom>
                   {room.filled ? (
-                    <ViewTransition
-                      name="q-aperture"
-                      share="cq-q-morph"
-                      default="none"
-                    >
-                      <QAperture
-                        state={presence.state}
-                        size="stage"
-                        inputLevel={client.inputLevel}
-                        outputLevel={client.outputLevel}
-                        stage
-                      />
-                    </ViewTransition>
+                    <div data-q-room-presence="filled">
+                      <ViewTransition
+                        name="q-aperture"
+                        share="cq-q-morph"
+                        default="none"
+                      >
+                        <QAperture
+                          state={presence.state}
+                          size="stage"
+                          inputLevel={client.inputLevel}
+                          outputLevel={client.outputLevel}
+                          stage
+                        />
+                      </ViewTransition>
+                    </div>
                   ) : (
                     // The voice room (owner 2026-10-19): with nothing beside
                     // Q, the room at rest is a large, dim Q that gathers
@@ -1998,7 +2000,17 @@ function readStageView(): QStageView {
   } catch {
     // Storage unavailable: fall through to this page's own choice.
   }
-  return stageViewInMemory ?? "presence";
+  // Owner 2026-10-28 (founder's direction): a phone opens like ChatGPT,
+  // the conversation itself; Q's presence view stays one tap away.
+  return stageViewInMemory ?? (phoneWidth() ? "chat" : "presence");
+}
+
+function phoneWidth(): boolean {
+  try {
+    return window.matchMedia("(max-width: 1023px)").matches;
+  } catch {
+    return false;
+  }
 }
 
 /*
