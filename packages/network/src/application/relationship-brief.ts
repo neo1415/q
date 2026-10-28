@@ -4,15 +4,22 @@ import {
   UtcTimestampSchema,
   type RelationshipBrief,
   type RelationshipBriefDecision,
+  type RelationshipBriefHistoryEntry,
   type RelationshipBriefMeeting,
   type RelationshipBriefMessage,
 } from "@capital-q/contracts";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import type { ActorContext } from "@capital-q/security";
 
-import { RelationshipIdSchema } from "../contracts/index.js";
+import { InterestIdSchema, RelationshipIdSchema } from "../contracts/index.js";
 import {
   MeetingActivityPayloadSchema,
+  RELATIONSHIP_EVENT_CONNECTION_ACCEPTED,
+  RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
+  RELATIONSHIP_EVENT_DOCUMENT_SHARED,
+  RELATIONSHIP_EVENT_INTEREST_DECLINED,
+  RELATIONSHIP_EVENT_INTEREST_EXPRESSED,
+  RELATIONSHIP_EVENT_MEETING_HELD,
   RELATIONSHIP_EVENT_MEETING_NO_SHOW,
   RELATIONSHIP_EVENT_MESSAGE_SENT,
 } from "../domain/event-registry.js";
@@ -303,6 +310,81 @@ export function deriveBriefDecisions(
   return { items, complete };
 }
 
+const HISTORY_KINDS: Readonly<
+  Record<string, RelationshipBriefHistoryEntry["kind"]>
+> = {
+  [RELATIONSHIP_EVENT_INTEREST_EXPRESSED]: "INTEREST_EXPRESSED",
+  [RELATIONSHIP_EVENT_INTEREST_DECLINED]: "INTEREST_DECLINED",
+  [RELATIONSHIP_EVENT_CONNECTION_ACCEPTED]: "CONNECTION_ACCEPTED",
+  [RELATIONSHIP_EVENT_DOCUMENT_SHARED]: "DOCUMENT_SHARED",
+  [RELATIONSHIP_EVENT_DOCUMENT_REQUESTED]: "DOCUMENT_REQUESTED",
+  [RELATIONSHIP_EVENT_MEETING_HELD]: "MEETING_HELD",
+};
+
+/** An interest's own record, for its note and who expressed it. */
+export type BriefInterestRead = {
+  readonly note: string | null;
+  readonly expressedBy: "INVESTOR" | "COMPANY";
+};
+
+const text = (value: unknown): string | null =>
+  typeof value === "string" && value.length > 0 ? value : null;
+
+/**
+ * Stress 2026-10-28 (J7-I, J7-F): both sides' meeting preparation said "no
+ * prior exchange" while the history held Aster's interest with its note,
+ * LedgerBridge's acceptance and a shared deck. The steps that make up the
+ * relationship, in order, from the history this side may see. Pure.
+ */
+export function historyOf(input: {
+  readonly visible: readonly ProjectableEvent[];
+  readonly side: "INVESTOR" | "COMPANY";
+  readonly interests: ReadonlyMap<string, BriefInterestRead>;
+  readonly documentTitles: ReadonlyMap<string, string>;
+}): RelationshipBriefHistoryEntry[] {
+  const relative = (party: "INVESTOR" | "COMPANY" | null) =>
+    party === null ? null : party === input.side ? "YOUR_SIDE" : "OTHER_SIDE";
+  const out: RelationshipBriefHistoryEntry[] = [];
+  for (const event of [...input.visible].sort(
+    (a, b) => a.sequence - b.sequence,
+  )) {
+    const kind = HISTORY_KINDS[event.eventType];
+    if (kind === undefined) continue;
+    const payload = event.payload ?? {};
+    const interestId = text(payload["interestId"]);
+    const interest =
+      interestId === null ? undefined : input.interests.get(interestId);
+    // Who expressed the interest; the answer is the other side's.
+    const expresser = interest?.expressedBy ?? "INVESTOR";
+    const answerer = expresser === "INVESTOR" ? "COMPANY" : "INVESTOR";
+    const by =
+      kind === "INTEREST_EXPRESSED"
+        ? relative(expresser)
+        : kind === "CONNECTION_ACCEPTED" || kind === "INTEREST_DECLINED"
+          ? relative(answerer)
+          : kind === "DOCUMENT_SHARED"
+            ? relative("COMPANY")
+            : kind === "DOCUMENT_REQUESTED"
+              ? relative("INVESTOR")
+              : null;
+    const documentId = text(payload["documentId"]);
+    out.push({
+      kind,
+      at: UtcTimestampSchema.parse(new Date(event.occurredAt).toISOString()),
+      by,
+      note:
+        kind === "INTEREST_EXPRESSED"
+          ? (interest?.note?.slice(0, 1000) ?? null)
+          : null,
+      document:
+        documentId === null
+          ? null
+          : (input.documentTitles.get(documentId)?.slice(0, 300) ?? null),
+    });
+  }
+  return out.slice(-30);
+}
+
 type PartyView = {
   readonly side: "INVESTOR" | "COMPANY";
   readonly counterpart: {
@@ -327,6 +409,8 @@ function assembleBrief(input: {
   readonly meetings: Read<{ readonly list: readonly BriefMeetingRead[] }>;
   readonly diligence: Read<{ readonly area: BriefDiligenceRead | null }>;
   readonly now: number;
+  /** The interests on this relationship, by id (notes); absent: none read. */
+  readonly interests?: ReadonlyMap<string, BriefInterestRead> | undefined;
 }): RelationshipBrief {
   const { view, visible, now, diligence } = input;
   const status = view.status;
@@ -404,6 +488,14 @@ function assembleBrief(input: {
             })),
           }
         : diligence,
+    history: historyOf({
+      visible,
+      side: view.side,
+      interests: input.interests ?? new Map(),
+      documentTitles: new Map(
+        (area?.sharedDocuments ?? []).map((d) => [d.id, d.title] as const),
+      ),
+    }),
     sourceVersions: {
       projector: status.projection.version,
       historySequence,
@@ -487,7 +579,33 @@ export function createRelationshipBrief(
       read(bound(sources.meetings), (list) => ({ list })),
       read(bound(sources.diligence), (area) => ({ area })),
     ]);
+    // The interests this side's history names, for their notes: the party
+    // check above already passed, and an interest's note is written to the
+    // other side. A failed read leaves the note unknown, never invented.
+    const interestIds = [
+      ...new Set(
+        visible.flatMap((event) =>
+          event.eventType === RELATIONSHIP_EVENT_INTEREST_EXPRESSED
+            ? [text(event.payload?.["interestId"])]
+            : [],
+        ),
+      ),
+    ].filter((interestId): interestId is string => interestId !== null);
+    const interests = new Map<string, BriefInterestRead>();
+    for (const interestId of interestIds.slice(0, 5)) {
+      const parsed = InterestIdSchema.safeParse(interestId);
+      if (!parsed.success) continue;
+      const found = await dependencies.interests
+        .findById(dependencies.sql, parsed.data)
+        .catch(() => null);
+      if (found === null || found.relationshipId !== relationshipId) continue;
+      interests.set(interestId, {
+        note: found.note ?? null,
+        expressedBy: found.expressedByParty,
+      });
+    }
     return assembleBrief({
+      interests,
       view: {
         side: view.side,
         counterpart: view.counterpart,

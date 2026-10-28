@@ -96,6 +96,30 @@ export const RelationshipBriefDecisionSchema = z
   })
   .strict();
 
+/** One step of the relationship's history, as the asking side may see it. */
+export const RelationshipBriefHistoryEntrySchema = z
+  .object({
+    kind: z.enum([
+      "INTEREST_EXPRESSED",
+      "INTEREST_DECLINED",
+      "CONNECTION_ACCEPTED",
+      "DOCUMENT_SHARED",
+      "DOCUMENT_REQUESTED",
+      "MEETING_HELD",
+    ]),
+    at: UtcTimestampSchema,
+    /** Which side acted, from the asker's side; null: not recorded. */
+    by: z.enum(["YOUR_SIDE", "OTHER_SIDE"]).nullable(),
+    /** The interest's own note, as written; null: none. */
+    note: z.string().max(1000).nullable().default(null),
+    /** The document shared or asked for, by title; null: not known. */
+    document: z.string().max(300).nullable().default(null),
+  })
+  .strict();
+export type RelationshipBriefHistoryEntry = z.infer<
+  typeof RelationshipBriefHistoryEntrySchema
+>;
+
 export const RelationshipBriefSchema = z
   .object({
     relationshipId: UuidSchema,
@@ -185,6 +209,12 @@ export const RelationshipBriefSchema = z
         )
         .max(50),
     }),
+    /**
+     * Stress 2026-10-28 (J7): what happened between them, in order, from
+     * the history this side may see: the interest with its note, the
+     * answer, documents shared. Absent from older briefs: [].
+     */
+    history: z.array(RelationshipBriefHistoryEntrySchema).max(30).default([]),
     sourceVersions: z
       .object({
         projector: z.string().max(64).nullable(),

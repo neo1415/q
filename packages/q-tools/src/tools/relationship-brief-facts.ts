@@ -51,6 +51,42 @@ export function briefFacts(brief: RelationshipBrief): readonly string[] {
     );
   }
 
+  // Stress 2026-10-28 (J7): what happened between them, in order, so a
+  // meeting brief never says "no prior exchange" over an interest note, an
+  // acceptance and a shared deck.
+  for (const step of (brief.history ?? []).slice(-6)) {
+    const actor =
+      step.by === "YOUR_SIDE" ? "Your side" : step.by === "OTHER_SIDE" ? them : "Someone";
+    switch (step.kind) {
+      case "INTEREST_EXPRESSED":
+        facts.push(
+          `${actor} expressed interest on ${at(step.at)}${step.note === null ? ", with no note" : `, with this note: "${step.note.slice(0, 250)}"`}.`,
+        );
+        break;
+      case "CONNECTION_ACCEPTED":
+        facts.push(
+          `${actor} accepted the interest on ${at(step.at)}: both sides agreed, so the relationship is connected (not an investment or commitment).`,
+        );
+        break;
+      case "INTEREST_DECLINED":
+        facts.push(`${actor} declined the interest on ${at(step.at)}.`);
+        break;
+      case "DOCUMENT_SHARED":
+        facts.push(
+          `${actor} shared ${step.document === null ? "a document" : `"${step.document.slice(0, 150)}"`} on ${at(step.at)}.`,
+        );
+        break;
+      case "DOCUMENT_REQUESTED":
+        facts.push(
+          `${actor} asked for ${step.document === null ? "a document" : `"${step.document.slice(0, 150)}"`} on ${at(step.at)}.`,
+        );
+        break;
+      case "MEETING_HELD":
+        facts.push(`A meeting was recorded as held on ${at(step.at)}.`);
+        break;
+    }
+  }
+
   const { count, latest } = brief.messages;
   if (latest.status === "OK") {
     if (count === 0 && latest.message === null) {
@@ -112,5 +148,5 @@ export function briefFacts(brief: RelationshipBrief): readonly string[] {
         : `Waiting on ${them}: ${decision.kind}${since}.`,
     );
   }
-  return facts.slice(0, 16);
+  return facts.slice(0, 22);
 }

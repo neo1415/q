@@ -238,7 +238,7 @@ export const GetRelationshipOutputSchema = z
           .object({
             status: z.literal("OK"),
             /** Code-written statements of fact; relay them, do not reinterpret. */
-            facts: z.array(z.string().max(400)).max(16),
+            facts: z.array(z.string().max(400)).max(22),
             detail: RelationshipBriefSchema,
           })
           .strict(),

@@ -146,6 +146,46 @@ describe("briefFacts", () => {
       "No messages have been sent in the chat with Tensorgate.",
     );
   });
+
+  // Stress 2026-10-28 (J7-I, J7-F): "No prior calls, messages… is provided"
+  // over an interest with a note, an acceptance and a shared deck.
+  it("says the interest with its note, the acceptance and the shared document", () => {
+    const brief = tensorGateBrief({
+      history: [
+        {
+          kind: "INTEREST_EXPRESSED",
+          at: "2026-10-06T14:16:48.644Z",
+          by: "YOUR_SIDE",
+          note: "We back B2B payments in Nigeria; keen to see your merchant data.",
+          document: null,
+        },
+        {
+          kind: "CONNECTION_ACCEPTED",
+          at: "2026-10-06T17:21:54.076Z",
+          by: "OTHER_SIDE",
+          note: null,
+          document: null,
+        },
+        {
+          kind: "DOCUMENT_SHARED",
+          at: "2026-10-06T17:22:30.000Z",
+          by: "OTHER_SIDE",
+          note: null,
+          document: "Tensorgate seed deck",
+        },
+      ],
+    });
+    const facts = briefFacts(brief).join("\n");
+    expect(facts).toContain(
+      'Your side expressed interest on 2026-10-06 14:16 UTC, with this note: "We back B2B payments in Nigeria; keen to see your merchant data."',
+    );
+    expect(facts).toContain(
+      "Tensorgate accepted the interest on 2026-10-06 17:21 UTC: both sides agreed, so the relationship is connected",
+    );
+    expect(facts).toContain(
+      'Tensorgate shared "Tensorgate seed deck" on 2026-10-06 17:22 UTC.',
+    );
+  });
 });
 
 describe("get_relationship carries the brief", () => {

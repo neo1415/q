@@ -447,6 +447,8 @@ export {
 } from "./relationships.js";
 export {
   RelationshipBriefDecisionSchema,
+  RelationshipBriefHistoryEntrySchema,
+  type RelationshipBriefHistoryEntry,
   RelationshipBriefMeetingSchema,
   RelationshipBriefMessageSchema,
   RelationshipBriefSchema,
