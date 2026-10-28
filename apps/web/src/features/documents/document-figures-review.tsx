@@ -93,9 +93,14 @@ export function DocumentFiguresReview({
 
   useEffect(() => {
     let live = true;
-    void onboardingCurrentAction("founder").then((result) => {
-      if (live && result.ok) setView(result.value);
-    });
+    onboardingCurrentAction("founder")
+      .then((result) => {
+        if (live && result.ok) setView(result.value);
+      })
+      .catch(() => {
+        // Nothing to review when the session cannot be read; the page
+        // around this card still renders.
+      });
     return () => {
       live = false;
     };

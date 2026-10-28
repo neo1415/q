@@ -111,7 +111,9 @@ create table q_runtime.q_plan_versions (
     check (not fully_reviewed or (score_r1 is not null and score_r2 is not null)),
   -- The first version is Q's draft or a refined upload; later ones are a
   -- change the person asked for or a re-plan.
-  constraint q_plan_versions_cause_check
+  -- Named apart from the column check above, which Postgres itself calls
+  -- q_plan_versions_cause_check.
+  constraint q_plan_versions_first_version_cause_check
     check ((version = 1) = (cause in ('DRAFT', 'UPLOAD'))),
   constraint q_plan_versions_direction_check
     check (direction_id is null or cause = 'CHANGE')
