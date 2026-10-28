@@ -791,3 +791,76 @@ describe("rehearsing with a researched external person (W4)", () => {
     expect(outcome.status).not.toBe("SUCCEEDED");
   });
 });
+
+// Owner decision 2026-10-28: the key figures of a highly confidential
+// financial document are read by code and offered to the founder. Q is told
+// only that they wait for confirmation (a count), and, once confirmed, the
+// founder's own claims set against the deck. Never the document.
+describe("figures read locally from a held-back document", () => {
+  const REPORT = "715b9d70-d70e-417e-8677-7b971a147eb4";
+  const executorWith = (figures: {
+    pending: number;
+    confirmed: readonly string[];
+  }) =>
+    createQToolExecutor({
+      registry: createQToolRegistry(
+        createOwnRecordTools({
+          ...fakePorts(),
+          evidenceDocuments: {
+            list: () =>
+              Promise.resolve([
+                {
+                  documentId: REPORT,
+                  title: "LedgerBridge financial report Sept 2026",
+                  documentType: "MANAGEMENT_ACCOUNTS",
+                  status: "ACTIVE",
+                  processing: "COMPLETED",
+                  updatedAt: "2026-10-28T15:35:56.664Z",
+                  sensitivityClass: "HIGHLY_CONFIDENTIAL",
+                  figures,
+                },
+              ]),
+          },
+        }),
+      ),
+    });
+  const plan = (): PermittedContextPlan => {
+    const base = ownPlan();
+    const evidence = planFor(actorA, "GENERAL_QUESTION", [
+      { kind: "EVIDENCE_DOCUMENTS", sensitivity: "CONFIDENTIAL" },
+    ]).scopes;
+    return { ...base, scopes: [...base.scopes, ...evidence] };
+  };
+
+  it("says its figures are ready for confirmation, by count, with no value", async () => {
+    const outcome = await executorWith({ pending: 4, confirmed: [] }).execute(
+      call("list_uploaded_documents", {}),
+      contextFor(actorA, plan()),
+    );
+    const [item] = dataOf(outcome).items as {
+      qUse?: string;
+      confirmedFigures?: string[];
+    }[];
+    expect(item?.qUse).toMatch(
+      /Figures from this document are ready for your confirmation/u,
+    );
+    expect(item?.qUse).toMatch(/4 key figures/u);
+    expect(item?.qUse).toMatch(/Held back from Q/u);
+    expect(item?.confirmedFigures).toBeUndefined();
+  });
+
+  it("carries the founder's confirmed figures, set against the deck", async () => {
+    const line =
+      "CONTRADICTED | Monthly revenue, September 2026 | Your figure: USD 51,000 (you confirmed it from your financial document) | Your deck: MRR: $65K (traction, as of Sep 2026) | Both stay on record; neither is picked.";
+    const outcome = await executorWith({ pending: 0, confirmed: [line] }).execute(
+      call("list_uploaded_documents", {}),
+      contextFor(actorA, plan()),
+    );
+    const [item] = dataOf(outcome).items as {
+      qUse?: string;
+      confirmedFigures?: string[];
+    }[];
+    expect(item?.qUse).toMatch(/confirmed 1 figure from it/u);
+    expect(item?.confirmedFigures).toEqual([line]);
+  });
+});
