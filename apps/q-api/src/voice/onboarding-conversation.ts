@@ -142,8 +142,10 @@ export function createOnboardingConversation(dependencies: {
     stated: ReadonlySet<string> = new Set(),
     declined: ReadonlySet<string> = new Set(),
     finishing = false,
+    addsTo: ReadonlySet<string> = new Set(),
   ) =>
     createOnboardingPort({
+      addsTo,
       session: sessionOf(line),
       onboardingSessionId: line.onboarding.sessionId,
       journeyType: line.onboarding.journeyType,
@@ -297,11 +299,23 @@ export function createOnboardingConversation(dependencies: {
       (item) => stepOf(state, item.stepKey)?.status === "OPEN",
     );
     if (answers.length === 0 && declined.length === 0) return;
+    // A list they add to keeps what is on record, unless the reading found
+    // they meant this as the whole list (owner 2026-10-28).
+    const addsTo = new Set(
+      answers
+        .filter(
+          (answer) =>
+            answer.replaces !== true && isList(stepOf(state, answer.stepKey)),
+        )
+        .map((answer) => answer.stepKey),
+    );
     const port = portFor(
       line,
       personTurns,
       new Set(answers.map((answer) => answer.stepKey)),
       new Set(declined.map((item) => item.stepKey)),
+      false,
+      addsTo,
     );
     const recorded =
       answers.length === 0
@@ -521,6 +535,15 @@ export function createOnboardingConversation(dependencies: {
         "";
       const port = portFor(line, personTurns);
       const state = await port.state();
+      // Setup is done: whatever they ask now, the call ends and they go
+      // into Capital Q (owner 2026-10-28: "take me to my Discover page"
+      // after finishing was answered "coming up" and nothing moved).
+      if (state.completed) {
+        return {
+          commentary: completedNote(line.onboarding.journeyType, true),
+          leave: true,
+        };
+      }
       const authority =
         dependencies.delegation === undefined || request.trim().length === 0
           ? null
@@ -559,7 +582,10 @@ export function createOnboardingConversation(dependencies: {
           true,
         ).finish();
         if (finished.completed) {
-          return { commentary: completedNote(line.onboarding.journeyType) };
+          return {
+            commentary: completedNote(line.onboarding.journeyType),
+            leave: true,
+          };
         }
         return { commentary: readBack(await port.state()) };
       }
@@ -595,9 +621,51 @@ function isConversational(step: OnboardingStepState): boolean {
   );
 }
 
+/** A step that holds a list: several options, or categories. */
+function isList(step: OnboardingStepState | undefined): boolean {
+  return step?.kind === "MANY_OF" || step?.kind === "CATEGORIES";
+}
+
 function isAnswerable(state: OnboardingState, stepKey: string): boolean {
   const step = stepOf(state, stepKey);
   return step !== undefined && isConversational(step);
+}
+
+/** Open, a spoken answer can fill it, and no other answer settled it. */
+function isAskable(step: OnboardingStepState): boolean {
+  return (
+    isConversational(step) &&
+    step.status === "OPEN" &&
+    step.coveredBy === undefined
+  );
+}
+
+/** A strength step qualifies the step before it; never asked on its own. */
+function isFollowOn(step: OnboardingStepState): boolean {
+  return step.stepKey.endsWith("_strength");
+}
+
+/**
+ * The optional topics not yet asked or declined, grouped by the setup's
+ * own phases in its order (the voice prompt groups related questions).
+ */
+export function optionalGroups(state: OnboardingState): string[][] {
+  const topics = topicsOf(state.steps);
+  const phaseOf = new Map(
+    definitionFor(state.journey).steps.map(
+      (step) => [step.stepKey, step.configuration.phaseKey] as const,
+    ),
+  );
+  const groups: { phase: string; topics: string[] }[] = [];
+  for (const step of state.steps) {
+    if (step.required || !isAskable(step)) continue;
+    const phase = phaseOf.get(step.stepKey) ?? step.stepKey;
+    const topic = topics.get(step.stepKey) ?? step.question;
+    const last = groups.at(-1);
+    if (last !== undefined && last.phase === phase) last.topics.push(topic);
+    else groups.push({ phase, topics: [topic] });
+  }
+  return groups.slice(0, 12).map((group) => group.topics.slice(0, 8));
 }
 
 /** "How firm is that?" means nothing on its own: it is about the step before. */
@@ -664,9 +732,20 @@ export function briefOf(state: OnboardingState): string {
   });
   const documents = state.steps.some((step) => step.kind === "DOCUMENT");
   const minutes = state.minutesLeft ?? null;
+  const groups = optionalGroups(state);
   return [
     `What this setup needs (${state.journey}), in the setup's order. These are topics, not a script: ask in your own plain words, one thing at a time, and group things that belong together.`,
     ...lines,
+    ...(groups.length === 0
+      ? []
+      : [
+          "Optional topics, grouped (every one is asked; they may skip any):",
+          ...groups.map(
+            (group, index) =>
+              `- Group ${String(index + 1)}: ${group.join("; ")}`,
+          ),
+          "After the needed topics, offer these a group at a time, in plain words, saying they can skip. Finish only when every topic has been asked or they declined it, or they ask to finish.",
+        ]),
     ...(documents
       ? [
           "They can upload what they already have (a deck, a one-pager, a financial model) on screen while you talk; Capital Q reads it and you will be told what it found.",
@@ -700,14 +779,14 @@ export function openingOf(input: {
       : state.steps.find(
           (step) => step.stepKey === input.askStepKey && step.status === "OPEN",
         );
+  // The setup's own order, optional steps included (owner 2026-10-28:
+  // every question is asked; a resumed call skipped an optional question
+  // asked just before the line dropped, for good). A question asked and
+  // never answered is still open, so it is asked again.
   const next =
     asked ??
     state.steps.find(
-      (step) =>
-        isConversational(step) && step.status === "OPEN" && step.required,
-    ) ??
-    state.steps.find(
-      (step) => isConversational(step) && step.status === "OPEN",
+      (step) => isAskable(step) && (step.required || !isFollowOn(step)),
     );
   const question =
     next === undefined ? null : (topics.get(next.stepKey) ?? next.question);
@@ -785,16 +864,8 @@ export function readBack(state: OnboardingState): string {
         isConversational(step) && step.required && step.status === "OPEN",
     )
     .map((step) => topics.get(step.stepKey) ?? step.question);
-  const optional = state.steps
-    .filter(
-      (step) =>
-        isConversational(step) &&
-        !step.required &&
-        step.status === "OPEN" &&
-        step.coveredBy === undefined,
-    )
-    .map((step) => topics.get(step.stepKey) ?? step.question)
-    .slice(0, 6);
+  const groups = optionalGroups(state);
+  const optionalLeft = groups.reduce((sum, group) => sum + group.length, 0);
   const found = state.steps
     .filter((step) => isConversational(step) && step.status === "OPEN")
     .flatMap((step) => {
@@ -810,17 +881,23 @@ export function readBack(state: OnboardingState): string {
       ? "Nothing is saved yet."
       : `Saved: ${saved.join("; ")}.`,
     needed.length === 0
-      ? "Everything needed is in."
+      ? optionalLeft === 0
+        ? "Everything needed is in, and every optional topic is covered or declined."
+        : `The essentials are in. ${String(optionalLeft)} optional ${optionalLeft === 1 ? "topic" : "topics"} left, not asked or declined yet.`
       : `Still needed: ${needed.join("; ")}.`,
-    optional.length === 0
+    groups.length === 0
       ? ""
-      : `Optional, not covered yet: ${optional.join("; ")}.`,
+      : `Optional, grouped: ${groups
+          .map((group, index) => `(${String(index + 1)}) ${group.join("; ")}`)
+          .join(" ")}`,
     found.length === 0
       ? ""
       : `Found in their documents or public sources, not confirmed yet (put these to them in one go and ask if they're right): ${found.join("; ")}.`,
-    needed.length === 0
-      ? "Read back the essentials in a few plain sentences (never the list word for word), ask if anything is wrong or missing, and whether they'd like to finish. If they want to finish, pass their words on."
-      : "Carry on naturally with what is still needed; mention optional ones lightly, as fine to skip or come back to.",
+    needed.length > 0
+      ? "Carry on naturally with what is still needed. Then offer the optional topics a group at a time, saying they can skip any."
+      : optionalLeft > 0
+        ? "Do not wrap up yet: offer the next optional group now, in plain words, one group at a time, saying they can skip it. If they'd rather finish now, that is their choice: pass their words on."
+        : "Read back the essentials in a few plain sentences (never the list word for word), ask if anything is wrong or missing, and whether they'd like to finish. If they want to finish, pass their words on.",
   ]
     .filter((line) => line.length > 0)
     .join("\n");
@@ -838,9 +915,18 @@ function pausingNote(
   return `They want to stop for now. ${String(saved)} things they told you are saved, and everything else they said is kept. In one or two warm sentences: say it's all kept, that they can pick up any time and you'll carry on where you left off, and that ${into}. Then stop talking: the call ends after your goodbye.`;
 }
 
-function completedNote(journey: "investor" | "founder"): string {
-  // Nothing here claims what their screen shows: only what is saved.
+function completedNote(
+  journey: "investor" | "founder",
+  already = false,
+): string {
+  // The browser takes them there when the call ends (leave), so this says
+  // where they are going, never that the page is open.
+  if (already) {
+    return journey === "investor"
+      ? "Their setup is already finished. In one short sentence, say you're taking them into Capital Q now, to Discover. Then stop talking: the call ends after it."
+      : "Their setup is already finished. In one short sentence, say you're taking them into Capital Q now, to their home page. Then stop talking: the call ends after it.";
+  }
   return journey === "investor"
-    ? "Their mandate is saved and live: Capital Q now matches companies to it. Tell them warmly, in one or two sentences, that it's done and that Discover will show them companies matched to it."
-    : "Their company profile is saved. Tell them warmly, in one or two sentences, that it's done and that investors who fit will now be matched to it.";
+    ? "Their mandate is saved and live: Capital Q now matches companies to it. Tell them warmly, in one or two sentences, that it's done and that you're taking them to Discover now, where they'll see companies matched to it. Then stop talking: the call ends after your goodbye."
+    : "Their company profile is saved. Tell them warmly, in one or two sentences, that it's done, that investors who fit will now be matched to it, and that you're taking them to their home page now. Then stop talking: the call ends after your goodbye.";
 }

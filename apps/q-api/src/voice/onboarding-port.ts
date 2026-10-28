@@ -106,7 +106,33 @@ const HELD_FOR_FIRM_REASON =
  */
 const OPTION_ONLY_STEPS: ReadonlySet<string> = new Set([
   INVESTOR_STEPS.investorType,
+  INVESTOR_STEPS.currency,
+  FOUNDER_STEPS.currency,
 ]);
+
+/**
+ * Money currency steps (live 2026-10-28, Tiara: "I do the dollars and
+ * pounds" was saved as her sentence, so the mandate got no currency and
+ * no cheque). The mandate holds one currency for its cheque amounts. When
+ * they name more than one, the first named is kept as the answer and the
+ * others are noted beside it for Q to ask which is their main one; their
+ * sentence is never the answer.
+ */
+const FIRST_NAMED_KEPT_STEPS: ReadonlySet<string> = new Set([
+  INVESTOR_STEPS.currency,
+  FOUNDER_STEPS.currency,
+]);
+
+/** How a note of options also named on a one-choice step begins. */
+export const ALSO_NAMED_NOTE = "Also named:";
+
+/** The note kept beside the first-named option, saying what to ask. */
+export function alsoNamedNote(labels: readonly string[]): string {
+  return `${ALSO_NAMED_NOTE} ${labels.join(", ")}. Only one is kept here, the first they named; ask which is their main one.`.slice(
+    0,
+    400,
+  );
+}
 
 /**
  * What the loop is told when it tries to fill an upload step with words.
@@ -218,6 +244,62 @@ export type FoundRecommendationPort = {
 };
 
 /** One value, whatever order a list was given in. */
+/**
+ * A list answer added to what is on the record (owner 2026-10-28): the
+ * recorded items first, then the new ones; their other words likewise.
+ * Null when the two are not lists of the same kind (nothing to add to).
+ */
+export function addedTo(
+  onRecord: {
+    readonly value: OnboardingResponseValue;
+    readonly note?: string | null;
+  },
+  value: OnboardingResponseValue,
+  note: string | undefined,
+): {
+  readonly value: OnboardingResponseValue;
+  readonly note: string | undefined;
+} | null {
+  const notes = (...all: (string | null | undefined)[]) => {
+    const pieces = all
+      .flatMap((n) => (n ?? "").split(/\s*;\s*/u))
+      .map((n) => n.trim())
+      .filter((n) => n.length > 0);
+    const kept = pieces.filter(
+      (piece, index) =>
+        pieces.findIndex((p) => p.toLowerCase() === piece.toLowerCase()) ===
+        index,
+    );
+    return kept.length === 0 ? undefined : kept.join("; ").slice(0, 500);
+  };
+  if (onRecord.value.type === "MULTI_SELECT" && value.type === "MULTI_SELECT") {
+    return {
+      value: {
+        ...value,
+        optionKeys: [
+          ...new Set([...onRecord.value.optionKeys, ...value.optionKeys]),
+        ],
+      },
+      note: notes(onRecord.note, note),
+    };
+  }
+  if (
+    onRecord.value.type === "RESOURCE_REFERENCE" &&
+    value.type === "RESOURCE_REFERENCE"
+  ) {
+    return {
+      value: {
+        ...value,
+        resourceIds: [
+          ...new Set([...onRecord.value.resourceIds, ...value.resourceIds]),
+        ],
+      },
+      note: notes(onRecord.note, note),
+    };
+  }
+  return null;
+}
+
 export function sameValue(
   a: OnboardingResponseValue,
   b: OnboardingResponseValue,
@@ -550,6 +632,12 @@ export function createOnboardingPort(input: {
   readonly held?: HeldOnboardingWrites | undefined;
   /** Facts the platform holds already (registration): never asked again. */
   readonly knownFacts?: readonly OnboardingKnownFact[] | undefined;
+  /**
+   * List steps whose new answer adds to what is on the record rather than
+   * replacing it: the transcript reading found no sign they meant it as
+   * the whole list. Absent: an answer replaces, as a typed one does.
+   */
+  readonly addsTo?: ReadonlySet<string> | undefined;
 }): BoundOnboardingPort {
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
@@ -780,6 +868,9 @@ export function createOnboardingPort(input: {
     view: OnboardingSessionView,
   ): Promise<string> => {
     if (note === undefined) return spoken(step, value, view);
+    if (note.startsWith(ALSO_NAMED_NOTE)) {
+      return `${await spoken(step, value, view)} (${note})`;
+    }
     if (value.type === "RESOURCE_REFERENCE" && value.resourceIds.length > 0) {
       const names = await spoken(step, value, view);
       // Their words matched no category: said so, never as one.
@@ -880,7 +971,9 @@ export function createOnboardingPort(input: {
                   stored.note !== null &&
                   stored.note.length > 0
                     ? `${stored.note} (in their words)`
-                    : await spoken(step, stored.value, view)
+                    : stored.note?.startsWith(ALSO_NAMED_NOTE) === true
+                      ? `${await spoken(step, stored.value, view)} (${stored.note})`
+                      : await spoken(step, stored.value, view)
                   ).slice(0, 600) || null,
             ...(open?.options === undefined || open.options.length === 0
               ? {}
@@ -1109,6 +1202,11 @@ export function createOnboardingPort(input: {
         readonly value: OnboardingResponseValue;
         /** Their own words where the options could not hold them. */
         readonly note?: string | undefined;
+        /**
+         * Other options they named for a one-choice step that keeps the
+         * first (ALSO_NAMED_NOTE): Capital Q's words, not theirs.
+         */
+        readonly aside?: string | undefined;
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
@@ -1173,6 +1271,7 @@ export function createOnboardingPort(input: {
     }
     let value: OnboardingResponseValue | null;
     let otherWords: string | undefined;
+    let aside: string | undefined;
     // Their own words where they hold the answer; the model's reading of
     // them otherwise. Bounded as the runtime keeps them.
     const ownWordsFor = (reading: string): string => {
@@ -1387,15 +1486,41 @@ export function createOnboardingPort(input: {
       ) {
         otherWords = ownWordsFor(phrases.join(", ")).slice(0, 200);
       }
-      const [only] = keys;
+      const distinct = [...new Set(keys)];
+      const [only] = distinct;
+      if (
+        c.stepType === "single_select" &&
+        distinct.length > 1 &&
+        only !== undefined
+      ) {
+        if (FIRST_NAMED_KEPT_STEPS.has(step.stepKey)) {
+          // The first they named is kept; the others are noted beside it
+          // and asked about, never saved as their sentence.
+          aside = alsoNamedNote(
+            distinct
+              .slice(1)
+              .map((key) => options.find((o) => o.key === key)?.label ?? key),
+          );
+        } else if (OPTION_ONLY_STEPS.has(step.stepKey)) {
+          return refuse({
+            stepKey: step.stepKey,
+            outcome: "AMBIGUOUS",
+            reason:
+              "They named more than one of this step's options and it keeps one: ask which one they mean.",
+            candidates: distinct
+              .map((key) => options.find((o) => o.key === key)?.label ?? key)
+              .slice(0, 40),
+          });
+        }
+      }
       value =
         only === undefined
           ? null
           : c.stepType === "single_select"
-            ? keys.length === 1
+            ? distinct.length === 1 || aside !== undefined
               ? toResponseValue(step, only)
               : null
-            : toResponseValue(step, [...new Set(keys)]);
+            : toResponseValue(step, distinct);
     } else {
       const raw =
         typeof answer.value === "number" ? String(answer.value) : answer.value;
@@ -1457,6 +1582,7 @@ export function createOnboardingPort(input: {
       step,
       value,
       ...(otherWords === undefined ? {} : { note: otherWords }),
+      ...(aside === undefined ? {} : { aside }),
     };
   };
 
@@ -2423,13 +2549,28 @@ export function createOnboardingPort(input: {
     // The same answer already on the record, with nothing new beside it:
     // nothing to write (live AP: the same early signal saved three times
     // in one turn, each a revision and a round trip).
-    const onRecord = latest?.responses.find(
-      (r) => r.stepKey === resolved.step.stepKey,
-    );
+    const adding = input.addsTo?.has(resolved.step.stepKey) === true;
+    const onRecord = (
+      adding ? (latest ?? (await current())) : latest
+    )?.responses.find((r) => r.stepKey === resolved.step.stepKey);
+    // A list they add to (owner 2026-10-28: "crypto and gambling" replaced
+    // by "adult content" on a later reading): what is on the record stays,
+    // with the new items beside it, unless the reading found they meant
+    // this as the whole list.
+    const added =
+      onRecord !== undefined && adding
+        ? addedTo(onRecord, resolved.value, resolved.note)
+        : null;
+    const value = added?.value ?? resolved.value;
+    const note = added === null ? resolved.note : added.note;
     if (
       onRecord !== undefined &&
-      resolved.note === undefined &&
-      sameValue(onRecord.value, resolved.value)
+      (added === null
+        ? resolved.note === undefined &&
+          (resolved.aside === undefined ||
+            (onRecord.note ?? undefined) === resolved.aside)
+        : (onRecord.note ?? undefined) === note) &&
+      sameValue(onRecord.value, value)
     ) {
       return done({
         stepKey: resolved.step.stepKey,
@@ -2440,19 +2581,15 @@ export function createOnboardingPort(input: {
           resolved.step.configuration.prompt
         ).slice(0, 400),
         recorded: (
-          await spoken(
-            resolved.step,
-            resolved.value,
-            latest ?? (await current()),
-          )
+          await spoken(resolved.step, value, latest ?? (await current()))
         ).slice(0, 600),
       });
     }
     return {
       kind: "WRITE",
       step: resolved.step,
-      value: resolved.value,
-      note: resolved.note,
+      value,
+      note: note ?? resolved.aside,
       quote: answer.quote,
     };
   };

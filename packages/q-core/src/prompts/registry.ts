@@ -302,6 +302,7 @@ import { DELEGATION_READER_V4 } from "./tasks/delegation-reader.v4.js";
 import { DELEGATION_READER_V5 } from "./tasks/delegation-reader.v5.js";
 import { DELEGATION_READER_V6 } from "./tasks/delegation-reader.v6.js";
 import { ONBOARDING_TRANSCRIPT_READER_V1 } from "./tasks/onboarding-transcript-reader.v1.js";
+import { ONBOARDING_TRANSCRIPT_READER_V2 } from "./tasks/onboarding-transcript-reader.v2.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 // DAILY block
@@ -466,7 +467,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DELEGATION_READER_V4,
     DELEGATION_READER_V5,
     DELEGATION_READER_V6,
-    ONBOARDING_TRANSCRIPT_READER_V1,
+    { ...ONBOARDING_TRANSCRIPT_READER_V1, status: "DEPRECATED" },
+    ONBOARDING_TRANSCRIPT_READER_V2,
     WELCOME_CONDUCTOR_V1,
     WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,

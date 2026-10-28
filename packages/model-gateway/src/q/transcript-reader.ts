@@ -3,9 +3,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  OnboardingTranscriptReaderResultSchema,
+  OnboardingTranscriptReaderV2ResultSchema,
   renderPrompt,
-  type OnboardingTranscriptReaderResult,
+  type OnboardingTranscriptReaderV2Result,
   type OnboardingTranscriptReaderVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -19,7 +19,19 @@ import type { ModelGateway } from "../gateway.js";
  * It reads; it writes nothing. A conversation that cannot be read is
  * `null`, and nothing is saved from it until the next reading.
  */
-export type OnboardingTranscriptReading = OnboardingTranscriptReaderResult;
+export type OnboardingTranscriptReading = {
+  readonly answers: readonly (Omit<
+    OnboardingTranscriptReaderV2Result["answers"][number],
+    "replaces"
+  > & {
+    /**
+     * A list step: true when they meant it as the whole list (read by
+     * meaning). Absent or false: it adds to what is on record.
+     */
+    readonly replaces?: boolean | undefined;
+  })[];
+  readonly declined: OnboardingTranscriptReaderV2Result["declined"];
+};
 
 export type OnboardingTranscriptReader = {
   readonly read: (input: {
@@ -136,12 +148,12 @@ export function createOnboardingTranscriptReader(dependencies: {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: OnboardingTranscriptReaderResultSchema,
+            schema: OnboardingTranscriptReaderV2ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = OnboardingTranscriptReaderResultSchema.safeParse(
+        const parsed = OnboardingTranscriptReaderV2ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;

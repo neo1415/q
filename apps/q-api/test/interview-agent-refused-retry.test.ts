@@ -212,7 +212,9 @@ describe("a required question pressed twice running is rested (HANDOVER §5.1)",
 
 describe("an answer no option holds, on a step with no Other option", () => {
   it("is saved in their words at once (owner 2026-10-16), never refused", async () => {
-    const world = investorSession({ currentStepKey: "I2.currency" });
+    const world = investorSession({
+      currentStepKey: "I4.capital_intensity",
+    });
     const prompts: string[] = [];
     let round = 0;
     const gateway = {
@@ -234,9 +236,9 @@ describe("an answer no option holds, on a step with no Other option", () => {
                       arguments: {
                         answers: [
                           {
-                            stepKey: "I2.currency",
-                            value: "seashells",
-                            quote: "We write cheques in seashells.",
+                            stepKey: "I4.capital_intensity",
+                            value: "whatever burns least, honestly",
+                            quote: "Whatever burns least, honestly.",
                           },
                         ],
                       },
@@ -258,12 +260,12 @@ describe("an answer no option holds, on a step with no Other option", () => {
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
-      delegation: readerOf(reading({ stated: ["I2.currency"] })),
-    }).turn({ ...turn(world, "We write cheques in seashells."), actor });
+      delegation: readerOf(reading({ stated: ["I4.capital_intensity"] })),
+    }).turn({ ...turn(world, "Whatever burns least, honestly."), actor });
     expect(prompts[1]).toContain('"outcome":"COMMITTED"');
-    expect(world.recordedValue("I2.currency")).toEqual({
+    expect(world.recordedValue("I4.capital_intensity")).toEqual({
       type: "TEXT",
-      text: "We write cheques in seashells.",
+      text: "Whatever burns least, honestly.",
     });
   });
 });

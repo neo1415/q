@@ -267,7 +267,9 @@ export const ALWAYS_SAVE_CASES: readonly Case[] = [
     journey: F,
     said: "About 500 thousand dollars.",
     stepKey: "F6.currency",
-    value: "dollars",
+    // A currency is saved only as one of its options, never in their
+    // words (owner 2026-10-28): the model reads which one is meant.
+    value: "usd",
     quote: "dollars",
   },
   {
@@ -374,8 +376,11 @@ export const ALWAYS_SAVE_CASES: readonly Case[] = [
     journey: F,
     said: "A mix of euros and dollars.",
     stepKey: "F6.currency",
-    value: "euros and dollars",
+    // Two named: the first is kept, the other noted to ask about (owner
+    // 2026-10-28), never their sentence.
+    value: ["eur", "usd"],
     quote: "A mix of euros and dollars",
+    holds: '"eur"',
   },
   // Money.
   {

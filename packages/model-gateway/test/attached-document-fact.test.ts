@@ -80,4 +80,37 @@ describe("attached document facts", () => {
     expect(kept.some((f) => f.statement.includes('"Pack B"'))).toBe(true);
     expect(kept.at(-1)?.statement).toContain("read_attached_document");
   });
+
+  it("a partly read document makes the answer say which pages it covers (live 2026-10-28: 28 pages summarised as whole)", () => {
+    const facts = attachedDocumentFacts({
+      status: "READ",
+      title: "Talent Q research",
+      pageCount: 28,
+      whole: true,
+      pages: Array.from({ length: 28 }, (_, i) => ({
+        page: i + 1,
+        text: "w ".repeat(600),
+      })),
+    });
+    const kept = attachedDocumentsWithin([facts]);
+    const total = kept.reduce((sum, fact) => sum + fact.statement.length, 0);
+    expect(total).toBeLessThanOrEqual(ATTACHED_FACTS_MAX_CHARS);
+    const last = kept.at(-1)?.statement ?? "";
+    const page = /only pages up to p\. (\d+) of this document/u.exec(last);
+    expect(page).not.toBeNull();
+    expect(Number(page?.[1])).toBeLessThan(28);
+    expect(last).toContain(`"from the first ${page?.[1] ?? ""} pages"`);
+    expect(last).toContain("never present it as the whole document");
+    // A short document read whole carries no such note.
+    const short = attachedDocumentsWithin([
+      attachedDocumentFacts({
+        status: "READ",
+        title: "Term sheet",
+        pageCount: 1,
+        whole: true,
+        pages: [{ page: 1, text: "Valuation $8m pre-money." }],
+      }),
+    ]);
+    expect(short.at(-1)?.statement).not.toContain("covers those pages only");
+  });
 });

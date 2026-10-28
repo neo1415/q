@@ -1,5 +1,9 @@
 import type { OnboardingTranscriptReader } from "@capital-q/model-gateway/q";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_DEFINITION_V1,
+  INVESTOR_STEPS,
+  stageChequePatch,
+} from "@capital-q/investor-onboarding";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 import { describe, expect, it } from "vitest";
@@ -12,6 +16,7 @@ import {
   type ConversationLine,
 } from "../src/voice/onboarding-conversation.js";
 import { createOnboardingPort } from "../src/voice/onboarding-port.js";
+import { SPOKEN_QUESTIONS } from "../src/voice/step-copy.js";
 import { reading } from "./authority-fixtures.js";
 import { investorSession, type InvestorWorld } from "./interviewer-fixtures.js";
 
@@ -475,5 +480,252 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
       "Accelerator",
     ]);
     expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+  });
+});
+
+/** Every required answer in except the last two, and the cheques: Tiara's call. */
+const TIARA_SO_FAR: Readonly<Record<string, string>> = Object.fromEntries([
+  ...Object.entries(SPOKEN_REQUIRED).filter(
+    ([key]) =>
+      key !== INVESTOR_STEPS.discoveryMode &&
+      key !== INVESTOR_STEPS.inboundPreference,
+  ),
+  [INVESTOR_STEPS.businessTitle, "Partner"],
+  [INVESTOR_STEPS.chequeMin, "1000000"],
+  [INVESTOR_STEPS.chequeTypical, "3000000"],
+  [INVESTOR_STEPS.chequeMax, "10000000"],
+]);
+
+describe("voice onboarding, owner live run 2026-10-28 (Tiara)", () => {
+  it("a currency named twice keeps the first as the answer, notes the second, and never saves her sentence", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.currency,
+      recorded: { [INVESTOR_STEPS.investorType]: "vc" },
+    });
+    world.record(INVESTOR_STEPS.chequeMin, { type: "RANGE", value: "1000000" });
+    world.record(INVESTOR_STEPS.chequeMax, {
+      type: "RANGE",
+      value: "10000000",
+    });
+    const { fetch } = withThread(world);
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch,
+      logger,
+      readAfterMs: 5,
+      reader: readerReturning({
+        answers: [
+          {
+            stepKey: INVESTOR_STEPS.currency,
+            value: ["usd", "gbp"],
+            quote: "I do the dollars and Um, pounds",
+            ownWords: false,
+          },
+        ],
+        declined: [],
+      }),
+    });
+    const call = line();
+    conversation.heard(call, [
+      { role: "Q", text: "What currency do you usually write in?" },
+      { role: "USER", text: "Uh- e-uh I do the dollars and Um, pounds" },
+    ]);
+    await conversation.ended(call);
+    expect(world.recordedValue(INVESTOR_STEPS.currency)).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "usd",
+    });
+    expect(world.recordedNote(INVESTOR_STEPS.currency)).toMatch(
+      /^Also named: Pound sterling\..*ask which is their main one/,
+    );
+    // Q is told, from the record, to ask which one is the main one.
+    const said = readBack(await stateOf(world));
+    expect(said).toMatch(/US dollar \(Also named: Pound sterling/);
+    // The mandate row gets its currency and cheque amounts from it.
+    const values = new Map(
+      [
+        INVESTOR_STEPS.currency,
+        INVESTOR_STEPS.chequeMin,
+        INVESTOR_STEPS.chequeMax,
+      ].flatMap((key) => {
+        const value = world.recordedValue(key);
+        return value === undefined ? [] : [[key, value] as const];
+      }),
+    ) as unknown as Parameters<typeof stageChequePatch>[0];
+    expect(stageChequePatch(values).chequeRange).toEqual({
+      currency: "USD",
+      min: "1000000",
+      max: "10000000",
+    });
+  });
+
+  it("a currency in no option's words is handed back with the options, never kept as free text", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.currency,
+      recorded: { [INVESTOR_STEPS.investorType]: "vc" },
+    });
+    const said = "We write cheques in seashells.";
+    const [result] = await createOnboardingPort({
+      session: {
+        baseUrl: "http://api.test",
+        accessToken: "eyPRIVATE.NEVER-EMITTED.bearer",
+        fetch: world.fetch,
+      },
+      onboardingSessionId: SESSION_ID,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () =>
+        Promise.resolve({
+          stated: new Set([INVESTOR_STEPS.currency]),
+          declined: new Set<string>(),
+          handed: new Set<string>(),
+          approved: new Set<string>(),
+          finishing: false,
+          lookup: null,
+        }),
+    }).record([
+      {
+        stepKey: INVESTOR_STEPS.currency,
+        value: "seashells",
+        quote: said,
+        basis: "STATED",
+        ownWords: true,
+      },
+    ]);
+    expect(result?.outcome).toBe("UNMATCHED");
+    expect(result?.candidates?.some((c) => c.includes("US dollar"))).toBe(true);
+    expect(world.recordedValue(INVESTOR_STEPS.currency)).toBeUndefined();
+  });
+
+  it("briefOf lists the optional topics in groups, every one to be asked", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.investmentRole,
+      recorded: TIARA_SO_FAR,
+    });
+    const brief = briefOf(await stateOf(world));
+    expect(brief).toContain("Optional topics, grouped");
+    expect(brief).toMatch(/- Group 1: .*lead rounds/);
+    expect(brief).toMatch(/- Group 2: /);
+    expect(brief).toContain(
+      "Finish only when every topic has been asked or they declined it, or they ask to finish.",
+    );
+  });
+
+  it("a resumed call carries on in setup order, optional steps included (the question the line dropped is asked again)", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.discoveryMode,
+      recorded: TIARA_SO_FAR,
+    });
+    const opening = openingOf({
+      state: await stateOf(world),
+      firstName: "Tiara",
+      resumed: true,
+    });
+    expect(opening).toContain(
+      SPOKEN_QUESTIONS[INVESTOR_STEPS.investmentRole] ?? "missing",
+    );
+    expect(opening).not.toContain(
+      SPOKEN_QUESTIONS[INVESTOR_STEPS.discoveryMode] ?? "missing",
+    );
+  });
+
+  it("the read-back counts the optional topics left until each is asked or declined", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.investmentRole,
+      recorded: SPOKEN_REQUIRED,
+    });
+    const state = await stateOf(world);
+    const said = readBack(state);
+    expect(said).toMatch(/The essentials are in\. \d+ optional topics left/);
+    expect(said).not.toContain("Everything needed is in");
+    expect(said).toContain("Do not wrap up yet");
+    const declinedAll = readBack({
+      ...state,
+      steps: state.steps.map((step) =>
+        step.required || step.status !== "OPEN"
+          ? step
+          : { ...step, status: "SET_ASIDE" as const },
+      ),
+    });
+    expect(declinedAll).toContain("Everything needed is in");
+    expect(declinedAll).toContain("whether they'd like to finish");
+  });
+
+  it("a list said in two goes adds up; a reading that replaces the list replaces it", async () => {
+    const run = async (replaces: boolean) => {
+      const world = investorSession({
+        currentStepKey: INVESTOR_STEPS.hardExclusions,
+        recorded: { [INVESTOR_STEPS.investorType]: "vc" },
+      });
+      world.record(INVESTOR_STEPS.hardExclusions, {
+        type: "MULTI_SELECT",
+        optionKeys: ["crypto_speculation", "gambling"],
+      });
+      const { fetch } = withThread(world);
+      const conversation = createOnboardingConversation({
+        apiBaseUrl: "http://api.test",
+        fetch,
+        logger,
+        readAfterMs: 5,
+        reader: readerReturning({
+          answers: [
+            {
+              stepKey: INVESTOR_STEPS.hardExclusions,
+              value: ["adult_content"],
+              quote: "adult content as well",
+              ownWords: false,
+              replaces,
+            },
+          ],
+          declined: [],
+        }),
+      });
+      const call = line();
+      conversation.heard(call, [
+        { role: "Q", text: "Anything you never want to see?" },
+        { role: "USER", text: "adult content as well" },
+      ]);
+      await conversation.ended(call);
+      return world.recordedValue(INVESTOR_STEPS.hardExclusions);
+    };
+    expect(await run(false)).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["crypto_speculation", "gambling", "adult_content"],
+    });
+    expect(await run(true)).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["adult_content"],
+    });
+  });
+
+  it("finishing takes them into Capital Q, and so does anything asked once setup is done", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.review,
+      recorded: SPOKEN_REQUIRED,
+    });
+    const { fetch } = withThread(world);
+    let finishing = true;
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch,
+      logger,
+      readAfterMs: 5,
+      reader: readerReturning({ answers: [], declined: [] }),
+      delegation: {
+        read: () => Promise.resolve(reading({ finishing })),
+      },
+    });
+    const finished = await conversation.settle(line(), "That's done");
+    expect(finished.leave).toBe(true);
+    expect(finished.commentary).toContain("taking them to Discover");
+    finishing = false;
+    const later = await conversation.settle(
+      line(),
+      "can you now take me to my Discover page",
+    );
+    expect(later.leave).toBe(true);
+    expect(later.commentary).toContain("already finished");
+    expect(later.commentary).toContain("to Discover");
   });
 });
