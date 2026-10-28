@@ -15,6 +15,7 @@ import {
 } from "../voice-audio";
 import { interceptHeard } from "../heard-intercept";
 import { watchSpokenMove } from "../use-follow-turn";
+import { idleEnds } from "./line-hold";
 import { noteForMove, receiptListener, type MoveOutcome } from "./move";
 import {
   boundedContent,
@@ -489,6 +490,8 @@ export async function startLiveCall(
   let connection: Connection | null = null;
   let ended = false;
   let lastSpeechAt = performance.now();
+  // The last keep-alive sent while promised work held the line open.
+  let heldReportAt = 0;
   let lastInputAt: number | null = null;
   // Seconds billed by earlier provider sessions of this same call.
   let billedBefore = 0;
@@ -1029,8 +1032,17 @@ export async function startLiveCall(
       update();
     }
     watchPage();
-    // Runaway guard: nobody has spoken for the idle window.
-    if (performance.now() - lastSpeechAt > idleMs) void end("idle");
+    // Runaway guard: nobody has spoken for the idle window -- unless work
+    // promised on this line is still running (bounded; line-hold.ts).
+    const silentMs = performance.now() - lastSpeechAt;
+    if (idleEnds(silentMs, idleMs)) void end("idle");
+    else if (silentMs > idleMs && performance.now() - heldReportAt > 60_000) {
+      // Held past the idle window: the Q API hears from the line (its
+      // usage, unchanged, so nothing is counted twice) so it does not
+      // close it as abandoned.
+      heldReportAt = performance.now();
+      void reportUsage(current, false);
+    }
   }, 100);
 
   // Runaway protection: the hard cap closes the call client-side too.

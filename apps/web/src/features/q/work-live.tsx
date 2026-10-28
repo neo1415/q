@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 import {
   WorkforceLiveSchema,
@@ -9,10 +9,16 @@ import {
   type WorkforceLiveStageName,
 } from "@capital-q/contracts";
 
-import { expectDocument } from "@/features/documents/document-ready";
+import {
+  announceDocument,
+  dismissDocument,
+  expectDocument,
+  openDocumentViewer,
+} from "@/features/documents/document-ready";
 import { useT } from "@/features/i18n/language";
 import { startPacedPoll, type PacedPoll } from "@/features/polling/paced-poll";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
+import { holdLine, releaseLine } from "@/features/voice/live/line-hold";
 
 import type { QTurnObjectBlock } from "./conversation";
 
@@ -38,6 +44,87 @@ export type WorkInProgress = Extract<
 export const WORK_LIVE_PATH = "/api/q-work-live";
 /** The job finished while this page watched: the conversation reads its record again. */
 export const Q_WORK_SETTLED_EVENT = "cq:q-work-settled";
+/** What the settled event carries: the job, how it ended, its document. */
+export type WorkSettled = {
+  readonly jobId: string;
+  readonly state: WorkforceLive["state"];
+  readonly document: WorkforceLive["document"];
+};
+
+/**
+ * Owner 2026-10-28: "it's done, here it is" -- the line Q says on an open
+ * voice line when the document arrives (the thread's own message says the
+ * same, from the Q API). Code's words around the document's own title.
+ */
+export function readyNote(title: string): string {
+  return `Your ${title.replace(/[.\s]+$/u, "")} is ready — here it is.`;
+}
+
+/** The settled event's detail, checked (an event is anyone's to send). */
+export function settledDetail(event: Event): WorkSettled | null {
+  if (!(event instanceof CustomEvent)) return null;
+  const detail: unknown = event.detail;
+  const parsed = WorkSettledSchema.safeParse(detail);
+  return parsed.success ? parsed.data : null;
+}
+
+const WorkSettledSchema = WorkforceLiveSchema.pick({
+  jobId: true,
+  state: true,
+  document: true,
+});
+
+/**
+ * Owner 2026-10-28: done is announced and opened. Q says it on an open
+ * live line; on the Q page the document opens in place (the one viewer);
+ * on any other page its ready card stays until they act on it.
+ */
+export function deliverWork(
+  document: NonNullable<WorkforceLive["document"]>,
+  how: {
+    readonly onQPage: boolean;
+    /** Says one line on the open voice line; false when none is open. */
+    readonly say: (line: string) => boolean;
+  },
+): void {
+  how.say(readyNote(document.title));
+  if (how.onQPage) {
+    dismissDocument(document.artifactId);
+    openDocumentViewer(document.artifactId);
+    return;
+  }
+  announceDocument({
+    artifactId: document.artifactId,
+    type: document.type,
+    title: document.title,
+    version: 0,
+    status: "READY",
+    persist: true,
+  });
+}
+
+/** "Usually 2–4 minutes", from the job's kind; null when not known. */
+export function usualLength(live: WorkforceLive | null): string | null {
+  const expected = live?.expected ?? null;
+  if (expected === null) return null;
+  const { minMinutes: min, maxMinutes: max } = expected;
+  if (min === max) {
+    return max === 1
+      ? "Usually about a minute"
+      : `Usually ${String(max)} minutes`;
+  }
+  return `Usually ${String(min)}–${String(max)} minutes`;
+}
+
+/** "45 s", "2 min 05 s": how long the work has been going. */
+export function elapsedWords(startedAt: string, now: number): string | null {
+  const started = Date.parse(startedAt);
+  if (!Number.isFinite(started)) return null;
+  const seconds = Math.max(0, Math.floor((now - started) / 1000));
+  if (seconds < 60) return `${String(seconds)} s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes)} min ${String(seconds % 60).padStart(2, "0")} s`;
+}
 /** Every 2.5 s while the job moves; up to 15 s while it doesn't (or waits on the person). */
 export const WORK_LIVE_PACE = { firstMs: 2_500, maxMs: 15_000 } as const;
 /** A card stops asking after this long; a reload asks again. */
@@ -179,16 +266,26 @@ function watchLive(jobId: string, entry: LiveEntry): void {
         // Not settled: a focus or a visible tab picks it up again.
         entry.expired = true;
         entry.poll = null;
+        releaseLine(jobId);
         return "done";
       }
       if (next === null) return "same";
-      if (next.state === "WORKING") entry.seenWorking = true;
+      if (next.state === "WORKING") {
+        entry.seenWorking = true;
+        // Owner 2026-10-28: an open live line waits for it (bounded).
+        holdLine(jobId);
+      } else releaseLine(jobId);
       if (next.state !== "WORKING" && next.state !== "WAITING") {
         entry.settled = true;
         if (entry.seenWorking) {
           if (next.state === "DONE") expectDocument();
+          const detail: WorkSettled = {
+            jobId,
+            state: next.state,
+            document: next.document,
+          };
           window.dispatchEvent(
-            new CustomEvent(Q_WORK_SETTLED_EVENT, { detail: { jobId } }),
+            new CustomEvent(Q_WORK_SETTLED_EVENT, { detail }),
           );
         }
         return "done";
@@ -236,6 +333,7 @@ function subscribeLive(jobId: string, listener: () => void): () => void {
     held.listeners.delete(listener);
     if (held.listeners.size > 0) return;
     held.poll?.stop();
+    releaseLine(jobId);
     window.removeEventListener("focus", held.wake);
     document.removeEventListener("visibilitychange", held.wake);
     if (liveEntries.get(jobId) === held) liveEntries.delete(jobId);
@@ -244,8 +342,62 @@ function subscribeLive(jobId: string, listener: () => void): () => void {
 
 /** Tests only: no job is held. */
 export function resetWorkLive(): void {
-  for (const entry of liveEntries.values()) entry.poll?.stop();
+  for (const [jobId, entry] of liveEntries) {
+    entry.poll?.stop();
+    releaseLine(jobId);
+  }
   liveEntries.clear();
+}
+
+/**
+ * Owner 2026-10-28: the conversation's promised work is followed from the
+ * moment Q accepted it, whether or not its card is on screen (in the live
+ * voice room the card was not, and the job was first read 3 minutes in).
+ * The session holds a subscription to each job its thread names, newest
+ * first, until that job has been delivered; one read per job, shared.
+ */
+export const WATCHED_JOBS_MAX = 4;
+
+type WithObjectBlocks = {
+  readonly blocks: readonly QTurnObjectBlock[];
+  /** Set by followWork on a delivery whose job cards it took off. */
+  readonly deliveredJobs?: readonly string[] | undefined;
+};
+
+/** The jobs a thread names that it has not yet been handed the document of. */
+export function promisedJobs(
+  turns: readonly WithObjectBlocks[],
+): readonly string[] {
+  const delivered = new Set<string>();
+  const named: string[] = [];
+  for (const turn of turns) {
+    for (const jobId of turn.deliveredJobs ?? []) delivered.add(jobId);
+    const handed = turn.blocks.some(
+      (block) => block.kind === "ARTIFACT_REFERENCE",
+    );
+    for (const block of turn.blocks) {
+      if (block.kind !== "WORK_IN_PROGRESS") continue;
+      if (handed) delivered.add(block.jobId);
+      if (!named.includes(block.jobId)) named.push(block.jobId);
+    }
+  }
+  return named
+    .filter((jobId) => !delivered.has(jobId))
+    .slice(-WATCHED_JOBS_MAX)
+    .reverse();
+}
+
+/** Follow these jobs from now on, with nothing rendered (see promisedJobs). */
+export function useFollowJobs(jobIds: readonly string[]): void {
+  const key = jobIds.join(",");
+  useEffect(() => {
+    if (key === "") return;
+    const quiet = () => undefined;
+    const stops = key.split(",").map((jobId) => subscribeLive(jobId, quiet));
+    return () => {
+      for (const stop of stops) stop();
+    };
+  }, [key]);
 }
 
 /**

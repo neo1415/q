@@ -103,7 +103,7 @@ describe("a finished plain document is announced once, with its card", () => {
     expect(await deliver(owner, row())).toBe(true);
     expect(posted).toHaveLength(1);
     expect(posted[0]?.content).toBe(
-      "Your Investor update — October 2026 is ready.",
+      "Your Investor update — October 2026 is ready — here it is.",
     );
     expect(posted[0]?.blocks).toEqual([
       expect.objectContaining({

@@ -32,7 +32,13 @@ import { greetingSeed, warmGreeting } from "@/features/briefing/greeting";
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
 import { bindAttachmentsTo } from "./q-attachments";
-import { Q_WORK_SETTLED_EVENT } from "./work-live";
+import {
+  deliverWork,
+  promisedJobs,
+  Q_WORK_SETTLED_EVENT,
+  settledDetail,
+  useFollowJobs,
+} from "./work-live";
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
@@ -393,10 +399,38 @@ export function QSessionProvider({
     stopReread.current = rereadUntilSettled({ read: qRefresh });
   }, [qRefresh]);
   useEffect(() => () => stopReread.current?.(), []);
+  // Owner 2026-10-28: the work Q promised in this conversation is followed
+  // from the moment it was accepted, on every page and in the voice room,
+  // not only while its card happens to be drawn.
+  const promised = useMemo(
+    () =>
+      promisedJobs(turns.flatMap((turn) => (turn.kind === "Q" ? [turn] : []))),
+    [turns],
+  );
+  useFollowJobs(promised);
   // Owner 2026-10-24: a document this page watched being made was filed;
-  // the record now holds Q's message delivering it.
+  // the record now holds Q's message delivering it. Owner 2026-10-28: a
+  // pop-up alone is not enough -- Q says it is here and it opens.
+  const voiceRef = useRef(voice);
   useEffect(() => {
-    const settled = () => reread();
+    voiceRef.current = voice;
+  }, [voice]);
+  useEffect(() => {
+    const settled = (event: Event) => {
+      reread();
+      const detail = settledDetail(event);
+      const delivered = detail?.state === "DONE" ? detail.document : null;
+      if (delivered == null) return;
+      deliverWork(delivered, {
+        onQPage: window.location.pathname === Q_PAGE,
+        say: (line) => {
+          const now = voiceRef.current;
+          return now.active && isLineLive(now.client)
+            ? (now.client.narrate?.(line) ?? false)
+            : false;
+        },
+      });
+    };
     window.addEventListener(Q_WORK_SETTLED_EVENT, settled);
     return () => window.removeEventListener(Q_WORK_SETTLED_EVENT, settled);
   }, [reread]);

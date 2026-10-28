@@ -28,7 +28,7 @@ import type {
   Owner,
   WorkforceStore,
 } from "./store.js";
-import { progressOf } from "./progress.js";
+import { expectedOf, progressOf } from "./progress.js";
 import { deliveredDocument } from "./delivery.js";
 import { filedDocumentIds } from "./results.js";
 import {
@@ -400,6 +400,10 @@ export function createWorkforcePage(dependencies: {
                 }
               : filed,
         reason: working || work.state === "COMPLETED" ? null : work.reason,
+        // Owner 2026-10-28: how long it has been going, and how long work
+        // of its kind usually takes, so a 3-minute wait is understood.
+        startedAt: work.created_at.toISOString(),
+        expected: expectedOf(work),
       };
     },
 

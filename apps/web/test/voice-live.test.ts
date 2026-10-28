@@ -746,3 +746,34 @@ describe("Q Pitch narration on the live line (owner 15 Oct)", () => {
     expect(h.sent).toEqual([]);
   });
 });
+
+describe("owner 2026-10-28: promised work's ready note on an open line", () => {
+  it("is said on the line, verbatim, when the document arrives", async () => {
+    const { deliverWork } = await import("../src/features/q/work-live");
+    const h = harness();
+    deliverWork(
+      {
+        artifactId: "11111111-1111-4111-8111-111111111111",
+        type: "ANALYSIS",
+        title: "Nixo: 12-month growth plan",
+      },
+      {
+        onQPage: false,
+        say: (line) => {
+          h.bridge.narrate(line);
+          return true;
+        },
+      },
+    );
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]?.type).toBe("session.commentary.append");
+    expect(
+      h.sent[0]?.content.endsWith(
+        "Words: Your Nixo: 12-month growth plan is ready — here it is.",
+      ),
+    ).toBe(true);
+    // A note, not a request: nothing goes to Q Brain.
+    h.advance(10_000);
+    expect(h.asked).toEqual([]);
+  });
+});

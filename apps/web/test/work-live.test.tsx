@@ -19,20 +19,31 @@ import {
   type QTurnObjectBlock,
 } from "../src/features/q/conversation";
 import {
+  nextStep,
   stepLine,
   stepStates,
   WorkInProgressCard,
 } from "../src/features/q/work-canvas";
 import { earlierWork, PinnedWorkLines } from "../src/features/q/pinned-work";
 import {
+  elapsedWords,
   liveFraction,
   liveKey,
   liveLine,
+  promisedJobs,
   Q_WORK_SETTLED_EVENT,
   resetWorkLive,
+  settledDetail,
+  useFollowJobs,
+  usualLength,
   useWorkLive,
   WORK_LIVE_WATCH_MS,
 } from "../src/features/q/work-live";
+import {
+  idleEnds,
+  LINE_HOLD_MAX_MS,
+  lineHeld,
+} from "../src/features/voice/live/line-hold";
 
 /**
  * Owner 2026-10-24: "they see 'On it. Starting now...' and then nothing
@@ -494,5 +505,116 @@ describe("coordinator 25 Oct: a document being made stays in view", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * Owner 2026-10-28 (job 9e52faf7: 3 min 25 s with only "Pulling it
+ * together" on screen): the plan as it happens, the wait understood, and
+ * done announced and opened.
+ */
+describe("owner 2026-10-28: long work, visible and announced", () => {
+  const STARTED = "2026-10-28T14:04:40.000Z";
+
+  it("shows which steps are done, which runs, what is next, how long it has gone and usually takes", async () => {
+    serve([
+      working({
+        startedAt: STARTED,
+        expected: { kind: "DOCUMENT", minMinutes: 2, maxMinutes: 4 },
+      }),
+    ]);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(Date.parse("2026-10-28T14:06:45.000Z"));
+    try {
+      render(<WorkInProgressCard block={work} />);
+      await waitFor(() =>
+        expect(
+          window.document.querySelector("[data-q-work-timing]"),
+        ).not.toBeNull(),
+      );
+      expect(stepsShown()).toEqual([
+        "DONE",
+        "DONE",
+        "DONE",
+        "CURRENT",
+        "LATER",
+        "LATER",
+      ]);
+      const timing =
+        window.document.querySelector("[data-q-work-timing]")?.textContent ??
+        "";
+      expect(timing).toMatch(/Going for 2 min 0\d s/u);
+      expect(timing).toContain("Usually 2–4 minutes");
+      expect(timing).toContain("Next: Revising");
+      // Never an internal name or reasoning: only the approved labels.
+      expect(window.document.body.textContent).not.toMatch(/agent|analyst/iu);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says nothing about length when the kind's usual length is not known", () => {
+    expect(usualLength(working())).toBeNull();
+    expect(
+      usualLength(
+        working({
+          expected: { kind: "RESEARCH", minMinutes: 1, maxMinutes: 2 },
+        }),
+      ),
+    ).toBe("Usually 1–2 minutes");
+    expect(elapsedWords(STARTED, Date.parse(STARTED) + 42_000)).toBe("42 s");
+    expect(nextStep(["DONE", "CURRENT", "LATER"])).toBe("Writing");
+    expect(nextStep(["DONE", "DONE", "DONE"])).toBeNull();
+  });
+
+  it("follows the promised job from acceptance until its delivery is in the thread", () => {
+    expect(promisedJobs([{ blocks: [work] }])).toEqual([JOB]);
+    // The delivery as the server sends it (document beside the job)...
+    expect(
+      promisedJobs([{ blocks: [work] }, { blocks: [document, work] }]),
+    ).toEqual([]);
+    // ...and as the thread holds it once followWork took the card off.
+    const turns = [qTurn("start", [work]), qTurn("delivery", [document, work])];
+    followWork(turns);
+    expect(
+      promisedJobs(turns.flatMap((turn) => (turn.kind === "Q" ? [turn] : []))),
+    ).toEqual([]);
+  });
+
+  it("subscribes with nothing drawn, holds an open live line while it works, and says it is done with its document", async () => {
+    serve([working(), done]);
+    const details: unknown[] = [];
+    const settled = (event: Event) => {
+      details.push(settledDetail(event));
+    };
+    window.addEventListener(Q_WORK_SETTLED_EVENT, settled);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    function Follower() {
+      useFollowJobs([JOB]);
+      return null;
+    }
+    try {
+      render(<Follower />);
+      await waitFor(() => expect(lineHeld()).toBe(true));
+      await vi.advanceTimersByTimeAsync(2_600);
+      await waitFor(() => expect(details).toHaveLength(1));
+      expect(details[0]).toEqual({
+        jobId: JOB,
+        state: "DONE",
+        document: done.document,
+      });
+      expect(lineHeld()).toBe(false);
+    } finally {
+      window.removeEventListener(Q_WORK_SETTLED_EVENT, settled);
+      vi.useRealTimers();
+    }
+  });
+
+  it("a stuck job holds the line only for a bounded while", () => {
+    const idle = 3 * 60_000;
+    expect(idleEnds(idle - 1, idle, true)).toBe(false);
+    expect(idleEnds(idle + 1, idle, false)).toBe(true);
+    expect(idleEnds(idle + 1, idle, true)).toBe(false);
+    expect(idleEnds(idle + LINE_HOLD_MAX_MS + 1, idle, true)).toBe(true);
   });
 });

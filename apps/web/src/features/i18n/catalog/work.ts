@@ -636,4 +636,11 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "Open Work": "فتح المهام",
   "This work stopped before the document was filed.":
     "توقف هذا العمل قبل حفظ المستند.",
+  // Owner 2026-10-28: the wait, understood.
+  "Going for {n} s": "جارٍ منذ {n} ث",
+  "Going for {n} min {n2} s": "جارٍ منذ {n} د {n2} ث",
+  "Usually {n}–{n2} minutes": "يستغرق عادةً من {n} إلى {n2} دقائق",
+  "Usually {n} minutes": "يستغرق عادةً {n} دقائق",
+  "Usually about a minute": "يستغرق عادةً نحو دقيقة",
+  "Next: {step}": "التالي: {step}",
 };

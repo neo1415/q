@@ -224,6 +224,41 @@ export const WORKFORCE_LIVE_STATES = [
   "STOPPED",
 ] as const;
 
+/**
+ * The kinds of job whose usual length is known, and that length in whole
+ * minutes. A document is researched, drafted up to three times with a
+ * review after each, then filed (job 9e52faf7: 3 min 25 s).
+ */
+export const WORKFORCE_JOB_KINDS = ["DOCUMENT", "RESEARCH"] as const;
+export type WorkforceJobKind = (typeof WORKFORCE_JOB_KINDS)[number];
+
+export const WORKFORCE_USUAL_MINUTES: Readonly<
+  Record<WorkforceJobKind, { readonly min: number; readonly max: number }>
+> = {
+  DOCUMENT: { min: 2, max: 4 },
+  RESEARCH: { min: 1, max: 2 },
+};
+
+export const WorkforceLiveExpectedSchema = z
+  .object({
+    kind: z.enum(WORKFORCE_JOB_KINDS),
+    minMinutes: z.number().int().min(0).max(60),
+    maxMinutes: z.number().int().min(1).max(120),
+  })
+  .strict()
+  .refine((expected) => expected.minMinutes <= expected.maxMinutes, {
+    message: "the shortest usual length is not longer than the longest",
+  });
+export type WorkforceLiveExpected = z.infer<typeof WorkforceLiveExpectedSchema>;
+
+/** The usual length of a job of this kind, as the live read carries it. */
+export function workforceExpected(
+  kind: WorkforceJobKind,
+): WorkforceLiveExpected {
+  const usual = WORKFORCE_USUAL_MINUTES[kind];
+  return { kind, minMinutes: usual.min, maxMinutes: usual.max };
+}
+
 /** `GET /v1/q/workforce/jobs/:jobId/live`: one job, read as its owner. */
 export const WorkforceLiveSchema = z
   .object({
@@ -244,6 +279,18 @@ export const WorkforceLiveSchema = z
       .nullable(),
     /** WAITING, FAILED, STOPPED: why, in the plain words the Work page shows. */
     reason: z.string().max(500).nullable(),
+    /**
+     * Owner 2026-10-28 (a 3.5-minute document with only "Pulling it
+     * together" on screen): when the job was accepted, so the card can say
+     * how long it has been going. Additive.
+     */
+    startedAt: UtcTimestampSchema.optional(),
+    /**
+     * How long work of this kind usually takes, decided by code from the
+     * approved plan's tools (never a model's estimate), so the wait is
+     * understood. Null: no usual length is known. Additive.
+     */
+    expected: WorkforceLiveExpectedSchema.nullable().optional(),
   })
   .strict();
 export type WorkforceLive = z.infer<typeof WorkforceLiveSchema>;
