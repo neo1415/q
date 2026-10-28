@@ -506,6 +506,12 @@ export type OnboardingWriteContext = {
   readonly defer?:
     | ((key: string, run: (tx: TransactionContext) => Promise<void>) => void)
     | undefined;
+  /**
+   * The proposal this commit accepts or corrects, when it is one: its
+   * provenance (where a figure was read, for which period) belongs on the
+   * record the target writes. Absent for a typed or spoken answer.
+   */
+  readonly resolvingSuggestion?: OnboardingSuggestion | undefined;
 };
 
 export type OnboardingStepContextInput = {

@@ -132,6 +132,7 @@ import {
 } from "./conversation";
 import { useHeldReply } from "./held-reply";
 import { useT } from "@/features/i18n/language";
+import { LocalFigureNote, localFigureProvenance } from "./local-figure-note";
 import { WorkingLine } from "@/components/working/working-line";
 
 /**
@@ -2212,6 +2213,13 @@ export function QOnboardingWorkspace({
                           {source.label}
                         </a>
                       </>
+                    );
+                  })()}
+                  {(() => {
+                    // Owner 2026-10-28: read by code from their accounts.
+                    const figure = localFigureProvenance(item.suggestion);
+                    return figure === null ? null : (
+                      <LocalFigureNote figure={figure} />
                     );
                   })()}
                   {item.suggestion.rationale === null ? null : (

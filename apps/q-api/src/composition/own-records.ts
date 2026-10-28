@@ -21,6 +21,7 @@ import type {
   OwnRecordsPort,
   RelationshipMailPort,
 } from "@capital-q/q-tools";
+import type { ActorContext } from "@capital-q/security";
 import type { CompanyVerificationService } from "@capital-q/verification";
 
 import type { ProfileFindingsReader } from "./profile-findings.js";
@@ -158,9 +159,28 @@ export function createOwnRecordsPort(
   };
 }
 
+type DocumentFigureState = {
+  readonly pending: number;
+  readonly confirmed: readonly string[];
+};
+
 /** Their organisation's uploaded documents: metadata, as document.view allows. */
 export function createEvidenceDocumentsPort(
   evidence: Pick<EvidenceService, "listDocumentsWithVersions">,
+  /**
+   * Owner 2026-10-28: the key figures code read from their financial
+   * documents (a pending count) and the ones they confirmed, set against
+   * their deck. Absent: listed without them.
+   */
+  figures?: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<
+    ReadonlyMap<
+      string,
+      { readonly pending: number; readonly confirmed: readonly string[] }
+    >
+  >,
 ): EvidenceDocumentsPort {
   return {
     list: async (actor, companyId) => {
@@ -168,7 +188,21 @@ export function createEvidenceDocumentsPort(
         actor,
         companyId,
       });
+      // Only when a highly confidential document is listed: nothing else
+      // has figures read locally.
+      const byDocument =
+        figures !== undefined &&
+        documents.some(
+          (entry) => entry.document.sensitivityClass === "HIGHLY_CONFIDENTIAL",
+        )
+          ? await figures(actor, companyId).catch(
+              (): ReadonlyMap<string, DocumentFigureState> => new Map(),
+            )
+          : new Map<string, DocumentFigureState>();
       return documents.map((entry) => ({
+        ...(byDocument.has(entry.document.id)
+          ? { figures: byDocument.get(entry.document.id) }
+          : {}),
         documentId: entry.document.id,
         title: entry.document.title,
         documentType: entry.document.documentType,

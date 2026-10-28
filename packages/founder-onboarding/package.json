@@ -16,6 +16,10 @@
     "./profile-sections": {
       "types": "./dist/definition/profile-sections.d.ts",
       "default": "./dist/definition/profile-sections.js"
+    },
+    "./local-figures/provenance": {
+      "types": "./dist/local-figures/provenance.d.ts",
+      "default": "./dist/local-figures/provenance.js"
     }
   },
   "main": "./dist/index.js",

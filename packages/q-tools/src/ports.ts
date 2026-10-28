@@ -1090,6 +1090,20 @@ export type EvidenceDocumentsPort = {
       readonly malwareScanStatus?: string | undefined;
       /** Evidence's own classification (HIGHLY_CONFIDENTIAL is never read by Q). */
       readonly sensitivityClass?: string | undefined;
+      /**
+       * Owner 2026-10-28: the key figures Capital Q's code read from this
+       * (highly confidential, financial) document. `pending`: offered to
+       * the founder and not yet confirmed (a count only: unconfirmed, they
+       * are the document's content and Q does not know them). `confirmed`:
+       * the founder's own claims from it, each set against their deck by
+       * code, one line each (the claim's value and the deck's line only).
+       */
+      readonly figures?:
+        | {
+            readonly pending: number;
+            readonly confirmed: readonly string[];
+          }
+        | undefined;
     }[]
   >;
 };

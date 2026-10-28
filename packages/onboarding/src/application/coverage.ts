@@ -302,6 +302,40 @@ const PUBLIC_SOURCE_TYPES = new Set([
   "PUBLIC_WEB",
 ]);
 
+/**
+ * A figure read by code out of the founder's highly confidential financial
+ * document (owner decision 2026-10-28). Until the founder confirms it, it is
+ * that document's content: shown to the founder only, and never put to a
+ * model (a voice or Q conversation does not read it back or accept it).
+ */
+export const LOCAL_FIGURE_SOURCE = "LOCAL_FIGURE" as const;
+
+export function isLocalFigureProposal(
+  refs: readonly { readonly sourceType: string }[],
+): boolean {
+  return refs.some((r) => r.sourceType === LOCAL_FIGURE_SOURCE);
+}
+
+/**
+ * Owner 2026-10-28: whether a proposal may be made, or settled, on a
+ * session the person already completed. Only a figure read from their own
+ * financial document, and only on a step the journey declares revisable
+ * (ADR 0024); every other offer still needs an open session, and nobody is
+ * sent back into setup to confirm a figure.
+ */
+export function settledAfterSetup(input: {
+  readonly status: string;
+  readonly stepKey: string;
+  readonly sourceRefs: readonly { readonly sourceType: string }[];
+  readonly revisable: ReadonlySet<string> | undefined;
+}): boolean {
+  return (
+    input.status === "COMPLETED" &&
+    isLocalFigureProposal(input.sourceRefs) &&
+    input.revisable?.has(input.stepKey) === true
+  );
+}
+
 /** Where a pending suggestion came from, by the references it carries. */
 export function proposalSource(
   refs: readonly { readonly sourceType: string }[],

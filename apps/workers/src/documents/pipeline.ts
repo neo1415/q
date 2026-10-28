@@ -115,8 +115,32 @@ export function openingTextOf(blocks: readonly ExtractedBlock[]): string {
   return parts.join("\n").slice(0, OPENING_CHARACTERS);
 }
 
+/**
+ * Owner decision 2026-10-28: the key figures of a founder's financial
+ * document (management accounts, a financial model), read by code from the
+ * blocks just extracted and offered to the founder to confirm. No model and
+ * no network: it runs here, at processing time, never when Q is asked.
+ */
+export type LocalFiguresPort = (input: {
+  readonly tenantId: string;
+  readonly documentId: string;
+  readonly documentVersionId: string;
+  readonly companyId: string | null;
+  readonly documentType: string;
+  readonly title: string;
+  readonly createdByUserId: string | null;
+  readonly blocks: readonly ExtractedBlock[];
+}) => Promise<{
+  readonly kind: string;
+  readonly reason?: string | undefined;
+  readonly read?: number | undefined;
+  readonly offered?: number | undefined;
+}>;
+
 export type DocumentPipelineOptions = {
   readonly evidence: DocumentProcessingService;
+  /** Owner 2026-10-28: local figures; absent, none are offered. */
+  readonly localFigures?: LocalFiguresPort | undefined;
   /** QA QO-23: files an unclassified upload by its content; absent: not filed. */
   readonly documentKind?: DocumentKindPort | undefined;
   readonly storage: PrivateDocumentStorageProvider;
@@ -530,6 +554,51 @@ export function createDocumentProcessingPipeline(
         },
         "document chunk set settled",
       );
+    }
+
+    // --- Local figures (owner decision 2026-10-28) ------------------------
+    // A financial document's key figures, read by code from the blocks in
+    // hand (nothing re-read, no model), offered to the founder to confirm.
+    // Idempotent per version; a failure here is logged and never fails or
+    // retries the job: the document is processed either way.
+    if (options.localFigures !== undefined) {
+      const figuresStartedAt = Date.now();
+      try {
+        const figures = await options.localFigures({
+          tenantId,
+          documentId: document.id,
+          documentVersionId: version.id,
+          companyId: document.companyId,
+          documentType: document.documentType,
+          title: document.title,
+          createdByUserId: document.createdByUserId,
+          blocks: output.blocks,
+        });
+        if (figures.kind !== "SKIPPED" || figures.reason !== "NOT_FINANCIAL") {
+          // Counts and codes only: never a figure, a label or a title.
+          logger.info(
+            {
+              msgId: message.msgId,
+              runId: run.id,
+              localFigures: figures.kind,
+              reason: figures.reason,
+              read: figures.read ?? 0,
+              offered: figures.offered ?? 0,
+              localFiguresDurationMs: Date.now() - figuresStartedAt,
+            },
+            "local figures read",
+          );
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            msgId: message.msgId,
+            runId: run.id,
+            failure: error instanceof Error ? error.name : "unknown",
+          },
+          "local figures not offered",
+        );
+      }
     }
 
     // --- Filed by what it says (QA QO-23) ----------------------------------

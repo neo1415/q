@@ -84,6 +84,8 @@ import {
 } from "@capital-q/evidence";
 import {
   createFounderDocumentReview,
+  createLocalFigureOffers,
+  FOUNDER_REVISABLE_STEPS,
   createFounderExtraction,
   createFounderFinancialCheck,
 } from "@capital-q/founder-onboarding";
@@ -333,6 +335,9 @@ const onboarding = createOnboardingService({
   sql: database.sql,
   transactions: database.transactions,
   outbox: createOutboxWriter({ registry }),
+  // Owner 2026-10-28: figures from a founder's financial document are
+  // offered after setup too, on the steps the journey lets them revise.
+  revisableSteps: { founder: FOUNDER_REVISABLE_STEPS },
   logger,
 });
 
@@ -1162,6 +1167,35 @@ const documents =
             outbox: createOutboxWriter({ registry }),
             storage,
           }),
+          // Owner 2026-10-28: a financial document's key figures, read by
+          // code in this worker (no model, no network) and offered to the
+          // founder through their onboarding suggestions to confirm.
+          localFigures: (() => {
+            const offers = createLocalFigureOffers({
+              sql: database.sql,
+              sessions: createPostgresOnboardingSessionRepository(),
+              responses: createPostgresOnboardingResponseRepository(),
+              offeredFromVersion: async (executor, sessionId, versionId) => {
+                const rows = await executor<{ step_key: string }[]>`
+                  select distinct g.step_key
+                    from onboarding.suggestions g
+                   where g.session_id = ${sessionId}::uuid
+                     and g.source_refs @> ${JSON.stringify([
+                       {
+                         sourceType: "EVIDENCE_DOCUMENT_VERSION",
+                         sourceId: versionId,
+                       },
+                     ])}::text::jsonb
+                     and g.source_refs @> '[{"sourceType":"LOCAL_FIGURE"}]'::jsonb`;
+                return new Set(rows.map((row) => row.step_key));
+              },
+              createSuggestion: (command) =>
+                onboarding.internal.createSuggestion(command as never),
+              logger,
+            });
+            return ({ blocks, ...document }) =>
+              offers.onDocumentProcessed({ document, blocks });
+          })(),
           // QA QO-23: an unclassified upload filed by what its opening
           // pages say, on FAST_CLASSIFICATION; without a model it stays
           // unclassified (never guessed from its name).

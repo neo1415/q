@@ -98,3 +98,6 @@ export {
   founderStatedFacts,
   type FounderStatedFacts,
 } from "./integration/stated-facts.js";
+// Owner decision 2026-10-28: a highly confidential financial document's key
+// figures, read locally by code (never a model) for the founder to confirm.
+export * from "./local-figures/index.js";
