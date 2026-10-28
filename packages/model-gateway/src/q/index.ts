@@ -417,6 +417,7 @@ import {
   compareTargets,
   namesToCompare,
   newestAnswerCards,
+  answerCardCompanies,
 } from "./compare-table.js";
 import {
   attachedDocumentIntent,
@@ -10171,6 +10172,10 @@ export function createModelGatewayQAnswer(
               fits: fitsRead,
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
               ...(request.compare === undefined ? {} : { compareAsked: true }),
+              shown: answerCardCompanies([
+                ...(modelBlocks ?? []),
+                ...(builtCards === null ? [] : [builtCards]),
+              ]).map((card) => card.companyId),
             });
         if (answerVerdict === null && comparedTable !== null) {
           answerVerdict = comparisonVerdict(comparedTable, fitsRead);
