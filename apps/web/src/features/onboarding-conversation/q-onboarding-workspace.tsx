@@ -61,6 +61,7 @@ import { VOICE_LEAVE_EVENT } from "../voice/live/live-call";
 import {
   CONTINUE_LATER_LINE,
   continueLaterDestination,
+  pausingDestination,
   useContinueLater,
 } from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
@@ -956,6 +957,8 @@ export function QOnboardingWorkspace({
     [push, qSubject, answerOf, view?.session.id],
   );
 
+  /** The Continue later leaving, declared below; a pausing typed turn uses it. */
+  const leaveLaterRef = useRef<(() => void) | null>(null);
   const sayOne = useCallback(
     async (text: string, typed = false) => {
       const trimmed = text.trim();
@@ -1100,13 +1103,16 @@ export function QOnboardingWorkspace({
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"
       // reached this seam and went nowhere.
-      if (turn.navigate === "HOME") {
-        // A typed reply never leaves the screen on its own (live typed run
-        // 2026-10-28, D3): an investor's "that's all for now" was read as
-        // a pause and the page moved to Home by itself, with the mandate
-        // still open. Q's line stays readable here; leaving is the
-        // person's own tap on Continue later (or the spoken leave event),
-        // never a reading of their words.
+      if (pausingDestination(turn.navigate, journeyName) !== null) {
+        // A pause ("I'll continue later"; coordinator 2026-10-28): the
+        // interviewer sends HOME on the typed channel for that alone, never
+        // for a plain reply or for finishing. Q's line joins the thread so
+        // what was saved and what is open can be read, then they leave the
+        // way the Continue later button leaves: the same line, the same
+        // pause, the journey's own destination.
+        pendingReply.drop();
+        if (turn.reply !== null) push("Q", turn.reply);
+        leaveLaterRef.current?.();
         return;
       }
       if (turn.navigate === "FORM") {
@@ -1626,6 +1632,9 @@ export function QOnboardingWorkspace({
   const { leaving: leavingForLater, leave: leaveForLater } = useContinueLater(
     continueLaterDestination(journeyName),
   );
+  useEffect(() => {
+    leaveLaterRef.current = () => leaveForLater();
+  }, [leaveForLater]);
   // They told Q they will continue later (owner 2026-10-28): Q has said its
   // goodbye and the call has ended; they are taken into Capital Q, as with
   // the Continue later button.

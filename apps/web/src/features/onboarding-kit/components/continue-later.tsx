@@ -30,6 +30,21 @@ export function continueLaterDestination(
   return journey === "investor" ? "/discover" : "/home";
 }
 
+/**
+ * Where a typed turn's `navigate` leaves to, if it is a leave at all
+ * (coordinator 2026-10-28): the interviewer sends HOME on the typed channel
+ * only when the person is pausing ("I'll continue later"), never for a
+ * plain reply or for finishing. A pause then takes the same way out as the
+ * Continue later button, to the journey's own destination. Null for
+ * anything else, so a plain reply never moves the page by itself.
+ */
+export function pausingDestination(
+  navigate: string | null | undefined,
+  journey: "investor" | "founder" | undefined,
+): string | null {
+  return navigate === "HOME" ? continueLaterDestination(journey) : null;
+}
+
 /** How long the line stays before Home opens: long enough to read it. */
 export const CONTINUE_LATER_PAUSE_MS = 1_600;
 
