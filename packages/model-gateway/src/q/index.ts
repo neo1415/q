@@ -43,6 +43,7 @@ import {
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
   QShowCalendarConnectIntentSchema,
+  QShowInQRoomIntentSchema,
   QSetLanguageIntentSchema,
   QDocumentToolResultSchema,
   QMessageIdSchema,
@@ -251,7 +252,11 @@ import {
   type ReadCache,
 } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
-import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
+import {
+  findKnownInvestor,
+  runPersonSearch,
+  type PersonAsk,
+} from "./person-search-answer.js";
 import {
   runInvestorDiscovery,
   type InvestorAsk,
@@ -457,6 +462,7 @@ import {
   PICTURE_WAIT_MS,
   pictureBlock,
   publicPictureBlocks,
+  scheduleBlock,
   withConversationFindings,
   type QPicturePort,
   type QPublicPicturePort,
@@ -598,6 +604,16 @@ const CalendarConnectCarrierSchema = z
  */
 const LanguageCarrierSchema = z
   .object({ clientAction: QSetLanguageIntentSchema })
+  .passthrough();
+
+/**
+ * A read tool's result that carries the record's own card (live
+ * 2026-10-28: list_messages brings the chat with its counterpart), so the
+ * answer that reads a thread shows the thread. The card is the tool's
+ * authorised result, never words.
+ */
+const RoomCardCarrierSchema = z
+  .object({ clientAction: QShowInQRoomIntentSchema })
   .passthrough();
 
 /**
@@ -2904,6 +2920,15 @@ export function createModelGatewayQAnswer(
     readonly namedCompanyCalls: readonly QToolCallObservation[];
     readonly ownDay: AuthorisedFact | null;
     readonly ownDayCalls: readonly QToolCallObservation[];
+    /**
+     * The day's raw reads beside the fact: what waits for their approval
+     * and their zone, for the schedule card when the model reads their
+     * schedule this turn (live 2026-10-28).
+     */
+    readonly ownDayReads: {
+      readonly approvals: unknown;
+      readonly timeZone: string | null;
+    } | null;
     readonly ownStanding: AuthorisedFact | null;
     readonly ownStandingCall: QToolCallObservation | null;
     readonly ownIndex: AuthorisedFact | null;
@@ -2916,6 +2941,7 @@ export function createModelGatewayQAnswer(
     namedCompanyCalls: [],
     ownDay: null,
     ownDayCalls: [],
+    ownDayReads: null,
     ownStanding: null,
     ownStandingCall: null,
     ownIndex: null,
@@ -3793,9 +3819,19 @@ export function createModelGatewayQAnswer(
     };
     // W2: a named person, company or body, identified from public sources
     // by the lookup tool under this run's plan; the card is built by code.
-    const personFor = (ask: PersonAsk) =>
+    const personFor = (ask: PersonAsk, notOnCapitalQ = false) =>
       runPersonSearch({
         ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+        notOnCapitalQ,
+      }).catch(() => null);
+    // Live 2026-10-28: a founder's named organisation is one of Capital
+    // Q's own investors first (the ones they may see), before any web.
+    const knownInvestorFor = (name: string) =>
+      findKnownInvestor({
+        name,
         tools,
         context: toolContext,
         available: prefetchTools,
@@ -4228,6 +4264,7 @@ export function createModelGatewayQAnswer(
      */
     let ownDay: AuthorisedFact | null = null;
     const ownDayCalls: QToolCallObservation[] = [];
+    let ownDayReads: WideReads["ownDayReads"] = null;
     const dayRead = async (): Promise<void> => {
       if (!prefetchTools.has("list_schedule")) return;
       const read = async (name: string): Promise<unknown> => {
@@ -4262,6 +4299,7 @@ export function createModelGatewayQAnswer(
         !/^(Etc\/)?(UTC|UCT|GMT|Universal|Zulu|Greenwich)$/i.test(device)
           ? device
           : null);
+      ownDayReads = { approvals, timeZone: zone };
       ownDay = ownDayFact({
         now: new Date(),
         timeZone: zone,
@@ -4472,6 +4510,7 @@ export function createModelGatewayQAnswer(
           namedCompanyCalls,
           ownDay,
           ownDayCalls,
+          ownDayReads,
           ownStanding,
           ownStandingCall,
           ownIndex,
@@ -4546,6 +4585,7 @@ export function createModelGatewayQAnswer(
       shownBefore,
       standingOf,
       personFor,
+      knownInvestorFor,
       investorsFor,
       prospectsFor,
       sweepForReading,
@@ -4910,6 +4950,7 @@ export function createModelGatewayQAnswer(
         shownBefore,
         standingOf,
         personFor,
+        knownInvestorFor,
         investorsFor,
         prospectsFor,
         sweepForReading,
@@ -6415,13 +6456,19 @@ export function createModelGatewayQAnswer(
           read.success || card?.success === true
             ? null
             : LanguageCarrierSchema.safeParse(outcome.result.data);
+        const room =
+          read.success || card?.success === true || language?.success === true
+            ? null
+            : RoomCardCarrierSchema.safeParse(outcome.result.data);
         const intent = read.success
           ? read.data.clientAction
           : card?.success === true
             ? card.data.clientAction
             : language?.success === true
               ? language.data.clientAction
-              : null;
+              : room?.success === true
+                ? room.data.clientAction
+                : null;
         if (intent === null) return;
         const block: QResultBlock = { kind: "UI_INTENT", intent };
         if (
@@ -6473,6 +6520,28 @@ export function createModelGatewayQAnswer(
           if (seen >= 0) clientActionBlocks.splice(seen, 1, go);
           else clientActionBlocks.push(go);
         }
+      };
+      /**
+       * Live 2026-10-28 ("what's on my schedule today?" was words alone):
+       * when the model reads their schedule this turn, the read's own
+       * result becomes their schedule card, with what waits for their
+       * approval from the day's reads beside it. Built by code from the
+       * tool's authorised result; the model chose only to read it.
+       */
+      const collectSchedule = (name: string, outcome: QToolCallOutcome) => {
+        if (name !== "list_schedule" || !outcome.result.ok) return;
+        const block = scheduleBlock({
+          schedule: outcome.result.data,
+          approvals: wideReads.ownDayReads?.approvals,
+          now: new Date(),
+          timeZone: wideReads.ownDayReads?.timeZone ?? null,
+        });
+        if (block === null) return;
+        const at = clientActionBlocks.findIndex(
+          (known) => known.kind === "SCHEDULE",
+        );
+        if (at >= 0) clientActionBlocks.splice(at, 1, block);
+        else clientActionBlocks.push(block);
       };
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
@@ -6915,7 +6984,43 @@ export function createModelGatewayQAnswer(
                   })
                   .catch(() => []))
             : null);
-        const found = await personFor(request.personSearch);
+        // Live 2026-10-28: for a founder, an organisation they named is
+        // looked for among Capital Q's own investors they may see before
+        // any public search; found, the answer is its card (public profile
+        // and published gate only), and no web page is read.
+        const founderAsking = !investorAsking && prepared.ownCompanyId !== null;
+        const known =
+          founderAsking &&
+          request.personSearch.entityKind !== "PERSON" &&
+          askedName.length > 0
+            ? await knownInvestorFor(askedName)
+            : null;
+        if (known !== null) {
+          const message = await persistCodeAnswer(known.text, [
+            ...known.blocks,
+          ]);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              investorOrganisationId: known.investorOrganisationId,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              personMs: Date.now() - personStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a named investor from Capital Q's own investors",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+        const found = await personFor(
+          request.personSearch,
+          founderAsking && request.personSearch.entityKind !== "PERSON",
+        );
         if (found !== null) {
           for (const source of found.sources) {
             if (!publicSources.some((known) => known.url === source.url)) {
@@ -8711,6 +8816,7 @@ export function createModelGatewayQAnswer(
               collectSources(outcome);
               collectClientAction(outcome);
               collectDocument(outcome);
+              collectSchedule(call.name, outcome);
               notePlatformLookup(outcome);
               noteRecommendationGrounds(outcome);
               noteFitGrounds(outcome);

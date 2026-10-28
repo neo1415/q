@@ -28,6 +28,7 @@ import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
 import { AttentionBody } from "./blocks/attention-block";
 import { SummaryBody } from "./blocks/summary-block";
+import { ScheduleBody } from "./blocks/schedule-block";
 import { PictureBody } from "./blocks/picture-block";
 import {
   ChartBody,
@@ -514,6 +515,14 @@ export function QResultBlocks({
             return (
               <QResultCard key={key} label={t("Summary")} title={block.title}>
                 <SummaryBody block={block} />
+              </QResultCard>
+            );
+
+          case "SCHEDULE":
+            // Live 2026-10-28: their day, from list_schedule's own result.
+            return (
+              <QResultCard key={key} label={t("Schedule")} title={block.title}>
+                <ScheduleBody block={block} />
               </QResultCard>
             );
 

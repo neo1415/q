@@ -2,9 +2,12 @@ import type { ActorContext } from "@capital-q/security";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   ApproveQApprovalRequestSchema,
+  ChatDraftDtoSchema,
   CorrelationIdSchema,
   EmailDraftDtoSchema,
+  Q_APPROVAL_CHAT_DRAFT_SUFFIX,
   Q_APPROVAL_EMAIL_DRAFT_SUFFIX,
+  ReviseChatDraftRequestSchema,
   ReviseEmailDraftRequestSchema,
   parseContract,
   Q_APPROVAL_APPROVE_SUFFIX,
@@ -36,6 +39,10 @@ import {
 import type { QOrchestrator } from "@capital-q/q-runtime";
 
 import type { ApprovedContinuation } from "../composition/approved-continuation.js";
+import {
+  CHAT_MESSAGE_SEND,
+  ChatMessageSendPayloadSchema,
+} from "../composition/chat-actions.js";
 import {
   EMAIL_SEND,
   EmailSendPayloadSchema,
@@ -371,6 +378,71 @@ export function registerQApprovalRoutes(
         approvalId: approvalIdParam(request),
         correlationId: correlation(),
         payload: { ...payload, subject: input.subject, body: input.body },
+      });
+      void dependencies
+        .onDecision?.(getActorContext(request), {
+          qActionId: result.action.id,
+          kind: "EDITED",
+          editedBody: input.body,
+        })
+        .catch(() => undefined);
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(QApprovalViewSchema.parse(result.view));
+    },
+  );
+
+  // The chat message behind a `chat.message.send` approval (live
+  // 2026-10-28), exactly as the email draft above: read by its approver,
+  // edited by them as a revision the old approval does not cover. The
+  // relationship and any shared document stay as proposed.
+  const chatDraft = async (request: FastifyRequest) => {
+    const read = await service.readProposal({
+      actor: getActorContext(request),
+      approvalId: approvalIdParam(request),
+      correlationId: correlation(),
+    });
+    const payload = ChatMessageSendPayloadSchema.safeParse(read.payload);
+    if (read.actionType !== CHAT_MESSAGE_SEND || !payload.success) {
+      throw new QApprovalNotFoundError();
+    }
+    return { view: read.view, payload: payload.data };
+  };
+
+  app.get(
+    `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const { view, payload } = await chatDraft(request);
+      return reply.header("Cache-Control", "no-store").send(
+        ChatDraftDtoSchema.parse({
+          approvalId: view.approvalId,
+          relationshipId: payload.relationshipId,
+          counterpartName: payload.counterpartName,
+          body: payload.body,
+          ...(payload.documentId === undefined
+            ? {}
+            : { documentId: payload.documentId }),
+        }),
+      );
+    },
+  );
+
+  app.post(
+    `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = parseContract(
+        ReviseChatDraftRequestSchema,
+        request.body ?? {},
+        "The edited message is not valid.",
+      );
+      const { payload } = await chatDraft(request);
+      const result = await service.revise({
+        actor: getActorContext(request),
+        approvalId: approvalIdParam(request),
+        correlationId: correlation(),
+        payload: { ...payload, body: input.body },
       });
       void dependencies
         .onDecision?.(getActorContext(request), {

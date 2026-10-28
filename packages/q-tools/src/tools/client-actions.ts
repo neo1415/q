@@ -643,6 +643,7 @@ export function createOpenPageTool(
     | "work"
     | "appActions"
     | "externalRehearsal"
+    | "profileMaterial"
   >,
 ): AnyQToolDefinition {
   const candidates = (
@@ -821,6 +822,26 @@ export function createOpenPageTool(
           ? input.tab
           : undefined;
       const onDeck = tab === "deck" || input.page === "COMPANY_DECK";
+      // Live 2026-10-28 ("open my pitch deck" left the Q page for
+      // /company/<id>?tab=deck, with no Download): the deck opens where
+      // they are, in the material viewer, as the data-room document it is.
+      // The deck tab's own read decides whether this reader may see it
+      // (null otherwise), and the viewer's signed read decides Download
+      // from the founder's download audience. No deck: the tab, as before.
+      if (openable && onDeck && COMPANY_TABS.has(input.page)) {
+        const view = await ports.profileMaterial
+          ?.deck(actor, recordId)
+          .catch(() => null);
+        if (view?.deck !== null && view?.deck !== undefined) {
+          return allowed({
+            kind: "OPEN_RECORD_PAGE",
+            page: "DATA_ROOM_DOCUMENT",
+            id: view.deck.documentId.toLowerCase(),
+            companyId: recordId,
+            title: view.deck.title.slice(0, 200),
+          });
+        }
+      }
       const tabs = {
         ...(tab === undefined ? {} : { tab }),
         ...(onDeck && input.subTab !== undefined

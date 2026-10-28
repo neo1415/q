@@ -73,6 +73,7 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
       case "TIMELINE":
       case "SUMMARY":
       case "WORK_IN_PROGRESS":
+      case "SCHEDULE":
         return block.title;
       case "COMPARISON_CARDS":
         if (block.title !== null && block.title.length > 0) return block.title;
@@ -302,6 +303,7 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
       case "UI_INTENT":
       case "ATTENTION":
       case "PICTURE": // names no subject to point back at
+      case "SCHEDULE": // their own day: talked about as such, not by a name
         break;
       case "SUMMARY":
         // Its points are the answer's words: it is talked about as "the

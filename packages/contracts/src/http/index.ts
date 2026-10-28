@@ -1282,6 +1282,11 @@ export {
   RotateInboundEmailRequestSchema,
   type StartGoogleConnectRequest,
   type StartGoogleConnectResponse,
+  ChatDraftDtoSchema,
+  type ChatDraftDto,
+  ReviseChatDraftRequestSchema,
+  type ReviseChatDraftRequest,
+  Q_APPROVAL_CHAT_DRAFT_SUFFIX,
 } from "./integrations.js";
 export {
   CHAT_MESSAGE_BODY_MAX_LENGTH,

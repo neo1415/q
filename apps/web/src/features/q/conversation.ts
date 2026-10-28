@@ -122,7 +122,9 @@ export type QTurnObjectBlock = Extract<
       // L-13: a credited picture of something visual.
       | "PICTURE"
       // Owner 2026-10-24: a document being made, followed as it is.
-      | "WORK_IN_PROGRESS";
+      | "WORK_IN_PROGRESS"
+      // Live 2026-10-28: their day as a card.
+      | "SCHEDULE";
   }
 >;
 
@@ -171,6 +173,7 @@ function objectBlocksOf(
       case "SUMMARY":
       case "PICTURE":
       case "WORK_IN_PROGRESS":
+      case "SCHEDULE":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block

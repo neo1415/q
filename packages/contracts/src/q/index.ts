@@ -514,6 +514,12 @@ export {
   Q_PICTURE_SOURCES,
   QPictureBlockSchema,
   QWorkInProgressBlockSchema,
+  // Live 2026-10-28: their day as a card.
+  Q_SCHEDULE_CALLS_MAX,
+  Q_SCHEDULE_REMINDERS_MAX,
+  Q_SCHEDULE_APPROVALS_MAX,
+  QScheduleBlockSchema,
+  type QScheduleBlock,
   type QPictureSource,
   chartableSeries,
   parseQResultBlocks,
