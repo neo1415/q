@@ -4365,6 +4365,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Suspension history",
   "Suspension lifted.",
   "Suspensions lifted.",
+  "Swipe sideways to see every column.",
   "Switch company or firm",
   "Switches couldn't load",
   "Switching on Discover…",

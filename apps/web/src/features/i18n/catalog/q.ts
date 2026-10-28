@@ -148,6 +148,7 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "So I can check when you’re free and add the invite. Calendar events only; disconnect any time in Settings.":
     "لأتمكن من معرفة أوقات فراغك وإضافة الدعوة. أحداث التقويم فقط؛ يمكنك فصله في أي وقت من الإعدادات.",
   Sources: "المصادر",
+  "Swipe sideways to see every column.": "اسحب جانبياً لرؤية كل الأعمدة.",
   "Still open": "ما زال مفتوحاً",
   Stop: "إيقاف",
   "Suggested questions": "أسئلة مقترحة",
