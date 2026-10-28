@@ -89,6 +89,7 @@ export function drawnArtifacts(
       case "ATTENTION":
       case "PICTURE":
       case "SUMMARY":
+      case "SCHEDULE": // their day as a card: no table, map, chart or timeline claim
         break;
     }
   }

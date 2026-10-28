@@ -861,6 +861,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     exempt(
       "the person's own edit of a draft's words on its card; asked to Q, Q prepares a new draft (propose_email) for its own approval",
     ),
+  // Live 2026-10-28: the chat reply's draft, read and edited as the email's.
+  "q-api/http/q-approvals.ts GET `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`":
+    cap("tool.propose_chat_message"),
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`":
+    exempt(
+      "the person's own edit of a draft's words on its card; asked to Q, Q prepares a new draft (propose_chat_message) for its own approval",
+    ),
   "q-api/http/q-artifacts.ts GET Q_ARTIFACTS_PATH": cap(
     "tool.list_my_documents",
   ),
@@ -1287,6 +1294,19 @@ const Q_STANDING_SETTINGS: ReadonlySet<string> = new Set([
   "q-api/http/standing.ts PUT Q_STANDING_LANGUAGE_PATH",
 ]);
 
+/**
+ * The person's own edit of a draft's words on its approval card (BIZ-007
+ * email; live 2026-10-28 chat reply). Not an action of its own: the
+ * revision voids the old approval and asks for a new one on exactly the
+ * new words, through the Approval Engine's `revise`; asked to Q, Q
+ * prepares a new draft (propose_email / propose_chat_message) for its own
+ * approval. Never Q's to call, so never declarable as an app action.
+ */
+const DRAFT_WORD_EDITS: ReadonlySet<string> = new Set([
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`",
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`",
+]);
+
 const Q_ROOM_DOCUMENT_DROPS: ReadonlySet<string> = new Set([
   "q-api/http/q-artifacts.ts POST `${artifactPath}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`",
 ]);
@@ -1485,6 +1505,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_ROOM_DOCUMENT_DROPS.has(key) &&
         !Q_STANDING_SETTINGS.has(key) &&
         !HELD_RETRY.has(key) &&
+        !DRAFT_WORD_EDITS.has(key) &&
         // A read by POST (a search with a body) changes nothing.
         !READS_BY_POST.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
