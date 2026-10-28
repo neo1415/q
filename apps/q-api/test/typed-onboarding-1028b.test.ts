@@ -198,8 +198,7 @@ describe("D1: one failing save never holds back the rest (live f46ddb69: I0.webs
         ],
       },
       {
-        reply:
-          "Got it. Your website is kept. Which sectors do you invest in?",
+        reply: "Got it. Your website is kept. Which sectors do you invest in?",
         asking: "I3.sectors",
       },
     ]);

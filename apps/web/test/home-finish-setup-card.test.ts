@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { readinessItems, setupStillOpen } from "../src/features/home/briefing";
+import {
+  composeBriefing,
+  readinessItems,
+  setupStillOpen,
+} from "../src/features/home/briefing";
 
 /**
  * Live typed run 2026-10-28, D6: Home said "3 steps before investors can
@@ -56,5 +60,23 @@ describe("the readiness card on Home", () => {
     expect(setupStillOpen(nudge)).toBe(true);
     expect(setupStillOpen({ ...nudge, doneCount: 9 })).toBe(false);
     expect(setupStillOpen(undefined)).toBe(false);
+  });
+
+  it("says Finish setup with Q from the open session, when the day's nudge is already seen (production re-test 2026-10-28)", () => {
+    const briefing = composeBriefing({
+      role: "FOUNDER",
+      since: "2026-10-21T00:00:00.000Z",
+      readinessGaps: GAPS,
+      // The nudge was claimed earlier today: none comes back.
+      setupNudge: undefined,
+      setupOpen: true,
+    });
+    const card = briefing?.items.find((item) =>
+      item.id.startsWith("readiness:"),
+    );
+    expect(card).toMatchObject({
+      href: "/onboarding/founder?from=home",
+      cta: "Finish setup with Q",
+    });
   });
 });

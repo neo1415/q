@@ -74,7 +74,9 @@ function transcriptReader(readings: Reading[]) {
     read: (input) => {
       seen.push([...input.turns]);
       return Promise.resolve(
-        readings.length > 1 ? (readings.shift() ?? null) : (readings[0] ?? null),
+        readings.length > 1
+          ? (readings.shift() ?? null)
+          : (readings[0] ?? null),
       );
     },
   };
@@ -145,7 +147,11 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
         "I0.organisation_name": "Harmattan Angels",
       },
     });
-    const answers = [
+    const answers: readonly (readonly [
+      string,
+      string | number | string[],
+      string,
+    ])[] = [
       ["I1.deployment_status", "actively_investing", "I'm actively investing"],
       ["I2.stages", ["pre_seed", "seed"], "pre-seed and seed"],
       ["I2.currency", "usd", "cheques in dollars"],
@@ -158,14 +164,14 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
       ],
       ["I9.discovery_mode", "strict", "stick closely to my mandate"],
       ["I10.inbound_preference", "qualified", "open to well-matched founders"],
-    ] as const;
+    ];
     const { say, seen } = typedWorld({
       world,
       readings: [
         {
           answers: answers.map(([stepKey, value, quote]) => ({
             stepKey,
-            value: Array.isArray(value) ? [...value] : value,
+            value,
             quote,
             ownWords: false,
           })),
@@ -174,7 +180,8 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
       ],
       script: [
         {
-          reply: "Thanks, that's a clear picture. Which sectors do you focus on?",
+          reply:
+            "Thanks, that's a clear picture. Which sectors do you focus on?",
           asking: "I3.sectors",
         },
       ],
@@ -191,7 +198,9 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     // Their line and Q's are in the thread, typed.
     await settled(() => world.thread().length >= 2);
     expect(world.thread().map((t) => t.role)).toEqual(["PERSON", "Q"]);
-    await settled(() => world.recordedValue("I10.inbound_preference") !== undefined);
+    await settled(
+      () => world.recordedValue("I10.inbound_preference") !== undefined,
+    );
     const saved = answers.filter(
       ([stepKey]) => world.recordedValue(stepKey) !== undefined,
     );
@@ -228,7 +237,9 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
           declined: [],
         },
       ],
-      script: [{ reply: "Got it, 50k up. Which sectors?", asking: "I3.sectors" }],
+      script: [
+        { reply: "Got it, 50k up. Which sectors?", asking: "I3.sectors" },
+      ],
     });
     await say("actually sorry, make that 50 to 100k, not 25");
     await settled(
@@ -242,7 +253,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     });
   });
 
-  it("\"that's all\" finishes: nothing is recorded as an answer, and the open things are named", async () => {
+  it('"that\'s all" finishes: nothing is recorded as an answer, and the open things are named', async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       subject: FIRM,
@@ -301,7 +312,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     expect(second.reply).toMatch(/saved and live/u);
   });
 
-  it("\"skip that\" sets an optional topic aside and the next question follows", async () => {
+  it('"skip that" sets an optional topic aside and the next question follows', async () => {
     const world = investorSession({
       currentStepKey: "I8.portfolio",
       subject: FIRM,
@@ -331,7 +342,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     expect(world.skippedSteps()).toContain("I8.portfolio");
   });
 
-  it("\"what do you have so far\" is read back from the record, after what they said is saved", async () => {
+  it('"what do you have so far" is read back from the record, after what they said is saved', async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       subject: FIRM,
@@ -350,7 +361,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     expect(outcome.reply).toMatch(/Still to cover: .*stages/iu);
   });
 
-  it("\"I'll continue this later\": one line of what is saved and open, and into the app", async () => {
+  it('"I\'ll continue this later": one line of what is saved and open, and into the app', async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       subject: FIRM,

@@ -217,7 +217,11 @@ export function createTypedOnboarding(dependencies: {
       if (authority?.pausing === true) {
         // What they said is saved first; the line says what is saved.
         await conversation.flush?.(line);
-        text = pausingLine(input.journeyType, await portOf(false).state(), labelOf);
+        text = pausingLine(
+          input.journeyType,
+          await portOf(false).state(),
+          labelOf,
+        );
         navigate = destination(false);
         pausing = true;
         path = "PAUSING";
@@ -247,7 +251,8 @@ export function createTypedOnboarding(dependencies: {
       } else if (written?.readBack === true) {
         // Read back from Capital Q's own record, once what they said is in.
         await conversation.flush?.(line);
-        text = `${written.reply.trim()} ${savedSoFar(await portOf(false).state(), labelOf)}`.trim();
+        text =
+          `${written.reply.trim()} ${savedSoFar(await portOf(false).state(), labelOf)}`.trim();
         path = "READ_BACK";
       } else if (written !== null) {
         text = written.reply.trim();
@@ -407,9 +412,13 @@ function savedLines(
   return state.steps
     .filter(
       (row) =>
-        row.status === "ANSWERED" && row.kind !== "YES_NO" && row.value !== null,
+        row.status === "ANSWERED" &&
+        row.kind !== "YES_NO" &&
+        row.value !== null,
     )
-    .map((row) => `${labelOf(row.stepKey) ?? row.question}: ${row.value ?? ""}`);
+    .map(
+      (row) => `${labelOf(row.stepKey) ?? row.question}: ${row.value ?? ""}`,
+    );
 }
 
 /** What is saved, what is still saving, and what is still needed. */
@@ -436,9 +445,7 @@ export function savedSoFar(
       ? "Nothing is saved yet."
       : `Saved so far: ${saved.join("; ")}.`,
     saving.length === 0 ? "" : `Still saving: ${saving.join(", ")}.`,
-    needed.length === 0
-      ? ""
-      : `Still to cover: ${needed.join(", ")}.`,
+    needed.length === 0 ? "" : `Still to cover: ${needed.join(", ")}.`,
   ]
     .filter((part) => part.length > 0)
     .join(" ");

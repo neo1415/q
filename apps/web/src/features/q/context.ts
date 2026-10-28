@@ -340,6 +340,57 @@ const currentOnboardingViews = cache(async () => {
   );
 });
 
+type JourneyView = {
+  readonly journey: "founder" | "investor";
+  readonly view:
+    | {
+        readonly status: "fulfilled";
+        readonly value: {
+          readonly session: {
+            readonly status: string;
+            readonly startedAt: string;
+          };
+        };
+      }
+    | { readonly status: "rejected"; readonly reason: unknown };
+};
+
+/**
+ * The person's own journey: the one they started first (production
+ * re-test 2026-10-28: a founder sent to `/mandate` was put into investor
+ * setup, and an investor sent to `/company` into founder setup; the stray
+ * second session then made Home nudge the investor as a founder). Among
+ * sessions in `statuses`, the earliest started; null when there is none.
+ */
+export function ownJourneyOf(
+  views: readonly JourneyView[],
+  statuses: readonly string[] = ["ACTIVE", "COMPLETED"],
+): "founder" | "investor" | null {
+  let first: { journey: "founder" | "investor"; at: number } | null = null;
+  for (const { journey, view } of views) {
+    if (view.status !== "fulfilled") continue;
+    if (!statuses.includes(view.value.session.status)) continue;
+    const at = Date.parse(view.value.session.startedAt);
+    if (first === null || at < first.at) first = { journey, at };
+  }
+  return first?.journey ?? null;
+}
+
+/**
+ * The person's journey for routing: their founder or investor context when
+ * they have one, else the onboarding they started first, else null (only
+ * then is the welcome choice theirs to make).
+ */
+export const resolveOwnJourney = cache(
+  async (): Promise<"founder" | "investor" | null> => {
+    const context = await resolveOwnContext();
+    if (context.kind === "FOUNDER") return "founder";
+    if (context.kind === "INVESTOR") return "investor";
+    const views = await currentOnboardingViews();
+    return views === null ? null : ownJourneyOf(views);
+  },
+);
+
 /**
  * The journey this person started and has not finished, if any: Home offers
  * the way back in ("Continue setup"), because once a company or investor
@@ -352,16 +403,11 @@ export const resolveUnfinishedSetup = cache(
     if (views === null) {
       return null;
     }
-    for (const { journey, view } of views) {
-      // A rejection is no such journey for this person: a normal state.
-      if (
-        view.status === "fulfilled" &&
-        view.value.session.status === "ACTIVE"
-      ) {
-        return journey;
-      }
-    }
-    return null;
+    // A rejection is no such journey for this person: a normal state. Of
+    // two, the one they started first is theirs (a stray second session,
+    // opened by a redirect, is not their setup).
+    const own = ownJourneyOf(views);
+    return own !== null && ownJourneyOf(views, ["ACTIVE"]) === own ? own : null;
   },
 );
 
@@ -387,7 +433,12 @@ export const resolveOnboardingState = cache(
     for (const { journey, view } of views) {
       if (view.status === "fulfilled") {
         if (view.value.session.status === "COMPLETED") return { kind: "DONE" };
-        if (view.value.session.status === "ACTIVE" && active === null) {
+        if (
+          view.value.session.status === "ACTIVE" &&
+          active === null &&
+          // Their own journey, not a stray second session (2026-10-28).
+          ownJourneyOf(views) === journey
+        ) {
           active = journey;
         }
       } else if (

@@ -1130,7 +1130,11 @@ export function createOnboardingConductor(
       });
       if (resumed !== null) return resumed;
     }
-    if (!opening && input.channel === "text" && dependencies.typed !== undefined) {
+    if (
+      !opening &&
+      input.channel === "text" &&
+      dependencies.typed !== undefined
+    ) {
       const typed = await dependencies.typed
         .turn(input)
         .catch((error: unknown) => {

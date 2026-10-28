@@ -98,6 +98,7 @@ import {
   alreadyHaveLine,
   contentHashOf,
   nothingNewLine,
+  canOfferFinish,
   findingsFromDocument,
   findingsNotFromDocuments,
   publicFindingsNote,
@@ -2617,7 +2618,7 @@ export function QOnboardingWorkspace({
         </section>
       ) : null}
 
-      {!isFinal && coverage !== null && coverage.summary.canComplete ? (
+      {!isFinal && coverage !== null && canOfferFinish(coverage) ? (
         // D3 (live typed run 2026-10-28): "that's all for now" paused the
         // interview and nothing on screen could finish it. Once coverage
         // says every essential is in, finishing is one visible tap; the

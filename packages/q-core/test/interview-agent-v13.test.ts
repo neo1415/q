@@ -73,17 +73,14 @@ describe("DELEGATION_READER v6 (typed onboarding 2026-10-28, D5)", () => {
 
 describe("DELEGATION_READER v7 (production re-test 2026-10-28)", () => {
   it("is active, reads that's all as finishing, and changes only the finishing rule", async () => {
-    const { DELEGATION_READER_V6, DELEGATION_READER_V7 } = await import(
-      "../src/index.js"
-    );
+    const { DELEGATION_READER_V6, DELEGATION_READER_V7 } =
+      await import("../src/index.js");
     expect(
       createDefaultPromptRegistry().getActive("DELEGATION_READER").definition
         .version,
     ).toBe(7);
     expect(DELEGATION_READER_V7.template).toContain("that's all");
-    expect(DELEGATION_READER_V7.template).toContain(
-      "Finishing is not pausing",
-    );
+    expect(DELEGATION_READER_V7.template).toContain("Finishing is not pausing");
     const v6 = DELEGATION_READER_V6.template.split("\n");
     const v7 = DELEGATION_READER_V7.template.split("\n");
     expect(v7).toHaveLength(v6.length);

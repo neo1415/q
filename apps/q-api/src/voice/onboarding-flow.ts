@@ -472,9 +472,7 @@ export function withStillSaving(
   savingLabels: readonly string[],
 ): string {
   const labels = [
-    ...new Set(
-      savingLabels.map((l) => l.trim()).filter((l) => l.length > 0),
-    ),
+    ...new Set(savingLabels.map((l) => l.trim()).filter((l) => l.length > 0)),
   ];
   if (labels.length === 0) return reply;
   const terms = labels.flatMap((label) => {

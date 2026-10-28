@@ -219,7 +219,9 @@ describe("held writes (ob1)", () => {
     };
     const gaveUp = await drainPendingWrites(ports([last]));
     expect(tried).toEqual(["2"]);
-    expect(gaveUp.failed).toEqual([{ stepKey: "I0.website", code: "HTTP_500" }]);
+    expect(gaveUp.failed).toEqual([
+      { stepKey: "I0.website", code: "HTTP_500" },
+    ]);
     expect(gaveUp.stillPending).toEqual([]);
   });
 

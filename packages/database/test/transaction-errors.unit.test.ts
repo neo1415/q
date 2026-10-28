@@ -11,7 +11,7 @@ function fakeSql(): Sql {
   } as unknown as Sql;
 }
 
-async function thrownBy(error: unknown): Promise<unknown> {
+async function thrownBy(error: Error): Promise<unknown> {
   try {
     await createTransactionManager(fakeSql()).run(() => Promise.reject(error));
   } catch (caught: unknown) {

@@ -2836,8 +2836,7 @@ export function createOnboardingPort(input: {
                 stepKey,
                 outcome: "HELD_FOR_RETRY",
                 question: questionOf(item.plan.step),
-                reason:
-                  STILL_SAVING_REASON,
+                reason: STILL_SAVING_REASON,
               });
               continue;
             } catch {

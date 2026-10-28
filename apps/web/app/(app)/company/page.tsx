@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { resolveOwnContext } from "@/features/q/context";
+import { resolveOwnContext, resolveOwnJourney } from "@/features/q/context";
 import { companyLandingPath } from "@/features/q/own-paths";
 
 export const dynamic = "force-dynamic";
@@ -11,5 +11,9 @@ export const dynamic = "force-dynamic";
  * Decided here, on the server, from the session's own context.
  */
 export default async function CompanyIndexPage(): Promise<never> {
-  redirect(companyLandingPath(await resolveOwnContext()));
+  const [context, journey] = await Promise.all([
+    resolveOwnContext(),
+    resolveOwnJourney(),
+  ]);
+  redirect(companyLandingPath(context, journey));
 }

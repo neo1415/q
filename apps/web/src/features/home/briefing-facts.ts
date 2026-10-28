@@ -22,7 +22,11 @@ import type {
 } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
-import { apiSession, type OwnContext } from "@/features/q/context";
+import {
+  apiSession,
+  resolveUnfinishedSetup,
+  type OwnContext,
+} from "@/features/q/context";
 import { relationshipHref } from "@/features/relationships/relationship-words";
 
 import { resolveSetupReminder } from "./setup-reminder";
@@ -79,6 +83,13 @@ export type BriefingReads = {
   readonly companySlate: () => Promise<DiscoveryCompanySlateDto>;
   /** Today's setup reminder, if the server's policy gives one (read only). */
   readonly setupNudge: () => Promise<OnboardingBriefingNudgeResponse>;
+  /**
+   * The journey this person started and has not finished (production
+   * re-test 2026-10-28: the way back read "Continue", because the day's
+   * nudge, once seen, no longer said the setup was open).
+   */
+  readonly unfinishedSetup?:
+    (() => Promise<"founder" | "investor" | null>) | undefined;
   /** REHEARSE: their own upcoming calls, with whom (Q API). */
   readonly rehearsalPartners?:
     (() => Promise<QRehearsalPartnersDto>) | undefined;
@@ -246,15 +257,25 @@ export async function readBriefingFacts(
   switch (context.kind) {
     case "FOUNDER": {
       const { companyId } = context;
-      const [approvals, relationships, interest, readiness, nudge, partners] =
-        await Promise.all([
-          within(reads.pendingApprovals),
-          within(() => reads.companyRelationships(companyId)),
-          within(() => reads.incomingInterest(companyId)),
-          within(() => reads.readiness(companyId)),
-          within(reads.setupNudge),
-          partnersWithin(reads, now),
-        ]);
+      const [
+        approvals,
+        relationships,
+        interest,
+        readiness,
+        nudge,
+        partners,
+        unfinished,
+      ] = await Promise.all([
+        within(reads.pendingApprovals),
+        within(() => reads.companyRelationships(companyId)),
+        within(() => reads.incomingInterest(companyId)),
+        within(() => reads.readiness(companyId)),
+        within(reads.setupNudge),
+        partnersWithin(reads, now),
+        reads.unfinishedSetup === undefined
+          ? Promise.resolve(undefined)
+          : within(reads.unfinishedSetup),
+      ]);
       return {
         role: "FOUNDER",
         since,
@@ -273,6 +294,7 @@ export async function readBriefingFacts(
           })),
         readinessGaps: readinessGaps(readiness, companyId),
         setupNudge: setupNudgeFact(nudge),
+        setupOpen: unfinished === "founder",
         upcomingCalls: partners,
       };
     }
@@ -351,6 +373,7 @@ export async function resolveBriefing(
         companySlate: () => discoverCompanies(session, { limit: SLATE_LOOK }),
         // A read: the card claims the reminder once it is seen.
         setupNudge: () => resolveSetupReminder().then((nudge) => ({ nudge })),
+        unfinishedSetup: () => resolveUnfinishedSetup(),
         ...(qSession === null
           ? {}
           : { rehearsalPartners: () => getRehearsalPartners(qSession) }),

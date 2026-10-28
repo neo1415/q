@@ -1184,3 +1184,37 @@ export function resumedThread<T>(
 ): T[] {
   return [...history, ...welcome, ...unsent];
 }
+
+/**
+ * Whether the Finish control is offered (production re-test 2026-10-28:
+ * nine mandate answers were still saving, coverage said it could not
+ * complete, and the button never showed). An answer still being saved
+ * counts as answered here, provisionally; the runtime still decides, on
+ * Finish, whether the session completes (it waits for the saves).
+ */
+export function canOfferFinish(coverage: {
+  readonly summary: {
+    readonly canComplete: boolean;
+    readonly contradictory: number;
+  };
+  readonly fields: readonly {
+    readonly applicable: boolean;
+    readonly required: boolean;
+    readonly state: string;
+    readonly savePending: boolean;
+  }[];
+}): boolean {
+  if (coverage.summary.canComplete) return true;
+  if (coverage.summary.contradictory > 0) return false;
+  const required = coverage.fields.filter((f) => f.applicable && f.required);
+  return (
+    required.some((f) => f.savePending) &&
+    required.every(
+      (f) =>
+        f.savePending ||
+        f.state === "KNOWN" ||
+        f.state === "CONFIRMED_SAVED" ||
+        f.state === "EVIDENCE_NEEDED",
+    )
+  );
+}
