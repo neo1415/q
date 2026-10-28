@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   ChatMessageBodySchema,
+  QShowInQRoomIntentSchema,
   UuidSchema,
   type PermittedContextPlan,
   type QTaskClass,
@@ -147,6 +148,17 @@ export type ChatIntelligencePort = {
     /** Either side blocked messaging (R34 safety); nothing can be sent. */
     readonly blocked?: boolean | undefined;
     readonly counterpartName: string;
+    /**
+     * The other side as a record (live 2026-10-28: "what did Savanna say
+     * in our chat?" came back as words alone). With it, list_messages
+     * carries the chat's own card; absent, the words stand on their own.
+     */
+    readonly counterpart?:
+      | {
+          readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+          readonly id: string;
+        }
+      | undefined;
     readonly messages: readonly {
       readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
       readonly senderName: string;
@@ -420,9 +432,39 @@ export const ListMessagesOutputSchema = z
         })
         .strict(),
     ),
+    /**
+     * The chat's own card (CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR), from
+     * the thread this read was authorised for: the answer seam puts it on
+     * the answer as a screen act, exactly as `show` does. Never a model's.
+     */
+    clientAction: QShowInQRoomIntentSchema.optional(),
   })
   .strict();
 export type ListMessagesOutput = z.infer<typeof ListMessagesOutputSchema>;
+
+/** The chat card for a thread whose other side is a known record. */
+export function chatCardOf(thread: {
+  readonly counterpartName: string;
+  readonly counterpart?:
+    | {
+        readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+        readonly id: string;
+      }
+    | undefined;
+}): z.infer<typeof QShowInQRoomIntentSchema> | undefined {
+  const counterpart = thread.counterpart;
+  if (counterpart === undefined) return undefined;
+  const parsed = QShowInQRoomIntentSchema.safeParse({
+    kind: "SHOW_IN_Q_ROOM",
+    object:
+      counterpart.kind === "COMPANY"
+        ? "CHAT_WITH_COMPANY"
+        : "CHAT_WITH_INVESTOR",
+    id: counterpart.id.toLowerCase(),
+    title: thread.counterpartName.slice(0, 120),
+  });
+  return parsed.success ? parsed.data : undefined;
+}
 
 type ThreadGrant = {
   readonly thread: NonNullable<
@@ -469,10 +511,12 @@ function createListMessagesTool(
         return deny("NOT_AVAILABLE");
       }
     },
-    execute: (_input, _context, grant) =>
-      Promise.resolve({
+    execute: (_input, _context, grant) => {
+      const card = chatCardOf(grant.thread);
+      return Promise.resolve({
         open: grant.thread.connected && grant.thread.blocked !== true,
         counterpartName: grant.thread.counterpartName,
+        ...(card === undefined ? {} : { clientAction: card }),
         // Pick the contract's fields: the port's rows carry more (id, viaQ,
         // envelope since the Q room build), and spreading them failed the
         // strict output on every non-empty thread -- hosted run 77dbcc69
@@ -486,7 +530,8 @@ function createListMessagesTool(
           attachmentTitle: message.attachmentTitle,
           sentAt: message.sentAt,
         })),
-      }),
+      });
+    },
   });
 }
 

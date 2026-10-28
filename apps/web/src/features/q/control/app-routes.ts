@@ -39,6 +39,8 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/admin/team",
   "/admin/verification",
   "/capital",
+  // D6: the bare address, resolved server-side to the person's own company.
+  "/company",
   "/company/[companyId]",
   "/company/[companyId]/founder/[position]",
   "/crm",
@@ -64,6 +66,8 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/investors/[investorOrganisationId]/rehearse",
   "/investors/top",
   "/join/[token]",
+  // D6: the bare address, resolved server-side to the investor's mandate.
+  "/mandate",
   "/onboarding/founder",
   "/onboarding/investor",
   "/pitch",
@@ -171,6 +175,10 @@ export const ROUTE_REDIRECTS: readonly Redirect[] = [
     from: /^\/admin\/(?:verification|reviews)$/u,
     to: startsWith("/admin/queue"),
   },
+  // D6 (2026-10-28): the bare company and mandate addresses land on the
+  // person's own page, or on the setup that creates it.
+  { from: /^\/company$/u, to: startsWith("/company/", "/onboarding/founder") },
+  { from: /^\/mandate$/u, to: startsWith("/profile", "/onboarding/investor") },
   // A founder's /investors sends them to Discover (go-to-discover.tsx).
   { from: /^\/investors$/u, to: startsWith("/discover") },
   { from: /^\/investors\/top$/u, to: startsWith("/investors", "/discover") },

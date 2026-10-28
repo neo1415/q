@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { ChatMessageBodySchema } from "./communication.js";
 
 /**
  * Integrations HTTP contracts (BIZ-007): a person's own connected Google
@@ -180,6 +181,33 @@ export type ReviseEmailDraftRequest = z.infer<
   typeof ReviseEmailDraftRequestSchema
 >;
 export const Q_APPROVAL_EMAIL_DRAFT_SUFFIX = "/email-draft" as const;
+
+/**
+ * The chat message behind a `chat.message.send` approval, as its approver
+ * may read and edit it (live 2026-10-28: the reply Q drafted could not be
+ * changed on its card while an email could). Editing follows the email
+ * exactly: the old approval is void and a new one is asked for the new
+ * words; the relationship and the shared document cannot change here.
+ */
+export const ChatDraftDtoSchema = z
+  .object({
+    approvalId: UuidSchema,
+    relationshipId: UuidSchema,
+    counterpartName: z.string().max(200),
+    body: ChatMessageBodySchema,
+    /** One of their own documents the message shares, when it does. */
+    documentId: UuidSchema.optional(),
+  })
+  .strict();
+export type ChatDraftDto = z.infer<typeof ChatDraftDtoSchema>;
+
+export const ReviseChatDraftRequestSchema = z
+  .object({ body: ChatMessageBodySchema })
+  .strict();
+export type ReviseChatDraftRequest = z.infer<
+  typeof ReviseChatDraftRequestSchema
+>;
+export const Q_APPROVAL_CHAT_DRAFT_SUFFIX = "/chat-draft" as const;
 
 export const RelationshipMailItemSchema = z
   .object({

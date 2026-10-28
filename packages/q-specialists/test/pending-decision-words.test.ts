@@ -265,6 +265,146 @@ describe("approval by words, read by code", () => {
   });
 });
 
+describe("a plain yes or no to Q's own ask about the one card (live 2026-10-28, phone)", () => {
+  const MANDATE: Proposal = {
+    proposalId: "md1",
+    summary: "Update your mandate",
+    status: "PENDING",
+  };
+  const INTEREST: Proposal = {
+    proposalId: "in1",
+    summary: "Express interest in Sahel Pumps",
+    status: "PENDING",
+  };
+  // The turn reader read the one word as a request (the phone run); the
+  // desktop's reading was a reply. Neither may decide a one-word answer
+  // to Q's own question.
+  const misread = {
+    kind: "TOOL_REQUEST",
+    addressedToQ: true,
+    namesAction: false,
+  } as const;
+  const asked = (card: Proposal, line: string) => [
+    { role: "USER" as const, text: "Change my cheque size to 50k to 250k" },
+    { role: "Q" as const, text: `${card.summary}. ${line}` },
+  ];
+
+  it.each([
+    ["yes", "Not saved yet: tap Approve on the card, or tell me to go ahead."],
+    [
+      "ok",
+      "It's waiting for your yes. Tap Approve on the card, or tell me to go ahead.",
+    ],
+    [
+      "yes please",
+      "Not saved yet: tap Approve on the card, or tell me to go ahead.",
+    ],
+  ])(
+    "%s to a record change: approved by code, no model reading, whatever the turn reader said",
+    async (said, line) => {
+      const { value, calls } = port([MANDATE]);
+      const outcome = await decidePending(value, {
+        ...turn(said, asked(MANDATE, line)),
+        turn: misread,
+      });
+      expect(calls.approve).toEqual(["md1"]);
+      expect(calls.read).toBe(0);
+      expect(outcome).toEqual({
+        kind: "REPLY",
+        line: "Done: Update your mandate.",
+      });
+    },
+  );
+
+  it("yes to an outward card's 'ready to send' ask: approved the same way", async () => {
+    const { value, calls } = port([INTEREST]);
+    const outcome = await decidePending(value, {
+      ...turn(
+        "yes",
+        asked(
+          INTEREST,
+          "Ready to send: approve on the card, or tell me what to change.",
+        ),
+      ),
+      turn: misread,
+    });
+    expect(calls.approve).toEqual(["in1"]);
+    expect(calls.read).toBe(0);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Done: Express interest in Sahel Pumps.",
+    });
+  });
+
+  it("no to the ask: declined by code", async () => {
+    const { value, calls } = port([MANDATE]);
+    const outcome = await decidePending(value, {
+      ...turn(
+        "no",
+        asked(
+          MANDATE,
+          "Not saved yet: tap Approve on the card, or tell me to go ahead.",
+        ),
+      ),
+      turn: misread,
+    });
+    expect(calls.decline).toEqual(["md1"]);
+    expect(calls.approve).toEqual([]);
+    expect(calls.read).toBe(0);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: "Declined: Update your mandate. Nothing was changed.",
+    });
+  });
+
+  it("a yes when Q's last line asked something else answers that question, never the card", async () => {
+    const { value, calls } = port([MANDATE]);
+    const outcome = await decidePending(
+      value,
+      turn("yes", [
+        { role: "Q", text: "Shall I also look at their latest round?" },
+      ]),
+    );
+    expect(calls.approve).toEqual([]);
+    expect(outcome).toEqual({ kind: "NONE" });
+  });
+
+  it("two cards waiting: a plain yes still asks which", async () => {
+    const { value, calls } = port([MANDATE, INTEREST]);
+    const outcome = await decidePending(
+      value,
+      turn(
+        "yes",
+        asked(
+          INTEREST,
+          "Ready to send: approve on the card, or tell me what to change.",
+        ),
+      ),
+    );
+    expect(calls.approve).toEqual([]);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: `${WHICH_TO_APPROVE} "Update your mandate" or "Express interest in Sahel Pumps"? Or say "both".`,
+    });
+  });
+
+  it("more than the bare decision ('yes, but make it 300k') is never decided here", async () => {
+    const { value, calls } = port([MANDATE]);
+    const outcome = await decidePending(
+      value,
+      turn(
+        "yes, but make it 300k",
+        asked(
+          MANDATE,
+          "Not saved yet: tap Approve on the card, or tell me to go ahead.",
+        ),
+      ),
+    );
+    expect(calls.approve).toEqual([]);
+    expect(outcome.kind).not.toBe("REPLY");
+  });
+});
+
 describe("the question back, answered (live 2026-10-16)", () => {
   it("a plain 'yes' to two cards asks in words the next turn reads, and 'both' then approves both", async () => {
     const first = port([FOLLOW_UP, MEETING]);

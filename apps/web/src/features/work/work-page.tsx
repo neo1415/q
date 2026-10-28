@@ -35,6 +35,7 @@ import {
   askQAction,
   readQApprovalAction,
 } from "@/features/q/actions";
+import { ChatDraftEditor } from "@/features/integrations/chat-draft-editor";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
 import { useQControlGroup } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
@@ -584,6 +585,13 @@ function ApprovalPlan({
       {view.action.actionType === "email.send" && canDecide ? (
         // An email's words can be edited; the server asks again (BIZ-007).
         <EmailDraftEditor
+          approvalId={approvalId}
+          onRevised={() => setVersion((now) => now + 1)}
+        />
+      ) : null}
+      {view.action.actionType === "chat.message.send" && canDecide ? (
+        // A chat reply's words too (live 2026-10-28), the same way.
+        <ChatDraftEditor
           approvalId={approvalId}
           onRevised={() => setVersion((now) => now + 1)}
         />

@@ -458,9 +458,20 @@ export function describeValue(
     case "RANGE": {
       const number = Number.parseFloat(value.value);
       if (!Number.isFinite(number)) return value.value;
-      return step !== undefined && MONEY_STEP.test(step.stepKey)
-        ? spokenMoney(number, currency ?? null)
-        : spokenFigure(number);
+      if (step !== undefined && MONEY_STEP.test(step.stepKey)) {
+        return spokenMoney(number, currency ?? null);
+      }
+      // The step's own unit, so a margin reads "61%" and not "61" (live
+      // 2026-10-28, founder 7982610e).
+      const unit =
+        step?.configuration.stepType === "range"
+          ? step.configuration.unit
+          : undefined;
+      return unit === undefined
+        ? spokenFigure(number)
+        : unit === "%"
+          ? `${spokenFigure(number)}%`
+          : `${spokenFigure(number)} ${unit}`;
     }
     case "TEXT":
       return value.text.slice(0, 300);
@@ -481,12 +492,33 @@ export function describeValue(
 export function recordedCurrency(
   view: OnboardingSessionView,
   steps: ReadonlyMap<string, OnboardingStepManifest>,
+  /**
+   * The money step the currency is for. A journey holds more than one
+   * currency step (the founder's financials in one, the raise in another;
+   * live 2026-10-28: KSh 2.1m of monthly revenue read back as "$2.1
+   * million" under the raise's dollars). The step's own phase names its
+   * currency; only with none is the journey's first one used.
+   */
+  forStepKey?: string,
 ): string | null {
+  const phase = forStepKey?.split(".")[0];
+  const currencyOf = (response: OnboardingSessionView["responses"][number]) =>
+    /currency$/.test(response.stepKey) &&
+    response.value.type === "SINGLE_SELECT" &&
+    steps.get(response.stepKey) !== undefined
+      ? response.value.optionKey
+      : null;
+  if (phase !== undefined) {
+    for (const response of view.responses) {
+      if (response.stepKey.split(".")[0] !== phase) continue;
+      const currency = currencyOf(response);
+      if (currency !== null) return currency;
+    }
+  }
   for (const response of view.responses) {
     if (!/\.currency$/.test(response.stepKey)) continue;
-    if (response.value.type !== "SINGLE_SELECT") continue;
-    if (steps.get(response.stepKey) === undefined) continue;
-    return response.value.optionKey;
+    const currency = currencyOf(response);
+    if (currency !== null) return currency;
   }
   return null;
 }

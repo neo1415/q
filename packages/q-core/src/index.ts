@@ -146,6 +146,7 @@ export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
 export { DELEGATION_READER_V4 } from "./prompts/tasks/delegation-reader.v4.js";
 export { DELEGATION_READER_V5 } from "./prompts/tasks/delegation-reader.v5.js";
+export { DELEGATION_READER_V6 } from "./prompts/tasks/delegation-reader.v6.js";
 export { ONBOARDING_TRANSCRIPT_READER_V1 } from "./prompts/tasks/onboarding-transcript-reader.v1.js";
 export {
   ONBOARDING_TRANSCRIPT_READER_SCHEMA_NAME,

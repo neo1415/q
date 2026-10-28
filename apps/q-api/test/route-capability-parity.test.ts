@@ -861,6 +861,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     exempt(
       "the person's own edit of a draft's words on its card; asked to Q, Q prepares a new draft (propose_email) for its own approval",
     ),
+  // Live 2026-10-28: the chat reply's draft, read and edited as the email's.
+  "q-api/http/q-approvals.ts GET `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`":
+    cap("tool.propose_chat_message"),
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`":
+    exempt(
+      "the person's own edit of a draft's words on its card; asked to Q, Q prepares a new draft (propose_chat_message) for its own approval",
+    ),
   "q-api/http/q-artifacts.ts GET Q_ARTIFACTS_PATH": cap(
     "tool.list_my_documents",
   ),
@@ -1149,6 +1156,15 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/discover/saved/compare": cap("tool.fit_compare"),
   // Founder design 2026-09-28: a Q Card by its whole @handle.
   "/find": exempt("the old address of Search; it only redirects"),
+  // D6 (live typed run 2026-10-28): short addresses people type; each only
+  // redirects to the person's own company page or mandate, or to the setup
+  // that creates it. Q already opens those destinations.
+  "/company": exempt(
+    "redirects to the person's own company page, or to founder setup",
+  ),
+  "/mandate": exempt(
+    "redirects to the investor's mandate on their profile, or to investor setup",
+  ),
   "/search": exempt(
     "search by @handle and founders' videos; the People tab opens public Q Cards and Q links them directly",
   ),
@@ -1285,6 +1301,19 @@ const LEGACY_MUTATION_ROUTES_MAX = 76;
  */
 const Q_STANDING_SETTINGS: ReadonlySet<string> = new Set([
   "q-api/http/standing.ts PUT Q_STANDING_LANGUAGE_PATH",
+]);
+
+/**
+ * The person's own edit of a draft's words on its approval card (BIZ-007
+ * email; live 2026-10-28 chat reply). Not an action of its own: the
+ * revision voids the old approval and asks for a new one on exactly the
+ * new words, through the Approval Engine's `revise`; asked to Q, Q
+ * prepares a new draft (propose_email / propose_chat_message) for its own
+ * approval. Never Q's to call, so never declarable as an app action.
+ */
+const DRAFT_WORD_EDITS: ReadonlySet<string> = new Set([
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`",
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`",
 ]);
 
 const Q_ROOM_DOCUMENT_DROPS: ReadonlySet<string> = new Set([
@@ -1485,6 +1514,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_ROOM_DOCUMENT_DROPS.has(key) &&
         !Q_STANDING_SETTINGS.has(key) &&
         !HELD_RETRY.has(key) &&
+        !DRAFT_WORD_EDITS.has(key) &&
         // A read by POST (a search with a body) changes nothing.
         !READS_BY_POST.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act

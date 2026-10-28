@@ -29,7 +29,10 @@ export function StageCanvas({
   onAsk,
   onPin,
   turns = [],
+  quiet = false,
 }: {
+  /** The full exchange is already on the stage (captions): no line over the cards. */
+  readonly quiet?: boolean | undefined;
   /** The conversation, for the spotlight (what is said after the set). */
   readonly turns?: readonly QTurn[] | undefined;
   readonly answerId: string;
@@ -81,6 +84,7 @@ export function StageCanvas({
         block={block}
         asked={asked}
         said={playback.said}
+        quietLine={quiet}
         focus={playback.focus}
         walking={playback.walking}
         presence={presence}

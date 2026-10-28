@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@capital-q/ui/button";
 
+import { useQSessionOptional } from "@/features/q/q-session";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
 import {
@@ -47,12 +48,17 @@ function isStandalone(): boolean {
 const noSubscription = () => () => undefined;
 
 /**
- * An unobtrusive offer to install Capital Q: once, dismissible, remembered
- * on the device (see install-state.ts for when it appears). It sits above
- * the phone's tab bar and registers as a zone the Q Dock moves away from.
+ * An unobtrusive offer to install Capital Q: dismissible, remembered on
+ * the device for 14 days (see install-state.ts for when it appears). A
+ * quiet row in the page's own flow -- never laid over the composer or
+ * the welcome (live run 2026-10-28, 390px: it covered both and took the
+ * taps until "Got it") -- and a zone the Q Dock moves away from.
  */
 export function InstallPrompt() {
   const pathname = usePathname();
+  const session = useQSessionOptional();
+  const conversing =
+    session !== null && (session.turns.length > 0 || session.q.working);
   const hydrated = useSyncExternalStore(
     noSubscription,
     () => true,
@@ -93,6 +99,7 @@ export function InstallPrompt() {
           userAgent: navigator.userAgent,
           maxTouchPoints: navigator.maxTouchPoints,
           pathname,
+          conversing,
         });
 
   useDockAvoid(ref, offer !== "NONE");
@@ -119,14 +126,14 @@ export function InstallPrompt() {
       ref={ref}
       aria-label="Install Capital Q"
       data-install-prompt={offer}
-      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+8px)] z-(--cq-z-toast) mx-auto flex max-w-sm flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 lg:end-6 lg:bottom-6 lg:start-auto lg:mx-0"
+      className="cq-install-row flex flex-none flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2"
     >
-      <p className="cq-body-sm text-(--cq-text-primary)">
+      <p className="cq-body-sm min-w-0 flex-1 text-(--cq-text-primary)">
         {offer === "PROMPT"
           ? "Install Capital Q to open it from your home screen, full screen."
           : "Add Capital Q to your Home Screen: tap Share, then Add to Home Screen."}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-none flex-wrap items-center gap-2">
         {offer === "PROMPT" ? (
           <>
             <Button variant="primary" onClick={() => void install()}>

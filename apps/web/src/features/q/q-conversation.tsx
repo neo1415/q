@@ -668,7 +668,7 @@ export function QConversationPanel({
   // C4 / F-37: what the Board holds, less a Board entry on the stage.
   const [stageObject, setStageObject] = useState<string | null>(null);
   const boardCount = boardCountOf(
-    boardTimeline(boardTurns),
+    boardTimeline(boardTurns, q.decisions),
     boardMarks.dismissed,
     stageObject,
   );
@@ -955,7 +955,6 @@ export function QConversationPanel({
       >
         <section
           aria-label="Q"
-          hidden={boardDocked}
           className="flex min-h-0 min-w-0 flex-1 flex-col"
           data-q-workspace
           data-q-stage={voice.active ? "voice" : "ready"}
@@ -968,15 +967,21 @@ export function QConversationPanel({
             output={client.outputLevel}
           />
 
-          {/* The top line: history and the saved transcript, quiet. */}
-          <div className="flex flex-none items-center justify-between gap-3 px-5 pt-4 sm:px-8">
+          {/* The top line: history and the saved transcript, quiet. It
+              wraps rather than overflow (live run 2026-10-28, 390px: the
+              history button sat past the viewport's edge). */}
+          <div
+            className="flex flex-none flex-wrap items-center justify-between gap-x-2 gap-y-1 px-5 pt-4 sm:gap-x-3 sm:px-8"
+            data-q-top-line
+          >
             {/* The scope, out of the input (R24). A phone's top bar already
                 carries it, so here it is the desktop's. */}
             <div className="flex min-w-0 items-center gap-3">
               {bigPresence ? null : (
-                // Q stepped up to the corner: small, still live.
+                // Q stepped up to the corner: small, still live. Decorative
+                // here: it never takes a tap meant for a control beside it.
                 <span
-                  className="flex items-center gap-2"
+                  className="pointer-events-none flex flex-none items-center gap-2"
                   data-q-presence="corner"
                 >
                   <ViewTransition
@@ -1007,7 +1012,7 @@ export function QConversationPanel({
               {/* Q room R1: what Q is looking at, quietly. */}
               <QCanSee className="max-sm:hidden" />
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
               {conversing ? (
                 <div
                   role="group"
@@ -1809,14 +1814,15 @@ export function QConversationPanel({
 
         {wide ? (
           boardOpen ? (
-            // C7: on a desktop the Board takes the page (the stage stays
-            // mounted underneath, so the conversation keeps its place).
+            // Stage + Board (ADR 0017): on a desktop the Board is a panel
+            // beside the thread, which keeps its top line and composer
+            // (live run 2026-10-28: it had replaced them).
             <aside
               aria-label={t("Board")}
-              className="cq-q-aside flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto"
+              className="cq-q-aside flex min-w-0 flex-none flex-col gap-4 overflow-y-auto border-s border-(--cq-border-subtle)"
               data-q-aside
             >
-              <div className="mx-auto w-full max-w-[1180px] px-6 pt-4">
+              <div className="w-full px-6 pt-4">
                 {/* Its own column: the one place a durable task's
                     progress shows on this screen (round 5). */}
                 <QNow
@@ -1830,6 +1836,7 @@ export function QConversationPanel({
               <QBoardTimeline
                 conversationId={q.conversationId}
                 turns={boardTurns}
+                decisions={q.decisions}
                 onClose={() => setBoardOpen(false)}
                 onShow={(answerId) => {
                   setBoardOpen(false);
@@ -1849,9 +1856,12 @@ export function QConversationPanel({
           <SheetRoot open={boardOpen} onOpenChange={setBoardOpen}>
             {boardOpen ? (
               <SheetContent side="bottom" title={t("Board")}>
+                {/* The sheet carries the title; the Board draws no second. */}
                 <QBoardTimeline
                   conversationId={q.conversationId}
                   turns={boardTurns}
+                  decisions={q.decisions}
+                  heading={false}
                   onAsk={(question) => {
                     setBoardOpen(false);
                     sayOrAsk(question);

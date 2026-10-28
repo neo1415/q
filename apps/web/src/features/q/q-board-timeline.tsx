@@ -17,6 +17,7 @@ import {
   boardTimeline,
   groupByDay,
   timeLabel,
+  type BoardDecision,
   type BoardEntry,
   type BoardSource,
 } from "./board-timeline";
@@ -80,8 +81,13 @@ function Entry({
   readonly onOpenArtifact: (artifactId: string) => void;
 }) {
   const time = timeLabel(entry.at);
+  // A decided change says when it was decided, where that is known.
+  const kindTime =
+    entry.outcome !== null && entry.outcome.at !== undefined
+      ? timeLabel(entry.outcome.at)
+      : time;
   return (
-    <li data-board-entry={entry.id}>
+    <li data-board-entry={entry.id} data-board-outcome={entry.outcome?.status}>
       <span className="cq-board-time">{time}</span>
       <span className="cq-board-node" aria-hidden="true" />
       <article className="cq-board-item">
@@ -90,8 +96,8 @@ function Entry({
             <h2>{entry.title}</h2>
             <p className="kind">
               {entry.kind}
-              {time.length > 0 ? (
-                <span className="t-inline">, {time}</span>
+              {kindTime.length > 0 ? (
+                <span className="t-inline">, {kindTime}</span>
               ) : null}
             </p>
           </div>
@@ -204,6 +210,8 @@ function Entry({
 export function QBoardTimeline({
   conversationId,
   turns,
+  decisions = [],
+  heading = true,
   onClose,
   onShow,
   onOpenArtifact,
@@ -213,6 +221,10 @@ export function QBoardTimeline({
 }: {
   readonly conversationId: string | null;
   readonly turns: readonly QTurn[];
+  /** What this tab decided on changes Q prepared (the thread's own state). */
+  readonly decisions?: readonly BoardDecision[] | undefined;
+  /** False inside a sheet that already carries the Board's title. */
+  readonly heading?: boolean | undefined;
   readonly onClose?: (() => void) | undefined;
   /** Put an answer back on the Q page. */
   readonly onShow?: ((answerId: string) => void) | undefined;
@@ -225,7 +237,7 @@ export function QBoardTimeline({
   const t = useT();
   const marks = useBoardMarks(conversationId);
   const [tab, setTab] = useState<Tab>("timeline");
-  const entries = boardTimeline(turns).filter(
+  const entries = boardTimeline(turns, decisions).filter(
     (entry) => !marks.dismissed.includes(entry.id),
   );
   const pinned = entries.filter((entry) => marks.pinned.includes(entry.id));
@@ -235,23 +247,25 @@ export function QBoardTimeline({
 
   return (
     <div className="cq-board" data-q-board-timeline>
-      <div className="cq-board-head">
-        <h1>{t("Board")}</h1>
-        {onClose === undefined ? null : (
-          <button
-            type="button"
-            className="cq-ac-x"
-            aria-label={t("Close the Board")}
-            onClick={onClose}
-          >
-            <X
-              aria-hidden="true"
-              size={ICON_SIZE.compact}
-              strokeWidth={ICON_STROKE}
-            />
-          </button>
-        )}
-      </div>
+      {heading ? (
+        <div className="cq-board-head">
+          <h1>{t("Board")}</h1>
+          {onClose === undefined ? null : (
+            <button
+              type="button"
+              className="cq-ac-x"
+              aria-label={t("Close the Board")}
+              onClick={onClose}
+            >
+              <X
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            </button>
+          )}
+        </div>
+      ) : null}
       {empty ? null : (
         <div className="cq-board-tabs" role="tablist" aria-label={t("Board")}>
           {(

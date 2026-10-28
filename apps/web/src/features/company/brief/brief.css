@@ -140,12 +140,29 @@
     overflow-x: auto;
     border-bottom: 1px solid var(--cq-border-subtle);
     scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 16px;
+  }
+  /* A phone shows the strip's edge (D7, 390 px): the last visible tab fades
+     out, so a strip that scrolls looks like one, and a hidden scrollbar
+     is not the only cue. */
+  @media (max-width: 640px) {
+    .cq-brief-tabs {
+      gap: 20px;
+      padding-inline-end: 40px;
+      mask-image: linear-gradient(
+        to right,
+        black calc(100% - 48px),
+        transparent
+      );
+    }
   }
   .cq-brief-tab {
     display: inline-flex;
     align-items: center;
     height: 46px;
     flex: none;
+    scroll-snap-align: start;
     font-size: 14px;
     white-space: nowrap;
     color: var(--cq-text-tertiary);
@@ -470,15 +487,16 @@
   .cq-brief-legend i[data-k="gap"] {
     background: var(--cq-brief-hatch);
   }
+  /* Each block is a 44 px target (D7: 22x30 at 390 px): blocks wrap onto a
+     second row on a phone rather than shrink below it. */
   .cq-brief-secstrip {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
     gap: 3px;
   }
   .cq-brief-secstrip > button {
     position: relative;
-    height: 30px;
+    min-height: 44px;
     border-radius: var(--cq-radius-xs);
     background: var(--cq-positive-soft);
     cursor: pointer;

@@ -5,9 +5,11 @@ import { z } from "zod";
 import {
   ApiProblemError,
   disconnectGoogle,
+  getChatDraft,
   getEmailDraft,
   getGoogleConnection,
   getInboundEmailAddress,
+  reviseChatDraft,
   reviseEmailDraft,
   rotateInboundEmailAddress,
   startGoogleConnect,
@@ -16,6 +18,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   StartGoogleConnectRequestSchema,
+  type ChatDraftDto,
   type EmailDraftDto,
   type GoogleConnectionDto,
   type InboundEmailAddressDto,
@@ -135,6 +138,34 @@ export async function reviseEmailDraftAction(
   }
   return run("q", async (s) => {
     await reviseEmailDraft(s, approvalId.data, draft.data);
+    return null;
+  });
+}
+
+const ChatDraft = z.object({ body: z.string().trim().min(1).max(4000) });
+
+/** The chat message Q drafted, behind its approval (live 2026-10-28). */
+export async function readChatDraft(
+  rawApprovalId: string,
+): Promise<IntegrationResult<ChatDraftDto>> {
+  const approvalId = ApprovalId.safeParse(rawApprovalId);
+  if (!approvalId.success)
+    return { ok: false, message: "That draft isn't available." };
+  return run("q", (s) => getChatDraft(s, approvalId.data));
+}
+
+/** The person's edit: the old approval is void; a new one waits for them. */
+export async function reviseChatDraftAction(
+  rawApprovalId: string,
+  input: { readonly body: string },
+): Promise<IntegrationResult<null>> {
+  const approvalId = ApprovalId.safeParse(rawApprovalId);
+  const draft = ChatDraft.safeParse(input);
+  if (!approvalId.success || !draft.success) {
+    return { ok: false, message: "The message needs some words." };
+  }
+  return run("q", async (s) => {
+    await reviseChatDraft(s, approvalId.data, draft.data);
     return null;
   });
 }

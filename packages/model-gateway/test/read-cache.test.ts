@@ -121,6 +121,22 @@ describe("the read cache", () => {
     expect(cache.get(proposal(), context())).toBeNull();
   });
 
+  it("forgets by the person alone: an approved action executed off any run (live 2026-10-28, the mandate re-read)", () => {
+    const cache = createReadCache();
+    const mandate = proposal("get_investor_mandate");
+    cache.keep(mandate, context(), outcome({ mandates: [{ min: "250000" }] }));
+    cache.keep(proposal(), context(), outcome());
+    // The card's Approve executed the mandate change: no run, no tool seam.
+    cache.forgetPerson({ tenantId: TENANT, userId: USER });
+    expect(cache.get(mandate, context())).toBeNull();
+    expect(cache.get(proposal(), context())).toBeNull();
+    // Another person's reads are theirs still.
+    const other = randomUUID();
+    cache.keep(proposal(), context({ user: other }), outcome());
+    cache.forgetPerson({ tenantId: TENANT, userId: USER });
+    expect(cache.get(proposal(), context({ user: other }))).not.toBeNull();
+  });
+
   it("keeps only slow-changing entity reads, never their own records", () => {
     const cache = createReadCache();
     cache.keep(proposal("list_pending_approvals"), context(), outcome());

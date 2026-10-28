@@ -16,15 +16,22 @@ import { THEME_COLORS } from "@capital-q/ui/tokens";
 
 import manifest from "../app/manifest";
 import {
+  INSTALL_DISMISSED_FOR_MS,
   INSTALL_DISMISSED_KEY,
   installOffer,
   isIosSafari,
   readDismissed,
+  rememberDismissed,
 } from "../src/pwa/install-state";
 
 let pathname = "/home";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 vi.mock("@/features/q-dock", () => ({ useDockAvoid: () => undefined }));
+let session: { turns: readonly unknown[]; q: { working: boolean } } | null =
+  null;
+vi.mock("@/features/q/q-session", () => ({
+  useQSessionOptional: () => session,
+}));
 
 const { InstallPrompt } = await import("../src/pwa/install-prompt");
 
@@ -117,6 +124,35 @@ describe("when to offer installing", () => {
     expect(installOffer({ ...eligible, pathname: "/discover" })).toBe("NONE");
   });
 
+  it("never offers on the Q page while a conversation is in progress", () => {
+    const eligible = { ...base, deferredPrompt: true };
+    expect(installOffer({ ...eligible, conversing: true })).toBe("NONE");
+    expect(installOffer({ ...eligible, conversing: false })).toBe("PROMPT");
+    // Elsewhere a conversation in the dock does not hide it.
+    expect(
+      installOffer({ ...eligible, conversing: true, pathname: "/work" }),
+    ).toBe("PROMPT");
+  });
+
+  it("holds a dismissal for 14 days, then may show once more", () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    } as unknown as Storage;
+    const at = Date.UTC(2026, 9, 28);
+    expect(readDismissed(storage, at)).toBe(false);
+    rememberDismissed(storage, at);
+    expect(readDismissed(storage, at)).toBe(true);
+    expect(readDismissed(storage, at + INSTALL_DISMISSED_FOR_MS - 1)).toBe(
+      true,
+    );
+    expect(readDismissed(storage, at + INSTALL_DISMISSED_FOR_MS)).toBe(false);
+    // The older "for ever" value still counts as dismissed.
+    store.set(INSTALL_DISMISSED_KEY, "1");
+    expect(readDismissed(storage, at)).toBe(true);
+  });
+
   it("treats unreadable storage as not dismissed, without throwing", () => {
     const throwing = {
       getItem: () => {
@@ -131,6 +167,7 @@ describe("the install prompt", () => {
   beforeEach(() => {
     window.localStorage.clear();
     pathname = "/home";
+    session = null;
     Object.defineProperty(window.navigator, "userAgent", {
       configurable: true,
       get: () => IPHONE,
@@ -154,7 +191,9 @@ describe("the install prompt", () => {
     expect(screen.queryByRole("region", { name: "Install Capital Q" })).toBe(
       null,
     );
-    expect(window.localStorage.getItem(INSTALL_DISMISSED_KEY)).toBe("1");
+    expect(
+      Number(window.localStorage.getItem(INSTALL_DISMISSED_KEY)),
+    ).toBeGreaterThan(0);
 
     cleanup();
     render(<InstallPrompt />);
@@ -192,6 +231,21 @@ describe("the install prompt", () => {
       await Promise.resolve();
     });
     expect(prompt).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("region", { name: "Install Capital Q" })).toBe(
+      null,
+    );
+  });
+
+  it("is a row in the page's flow, not a layer over the composer", () => {
+    render(<InstallPrompt />);
+    const region = screen.getByRole("region", { name: "Install Capital Q" });
+    expect(region.className).toContain("cq-install-row");
+    expect(region.className).not.toMatch(/\bfixed\b/);
+  });
+
+  it("stays off the Q page while a conversation is going", () => {
+    session = { turns: [{}], q: { working: false } };
+    render(<InstallPrompt />);
     expect(screen.queryByRole("region", { name: "Install Capital Q" })).toBe(
       null,
     );

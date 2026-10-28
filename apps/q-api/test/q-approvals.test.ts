@@ -649,3 +649,94 @@ describe("POST /v1/q/approvals/:approvalId/reject", () => {
     await app.close();
   });
 });
+
+describe("the chat draft behind a chat.message.send approval (live 2026-10-28)", () => {
+  const RELATIONSHIP = "f0000000-0000-4000-8000-000000000005";
+  const chatProposal = () => ({
+    view: VIEW,
+    actionType: "chat.message.send" as never,
+    payload: {
+      relationshipId: RELATIONSHIP,
+      counterpartName: "Savanna Seed Partners",
+      body: "Hi Amara, we'd love to meet next week.",
+    },
+  });
+
+  it("reads the drafted words for its approver, exactly as the email draft is read", async () => {
+    const { service } = fakeEngine({
+      readProposal: () => Promise.resolve(chatProposal()),
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/q/approvals/${APPROVAL_ID}/chat-draft`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      approvalId: APPROVAL_ID,
+      relationshipId: RELATIONSHIP,
+      counterpartName: "Savanna Seed Partners",
+      body: "Hi Amara, we'd love to meet next week.",
+    });
+    await app.close();
+  });
+
+  it("revises only the words: the relationship stays, and a new approval is asked", async () => {
+    const revised: unknown[] = [];
+    const { service } = fakeEngine({
+      readProposal: () => Promise.resolve(chatProposal()),
+      revise: (command) => {
+        revised.push(command.payload);
+        return Promise.resolve({
+          view: VIEW,
+          action: { id: ACTION_ID, runId: RUN_ID } as never,
+        } as never);
+      },
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/q/approvals/${APPROVAL_ID}/chat-draft`,
+      payload: {
+        body: "Hi Amara, Tuesday at 10 works for us.",
+        relationshipId: "00000000-0000-4000-8000-000000000000",
+      },
+    });
+    // A body that names anything but the words is refused outright.
+    expect(response.statusCode).toBe(422);
+    expect(revised).toHaveLength(0);
+
+    const edited = await app.inject({
+      method: "POST",
+      url: `/v1/q/approvals/${APPROVAL_ID}/chat-draft`,
+      payload: { body: "Hi Amara, Tuesday at 10 works for us." },
+    });
+    expect(edited.statusCode).toBe(200);
+    expect(revised).toEqual([
+      {
+        relationshipId: RELATIONSHIP,
+        counterpartName: "Savanna Seed Partners",
+        body: "Hi Amara, Tuesday at 10 works for us.",
+      },
+    ]);
+    await app.close();
+  });
+
+  it("is not found for an approval that is not a chat message", async () => {
+    const { service } = fakeEngine({
+      readProposal: () =>
+        Promise.resolve({
+          view: VIEW,
+          actionType: "email.send" as never,
+          payload: { subject: "Hello", body: "Hi" },
+        }),
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/q/approvals/${APPROVAL_ID}/chat-draft`,
+    });
+    expect(response.statusCode).toBe(404);
+    await app.close();
+  });
+});

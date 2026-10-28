@@ -277,6 +277,8 @@ export {
 } from "./q-cards.js";
 export {
   disconnectGoogle,
+  getChatDraft,
+  reviseChatDraft,
   getEmailDraft,
   getGoogleConnection,
   getInboundEmailAddress,

@@ -1,12 +1,14 @@
 import {
   PersonSearchResultSchema,
   QAnswerCardsBlockSchema,
+  QClientActionToolResultSchema,
   type ExternalPersonConfidence,
   type IdentityCandidate,
   type IdentityCard,
   type PersonSearchResult,
   type QAnswerCardLevel,
   type QAnswerCardsBlock,
+  type QResultBlock,
 } from "@capital-q/contracts/q";
 import type {
   QToolCallOutcome,
@@ -422,11 +424,77 @@ export function personSearchText(
   return "Public search isn't answering right now, so I can't say either way. Try again in a moment.";
 }
 
+/** The founder-side card: what one Capital Q investor looks for. */
+const SHOW_TOOL = "show";
+
+export type KnownInvestorAnswer = {
+  readonly text: string;
+  readonly blocks: readonly QResultBlock[];
+  readonly calls: readonly QToolCallOutcome[];
+  readonly investorOrganisationId: string;
+  readonly name: string;
+};
+
+/**
+ * Live 2026-10-28 ("what do investors like Lagoon Angels Circle look
+ * for?" went to the public web and found no one, while Lagoon Angels
+ * Circle was on the founder's Discover page): a founder's named
+ * organisation is looked up among Capital Q's own investors first, through
+ * the `show` tool's INVESTOR_LOOKS_FOR step, which finds it only among the
+ * investors the founder may already see (their relationships, their
+ * Discover list) and whose card reads only the investor's public profile
+ * and published gate, never an investor-private mandate. Null: not an
+ * investor they can see on Capital Q, so the public lookup runs as before.
+ */
+export async function findKnownInvestor(input: {
+  readonly name: string;
+  readonly tools: Pick<QToolPort, "execute">;
+  readonly context: QToolExecutionContext;
+  readonly available: ReadonlySet<string>;
+}): Promise<KnownInvestorAnswer | null> {
+  const { name, tools, context, available } = input;
+  if (!available.has(SHOW_TOOL) || name.trim().length === 0) return null;
+  const outcome = await tools
+    .execute(
+      {
+        callId: "q-known-investor",
+        name: SHOW_TOOL,
+        arguments: { object: "INVESTOR_LOOKS_FOR", name: name.trim() },
+      },
+      context,
+    )
+    .catch(() => null);
+  if (outcome === null || !outcome.result.ok) return null;
+  const read = QClientActionToolResultSchema.safeParse(outcome.result.data);
+  if (!read.success) return null;
+  const intent = read.data.clientAction;
+  if (
+    intent.kind !== "SHOW_IN_Q_ROOM" ||
+    intent.object !== "INVESTOR_LOOKS_FOR" ||
+    intent.id === undefined
+  ) {
+    return null;
+  }
+  const title = intent.title;
+  return {
+    text: `${title} is an investor on Capital Q. What they publish they look for, and how your company reads against their published criteria, is on the card; say the word and I'll draft your application to them.`,
+    blocks: [
+      { kind: "UI_INTENT", intent },
+      { kind: "INVESTOR_REFERENCE", investorOrganisationId: intent.id },
+    ],
+    calls: [outcome],
+    investorOrganisationId: intent.id,
+    name: title,
+  };
+}
+
 export async function runPersonSearch(input: {
   readonly ask: PersonAsk;
   readonly tools: Pick<QToolPort, "execute">;
   readonly context: QToolExecutionContext;
   readonly available: ReadonlySet<string>;
+  /** Capital Q's own investors were checked first and had no such name. */
+  readonly notOnCapitalQ?: boolean | undefined;
 }): Promise<PersonSearchAnswer | null> {
   const { ask, tools, context, available } = input;
   if (!available.has(FIND_TOOL)) return null;
@@ -465,8 +533,12 @@ export async function runPersonSearch(input: {
       : result.outcome === "AMBIGUOUS"
         ? candidatesBlock(result.candidates, result.clarifyingQuestion)
         : null;
+  const text = personSearchText(result, ask);
   return {
-    text: personSearchText(result, ask),
+    text:
+      input.notOnCapitalQ === true && result.outcome === "NOT_FOUND"
+        ? `${ask.name} isn't an investor you can see on Capital Q. ${text}`
+        : text,
     block,
     sources: sourcesOf(result.card),
     result,

@@ -155,6 +155,16 @@ export function QBriefing({
                   <span className="cq-caption text-(--cq-text-secondary)">
                     {t(item.description)}
                   </span>
+                  {item.cta === undefined ? null : (
+                    // D6: the card says where it leads, in words, not only
+                    // by its chevron.
+                    <span
+                      className="cq-caption mt-1 font-medium text-(--cq-text-primary) underline underline-offset-2"
+                      data-briefing-cta
+                    >
+                      {t(item.cta)}
+                    </span>
+                  )}
                 </span>
                 <ChevronRight
                   aria-hidden="true"

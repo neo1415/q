@@ -207,7 +207,7 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
 });
 
 describe("a pause, read as a concept", () => {
-  it("asks nothing, and the loop is told to acknowledge and keep their answers", async () => {
+  it("asks nothing, says in one line what is saved and open, and lets an investor into Discover (owner 2026-10-28)", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       recorded: SO_FAR,
@@ -223,8 +223,11 @@ describe("a pause, read as a concept", () => {
     expect(outcome.asking).toBeNull();
     expect(outcome.questionForQ).toBeNull();
     expect(seen[0]).toContain("They want to pause");
-    // Owner 2026-10-16, "continue later": they are let into the app.
-    expect(outcome.navigate).toBe("HOME");
+    expect(outcome.reply).toMatch(/saved/u);
+    expect(outcome.reply).not.toMatch(/\?/u);
+    // Where the Continue later button goes: an investor to Discover.
+    expect(outcome.navigate).toBe("DISCOVER");
+    expect(outcome.view.session.status).toBe("ACTIVE");
   });
 
   it("without the reading, a turn is not a pause, whatever its words", async () => {

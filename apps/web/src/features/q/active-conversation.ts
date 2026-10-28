@@ -87,7 +87,32 @@ export function forgetActiveConversations(): void {
 }
 
 /** "New chat": the Q page with a new conversation (a bare /home keeps this tab's). */
-export const NEW_CHAT_HREF = "/home?new=1";
+export const NEW_CHAT_PARAM = "new";
+export const NEW_CHAT_HREF = `/home?${NEW_CHAT_PARAM}=1`;
+
+const Q_PAGE_PATH = "/home";
+
+/**
+ * Where a fresh load starts: the Q page's own URL when it names a
+ * conversation, else this tab's last. A bare /home loaded afresh (the
+ * back button after Q opened a company page, the wordmark, a typed
+ * address) is the same surface this tab was in, not a new conversation;
+ * only "New chat" (`?new=1`) starts over. Live 2026-10-28 (investor): a
+ * full load of /home after Q had opened a company page began a new
+ * conversation, and the thread with its cards was lost.
+ */
+export function initialConversationFor(location: {
+  readonly pathname: string;
+  readonly search: string;
+}): string | null {
+  if (location.pathname === Q_PAGE_PATH) {
+    const params = new URLSearchParams(location.search);
+    const named = conversationIdOf(params.get(Q_CONVERSATION_PARAM));
+    if (named !== undefined) return named;
+    if (params.get(NEW_CHAT_PARAM) !== null) return null;
+  }
+  return readActiveConversation("home");
+}
 
 /** Where Home is for this tab: its open conversation, if it has one. */
 export function homeHref(conversationId: string | null): string {

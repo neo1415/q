@@ -29,6 +29,7 @@ import {
   shownCardsKey,
   type CarriedApproval,
 } from "./carried-approval";
+import type { BoardDecision } from "./board-timeline";
 import type { PendingTurn } from "./conversation";
 import { nextCursor, withDelta } from "./conversation-delta";
 import {
@@ -118,6 +119,8 @@ export type QConversation = {
   readonly runId: string | null;
   /** The conversation this surface is in, once the server has named it. */
   readonly conversationId: string | null;
+  /** Decisions made here on changes Q prepared, newest last (the Board reads them). */
+  readonly decisions: readonly BoardDecision[];
   /** `viewing`: where in a pitch the person was; sent only when a run starts. */
   readonly ask: (
     question: string,
@@ -249,6 +252,21 @@ export function useQConversation(
   /** The last message a read of the thread returned (conversation-delta.ts). */
   const readCursor = useRef<string | null>(null);
   // The server's waiting approvals as last read, and for which thread.
+  // What this tab decided, so the Board says the same as the thread.
+  const [decisions, setDecisions] = useState<readonly BoardDecision[]>([]);
+  const recordDecision = useCallback(
+    (approvalId: string, decision: "APPROVE" | "REJECT") => {
+      setDecisions((current) => [
+        ...current,
+        {
+          approvalId,
+          decision: decision === "APPROVE" ? "APPROVED" : "DECLINED",
+          at: new Date().toISOString(),
+        },
+      ]);
+    },
+    [],
+  );
   const [waiting, setWaiting] = useState<{
     readonly key: string;
     readonly items: readonly QPendingApproval[];
@@ -775,6 +793,7 @@ export function useQConversation(
           setNotice(result.message);
           return;
         }
+        recordDecision(carried.approval.approvalId, decision);
         // Decided: never carried again from the last read.
         setWaiting((held) =>
           held === null
@@ -809,13 +828,14 @@ export function useQConversation(
         setNotice(result.message);
         return;
       }
+      recordDecision(approval.approvalId, decision);
       setRunState((current) => ({ ...current, approval: null }));
       if (decision === "APPROVE") {
         finished.current = false;
         follow(open);
       }
     },
-    [follow, refresh, runState.approval, carried],
+    [follow, refresh, runState.approval, carried, recordDecision],
   );
   const approve = useCallback(() => decide("APPROVE"), [decide]);
   const revised = useCallback(() => {
@@ -868,6 +888,7 @@ export function useQConversation(
     notice,
     runId,
     conversationId: conversationIdState,
+    decisions,
     ask,
     stop,
     approve,

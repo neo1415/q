@@ -294,10 +294,18 @@ export function createChatActionBoard(
 /** What Q's chat tools read and prepare through. */
 export function createChatIntelligencePort(dependencies: {
   readonly chat: ChatService;
-  readonly counterpartName: (
+  /**
+   * The actor's counterparty on the relationship (null: not a party): its
+   * name for the words, its record for the chat's card on the answer.
+   */
+  readonly counterpart: (
     actor: ActorContext,
     relationshipId: string,
-  ) => Promise<string | null>;
+  ) => Promise<{
+    readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+    readonly id: string;
+    readonly name: string;
+  } | null>;
   readonly board: ReturnType<typeof createChatActionBoard>;
   /** The person's running errand for a subject (one errand per subject). */
   readonly activeErrand?: ChatIntelligencePort["activeErrand"];
@@ -308,12 +316,16 @@ export function createChatIntelligencePort(dependencies: {
         .readForQ({ actor, relationshipId })
         .catch(() => null);
       if (read === null) return null;
+      const counterpart = await dependencies
+        .counterpart(actor, relationshipId)
+        .catch(() => null);
       return {
         connected: read.connected,
         blocked: read.blocked,
-        counterpartName:
-          (await dependencies.counterpartName(actor, relationshipId)) ??
-          "the other side",
+        counterpartName: counterpart?.name ?? "the other side",
+        ...(counterpart === null
+          ? {}
+          : { counterpart: { kind: counterpart.kind, id: counterpart.id } }),
         messages: read.messages,
       };
     },

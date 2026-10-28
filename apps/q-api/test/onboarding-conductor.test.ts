@@ -397,9 +397,10 @@ describe("a brand-new conversation opens by code (owner 2026-10-27)", () => {
     const { fetch: f, appended } = api({
       view: stuckView({ answered: [] }),
     });
+    const ports = fakePorts(stuckView({ answered: [] }));
     const conductor = createOnboardingConductor({
       agent,
-      portFor: fakePorts().portFor,
+      portFor: ports.portFor,
       logger,
       introduction: {
         opening: (request) => {
@@ -417,6 +418,10 @@ describe("a brand-new conversation opens by code (owner 2026-10-27)", () => {
     expect(agent.calls).toEqual([]);
     expect(outcome.reply).toMatch(/^Hi Aria, I'm Q/);
     expect(outcome.intent).toBe("OPENING");
+    // What the platform already holds is on the record before the first
+    // question (live 2026-10-28: the company name typed at sign-up was
+    // asked again): the journey's choice and the company they named.
+    expect(ports.known).toEqual(["F0.intent", "F1.company_name"]);
     // The question said and the choices shown are the journey's same next step.
     const next = nextUnansweredStep(stuckView({ answered: [] }), "founder");
     expect(openings).toEqual([

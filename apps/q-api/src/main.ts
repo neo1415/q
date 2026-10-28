@@ -444,6 +444,7 @@ import {
   type ModelProvider,
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
+import { createReadCache } from "@capital-q/model-gateway/q";
 import {
   budgetForTaskClass,
   createQDelegationReader,
@@ -3447,9 +3448,12 @@ const qTools = createQTools({
       // of preparing a second card (QA 2026-10-01).
       activeErrand: (actor, ref) =>
         errandStore.activeFor?.(actor, ref) ?? Promise.resolve(null),
-      counterpartName: async (actor, relationshipId) =>
-        (await relationshipCounterparts.of(actor, relationshipId))?.name ??
-        null,
+      counterpart: async (actor, relationshipId) => {
+        const other = await relationshipCounterparts.of(actor, relationshipId);
+        return other === null
+          ? null
+          : { kind: other.kind, id: other.id, name: other.name };
+      },
     }),
     // BIZ-008: calls and reminders, prepared on the chat board.
     schedule: {
@@ -4024,6 +4028,12 @@ const qActionRegistry = createQActionRegistry([
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.
 assertComposedActionTypes(qActionRegistry);
+// What Q read for a person ("what Q knows, Q knows"), shared with the
+// Approval Engine: an action of theirs that executes outside any run's
+// tool seam (the card's Approve, a continuation) forgets their reads, so
+// the next turn reads their changed record (live 2026-10-28: a mandate
+// re-read 7 s after its approved change still said the old cheque range).
+const qReadCache = createReadCache();
 const qActions = createQActionService({
   sql: database.sql,
   transactions: database.transactions,
@@ -4037,6 +4047,9 @@ const qActions = createQActionService({
     registry: createEventRegistry(Q_ACTION_EVENTS),
   }),
   logger,
+  onExecuted: (actor) => {
+    qReadCache.forgetPerson(actor);
+  },
 });
 // Reminders of a still-waiting card, said after the engine's step for the
 // run so a card it replaced is never also "still waiting" (lead 2026-10-03).
@@ -4441,6 +4454,7 @@ const arrivalSnapshots = createArrivalSnapshots({
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
 const qIntelligence = composeQIntelligence({
+  readCache: qReadCache,
   // Owner 2026-10-23: a call with one named counterpart, prepared in the
   // answer from the rehearsal's own material (read as them); the name is
   // matched only among records they may already see, as open_page does.

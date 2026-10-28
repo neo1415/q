@@ -2,6 +2,7 @@ import {
   closestByName,
   readApprovalWords,
   readEditRequest,
+  type ApprovalWords,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
@@ -795,7 +796,11 @@ async function decideByWords(
     // Only an answer to "which one?" Q itself asked.
     if (asked === null) return null;
     decision = asked;
-  } else if (words.strength === "EXPLICIT" || asked === words.kind) {
+  } else if (
+    words.strength === "EXPLICIT" ||
+    asked === words.kind ||
+    answersCardAsk(words, lastQ, stage)
+  ) {
     decision = words.kind;
   } else {
     return null;
@@ -852,6 +857,42 @@ async function decideByWords(
     );
   }
   return { kind: "REPLY", line: lines.join(" ") };
+}
+
+/**
+ * Q's own ask about the one card it just showed, in the words code
+ * writes for it ("tap Approve on the card, or tell me to go ahead",
+ * "approve on the card, or tell me what to change", "waiting for your
+ * yes"). Never a line that asks anything else.
+ */
+const CARD_ASK =
+  /(?:tell me to go ahead|tell me what to change|approve on (?:the|its|that) card|tap approve on (?:the|its|that) card|waiting for your yes)/iu;
+
+/**
+ * Live 2026-10-28 (investor, phone): Q showed "Update your mandate. Not
+ * saved yet: tap Approve on the card, or tell me to go ahead."; the person
+ * typed "yes"; the turn reader read the one word as a TOOL_REQUEST, so
+ * nothing decided the card and the model answered that it was still
+ * waiting. On the desktop the same "yes" was read as a reply and saved.
+ * A plain yes or no that is nothing but the decision, said straight after
+ * Q's own ask about the one card waiting in this conversation, is that
+ * ask's answer: decided by code, as an answer to "which one?" already is.
+ * Anything beyond the bare decision, several cards, or a card from another
+ * conversation stays with the readings of meaning.
+ */
+function answersCardAsk(
+  words: Extract<ApprovalWords, { kind: "APPROVE" | "DECLINE" }>,
+  lastQ: string,
+  stage: Extract<PendingStage, { kind: "WAITING" }>,
+): boolean {
+  return (
+    words.scope === "ONE" &&
+    words.ordinal === null &&
+    !stage.elsewhere &&
+    stage.only !== undefined &&
+    stage.allPending.length === 1 &&
+    CARD_ASK.test(lastQ)
+  );
 }
 
 /** Q's line asked about a waiting card (its own approval wording). */

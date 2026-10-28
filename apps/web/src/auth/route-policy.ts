@@ -31,6 +31,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/explore",
   "/verification",
   "/profile",
+  // D6: the bare mandate address, resolved to the person's own profile.
+  "/mandate",
   "/onboarding",
   "/relationships",
   // CRM (2026-10-15): the alias of the relationship workspace.

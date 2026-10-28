@@ -102,14 +102,21 @@ async function enrichGroup(
       }),
     };
   }
-  if (group.id !== "categories") {
-    return {};
-  }
-  const response = view.responses.find((r) => r.stepKey === group.stepKeys[0]);
+  // The chosen categories are named on every step, not only their own
+  // (live typed run 2026-10-28, minor copy): the review read "Sector: 2
+  // selected" because the labels were loaded for the categories step
+  // alone. One lookup per load, only when something was chosen.
+  const categories = GROUPS.find((candidate) => candidate.id === "categories");
+  const response = view.responses.find(
+    (r) => r.stepKey === categories?.stepKeys[0],
+  );
   const ids =
     response?.value.type === "RESOURCE_REFERENCE"
       ? response.value.resourceIds
       : [];
+  if (group.id !== "categories" && ids.length === 0) {
+    return {};
+  }
   return {
     selectedTaxonomy: ids.length === 0 ? [] : await port.describeNodes(ids),
   };

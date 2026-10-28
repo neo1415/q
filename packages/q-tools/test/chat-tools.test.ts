@@ -57,6 +57,8 @@ function world(
     readonly counterpart?: string;
     /** Rows as communication's readForQ returns them (id, viaQ, envelope). */
     readonly richRows?: boolean;
+    /** The other side as a record, so the thread carries its chat card. */
+    readonly withCounterpart?: boolean;
   } = {},
 ) {
   const counterpart = options.counterpart ?? "Apex";
@@ -72,6 +74,9 @@ function world(
               connected: options.connected ?? true,
               blocked: options.blocked ?? false,
               counterpartName: counterpart,
+              ...(options.withCounterpart === true
+                ? { counterpart: { kind: "COMPANY" as const, id: OTHER } }
+                : {}),
               messages: [
                 {
                   from: "OTHER_SIDE" as const,
@@ -149,6 +154,45 @@ const base = (actor: typeof actorA) =>
   ]);
 
 describe("list_messages", () => {
+  // Live 2026-10-28: the chat question answered in words alone. The read
+  // carries the chat's own card when the other side is a known record.
+  it("carries the chat card for a thread whose other side is a record", async () => {
+    const { executor } = world({ withCounterpart: true });
+    const outcome = await executor.execute(
+      {
+        callId: "c-card",
+        name: "list_messages",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        clientAction: {
+          kind: "SHOW_IN_Q_ROOM",
+          object: "CHAT_WITH_COMPANY",
+          id: OTHER,
+          title: "Apex",
+        },
+      },
+    });
+  });
+
+  it("carries no card when the other side is only a name", async () => {
+    const { executor } = world();
+    const outcome = await executor.execute(
+      {
+        callId: "c-no-card",
+        name: "list_messages",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    const data = outcome.result.ok ? outcome.result.data : null;
+    expect(JSON.stringify(data)).not.toContain("clientAction");
+  });
+
   // R1 regression (TensorGate, hosted run 77dbcc69, 2026-10-09): the real
   // port's rows carry id/viaQ/envelope; spreading them failed the strict
   // output with INVALID_TOOL_OUTPUT on every non-empty thread.

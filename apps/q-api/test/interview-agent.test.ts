@@ -10,7 +10,6 @@ import { ActorContextSchema } from "@capital-q/security";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
-import { asksToLeave } from "../src/voice/onboarding-flow.js";
 import {
   UPLOAD_ONLY_REASON,
   uploadReadReason,
@@ -1079,27 +1078,8 @@ describe("an upload announced in words (live 25 Oct, run b9-0746)", () => {
   });
 });
 
-describe("leaving for now (live 25 Oct e2e)", () => {
-  it("reads a request to leave, and not a fact that mentions finishing", () => {
-    for (const said of [
-      "That is everything for now. I would like to finish and go to my home page.",
-      "Take me to my dashboard",
-      "I'll finish this later",
-      "Let's stop here for today",
-      "I'd like to stop now",
-    ]) {
-      expect(asksToLeave(said), said).toBe(true);
-    }
-    for (const said of [
-      "We finish payroll runs every Friday.",
-      "Our customers come back every month.",
-      "We're at seed stage.",
-    ]) {
-      expect(asksToLeave(said), said).toBe(false);
-    }
-  });
-
-  it("a finish the journey cannot take yet goes home, with no question added", async () => {
+describe("finishing for now (live 25 Oct e2e; typed 2026-10-28, D3)", () => {
+  it("a finish the journey cannot take yet says what is still needed and asks the first of it; nobody goes home", async () => {
     const world = investorSession({
       journey: "founder",
       currentStepKey: "F1.website",
@@ -1119,8 +1099,9 @@ describe("leaving for now (live 25 Oct e2e)", () => {
       ...turn(world, "I'm done, finish it."),
       actor,
     });
-    expect(outcome.navigate).toBe("HOME");
-    expect(outcome.reply).not.toMatch(/\?/u);
-    expect(outcome.asking).toBeNull();
+    expect(outcome.navigate).toBeNull();
+    expect(outcome.reply).toMatch(/^Before I can finish, I still need /u);
+    expect(outcome.reply).not.toMatch(/pause/iu);
+    expect(outcome.asking).not.toBeNull();
   });
 });

@@ -61,6 +61,7 @@ import {
   createQToolRegistry,
   HOME_Q_CAPABILITY_GROUPS,
   OnboardingRecordResultSchema,
+  type FinishOnboardingOutput,
   type OnboardingRecordResult,
   type QCapabilityGroup,
 } from "@capital-q/q-tools";
@@ -103,9 +104,10 @@ import {
   type ChoicesOf,
 } from "./quick-acknowledgement.js";
 import {
-  asksToLeave,
+  finishingLine,
   firstNameOf,
   onboardingFlowFor,
+  pausingLine,
   withNextQuestion,
   withoutUnbackedFieldClaims,
   withoutUnbackedReadingClaims,
@@ -608,6 +610,10 @@ export function unrecordedStatedIn(
 
 export function turnNotesFor(input: {
   readonly pausing: boolean;
+  /** They want to finish now (typed, 2026-10-28): code finishes after the round. */
+  readonly finishing?: boolean | undefined;
+  /** Required steps they declined for now, by label: not asked again this conversation. */
+  readonly declinedForNow?: readonly string[] | undefined;
   /** Research first (BIZ-009): what to say about it this turn, once. */
   readonly research?: "STARTED" | "NOTHING_FOUND" | null | undefined;
   readonly lookup:
@@ -691,6 +697,16 @@ export function turnNotesFor(input: {
   if (input.pausing) {
     notes.push(
       "They want to pause and come back later: acknowledge it in one short sentence, say their answers are kept, and ask nothing.",
+    );
+  }
+  if (input.finishing === true) {
+    notes.push(
+      "They want to finish now. Code finishes for them right after this round when everything required is on the record, or says exactly what is still needed and asks it. Record anything their words state, acknowledge in one short sentence, and ask nothing; never say the setup is paused, that they are leaving, or that it is done.",
+    );
+  }
+  if (input.declinedForNow !== undefined && input.declinedForNow.length > 0) {
+    notes.push(
+      `Set aside for now at their request, and not to be asked again in this conversation (required, so it stays open and is listed when they finish): ${input.declinedForNow.join("; ")}. Move on to the next question.`,
     );
   }
   switch (input.lookup?.kind) {
@@ -852,6 +868,14 @@ export function createInterviewAgent(
   // Optional questions already put to each person: asked once, never
   // pressed again (live 2026-09-30: the website was asked every turn).
   const askedOptional = createInMemoryRaisedChecks();
+  /**
+   * Required steps each person declined for now (live 2026-10-28, D5:
+   * "skip that one" on the discovery mode, then the question came back
+   * after "hold on, my dog is barking"). The record cannot set a required
+   * step aside, so this process remembers it: not asked again in this
+   * conversation, and listed when they finish.
+   */
+  const declinedForNow = createInMemoryRaisedChecks();
   // The step each session's last reply asked, for the independent reading
   // of the answer to it (DELEGATION_READER v4).
   const lastAsked = new Map<string, string>();
@@ -1513,12 +1537,32 @@ export function createInterviewAgent(
           (row) => row.stepKey === key && row.status === "OPEN",
         ),
       ) ?? null;
+    /**
+     * The state as this conversation asks it: a required step they declined
+     * for now (D5) is set aside here, so no next question is it. On the
+     * record it stays open, and finishing lists it.
+     */
+    const withoutDeclined = (current: typeof state): typeof state => {
+      const declined = declinedForNow.get(input.onboardingSessionId);
+      if (declined.size === 0) return current;
+      return {
+        ...current,
+        steps: current.steps.map((row) =>
+          declined.has(row.stepKey) && row.status === "OPEN"
+            ? { ...row, status: "SET_ASIDE" as const }
+            : row,
+        ),
+        ...(current.next === undefined
+          ? {}
+          : { next: current.next.filter((n) => !declined.has(n.stepKey)) }),
+      };
+    };
     const flowFor = (current: typeof state) =>
       onboardingFlowFor({
         focusStepKey: focusStepOf(current),
         journey: input.journeyType,
         opening,
-        state: current,
+        state: withoutDeclined(current),
         firstName: firstNameOf(
           input.signup?.displayName ?? null,
           input.signup?.organisationName ?? null,
@@ -1733,16 +1777,33 @@ export function createInterviewAgent(
           textStatedIn(authority.pronounce.term, lastQTurn ?? ""))
           ? authority.pronounce
           : null;
-      // Leaving for now is honoured whichever way it reads (live 25 Oct
-      // e2e: "I would like to finish and go to my home page" with
-      // essentials open got "we'll pause here … How many founders?", the
-      // next question appended and no way out). A finish the journey
-      // cannot take yet is a pause: their answers wait, they go home.
-      const pausing =
-        !opening &&
-        (authority.pausing ||
-          (!state.canComplete &&
-            (authority.finishing || asksToLeave(utterance))));
+      // Whether they are finishing or pausing is the reading's, by meaning
+      // (DECISIONS 40: no phrase list over their words). Pausing ("I'll
+      // continue this later") saves what was heard and lets them into the
+      // app (owner 2026-10-28); finishing ("that's all", "finish") is
+      // code's: it completes on their word or says what is still needed.
+      const pausing = !opening && authority.pausing;
+      const finishing = !opening && authority.finishing;
+      // A required step they decline for now stays open on the record;
+      // this conversation stops asking it (D5).
+      declinedForNow.add(
+        input.onboardingSessionId,
+        [...authority.declined].filter(
+          (key) =>
+            journeySteps.find((step) => step.stepKey === key)?.required ===
+            true,
+        ),
+      );
+      const declinedLabels = [...declinedForNow.get(input.onboardingSessionId)]
+        .filter((key) =>
+          state.steps.some(
+            (row) => row.stepKey === key && row.status === "OPEN",
+          ),
+        )
+        .map(
+          (key) =>
+            `${coverageProfileFor(input.journeyType).fields[key]?.label ?? questionOf(key)} (${key})`,
+        );
       // Rendered against the state of each round, never the state when the
       // reading landed (live 2026-10-16: findings accepted by code this
       // turn, and the round was still told to ask for the description).
@@ -1754,8 +1815,10 @@ export function createInterviewAgent(
                 (key) =>
                   `${coverageProfileFor(input.journeyType).fields[key]?.label ?? questionOf(key)} (${key})`,
               ),
-          flow: pausing ? undefined : flowFor(now).note,
+          flow: pausing || finishing ? undefined : flowFor(now).note,
           pausing,
+          finishing,
+          declinedForNow: declinedLabels,
           lookup,
           pronounce,
           research: researchNote,
@@ -1780,6 +1843,7 @@ export function createInterviewAgent(
         lookup,
         pronounce,
         pausing,
+        finishing,
         turnNotes,
       };
     };
@@ -2652,11 +2716,76 @@ export function createInterviewAgent(
       clearTimeout(timer);
     }
 
-    const { authority, lookup, pronounce, pausing } =
+    const { authority, lookup, pronounce, pausing, finishing } =
       reading ?? (await readingDone);
     // A reading that came in after the last round still records what they
     // approved: the approval is theirs whether or not a round saw it.
     await recordApproved(authority.approved);
+    // Pausing (owner 2026-10-28): what was heard is saved by the round
+    // above; one short line says what is saved and what is still open, and
+    // the person goes into the app (`navigate` below). Never completed,
+    // never the next question.
+    if (pausing && codeSpeaksEnglish && !opening) {
+      const line = pausingLine(
+        input.journeyType,
+        await port.state(),
+        (stepKey) =>
+          coverageProfileFor(input.journeyType).fields[stepKey]?.label,
+      );
+      const written = InterviewAgentV16ResultSchema.safeParse({
+        reply: line,
+        asking: null,
+      });
+      if (written.success) {
+        result = written.data;
+        writtenByCode = true;
+      }
+    }
+    // D3 (typed, live 2026-10-28): "that's all" is finishing, and finishing
+    // is code's, on their word. The port confirms the journey's own review
+    // steps and completes it when every required answer is on the record;
+    // otherwise it says exactly which are not, and the reply asks the
+    // first of them. Never "we'll pause here".
+    if (
+      finishing &&
+      !opening &&
+      port.view()?.session.status !== "COMPLETED" &&
+      dependencies.delegation !== undefined
+    ) {
+      const finishedByCode: FinishOnboardingOutput | null = await port
+        .finish()
+        .catch((error: unknown) => {
+          logger.warn({ err: error }, "finishing on their word failed");
+          return null;
+        });
+      if (finishedByCode !== null) {
+        logger.info(
+          {
+            completed: finishedByCode.completed,
+            missing: finishedByCode.missing.map((m) => m.stepKey),
+          },
+          "onboarding finished by code on their word",
+        );
+        const line = codeSpeaksEnglish
+          ? finishingLine(input.journeyType, finishedByCode, {
+              labelOf: (stepKey) =>
+                coverageProfileFor(input.journeyType).fields[stepKey]?.label,
+              questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,
+            })
+          : null;
+        const written =
+          line === null
+            ? null
+            : InterviewAgentV16ResultSchema.safeParse({
+                reply: line.reply,
+                asking: line.asking,
+              });
+        if (written?.success === true) {
+          result = written.data;
+          writtenByCode = true;
+        }
+      }
+    }
     const view = port.view() ?? (await port.state(), port.view());
     if (view === null) {
       throw new Error("the onboarding session could not be read");
@@ -2739,12 +2868,22 @@ export function createInterviewAgent(
     // checked against what this turn actually committed.
     const backedReply = withoutUnbackedSaveClaims(
       replyWritten,
-      opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
+      opening ||
+        writtenByCode ||
+        recorded.length > 0 ||
+        (heldNote?.applied.length ?? 0) > 0,
       // Code's own words only in English; in any other language the claim
       // is taken out and the model's reply speaks for itself. QA F-49: a
       // file they just added is being read (or waits for their company),
       // not "not saved": the claim goes, and nothing is said in its place.
-      codeSpeaksEnglish && !announcesUpload(utterance) ? undefined : "",
+      // "I haven't saved that yet" is said only when their words stated
+      // something that is not on the record (live 2026-10-28: it opened
+      // the reply to "hold on, my dog is barking" and to "skip that one").
+      codeSpeaksEnglish &&
+        !announcesUpload(utterance) &&
+        authority.stated.size > 0
+        ? undefined
+        : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");
@@ -2960,7 +3099,7 @@ export function createInterviewAgent(
       const nextFlow = onboardingFlowFor({
         journey: input.journeyType,
         opening: false,
-        state: stateAfter,
+        state: withoutDeclined(stateAfter),
         firstName: null,
         knownName: null,
       });
@@ -3130,11 +3269,14 @@ export function createInterviewAgent(
             : "PROFILE"
           : conduct.action === "ROUTE_AWAY"
             ? "DISCOVER"
-            : // Owner 2026-10-16, "continue later": Q has acknowledged it
-              // in one line (the pausing note), and the person is let
-              // into the app; their saved answers wait where they are.
+            : // Owner 2026-10-16 and 2026-10-28, "continue later": Q has
+              // said in one line what is saved, and the person is let into
+              // the app, where the Continue later button goes (an investor
+              // to Discover, a founder Home); their answers wait.
               pausing
-              ? "HOME"
+              ? input.journeyType === "investor"
+                ? "DISCOVER"
+                : "HOME"
               : null,
       handoff: null,
       pronounce,

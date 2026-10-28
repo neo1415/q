@@ -27,6 +27,8 @@ export const config = {
     "/explore/:path*",
     "/verification/:path*",
     "/profile/:path*",
+    // D6: the bare mandate address, resolved to the person's own profile.
+    "/mandate/:path*",
     "/onboarding/:path*",
     "/relationships/:path*",
     "/crm/:path*",

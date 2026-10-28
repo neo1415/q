@@ -33,12 +33,32 @@ export type BoardFile = {
   readonly detail: string;
 };
 
+/**
+ * A decision this tab made on a change Q prepared (CQ-Q-008): what the
+ * thread acts on the moment it is made, and what the Board reads so its
+ * entry says the same (live run 2026-10-28: the thread said "Saved."
+ * while the Board still said "Waiting for your yes").
+ */
+export type BoardDecision = {
+  readonly approvalId: string;
+  readonly decision: "APPROVED" | "DECLINED";
+  readonly at: string;
+};
+
+export type BoardOutcome = {
+  readonly status: "APPROVED" | "DECLINED" | "EXPIRED" | "WITHDRAWN";
+  /** When it was decided, where known. */
+  readonly at: string | undefined;
+};
+
 export type BoardEntry = {
   /** The answer's id: also its key for pinning and dismissing. */
   readonly id: string;
   readonly at: string | undefined;
   readonly title: string;
   readonly kind: string;
+  /** For a change Q prepared: how it was decided, null while it waits. */
+  readonly outcome: BoardOutcome | null;
   readonly minis: readonly BoardMini[];
   /** Q's words about it, the first sentence or two. */
   readonly said: string | null;
@@ -61,7 +81,56 @@ function count(n: number, one: string, many: string): string {
   return `${String(n)} ${n === 1 ? one : many}`;
 }
 
-function kindOf(blocks: readonly QTurnObjectBlock[]): string {
+const OUTCOME_WORDS: Readonly<Record<BoardOutcome["status"], string>> = {
+  APPROVED: "Approved",
+  DECLINED: "Declined",
+  EXPIRED: "Expired",
+  WITHDRAWN: "Withdrawn",
+};
+
+/**
+ * How a prepared change was decided: from the proposal's own approval
+ * record where the read-back carries it, else from a decision made in
+ * this tab; null while it still waits on the person.
+ */
+export function proposalOutcome(
+  blocks: readonly QTurnObjectBlock[],
+  decisions: readonly BoardDecision[],
+): BoardOutcome | null {
+  for (const block of blocks) {
+    if (block.kind !== "ACTION_PROPOSAL") continue;
+    const { proposal } = block;
+    const approval = proposal.approval.required
+      ? proposal.approval.approval
+      : undefined;
+    if (approval !== undefined) {
+      const decided = decisions.find(
+        (one) => one.approvalId === approval.approvalId,
+      );
+      if (decided !== undefined) {
+        return { status: decided.decision, at: decided.at };
+      }
+      if (approval.status === "APPROVED") {
+        return { status: "APPROVED", at: undefined };
+      }
+      if (approval.status === "REJECTED") {
+        return { status: "DECLINED", at: undefined };
+      }
+    }
+    if (proposal.status === "EXPIRED")
+      return { status: "EXPIRED", at: undefined };
+    if (proposal.status === "WITHDRAWN") {
+      return { status: "WITHDRAWN", at: undefined };
+    }
+    return null;
+  }
+  return null;
+}
+
+function kindOf(
+  blocks: readonly QTurnObjectBlock[],
+  outcome: BoardOutcome | null,
+): string {
   for (const block of blocks) {
     switch (block.kind) {
       case "ANSWER_CARDS": {
@@ -77,7 +146,9 @@ function kindOf(blocks: readonly QTurnObjectBlock[]): string {
       case "COMPARISON":
         return `Comparison of ${count(block.subjects.length, "thing", "things")}`;
       case "ACTION_PROPOSAL":
-        return "Waiting for your yes";
+        return outcome === null
+          ? "Waiting for your yes"
+          : OUTCOME_WORDS[outcome.status];
       case "ARTIFACT_REFERENCE":
         return "File Q made for you";
       case "WORK_IN_PROGRESS":
@@ -94,6 +165,8 @@ function kindOf(blocks: readonly QTurnObjectBlock[]): string {
       case "CLARIFICATION_REQUEST":
       case "UI_INTENT":
         break;
+      case "SCHEDULE":
+        return "Your schedule";
     }
   }
   return "Shown by Q";
@@ -109,7 +182,16 @@ function titleOf(
       return block.title;
     if (block.kind === "ARTIFACT_REFERENCE") return block.title;
   }
-  return question?.trim().slice(0, 120) || "Shown by Q";
+  return cutAtWord(question?.trim() ?? "", 120) || "Shown by Q";
+}
+
+/** At most `max` characters, cut at a word, never mid-word (live 2026-10-28). */
+export function cutAtWord(text: string, max: number): string {
+  const plain = text.replace(/\s+/gu, " ").trim();
+  if (plain.length <= max) return plain;
+  const head = plain.slice(0, max - 1);
+  const space = head.lastIndexOf(" ");
+  return `${(space > max / 2 ? head.slice(0, space) : head).trimEnd()}…`;
 }
 
 function minisOf(blocks: readonly QTurnObjectBlock[]): BoardMini[] {
@@ -174,7 +256,10 @@ function sourcesOf(turn: Extract<QTurn, { kind: "Q" }>): BoardSource[] {
   return sources;
 }
 
-export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
+export function boardTimeline(
+  turns: readonly QTurn[],
+  decisions: readonly BoardDecision[] = [],
+): BoardEntry[] {
   const entries: BoardEntry[] = [];
   // INC-1: one run, one Board entry, as first filed; a later copy of the
   // same run (room feed, read-back) never adds or merges a second.
@@ -198,11 +283,13 @@ export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
     const run = turn.runId ?? turn.id;
     if (runs.has(run)) continue;
     runs.add(run);
+    const outcome = proposalOutcome(blocks, decisions);
     entries.push({
       id: turn.id,
       at: turn.at,
       title: titleOf(blocks, question),
-      kind: kindOf(blocks),
+      kind: kindOf(blocks, outcome),
+      outcome,
       minis: minisOf(blocks),
       said: firstWords(turn.text),
       sources: sourcesOf(turn),

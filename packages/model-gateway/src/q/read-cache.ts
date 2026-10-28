@@ -100,6 +100,16 @@ export type ReadCache = {
   ) => void;
   /** Something of theirs changed: nothing kept for them is trusted. */
   readonly forget: (context: QToolExecutionContext) => void;
+  /**
+   * The same, by the person alone: an approved action executed for them
+   * outside any run's tool seam (the card's Approve, a continuation) has
+   * changed their records (live 2026-10-28: a mandate re-read 7 s after
+   * its approved change still said the old cheque range).
+   */
+  readonly forgetPerson: (actor: {
+    readonly tenantId: string;
+    readonly userId: string;
+  }) => void;
 };
 
 export function createReadCache(now: () => number = Date.now): ReadCache {
@@ -147,9 +157,16 @@ export function createReadCache(now: () => number = Date.now): ReadCache {
       }
     },
     forget: (context) => {
-      const person = personOf(context);
-      for (const key of byPerson.get(person) ?? []) entries.delete(key);
-      byPerson.delete(person);
+      forgetPerson(context.actor);
     },
+    forgetPerson,
   };
+  function forgetPerson(actor: {
+    readonly tenantId: string;
+    readonly userId: string;
+  }): void {
+    const person = `${actor.tenantId}:${actor.userId}`;
+    for (const key of byPerson.get(person) ?? []) entries.delete(key);
+    byPerson.delete(person);
+  }
 }

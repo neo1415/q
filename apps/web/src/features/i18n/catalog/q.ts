@@ -148,6 +148,7 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "So I can check when you’re free and add the invite. Calendar events only; disconnect any time in Settings.":
     "لأتمكن من معرفة أوقات فراغك وإضافة الدعوة. أحداث التقويم فقط؛ يمكنك فصله في أي وقت من الإعدادات.",
   Sources: "المصادر",
+  "Swipe sideways to see every column.": "اسحب جانبياً لرؤية كل الأعمدة.",
   "Still open": "ما زال مفتوحاً",
   Stop: "إيقاف",
   "Suggested questions": "أسئلة مقترحة",
@@ -183,4 +184,18 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "Read by Capital Q": "قرأته Capital Q",
   "Show all": "اعرض الكل",
   read: "قُرئ",
+  // The schedule card (live 2026-10-28).
+  Schedule: "الجدول",
+  Reminders: "التذكيرات",
+  With: "مع",
+  "You organised it.": "أنت من نظّمها.",
+  "Booked by someone else.": "حجزها شخص آخر.",
+  "Open the prep brief": "افتح ملخص التحضير",
+  "Nothing booked today, and nothing waits for you.":
+    "لا شيء محجوز اليوم، ولا شيء ينتظرك.",
+  "Nothing booked in the next seven days, and nothing waits for you.":
+    "لا شيء محجوز في الأيام السبعة القادمة، ولا شيء ينتظرك.",
+  "Times are in UTC; tell Q your city for local times.":
+    "الأوقات بالتوقيت العالمي (UTC)؛ أخبر Q بمدينتك لعرض التوقيت المحلي.",
+  "Times in": "الأوقات بتوقيت",
 };

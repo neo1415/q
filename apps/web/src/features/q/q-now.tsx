@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { ChatDraftEditor } from "../integrations/chat-draft-editor";
 import { EmailDraftEditor } from "../integrations/email-draft-editor";
 import { openQuestions } from "./board";
 import type { QSessionValue } from "./q-session";
@@ -116,6 +117,15 @@ export function QNow({
           {proposal?.actionType === "email.send" ? (
             // The email draft (BIZ-007): editable here; saving asks again.
             <EmailDraftEditor
+              key={approval.approvalId}
+              approvalId={approval.approvalId}
+              onRevised={() => q.revised()}
+            />
+          ) : null}
+          {proposal?.actionType === "chat.message.send" ? (
+            // The chat reply (live 2026-10-28): editable as the email is;
+            // saving asks again for exactly the new words.
+            <ChatDraftEditor
               key={approval.approvalId}
               approvalId={approval.approvalId}
               onRevised={() => q.revised()}

@@ -243,6 +243,15 @@ const completedRun = {
       pageUrl: "https://www.pexels.com/photo/market-street-1/",
     },
     {
+      kind: "SCHEDULE",
+      title: "Your day",
+      span: "TODAY",
+      timeZone: "Africa/Lagos",
+      calls: [],
+      reminders: [],
+      approvals: [],
+    },
+    {
       kind: "TIMELINE",
       title: "Your relationship",
       events: [
@@ -411,6 +420,7 @@ describe("type-level guarantees", () => {
         case "MAP":
         case "TIMELINE":
         case "SUMMARY":
+        case "SCHEDULE":
           return block.title;
         case "ATTENTION":
           return block.report.readAt;

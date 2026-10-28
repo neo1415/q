@@ -516,6 +516,7 @@ export function QPresenceStage({
             closing={closingLine(captionTurn ?? canvas.turn)}
             exchangeId={captionTurn?.id ?? canvas.item.id}
             live={live}
+            quiet={captions && !live}
             presence={presence(true, true)}
             onCloseAll={() => dismiss(canvas.item)}
             onAsk={onAsk}
@@ -637,6 +638,7 @@ export function QPresenceStage({
             load={loadRoomCard}
             turns={turns}
             deckLoaders={deckLoaders}
+            onAsk={onAsk}
           />
         </Suspense>
       ) : null}
