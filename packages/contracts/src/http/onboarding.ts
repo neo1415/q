@@ -908,6 +908,24 @@ export const OnboardingSessionViewSchema = z.object({
    * one that brought nothing new is said so, never waited on in silence.
    */
   reviewedDocumentIds: z.array(z.string().uuid()).max(50).optional(),
+  /**
+   * Deck reading 2026-10-28: reviewed documents Q could not fully read.
+   * `unreadPages` were pictures (scans, image-only slides) nobody could
+   * transcribe; `truncated` means a size limit stopped the reading early.
+   * Present only when some document has such a note.
+   */
+  documentNotes: z
+    .array(
+      z
+        .object({
+          documentId: z.string().uuid(),
+          unreadPages: z.number().int().min(0).max(10_000),
+          truncated: z.boolean(),
+        })
+        .strict(),
+    )
+    .max(50)
+    .optional(),
 });
 export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
 

@@ -1,6 +1,8 @@
-import type {
-  ExtractedBlock,
-  ParserOutput,
+import {
+  EXTRACTION_LIMITS,
+  LOW_TEXT_PAGE_CHARACTERS,
+  type ExtractedBlock,
+  type ParserOutput,
 } from "@capital-q/evidence/contracts";
 
 import {
@@ -13,7 +15,11 @@ import {
   type XmlNode,
   type ZipLimits,
 } from "./ooxml.js";
-import { pageBlocks, type PdfTextItem } from "./pdf-layout.js";
+import {
+  pageBlocks,
+  pageTextCharacters,
+  type PdfTextItem,
+} from "./pdf-layout.js";
 
 /**
  * Content extractors (doc 14 §9.2).
@@ -437,10 +443,19 @@ export function createPdfExtractor(
       const document = await loadPdf(new Uint8Array(input));
       const builder = new BlockBuilder(context.limits);
       const pageCount = Math.min(document.numPages, context.limits.maxPages);
+      // Pages that are pictures (scans, slides exported as one image):
+      // recorded, so a reader is told rather than handed silence.
+      const lowTextPages: number[] = [];
       try {
         for (let page = 1; page <= pageCount; page += 1) {
           const loaded = await document.getPage(page);
           const content = await loaded.getTextContent();
+          if (
+            pageTextCharacters(content.items) < LOW_TEXT_PAGE_CHARACTERS &&
+            lowTextPages.length < EXTRACTION_LIMITS.maxPageList
+          ) {
+            lowTextPages.push(page);
+          }
           for (const block of pageBlocks(content.items)) {
             const clipped = builder.clip(block.text);
             builder.add(
@@ -477,11 +492,59 @@ export function createPdfExtractor(
           parser: "pdf",
           parserVersion: PDF_EXTRACTOR_VERSION,
           pageCount: document.numPages,
+          ...(lowTextPages.length === 0 ? {} : { lowTextPages }),
           ...(builder.truncated || pageCount < document.numPages
             ? { truncated: true }
             : {}),
         },
       };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Images
+// ---------------------------------------------------------------------------
+
+export const IMAGE_EXTRACTOR_VERSION = "1.0.0";
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/**
+ * An uploaded PNG or JPEG: a picture has no text layer, so the extraction
+ * is honest about that (one low-text page, no blocks) instead of refusing
+ * the file as unsupported. The page's text can then be transcribed from
+ * the picture through the model gateway; without a vision provider the
+ * founder is told the picture could not be read. The bytes must be what
+ * the type claims: a file whose signature disagrees is malformed.
+ */
+export function createImageExtractor(): ContentExtractor {
+  return {
+    id: "image",
+    version: IMAGE_EXTRACTOR_VERSION,
+    supports: (descriptor) =>
+      descriptor.mimeType === "image/png" ||
+      descriptor.mimeType === "image/jpeg",
+    extract: (input) => {
+      const png = PNG_SIGNATURE.every((byte, at) => input[at] === byte);
+      const jpeg = input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff;
+      if (!png && !jpeg) {
+        return Promise.reject(
+          new OoxmlRefusedError(
+            "MALFORMED_PACKAGE",
+            "image signature mismatch",
+          ),
+        );
+      }
+      return Promise.resolve({
+        blocks: [],
+        metadata: {
+          parser: "image",
+          parserVersion: IMAGE_EXTRACTOR_VERSION,
+          pageCount: 1,
+          lowTextPages: [1],
+        },
+      });
     },
   };
 }

@@ -1367,6 +1367,19 @@ export {
   type DocumentCritiqueResult,
   type DocumentCritiqueVariables,
 } from "./prompts/schemas/document-critique.js";
+// Deck reading 2026-10-28: verbatim text of image-only pages.
+export { DOCUMENT_PAGE_TRANSCRIBE_V1 } from "./prompts/tasks/document-page-transcribe.v1.js";
+export {
+  DOCUMENT_PAGE_TRANSCRIBE_PAGES_PER_REQUEST,
+  DOCUMENT_PAGE_TRANSCRIBE_SCHEMA_NAME,
+  DOCUMENT_PAGE_TRANSCRIBE_SCHEMA_VERSION,
+  DOCUMENT_PAGE_TRANSCRIBE_TEXT_MAX,
+  DOCUMENT_PAGE_TRANSCRIBE_UNTRUSTED,
+  DocumentPageTranscribeResultSchema,
+  DocumentPageTranscribeVariablesSchema,
+  type DocumentPageTranscribeResult,
+  type DocumentPageTranscribeVariables,
+} from "./prompts/schemas/document-page-transcribe.js";
 
 // DAILY block (The Q Daily)
 export { DAILY_STORY_WRITER_V1 } from "./prompts/tasks/daily-story-writer.v1.js";

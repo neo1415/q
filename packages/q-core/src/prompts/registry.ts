@@ -253,6 +253,7 @@ import { NAVIGATION_CHOOSER_V1 } from "./tasks/navigation-chooser.v1.js";
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
 import { DOCUMENT_POLISH_V2 } from "./tasks/document-polish.v2.js";
 import { DOCUMENT_CRITIQUE_V1 } from "./tasks/document-critique.v1.js";
+import { DOCUMENT_PAGE_TRANSCRIBE_V1 } from "./tasks/document-page-transcribe.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FIT_Q_VIEW_V1 } from "./tasks/fit-q-view.v1.js";
 import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
@@ -660,6 +661,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DOCUMENT_POLISH_V1,
     DOCUMENT_POLISH_V2,
     DOCUMENT_CRITIQUE_V1,
+    DOCUMENT_PAGE_TRANSCRIBE_V1,
     { ...GATEQ_INTERVIEWER_V1, status: "DEPRECATED" },
     { ...GATEQ_INTERVIEWER_V2, status: "DEPRECATED" },
     GATEQ_INTERVIEWER_V3,

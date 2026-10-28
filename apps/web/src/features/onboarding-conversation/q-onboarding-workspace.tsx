@@ -89,6 +89,7 @@ import {
   isTaxonomySuggestion,
   pickedUp,
   documentReading,
+  documentReadingNote,
   sameFileAs,
   alreadyHaveLine,
   contentHashOf,
@@ -1600,6 +1601,7 @@ export function QOnboardingWorkspace({
     readonly fileName: string;
     readonly stage: DocumentReadingStage;
     readonly found: readonly DocumentFinding[];
+    readonly note?: string | null;
   } | null>(null);
   // A landed reading stays long enough to read, then gives the stage back.
   useEffect(() => {
@@ -1829,15 +1831,18 @@ export function QOnboardingWorkspace({
        */
       const landedFor = (reading: "FOUND" | "NOTHING_NEW"): boolean => {
         const found = reading === "FOUND" ? findingsOf.current(documentId) : [];
+        const note = documentReadingNote(viewRef.current, documentId);
         setUploadCard({
           fileName: file.name,
           stage: reading === "FOUND" ? "DONE" : "NOTHING_NEW",
           found,
+          note,
         });
         if (!voiceActive) return false;
         return (
-          briefCall.current?.(uploadFindingsNote(file.name, reading, found)) ??
-          false
+          briefCall.current?.(
+            uploadFindingsNote(file.name, reading, found, note),
+          ) ?? false
         );
       };
       const first =

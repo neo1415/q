@@ -58,6 +58,34 @@ describe("parser sandbox", () => {
     expect(result.output.blocks[1]).toMatchObject({ text: "document bytes" });
   });
 
+  it("reads back only the low-text pages' pictures it asked for, within the byte bound", async () => {
+    const pageImages = { maxPages: 30, maxLongSide: 1_600, maxBytes: 20_000 };
+    const result = await sandbox("page-images.mjs").run({
+      ...input,
+      filename: "scan.pdf",
+      pageImages,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(
+      result.pageImages?.map((image) => [image.page, image.bytes.toString()]),
+    ).toEqual([
+      [2, "jpeg-two"],
+      [3, "jpeg-three"],
+    ]);
+
+    const oversize = await sandbox("page-images.mjs").run({
+      ...input,
+      filename: "oversize.pdf",
+      pageImages,
+    });
+    expect(oversize.ok && oversize.pageImages?.map((i) => i.page)).toEqual([2]);
+
+    // Not asked: no pictures are read at all.
+    const unasked = await sandbox("page-images.mjs").run(input);
+    expect(unasked.ok && unasked.pageImages).toBeUndefined();
+  });
+
   it("treats a filename containing shell metacharacters as data", async () => {
     // No shell is involved, so this is a string in a JSON file and nothing
     // more. If it were interpolated into a command line it would not be.

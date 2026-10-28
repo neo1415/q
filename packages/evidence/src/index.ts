@@ -235,6 +235,11 @@ export {
   createPostgresEvidenceSourceQueryPort,
 } from "./infrastructure/postgres-query-ports.js";
 export {
+  createPostgresDocumentReadingNotes,
+  type DocumentReadingNote,
+  type DocumentReadingNotesPort,
+} from "./infrastructure/postgres-reading-notes.js";
+export {
   DocumentReadyEvent,
   documentReadyEvent,
   EVIDENCE_EVENTS,

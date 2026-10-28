@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -14,7 +14,9 @@ import { z } from "zod";
 import {
   PARSER_INPUT_FILE,
   PARSER_REQUEST_FILE,
+  pageImageFile,
   ParserRefusalCodeSchema,
+  type PageImageRequest,
   type ParserLimits,
   type ParserRefusalCode,
 } from "./protocol.js";
@@ -46,6 +48,11 @@ const ChildResultSchema = z.discriminatedUnion("ok", [
       extractorId: z.string().min(1).max(64),
       extractorVersion: z.string().min(1).max(32),
       output: ParserOutputSchema,
+      /** Low-text pages the child pictured into the workspace. */
+      pageImages: z
+        .array(z.number().int().min(1).max(10_000))
+        .max(60)
+        .optional(),
     })
     .strict(),
   z.object({ ok: z.literal(false), code: ParserRefusalCodeSchema }).strict(),
@@ -57,6 +64,8 @@ export type ParserResult =
       readonly extractorId: string;
       readonly extractorVersion: string;
       readonly output: ParserOutput;
+      /** Pictures of low-text pages, when asked for and drawable. */
+      readonly pageImages?: readonly ParsedPageImage[] | undefined;
       readonly durationMs: number;
     }
   | {
@@ -80,6 +89,15 @@ export type ParserSandboxInput = {
   readonly mimeType: string;
   readonly filename: string;
   readonly sizeBytes: number;
+  /** Ask for pictures of low-text pages (for transcription). */
+  readonly pageImages?: PageImageRequest | undefined;
+};
+
+/** A low-text page's picture, drawn in the sandbox. */
+export type ParsedPageImage = {
+  readonly page: number;
+  readonly mediaType: "image/jpeg";
+  readonly bytes: Buffer;
 };
 
 export type ParserSandbox = {
@@ -176,6 +194,9 @@ export function createParserSandbox(
             filename: input.filename,
             sizeBytes: input.sizeBytes,
             limits: options.limits,
+            ...(input.pageImages === undefined
+              ? {}
+              : { pageImages: input.pageImages }),
           }),
           { mode: 0o600 },
         );
@@ -206,15 +227,39 @@ export function createParserSandbox(
         if (!parsed.success) {
           return { ok: false, code: "PARSER_INVALID_OUTPUT", durationMs };
         }
-        return parsed.data.ok
-          ? {
-              ok: true,
-              extractorId: parsed.data.extractorId,
-              extractorVersion: parsed.data.extractorVersion,
-              output: parsed.data.output,
-              durationMs,
-            }
-          : { ok: false, code: parsed.data.code, durationMs };
+        if (!parsed.data.ok) {
+          return { ok: false, code: parsed.data.code, durationMs };
+        }
+        // Read back only pictures that were asked for, of pages the
+        // extraction itself named as low-text, each within the byte bound.
+        const pageImages: ParsedPageImage[] = [];
+        const asked = input.pageImages;
+        const low = new Set(parsed.data.output.metadata.lowTextPages ?? []);
+        if (asked !== undefined) {
+          for (const page of (parsed.data.pageImages ?? []).slice(
+            0,
+            asked.maxPages,
+          )) {
+            if (!low.has(page)) continue;
+            const path = join(workspace, pageImageFile(page));
+            const info = await stat(path).catch(() => null);
+            if (info === null || !info.isFile() || info.size > asked.maxBytes)
+              continue;
+            pageImages.push({
+              page,
+              mediaType: "image/jpeg",
+              bytes: await readFile(path),
+            });
+          }
+        }
+        return {
+          ok: true,
+          extractorId: parsed.data.extractorId,
+          extractorVersion: parsed.data.extractorVersion,
+          output: parsed.data.output,
+          ...(pageImages.length === 0 ? {} : { pageImages }),
+          durationMs,
+        };
       } catch (error: unknown) {
         return {
           ok: false,

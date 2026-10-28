@@ -127,6 +127,7 @@ import {
   createWordsReaders,
   budgetForTaskClass,
   createDeckReader,
+  createPageTranscriber,
   createPitchSectionReader,
   createDiligenceDocumentSummariser,
 } from "@capital-q/model-gateway/q";
@@ -1176,6 +1177,34 @@ const documents =
                     { tenantId: input.tenantId, userId: input.userId },
                     { filename: input.filename, opening: input.opening },
                   ),
+              }),
+          // Deck reading 2026-10-28: pages with no text layer (scans,
+          // picture slides, PNG/JPEG uploads) transcribed by a vision model
+          // through the gateway, under the document's own sensitivity and a
+          // per-document page and dollar bound. Without a model, or with
+          // CQ_PAGE_TRANSCRIPTION=disabled, they are recorded as unread.
+          ...(modelProviders.length === 0 ||
+          process.env["CQ_PAGE_TRANSCRIPTION"] === "disabled"
+            ? {}
+            : {
+                pageTranscriber: async (input) => {
+                  const run = await createPageTranscriber({
+                    gateway: modelGateway,
+                    dataPosture: demoDataPosture,
+                    logger,
+                  }).transcribe({
+                    images: input.images,
+                    sensitivity: input.sensitivity,
+                    attribution: {
+                      tenantId: input.tenantId,
+                      ...(input.userId === null
+                        ? {}
+                        : { userId: input.userId }),
+                      correlationId: input.correlationId.slice(0, 128),
+                    },
+                  });
+                  return run.transcriptions;
+                },
               }),
           storage,
           // Derived chunks are written by the same worker, after the

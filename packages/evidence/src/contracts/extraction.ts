@@ -56,6 +56,8 @@ export const EXTRACTION_LIMITS = {
   maxRangeRows: 200,
   maxRangeColumns: 256,
   maxSheetNameCharacters: 255,
+  /** Most page numbers a low-text or transcribed list names. */
+  maxPageList: 2_000,
   /** Serialized artifact ceiling, checked before anything is persisted. */
   maxArtifactBytes: 8 * 1024 * 1024,
 } as const;
@@ -95,7 +97,20 @@ export const BlockLocatorSchema = z
   .strict();
 export type BlockLocator = z.infer<typeof BlockLocatorSchema>;
 
-const base = { locator: BlockLocatorSchema };
+const base = {
+  locator: BlockLocatorSchema,
+  /**
+   * Provenance: true when the text was not in the file's own text layer
+   * but transcribed from a picture of the page by a vision model
+   * (DOCUMENT_PAGE_TRANSCRIBE). Absent means the file's own text.
+   */
+  transcribed: z.literal(true).optional(),
+};
+
+/** Page numbers, bounded like the page locator. */
+const PageList = z
+  .array(z.number().int().min(1).max(10_000))
+  .max(EXTRACTION_LIMITS.maxPageList);
 
 export const ExtractedBlockSchema = z.discriminatedUnion("kind", [
   z
@@ -167,6 +182,15 @@ export const ExtractionMetadataSchema = z
     slideCount: z.number().int().min(0).max(10_000).optional(),
     /** True when a limit stopped extraction early; never silently dropped. */
     truncated: z.boolean().optional(),
+    /**
+     * Pages whose text layer held almost no text (under
+     * LOW_TEXT_PAGE_CHARACTERS): scanned pages, slides exported as one
+     * picture, an uploaded image. Recorded so nobody is told a document
+     * was read when its pages were pictures.
+     */
+    lowTextPages: PageList.optional(),
+    /** Of those, the pages whose text was transcribed from their picture. */
+    transcribedPages: PageList.optional(),
   })
   .strict();
 export type ExtractionMetadata = z.infer<typeof ExtractionMetadataSchema>;
@@ -200,6 +224,9 @@ export const ParserOutputSchema = z
     }
   });
 export type ParserOutput = z.infer<typeof ParserOutputSchema>;
+
+/** A page with fewer text characters than this is treated as a picture. */
+export const LOW_TEXT_PAGE_CHARACTERS = 40;
 
 export function blockCharacters(block: ExtractedBlock): number {
   switch (block.kind) {

@@ -12,6 +12,8 @@ import {
   hasFindingsFrom,
   composerHint,
   documentReading,
+  documentReadingNote,
+  uploadFindingsNote,
   sameFileAs,
   alreadyHaveLine,
   contentHashOf,
@@ -1013,6 +1015,30 @@ describe("a re-uploaded deck that adds nothing new (live e2e 25 Oct)", () => {
         "doc-1",
       ),
     ).toBe("READING");
+  });
+  it("says plainly what it could not read (deck reading 2026-10-28)", () => {
+    const view = {
+      documentNotes: [
+        { documentId: "doc-1", unreadPages: 3, truncated: false },
+        { documentId: "doc-2", unreadPages: 1, truncated: true },
+      ],
+    };
+    expect(documentReadingNote(view, "doc-1")).toBe(
+      "3 pages were images I couldn't read.",
+    );
+    expect(documentReadingNote(view, "doc-2")).toBe(
+      "1 page was an image I couldn't read. It was too long to read in full; I read the first part.",
+    );
+    expect(documentReadingNote(view, "doc-3")).toBeNull();
+    expect(documentReadingNote(undefined, "doc-1")).toBeNull();
+    expect(
+      uploadFindingsNote(
+        "deck.pdf",
+        "NOTHING_NEW",
+        [],
+        "3 pages were images I couldn't read.",
+      ),
+    ).toContain("Q could not read all of it: 3 pages were images");
   });
 });
 

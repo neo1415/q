@@ -322,6 +322,7 @@ import {
   DocumentIdSchema,
   createPostgresClaimQueryPort,
   createPostgresDataRoom,
+  createPostgresDocumentReadingNotes,
 } from "@capital-q/evidence";
 import {
   composeChat,
@@ -1129,6 +1130,9 @@ const onboarding = createOnboardingService({
   // (CQ-Q-VOICE-001 A): one sentence may answer many questions, each
   // proposal validated by the definition and confirmed by the person.
   interviewCues: { ...FOUNDER_INTERVIEW_CUES, ...INVESTOR_INTERVIEW_CUES },
+  // Deck reading 2026-10-28: a reviewed document's pages that were pictures
+  // nobody could read, and a reading a size limit cut short, are said so.
+  documentNotes: createPostgresDocumentReadingNotes(),
   // ADR 0024: the profile facts a completed onboarding may still revise.
   revisableSteps: {
     founder: FOUNDER_REVISABLE_STEPS,
