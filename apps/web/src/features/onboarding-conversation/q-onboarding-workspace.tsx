@@ -60,11 +60,14 @@ import {
 import { VOICE_LEAVE_EVENT } from "../voice/live/live-call";
 import {
   CONTINUE_LATER_LINE,
-  CONTINUE_LATER_PAUSE_MS,
   continueLaterDestination,
   useContinueLater,
 } from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
+import {
+  appendReplySentence,
+  replyStreamText,
+} from "../onboarding-kit/reply-stream-state";
 import {
   confirmSent,
   holdPending,
@@ -340,7 +343,10 @@ export function QOnboardingWorkspace({
   const [askingQ, setAskingQ] = useState(false);
   const [qStream, setQStream] = useState<QStreamState | null>(null);
   /** Turn latency L9: Q's typed reply, as far as Q has written it. */
-  const [replyStream, setReplyStream] = useState<string | null>(null);
+  // D2: kept as sentences so a replayed sentence is recognised and dropped.
+  const [replyStream, setReplyStream] = useState<readonly string[] | null>(
+    null,
+  );
   /**
    * What Q is doing during a typed turn, when it says something: the step
    * being saved ("Saving your round size") or whom Q is looking up ("Looking
@@ -1003,9 +1009,7 @@ export function QOnboardingWorkspace({
           undefined,
           (sentence) => {
             setQThinking(false);
-            setReplyStream((so) =>
-              so === null ? sentence : `${so} ${sentence}`,
-            );
+            setReplyStream((so) => appendReplySentence(so, sentence));
           },
           (stage) => {
             setTurnStage(stage.label);
@@ -1096,14 +1100,13 @@ export function QOnboardingWorkspace({
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"
       // reached this seam and went nowhere.
-      if (turn.navigate === "HOME" && turn.reply !== null) {
-        // "Let's finish this later" (owner 2026-10-16): Q's one-line
-        // acknowledgement stays readable, then they are let into the app.
-        pendingReply.drop();
-        push("Q", turn.reply);
-        window.setTimeout(() => {
-          router.push("/home");
-        }, CONTINUE_LATER_PAUSE_MS);
+      if (turn.navigate === "HOME") {
+        // A typed reply never leaves the screen on its own (live typed run
+        // 2026-10-28, D3): an investor's "that's all for now" was read as
+        // a pause and the page moved to Home by itself, with the mandate
+        // still open. Q's line stays readable here; leaving is the
+        // person's own tap on Continue later (or the spoken leave event),
+        // never a reading of their words.
         return;
       }
       if (turn.navigate === "FORM") {
@@ -2125,7 +2128,12 @@ export function QOnboardingWorkspace({
           />
         ))}
         {replyStream === null ? null : (
-          <QLine id="q-reply-streaming" kind="Q" text={replyStream} streaming />
+          <QLine
+            id="q-reply-streaming"
+            kind="Q"
+            text={replyStreamText(replyStream)}
+            streaming
+          />
         )}
         {qStream?.partial !== null && qStream?.partial !== undefined ? (
           <QLine
@@ -2598,6 +2606,21 @@ export function QOnboardingWorkspace({
             </ul>
           ) : null}
         </section>
+      ) : null}
+
+      {!isFinal && coverage !== null && coverage.summary.canComplete ? (
+        // D3 (live typed run 2026-10-28): "that's all for now" paused the
+        // interview and nothing on screen could finish it. Once coverage
+        // says every essential is in, finishing is one visible tap; the
+        // runtime still decides whether the session may complete.
+        <div className="flex flex-wrap items-center gap-3" data-q-finish-offer>
+          <Button disabled={working} onClick={onFinish} data-q-finish>
+            {t("Finish setup")}
+          </Button>
+          <span className="cq-caption text-(--cq-text-secondary)">
+            {t("Everything essential is in. You can add the rest later.")}
+          </span>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">

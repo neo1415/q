@@ -72,13 +72,13 @@ export function ReviewStep({
                 className="flex flex-col gap-3 py-4"
               >
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="cq-caption text-(--cq-text-tertiary)">
+                  <span className="cq-caption break-words text-(--cq-text-tertiary)">
                     {suggestion.label}
                     {suggestion.source === undefined
                       ? ""
                       : ` · ${suggestion.source}`}
                   </span>
-                  <span className="cq-body text-(--cq-text-primary)">
+                  <span className="cq-body break-words [overflow-wrap:anywhere] text-(--cq-text-primary)">
                     {suggestion.value}
                   </span>
                 </div>
@@ -133,7 +133,9 @@ export function ReviewStep({
               <dt className="cq-caption text-(--cq-text-tertiary)">
                 {item.label}
               </dt>
-              <dd className="cq-body text-(--cq-text-primary)">
+              {/* D7 (390 px): a long address or figure wraps inside its
+                  column instead of running past the screen's edge. */}
+              <dd className="cq-body break-words [overflow-wrap:anywhere] text-(--cq-text-primary)">
                 {item.value ?? (
                   <span className="text-(--cq-text-secondary)">
                     {t("Not added yet")}

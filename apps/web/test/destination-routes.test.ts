@@ -87,6 +87,10 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
     "the founder track's Capital Q pitch page, opened by the tour",
   "/find": "old address, redirects to /search",
   "/gateway": "old address, redirects to /gateq",
+  "/company":
+    "the bare company address, redirects to the founder's own /company/<id> (Q opens it by name)",
+  "/mandate":
+    "the bare mandate address, redirects to the investor's profile (Q's PROFILE)",
   "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",
   "/capital": "old address, redirects to the CRM's Capital tab (Q's CAPITAL)",
   "/discover/yours": "old address, redirects to /discover?tab=yours",

@@ -12,6 +12,8 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "{name} expressed interest": "أبدى {name} اهتماماً",
   "{n} investors expressed interest": "أبدى {n} مستثمرين اهتماماً",
   "{n} steps before investors can find you": "{n} خطوات قبل أن يجدك المستثمرون",
+  // D6 (2026-10-28): the readiness card's way back into setup.
+  "Finish setup with Q": "أنهِ الإعداد مع Q",
   "A pitch from {name}": "عرض من {name}",
   "{n} pitches that match your mandate": "{n} عروض تطابق تفويضك",
   "Setup: {n} of {n2} done — {minutes}":

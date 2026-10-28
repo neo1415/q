@@ -1,4 +1,7 @@
-import type { OnboardingJourneyType } from "@capital-q/contracts";
+import type {
+  OnboardingJourneyType,
+  SayOnboardingResponse,
+} from "@capital-q/contracts";
 
 import {
   onboardingAnswerQuestionAction,
@@ -15,8 +18,10 @@ import {
   onboardingSkipAction,
   onboardingStartAction,
   onboardingSubmitAction,
+  onboardingThreadTurnsAction,
   type ActionResult,
 } from "./api-actions";
+import { settledReplyFromThread } from "./reply-stream-state";
 import {
   materialListAction,
   materialUploadCompleteAction,
@@ -47,6 +52,35 @@ async function through<T>(call: Promise<ActionResult<T>>): Promise<T> {
     );
   }
   return unwrap(result);
+}
+
+/**
+ * D2 (live typed run 2026-10-28): a streamed turn that has gone quiet is
+ * settled from the record. The server keeps the thread and the session;
+ * once the thread carries Q's reply to these exact words, the session is
+ * re-read and the turn is returned as the stream would have returned it.
+ * Nothing is inferred from the reply: what was recorded is in the view.
+ * Null while the thread does not yet answer, so the stream is waited on.
+ */
+export async function settleFromThread(
+  sessionId: string,
+  said: string,
+): Promise<SayOnboardingResponse | null> {
+  const turns = await onboardingThreadTurnsAction(sessionId);
+  const reply = settledReplyFromThread(turns, said);
+  if (reply === null) return null;
+  const view = await onboardingGetAction(sessionId);
+  if (!view.ok) return null;
+  return {
+    view: view.value,
+    understood: null,
+    reply,
+    navigate: null,
+    researching: null,
+    degraded: false,
+    askingAbout: [],
+    pending: { recommendations: [], held: [] },
+  };
 }
 
 /**
@@ -82,6 +116,9 @@ export function createApiRuntimePort(input: {
           onSentence,
           undefined,
           onStage,
+          {
+            onStall: () => settleFromThread(request.sessionId, request.text),
+          },
         );
         if (streamed !== null) return streamed;
       }

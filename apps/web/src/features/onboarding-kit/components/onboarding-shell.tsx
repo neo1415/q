@@ -8,7 +8,11 @@ import { useT } from "@/features/i18n/language";
 
 import type { SaveStatus } from "../controller";
 import { ContinueLater } from "./continue-later";
+import { revealFirstProblem } from "./field-problem";
 import { SaveStatusIndicator } from "./save-status";
+
+/** Long enough for the step to commit its message after the click. */
+const REVEAL_PROBLEM_AFTER_MS = 80;
 
 /**
  * Focused onboarding frame. Mobile: compact top bar (Back · wordmark ·
@@ -67,6 +71,13 @@ export function OnboardingShell({
       return;
     }
     primaryAction.onClick?.();
+    // D3 (live typed run 2026-10-28): a step that refuses to move on prints
+    // why; if that message is off screen (a long step, the sticky bar over
+    // its foot), Continue looked dead. Once the step has rendered its
+    // answer, the first message is brought into view and focused.
+    if (primaryAction.formId !== undefined) {
+      window.setTimeout(() => revealFirstProblem(), REVEAL_PROBLEM_AFTER_MS);
+    }
   };
 
   return (

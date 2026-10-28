@@ -7,6 +7,7 @@ import { Input } from "@capital-q/ui/input";
 
 import type { MetricQuestion, StepResponse } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { FieldProblem } from "@/features/onboarding-kit/components/field-problem";
 import { useT } from "@/features/i18n/language";
 
 type MetricAnswer = { readonly value: string } | { readonly unknown: true };
@@ -27,7 +28,12 @@ export function TractionStep({
   const [answers, setAnswers] = useState<Record<string, MetricAnswer>>(() => ({
     ...(step.response?.metrics ?? {}),
   }));
-  const [error, setError] = useState<string | undefined>(undefined);
+  // The one unanswered required metric, named beside its own field (live
+  // typed run 2026-10-28, D3): a message at the foot of fourteen questions
+  // sat under the sticky Continue bar, and the button looked dead.
+  const [missing, setMissing] = useState<
+    { readonly id: string; readonly message: string } | undefined
+  >(undefined);
 
   function set(id: string, answer: MetricAnswer | undefined) {
     setAnswers((current) => {
@@ -39,16 +45,19 @@ export function TractionStep({
       }
       return next;
     });
-    setError(undefined);
+    setMissing(undefined);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const missing = step.metrics.find(
+    const unanswered = step.metrics.find(
       (metric) => !metric.optional && answers[metric.id] === undefined,
     );
-    if (missing !== undefined) {
-      setError(`Answer “${missing.label}” to continue.`);
+    if (unanswered !== undefined) {
+      setMissing({
+        id: unanswered.id,
+        message: `Answer “${unanswered.label}” to continue.`,
+      });
       return;
     }
     const metrics: TractionMetrics = {};
@@ -78,14 +87,10 @@ export function TractionStep({
           metric={metric}
           answer={answers[metric.id]}
           busy={busy}
+          problem={missing?.id === metric.id ? missing.message : undefined}
           onChange={(answer) => set(metric.id, answer)}
         />
       ))}
-      {error !== undefined ? (
-        <p role="alert" className="cq-caption text-(--cq-danger)">
-          {error}
-        </p>
-      ) : null}
     </form>
   );
 }
@@ -94,11 +99,14 @@ function MetricField({
   metric,
   answer,
   busy,
+  problem,
   onChange,
 }: {
   readonly metric: MetricQuestion;
   readonly answer: MetricAnswer | undefined;
   readonly busy: boolean;
+  /** Why Continue did not move on, when it is this field. */
+  readonly problem: string | undefined;
   readonly onChange: (answer: MetricAnswer | undefined) => void;
 }) {
   const t = useT();
@@ -120,7 +128,11 @@ function MetricField({
 
   if (metric.kind === "choice") {
     return (
-      <div className="flex flex-col gap-2">
+      <div
+        className="flex flex-col gap-2"
+        data-metric={metric.id}
+        data-metric-problem={problem === undefined ? undefined : ""}
+      >
         <ChoiceList
           id={`metric-${metric.id}`}
           name={metric.id}
@@ -133,13 +145,22 @@ function MetricField({
           disabled={busy || unknown}
           onChange={(value) => onChange({ value })}
         />
+        {problem === undefined ? null : (
+          <FieldProblem id={`metric-${metric.id}-problem`}>
+            {problem}
+          </FieldProblem>
+        )}
         {unknownToggle}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className="flex flex-col gap-2"
+      data-metric={metric.id}
+      data-metric-problem={problem === undefined ? undefined : ""}
+    >
       <Input
         id={`metric-${metric.id}`}
         label={metric.label}
@@ -153,6 +174,11 @@ function MetricField({
           onChange({ value: event.target.value.replace(/[^0-9]/g, "") })
         }
       />
+      {problem === undefined ? null : (
+        <FieldProblem id={`metric-${metric.id}-problem`}>
+          {problem}
+        </FieldProblem>
+      )}
       {unknownToggle}
     </div>
   );
