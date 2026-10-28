@@ -238,6 +238,9 @@ export function createMakeSpreadsheetTool(
       (purpose) => purpose !== "ACTION_PREPARATION",
     ),
     eligibleWhenNamed: true,
+    // Offered after each purpose's own tools: unfocused, it is the one the
+    // model's bound cuts; named, or in the documents area, it leads.
+    offerLast: true,
     requiredScopeKinds: ["OWN_Q_CONVERSATION"],
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",

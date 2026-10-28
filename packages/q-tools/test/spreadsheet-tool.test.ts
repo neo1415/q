@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   QDocumentToolResultSchema,
+  Q_TASK_CLASSES,
   QWorkbookSchema,
   type PermittedContextPlan,
   type QArtifactContent,
@@ -439,5 +440,39 @@ describe("make_spreadsheet", () => {
     const { run } = setUp();
     const outcome = await run({ source: "PIPELINE", companyId: CO_1 });
     expect(outcome.result.ok).toBe(false);
+  });
+});
+
+describe("make_spreadsheet's place in the offer", () => {
+  const port: SpreadsheetPort = {
+    shownAnswers: () => Promise.resolve([]),
+    file: () => Promise.reject(new Error("not used")),
+  };
+  const sheet = createMakeSpreadsheetTool(fakePorts(), port);
+  // A purpose's own tool that serves more purposes than the spreadsheet.
+  const own: typeof sheet = {
+    ...sheet,
+    id: "documents.own.other",
+    providerName: "other_own_tool",
+    offerLast: false,
+    supportedPurposes: [...Q_TASK_CLASSES],
+  };
+  const registry = createQToolRegistry([sheet, own]);
+  const names = (focus?: { areas: string[]; tools: string[] }) =>
+    registry
+      .ranked({ ...contextFor(actorA, ownPlan()), focus })
+      .map((record) => record.definition.providerName);
+
+  it("comes after the purpose's own tools when the turn names nothing", () => {
+    expect(names()).toEqual(["other_own_tool", "make_spreadsheet"]);
+  });
+
+  it("leads when the turn names it or is about documents", () => {
+    expect(names({ areas: [], tools: ["make_spreadsheet"] })[0]).toBe(
+      "make_spreadsheet",
+    );
+    expect(names({ areas: ["Documents"], tools: [] })[0]).toBe(
+      "make_spreadsheet",
+    );
   });
 });

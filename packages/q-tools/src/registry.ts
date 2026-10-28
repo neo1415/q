@@ -318,6 +318,9 @@ export function createQToolRegistry(
           // Then what is in the turn's areas, so a widened offer keeps
           // what the turn is about within the bound.
           Number(focusArea(b)) - Number(focusArea(a)) ||
+          // A tool marked to come last never displaces a purpose's own.
+          Number(a.definition.offerLast === true) -
+            Number(b.definition.offerLast === true) ||
           a.definition.supportedPurposes.length -
             b.definition.supportedPurposes.length ||
           a.definition.id.localeCompare(b.definition.id),

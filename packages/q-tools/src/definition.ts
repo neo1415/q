@@ -125,6 +125,14 @@ export type QToolDefinition<I, O, G> = {
    */
   readonly offeredWhenNamed?: boolean | undefined;
   /**
+   * XLSX-001: ranked after every other tool of its purpose (but still
+   * ahead of nothing the turn named or put in its areas), so a tool that
+   * serves many purposes never pushes a purpose's own tool past the
+   * model's bound on an unfocused offer. Named by the turn, or in its
+   * areas, it leads as any tool does. Absent: false.
+   */
+  readonly offerLast?: boolean | undefined;
+  /**
    * Whether it can apply to this person at all right now, before any input
    * is known (a reply to an investor's open question, with none open).
    * False: left off the list the turn reader and router choose from this
