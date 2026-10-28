@@ -126,6 +126,8 @@ export type OnboardingServiceOptions = {
   readonly taxonomy?: OnboardingTaxonomyResolver | undefined;
   /** ADR 0024: per journey, the answers a completed session may revise. */
   readonly revisableSteps?: OnboardingRuntimeDependencies["revisableSteps"];
+  /** Deck reading 2026-10-28: how well each reviewed document was read. */
+  readonly documentNotes?: OnboardingRuntimeDependencies["documentNotes"];
   /** Safe structured logging only; never response content. */
   readonly logger?: Logger | undefined;
 };
@@ -166,6 +168,7 @@ export function createOnboardingService(
       options.repositories?.documentReviews ??
       createPostgresOnboardingDocumentReviewRepository(),
     utteranceAliases: options.utteranceAliases,
+    documentNotes: options.documentNotes,
     moveReader: options.moveReader,
     interviewCues: options.interviewCues,
     taxonomy: options.taxonomy,

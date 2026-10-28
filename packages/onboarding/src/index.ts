@@ -223,6 +223,14 @@ export {
   type StepInterpretation,
 } from "./domain/interpretation.js";
 export {
+  normaliseDigits,
+  parseMoney,
+  parseMoneyAll,
+  roundToCents,
+  type MoneyUnit,
+  type ParsedMoney,
+} from "./domain/money.js";
+export {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,
   createPostgresOnboardingSessionRepository,

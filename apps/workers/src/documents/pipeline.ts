@@ -21,7 +21,16 @@ import type { RunnerLogger } from "../outbox-runner.js";
 import type { MessageOutcome } from "../queue/runner.js";
 import type { QueueMessage } from "../queue/pgmq.js";
 import type { ParserSandbox } from "../parser/sandbox.js";
-import { isPermanentRefusal } from "../parser/protocol.js";
+import {
+  isPermanentRefusal,
+  type PageImageRequest,
+} from "../parser/protocol.js";
+import {
+  mergeTranscriptions,
+  transcribable,
+  unreadPagesOf,
+  type DocumentPageTranscriberPort,
+} from "./transcription.js";
 import {
   decideOnVerdict,
   type MalwarePolicy,
@@ -114,6 +123,15 @@ export type DocumentPipelineOptions = {
   readonly scanner: MalwareScanner;
   readonly malwarePolicy: MalwarePolicy;
   readonly sandbox: ParserSandbox;
+  /**
+   * Deck reading 2026-10-28: transcribes low-text pages (scans, picture
+   * slides, PNG/JPEG uploads) from pictures drawn in the sandbox, through
+   * the model gateway. Absent: those pages are recorded as unread, and the
+   * founder is told, never handed silence.
+   */
+  readonly pageTranscriber?: DocumentPageTranscriberPort | undefined;
+  /** The pictures asked of the sandbox for transcription. */
+  readonly pageImages?: PageImageRequest | undefined;
   readonly knowledge?: DocumentChunkingPort | undefined;
   readonly pipelineVersion: string;
   /** Ceiling on bytes read out of storage, independent of the parser's own. */
@@ -136,6 +154,13 @@ async function readBounded(
   }
   return Buffer.concat(chunks);
 }
+
+/** Pictures for transcription: legible text, inside the model image bound. */
+export const DEFAULT_PAGE_IMAGES: PageImageRequest = {
+  maxPages: 30,
+  maxLongSide: 1_600,
+  maxBytes: 500_000,
+};
 
 export function createDocumentProcessingPipeline(
   options: DocumentPipelineOptions,
@@ -353,11 +378,19 @@ export function createDocumentProcessingPipeline(
       return { kind: "DONE" };
     }
 
+    const transcribe =
+      options.pageTranscriber !== undefined &&
+      transcribable(document.sensitivityClass)
+        ? options.pageTranscriber
+        : undefined;
     const result = await options.sandbox.run({
       content,
       mimeType: version.mimeType,
       filename: version.originalFilename,
       sizeBytes: version.sizeBytes,
+      ...(transcribe === undefined
+        ? {}
+        : { pageImages: options.pageImages ?? DEFAULT_PAGE_IMAGES }),
     });
 
     if (!result.ok) {
@@ -384,13 +417,51 @@ export function createDocumentProcessingPipeline(
       return { kind: "DONE" };
     }
 
+    const correlationId = CorrelationIdSchema.parse(
+      job.correlationId ?? `cor_${randomUUID()}`,
+    );
+
+    // --- Pictures read (deck reading 2026-10-28) ---------------------------
+    // Pages with no text layer, transcribed from the sandbox's pictures of
+    // them. Every failure here leaves the pages unread and recorded as
+    // such; it never fails or retries the job.
+    let output = result.output;
+    if (transcribe !== undefined && (result.pageImages?.length ?? 0) > 0) {
+      try {
+        const transcriptions = await transcribe({
+          tenantId,
+          userId: document.createdByUserId,
+          sensitivity: document.sensitivityClass,
+          correlationId,
+          images: (result.pageImages ?? []).map((image) => ({
+            page: image.page,
+            mediaType: image.mediaType,
+            dataBase64: image.bytes.toString("base64"),
+          })),
+        });
+        if (transcriptions !== null) {
+          output = mergeTranscriptions(output, transcriptions);
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            msgId: message.msgId,
+            runId: run.id,
+            failure: error instanceof Error ? error.name : "unknown",
+          },
+          "low-text pages not transcribed; recorded as unread",
+        );
+      }
+    }
+    const unreadPages = unreadPagesOf(output);
+
     const recorded = await evidence.recordDocumentExtraction({
       tenantId,
       documentVersionId: version.id,
       processingRunId: run.id,
       pipelineVersion,
       extractorId: result.extractorId,
-      output: result.output,
+      output,
     });
 
     // --- Structure-aware chunking -------------------------------------------
@@ -417,7 +488,7 @@ export function createDocumentProcessingPipeline(
           tenantId,
           documentVersionId: version.id,
           pipelineVersion,
-          blocks: [...result.output.blocks],
+          blocks: [...output.blocks],
         });
       } catch (error: unknown) {
         logger.warn(
@@ -474,7 +545,7 @@ export function createDocumentProcessingPipeline(
       document.sensitivityClass !== "HIGHLY_CONFIDENTIAL" &&
       document.sensitivityClass !== "RESTRICTED"
     ) {
-      const opening = openingTextOf(result.output.blocks);
+      const opening = openingTextOf(output.blocks);
       if (opening.trim().length > 0) {
         try {
           const kind = DocumentTypeSchema.exclude(["UNCLASSIFIED"]).safeParse(
@@ -509,9 +580,6 @@ export function createDocumentProcessingPipeline(
       }
     }
 
-    const correlationId = CorrelationIdSchema.parse(
-      job.correlationId ?? `cor_${randomUUID()}`,
-    );
     const completion = await evidence.completeDocumentProcessing({
       tenantId,
       documentVersionId: version.id,
@@ -522,7 +590,7 @@ export function createDocumentProcessingPipeline(
       scannedClean: decision.scanned,
       ...(decision.recordNotScanned === true ? { notScanned: true } : {}),
       provenance: {
-        extractorVersion: result.output.metadata.parserVersion,
+        extractorVersion: output.metadata.parserVersion,
         ...(chunking?.chunkingVersion === undefined
           ? {}
           : { chunkingVersion: chunking.chunkingVersion }),
@@ -531,10 +599,16 @@ export function createDocumentProcessingPipeline(
         // operators and could otherwise carry document content into logs.
         metadata: {
           extractorId: result.extractorId,
-          blockCount: result.output.blocks.length,
+          blockCount: output.blocks.length,
           instructionRiskSignals: recorded.extraction.instructionRiskSignals,
           instructionRiskCategories: [...recorded.instructionRiskCategories],
-          truncated: result.output.metadata.truncated === true,
+          truncated: output.metadata.truncated === true,
+          // Counts only: how many pages were pictures, how many of those Q
+          // transcribed, and how many nobody could read (the founder is
+          // told that number; deck reading 2026-10-28).
+          lowTextPages: output.metadata.lowTextPages?.length ?? 0,
+          transcribedPages: output.metadata.transcribedPages?.length ?? 0,
+          unreadPages: unreadPages.length,
           parseDurationMs: result.durationMs,
           scanned: decision.scanned,
           // The policy this run was made under (ADR 0042).
@@ -570,7 +644,8 @@ export function createDocumentProcessingPipeline(
         documentId: document.id,
         documentVersionId: version.id,
         extractorId: result.extractorId,
-        blockCount: result.output.blocks.length,
+        blockCount: output.blocks.length,
+        unreadPages: unreadPages.length,
         instructionRiskSignals: recorded.extraction.instructionRiskSignals,
         alreadyRecorded: recorded.alreadyRecorded,
         chunkCount: chunking?.chunkCount ?? 0,

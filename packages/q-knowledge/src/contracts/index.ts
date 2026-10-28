@@ -46,8 +46,10 @@ export type ChunkId = z.infer<typeof ChunkIdSchema>;
  * History:
  *   q-chunking-v1  CQ-RAG-001: slide / narrative / spreadsheet strategies,
  *                  parent-child for long sections, 10% sentence overlap.
+ *   q-chunking-v2  Paged prose (PDF) is chunked per page, like slides: no
+ *                  chunk spans a page boundary, so page locators are exact.
  */
-export const CHUNKING_VERSION = "q-chunking-v1" as const;
+export const CHUNKING_VERSION = "q-chunking-v2" as const;
 
 export const ChunkingVersionSchema = z
   .string()

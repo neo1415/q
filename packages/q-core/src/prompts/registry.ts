@@ -253,12 +253,14 @@ import { NAVIGATION_CHOOSER_V1 } from "./tasks/navigation-chooser.v1.js";
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
 import { DOCUMENT_POLISH_V2 } from "./tasks/document-polish.v2.js";
 import { DOCUMENT_CRITIQUE_V1 } from "./tasks/document-critique.v1.js";
+import { DOCUMENT_PAGE_TRANSCRIBE_V1 } from "./tasks/document-page-transcribe.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FIT_Q_VIEW_V1 } from "./tasks/fit-q-view.v1.js";
 import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
 import { FIT_Q_VIEW_V3 } from "./tasks/fit-q-view.v3.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
+import { FOUNDER_ONBOARDING_EXTRACTION_V3 } from "./tasks/founder-onboarding-extraction.v3.js";
 import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
@@ -425,7 +427,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     Q_SYSTEM_VOICE_V2,
     Q_SYSTEM_VOICE_V3,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
-    FOUNDER_ONBOARDING_EXTRACTION_V2,
+    { ...FOUNDER_ONBOARDING_EXTRACTION_V2, status: "DEPRECATED" },
+    FOUNDER_ONBOARDING_EXTRACTION_V3,
     INTERVIEW_CONDUCTOR_V1,
     INTERVIEW_CONDUCTOR_V2,
     INTERVIEW_CONDUCTOR_V3,
@@ -660,6 +663,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DOCUMENT_POLISH_V1,
     DOCUMENT_POLISH_V2,
     DOCUMENT_CRITIQUE_V1,
+    DOCUMENT_PAGE_TRANSCRIBE_V1,
     { ...GATEQ_INTERVIEWER_V1, status: "DEPRECATED" },
     { ...GATEQ_INTERVIEWER_V2, status: "DEPRECATED" },
     GATEQ_INTERVIEWER_V3,

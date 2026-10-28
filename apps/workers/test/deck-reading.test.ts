@@ -70,6 +70,13 @@ function harness(
     readonly readGate?: Promise<void>;
     /** What the wrapped handler records when it runs. */
     readonly order?: string[];
+    /** The version's chunks, when not the two-slide default. */
+    readonly chunks?: readonly {
+      content: string;
+      chunkIndex: number;
+      role?: "LEAF" | "PARENT";
+      locator: { slide?: number; pageStart?: number };
+    }[];
   } = {},
 ) {
   const logger = createRecordingLogger();
@@ -134,18 +141,20 @@ function harness(
       },
       chunks: {
         listActiveByVersion: () =>
-          Promise.resolve([
-            {
-              content: "Traction $41k MRR",
-              chunkIndex: 1,
-              locator: { slide: 7 },
-            },
-            {
-              content: "Clinics wait 94 days",
-              chunkIndex: 0,
-              locator: { slide: 2 },
-            },
-          ]),
+          Promise.resolve(
+            behaviour.chunks ?? [
+              {
+                content: "Traction $41k MRR",
+                chunkIndex: 1,
+                locator: { slide: 7 },
+              },
+              {
+                content: "Clinics wait 94 days",
+                chunkIndex: 0,
+                locator: { slide: 2 },
+              },
+            ],
+          ),
       },
       store: {
         insertExtraction: (_e, input) => {
@@ -237,6 +246,39 @@ describe("deck readings", () => {
       promptVersion: 1,
       pageCount: 7,
     });
+  });
+
+  it("reads a long deck to its end, each slide once, never a parent beside its leaves", async () => {
+    const chunks = Array.from({ length: 60 }, (_u, at) => {
+      const slide = at + 1;
+      const content =
+        slide === 59
+          ? "Traction: KSh 120m revenue in 2025"
+          : `Slide ${String(slide)} ${"detail ".repeat(200)}`;
+      return [
+        {
+          content,
+          chunkIndex: at * 2,
+          role: "PARENT" as const,
+          locator: { slide },
+        },
+        {
+          content,
+          chunkIndex: at * 2 + 1,
+          role: "LEAF" as const,
+          locator: { slide },
+        },
+      ];
+    }).flat();
+    const h = harness(true, { chunks });
+    await h.handle(ready());
+    const sent = h.asked[0]?.passages ?? [];
+    expect(sent.some((p) => p.content.includes("KSh 120m"))).toBe(true);
+    expect(sent.filter((p) => p.slide === 59)).toHaveLength(1);
+    expect(sent.at(-1)?.slide).toBe(60);
+    expect(sent.reduce((n, p) => n + p.content.length, 0)).toBeLessThanOrEqual(
+      36_000,
+    );
   });
 
   it("reads nothing for a document that is not an eligible deck", async () => {

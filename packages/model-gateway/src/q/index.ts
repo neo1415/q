@@ -498,6 +498,15 @@ export {
   type PitchSectionSpec,
 } from "./pitch-section-reader.js";
 export {
+  createPageTranscriber,
+  PAGE_TRANSCRIBER_MAX_COST_USD,
+  PAGE_TRANSCRIBER_MAX_PAGES,
+  type PageImage,
+  type PageTranscriber,
+  type PageTranscription,
+  type PageTranscriptionRun,
+} from "./page-transcriber.js";
+export {
   createDeckReader,
   DECK_READER_PROMPT_VERSION,
   DECK_READER_TEXT_MAX,

@@ -179,9 +179,6 @@ export type FounderReviewServiceDependencies = {
   readonly pitchSections?: FounderPitchSectionsPort | undefined;
 };
 
-/** How many of a document's chunks the model reads. Bounded (CQ-Q-021 §79). */
-const PASSAGES_PER_DOCUMENT = 12;
-
 /** The narrative steps whose commit is worth Q's reading (CQ-PRE-REC-001 §20). */
 export const FOUNDER_NARRATIVE_STEP_KEYS: readonly string[] = [
   FOUNDER_STEPS.description,
@@ -440,21 +437,19 @@ export function createFounderDocumentReview(
         return { kind: "SKIPPED", reason: "NO_PASSAGES" };
       }
 
-      const sources = passagesFrom(
-        [
-          {
-            documentId: event.documentId,
-            documentVersionId: event.documentVersionId,
-            title: document.title,
-            chunks: stored.map((chunk) => ({
-              content: chunk.content,
-              chunkIndex: chunk.chunkIndex,
-              locator: chunk.locator,
-            })),
-          },
-        ],
-        PASSAGES_PER_DOCUMENT,
-      );
+      const sources = passagesFrom([
+        {
+          documentId: event.documentId,
+          documentVersionId: event.documentVersionId,
+          title: document.title,
+          chunks: stored.map((chunk) => ({
+            content: chunk.content,
+            chunkIndex: chunk.chunkIndex,
+            role: chunk.role,
+            locator: chunk.locator,
+          })),
+        },
+      ]);
 
       const result = await read({
         tenantId: event.tenantId,

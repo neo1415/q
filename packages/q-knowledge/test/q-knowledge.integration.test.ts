@@ -270,7 +270,7 @@ describe("@capital-q/q-knowledge against local PostgreSQL", () => {
         extractorId: "ooxml_docx",
         extractorVersion: "1.0.0",
         chunkingStrategy: "narrative",
-        chunkingVersion: "q-chunking-v1",
+        chunkingVersion: "q-chunking-v2",
         visibilityScope: "founder_private",
         sensitivityClass: "RESTRICTED",
         status: "ACTIVE",
@@ -380,7 +380,7 @@ describe("@capital-q/q-knowledge against local PostgreSQL", () => {
         documentVersionId: doc.versionId,
         pipelineVersion: PIPELINE,
         blocks,
-        chunkingVersion: "q-chunking-v2",
+        chunkingVersion: "q-chunking-v3",
       });
       expect(v1.outcome).toBe("BUILT");
       expect(v2.outcome).toBe("BUILT");
@@ -396,8 +396,8 @@ describe("@capital-q/q-knowledge against local PostgreSQL", () => {
       expect(
         sets.map((s) => [s.chunkingVersion, s.status, s.statusReason]),
       ).toEqual([
-        ["q-chunking-v1", "SUPERSEDED", "NEWER_CHUNKING_VERSION"],
-        ["q-chunking-v2", "ACTIVE", null],
+        ["q-chunking-v2", "SUPERSEDED", "NEWER_CHUNKING_VERSION"],
+        ["q-chunking-v3", "ACTIVE", null],
       ]);
       // v1 provenance and content remain readable; only eligibility changed.
       const old = await service.listChunks({

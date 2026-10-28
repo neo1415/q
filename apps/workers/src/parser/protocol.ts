@@ -39,6 +39,26 @@ export const ParserLimitsSchema = z
   .strict();
 export type ParserLimits = z.infer<typeof ParserLimitsSchema>;
 
+/**
+ * Pictures of low-text pages, for transcription (deck reading 2026-10-28).
+ * Drawn inside the sandbox, because drawing a PDF or decoding an image is
+ * interpreting untrusted bytes; written as JPEG files into the workspace,
+ * read back and bounded by the parent. Absent: no pictures are made.
+ */
+export const PageImageRequestSchema = z
+  .object({
+    maxPages: z.number().int().min(1).max(60),
+    maxLongSide: z.number().int().min(256).max(4_000),
+    maxBytes: z.number().int().min(10_000).max(2_000_000),
+  })
+  .strict();
+export type PageImageRequest = z.infer<typeof PageImageRequestSchema>;
+
+/** The workspace file a page's picture is written to. Server-owned name. */
+export function pageImageFile(page: number): string {
+  return `page-${String(Math.trunc(page))}.jpg`;
+}
+
 export const ParserRequestSchema = z
   .object({
     mimeType: z.string().min(1).max(255),
@@ -46,6 +66,7 @@ export const ParserRequestSchema = z
     filename: z.string().max(512),
     sizeBytes: z.number().int().min(0),
     limits: ParserLimitsSchema,
+    pageImages: PageImageRequestSchema.optional(),
   })
   .strict();
 export type ParserRequest = z.infer<typeof ParserRequestSchema>;

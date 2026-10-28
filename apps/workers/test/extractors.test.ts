@@ -151,6 +151,33 @@ describe("pptx extractor", () => {
     });
     expect(output.metadata.slideCount).toBe(3);
   });
+
+  it("reads a slide's chart values and speaker notes, and follows no external or escaping target", async () => {
+    const slide = `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="ppt" xmlns:a="draw" xmlns:c="chart" xmlns:r="rel"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Traction</a:t></a:r></a:p></p:txBody></p:sp><p:graphicFrame><a:graphic><a:graphicData><c:chart r:id="rId2"/></a:graphicData></a:graphic></p:graphicFrame><p:graphicFrame><a:graphic><a:graphicData><c:chart r:id="rId9"/></a:graphicData></a:graphic></p:graphicFrame></p:spTree></p:cSld></p:sld>`;
+    const rels = `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://schemas/notesSlide" Target="../notesSlides/notesSlide1.xml"/><Relationship Id="rId2" Type="http://schemas/chart" Target="../charts/chart1.xml"/><Relationship Id="rId9" Type="http://schemas/chart" Target="../../../outside.xml"/><Relationship Id="rId3" Type="http://schemas/chart" Target="https://example.invalid/x" TargetMode="External"/></Relationships>`;
+    const chart = `<?xml version="1.0"?><c:chartSpace xmlns:c="chart" xmlns:a="draw"><c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Revenue (NGN m)</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart><c:ser><c:tx><c:strRef><c:strCache><c:pt idx="0"><c:v>Revenue</c:v></c:pt></c:strCache></c:strRef></c:tx><c:cat><c:strRef><c:strCache><c:pt idx="1"><c:v>2025</c:v></c:pt><c:pt idx="0"><c:v>2024</c:v></c:pt></c:strCache></c:strRef></c:cat><c:val><c:numRef><c:numCache><c:pt idx="0"><c:v>120</c:v></c:pt><c:pt idx="1"><c:v>450</c:v></c:pt></c:numCache></c:numRef></c:val></c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>`;
+    const notes = `<?xml version="1.0"?><p:notes xmlns:p="ppt" xmlns:a="draw"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:nvPr><p:ph type="sldImg"/></p:nvPr></p:nvSpPr></p:sp><p:sp><p:nvSpPr><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>Say: 38 hospitals pay monthly.</a:t></a:r></a:p></p:txBody></p:sp><p:sp><p:nvSpPr><p:nvPr><p:ph type="sldNum"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>7</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>`;
+    const pptx = buildZip([
+      { name: "[Content_Types].xml", content: "<Types/>" },
+      { name: "ppt/slides/slide7.xml", content: slide },
+      { name: "ppt/slides/_rels/slide7.xml.rels", content: rels },
+      { name: "ppt/charts/chart1.xml", content: chart },
+      { name: "ppt/notesSlides/notesSlide1.xml", content: notes },
+      {
+        name: "outside.xml",
+        content: chart.replace("Revenue (NGN m)", "LEAK"),
+      },
+    ]);
+    const output = await createPptxExtractor().extract(pptx, context);
+    expect(output.blocks).toHaveLength(1);
+    expect(output.blocks[0]).toMatchObject({
+      kind: "slide",
+      slideNumber: 7,
+      title: "Traction",
+      text: "Traction\nChart: Revenue (NGN m)\nRevenue: 2024 = 120; 2025 = 450\nSpeaker notes: Say: 38 hospitals pay monthly.",
+    });
+    expect(JSON.stringify(output)).not.toContain("LEAK");
+  });
 });
 
 describe("pdf extractor", () => {

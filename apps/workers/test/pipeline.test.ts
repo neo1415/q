@@ -7,6 +7,7 @@ import type {
   PrivateDocumentStorageProvider,
   StoredObjectRef,
 } from "@capital-q/evidence";
+import type { ParserOutput } from "@capital-q/evidence/contracts";
 
 import {
   createDocumentProcessingPipeline,
@@ -884,4 +885,126 @@ describe("the malware policy matrix", () => {
       });
     }
   }
+});
+
+/** Deck reading 2026-10-28: pages that are pictures are read, or reported. */
+describe("low-text pages are transcribed, or recorded as unread", () => {
+  const scanParse: ParserResult = {
+    ok: true,
+    extractorId: "pdf",
+    extractorVersion: "2.0.0",
+    durationMs: 9,
+    output: {
+      blocks: [
+        { kind: "paragraph", text: "Cover", locator: { index: 0, page: 1 } },
+        { kind: "page_break", locator: { index: 1, page: 1 } },
+        { kind: "page_break", locator: { index: 2, page: 2 } },
+      ],
+      metadata: {
+        parser: "pdf",
+        parserVersion: "2.0.0",
+        pageCount: 3,
+        lowTextPages: [2, 3],
+      },
+    },
+    pageImages: [
+      { page: 2, mediaType: "image/jpeg", bytes: Buffer.from("two") },
+      { page: 3, mediaType: "image/jpeg", bytes: Buffer.from("three") },
+    ],
+  };
+  const run = async (
+    document: Partial<Parameters<typeof makeDocument>[1]>,
+    pageTranscriber: DocumentPipelineOptions["pageTranscriber"],
+  ) => {
+    const version = makeVersion();
+    const evidence = createFakeEvidence({
+      version,
+      document: makeDocument(version, document),
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const asked: unknown[] = [];
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storageStub(version.sizeBytes).provider,
+      sandbox: {
+        run: (input) => {
+          asked.push(input.pageImages);
+          return Promise.resolve(scanParse);
+        },
+      },
+      pageTranscriber,
+    });
+    const outcome = await handle(jobMessage({ documentVersionId: version.id }));
+    const recorded = evidence.calls.find(
+      (c) => c.name === "recordDocumentExtraction",
+    )?.input as { output: ParserOutput } | undefined;
+    const completed = evidence.calls.find(
+      (c) => c.name === "completeDocumentProcessing",
+    )?.input as
+      { provenance: { metadata: Record<string, unknown> } } | undefined;
+    return { outcome, asked, recorded, completed };
+  };
+
+  it("transcribes the pictures through the port, marks the text as transcribed, on its page", async () => {
+    const seen: { sensitivity: string; pages: number[] }[] = [];
+    const { outcome, asked, recorded, completed } = await run({}, (input) => {
+      seen.push({
+        sensitivity: input.sensitivity,
+        pages: input.images.map((i) => i.page),
+      });
+      return Promise.resolve([
+        { page: 2, text: "Traction\n\nARR ₦450m", legible: true },
+      ]);
+    });
+    expect(outcome).toEqual({ kind: "DONE" });
+    expect(asked[0]).toMatchObject({ maxPages: 30 });
+    expect(seen).toEqual([{ sensitivity: "CONFIDENTIAL", pages: [2, 3] }]);
+    const blocks = recorded?.output.blocks ?? [];
+    expect(blocks.map((b) => b.locator.index)).toEqual(
+      blocks.map((_b, at) => at),
+    );
+    expect(
+      blocks
+        .filter((b) => b.transcribed === true)
+        .map((b) => [b.locator.page, "text" in b ? b.text : ""]),
+    ).toEqual([
+      [2, "Traction"],
+      [2, "ARR ₦450m"],
+    ]);
+    expect(recorded?.output.metadata.transcribedPages).toEqual([2]);
+    expect(completed?.provenance.metadata).toMatchObject({
+      lowTextPages: 2,
+      transcribedPages: 1,
+      unreadPages: 1,
+    });
+  });
+
+  it("without a transcriber asks for no pictures and records every low-text page as unread", async () => {
+    const { outcome, asked, completed } = await run({}, undefined);
+    expect(outcome).toEqual({ kind: "DONE" });
+    expect(asked).toEqual([undefined]);
+    expect(completed?.provenance.metadata).toMatchObject({
+      lowTextPages: 2,
+      transcribedPages: 0,
+      unreadPages: 2,
+    });
+  });
+
+  it("never shows a highly confidential document's pages to a model, and a failed transcription still completes", async () => {
+    let called = 0;
+    const secret = await run(
+      { sensitivityClass: "HIGHLY_CONFIDENTIAL" },
+      () => {
+        called += 1;
+        return Promise.resolve([]);
+      },
+    );
+    expect(called).toBe(0);
+    expect(secret.asked).toEqual([undefined]);
+    const failed = await run({}, () => Promise.reject(new Error("refused")));
+    expect(failed.outcome).toEqual({ kind: "DONE" });
+    expect(failed.completed?.provenance.metadata).toMatchObject({
+      unreadPages: 2,
+    });
+  });
 });

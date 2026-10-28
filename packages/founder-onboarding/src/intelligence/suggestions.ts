@@ -1,5 +1,9 @@
 import type { OnboardingResponseValue } from "@capital-q/contracts";
-import { affirmedMention, parseFigure } from "@capital-q/onboarding";
+import {
+  affirmedMention,
+  parseFigure,
+  parseMoney,
+} from "@capital-q/onboarding";
 import type { FounderFactKey } from "@capital-q/q-core";
 
 import {
@@ -18,7 +22,11 @@ import {
   USE_OF_FUNDS_OPTIONS,
 } from "../definition/founder-v1.js";
 import { FOUNDER_UTTERANCE_ALIASES } from "../definition/utterance-aliases.js";
-import type { FounderCandidate, FounderSuggestionDraft } from "./contracts.js";
+import type {
+  FounderCandidate,
+  FounderConflict,
+  FounderSuggestionDraft,
+} from "./contracts.js";
 import { stepForFactKey } from "./mapping.js";
 
 /**
@@ -262,11 +270,82 @@ function confidenceFor(candidate: FounderCandidate): string {
   }
 }
 
+/** Keys whose figure is money in the raise's currency step. */
+const MONEY_KEYS: ReadonlySet<FounderFactKey> = new Set<FounderFactKey>([
+  "target_amount",
+]);
+
+const CURRENCY_OPTION_KEYS = new Set(CURRENCY_OPTIONS.map((o) => o.optionKey));
+
+/**
+ * The ISO currency a money candidate's own words state, when they state
+ * one unambiguously ("₦450m", "KSh 120 mn", "1,5 M€"). A bare "$" is not
+ * enough to propose a currency, and no currency is never a default.
+ */
+export function statedCurrency(candidate: FounderCandidate): string | null {
+  if (!MONEY_KEYS.has(candidate.key)) return null;
+  // The value as extracted first; the verbatim quote when the value lost
+  // the symbol ("450000000" from "₦450m").
+  for (const text of [candidate.value, candidate.quote]) {
+    if (text === null) continue;
+    const money = parseMoney(text);
+    if (money?.currency != null) {
+      return money.currencyCertain ? money.currency : null;
+    }
+  }
+  return null;
+}
+
+export type DraftSuggestionContext = {
+  /** The currency the founder chose for the raise, as its option key, if any. */
+  readonly chosenCurrency?: string | null | undefined;
+  /** Whether the currency step is still open for a proposal. */
+  readonly currencyOpen?: boolean | undefined;
+};
+
+/**
+ * A raise figure whose material names a different currency from the one
+ * the founder chose. It is never relabelled: "₦450m" offered as USD
+ * 450,000,000 would be a fabricated figure. Both readings go back to the
+ * founder as one question, and the amount is not proposed until they say.
+ */
+export function currencyConflicts(
+  candidates: readonly FounderCandidate[],
+  chosenCurrency: string | null,
+): readonly FounderConflict[] {
+  if (chosenCurrency === null) return [];
+  const chosen = chosenCurrency.toUpperCase();
+  return candidates.flatMap((candidate): FounderConflict[] => {
+    const stated = statedCurrency(candidate);
+    if (stated === null || stated === chosen) return [];
+    return [
+      {
+        key: "currency",
+        readings: [
+          {
+            value: `${stated} (${candidate.value})`,
+            origins: candidate.origins,
+          },
+          { value: `${chosen} (your answer)`, origins: [] },
+        ],
+        question: `Your material gives the raise as ${candidate.value}, in ${stated}, but you chose ${chosen} as the currency. Which currency is the round in?`,
+      },
+    ];
+  });
+}
+
 export function draftSuggestions(
   candidates: readonly FounderCandidate[],
+  context: DraftSuggestionContext = {},
 ): readonly FounderSuggestionDraft[] {
   const drafts: FounderSuggestionDraft[] = [];
   const claimed = new Set<FounderFactKey>();
+  const chosen = context.chosenCurrency?.toUpperCase() ?? null;
+  let deckCurrency: {
+    readonly code: string;
+    readonly sourceRefs: FounderSuggestionDraft["sourceRefs"];
+    readonly confidence: string | null;
+  } | null = null;
 
   for (const candidate of candidates) {
     if (claimed.has(candidate.key) || !isDirectlySuggestable(candidate.key)) {
@@ -283,6 +362,12 @@ export function draftSuggestions(
     // the review list rather than forced into an option.
     const suggestedValue = structuredValueFor(candidate.key, candidate.value);
     if (suggestedValue === null) {
+      continue;
+    }
+    // A figure stated in another currency than the founder's chosen one is
+    // a question (currencyConflicts), never a relabelled suggestion.
+    const stated = statedCurrency(candidate);
+    if (stated !== null && chosen !== null && stated !== chosen) {
       continue;
     }
     claimed.add(candidate.key);
@@ -304,6 +389,40 @@ export function draftSuggestions(
       suggestedValue,
       sourceRefs: sourceRefs.slice(0, 20),
       confidence: confidenceFor(candidate),
+    });
+    if (
+      stated !== null &&
+      deckCurrency === null &&
+      CURRENCY_OPTION_KEYS.has(stated.toLowerCase())
+    ) {
+      deckCurrency = {
+        code: stated,
+        sourceRefs: sourceRefs.slice(0, 20),
+        confidence: confidenceFor(candidate),
+      };
+    }
+  }
+
+  // The amount keeps the currency its own words gave: when the currency
+  // step is open and nothing else proposed one, the deck's currency is
+  // proposed beside the amount, from the same passage.
+  const currencyStep = stepForFactKey("currency");
+  if (
+    deckCurrency !== null &&
+    context.currencyOpen === true &&
+    chosen === null &&
+    !claimed.has("currency") &&
+    currencyStep !== null
+  ) {
+    drafts.push({
+      stepKey: currencyStep,
+      targetField: "currency",
+      suggestedValue: {
+        type: "SINGLE_SELECT",
+        optionKey: deckCurrency.code.toLowerCase(),
+      },
+      sourceRefs: deckCurrency.sourceRefs,
+      confidence: deckCurrency.confidence,
     });
   }
 
