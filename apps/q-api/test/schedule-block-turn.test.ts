@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   answer,
@@ -19,6 +19,18 @@ import {
  */
 
 const RELATIONSHIP = "91000000-0000-4000-8000-000000000001";
+// A fixed morning clock: the test schedules a call 2 h ahead and a reminder
+// 5 h ahead and expects both on today's card. On the real clock, run late
+// in the day, the reminder fell on tomorrow and the card dropped it (CI
+// 2026-10-28 21:16 UTC).
+const FIXED_NOW = Date.parse("2026-10-28T09:00:00.000Z");
+beforeAll(() => {
+  vi.useFakeTimers({ now: FIXED_NOW, toFake: ["Date"] });
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
+
 const soon = (hours: number) =>
   new Date(Date.now() + hours * 3_600_000).toISOString();
 
