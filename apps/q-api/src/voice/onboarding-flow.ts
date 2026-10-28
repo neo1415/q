@@ -459,6 +459,34 @@ function spokenList(items: readonly string[]): string {
 }
 
 /**
+ * What code says when they pause ("I'll continue this later"; owner
+ * 2026-10-28): one short line, what is saved and what is still open, and
+ * that Q carries on from here. No question: the screen then takes them
+ * into the app, as the Continue later button does.
+ */
+export function pausingLine(
+  journey: "founder" | "investor",
+  state: OnboardingState,
+  labelOf: (stepKey: string) => string | undefined,
+): string {
+  const saved = state.steps.filter((s) => s.status === "ANSWERED").length;
+  const open = state.steps
+    .filter((s) => s.status === "OPEN" && s.required && s.kind !== "YES_NO")
+    .map((s) => labelOf(s.stepKey)?.toLowerCase() ?? s.question);
+  const named = open.slice(0, 4);
+  const more = open.length - named.length;
+  const stillOpen =
+    open.length === 0
+      ? "nothing required is still open"
+      : `still open: ${spokenList(named)}${more > 0 ? ` and ${String(more)} more` : ""}`;
+  const into =
+    journey === "investor"
+      ? "Discover already works from what you've told me"
+      : "your home page is ready";
+  return `Of course. ${saved === 1 ? "One thing" : `${String(saved)} things`} you've told me ${saved === 1 ? "is" : "are"} saved, and ${stillOpen}. Pick this up whenever you like; I'll carry on from here, and ${into}.`;
+}
+
+/**
  * What code says when they asked to finish (typed, live 2026-10-28, D3).
  * Finished: one line that it is done. Not yet: one line naming exactly
  * which required things are still open, then the first of them asked.

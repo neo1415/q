@@ -240,9 +240,7 @@ describe("the reading runs alongside the first round (live 2026-09-30)", () => {
       delegation: slowReader(reading({ pausing: true })),
     }).turn({ ...turn(world, "Can we stop for today?"), actor });
     expect(prompts).toHaveLength(2);
-    // Typed (D3, 2026-10-28): stopping now is finishing; code finishes
-    // after the round or says what is still needed.
-    expect(prompts[1]).toContain("They want to finish now");
+    expect(prompts[1]).toContain("They want to pause");
   });
 });
 

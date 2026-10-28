@@ -107,6 +107,7 @@ import {
   finishingLine,
   firstNameOf,
   onboardingFlowFor,
+  pausingLine,
   withNextQuestion,
   withoutUnbackedFieldClaims,
   withoutUnbackedReadingClaims,
@@ -456,24 +457,6 @@ export type RaisedChecks = {
  * a check may be put once more; the settlement itself is durable, on the
  * record (confirm_as_stated's note).
  */
-/**
- * Typed onboarding (live 2026-10-28, investor ca3626ab, D3): "that's all
- * for now" was read as pausing, Q said "we'll stop here" and the screen
- * moved them to Home with 2 of 9 essentials saved. In a typed
- * conversation, wanting to stop now is wanting to finish: code then
- * finishes on their word, or says what is still needed and asks it.
- * Nobody is moved out of the conversation by a reply; the screen's own
- * "Continue later" is how they leave.
- */
-export function stoppingIsFinishing(
-  authority: QTurnAuthority | null,
-): QTurnAuthority | null {
-  if (authority === null || authority.finishing || !authority.pausing) {
-    return authority;
-  }
-  return { ...authority, finishing: true, pausing: false };
-}
-
 export function createInMemoryRaisedChecks(maxSessions = 2_000): RaisedChecks {
   const bySession = new Map<string, Set<string>>();
   return {
@@ -1228,10 +1211,6 @@ export function createInterviewAgent(
       Promise.resolve(NO_TURN_AUTHORITY);
     /** The reading code decided exactly (one step stated), if it did. */
     let codeDecided: QTurnAuthority | null = null;
-    // On the typed channel, stopping now is finishing (D3); the spoken
-    // guided interview keeps its pause.
-    const turnAuthorityOf = (authority: QTurnAuthority | null) =>
-      input.channel === "voice" ? authority : stoppingIsFinishing(authority);
     const wordsCheck = dependencies.wordsCheck;
     const port = createOnboardingPort({
       ...(wordsCheck === undefined
@@ -1263,7 +1242,7 @@ export function createInterviewAgent(
       authority:
         dependencies.delegation === undefined
           ? undefined
-          : () => delegationRead.then(turnAuthorityOf),
+          : () => delegationRead,
       recommendations: dependencies.recommendations,
       raisedChecks: raisedChecks.get(input.onboardingSessionId),
       runId,
@@ -1799,10 +1778,10 @@ export function createInterviewAgent(
           ? authority.pronounce
           : null;
       // Whether they are finishing or pausing is the reading's, by meaning
-      // (DECISIONS 40: no phrase list over their words). On the typed
-      // channel pausing is finishing (D3, `stoppingIsFinishing`): after
-      // the round, code finishes on their word or says what is still
-      // needed. The spoken guided interview keeps its pause.
+      // (DECISIONS 40: no phrase list over their words). Pausing ("I'll
+      // continue this later") saves what was heard and lets them into the
+      // app (owner 2026-10-28); finishing ("that's all", "finish") is
+      // code's: it completes on their word or says what is still needed.
       const pausing = !opening && authority.pausing;
       const finishing = !opening && authority.finishing;
       // A required step they decline for now stays open on the record;
@@ -1875,7 +1854,7 @@ export function createInterviewAgent(
     // nothing different of the turn.
     let reading: ReturnType<typeof readingOf> | null = null;
     const readingDone = delegationRead.then((authority) => {
-      reading = readingOf(turnAuthorityOf(authority) ?? NO_TURN_AUTHORITY);
+      reading = readingOf(authority ?? NO_TURN_AUTHORITY);
       rememberStated(
         input.onboardingSessionId,
         utterance,
@@ -2742,11 +2721,31 @@ export function createInterviewAgent(
     // A reading that came in after the last round still records what they
     // approved: the approval is theirs whether or not a round saw it.
     await recordApproved(authority.approved);
-    // D3 (typed, live 2026-10-28): finishing is code's, on their word. The
-    // port confirms the journey's own review steps and completes it when
-    // every required answer is on the record; otherwise it says exactly
-    // which are not, and the reply asks the first of them. Never "we'll
-    // pause here", never a move to Home.
+    // Pausing (owner 2026-10-28): what was heard is saved by the round
+    // above; one short line says what is saved and what is still open, and
+    // the person goes into the app (`navigate` below). Never completed,
+    // never the next question.
+    if (pausing && codeSpeaksEnglish && !opening) {
+      const line = pausingLine(
+        input.journeyType,
+        await port.state(),
+        (stepKey) =>
+          coverageProfileFor(input.journeyType).fields[stepKey]?.label,
+      );
+      const written = InterviewAgentV16ResultSchema.safeParse({
+        reply: line,
+        asking: null,
+      });
+      if (written.success) {
+        result = written.data;
+        writtenByCode = true;
+      }
+    }
+    // D3 (typed, live 2026-10-28): "that's all" is finishing, and finishing
+    // is code's, on their word. The port confirms the journey's own review
+    // steps and completes it when every required answer is on the record;
+    // otherwise it says exactly which are not, and the reply asks the
+    // first of them. Never "we'll pause here".
     if (
       finishing &&
       !opening &&
@@ -3270,11 +3269,14 @@ export function createInterviewAgent(
             : "PROFILE"
           : conduct.action === "ROUTE_AWAY"
             ? "DISCOVER"
-            : // Owner 2026-10-16, "continue later": Q has acknowledged it
-              // in one line (the pausing note), and the person is let
-              // into the app; their saved answers wait where they are.
+            : // Owner 2026-10-16 and 2026-10-28, "continue later": Q has
+              // said in one line what is saved, and the person is let into
+              // the app, where the Continue later button goes (an investor
+              // to Discover, a founder Home); their answers wait.
               pausing
-              ? "HOME"
+              ? input.journeyType === "investor"
+                ? "DISCOVER"
+                : "HOME"
               : null,
       handoff: null,
       pronounce,

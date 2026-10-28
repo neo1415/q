@@ -16,10 +16,7 @@ import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createHeldWritesStore } from "../src/voice/held-writes.js";
-import {
-  createInterviewAgent,
-  stoppingIsFinishing,
-} from "../src/voice/interview-agent.js";
+import { createInterviewAgent } from "../src/voice/interview-agent.js";
 import {
   describeValue,
   recordedCurrency,
@@ -375,19 +372,34 @@ describe("D1: an investor's whole first sentence is saved (live ca3626ab, 10:39:
 });
 
 describe("D3: 'that's all for now' finishes, or says exactly what is still needed (live ca3626ab, 10:40:50)", () => {
-  it("reads stopping as finishing on the typed channel, and leaves the spoken reading alone", () => {
-    expect(stoppingIsFinishing(reading({ pausing: true }))).toMatchObject({
-      finishing: true,
-      pausing: false,
+  it("a pause ('I'll continue this later') saves, says what is saved and open, asks nothing, and takes an investor to Discover without completing anything", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: {
+        "I0.investor_type": "angel",
+        "I0.organisation_name": "Harmattan Angels",
+        "I1.deployment_status": "actively_investing",
+      },
     });
-    expect(stoppingIsFinishing(reading({ finishing: true }))).toMatchObject({
-      finishing: true,
-    });
-    expect(stoppingIsFinishing(reading({}))).toMatchObject({
-      finishing: false,
-      pausing: false,
-    });
-    expect(stoppingIsFinishing(null)).toBeNull();
+    const { gateway } = model([
+      { reply: "Of course, we'll pick this up later." },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ pausing: true })),
+    }).turn({ ...turn(world, "I'll continue this later"), actor });
+    expect(outcome.navigate).toBe("DISCOVER");
+    expect(outcome.pausing).toBe(true);
+    expect(outcome.asking).toBeNull();
+    expect(outcome.reply).toMatch(
+      /^Of course\. 3 things you've told me are saved, and still open: /u,
+    );
+    expect(outcome.reply).toMatch(/stages/u);
+    expect(outcome.reply).not.toMatch(/\?/u);
+    expect(outcome.view.session.status).toBe("ACTIVE");
   });
 
   it("with essentials open: one line naming the required things still open, the first of them asked, and nobody moved to Home", async () => {
@@ -410,8 +422,8 @@ describe("D3: 'that's all for now' finishes, or says exactly what is still neede
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
-      // Read as pausing, as the live reader read "that's all for now".
-      delegation: readerOf(reading({ pausing: true })),
+      // "that's all" is finishing (owner 2026-10-28), not pausing.
+      delegation: readerOf(reading({ finishing: true })),
     }).turn({ ...turn(world, "that's all for now"), actor });
     expect(outcome.navigate).toBeNull();
     expect(outcome.pausing).toBeUndefined();

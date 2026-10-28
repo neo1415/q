@@ -207,7 +207,7 @@ describe("a question that needs a look-up is handed to Q, in the person's words"
 });
 
 describe("a pause, read as a concept", () => {
-  it("on the typed channel is finishing: what is still needed is said and asked, and nobody is moved to Home (D3, 2026-10-28)", async () => {
+  it("asks nothing, says in one line what is saved and open, and lets an investor into Discover (owner 2026-10-28)", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       recorded: SO_FAR,
@@ -220,33 +220,14 @@ describe("a pause, read as a concept", () => {
       recommendations: world.recommendations,
       delegation: readerOf(reading({ pausing: true })),
     }).turn({ ...turn(world, "Let's pick this up tomorrow."), actor });
-    expect(outcome.asking).not.toBeNull();
-    expect(outcome.questionForQ).toBeNull();
-    expect(seen[0]).toContain("They want to finish now");
-    expect(outcome.reply).toMatch(/^Before I can finish, I still need /u);
-    expect(outcome.navigate).toBeNull();
-  });
-
-  it("on the spoken guided interview stays a pause: asks nothing, and they are let into the app (owner 2026-10-16)", async () => {
-    const world = investorSession({
-      currentStepKey: "I2.stages",
-      recorded: SO_FAR,
-    });
-    const { gateway, seen } = replying("I2.stages");
-    const outcome = await createInterviewAgent({
-      gateway,
-      firewall: firewall(),
-      logger,
-      recommendations: world.recommendations,
-      delegation: readerOf(reading({ pausing: true })),
-    }).turn({
-      ...turn(world, "Let's pick this up tomorrow."),
-      channel: "voice",
-      actor,
-    });
     expect(outcome.asking).toBeNull();
+    expect(outcome.questionForQ).toBeNull();
     expect(seen[0]).toContain("They want to pause");
-    expect(outcome.navigate).toBe("HOME");
+    expect(outcome.reply).toMatch(/saved/u);
+    expect(outcome.reply).not.toMatch(/\?/u);
+    // Where the Continue later button goes: an investor to Discover.
+    expect(outcome.navigate).toBe("DISCOVER");
+    expect(outcome.view.session.status).toBe("ACTIVE");
   });
 
   it("without the reading, a turn is not a pause, whatever its words", async () => {
