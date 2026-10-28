@@ -786,6 +786,11 @@ export function createWorkforceJobBoard(dependencies: {
                       },
               waiting: waitingNow,
             }),
+            // Q's own earlier answer the goal refers to: beside the goal,
+            // labelled as Q's inference in the plan's prompt (v15).
+            ...(options?.priorAnswer === undefined
+              ? {}
+              : { priorAnswer: options.priorAnswer.text }),
           })
           .catch(() => null);
         // Live 2026-10-12: the planner's provider refused (credit exhausted)

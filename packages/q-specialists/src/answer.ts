@@ -18,11 +18,13 @@ import {
   TEAM_JOB_KINDS,
   goAheadGoal,
   earlierRequestGoal,
+  priorAnswerOf,
   teamJobBlocks,
   teamJobLine,
   teamJobOutcomeOf,
   workKindsAsked,
   type QTeamJobPort,
+  type TeamJobAudience,
 } from "./team-job.js";
 import {
   readingMisfit,
@@ -2510,7 +2512,7 @@ export function createSpecialistQAnswer(
     // said saving was not available in the job. The save is the board's
     // part; the planner gets only the work.
     const planned = await teamJob.propose(request, withoutBoardSave(words));
-    const line = teamJobLine(planned);
+    const line = teamJobLine(planned, teamJobAudienceOf(request));
     const blocks = teamJobBlocks(planned);
     if (planned.status !== "STARTED") {
       return recordAnswer(
@@ -5886,16 +5888,33 @@ export function createSpecialistQAnswer(
         goAhead === null && read?.workFromEarlier === true
           ? earlierRequestGoal(history, latest.content)
           : null;
+      // Live 2026-10-28 (run 8b649d10): "make it into a plan and execute
+      // that plan" after Q's gap analysis was planned from those words
+      // alone. When the reading says this turn takes up what came just
+      // before -- work from earlier, or a reply to Q's last question or
+      // invitation -- Q's own last answer goes beside the goal as Q's
+      // inference; the goal stays the person's words.
+      const refersBack =
+        goAhead === null &&
+        (read?.workFromEarlier === true ||
+          read?.replyTo?.kind === "Q_QUESTION");
+      const priorAnswer = refersBack ? priorAnswerOf(history) : null;
       const planned = await dependencies.teamJob.propose(
         request,
         goAhead ?? earlier ?? latest.content,
-        ...(goAhead === null ? [] : [{ proceed: true }]),
+        {
+          ...(goAhead === null ? {} : { proceed: true }),
+          ...(priorAnswer === null ? {} : { priorAnswer }),
+        },
       );
       logger?.info(
         {
           qRunId: request.runId,
           by: teamJobBy,
           goAhead: goAhead !== null,
+          workFromEarlier: read?.workFromEarlier === true,
+          replyTo: read?.replyTo?.kind ?? null,
+          priorAnswerItems: priorAnswer?.items.length ?? null,
           outcome: planned.status,
           planMs: Date.now() - startedAt,
         },
@@ -5904,7 +5923,7 @@ export function createSpecialistQAnswer(
       return recordAnswer(
         request,
         conversationId,
-        teamJobLine(planned),
+        teamJobLine(planned, teamJobAudienceOf(request)),
         teamJobBlocks(planned),
       );
     }
@@ -7358,4 +7377,17 @@ export function bareCityReply(
     )
     .join(" ");
   return { said: said.length > 0 ? said : zone, zone };
+}
+
+/**
+ * Whose side of the table a team-job line speaks to (live 2026-10-28: a
+ * founder was offered "questions for the founder"): an investor when the
+ * run is bound to their own investor organisation's mandate -- the
+ * firewall's proof, as the record resolver above reads it -- a founder
+ * otherwise.
+ */
+function teamJobAudienceOf(request: QAnswerRequest): TeamJobAudience {
+  return ownInvestorOrganisationIn(request.plan) !== null
+    ? "INVESTOR"
+    : "FOUNDER";
 }

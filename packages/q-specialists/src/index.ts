@@ -325,12 +325,15 @@ export {
   createToolTeamJobPort,
   TEAM_JOB_KINDS,
   earlierRequestGoal,
+  priorAnswerOf,
   teamJobBlocks,
   ownWorkSummary,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,
+  type TeamJobAudience,
   type TeamJobOutcome,
+  type TeamJobPriorAnswer,
 } from "./team-job.js";
 export {
   actOnDelegation,

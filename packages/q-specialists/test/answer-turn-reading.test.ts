@@ -46,7 +46,13 @@ import {
   namedInWords,
   unknownScreenLine,
 } from "../src/answer.js";
-import { workKindsAsked, type QTeamJobPort } from "../src/team-job.js";
+import {
+  teamJobLine,
+  teamJobOutcomeOf,
+  workKindsAsked,
+  type QTeamJobPort,
+  type TeamJobPriorAnswer,
+} from "../src/team-job.js";
 import type { CallPrep, QCallPrepPort } from "../src/call-prep.js";
 import {
   createToolProfileGapsPort,
@@ -2629,6 +2635,105 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     await yes.answer.answer(request());
     expect(goals.at(-1)).toBe("Write me a 12-month plan\nyes");
     expect(yes.delegated()).toBe(0);
+  });
+
+  // Live 2026-10-28 (run 8b649d10): a founder asked for their gaps, Q listed
+  // three, and "make that into a plan and execute it" reached the planner
+  // without them; Q replied with investor wording.
+  const GAPS = [
+    "Here are the three gaps investors will see first:",
+    "1. No audited financials for 2025",
+    "2. No named customer references",
+    "3. The cap table is not in your data room",
+  ].join("\n");
+
+  it("run 8b649d10: 'make that into a plan and execute it' after Q's gaps carries the three gaps beside the person's words", async () => {
+    const calls: {
+      goal: string;
+      prior: TeamJobPriorAnswer | undefined;
+    }[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal, options) => {
+        calls.push({ goal, prior: options?.priorAnswer });
+        return Promise.resolve({
+          status: "NOT_PLANNED",
+          choices: options?.priorAnswer?.items ?? [],
+        });
+      },
+    };
+    const said =
+      "Can you make that into a plan and then go ahead and execute it";
+    const turn = seam({
+      said,
+      earlier: [
+        { role: "USER", content: "What are my gaps?" },
+        { role: "Q", content: GAPS },
+      ],
+      reading: {
+        ...reading(null),
+        handOver: null,
+        teamJob: true,
+        workFromEarlier: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await turn.answer.answer(request());
+    expect(calls).toHaveLength(1);
+    // The goal is the person's own words; Q's answer travels beside it.
+    expect(calls[0]?.goal).toBe(`What are my gaps?\n${said}`);
+    expect(calls[0]?.prior?.items).toEqual([
+      "No audited financials for 2025",
+      "No named customer references",
+      "The cap table is not in your data room",
+    ]);
+    const line = turn.stored.at(-1)?.content ?? "";
+    expect(line).toMatch(
+      /^Tell me which of these you want done first: 1\) No audited financials for 2025; 2\) No named customer references; 3\) The cap table is not in your data room\./u,
+    );
+    expect(teamJobOutcomeOf(line)).toBe("NOT_PLANNED");
+  });
+
+  it("run 8b649d10: a turn the reading does not tie to Q's answer carries no earlier answer", async () => {
+    const priors: (TeamJobPriorAnswer | undefined)[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, _goal, options) => {
+        priors.push(options?.priorAnswer);
+        return Promise.resolve({ status: "NOT_PLANNED" });
+      },
+    };
+    const turn = seam({
+      said: "Research the Kenyan water market and write me a growth plan",
+      earlier: [
+        { role: "USER", content: "What are my gaps?" },
+        { role: "Q", content: GAPS },
+      ],
+      reading: {
+        ...reading(null),
+        handOver: null,
+        teamJob: true,
+        replyTo: { kind: "NEW", card: null },
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await turn.answer.answer(request());
+    expect(priors).toEqual([undefined]);
+    // A founder (no investor mandate in the run) hears a founder's options.
+    const line = turn.stored.at(-1)?.content ?? "";
+    expect(line).toMatch(/a one-pager for investors/u);
+    expect(line).not.toMatch(/questions for the founder/u);
+  });
+
+  it("the not-planned line is the person's side of the table: founder and investor wording", () => {
+    const founder = teamJobLine({ status: "NOT_PLANNED" }, "FOUNDER");
+    const investor = teamJobLine({ status: "NOT_PLANNED" }, "INVESTOR");
+    expect(founder).not.toMatch(/questions for the founder|who it's about/u);
+    expect(founder).toMatch(/updated pitch deck, a one-pager for investors/u);
+    expect(investor).toMatch(/questions for the founder/u);
+    for (const line of [founder, investor]) {
+      expect(teamJobOutcomeOf(line)).toBe("NOT_PLANNED");
+    }
   });
 
   it("the same words without the reading's teamJob are answered as before (no magic word)", async () => {

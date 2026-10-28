@@ -1111,6 +1111,11 @@ export function createWorkforceJobs(dependencies: {
         | undefined;
       /** What code read from their records for this job (authorised). */
       readonly situation?: JobSituation | undefined;
+      /**
+       * Q's own earlier answer the goal refers to (JOB_PLAN v15): Q's
+       * inference beside the goal, never the goal or a situation fact.
+       */
+      readonly priorAnswer?: string | undefined;
     },
     trace: { readonly jobId: string; readonly runId: string } | null,
   ): Promise<PlannedJob | null> {
@@ -1133,6 +1138,9 @@ export function createWorkforceJobs(dependencies: {
         roster: executorRosterText(executors, permitted),
         allowed: `${allowed}${feedback}`.slice(0, 2_000),
         situation: situationText(situation).slice(0, 8_000),
+        ...(input.priorAnswer === undefined
+          ? {}
+          : { priorAnswer: input.priorAnswer.slice(0, 4_000) }),
       });
       if (planned === null) return null;
       let droppedRefs = 0;
@@ -1185,6 +1193,24 @@ export function createWorkforceJobs(dependencies: {
           .join(
             "; ",
           )}. Plan again: fix those steps, or put what no role can do in cannot.`,
+      );
+      if (again !== null) made = again;
+    }
+    if (
+      made.bound.steps.length === 0 &&
+      made.bound.refused.length === 0 &&
+      input.priorAnswer !== undefined
+    ) {
+      // Live 2026-10-28 (run 8b649d10): "make it into a plan and execute
+      // it" came back with no step. With Q's earlier answer beside the job,
+      // the lead is asked once more to plan its items; still empty is not
+      // planned, and the person is asked which item comes first.
+      dependencies.logger?.info(
+        { steps: 0, priorAnswer: true },
+        "workforce plan came back empty; replanning once from the earlier answer",
+      );
+      const again = await attempt(
+        " YOUR LAST PLAN HAD NO STEPS. The job refers to your earlier answer (YOUR EARLIER ANSWER): plan steps for its concrete items that the roster can work on, most important first, and put the items no role can do in cannot.",
       );
       if (again !== null) made = again;
     }
@@ -1368,6 +1394,8 @@ export function createWorkforceJobs(dependencies: {
           | null
           | undefined;
         readonly situation?: JobSituation | undefined;
+        /** Q's own earlier answer the goal refers to (JOB_PLAN v15). */
+        readonly priorAnswer?: string | undefined;
       },
     ) => plan(owner, input, null),
 

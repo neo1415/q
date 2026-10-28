@@ -666,6 +666,8 @@ export {
   type QJobNamePorts,
   type QJobPlanView,
   type QJobPort,
+  QJobPriorAnswerSchema,
+  type QJobPriorAnswer,
   type QJobSituationReads,
   situationReads,
   JOB_BRIEFS_MAX,

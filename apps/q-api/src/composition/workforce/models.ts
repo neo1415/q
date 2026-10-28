@@ -51,7 +51,7 @@ import {
   type EtiquettePurpose,
   type JobPlanResultV9Input,
   type JobPlanResultV10,
-  type JobPlanVariablesV5,
+  type JobPlanVariablesV15Input,
   type ReplyReaderResult,
   type ReplyReaderVariables,
 } from "@capital-q/q-core";
@@ -80,7 +80,8 @@ type Frame =
 export type ReviewVariables = Omit<DraftReviewV2Variables, Frame>;
 export type RedraftVariables = Omit<DraftRedraftVariables, Frame>;
 export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
-export type PlanVariables = Omit<JobPlanVariablesV5, Frame>;
+/** JOB_PLAN v15's input: priorAnswer is absent when the job refers to none. */
+export type PlanVariables = Omit<JobPlanVariablesV15Input, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
 export type ResearchPlanInput = Omit<ResearchPlanVariables, Frame>;

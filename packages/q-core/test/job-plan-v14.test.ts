@@ -18,9 +18,9 @@ import {
  * research and written with a growth plan's sections.
  */
 describe("diligence prompts", () => {
-  it("JOB_PLAN v14 is active: v13 plus DUE DILIGENCE, the same result", () => {
+  it("JOB_PLAN v14: v13 plus DUE DILIGENCE, the same result (v15 follows it)", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(14);
+    expect(registry.get("JOB_PLAN", 14)?.definition.status).toBe("DEPRECATED");
     expect(registry.get("JOB_PLAN", 13)?.definition.status).toBe("DEPRECATED");
     expect(JOB_PLAN_V14.output).toBe(JOB_PLAN_V13.output);
     expect(JOB_PLAN_V14.template).toContain(V14_NAMED_COMPANY_KINDS);
