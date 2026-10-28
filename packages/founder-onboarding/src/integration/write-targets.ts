@@ -62,6 +62,7 @@ import {
   financialClaimFor,
   type FinancialKnowledgePort,
 } from "./financial-claims.js";
+import { localFigureOf } from "../local-figures/provenance.js";
 import { FOUNDER_FINANCIAL_WRITE_TARGET } from "../definition/founder-v4.js";
 import {
   createFounderDomainServices,
@@ -759,9 +760,23 @@ export function createFounderWriteTargets(
       // or a figure with no currency records nothing: unknown stays unknown.
       targetKey: FOUNDER_FINANCIAL_WRITE_TARGET,
       apply: async (context, response) => {
+        // Owner 2026-10-28: kept from a figure read out of their own
+        // financial document, the claim carries that figure's period and
+        // stated currency, and names the document as where it was read.
+        const figure =
+          context.resolvingSuggestion === undefined
+            ? null
+            : localFigureOf(context.resolvingSuggestion.sourceRefs);
         const claim = financialClaimFor(
           response.stepKey,
           responseValues(context.currentResponses, response),
+          figure === null
+            ? null
+            : {
+                figure,
+                edited: response.sourceModality === "SUGGESTION_EDIT",
+                documentKind: "financial document",
+              },
         );
         if (claim === null) {
           return;

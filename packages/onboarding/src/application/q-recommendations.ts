@@ -24,6 +24,7 @@ import {
   createPostgresOnboardingSuggestionRepository,
 } from "../infrastructure/postgres-session-repository.js";
 import { sameResponseValue } from "./pending-writes.js";
+import { isLocalFigureProposal } from "./coverage.js";
 import { supersededDocumentOffers } from "./superseded-offers.js";
 import { createDefinitionCache } from "./view.js";
 
@@ -253,6 +254,10 @@ export function createOnboardingQRecommendations(options: {
         // approval to accept: a deck read mid-conversation could be
         // neither said nor confirmed in the conversation.
         return (await suggestions.listPending(tx.sql, sessionId))
+          // A figure from their highly confidential accounts is confirmed
+          // on screen only: never read back or accepted in a conversation
+          // a model writes (owner 2026-10-28).
+          .filter((s) => !isLocalFigureProposal(s.sourceRefs))
           .filter((s) => isQ(s.sourceRefs) || fromDocument(s.sourceRefs))
           .map((s) => ({
             id: s.id,

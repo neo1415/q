@@ -617,6 +617,7 @@ import {
   createOwnRecordsPort,
   createRelationshipMailPort,
 } from "./composition/own-records.js";
+import { createLocalFigureStatus } from "./composition/local-figures.js";
 import {
   createRecordChangeActions,
   createRecordChangeBoard,
@@ -3124,6 +3125,7 @@ const appActionPorts: OwnReadPorts = {
     if (companyId === null) return [];
     const files = await createEvidenceDocumentsPort(
       researchComposition.evidence,
+      createLocalFigureStatus(database.sql),
     ).list(actor, companyId);
     return files.slice(0, 30).map((file) => ({
       id: file.documentId,
@@ -3138,9 +3140,23 @@ const appActionPorts: OwnReadPorts = {
         qReading: file.processing,
         // Stress 2026-10-28: a highly confidential file is never read by Q;
         // it says so, with the compliant path, rather than "COMPLETED" alone.
-        ...((): { qUse?: string } => {
-          const held = heldBackFromQ(file.sensitivityClass);
-          return held === null ? {} : { qUse: held };
+        ...((): { qUse?: string; confirmedFigures?: string } => {
+          // Owner 2026-10-28: figures read by code wait for their
+          // confirmation; the ones they confirmed are theirs, beside the deck.
+          const held = heldBackFromQ(file.sensitivityClass, file.figures);
+          return held === null
+            ? {}
+            : {
+                qUse: held,
+                ...(file.figures === undefined ||
+                file.figures.confirmed.length === 0
+                  ? {}
+                  : {
+                      confirmedFigures: file.figures.confirmed
+                        .slice(0, 10)
+                        .join("\n"),
+                    }),
+              };
         })(),
         shareable: "yes, whether or not Q has read it",
         // ADR 0042: no scanner yet. Q says so whenever it offers the file.
@@ -3655,6 +3671,7 @@ const qTools = createQTools({
     },
     evidenceDocuments: createEvidenceDocumentsPort(
       researchComposition.evidence,
+      createLocalFigureStatus(database.sql),
     ),
     // Lane 8: what they attached to Q, authorised by Evidence as them.
     attachedDocuments: createAttachedDocumentReads({
@@ -4738,6 +4755,9 @@ const qIntelligence = composeQIntelligence({
          and s.tenant_id = ${tenantId}
          and s.status = 'COMPLETED'
          and g.status = 'PENDING'
+         -- Owner 2026-10-28: figures read from their highly confidential
+         -- accounts are confirmed on screen, never put to a model.
+         and not (g.source_refs @> '[{"sourceType":"LOCAL_FIGURE"}]'::jsonb)
        order by g.created_at desc
        limit 4`.catch(() => []);
     const findings = found

@@ -712,6 +712,12 @@ async function commitResponse(
     }
     return handler;
   });
+  const resolvingSuggestion =
+    options.resolvingSuggestionId === undefined
+      ? undefined
+      : aggregate.pendingSuggestions.find(
+          (pending) => pending.id === options.resolvingSuggestionId,
+        );
   const applyAll = async (unit: TransactionContext) => {
     for (const handler of handlers) {
       await handler.apply(
@@ -725,6 +731,7 @@ async function commitResponse(
           bindContext,
           requestMemo: options.requestMemo,
           defer: options.defer,
+          ...(resolvingSuggestion === undefined ? {} : { resolvingSuggestion }),
         },
         validated,
       );

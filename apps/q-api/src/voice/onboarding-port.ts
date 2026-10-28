@@ -33,6 +33,7 @@ import {
 } from "@capital-q/investor-onboarding";
 import {
   deriveOnboardingCoverage,
+  isLocalFigureProposal,
   isTransientOnboardingFailure,
   waitsForContext,
   clausesOf,
@@ -988,9 +989,13 @@ export function createOnboardingPort(input: {
             ...(() => {
               const field = coverageOf.get(step.stepKey);
               if (field === undefined) return {};
+              // A figure read from their highly confidential accounts is
+              // confirmed on screen, never put to the voice model (owner
+              // 2026-10-28).
               const offer = field.proposals.find(
                 (p) =>
-                  p.source === "DOCUMENT" || p.source === "PUBLIC_RESEARCH",
+                  (p.source === "DOCUMENT" || p.source === "PUBLIC_RESEARCH") &&
+                  !isLocalFigureProposal(p.sourceRefs),
               );
               return {
                 coverage: field.state,

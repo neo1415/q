@@ -36,6 +36,11 @@ import {
 } from "@capital-q/q-knowledge";
 import type { ActorContext } from "@capital-q/security";
 
+import { describePeriod, periodBounds } from "../local-figures/period.js";
+import type { LocalFigureProvenance } from "../local-figures/provenance.js";
+import { MEASURE_STEPS } from "../local-figures/steps.js";
+import { measureByKey } from "../local-figures/measures.js";
+
 import type { FounderDomainDependencies } from "./services.js";
 
 /**
@@ -62,6 +67,30 @@ export type FinancialClaim = {
   /** Capital Q's wording of what the founder said. */
   readonly statement: string;
   readonly structuredValue: Readonly<Record<string, string>>;
+  /**
+   * Owner 2026-10-28: a figure the founder confirmed from their own
+   * financial document. The claim is theirs (USER_CLAIM, SELF_REPORTED);
+   * the document is named as where the figure was read, never quoted into
+   * the claim and never handed to a model. Absent for a typed answer.
+   */
+  readonly fromDocument?:
+    | {
+        /** "document-figure:<version>:<measure>:<period>", for the source. */
+        readonly externalReference: string;
+        /** The period the figure is for, as validity (end exclusive). */
+        readonly validFrom: string;
+        readonly validTo: string;
+      }
+    | undefined;
+};
+
+/** How a figure the founder confirmed from their document is described. */
+export type ConfirmedDocumentFigure = {
+  readonly figure: LocalFigureProvenance;
+  /** True when they changed the figure before keeping it. */
+  readonly edited: boolean;
+  /** "management accounts", "financial model". */
+  readonly documentKind: string;
 };
 
 /** The knowledge key each financial step's answer is recorded under. */
@@ -120,13 +149,94 @@ export function canonicalDecimal(amount: string): string {
   return trimmed.replace(/^(-?)0+(?=\d)/, "$1");
 }
 
+const MEASURE_WORDS: Readonly<Record<string, string>> = {
+  [FOUNDER_FINANCIAL_STEPS.monthlyRevenue]: "monthly revenue",
+  [FOUNDER_FINANCIAL_STEPS.monthlyBurn]: "monthly net burn",
+  [FOUNDER_FINANCIAL_STEPS.cash]: "cash in the bank",
+  [FOUNDER_FINANCIAL_STEPS.grossMargin]: "gross margin",
+  [FOUNDER_FINANCIAL_STEPS.runway]: "runway",
+};
+
+/**
+ * The claim a figure confirmed from their document makes: the period it is
+ * for, the currency the document stated (never relabelled to the reporting
+ * currency), and where it was read. Null when the provenance does not fit
+ * this step or the answer is not a figure.
+ */
+function documentFigureClaim(
+  stepKey: string,
+  knowledgeKey: string,
+  values: ResponseValues,
+  confirmed: ConfirmedDocumentFigure,
+): FinancialClaim | null {
+  const { figure } = confirmed;
+  if (MEASURE_STEPS[figure.measure] !== stepKey) return null;
+  const raw = decimal(values, stepKey);
+  if (raw === null) return null;
+  const amount = canonicalDecimal(raw);
+  const period = describePeriod(figure.period);
+  const words = MEASURE_WORDS[stepKey] ?? "the figure";
+  const unit = measureByKey(figure.measure).unit;
+  let shown: string;
+  let structured: Record<string, string>;
+  if (unit === "MONEY") {
+    if (figure.currency === null) return null;
+    shown = `${figure.currency} ${groupDecimal(amount)}`;
+    structured = { kind: "MONEY", amount, currency: figure.currency };
+  } else if (unit === "PERCENT") {
+    shown = `${amount}%`;
+    structured = { kind: "PERCENTAGE", value: amount };
+  } else if (unit === "MONTHS") {
+    shown = `${amount} months`;
+    structured = { kind: "DURATION", value: amount, unit: "MONTH" };
+  } else {
+    return null;
+  }
+  const bounds = periodBounds(figure.period);
+  return {
+    stepKey,
+    knowledgeKey,
+    statement: confirmed.edited
+      ? `The founder stated ${words} for ${period} was ${shown}, correcting the figure read from their ${confirmed.documentKind}.`
+      : `The founder confirmed ${words} for ${period} was ${shown}, as stated in their ${confirmed.documentKind}.`,
+    structuredValue: {
+      ...structured,
+      origin: "DOCUMENT_FIGURE",
+      measure: figure.measure,
+      measuresVersion: figure.measuresVersion,
+      periodGranularity: figure.period.granularity,
+      period: figure.period.key,
+      ...(figure.period.asOf === null ? {} : { asOf: figure.period.asOf }),
+      ...(figure.documentId === null ? {} : { documentId: figure.documentId }),
+      ...(figure.documentVersionId === null
+        ? {}
+        : { documentVersionId: figure.documentVersionId }),
+      ...(figure.where === null ? {} : { where: figure.where }),
+      confirmation: confirmed.edited ? "EDITED" : "KEPT",
+    },
+    fromDocument: {
+      externalReference:
+        `document-figure:${figure.documentVersionId ?? "unknown"}:${figure.measure}:${figure.period.key}`.slice(
+          0,
+          256,
+        ),
+      validFrom: bounds.from,
+      validTo: bounds.to,
+    },
+  };
+}
+
 /** The claim a committed financial answer makes, or null (unknown, or no currency). */
 export function financialClaimFor(
   stepKey: string,
   values: ResponseValues,
+  confirmed?: ConfirmedDocumentFigure | null,
 ): FinancialClaim | null {
   const knowledgeKey = FINANCIAL_KNOWLEDGE_KEYS[stepKey];
   if (knowledgeKey === undefined) return null;
+  if (confirmed !== undefined && confirmed !== null) {
+    return documentFigureClaim(stepKey, knowledgeKey, values, confirmed);
+  }
   if (stepKey === FOUNDER_FINANCIAL_STEPS.revenueTrend) {
     const trend = singleSelect(values, stepKey);
     const label = REVENUE_TREND_OPTIONS.find((o) => o.optionKey === trend);
@@ -241,11 +351,27 @@ export function createFinancialKnowledgeRecorder({
         input: {
           sourceType: "USER_STATEMENT",
           subject: { subjectType: "COMPANY", subjectId: companyId },
-          title: "Answer in the founder interview",
-          externalReference: `onboarding:${sessionId}:${claim.stepKey}`,
+          // The founder's statement either way: a figure they confirmed from
+          // their own document names the document (by version) as where it
+          // was read; the document's content is not part of the source.
+          title:
+            claim.fromDocument === undefined
+              ? "Answer in the founder interview"
+              : "Figure the founder confirmed from their financial document",
+          externalReference:
+            claim.fromDocument?.externalReference ??
+            `onboarding:${sessionId}:${claim.stepKey}`,
           reliabilityClass: "USER_STATEMENT",
           visibilityScope: "founder_private",
-          sensitivityClass: "HIGHLY_CONFIDENTIAL",
+          // Owner 2026-10-28: a figure the founder confirmed from their
+          // document is their own claim that Q may use in their own
+          // answers (CONFIDENTIAL: reviewed providers only); the document
+          // stays HIGHLY_CONFIDENTIAL and is never read. founder_private
+          // either way: no investor sees it without an explicit share.
+          sensitivityClass:
+            claim.fromDocument === undefined
+              ? "HIGHLY_CONFIDENTIAL"
+              : "CONFIDENTIAL",
         },
       });
       const now = new Date().toISOString();
@@ -258,7 +384,7 @@ export function createFinancialKnowledgeRecorder({
           summary: claim.statement,
           locator: { kind: "statement" },
           evidenceStatus: "SELF_REPORTED",
-          validFrom: now,
+          validFrom: claim.fromDocument?.validFrom ?? now,
         },
       });
       return gate.submit({
@@ -278,13 +404,16 @@ export function createFinancialKnowledgeRecorder({
           supportingClaimIds: [],
           supportingEvidenceItemIds: [item.id],
           supportingSourceIds: [source.id],
-          validFrom: now,
-          validTo: null,
+          validFrom: claim.fromDocument?.validFrom ?? now,
+          validTo: claim.fromDocument?.validTo ?? null,
           definitionQualifier: null,
           measurementBasis: "ACTUAL",
           correctsEarlier: false,
           lineage: [],
-          reason: "USER_ANSWERED_IN_INTERVIEW",
+          reason:
+            claim.fromDocument === undefined
+              ? "USER_ANSWERED_IN_INTERVIEW"
+              : "USER_CONFIRMED_DOCUMENT_FIGURE",
         },
       });
     },

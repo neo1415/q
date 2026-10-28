@@ -121,6 +121,10 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
     "لا يظهر في توصياتك، أياً كان أسلوب اكتشافك. ويختلف عن «أفضّل ألّا أرى» الذي يخفض الترتيب فقط.",
   "Not sure / not tracked": "غير متأكد / غير متتبَّع",
   "Not this": "ليس هذا",
+  // Owner 2026-10-28: a figure read by code from their financial document.
+  "From your financial document": "من مستندك المالي",
+  "Read by Capital Q's code. No model saw this document.":
+    "قرأته شيفرة Capital Q. لم يطّلع أي نموذج على هذا المستند.",
   "Nothing I still need from you": "لا شيء أحتاجه منك بعد",
   "Nothing I still need from you. Everything important is answered or waiting on your review.":
     "لا شيء أحتاجه منك بعد. كل ما هو مهم أُجيب عنه أو بانتظار مراجعتك.",

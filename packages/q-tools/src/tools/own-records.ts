@@ -232,6 +232,12 @@ export const ListUploadedDocumentsOutputSchema = z
             updatedAt: z.string().max(40),
             /** Present when Q may not read it: why, and the compliant path. */
             qUse: z.string().max(600).optional(),
+            /**
+             * Figures the founder confirmed from it (their own USER_CLAIM),
+             * each set against their deck by code: CORROBORATED,
+             * CONTRADICTED (both sides) or UNVERIFIED.
+             */
+            confirmedFigures: z.array(z.string().max(600)).max(10).optional(),
           })
           .strict(),
       )
@@ -251,11 +257,30 @@ export const ListUploadedDocumentsOutputSchema = z
  */
 export function heldBackFromQ(
   sensitivityClass: string | null | undefined,
+  figures?: {
+    readonly pending: number;
+    readonly confirmed: readonly unknown[];
+  },
 ): string | null {
-  return sensitivityClass === "HIGHLY_CONFIDENTIAL" ||
-    sensitivityClass === "RESTRICTED"
-    ? "Held back from Q by its classification (highly confidential, e.g. management accounts or a financial model): Q does not read its contents and never sends them to a model, so nothing in it is in Q's answers. Say so plainly whenever their figures or contradictions come up. The compliant path: the founder states the key figures themselves (for example monthly revenue and its month), which become their own stated figures (USER_CLAIM) Q can use and set beside the deck's."
-    : null;
+  if (
+    sensitivityClass !== "HIGHLY_CONFIDENTIAL" &&
+    sensitivityClass !== "RESTRICTED"
+  ) {
+    return null;
+  }
+  const held =
+    "Held back from Q by its classification (highly confidential, e.g. management accounts or a financial model): Q does not read its contents and never sends them to a model, so nothing in it is in Q's answers. Say so plainly whenever their figures or contradictions come up.";
+  // Owner 2026-10-28: its key figures are read by code, never a model, and
+  // offered to the founder; only what they confirm becomes theirs.
+  const pending = figures?.pending ?? 0;
+  const confirmed = figures?.confirmed.length ?? 0;
+  if (pending > 0) {
+    return `${held} Figures from this document are ready for your confirmation: Capital Q's code (no model) read ${String(pending)} key figure${pending === 1 ? "" : "s"} from it, waiting on their setup screen to Keep, Change or say Not this. Until they confirm, Q does not know them; tell them where to confirm.${confirmed > 0 ? " Figures they already confirmed are in confirmedFigures." : ""}`;
+  }
+  if (confirmed > 0) {
+    return `${held} The founder confirmed ${String(confirmed)} figure${confirmed === 1 ? "" : "s"} from it as their own stated figures (USER_CLAIM, SELF_REPORTED), set against their deck by code in confirmedFigures: use those, with both sides of any contradiction, and never more of the document.`;
+  }
+  return `${held} The compliant path: the founder states the key figures themselves (for example monthly revenue and its month), which become their own stated figures (USER_CLAIM) Q can use and set beside the deck's.`;
 }
 export type ListUploadedDocumentsOutput = z.infer<
   typeof ListUploadedDocumentsOutputSchema
@@ -298,7 +323,8 @@ export function createListUploadedDocumentsTool(
       items: (await documents.list(context.actor, grant.subjectId))
         .slice(0, 50)
         .map((item) => {
-          const held = heldBackFromQ(item.sensitivityClass);
+          const held = heldBackFromQ(item.sensitivityClass, item.figures);
+          const confirmed = item.figures?.confirmed ?? [];
           return {
             documentId: item.documentId,
             title: item.title.slice(0, 300),
@@ -307,6 +333,13 @@ export function createListUploadedDocumentsTool(
             processing: item.processing,
             updatedAt: item.updatedAt,
             ...(held === null ? {} : { qUse: held }),
+            ...(held === null || confirmed.length === 0
+              ? {}
+              : {
+                  confirmedFigures: confirmed
+                    .slice(0, 10)
+                    .map((line) => line.slice(0, 600)),
+                }),
           };
         }),
     }),

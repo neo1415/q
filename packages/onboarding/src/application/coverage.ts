@@ -302,6 +302,20 @@ const PUBLIC_SOURCE_TYPES = new Set([
   "PUBLIC_WEB",
 ]);
 
+/**
+ * A figure read by code out of the founder's highly confidential financial
+ * document (owner decision 2026-10-28). Until the founder confirms it, it is
+ * that document's content: shown to the founder only, and never put to a
+ * model (a voice or Q conversation does not read it back or accept it).
+ */
+export const LOCAL_FIGURE_SOURCE = "LOCAL_FIGURE" as const;
+
+export function isLocalFigureProposal(
+  refs: readonly { readonly sourceType: string }[],
+): boolean {
+  return refs.some((r) => r.sourceType === LOCAL_FIGURE_SOURCE);
+}
+
 /** Where a pending suggestion came from, by the references it carries. */
 export function proposalSource(
   refs: readonly { readonly sourceType: string }[],
