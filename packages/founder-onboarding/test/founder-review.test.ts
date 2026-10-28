@@ -394,9 +394,54 @@ describe("QFOR-007 · passages carry where they came from", () => {
           chunks,
         },
       ],
-      5,
+      { maxPassages: 5 },
     );
     expect(passages).toHaveLength(5);
+    // Nothing dropped: the last chunk is still read, inside the last passage.
+    expect(passages[4]?.text).toContain("Chunk 29");
+  });
+
+  it("a 60-slide deck is read to its end, with no parent duplicating its leaves", () => {
+    const slides = Array.from({ length: 60 }, (_unused, at) => {
+      const slide = at + 1;
+      const text =
+        slide === 58
+          ? "Traction: ARR NGN 450 million, 38 paying hospitals."
+          : slide === 60
+            ? "The ask: raising USD 3m seed."
+            : `Slide ${String(slide)} body. ${"Context sentence. ".repeat(60)}`;
+      return { slide, text };
+    });
+    const chunks = slides.flatMap(({ slide, text }, at) => [
+      {
+        content: text,
+        chunkIndex: at * 2,
+        role: "PARENT" as const,
+        locator: { slide },
+      },
+      {
+        content: text,
+        chunkIndex: at * 2 + 1,
+        role: "LEAF" as const,
+        locator: { slide },
+      },
+    ]);
+    const passages = passagesFrom([
+      {
+        documentId: "33333333-3333-4333-8333-333333333333",
+        documentVersionId: "44444444-4444-4444-8444-444444444444",
+        title: "pitch deck",
+        chunks,
+      },
+    ]);
+    const all = passages.map((p) => p.text).join("\n");
+    expect(all).toContain("ARR NGN 450 million");
+    expect(all).toContain("raising USD 3m seed");
+    expect(all.length).toBeLessThanOrEqual(36_000 + passages.length * 2 * 60);
+    expect(passages.length).toBeLessThanOrEqual(40);
+    // Each slide's text appears once, never as parent and leaf both.
+    expect(all.split("The ask: raising").length - 1).toBe(1);
+    expect(passages.at(-1)?.label).toMatch(/slides? (59–)?60$/);
   });
 });
 

@@ -43,6 +43,12 @@ export {
   splitSentences,
 } from "./chunking/index.js";
 export {
+  MIN_CHARACTERS_PER_PLACE,
+  selectReadingPassages,
+  type ReadableChunk,
+  type ReadingSelection,
+} from "./chunking/reading.js";
+export {
   assertInherits,
   DerivedGovernanceError,
   isNoWiderThan,
