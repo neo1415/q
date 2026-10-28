@@ -22,7 +22,7 @@ describe("what a relationship state means, by code", () => {
     const means = stateMeans("INTEREST_EXPRESSED", "ANSWER_INTEREST") ?? "";
     expect(means).toMatch(/becomes CONNECTED \(a mutual match\)/u);
     expect(means).toMatch(/not a match yet/u);
-    expect(means).toMatch(/not an investment or a commitment/u);
+    expect(means).toMatch(/is an investment or a commitment/u);
   });
   it("connected is a mutual match, not an investment", () => {
     expect(stateMeans("CONNECTED", "SCHEDULE_MEETING")).toMatch(
