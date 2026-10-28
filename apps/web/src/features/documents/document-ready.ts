@@ -18,8 +18,14 @@ export type ReadyDocument = {
   readonly artifactId: string;
   readonly type: string;
   readonly title: string;
+  /** 0: not known here (the current version is what opens). */
   readonly version: number;
   readonly status: "READY" | "FAILED";
+  /**
+   * Owner 2026-10-28: work Q promised, delivered while the person was on
+   * another page. It stays until they open or dismiss it (no 12 s fade).
+   */
+  readonly persist?: boolean | undefined;
 };
 
 /** At most this many toasts at once; the newest is on top. */
@@ -51,11 +57,28 @@ export function documentsOnStage(artifactIds: readonly string[]): void {
 
 export function announceDocument(document: ReadyDocument): void {
   const key = keyOf(document);
-  if (announced.has(key)) return;
+  const persist = document.persist === true;
+  // Promised work is announced even when the listing already raised (and
+  // faded) its toast, and whatever the last stage showed: it is not on
+  // the screen they are on now.
+  if (announced.has(key) && !persist) return;
   announced.add(key);
-  if (document.status === "READY" && onStage.has(document.artifactId)) return;
+  if (
+    !persist &&
+    document.status === "READY" &&
+    onStage.has(document.artifactId)
+  ) {
+    return;
+  }
+  const before = toasts.find(
+    (shown) => shown.artifactId === document.artifactId,
+  );
+  const next =
+    before?.persist === true && !persist
+      ? { ...document, persist: true }
+      : document;
   toasts = [
-    document,
+    next,
     ...toasts.filter((shown) => shown.artifactId !== document.artifactId),
   ].slice(0, READY_TOASTS_MAX);
   emit();

@@ -88,6 +88,12 @@ export type QTurn =
        * no card of its own but is still a document's delivery.
        */
       readonly deliversDocument?: true | undefined;
+      /**
+       * Owner 2026-10-28: the jobs whose delivery this message is (their
+       * cards were taken off it by followWork), so the session stops
+       * following them.
+       */
+      readonly deliveredJobs?: readonly string[] | undefined;
     };
 
 /**
@@ -359,6 +365,7 @@ export function followWork(turns: QTurn[]): void {
     turns[index] = {
       ...turn,
       ...(followed ? { deliversDocument: true as const } : {}),
+      deliveredJobs: work.map((block) => block.jobId),
       blocks: turn.blocks.filter(
         (block) =>
           block.kind !== "WORK_IN_PROGRESS" &&

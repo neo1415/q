@@ -36,7 +36,13 @@ import {
 import { useT } from "@/features/i18n/language";
 
 import { ArtifactCard, RETRY_PROMPT } from "./artifact-card";
-import { liveLine, useWorkLive, type WorkInProgress } from "./work-live";
+import {
+  elapsedWords,
+  liveLine,
+  usualLength,
+  useWorkLive,
+  type WorkInProgress,
+} from "./work-live";
 
 /**
  * Owner 2026-10-24, the work canvas: the document being made, shown as the
@@ -178,6 +184,59 @@ export function stepLine(
     case "FILING":
       return state === "DONE" ? "Filed" : "Filing";
   }
+}
+
+/** The plan's next step after the one running, in its approved label. */
+export function nextStep(states: readonly StepState[]): string | null {
+  const current = states.indexOf("CURRENT");
+  if (current === -1) return null;
+  const later = states.findIndex(
+    (state, index) => index > current && state === "LATER",
+  );
+  return later === -1 ? null : (STEPS[later]?.label ?? null);
+}
+
+/** Seconds, while something is running; the clock is still otherwise. */
+function useSecondClock(running: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [running]);
+  return now;
+}
+
+/**
+ * Owner 2026-10-28: the wait is understood -- how long it has been going,
+ * how long work of this kind usually takes, and what comes next.
+ */
+function WorkTiming({
+  live,
+  next,
+}: {
+  readonly live: WorkforceLive | null;
+  readonly next: string | null;
+}) {
+  const t = useT();
+  const now = useSecondClock(live?.startedAt !== undefined);
+  const elapsed =
+    live?.startedAt === undefined ? null : elapsedWords(live.startedAt, now);
+  const usual = usualLength(live);
+  const parts = [
+    elapsed === null ? null : t(`Going for ${elapsed}`),
+    usual === null ? null : t(usual),
+    next === null ? null : t(`Next: ${next}`),
+  ].filter((part): part is string => part !== null);
+  if (parts.length === 0) return null;
+  return (
+    <p
+      className="cq-caption cq-numeric text-(--cq-text-tertiary)"
+      data-q-work-timing
+    >
+      {parts.join(" · ")}
+    </p>
+  );
 }
 
 type Status = "WORKING" | "WAITING" | "DONE" | "FAILED" | "STOPPED";
@@ -627,6 +686,9 @@ export function WorkInProgressCard({
             {title}
           </p>
           <StatusDot status={status} />
+          {status === "WORKING" ? (
+            <WorkTiming live={live} next={nextStep(states)} />
+          ) : null}
         </div>
         <button
           type="button"

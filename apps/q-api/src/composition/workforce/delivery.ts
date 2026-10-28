@@ -59,13 +59,18 @@ export function deliveredDocument(
   return null;
 }
 
+/**
+ * Owner 2026-10-28: "it's done, here it is" -- the line that opens the
+ * delivery says so, and the screen opens the document beside it.
+ */
+export function readyLine(title: string): string {
+  return `Your ${title.replace(/[.\s]+$/u, "")} is ready — here it is.`;
+}
+
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
-  const lines = [
-    `Your ${delivery.title.replace(/[.\s]+$/u, "")} is ready.`,
-    delivery.summary.trim(),
-  ];
+  const lines = [readyLine(delivery.title), delivery.summary.trim()];
   if (delivery.topRecommendations.length > 0) {
     lines.push(
       `What I'd do first:\n${delivery.topRecommendations
@@ -238,7 +243,7 @@ export function createWorkforceDelivery(dependencies: {
     const type = QArtifactTypeSchema.safeParse(filed?.type);
     if (filed === undefined || !type.success) return false;
     const title = filed.title.slice(0, 160);
-    const text = `Your ${title.replace(/[.\s]+$/u, "")} is ready.`;
+    const text = readyLine(title);
     const posted = await post(owner, row, messageIdFor(row.job_id), text, [
       {
         kind: "ARTIFACT_REFERENCE",

@@ -181,13 +181,15 @@ function ReadyCard({
   const t = useT();
 
   const [held, setHeld] = useState(false);
+  const persist = ready.persist === true;
   useEffect(() => {
-    if (held) return;
+    // Promised work stays until it is opened or dismissed.
+    if (held || persist) return;
     const timer = window.setTimeout(() => {
       dismissDocument(ready.artifactId);
     }, AUTO_DISMISS_MS);
     return () => window.clearTimeout(timer);
-  }, [held, ready.artifactId, ready.version]);
+  }, [held, persist, ready.artifactId, ready.version]);
 
   const failed = ready.status === "FAILED";
   const Icon = failed
@@ -257,7 +259,7 @@ function ReadyCard({
           <ArtifactDownloads
             artifactId={ready.artifactId}
             formats={qArtifactExportFormats(ready.type)}
-            version={ready.version}
+            version={ready.version > 0 ? ready.version : null}
           />
         </div>
       )}

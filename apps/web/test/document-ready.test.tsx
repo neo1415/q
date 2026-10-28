@@ -30,10 +30,12 @@ const {
   readyChanges,
   resetReadyDocuments,
   useReadyDocuments,
+  viewingDocumentNow,
   READY_TOASTS_MAX,
 } = await import("../src/features/documents/document-ready");
 const { DocumentReadyCenter } =
   await import("../src/features/documents/document-ready-center");
+const { deliverWork } = await import("../src/features/q/work-live");
 
 const DECK = "a0000000-0000-4000-8000-000000000001";
 const BRIEF = "a0000000-0000-4000-8000-000000000002";
@@ -252,6 +254,71 @@ describe("the document-ready card, on any page", () => {
       await vi.advanceTimersByTimeAsync(9_000);
     });
     expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("owner 2026-10-28: promised work is announced and opened", () => {
+  const delivered = {
+    artifactId: BRIEF,
+    type: "ANALYSIS",
+    title: "Nixo: 12-month growth plan.",
+  };
+  beforeEach(() => {
+    resetReadyDocuments();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ items: [] }), {
+            headers: { "content-type": "application/json" },
+          }),
+        ),
+      ),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("on the Q page: Q says it on the open line and the document opens in place", () => {
+    const say = vi.fn(() => true);
+    deliverWork(delivered, { onQPage: true, say });
+    expect(say).toHaveBeenCalledWith(
+      "Your Nixo: 12-month growth plan is ready — here it is.",
+    );
+    expect(viewingDocumentNow()).toBe(BRIEF);
+  });
+
+  it("on another page: its card stays until it is opened, even after the listing's own toast faded", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<DocumentReadyCenter connected={false} />);
+    // The listing's toast came and went (12 s) while they were elsewhere.
+    act(() => {
+      announceDocument({ ...delivered, version: 1, status: "READY" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(13_000);
+    });
+    expect(screen.queryByRole("status", { name: /growth plan/ })).toBeNull();
+    // A line that is not open says nothing; the card is the announcement.
+    const say = vi.fn(() => false);
+    act(() => {
+      deliverWork(delivered, { onQPage: false, say });
+    });
+    expect(say).toHaveBeenCalledTimes(1);
+    expect(viewingDocumentNow()).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    expect(
+      screen.getByRole("status", { name: /growth plan.*Ready\./ }),
+    ).toBeTruthy();
+    vi.useRealTimers();
+    readQArtifactAction.mockResolvedValue({ ok: false, message: "Not now." });
+    await userEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(viewingDocumentNow()).toBe(BRIEF);
+    expect(screen.queryByRole("status", { name: /growth plan/ })).toBeNull();
   });
 });
 

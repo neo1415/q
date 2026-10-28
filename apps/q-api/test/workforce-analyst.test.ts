@@ -29,6 +29,7 @@ import {
   type ResearchDossier,
 } from "../src/composition/workforce/deep-research.js";
 import {
+  createWorkforceDelivery,
   deliveredDocument,
   deliveryText,
 } from "../src/composition/workforce/delivery.js";
@@ -398,6 +399,110 @@ describe("the person sees their document being made (owner 2026-10-24)", () => {
         prepared.jobId,
       ),
     ).toBeNull();
+  });
+
+  it("owner 2026-10-28: a document job records each stage in order, says how long it usually takes, and its delivery names the artifact", async () => {
+    const { board, runner, queue, store } = world();
+    const recorded: string[] = [];
+    const recordLive = queue.recordLive;
+    expect(recordLive).toBeDefined();
+    if (recordLive === undefined) return;
+    Object.assign(queue, {
+      recordLive: (
+        ...args: Parameters<NonNullable<typeof queue.recordLive>>
+      ) => {
+        recorded.push(args[2].stage);
+        return recordLive(...args);
+      },
+    });
+    const prepared = await board.port.prepare(
+      actor,
+      randomUUID(),
+      MAJI_LOOP_REQUEST,
+    );
+    if (prepared.status !== "STARTED" || prepared.jobId === undefined) {
+      throw new Error("not started");
+    }
+    const owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const page = createWorkforcePage({ store, work: queue });
+    const before = await page.live(owner, prepared.jobId);
+    // From the moment it is accepted: when, and how long it usually takes.
+    expect(before?.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
+    expect(before?.expected).toEqual({
+      kind: "DOCUMENT",
+      minMinutes: 2,
+      maxMinutes: 4,
+    });
+
+    await runner.pass();
+    // Research, then the review of the draft, then filing: in order.
+    expect(recorded).toEqual(["SEARCHING", "READING", "REVIEWING", "FILING"]);
+    const live = await page.live(owner, prepared.jobId);
+    expect(WorkforceLiveSchema.safeParse(live).success).toBe(true);
+    expect(live?.state).toBe("DONE");
+
+    // The delivery: one Q message whose first words say it is here, with
+    // the filed artifact's id on its card.
+    const [row] = await queue.forOwner(owner, [prepared.jobId]);
+    if (row === undefined) throw new Error("no row");
+    const events: { eventType: string; payload: unknown }[] = [];
+    const deliver = createWorkforceDelivery({
+      sql: {} as never,
+      transactions: { run: (work) => work({} as never) },
+      runtime: {
+        runs: {
+          findForActor: () =>
+            Promise.resolve({
+              id: row.trace.runId,
+              tenantId: actor.tenantId,
+              conversationId: randomUUID(),
+            }),
+          allocateEventSequence: () => Promise.resolve(2),
+        },
+        runEvents: {
+          append: (
+            _tx: unknown,
+            event: { eventType: string; payload: unknown },
+          ) => {
+            events.push(event);
+            return Promise.resolve({});
+          },
+        },
+        messages: {
+          insert: (_tx: unknown, input: { content: string }) =>
+            Promise.resolve({
+              id: randomUUID(),
+              tenantId: actor.tenantId,
+              conversationId: randomUUID(),
+              runId: row.trace.runId,
+              role: "Q",
+              content: input.content,
+              contentType: "TEXT",
+              createdAt: new Date().toISOString(),
+            }),
+        },
+      } as never,
+      notify: () => Promise.resolve(),
+    });
+    expect(await deliver(owner, row)).toBe(true);
+    const completed = events.find(
+      (event) => event.eventType === "q.message.completed",
+    );
+    expect(completed?.payload).toMatchObject({
+      message: {
+        text: expect.stringMatching(
+          /^Your .+ is ready — here it is\.\n/u,
+        ) as unknown,
+        blocks: [
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: "11111111-1111-4111-8111-111111111111",
+            status: "READY",
+          },
+          { kind: "WORK_IN_PROGRESS", jobId: prepared.jobId },
+        ],
+      },
+    });
   });
 
   it("reports drafting, review and each revision with the draft's headings", async () => {
@@ -1403,7 +1508,9 @@ describe("delivery to the conversation", () => {
     expect(
       text.split("\n").filter((line) => line.trim().length > 0).length,
     ).toBeLessThanOrEqual(6);
-    expect(text).toMatch(/^Your Maji Loop: 12-month growth plan is ready\./u);
+    expect(text).toMatch(
+      /^Your Maji Loop: 12-month growth plan is ready — here it is\./u,
+    );
     expect(text).toContain("1. Instrument every kiosk");
   });
 });

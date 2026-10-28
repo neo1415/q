@@ -102,6 +102,7 @@ import { readTypedDraft } from "./control/fast-navigation";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
 import { earlierWork, PinnedWorkLines } from "./pinned-work";
+import { promisedJobs } from "./work-live";
 
 /*
  * Q room W7: what opens on request -- a document Q made, the previous
@@ -556,6 +557,15 @@ export function QConversationPanel({
       turnsOf(thread.slice(0, thread.length - latest.length)),
       turnsOf(latest),
     );
+  }, [thread]);
+  // Owner 2026-10-28: the voice room draws no thread, so every job the
+  // conversation named keeps its line there (each hides once finished).
+  const roomWork = useMemo(() => {
+    const turnsHere = thread.flatMap((line) =>
+      line.turn === undefined ? [] : [line.turn],
+    );
+    const pending = new Set(promisedJobs(turnsHere));
+    return earlierWork(turnsHere, []).filter((job) => pending.has(job.jobId));
   }, [thread]);
 
   // The newest words are where the eye is: the thread keeps its end in view.
@@ -1255,6 +1265,18 @@ export function QConversationPanel({
                             className="flex w-full flex-col items-center gap-3"
                             data-q-voice-room-end
                           >
+                            {/* Owner 2026-10-28 (job 9e52faf7): in the
+                                voice room the work Q promised was never on
+                                screen, only "Pulling it together". Each
+                                running job keeps its line here, its plan
+                                one tap away; it goes when it is done. */}
+                            <div className="w-full max-w-md">
+                              <PinnedWorkLines
+                                jobs={roomWork}
+                                onOpenArtifact={showArtifact}
+                                onAsk={sayOrAsk}
+                              />
+                            </div>
                             {/* QO-19: Q's spoken words as captions, in a
                                 slot of fixed height that is there whether
                                 Q speaks or not, so nothing moves (owner

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import {
   WorkforceJobStartPayloadSchema,
+  workforceExpected,
+  type WorkforceLiveExpected,
   type WorkforcePlanProgress,
 } from "@capital-q/contracts";
 import {
@@ -86,4 +88,22 @@ export function progressOf(
     outcomes,
     finished: !LIVE_STATES.has(work.state),
   });
+}
+
+/**
+ * Owner 2026-10-28: how long this job usually takes, from the approved
+ * plan's tools (a step that files a document, else one that searches the
+ * public web), so the card can say "usually 2-4 minutes". Classified by
+ * tool, never by words; null when no usual length is known.
+ */
+export function expectedOf(
+  work: Pick<WorkRow, "plan"> | undefined,
+): WorkforceLiveExpected | null {
+  if (work === undefined) return null;
+  const plan = WorkforceJobStartPayloadSchema.safeParse(work.plan);
+  if (!plan.success) return null;
+  const tools = new Set(plan.data.steps.flatMap((step) => step.tools));
+  if (tools.has("documents.own.prepare")) return workforceExpected("DOCUMENT");
+  if (tools.has("public_web.search")) return workforceExpected("RESEARCH");
+  return null;
 }
