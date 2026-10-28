@@ -333,7 +333,10 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
       readAfterMs: 5,
       reader: readerReturning({ answers: [], declined: [] }),
     });
-    const said = await conversation.settle(line(), "What do you have so far?");
+    const { commentary: said } = await conversation.settle(
+      line(),
+      "What do you have so far?",
+    );
     expect(said).toContain("From Capital Q's own records");
     expect(said).toMatch(/Saved: .*Accelerator/);
     expect(said).toMatch(/Still needed: .*Which stages do you like to back/);
@@ -356,7 +359,7 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
         read: () => Promise.resolve(reading({ finishing: true })),
       },
     });
-    const said = await conversation.settle(
+    const { commentary: said } = await conversation.settle(
       line(),
       "Yes, that's all right, let's finish",
     );
@@ -382,12 +385,15 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
       reader: readerReturning({ answers: [], declined: [] }),
       delegation: { read: () => Promise.resolve(reading({ pausing: true })) },
     });
-    const said = await conversation.settle(
+    const { commentary: said, leave } = await conversation.settle(
       line(),
       "Can we continue this later?",
     );
     expect(said).toContain("They want to stop for now");
     expect(said).toContain("pick up any time");
+    expect(said).toContain("to Discover");
+    // The call ends after the goodbye and they go into Capital Q.
+    expect(leave).toBe(true);
   });
 
   it("starts research on their firm as Q introduces itself, and again once its name is saved", async () => {

@@ -1460,16 +1460,17 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         deps.onboardingConversation !== undefined
       ) {
         try {
-          const commentary = await deps.onboardingConversation.settle(
+          const settled = await deps.onboardingConversation.settle(
             conversationLine,
             spokenWords(delegation.request).slice(0, 2_000),
           );
           return {
             delegationId: delegation.delegationId,
-            commentary,
+            commentary: settled.commentary,
             stale: false,
             approvalPending: false,
             failed: false,
+            ...(settled.leave === true ? { leave: true as const } : {}),
           };
         } catch (error: unknown) {
           logger.warn(

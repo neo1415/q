@@ -14,7 +14,10 @@ import { createInvestorOnboardingClient } from "./adapters/compose";
 import { INVESTOR_VOCABULARY } from "./conversation-adapter";
 import { reviewLines } from "../onboarding-conversation/conversation";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
-import { ContinueLater } from "../onboarding-kit/components/continue-later";
+import {
+  ContinueLater,
+  continueLaterDestination,
+} from "../onboarding-kit/components/continue-later";
 import { finishJourney } from "../onboarding-kit/finish";
 import { FormCoverageArea } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
@@ -256,7 +259,7 @@ export function InvestorOnboardingScreen({
         <div className="flex items-center justify-between gap-2">
           {/* Owner 2026-10-17: both ways out are plain buttons, not faint
               text, so nobody feels trapped in setup. */}
-          <ContinueLater />
+          <ContinueLater destination={continueLaterDestination("investor")} />
           <span className="cq-label text-(--cq-text-primary)">
             {t("Investor setup")}
           </span>

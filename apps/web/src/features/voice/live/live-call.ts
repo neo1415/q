@@ -166,6 +166,17 @@ export function isLiveTrialSpent(error: unknown): boolean {
 }
 
 const RELAY = "/api/q-voice-live";
+/**
+ * Owner 2026-10-28: someone stopping for now is taken into Capital Q once
+ * Q has said goodbye. The call ends first; the surface that started it
+ * hears this and takes them in (the same leaving as its Continue later).
+ */
+export const VOICE_LEAVE_EVENT = "cq:voice-leave";
+/** The goodbye may take this long to start, and to be said, at most. */
+const GOODBYE_START_MS = 6_000;
+const GOODBYE_MAX_MS = 15_000;
+/** Quiet after the goodbye before the call ends (its last word plays out). */
+const GOODBYE_QUIET_MS = 1_200;
 const ICE_TIMEOUT_MS = 10_000;
 const CLOSE_WAIT_MS = 15_000;
 /** How long an end waits for the last transcript segments to be sent. */
@@ -534,14 +545,12 @@ export async function startLiveCall(
         receipt.stop();
       }
       if (id === null) throw new LiveCallUnavailable(null);
-      const result = await post<DelegationOutcome & { ended?: boolean }>(
-        doFetch,
-        `delegate/${id}`,
-        request,
-        token,
-      );
+      const result = await post<
+        DelegationOutcome & { ended?: boolean; leave?: true }
+      >(doFetch, `delegate/${id}`, request, token);
       // Past the hard cap: the server refuses; the call closes.
       if (result.ended === true) void end("max_length");
+      if (result.leave === true) leaveAfterGoodbye();
       return result;
     },
     cancel: async (delegationId) =>
@@ -1042,6 +1051,36 @@ export async function startLiveCall(
    * presses Continue later right after speaking must not leave with their
    * last words still in the tab (owner 2026-10-27, conversation first).
    */
+  /**
+   * They are stopping for now: let Q's goodbye start and play out, then end
+   * the call and tell the surface to take them in. Bounded, so a goodbye
+   * that never comes still lets them go.
+   */
+  let leaving = false;
+  const leaveAfterGoodbye = () => {
+    if (leaving) return;
+    leaving = true;
+    const startedAt = performance.now();
+    let heard = false;
+    const watch = setInterval(() => {
+      const waited = performance.now() - startedAt;
+      if (stats.qSpeaking) heard = true;
+      const done =
+        waited >= GOODBYE_MAX_MS ||
+        (!heard && waited >= GOODBYE_START_MS) ||
+        (heard &&
+          !stats.qSpeaking &&
+          performance.now() - lastSpeechAt >= GOODBYE_QUIET_MS);
+      if (!done) return;
+      clearInterval(watch);
+      void end("ended").then(() => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event(VOICE_LEAVE_EVENT));
+        }
+      });
+    }, 250);
+  };
+
   const end = (reason: LiveCallEnd = "ended"): Promise<void> => {
     if (ended) return Promise.resolve();
     ended = true;

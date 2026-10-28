@@ -19,6 +19,17 @@ import { useT } from "@/features/i18n/language";
 export const CONTINUE_LATER_LINE =
   "Of course. Everything you've confirmed is saved, so we'll pick up right here whenever you're ready.";
 
+/**
+ * Where leaving takes them (owner 2026-10-28): into Capital Q itself. An
+ * investor goes to Discover, which already works from what they have told
+ * Q; a founder goes Home. The occasional reminder brings them back.
+ */
+export function continueLaterDestination(
+  journey: "investor" | "founder" | undefined,
+): string {
+  return journey === "investor" ? "/discover" : "/home";
+}
+
 /** How long the line stays before Home opens: long enough to read it. */
 export const CONTINUE_LATER_PAUSE_MS = 1_600;
 

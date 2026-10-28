@@ -57,9 +57,11 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
+import { VOICE_LEAVE_EVENT } from "../voice/live/live-call";
 import {
   CONTINUE_LATER_LINE,
   CONTINUE_LATER_PAUSE_MS,
+  continueLaterDestination,
   useContinueLater,
 } from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
@@ -1616,7 +1618,21 @@ export function QOnboardingWorkspace({
    * the words for the person's tap, as before.
    */
   /** Continue later from the voice stage: the form's own leaving. */
-  const { leaving: leavingForLater, leave: leaveForLater } = useContinueLater();
+  const { leaving: leavingForLater, leave: leaveForLater } = useContinueLater(
+    continueLaterDestination(journeyName),
+  );
+  // They told Q they will continue later (owner 2026-10-28): Q has said its
+  // goodbye and the call has ended; they are taken into Capital Q, as with
+  // the Continue later button.
+  useEffect(() => {
+    const onLeave = () => {
+      leaveForLater();
+    };
+    window.addEventListener(VOICE_LEAVE_EVENT, onLeave);
+    return () => {
+      window.removeEventListener(VOICE_LEAVE_EVENT, onLeave);
+    };
+  }, [leaveForLater]);
   const briefCall = useRef(voice.client.brief);
   useEffect(() => {
     briefCall.current = voice.client.brief;

@@ -557,6 +557,37 @@ describe("the voice preview gate", () => {
   });
 });
 
+describe("stopping for now leaves the call (owner 2026-10-28)", () => {
+  it("relays a delegation's leave, so the call can end after the goodbye", async () => {
+    const upstream = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        Response.json({
+          delegationId: "dlg_1",
+          commentary: "Say goodbye.",
+          stale: false,
+          approvalPending: false,
+          failed: false,
+          leave: true,
+        }),
+      ),
+    );
+    const id = "5f000000-0000-4000-8000-000000000001";
+    const response = await relayLive(
+      new Request(`http://web.test/api/q-voice-live/delegate/${id}`, {
+        method: "POST",
+        body: JSON.stringify({
+          delegationId: "dlg_1",
+          request: "I'll continue later",
+        }),
+      }),
+      { relay: "delegate", voiceSessionId: id },
+      { doFetch: upstream, enabled: () => true },
+    );
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { leave?: boolean }).leave).toBe(true);
+  });
+});
+
 describe("the person's words reach the record (live 2026-10-27)", () => {
   it("relays a transcript batch that carries the line's measured latencies, words intact", async () => {
     // The batch after someone speaks carries how long Q took to answer.

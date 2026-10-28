@@ -38,6 +38,7 @@ import {
   type FeedTally,
 } from "./feed-moments";
 import { useDiscoverTab } from "./discover-tab";
+import { StartDiscoverNow } from "./start-discover-now";
 import { ruleList } from "./mandate-rules";
 import {
   actionFeedTransport,
@@ -567,15 +568,16 @@ function InvestorFeed({
       */
       <div className="flex flex-col gap-4">
         <EmptyState
-          title={t("Finish your mandate to see companies.")}
+          title={t("See companies with what you've told Q so far.")}
           description={t(
-            "Discover ranks companies against what you told Q. Your mandate isn't active yet, so there is nothing to rank them against.",
+            "Your mandate isn't finished yet. Q can already rank companies against what you've told it, and you can finish the rest any time.",
           )}
           action={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-start gap-2">
+              <StartDiscoverNow />
               <Link
                 href="/onboarding/investor"
-                className={buttonClassName("primary")}
+                className={buttonClassName("secondary")}
               >
                 {t("Finish my mandate")}
               </Link>

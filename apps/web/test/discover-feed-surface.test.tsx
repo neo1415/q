@@ -1170,7 +1170,12 @@ describe("degraded and empty states", () => {
 
     render(<InvestorFeedScreen />);
 
-    expect(await screen.findByText(/mandate isn't active yet/i)).toBeTruthy();
+    expect(await screen.findByText(/mandate isn't finished yet/i)).toBeTruthy();
+    // Owner 2026-10-28: an unfinished mandate still opens Discover, on
+    // their own tap, with what they have told Q so far.
+    expect(
+      screen.getByRole("button", { name: "Show me companies now" }),
+    ).toBeTruthy();
     // The way forward, not a claim about the market (CQ-ACCEPT-001).
     expect(
       screen

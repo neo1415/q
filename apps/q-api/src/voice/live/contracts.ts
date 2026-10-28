@@ -132,6 +132,11 @@ export const LiveDelegationResultSchema = z
     /** The run moved the screen: follow it, and await its receipt, first. */
     move: LiveMoveSchema.optional(),
     /**
+     * Owner 2026-10-28: they are stopping for now. The voice says its
+     * goodbye; then the client ends the call and takes them into Capital Q.
+     */
+    leave: z.literal(true).optional(),
+    /**
      * Only the start of the answer: say it now, then ask again with the
      * same delegation id for the rest.
      */

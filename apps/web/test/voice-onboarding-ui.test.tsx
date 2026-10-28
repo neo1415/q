@@ -28,7 +28,7 @@ const {
   publicFindingsNote,
   uploadFindingsNote,
 } = await import("../src/features/onboarding-conversation/conversation");
-const { useContinueLater, CONTINUE_LATER_PAUSE_MS } =
+const { useContinueLater, CONTINUE_LATER_PAUSE_MS, continueLaterDestination } =
   await import("../src/features/onboarding-kit/components/continue-later");
 
 function client(): VoiceSessionClient {
@@ -197,6 +197,14 @@ describe("the note a live call gets when a reading lands", () => {
     expect(findingsFromDocument(items, "doc-a")).toEqual([
       { label: "Stage", value: "Seed" },
     ]);
+  });
+});
+
+describe("continue later takes them into Capital Q (owner 2026-10-28)", () => {
+  it("lands an investor on Discover and a founder at Home", () => {
+    expect(continueLaterDestination("investor")).toBe("/discover");
+    expect(continueLaterDestination("founder")).toBe("/home");
+    expect(continueLaterDestination(undefined)).toBe("/home");
   });
 });
 

@@ -86,6 +86,18 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Filter Discover": "تصفية Discover",
   Filters: "عوامل التصفية",
   "Finish my mandate": "أكمل تفويضي",
+  "See companies with what you've told Q so far.":
+    "اطّلع على الشركات وفق ما أخبرت به Q حتى الآن.",
+  "Your mandate isn't finished yet. Q can already rank companies against what you've told it, and you can finish the rest any time.":
+    "لم يكتمل تفويضك بعد. يستطيع Q الآن ترتيب الشركات وفق ما أخبرته به، ويمكنك إكمال الباقي في أي وقت.",
+  "Show me companies now": "أرني الشركات الآن",
+  "Switching on Discover…": "جارٍ تشغيل Discover…",
+  "Choose which mandate to use in your setup first.":
+    "اختر أولاً التفويض الذي تريد استخدامه في إعدادك.",
+  "Discover couldn't be switched on just now. Try again in a moment.":
+    "تعذّر تشغيل Discover الآن. حاول مرة أخرى بعد قليل.",
+  "Discover ranks companies for investors.":
+    "يرتّب Discover الشركات للمستثمرين.",
   "Finish your mandate to see companies.": "أكمل تفويضك لترى الشركات.",
   "Founders' videos couldn't load": "تعذّر تحميل مقاطع المؤسسين",
   "Founders' videos": "مقاطع المؤسسين",

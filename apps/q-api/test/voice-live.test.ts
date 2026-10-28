@@ -1174,7 +1174,11 @@ describe("GPT-Live line", () => {
         },
         settle: (_line, request) => {
           settled.push(request);
-          return Promise.resolve("From Capital Q's own records: Saved: ...");
+          return Promise.resolve(
+            request === "Let's continue later"
+              ? { commentary: "They want to stop for now.", leave: true }
+              : { commentary: "From Capital Q's own records: Saved: ..." },
+          );
         },
       },
     });
@@ -1211,6 +1215,10 @@ describe("GPT-Live line", () => {
     const result = await ask(broker, "dlg_1", "What do you have so far?");
     expect(result?.commentary).toContain("From Capital Q's own records");
     expect(settled).toEqual(["What do you have so far?"]);
+    expect(result?.leave).toBeUndefined();
+    // Stopping for now: the browser ends the call after the goodbye.
+    const leaving = await ask(broker, "dlg_2", "Let's continue later");
+    expect(leaving?.leave).toBe(true);
     // The per-turn interview never runs on this line.
     expect(runs).toEqual([]);
     expect(

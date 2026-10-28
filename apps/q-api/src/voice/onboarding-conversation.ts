@@ -81,7 +81,10 @@ export type OnboardingConversation = {
    * for now, or to finish): everything heard is saved first, then the
    * record is read back from Capital Q's own data.
    */
-  readonly settle: (line: ConversationLine, request: string) => Promise<string>;
+  readonly settle: (
+    line: ConversationLine,
+    request: string,
+  ) => Promise<{ readonly commentary: string; readonly leave?: true }>;
 };
 
 /** Quiet after something they said before it is read (coalesced). */
@@ -537,7 +540,12 @@ export function createOnboardingConversation(dependencies: {
                 correlationId: randomUUID(),
               },
             });
-      if (authority?.pausing === true) return pausingNote(state);
+      if (authority?.pausing === true) {
+        return {
+          commentary: pausingNote(state, line.onboarding.journeyType),
+          leave: true,
+        };
+      }
       // Finish decides, not a precheck: it confirms the journey's own review
       // steps on their word, which no spoken answer fills, and says exactly
       // what is still missing when it cannot complete.
@@ -550,11 +558,12 @@ export function createOnboardingConversation(dependencies: {
           new Set(),
           true,
         ).finish();
-        if (finished.completed)
-          return completedNote(line.onboarding.journeyType);
-        return readBack(await port.state());
+        if (finished.completed) {
+          return { commentary: completedNote(line.onboarding.journeyType) };
+        }
+        return { commentary: readBack(await port.state()) };
       }
-      return readBack(state);
+      return { commentary: readBack(state) };
     },
   };
 }
@@ -817,9 +826,16 @@ export function readBack(state: OnboardingState): string {
     .join("\n");
 }
 
-function pausingNote(state: OnboardingState): string {
+function pausingNote(
+  state: OnboardingState,
+  journey: "investor" | "founder",
+): string {
   const saved = savedLines(state).length;
-  return `They want to stop for now. ${String(saved)} things they told you are saved, and the rest of what they said is kept. Tell them warmly that it's all kept, that they can pick up any time from Home and you'll carry on where you left off, and say goodbye. They can tap Continue later on screen.`;
+  const into =
+    journey === "investor"
+      ? "you're taking them into Capital Q now, to Discover, where they can already look at companies"
+      : "you're taking them into Capital Q now, to their home page";
+  return `They want to stop for now. ${String(saved)} things they told you are saved, and everything else they said is kept. In one or two warm sentences: say it's all kept, that they can pick up any time and you'll carry on where you left off, and that ${into}. Then stop talking: the call ends after your goodbye.`;
 }
 
 function completedNote(journey: "investor" | "founder"): string {
