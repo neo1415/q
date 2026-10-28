@@ -34,7 +34,16 @@ export type TeamJobOutcome =
       readonly jobId?: string | undefined;
     }
   | { readonly status: "ALREADY_WAITING"; readonly waiting: readonly string[] }
-  | { readonly status: "NOT_PLANNED" | "LIMIT_REACHED" }
+  /**
+   * Live 2026-10-28 (run 8b649d10): nothing could be planned. choices: the
+   * items of Q's own earlier answer the request referred to, so Q asks
+   * which comes first instead of saying only that it could not plan.
+   */
+  | {
+      readonly status: "NOT_PLANNED";
+      readonly choices?: readonly string[] | undefined;
+    }
+  | { readonly status: "LIMIT_REACHED" }
   /**
    * F-108: their plan's allowance for Q's work this month is used. The
    * plan's own sentence (counts, reset), or null when it gave none.
@@ -45,6 +54,17 @@ export type TeamJobOutcome =
   /** Planning broke: an error, or output that did not validate. */
   | { readonly status: "FAILED" };
 
+/**
+ * Q's own earlier answer a request refers to ("make that into a plan and
+ * execute it"): beside the goal, never in it. Q wrote it, so it travels as
+ * Q_INFERENCE -- what "that" means, never a fact or the person's words.
+ */
+export type TeamJobPriorAnswer = {
+  readonly text: string;
+  /** Its own listed points, in order (may be empty). */
+  readonly items: readonly string[];
+};
+
 export type QTeamJobPort = {
   /** Never throws, except to pass on a cancellation. */
   readonly propose: (
@@ -52,7 +72,9 @@ export type QTeamJobPort = {
     goal: string,
     options?: {
       /** They heard what was already waiting and said to go ahead (R5). */
-      readonly proceed: boolean;
+      readonly proceed?: boolean | undefined;
+      /** Q's own earlier answer the request refers to. */
+      readonly priorAnswer?: TeamJobPriorAnswer | undefined;
     },
   ) => Promise<TeamJobOutcome>;
 };
@@ -113,6 +135,7 @@ export function createToolTeamJobPort(dependencies: {
 }): QTeamJobPort {
   return {
     propose: async (request, goal, options) => {
+      const prior = priorAnswerArgument(options?.priorAnswer);
       try {
         const outcome = await dependencies.tools.execute(
           {
@@ -121,6 +144,7 @@ export function createToolTeamJobPort(dependencies: {
             arguments: {
               goal: goal.trim().slice(0, 1_000),
               proceed: options?.proceed === true,
+              ...(prior === null ? {} : { priorAnswer: prior }),
             },
           },
           {
@@ -173,9 +197,14 @@ export function createToolTeamJobPort(dependencies: {
         if (data.status === "PLAN_LIMIT") {
           return { status: "PLAN_LIMIT", message: data.message ?? null };
         }
-        return data.status === "LIMIT_REACHED" || data.status === "FAILED"
-          ? { status: data.status }
-          : { status: "NOT_PLANNED" };
+        if (data.status === "LIMIT_REACHED" || data.status === "FAILED") {
+          return { status: data.status };
+        }
+        // The planner had the earlier answer and still planned nothing
+        // (after its one retry): ask which of its items comes first.
+        return prior === null || prior.items.length === 0
+          ? { status: "NOT_PLANNED" }
+          : { status: "NOT_PLANNED", choices: prior.items };
       } catch (error: unknown) {
         if (request.signal?.aborted === true) throw error;
         dependencies.logger?.warn(
@@ -187,6 +216,68 @@ export function createToolTeamJobPort(dependencies: {
     },
   };
 }
+
+/** Items of an earlier answer carried with a job (the tool's own bound). */
+const PRIOR_ITEMS_MAX = 12;
+
+/** The tool's priorAnswer argument (q-tools QJobPriorAnswerSchema), bounded. */
+function priorAnswerArgument(prior: TeamJobPriorAnswer | undefined): {
+  readonly truthClass: "Q_INFERENCE";
+  readonly text: string;
+  readonly items: readonly string[];
+} | null {
+  if (prior === undefined) return null;
+  const text = prior.text.trim().slice(0, 4_000);
+  if (text.length === 0) return null;
+  return {
+    truthClass: "Q_INFERENCE",
+    text,
+    items: prior.items
+      .map((item) => item.trim().slice(0, 300))
+      .filter((item) => item.length > 0)
+      .slice(0, PRIOR_ITEMS_MAX),
+  };
+}
+
+/**
+ * Live 2026-10-28 (run 8b649d10): the answer of Q's that a request refers
+ * to. Whether it refers to one is the turn reader's call (workFromEarlier,
+ * or a reply to Q's last question or invitation), made by the caller; this
+ * only reads Q's own stored last turn, deterministically: its words, and
+ * the points it listed (lines that open with a bullet or a number), in
+ * their order. Null when the turn before this one is not Q's, or is Q's
+ * own line about planning work (nothing to plan from in it).
+ */
+export function priorAnswerOf(
+  history: readonly { readonly role: string; readonly content: string }[],
+): TeamJobPriorAnswer | null {
+  // history ends with this turn; Q's answer is the one just before it.
+  const before = history.at(-2);
+  if (before === undefined || before.role === "USER") return null;
+  const text = before.content.trim();
+  if (text.length === 0 || teamJobOutcomeOf(text) !== null) return null;
+  const items: string[] = [];
+  for (const line of text.split(/\r?\n/u)) {
+    const listed = /^\s*(?:[-*•–]|\d{1,2}[.)])\s+(.+)$/u.exec(line);
+    const item = listed?.[1]
+      ?.replace(/\*\*|__/gu, "")
+      .replace(/\s+/gu, " ")
+      .trim();
+    if (item !== undefined && item.length > 0) items.push(item);
+    if (items.length >= PRIOR_ITEMS_MAX) break;
+  }
+  return { text: text.slice(0, 4_000), items };
+}
+
+/**
+ * Whose words the not-planned line uses: a founder plans for their own
+ * company, an investor about a company they look at (live 2026-10-28: a
+ * founder was offered "questions for the founder").
+ */
+export type TeamJobAudience = "FOUNDER" | "INVESTOR";
+
+/** How the clarifying line opens (read back by teamJobOutcomeOf). */
+const WHICH_FIRST = "Tell me which of these you want done first:";
 
 /**
  * The question Q ends an ALREADY_WAITING line with. The next turn's reply
@@ -286,7 +377,10 @@ export function teamJobOutcomeOf(
   ) {
     return "ALREADY_WAITING";
   }
-  if (said.startsWith("I couldn't turn that into a plan I can carry out")) {
+  if (
+    said.startsWith("I couldn't turn that into a plan I can carry out") ||
+    said.startsWith(WHICH_FIRST)
+  ) {
     return "NOT_PLANNED";
   }
   if (said.startsWith("Your monthly limit for Q's work is reached")) {
@@ -304,7 +398,10 @@ export function teamJobOutcomeOf(
  * What Q says about the job: the plan in plain words and what needs them,
  * or, when nothing was planned, that nothing started and what they can do.
  */
-export function teamJobLine(outcome: TeamJobOutcome): string {
+export function teamJobLine(
+  outcome: TeamJobOutcome,
+  audience: TeamJobAudience = "INVESTOR",
+): string {
   switch (outcome.status) {
     case "ALREADY_WAITING": {
       const first = outcome.waiting[0];
@@ -313,7 +410,7 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
         : `Something like this is already waiting for you: ${waitingWork(first)}. ${PLAN_ANYWAY_QUESTION}`;
     }
     case "NOT_PLANNED":
-      return `I couldn't turn that into a plan I can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a growth plan, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;
+      return notPlannedLine(outcome.choices ?? [], audience);
     // F-108: whose limit it is, said plainly. Their own monthly spending
     // limit for Q's work is theirs to raise; nothing is "running".
     case "LIMIT_REACHED":
@@ -345,6 +442,31 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
     `I've planned this in ${steps}: ${who.join(" → ")}.`,
     ...needs.map((need) => `${need.replace(/\.$/u, "")}.`),
   ].join(" ");
+}
+
+/**
+ * Nothing was planned. With the items of the answer they referred to, Q
+ * asks which comes first, in those items' own words; without, it says
+ * what it needs, in the words of their side of the table.
+ */
+function notPlannedLine(
+  choices: readonly string[],
+  audience: TeamJobAudience,
+): string {
+  if (choices.length > 0) {
+    const listed = choices
+      .map(
+        (choice, index) =>
+          `${String(index + 1)}) ${choice.replace(/[.;:,]+$/u, "")}`,
+      )
+      .join("; ");
+    return `${WHICH_FIRST} ${listed}. Nothing has started yet; once you pick, I'll plan it and get going.`;
+  }
+  const ends =
+    audience === "FOUNDER"
+      ? "Tell me what you want at the end (a growth plan, an updated pitch deck, a one-pager for investors) and I'll plan it."
+      : "Tell me who it's about and what you want at the end (a memo, a growth plan, questions for the founder) and I'll plan it.";
+  return `I couldn't turn that into a plan I can carry out, so nothing has started. ${ends} ${ANSWER_HERE}`;
 }
 
 /**

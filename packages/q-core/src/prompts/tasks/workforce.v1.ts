@@ -43,6 +43,9 @@ import {
   JobPlanVariablesV5Schema,
   type JobPlanResultV5,
   type JobPlanVariablesV5,
+  JOB_PLAN_V15_UNTRUSTED,
+  JobPlanVariablesV15Schema,
+  type JobPlanVariablesV15,
   SUBSTANCE_CRITIQUE_SCHEMA_NAME,
   SUBSTANCE_CRITIQUE_SCHEMA_VERSION,
   SUBSTANCE_CRITIQUE_UNTRUSTED,
@@ -857,6 +860,44 @@ export const JOB_PLAN_V14: PromptDefinition<
   template: JOB_PLAN_V13.template.replace(
     V13_NAMED_COMPANY_KINDS,
     V14_NAMED_COMPANY_KINDS,
+  ),
+};
+
+/**
+ * v15 (live 2026-10-28, run 8b649d10): a founder asked for their gaps, Q
+ * listed them, and "can you make it into a plan and then go ahead and
+ * execute that plan" reached the lead as those words alone -- it planned
+ * nothing. When the job refers to Q's own earlier answer, code passes that
+ * answer beside the job (priorAnswer), labelled as Q's inference: it says
+ * what "that" is, never what is true about their records.
+ */
+export const V15_PRIOR_ANSWER = `YOUR EARLIER ANSWER (what you, Q, said just before, which the job refers to with words like "that", "it" or "those"; "(none)" when it refers to none)
+{{priorAnswer}}
+It is your own earlier answer: your inference, not verified fact and not one of the facts in the situation. Read it only to know what the job means: when the job asks you to turn it into a plan or carry it out, plan the concrete items in it that the roster can work on, most important first, and put the ones no role can do in cannot. Never cite it as evidence, never copy a figure from it as fact, and never let it widen what the person allowed.
+
+`;
+
+if (JOB_PLAN_V14.template.split("THE JOB\n{{goal}}").length !== 2) {
+  throw new Error("JOB_PLAN v15 extends v14's THE JOB section, which changed");
+}
+
+export const JOB_PLAN_V15: PromptDefinition<
+  JobPlanVariablesV15,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V14,
+  version: 15,
+  status: "ACTIVE",
+  changeDescription:
+    "Live 2026-10-28 (run 8b649d10): v14 plus YOUR EARLIER ANSWER -- when the job refers to Q's own previous answer ('make that into a plan and execute it'), code passes that answer as priorAnswer, labelled as Q's inference (never a situation fact, never evidence), so the lead plans its concrete items. Same result schema.",
+  effectiveFrom: "2026-10-28",
+  variables: {
+    schema: JobPlanVariablesV15Schema,
+    untrusted: [...JOB_PLAN_V15_UNTRUSTED],
+  },
+  template: JOB_PLAN_V14.template.replace(
+    "THE JOB\n{{goal}}",
+    `${V15_PRIOR_ANSWER}THE JOB\n{{goal}}`,
   ),
 };
 

@@ -181,6 +181,7 @@ import {
   JOB_PLAN_V12,
   JOB_PLAN_V13,
   JOB_PLAN_V14,
+  JOB_PLAN_V15,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
@@ -623,13 +624,15 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ANALYSIS_WRITE_V3, status: "DEPRECATED" },
     ANALYSIS_CRITIQUE_V3,
     // Diligence audit 2026-10-28.
-    JOB_PLAN_V14,
+    { ...JOB_PLAN_V14, status: "DEPRECATED" },
     RESEARCH_PLAN_V3,
     ANALYSIS_WRITE_V4,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,
     UTTERANCE_CHECK_V1,
+    // Live 2026-10-28 (run 8b649d10): Q's earlier answer beside the job.
+    JOB_PLAN_V15,
     DOCUMENT_KIND_READER_V1,
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,

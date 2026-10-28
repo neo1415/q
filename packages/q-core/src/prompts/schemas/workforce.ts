@@ -475,6 +475,29 @@ export type JobPlanVariablesV5 = z.infer<typeof JobPlanVariablesV5Schema>;
 
 export const JOB_PLAN_V5_UNTRUSTED = ["goal", "situation"] as const;
 
+/**
+ * v15 (live 2026-10-28, run 8b649d10): "make it into a plan and execute
+ * it" after Q's own gap analysis reached the lead without the gaps, and it
+ * planned nothing. The answer the job refers to travels beside the goal,
+ * labelled as Q's own earlier answer: inference, never a fact of the
+ * situation and never the job itself. "(none)" when the job refers to none.
+ */
+export const JobPlanVariablesV15Schema = JobPlanVariablesV5Schema.extend({
+  /** Q's own earlier answer the job refers to. UNTRUSTED (a model wrote it). */
+  priorAnswer: z.string().max(4_000).default("(none)"),
+}).strict();
+export type JobPlanVariablesV15 = z.infer<typeof JobPlanVariablesV15Schema>;
+/** The input shape: priorAnswer may be absent (a job that refers to none). */
+export type JobPlanVariablesV15Input = z.input<
+  typeof JobPlanVariablesV15Schema
+>;
+
+export const JOB_PLAN_V15_UNTRUSTED = [
+  "goal",
+  "situation",
+  "priorAnswer",
+] as const;
+
 const FactRef = z.string().regex(/^F[1-9][0-9]?$/u);
 
 export const JobPlanResultV5Schema = JobPlanResultV4Schema.extend({

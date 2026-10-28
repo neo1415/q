@@ -213,6 +213,22 @@ export async function situationReads(
   };
 }
 
+/**
+ * Live 2026-10-28 (run 8b649d10): Q's own earlier answer a job refers to.
+ * Always Q_INFERENCE -- Q wrote it -- so it is context for the plan, never
+ * the goal, a fact of the situation or evidence. `items` are the answer's
+ * own listed points (in its order), for asking which comes first when no
+ * plan could be made from them.
+ */
+export const QJobPriorAnswerSchema = z
+  .object({
+    truthClass: z.literal("Q_INFERENCE"),
+    text: z.string().trim().min(1).max(4_000),
+    items: z.array(z.string().trim().min(1).max(300)).max(12),
+  })
+  .strict();
+export type QJobPriorAnswer = z.infer<typeof QJobPriorAnswerSchema>;
+
 export type QJobPort = {
   /**
    * The lead Q's plan for the goal, prepared as this run's card. NOT_PLANNED:
@@ -232,6 +248,12 @@ export type QJobPort = {
       readonly subjects?: readonly QSubjectRef[] | undefined;
       /** wf: what was read about them, as the person, before planning. */
       readonly reads?: QJobSituationReads | undefined;
+      /**
+       * Q's own earlier answer the goal refers to ("make that into a plan"),
+       * beside the goal, never in it: Q's inference, for the lead to read
+       * what "that" is (JOB_PLAN v15 priorAnswer). Absent: it refers to none.
+       */
+      readonly priorAnswer?: QJobPriorAnswer | undefined;
     },
   ) => Promise<
     | {
@@ -296,6 +318,9 @@ const ProposeQJobInputSchema = z
       .describe(
         "True only after you told them what was already waiting (ALREADY_WAITING) and they said to go ahead anyway.",
       ),
+    priorAnswer: QJobPriorAnswerSchema.optional().describe(
+      "Only when their words refer to your own previous answer ('make that into a plan'): that answer, as you said it, with its listed items. It is your inference, never their goal.",
+    ),
   })
   .strict();
 type ProposeQJobInput = z.output<typeof ProposeQJobInputSchema>;
@@ -358,7 +383,9 @@ export function createQJobTools(
       // by the same kind of job when it names nobody (`about`).
       // v3 (wf): the lead reads the named relationships' briefs first, and
       // the plan says its outcome, what is missing and what comes next.
-      version: 3,
+      // v4 (live 2026-10-28): an optional priorAnswer -- Q's own earlier
+      // answer the goal refers to, beside it as Q's inference.
+      version: 4,
       status: "ACTIVE",
       requiredCapabilities: [],
       supportedPurposes: [...Q_TASK_CLASSES],
@@ -406,6 +433,9 @@ export function createQJobTools(
             proceed: input.proceed,
             subjects,
             ...(reads === undefined ? {} : { reads }),
+            ...(input.priorAnswer === undefined
+              ? {}
+              : { priorAnswer: input.priorAnswer }),
           },
         );
         if (prepared.status === "ALREADY_WAITING") {
