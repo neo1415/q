@@ -541,6 +541,30 @@ export {
   type DocumentStudioPort,
 } from "./tools/documents.js";
 
+// XLSX-001: a spreadsheet of their data, built by code.
+export {
+  createMakeSpreadsheetTool,
+  MAKE_SPREADSHEET,
+  MakeSpreadsheetInputSchema,
+  MakeSpreadsheetOutputSchema,
+  SPREADSHEET_ARTIFACT_TYPE,
+  SPREADSHEET_SOURCES,
+  type MakeSpreadsheetInput,
+  type MakeSpreadsheetOutput,
+  type ShownAnswer,
+  type SpreadsheetPort,
+} from "./tools/spreadsheet.js";
+export {
+  buildComparisonSheet,
+  buildFiguresSheet,
+  buildPipelineSheet,
+  buildRankedSheet,
+  buildTableSheet,
+  spreadsheetSections,
+  type BuiltSpreadsheet,
+  type SheetChoice,
+} from "./tools/spreadsheet-build.js";
+
 // DAILY block: The Q Daily tools.
 export {
   createGetQDailyTool,

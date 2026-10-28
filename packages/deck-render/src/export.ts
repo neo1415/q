@@ -12,6 +12,7 @@ import {
 import { layOutDeck } from "./layout.js";
 import { deckToPdf } from "./pdf.js";
 import { deckToPptx } from "./pptx.js";
+import { workbookToCsv, workbookToXlsx } from "./spreadsheet.js";
 import type { BrandInput } from "./theme.js";
 
 /**
@@ -36,12 +37,16 @@ export const EXPORT_CONTENT_TYPES: Readonly<
 > = {
   pdf: "application/pdf",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv: "text/csv; charset=utf-8",
 };
 
 /** The formats this version can be written as. Content decides, not the type code. */
 export function exportFormatsForVersion(
   version: QArtifactVersion,
 ): readonly QArtifactExportFormat[] {
+  // XLSX-001: a workbook is data; its files are the sheet, not a page.
+  if (version.content.workbook !== undefined) return ["xlsx", "csv"];
   return version.content.deck === undefined ? ["pdf"] : ["pdf", "pptx"];
 }
 
@@ -60,6 +65,28 @@ export async function renderArtifactFile(input: {
 }): Promise<ArtifactFile | null> {
   const { version, format } = input;
   const meta = { title: version.title, company: input.company };
+  const workbook = version.content.workbook;
+  if (workbook !== undefined) {
+    if (format === "xlsx") {
+      return {
+        bytes: await workbookToXlsx(workbook, { title: version.title }),
+        contentType: EXPORT_CONTENT_TYPES.xlsx,
+        extension: "xlsx",
+      };
+    }
+    if (format === "csv") {
+      return {
+        bytes: workbookToCsv(workbook),
+        contentType: EXPORT_CONTENT_TYPES.csv,
+        extension: "csv",
+      };
+    }
+    return null;
+  }
+  if (format === "xlsx" || format === "csv") {
+    // Only a spreadsheet is a sheet.
+    return null;
+  }
   const deck = version.content.deck;
   if (deck !== undefined) {
     const first = layOutDeck(deck, input.brand);

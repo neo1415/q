@@ -213,6 +213,14 @@ const pdfOnly = () =>
     "FORMAT_NOT_AVAILABLE",
     "PowerPoint is for decks; that document downloads as a PDF.",
   );
+// XLSX-001: a spreadsheet is a sheet, and only a spreadsheet is.
+const sheetOnly = () =>
+  refused("FORMAT_NOT_AVAILABLE", "A spreadsheet downloads as Excel or CSV.");
+const notASheet = () =>
+  refused(
+    "FORMAT_NOT_AVAILABLE",
+    "Only a spreadsheet downloads as Excel or CSV; that document downloads as a PDF.",
+  );
 
 /**
  * Where an artifact can be drawn from, and in what.
@@ -473,7 +481,15 @@ export function registerQArtifactRoutes(
         });
       }
       if (file === null) {
-        return reply.code(409).send(pdfOnly());
+        return reply
+          .code(409)
+          .send(
+            found.version.content.workbook !== undefined
+              ? sheetOnly()
+              : format === "xlsx" || format === "csv"
+                ? notASheet()
+                : pdfOnly(),
+          );
       }
       return reply
         .code(200)

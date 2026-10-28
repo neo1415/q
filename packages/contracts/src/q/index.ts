@@ -846,6 +846,7 @@ export {
   Q_ARTIFACT_EXPORT_REFUSALS,
   Q_ARTIFACT_EXPORT_SUFFIX,
   qArtifactExportFormats,
+  Q_ARTIFACT_TYPES_WITH_SHEETS,
   qArtifactPath,
   QArtifactExportFormatSchema,
   QArtifactExportRefusalSchema,
@@ -897,6 +898,35 @@ export {
   type QArtifactVersion,
   type ReviseQArtifactRequest,
 } from "./artifact.js";
+// XLSX-001: a spreadsheet's typed sheet spec.
+export {
+  Q_SHEET_COLUMN_TYPES,
+  Q_SHEET_COLUMNS_MAX,
+  Q_SHEET_NAME_MAX,
+  Q_SHEET_ROWS_MAX,
+  Q_SHEET_SOURCE_REF_KINDS,
+  Q_SHEET_SOURCES_MAX,
+  Q_SHEET_TEXT_MAX,
+  Q_SHEET_TOTAL_FUNCTIONS,
+  Q_SHEETS_MAX,
+  Q_SOURCES_SHEET_NAME,
+  QSheetCellSchema,
+  QSheetColumnSchema,
+  QSheetColumnTypeSchema,
+  QSheetSchema,
+  QSheetSourceRefSchema,
+  QSheetSourceSchema,
+  QSheetTotalSchema,
+  QWorkbookSchema,
+  qSheetCellFits,
+  type QSheet,
+  type QSheetCell,
+  type QSheetColumn,
+  type QSheetColumnType,
+  type QSheetSource,
+  type QSheetTotal,
+  type QWorkbook,
+} from "./spreadsheet.js";
 
 // DOCS block: brand kit, audit, pairings, answer exports.
 export {

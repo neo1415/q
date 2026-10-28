@@ -550,6 +550,13 @@ const OFFERS: readonly QCapability[] = [
     false,
   ),
   // --- end DOCS block -------------------------------------------------------
+  // XLSX-001: a spreadsheet of their data, every cell written by code.
+  tool(
+    "make_spreadsheet",
+    "DOCUMENT",
+    "Makes an Excel spreadsheet (.xlsx, CSV) of their pipeline, a company's stated figures, or a table, comparison or ranked list Q showed, as their own private document; every cell is copied from their records.",
+    { acts: true },
+  ),
   // BIZ-008 (B8 worker block).
   offer(
     "reminder_dismiss",

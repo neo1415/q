@@ -102,6 +102,7 @@ import type { HumanReviewPort } from "./tools/human-review.js";
 import type { QEntitlementPort } from "./tools/plan.js";
 // DOCS block.
 import type { DocumentStudioPort } from "./tools/documents.js";
+import type { SpreadsheetPort } from "./tools/spreadsheet.js";
 import type { QDailyToolPort } from "./tools/daily.js";
 import type { OwnReadPorts } from "@capital-q/app-actions";
 import type { AppApprovalPort } from "./tools/app-actions.js";
@@ -700,6 +701,8 @@ export type QToolPorts = {
   readonly documentEdit?: DocumentEditPort | undefined;
   /** DOCS: brand kit, a document's audit, their brand applied. */
   readonly documentStudio?: DocumentStudioPort | undefined;
+  /** XLSX-001: spreadsheets of their data; absent means no make_spreadsheet. */
+  readonly spreadsheets?: SpreadsheetPort | undefined;
   /** R33: changes to their own records, for approval. */
   readonly recordChanges?: RecordChangePort | undefined;
   /** R33: reads of their own records. */

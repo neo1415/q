@@ -39,6 +39,7 @@ import {
   materialUploadTargetAction,
 } from "@/features/onboarding-kit/material-actions";
 import { artifactFileUrl } from "@/features/q/artifact-download";
+import { qArtifactExportFormats } from "@/features/q/wire-constants";
 import { newIntentKey } from "@/features/q/control/intent-key";
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
@@ -605,7 +606,12 @@ export function DocumentLibrary({
     },
     download: (item) => {
       if (item.source === "Q") {
-        window.location.href = artifactFileUrl(item.id, "pdf", null);
+        // XLSX-001: a spreadsheet's file is its Excel, anything else a PDF.
+        window.location.href = artifactFileUrl(
+          item.id,
+          qArtifactExportFormats(item.artifactType ?? "")[0] ?? "pdf",
+          null,
+        );
         return;
       }
       void documentFileAction(item.id).then((link) => {

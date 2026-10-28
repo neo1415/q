@@ -46,6 +46,9 @@ const FORMATS = {
   slides: { suffix: "/slides", download: false },
   pptx: { suffix: "/export/pptx", download: true },
   pdf: { suffix: "/export/pdf", download: true },
+  // XLSX-001: a spreadsheet's Excel and CSV files.
+  xlsx: { suffix: "/export/xlsx", download: true },
+  csv: { suffix: "/export/csv", download: true },
 } as const;
 type Format = keyof typeof FORMATS;
 
@@ -54,7 +57,9 @@ function isFormat(value: string): value is Format {
     value === "detail" ||
     value === "slides" ||
     value === "pptx" ||
-    value === "pdf"
+    value === "pdf" ||
+    value === "xlsx" ||
+    value === "csv"
   );
 }
 
@@ -94,6 +99,13 @@ async function refusalSentence(
   }
   if (format === "slides") {
     return "That document has no slides.";
+  }
+  if (format === "xlsx" || format === "csv") {
+    return "Only a spreadsheet downloads as Excel or CSV. This document downloads as a PDF.";
+  }
+  if (format === "pdf" && code.success) {
+    // XLSX-001: asked for a PDF of a spreadsheet.
+    return "This is a spreadsheet. It downloads as Excel or CSV.";
   }
   return "I couldn't prepare that file. Try again.";
 }

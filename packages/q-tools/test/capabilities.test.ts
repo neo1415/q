@@ -65,6 +65,7 @@ const EVERY_PORT: QToolPorts = {
   documentEdit: STUB,
   // DOCS block.
   documentStudio: STUB,
+  spreadsheets: STUB,
   recordChanges: STUB,
   ownRecords: STUB,
   onboardingTranscript: STUB,

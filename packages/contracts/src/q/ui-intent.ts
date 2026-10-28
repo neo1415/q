@@ -893,6 +893,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "suggest_brand_kit",
   "apply_my_brand",
   "illustrate_my_document",
+  // XLSX-001: a spreadsheet of their data, filed as their own private
+  // document (a new document; nothing shared or sent).
+  "make_spreadsheet",
   // DAILY: how they receive The Q Daily, reversible in Settings.
   "set_q_daily_preferences",
   // Action parity (2026-10-02): the person's own word, as the control does.

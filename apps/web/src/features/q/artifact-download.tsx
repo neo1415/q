@@ -19,6 +19,8 @@ import {
 import { InlineNotice } from "@capital-q/ui/states";
 import { useT } from "@/features/i18n/language";
 
+import { qArtifactExportFormats } from "./wire-constants";
+
 /**
  * Downloading what Q composed (BIZ-001).
  *
@@ -56,12 +58,16 @@ export function artifactFileUrl(
 const LABELS: Readonly<Record<QArtifactExportFormat, string>> = {
   pdf: "PDF",
   pptx: "PowerPoint",
+  xlsx: "Excel",
+  csv: "CSV",
 };
 
 /** What the menu says, so nobody has to guess what a PowerPoint is saved as. */
 const MENU_LABELS: Readonly<Record<QArtifactExportFormat, string>> = {
   pdf: "PDF document",
   pptx: "PowerPoint (.pptx)",
+  xlsx: "Excel (.xlsx)",
+  csv: "CSV (.csv)",
 };
 
 /** The name the server put on the file, or a plain one. */
@@ -109,18 +115,50 @@ function saveFile(blob: Blob, name: string): void {
 }
 
 /**
+ * XLSX-001: the file "download it" means for a document known only by id:
+ * its type's first format (a spreadsheet's Excel, anything else's PDF),
+ * read from the same narrow detail route the card polls.
+ */
+async function firstFormatOf(
+  artifactId: string,
+): Promise<QArtifactExportFormat> {
+  try {
+    const response = await fetch(
+      `/api/q-artifact/${encodeURIComponent(artifactId)}/detail`,
+    );
+    if (!response.ok) return "pdf";
+    const body: unknown = await response.json();
+    const type =
+      typeof body === "object" &&
+      body !== null &&
+      "artifact" in body &&
+      typeof body.artifact === "object" &&
+      body.artifact !== null &&
+      "type" in body.artifact
+        ? body.artifact.type
+        : undefined;
+    return typeof type === "string"
+      ? (qArtifactExportFormats(type)[0] ?? "pdf")
+      : "pdf";
+  } catch {
+    return "pdf";
+  }
+}
+
+/**
  * Q room W3: "download it", said or typed, for a document Q made. The
  * same request the Download control makes; null when it downloaded,
  * otherwise what to say.
  */
 export async function downloadArtifact(
   artifactId: string,
-  format: QArtifactExportFormat = "pdf",
+  format?: QArtifactExportFormat,
 ): Promise<string | null> {
   try {
-    const response = await fetch(artifactFileUrl(artifactId, format, null));
+    const chosen = format ?? (await firstFormatOf(artifactId));
+    const response = await fetch(artifactFileUrl(artifactId, chosen, null));
     if (!response.ok) return await failureMessage(response);
-    saveFile(await response.blob(), fileNameFrom(response, format));
+    saveFile(await response.blob(), fileNameFrom(response, chosen));
     return null;
   } catch {
     return "I lost the connection to Q. Try again.";

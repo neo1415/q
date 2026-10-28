@@ -39,6 +39,7 @@ export {
   ExternalLink,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   FileText,
   Filter,
   Flag,
