@@ -158,7 +158,7 @@ describe("the financial write target and the Write Gate", () => {
     });
   });
 
-  it("writes a founder_private, HIGHLY_CONFIDENTIAL source, a SELF_REPORTED item and a USER_CLAIM candidate", async () => {
+  it("writes a founder_private, CONFIDENTIAL source (owner 2026-10-28), a SELF_REPORTED item and a USER_CLAIM candidate", async () => {
     const sources: unknown[] = [];
     const items: unknown[] = [];
     const submitted: unknown[] = [];
@@ -200,7 +200,7 @@ describe("the financial write target and the Write Gate", () => {
       input: {
         sourceType: "USER_STATEMENT",
         visibilityScope: "founder_private",
-        sensitivityClass: "HIGHLY_CONFIDENTIAL",
+        sensitivityClass: "CONFIDENTIAL",
       },
     });
     expect(items[0]).toMatchObject({

@@ -46,6 +46,7 @@ import { setReaderUpload } from "@/features/q/screen";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 
 import { DECK_AUDIENCE_OPTIONS, deckAudienceDescription } from "./deck-sharing";
+import { DocumentFiguresReview } from "./document-figures-review";
 import { setDeckAudienceAction } from "./deck-sharing-actions";
 import { openDocumentViewer } from "./document-ready";
 import { InAppReader, type ReaderDocument } from "./in-app-reader";
@@ -690,6 +691,16 @@ export function DocumentLibrary({
       <h2 id="documents-list" className="sr-only">
         {t("Your documents")}
       </h2>
+
+      {/* Owner 2026-10-28: figures read by code from their financial
+          documents, to keep, change or refuse here, after setup too. */}
+      {companyId === null ? null : (
+        <DocumentFiguresReview
+          documents={items
+            .filter((item) => item.source === "UPLOAD")
+            .map((item) => ({ id: item.id, title: item.title }))}
+        />
+      )}
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">

@@ -227,7 +227,17 @@ describe("the worker hook", () => {
     }[] = [];
     const deps: LocalFigureOfferDependencies = {
       sql: {} as never,
-      sessions: { findActive: () => Promise.resolve({ id: "s-1" } as never) },
+      // A founder who finished setup (every real customer): no open
+      // journey, their completed one for this company.
+      sessions: {
+        findActive: () => Promise.resolve(null),
+        findLatest: () =>
+          Promise.resolve({
+            id: "s-1",
+            status: "COMPLETED",
+            subject: { subjectType: "COMPANY", subjectId: COMPANY },
+          } as never),
+      },
       responses: { listCurrent: () => Promise.resolve([]) },
       offeredFromVersion: (_sql, _session, versionId) =>
         Promise.resolve(

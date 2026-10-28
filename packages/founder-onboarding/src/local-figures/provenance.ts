@@ -189,3 +189,48 @@ export function localFigureRationale(
     300,
   );
 }
+
+const MEASURE_WORDS: Readonly<Record<FinancialMeasureKey, string>> = {
+  monthly_revenue: "Monthly revenue",
+  annual_revenue: "Annual revenue",
+  gross_margin: "Gross margin",
+  net_burn: "Monthly net burn",
+  cash_balance: "Cash in the bank",
+  runway_months: "Runway",
+  paying_customers: "Paying customers",
+  headcount: "Headcount",
+  cac: "Customer acquisition cost",
+  churn: "Customer churn",
+};
+
+/** The measure's name for the founder ("Monthly revenue"). */
+export function localFigureLabel(measure: FinancialMeasureKey): string {
+  return MEASURE_WORDS[measure];
+}
+
+/** A figure as the founder reads it: "USD 51,000", "62%", "5 months". */
+export function formatLocalFigure(
+  figure: LocalFigureProvenance,
+  value: string,
+): string {
+  const [whole = "0", fraction] = value.split(".");
+  const grouped = `${whole.replace(/\B(?=(\d{3})+(?!\d))/gu, ",")}${fraction === undefined ? "" : `.${fraction}`}`;
+  switch (figure.measure) {
+    case "gross_margin":
+    case "churn":
+      return `${grouped}%`;
+    case "runway_months":
+      return `${grouped} months`;
+    case "paying_customers":
+    case "headcount":
+      return grouped;
+    case "monthly_revenue":
+    case "annual_revenue":
+    case "net_burn":
+    case "cash_balance":
+    case "cac":
+      return figure.currency === null
+        ? grouped
+        : `${figure.currency} ${grouped}`;
+  }
+}

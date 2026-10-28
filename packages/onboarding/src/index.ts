@@ -322,6 +322,7 @@ export {
   LOCAL_FIGURE_SOURCE,
   proposalSource,
   selectNextFields,
+  settledAfterSetup,
   type DeriveOnboardingCoverageInput,
   type OnboardingCoverageCheck,
   type OnboardingCoverageFieldProfile,

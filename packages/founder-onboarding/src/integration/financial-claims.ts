@@ -48,7 +48,7 @@ import type { FounderDomainDependencies } from "./services.js";
  *
  * Each answer in the financials block is written through the Knowledge
  * Write Gate exactly as a founder's statement in a Q conversation is: a
- * USER_STATEMENT evidence source (founder_private, HIGHLY_CONFIDENTIAL), an
+ * USER_STATEMENT evidence source (founder_private, CONFIDENTIAL), an
  * evidence item quoting the answer (SELF_REPORTED), and a knowledge
  * candidate proposed as USER_CLAIM. The gate derives visibility (the
  * narrowest input: founder_private) and confidence; nothing here can make
@@ -336,7 +336,7 @@ export type FinancialKnowledgeCollaborators = {
 };
 
 /**
- * Source (founder_private, HIGHLY_CONFIDENTIAL) → item (SELF_REPORTED) →
+ * Source (founder_private, CONFIDENTIAL) → item (SELF_REPORTED) →
  * candidate (USER_CLAIM). Exported so the provenance it writes is tested.
  */
 export function createFinancialKnowledgeRecorder({
@@ -363,15 +363,14 @@ export function createFinancialKnowledgeRecorder({
             `onboarding:${sessionId}:${claim.stepKey}`,
           reliabilityClass: "USER_STATEMENT",
           visibilityScope: "founder_private",
-          // Owner 2026-10-28: a figure the founder confirmed from their
-          // document is their own claim that Q may use in their own
-          // answers (CONFIDENTIAL: reviewed providers only); the document
-          // stays HIGHLY_CONFIDENTIAL and is never read. founder_private
-          // either way: no investor sees it without an explicit share.
-          sensitivityClass:
-            claim.fromDocument === undefined
-              ? "HIGHLY_CONFIDENTIAL"
-              : "CONFIDENTIAL",
+          // Owner 2026-10-28: a figure the founder stated or confirmed is
+          // their own claim, whichever way it arrived (typed in the
+          // interview or kept from their document), and Q may use it in
+          // their own answers: CONFIDENTIAL, reviewed providers only. A
+          // source financial document stays HIGHLY_CONFIDENTIAL and is
+          // never read. founder_private: no investor sees it without an
+          // explicit share.
+          sensitivityClass: "CONFIDENTIAL",
         },
       });
       const now = new Date().toISOString();

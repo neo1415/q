@@ -34,6 +34,7 @@ import {
   type OpenedFile,
 } from "./material-actions";
 import { useT } from "@/features/i18n/language";
+import { DocumentFiguresReview } from "@/features/documents/document-figures-review";
 import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
@@ -540,6 +541,9 @@ export function DeckCoach({
             </button>
           </div>
         ) : null}
+        {/* Owner 2026-10-28: figures read by code from their financial
+            documents wait here too, beside the deck they are set against. */}
+        <DocumentFiguresReview />
         {message === null ? null : (
           <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
             {message}

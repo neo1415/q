@@ -152,7 +152,7 @@ import {
   type OnboardingSessionAggregate,
   presentationOf,
 } from "./view.js";
-import { proposalSource } from "./coverage.js";
+import { proposalSource, settledAfterSetup } from "./coverage.js";
 import { sameResponseValue } from "./pending-writes.js";
 import { supersededDocumentOffers, withSources } from "./superseded-offers.js";
 
@@ -2024,7 +2024,19 @@ export function createOnboardingUseCases(
       .parse(raw);
     return transactions.run(async (tx) => {
       const session = await sessions.findById(tx.sql, command.sessionId);
-      if (session === null || session.status !== "ACTIVE") {
+      // Owner 2026-10-28: a figure read from their financial document is
+      // offered after setup too (every real founder has finished it), on a
+      // step the journey declares revisable (ADR 0024). Nothing else is
+      // offered on a completed session.
+      const afterSetup =
+        session !== null &&
+        settledAfterSetup({
+          status: session.status,
+          stepKey: command.stepKey,
+          sourceRefs: command.sourceRefs,
+          revisable: runtime.revisableSteps?.[session.journeyType],
+        });
+      if (session === null || (session.status !== "ACTIVE" && !afterSetup)) {
         throw new OnboardingSessionNotFoundError();
       }
       const published = await runtime.loadDefinition(
@@ -2145,18 +2157,36 @@ export function createOnboardingUseCases(
       if (idem.replay) {
         return view(tx.sql, actor, locked);
       }
-      const session = await lockedActiveSession(
-        runtime,
-        tx,
-        actor,
-        command.sessionId,
-        command.expectedSessionVersion,
-      );
-      const suggestion = await suggestions.findById(
-        tx.sql,
-        session.id,
-        command.suggestionId,
-      );
+      // Owner 2026-10-28: a figure from their financial document is kept,
+      // changed or refused after setup too, through this same commit, on a
+      // revisable step (ADR 0024); the session stays COMPLETED.
+      const offered =
+        locked.status === "COMPLETED"
+          ? await suggestions.findById(tx.sql, locked.id, command.suggestionId)
+          : null;
+      const afterSetup =
+        offered !== null &&
+        settledAfterSetup({
+          status: locked.status,
+          stepKey: offered.stepKey,
+          sourceRefs: offered.sourceRefs,
+          revisable: runtime.revisableSteps?.[locked.journeyType],
+        });
+      if (afterSetup && locked.version !== command.expectedSessionVersion) {
+        throw new OnboardingSessionVersionConflictError();
+      }
+      const session = afterSetup
+        ? locked
+        : await lockedActiveSession(
+            runtime,
+            tx,
+            actor,
+            command.sessionId,
+            command.expectedSessionVersion,
+          );
+      const suggestion =
+        offered ??
+        (await suggestions.findById(tx.sql, session.id, command.suggestionId));
       if (suggestion === null) {
         throw new OnboardingSuggestionNotFoundError();
       }

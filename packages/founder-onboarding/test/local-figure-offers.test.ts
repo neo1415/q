@@ -68,9 +68,23 @@ const document = {
   createdByUserId: USER,
 };
 
+type Journey = {
+  readonly id: string;
+  readonly status: "ACTIVE" | "COMPLETED";
+  readonly subject: {
+    readonly subjectType: "COMPANY";
+    readonly subjectId: string;
+  };
+};
+
 function harness(
   answers: Record<string, OnboardingResponseValue> = {},
   offeredBefore: readonly string[] = [],
+  journey: Journey | null = {
+    id: SESSION,
+    status: "ACTIVE",
+    subject: { subjectType: "COMPANY", subjectId: COMPANY },
+  },
 ) {
   const created: Parameters<
     LocalFigureOfferDependencies["createSuggestion"]
@@ -79,7 +93,11 @@ function harness(
   const offers = createLocalFigureOffers({
     sql: {} as never,
     sessions: {
-      findActive: () => Promise.resolve({ id: SESSION } as never),
+      findActive: () =>
+        Promise.resolve(
+          (journey?.status === "ACTIVE" ? journey : null) as never,
+        ),
+      findLatest: () => Promise.resolve(journey as never),
     },
     responses: {
       listCurrent: () =>
@@ -167,6 +185,44 @@ describe("local figure offers (the worker hook)", () => {
       }),
     ).toMatchObject({ kind: "SKIPPED", reason: "NOT_FINANCIAL" });
     expect(created).toEqual([]);
+  });
+
+  it("offers to a founder who finished setup, on their completed journey, without reopening it", async () => {
+    const { offers, created } = harness({}, [], {
+      id: SESSION,
+      status: "COMPLETED",
+      subject: { subjectType: "COMPANY", subjectId: COMPANY },
+    });
+    const result = await offers.onDocumentProcessed({
+      document,
+      blocks: ACCOUNTS,
+    });
+    expect(result).toMatchObject({
+      kind: "OFFERED",
+      sessionId: SESSION,
+      offered: 4,
+    });
+    expect(created.every((c) => c.sessionId === SESSION)).toBe(true);
+    expect(created.map((c) => c.stepKey)).toContain("F5.monthly_revenue");
+  });
+
+  it("never offers on a finished journey about another company, or with none", async () => {
+    const other = harness({}, [], {
+      id: SESSION,
+      status: "COMPLETED",
+      subject: {
+        subjectType: "COMPANY",
+        subjectId: "99999999-9999-4999-8999-000000000000",
+      },
+    });
+    expect(
+      await other.offers.onDocumentProcessed({ document, blocks: ACCOUNTS }),
+    ).toMatchObject({ kind: "SKIPPED", reason: "NO_FOUNDER_SESSION" });
+    expect(other.created).toEqual([]);
+    const none = harness({}, [], null);
+    expect(
+      await none.offers.onDocumentProcessed({ document, blocks: ACCOUNTS }),
+    ).toMatchObject({ kind: "SKIPPED", reason: "NO_FOUNDER_SESSION" });
   });
 
   it("uses the onboarding runtime's own marker", () => {
@@ -318,6 +374,9 @@ describe("confirmation becomes the founder's own claim", () => {
     expect(sources[0]?.input).toMatchObject({
       sourceType: "USER_STATEMENT",
       visibilityScope: "founder_private",
+      // The founder's own claim, usable by Q on reviewed providers; the
+      // accounts themselves stay HIGHLY_CONFIDENTIAL and unread.
+      sensitivityClass: "CONFIDENTIAL",
       externalReference: `document-figure:${VERSION}:monthly_revenue:2026-09`,
     });
     expect(items[0]?.input).toMatchObject({ evidenceStatus: "SELF_REPORTED" });

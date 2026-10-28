@@ -41,7 +41,7 @@ export const LOCAL_FIGURE_SKIP_REASONS = [
   "NOT_FINANCIAL",
   "NOT_A_COMPANY_DOCUMENT",
   "NO_FIGURES",
-  "NO_ACTIVE_SESSION",
+  "NO_FOUNDER_SESSION",
 ] as const;
 export type LocalFigureSkipReason = (typeof LOCAL_FIGURE_SKIP_REASONS)[number];
 
@@ -63,7 +63,10 @@ export type LocalFigureOfferResult =
 
 export type LocalFigureOfferDependencies = {
   readonly sql: DatabaseExecutor;
-  readonly sessions: Pick<OnboardingSessionRepository, "findActive">;
+  readonly sessions: Pick<
+    OnboardingSessionRepository,
+    "findActive" | "findLatest"
+  >;
   readonly responses: {
     readonly listCurrent: (
       executor: DatabaseExecutor,
@@ -144,16 +147,33 @@ export function createLocalFigureOffers(
       if (candidates.length === 0) {
         return { kind: "SKIPPED", reason: "NO_FIGURES", read: 0 };
       }
-      const session = await dependencies.sessions.findActive(
-        sql,
-        document.createdByUserId as UserId,
-        FOUNDER_JOURNEY_TYPE,
-        { subjectType: "COMPANY", subjectId: document.companyId },
-      );
+      // Their journey for this company: the one still open, or the one
+      // they finished (every real founder has). Offers never require
+      // re-entering setup: after it, they land on revisable steps and are
+      // confirmed from the Documents page, the deck tab or Q's list.
+      const userId = document.createdByUserId as UserId;
+      const companyId = document.companyId;
+      const session =
+        (await dependencies.sessions.findActive(
+          sql,
+          userId,
+          FOUNDER_JOURNEY_TYPE,
+          { subjectType: "COMPANY", subjectId: companyId },
+        )) ??
+        (await dependencies.sessions
+          .findLatest(sql, userId, FOUNDER_JOURNEY_TYPE)
+          .then((latest) =>
+            latest !== null &&
+            latest.status === "COMPLETED" &&
+            latest.subject?.subjectType === "COMPANY" &&
+            latest.subject.subjectId === companyId
+              ? latest
+              : null,
+          ));
       if (session === null) {
         return {
           kind: "SKIPPED",
-          reason: "NO_ACTIVE_SESSION",
+          reason: "NO_FOUNDER_SESSION",
           read: candidates.length,
         };
       }

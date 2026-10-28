@@ -85,6 +85,7 @@ import {
 import {
   createFounderDocumentReview,
   createLocalFigureOffers,
+  FOUNDER_REVISABLE_STEPS,
   createFounderExtraction,
   createFounderFinancialCheck,
 } from "@capital-q/founder-onboarding";
@@ -334,6 +335,9 @@ const onboarding = createOnboardingService({
   sql: database.sql,
   transactions: database.transactions,
   outbox: createOutboxWriter({ registry }),
+  // Owner 2026-10-28: figures from a founder's financial document are
+  // offered after setup too, on the steps the journey lets them revise.
+  revisableSteps: { founder: FOUNDER_REVISABLE_STEPS },
   logger,
 });
 
