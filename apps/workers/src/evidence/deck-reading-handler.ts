@@ -4,8 +4,10 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import { verifyDeckReading, type PostgresDataRoom } from "@capital-q/evidence";
 import {
   DECK_READER_PROMPT_VERSION,
+  DECK_READER_TEXT_MAX,
   type DeckReader,
 } from "@capital-q/model-gateway/q";
+import { selectReadingPassages } from "@capital-q/q-knowledge";
 
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 import type { QueueMessage } from "../queue/pgmq.js";
@@ -28,8 +30,12 @@ import type { MessageOutcome } from "../queue/runner.js";
  */
 
 const READY_EVENT = "evidence.document.ready";
-/** Passages read: a long deck read from the top. */
-const PASSAGES_MAX = 120;
+/**
+ * Characters of deck text chosen for the reader: its own cap less room for
+ * the "[Slide N]" markers, so the reader's final clip never cuts the end
+ * of the deck (where traction and the ask usually are).
+ */
+const DECK_READING_CHARACTERS = DECK_READER_TEXT_MAX - 4_000;
 /** A ready deck still unread after this long is an alert. */
 export const DECK_READING_ALERT_AFTER_MINUTES = 10;
 const UUID =
@@ -44,6 +50,8 @@ export type DeckReadingChunks = {
     readonly {
       readonly content: string;
       readonly chunkIndex: number;
+      /** PARENT chunks repeat their LEAF children; absent is read as LEAF. */
+      readonly role?: "LEAF" | "PARENT" | undefined;
       readonly locator: {
         readonly pageEnd?: number | undefined;
         readonly pageStart?: number | undefined;
@@ -124,15 +132,19 @@ export async function readDeckDocument(
               and x.prompt_version = ${DECK_READER_PROMPT_VERSION}))`
   )[0];
   if (target === undefined) return { kind: "NOT_ELIGIBLE" };
-  const chunks = (
-    await options.chunks.listActiveByVersion(
-      options.sql,
-      target.tenant_id,
-      target.version_id,
-    )
-  )
-    .toSorted((a, b) => a.chunkIndex - b.chunkIndex)
-    .slice(0, PASSAGES_MAX);
+  // The whole deck, once: leaves only (a parent repeats its children), and
+  // every slide or page given a share of the budget rather than the first
+  // N chunks, so the end of a long deck is read too.
+  const chunks = selectReadingPassages(
+    (
+      await options.chunks.listActiveByVersion(
+        options.sql,
+        target.tenant_id,
+        target.version_id,
+      )
+    ).map((chunk) => ({ ...chunk, role: chunk.role ?? "LEAF" })),
+    { maxCharacters: DECK_READING_CHARACTERS },
+  ).passages;
   if (chunks.length === 0) {
     options.logger.error(
       { documentVersionId: target.version_id, alert: "DECK_READING_NO_TEXT" },
@@ -433,9 +445,10 @@ export async function checkStoredDeckReadings(options: {
     if (passages.length === 0) continue;
     const verified = verifyDeckReading(
       row.sections,
+      // Figures are checked against the deck's whole text, once.
       passages
+        .filter((chunk) => (chunk.role ?? "LEAF") === "LEAF")
         .toSorted((a, b) => a.chunkIndex - b.chunkIndex)
-        .slice(0, PASSAGES_MAX)
         .map((chunk) => chunk.content)
         .join("\n"),
     );

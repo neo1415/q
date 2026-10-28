@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
   createContentExtractorRegistry,
   createDocxExtractor,
+  createImageExtractor,
   createPdfExtractor,
   createPptxExtractor,
   createTextExtractor,
@@ -11,10 +12,14 @@ import {
 } from "./extractors.js";
 import { createCsvExtractor, createXlsxExtractor } from "./spreadsheets.js";
 import { OoxmlRefusedError } from "./ooxml.js";
+import { imageToJpeg, pdfPagesToJpeg } from "./page-render.js";
+import { pdfjsAssetOptions } from "./pdfjs-assets.js";
 import {
   PARSER_INPUT_FILE,
   PARSER_REQUEST_FILE,
+  pageImageFile,
   ParserRequestSchema,
+  type PageImageRequest,
   ParserRefusalCodeSchema,
   type ParserRefusalCode,
 } from "./protocol.js";
@@ -62,6 +67,10 @@ async function loadPdfDocument(bytes: Uint8Array): Promise<PdfDocument> {
   }
   const task: unknown = getDocument({
     data: bytes,
+    // CMaps and standard font data from the installed package (no
+    // network): without them CID-keyed fonts (Arabic, CJK, many design
+    // exports) yield empty text.
+    ...pdfjsAssetOptions(),
     // No eval, no system fonts, no network font fetches, no scripting: a PDF
     // is data here, never a program.
     isEvalSupported: false,
@@ -91,7 +100,49 @@ function buildRegistry(): readonly ContentExtractor[] {
     createXlsxExtractor(),
     createCsvExtractor(),
     createTextExtractor(),
+    createImageExtractor(),
   ];
+}
+
+/**
+ * Pictures of the low-text pages, written into the workspace. Best effort:
+ * a page that cannot be drawn is simply not pictured, and the extraction
+ * stands on its own either way.
+ */
+async function writePageImages(
+  workspace: string,
+  extractorId: string,
+  input: Buffer,
+  lowTextPages: readonly number[],
+  request: PageImageRequest,
+): Promise<readonly number[]> {
+  const pages = lowTextPages.slice(0, request.maxPages);
+  if (pages.length === 0) return [];
+  const written: number[] = [];
+  try {
+    if (extractorId === "pdf") {
+      const images = await pdfPagesToJpeg(
+        new Uint8Array(input),
+        pages,
+        request,
+      );
+      for (const [page, jpeg] of images) {
+        writeFileSync(join(workspace, pageImageFile(page)), jpeg, {
+          mode: 0o600,
+        });
+        written.push(page);
+      }
+    } else if (extractorId === "image") {
+      const jpeg = await imageToJpeg(input, request);
+      if (jpeg !== null) {
+        writeFileSync(join(workspace, pageImageFile(1)), jpeg, { mode: 0o600 });
+        written.push(1);
+      }
+    }
+  } catch {
+    return written;
+  }
+  return written;
 }
 
 function refusalOf(error: unknown): ParserRefusalCode {
@@ -141,11 +192,22 @@ async function main(): Promise<void> {
 
   try {
     const output = await extractor.extract(input, { limits: request.limits });
+    const pageImages =
+      request.pageImages === undefined
+        ? []
+        : await writePageImages(
+            workspace,
+            extractor.id,
+            input,
+            output.metadata.lowTextPages ?? [],
+            request.pageImages,
+          );
     emit({
       ok: true,
       extractorId: extractor.id,
       extractorVersion: extractor.version,
       output,
+      ...(pageImages.length === 0 ? {} : { pageImages }),
     });
   } catch (error: unknown) {
     emit({ ok: false, code: refusalOf(error) });

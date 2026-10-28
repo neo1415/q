@@ -5,6 +5,8 @@ import {
   isWorkforceAnalysisRequest,
   QRunIdSchema,
   WORKFORCE_ANALYSIS_KIND,
+  WORKFORCE_DILIGENCE_PROFILE,
+  type QArtifactContent,
   type QArtifactSummary,
   type QSubjectRef,
   type WorkforceAnalysisRequest,
@@ -33,7 +35,23 @@ import {
   sourcesText,
   writeAnalysisWithReview,
 } from "./analysis.js";
+import {
+  claimsSection,
+  matchClaims,
+  type ClaimRow,
+  type CompanyClaim,
+} from "./claims.js";
 import { createSpend } from "./deep-research.js";
+import {
+  BUDGET_LIMITED_GAP,
+  NO_RESEARCH_GAP,
+  dataRoomText,
+  diligenceContent,
+  diligencePurpose,
+  orderDiligenceDraft,
+  readDataRoom,
+  type DataRoomReads,
+} from "./diligence-memo.js";
 import { safeReport } from "./live.js";
 import type { WorkforceModels } from "./models.js";
 
@@ -101,6 +119,11 @@ export function createWorkforceDocuments(dependencies: {
    */
   readonly ownContext?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /**
+   * Diligence (2026-10-28): the company's data room, through its own view
+   * read AS the person. Absent: a diligence memo says none was read.
+   */
+  readonly dataRoom?: DataRoomReads | undefined;
 }) {
   /**
    * An ANALYSIS document: the company's own record read as the person
@@ -170,6 +193,15 @@ export function createWorkforceDocuments(dependencies: {
       return unavailable();
     const subject: Extract<QSubjectRef, { kind: "COMPANY" }> | null =
       companyId === null ? null : { kind: "COMPANY", companyId };
+    // Diligence (2026-10-28): fixed sections, the data room as they may
+    // read it, and claims set against evidence by code.
+    const diligence =
+      request.scope === "NAMED_COMPANY" &&
+      request.profile === WORKFORCE_DILIGENCE_PROFILE;
+    const claims: CompanyClaim[] = [];
+    const recordContradictions: (readonly string[])[] = [];
+    const codeGaps: string[] = [];
+    let dataRoomPassages = 0;
     const runId = QRunIdSchema.parse(input.qRunId);
     const correlationId = createCorrelationId();
     const authorise = async (who: ActorContext) =>
@@ -245,11 +277,60 @@ export function createWorkforceDocuments(dependencies: {
           (finding) =>
             `- (${finding.truthClass}, ${finding.evidenceStatus}) ${finding.statement}`,
         ),
+        // Contradictions coexist (2026-10-28): the specialist computed them
+        // and they were dropped; every side is kept, labelled.
+        ...read.contradictions.map(
+          (set) =>
+            `- (CONTRADICTORY on record, both kept) ${set.statements.join(" | ")}`,
+        ),
       ];
       company =
         lines.length === 0
           ? "The company's record holds nothing yet; say what is not known."
           : lines.join("\n");
+      if (diligence && subject !== null) {
+        claims.push(
+          ...read.findings
+            .filter(
+              (finding) =>
+                finding.truthClass === "USER_CLAIM" ||
+                finding.evidenceStatus === "SELF_REPORTED",
+            )
+            .map((finding) => ({
+              statement: finding.statement,
+              source: "its record",
+              truthClass: finding.truthClass,
+              evidenceStatus: finding.evidenceStatus,
+            })),
+        );
+        recordContradictions.push(
+          ...read.contradictions.map((set) => set.statements),
+        );
+        // The data room, as THIS person may open it (its own view decides,
+        // read as them; never a privileged read, never founder-private).
+        if (dependencies.dataRoom !== undefined) {
+          if (!(await input.canContinue())) return unavailable();
+          const room = await readDataRoom(
+            dependencies.dataRoom,
+            actor,
+            subject.companyId,
+          );
+          dataRoomPassages = room.passages.length;
+          claims.push(...room.passages.flatMap((one) => one.claims));
+          const text = dataRoomText(room.passages);
+          if (text.length > 0) company = `${company}\n\n${text}`;
+          if (room.passages.length === 0)
+            codeGaps.push(
+              room.available
+                ? "No data-room document open to you held readable text, so none was read."
+                : "The company's data room could not be read as you, so none of its documents were used.",
+            );
+          if (room.notOpen > 0)
+            codeGaps.push(
+              `${String(room.notOpen)} data-room document${room.notOpen === 1 ? " is" : "s are"} listed but not open to you, so ${room.notOpen === 1 ? "it was" : "they were"} not read.`,
+            );
+        }
+      }
     }
     // Whoever it is for: their own context, read as them.
     const theirs = await dependencies.ownContext?.(actor).catch(() => null);
@@ -257,6 +338,13 @@ export function createWorkforceDocuments(dependencies: {
       company = `${company}\n\nWHO THIS IS FOR (${input.principalName ?? "the person"}), from their own records:\n${theirs}`;
     }
     const merged = mergeDossiers(input.research ?? []);
+    if (merged.budgetLimited) codeGaps.unshift(BUDGET_LIMITED_GAP);
+    if (
+      diligence &&
+      (input.research ?? []).length === 0 &&
+      input.publicSources === undefined
+    )
+      codeGaps.unshift(NO_RESEARCH_GAP);
     const spend = createSpend(input.budgetUsd);
     const today = new Date((dependencies.now ?? Date.now)())
       .toISOString()
@@ -271,7 +359,9 @@ export function createWorkforceDocuments(dependencies: {
       inputs: {
         principalName: input.principalName ?? "the person",
         request: input.personRequest ?? input.goal,
-        purpose: input.goal,
+        purpose: diligence
+          ? diligencePurpose(companyName, input.goal)
+          : input.goal,
         today,
         company,
         research: researchText(merged.facts, input.publicSources ?? null),
@@ -286,14 +376,52 @@ export function createWorkforceDocuments(dependencies: {
       };
     if (!(await input.canContinue())) return unavailable();
     safeReport(input.progress)({ stage: "FILING" });
-    const content = analysisContent({
-      draft: written.draft,
-      review: written.review,
-      sources: merged.sources,
-      facts: merged.facts,
-      seed: `${input.jobId}:${input.stepKey}`,
-      publicSources: input.publicSources ?? null,
-    });
+    const seed = `${input.jobId}:${input.stepKey}`;
+    let content: QArtifactContent;
+    let claimRows: readonly ClaimRow[] = [];
+    if (diligence) {
+      const ordered = orderDiligenceDraft(written.draft);
+      claimRows = matchClaims({
+        companyName,
+        claims,
+        evidence: merged.facts.map((fact) => ({
+          statement: fact.statement,
+          sourceIndex: fact.source,
+          domain: fact.domain,
+          asOf: fact.asOf,
+        })),
+        recordContradictions,
+      });
+      const section = claimsSection(claimRows, seed);
+      content = diligenceContent({
+        content: analysisContent({
+          draft: ordered.draft,
+          review: written.review,
+          sources: merged.sources,
+          facts: merged.facts,
+          seed,
+          publicSources: input.publicSources ?? null,
+          alsoCites: [section.body],
+          codeGaps,
+          sourcesAlways: true,
+        }),
+        claims: {
+          heading: section.heading,
+          body: section.body,
+          findings: [...section.findings],
+        },
+      });
+    } else {
+      content = analysisContent({
+        draft: written.draft,
+        review: written.review,
+        sources: merged.sources,
+        facts: merged.facts,
+        seed,
+        publicSources: input.publicSources ?? null,
+        codeGaps,
+      });
+    }
     // Filed under a fresh decision, as the person now.
     const refreshed = await dependencies.freshActor(actor);
     if (
@@ -329,6 +457,12 @@ export function createWorkforceDocuments(dependencies: {
         facts: merged.facts.length,
         spentUsd: Number(spend.spent().toFixed(4)),
         named: companyName !== null,
+        diligence,
+        dataRoomPassages,
+        claims: claimRows.length,
+        contradicted: claimRows.filter((row) => row.status === "CONTRADICTED")
+          .length,
+        budgetLimited: merged.budgetLimited,
       },
       "workforce analysis filed",
     );

@@ -499,6 +499,15 @@ export const WorkforceAnalysisRequestSchema = z
   })
   .strict();
 
+/**
+ * Diligence (2026-10-28): "do due diligence on X", an investment memo or a
+ * brief about the one company the job names is an analysis with fixed
+ * sections, written after a RESEARCH step, from the company's data room as
+ * the person may read it, with a claims-vs-evidence table built by code.
+ * Absent: an open analysis whose sections fit the request.
+ */
+export const WORKFORCE_DILIGENCE_PROFILE = "DILIGENCE" as const;
+
 /** Analysis about the ONE company the job names; code binds the company. */
 export const WorkforceNamedCompanyAnalysisRequestSchema = z
   .object({
@@ -506,6 +515,7 @@ export const WorkforceNamedCompanyAnalysisRequestSchema = z
     kind: z.literal(WORKFORCE_ANALYSIS_KIND),
     scope: z.literal("NAMED_COMPANY"),
     companyId: UuidSchema,
+    profile: z.literal(WORKFORCE_DILIGENCE_PROFILE).optional(),
   })
   .strict();
 

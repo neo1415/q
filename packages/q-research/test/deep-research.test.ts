@@ -7,6 +7,8 @@ import {
   admitFacts,
   composeEgressQuery,
   createDeepResearch,
+  createSearchBudget,
+  PLANNED_EXTRACT_BUDGET_MS,
   createPublicWebResearchService,
   namesShown,
   numbersIn,
@@ -418,5 +420,117 @@ describe("the dossier's admission rules", () => {
       "Majik Water expands",
       "Majik Water operates water ATMs.",
     ]);
+  });
+});
+
+/**
+ * Diligence audit 2026-10-28: planned questions bypassed the per-run
+ * budget (up to ~32 searches a step) and their page reads were cut at a
+ * turn's 3 s.
+ */
+describe("a job's search budget and a planned call's page reads", () => {
+  it("never sends more searches than the job's budget, across rounds, and says it was limited", async () => {
+    const seen: PublicWebSearchRequest[] = [];
+    const service = createPublicWebResearchService({
+      provider: topicalProvider("brave", seen),
+    });
+    const deep = createDeepResearch({ service });
+    const budget = createSearchBudget(4);
+    const questions = [
+      {
+        lane: "MARKET_SIZE",
+        query: "Kenya water kiosks market size",
+        alsoQuery: "Kenya water vending market",
+      },
+      {
+        lane: "DEMAND",
+        query: "Kenya households water access statistics",
+        alsoQuery: "Kenya water access households",
+      },
+      {
+        lane: "COMPETITORS",
+        query: "Kenya water kiosk competitors",
+        alsoQuery: "water atm competitors Kenya",
+      },
+      {
+        lane: "REGULATION",
+        query: "Kenya water kiosk regulation",
+        alsoQuery: "wasreb kiosk regulation",
+      },
+      { lane: "NEWS", query: "Kenya water kiosks news" },
+      { lane: "PRICES", query: "Kenya water kiosk prices" },
+    ];
+    const first = await deep.run({
+      actor,
+      runId: "55555555-5555-4555-8555-555555555590",
+      correlationId,
+      request: REQUEST,
+      questions,
+      deadlineAt: Date.now() + 60_000,
+      searchBudget: budget,
+    });
+    expect(seen.length).toBeLessThanOrEqual(4);
+    // Too tight for two phrasings each: one each, then none.
+    expect(
+      first.lanes.filter((lane) => lane.status === "SKIPPED_BUDGET"),
+    ).toHaveLength(questions.length - seen.length);
+    expect(budget.limited()).toBe(true);
+    const second = await deep.run({
+      actor,
+      runId: "55555555-5555-4555-8555-555555555590",
+      correlationId,
+      request: REQUEST,
+      questions: [{ lane: "MORE", query: "Kenya water kiosks operators" }],
+      deadlineAt: Date.now() + 60_000,
+      searchBudget: budget,
+    });
+    expect(second.lanes[0]?.status).toBe("SKIPPED_BUDGET");
+    expect(seen.length).toBeLessThanOrEqual(4);
+    expect(budget.remaining()).toBeGreaterThanOrEqual(0);
+  });
+
+  it("gives a planned call's page reads the longer background budget", async () => {
+    const slowReads = (): PublicWebResearchProvider => ({
+      ...topicalProvider("brave", []),
+      extract: (request) =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            resolve({
+              pages: request.urls.flatMap((url) => {
+                const page = PAGES.find((one) => one.url === url);
+                return page === undefined
+                  ? []
+                  : [{ url, title: page.title, text: page.text }];
+              }),
+              failedUrls: [],
+              latencyMs: 60,
+            });
+          }, 60),
+        ),
+    });
+    const read = async (planned: boolean) => {
+      const service = createPublicWebResearchService({
+        provider: slowReads(),
+        extractBudgetMs: 10,
+        plannedExtractBudgetMs: 1_000,
+      });
+      const outcome = await service.research({
+        actor,
+        runId: `55555555-5555-4555-8555-55555555559${planned ? "1" : "2"}`,
+        correlationId,
+        requestedQuery: "Kenya water kiosks market size",
+        userText: REQUEST,
+        subject: null,
+        focused: true,
+        planned,
+        researchVocabulary: true,
+      });
+      return outcome.status === "OK"
+        ? outcome.sources.some((source) => source.extracted)
+        : null;
+    };
+    expect(await read(false)).toBe(false);
+    expect(await read(true)).toBe(true);
+    expect(PLANNED_EXTRACT_BUDGET_MS).toBe(8_000);
   });
 });

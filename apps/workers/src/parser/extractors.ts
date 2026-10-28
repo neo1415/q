@@ -1,6 +1,8 @@
-import type {
-  ExtractedBlock,
-  ParserOutput,
+import {
+  EXTRACTION_LIMITS,
+  LOW_TEXT_PAGE_CHARACTERS,
+  type ExtractedBlock,
+  type ParserOutput,
 } from "@capital-q/evidence/contracts";
 
 import {
@@ -13,6 +15,11 @@ import {
   type XmlNode,
   type ZipLimits,
 } from "./ooxml.js";
+import {
+  pageBlocks,
+  pageTextCharacters,
+  type PdfTextItem,
+} from "./pdf-layout.js";
 
 /**
  * Content extractors (doc 14 §9.2).
@@ -333,7 +340,129 @@ export function createDocxExtractor(): ContentExtractor {
 // PPTX
 // ---------------------------------------------------------------------------
 
-export const PPTX_EXTRACTOR_VERSION = "1.0.0";
+/**
+ * 1.1.0: a slide's speaker notes and its charts' series, categories and
+ * values are read with it (founders put the numbers in a chart and the
+ * story in the notes); both are labelled in the slide's text.
+ */
+export const PPTX_EXTRACTOR_VERSION = "1.1.0";
+
+type XmlLimits = { readonly maxNodes: number; readonly maxDepth: number };
+
+/**
+ * A part's relationships, internal targets only, resolved against the
+ * part's folder. An external target or one that climbs out of the package
+ * is never followed.
+ */
+function relationshipsOf(
+  pkg: { readonly read: (name: string) => string | null },
+  partName: string,
+  limits: XmlLimits,
+): ReadonlyMap<string, { readonly type: string; readonly target: string }> {
+  const slash = partName.lastIndexOf("/");
+  const folder = partName.slice(0, slash);
+  const xml = pkg.read(`${folder}/_rels/${partName.slice(slash + 1)}.rels`);
+  const found = new Map<string, { type: string; target: string }>();
+  if (xml === null) return found;
+  for (const rel of findAll(parseXml(xml, limits), "Relationship")) {
+    const id = rel.attributes.get("Id");
+    const type = rel.attributes.get("Type") ?? "";
+    const target = rel.attributes.get("Target");
+    if (id === undefined || target === undefined) continue;
+    if (rel.attributes.get("TargetMode") === "External") continue;
+    const parts = target.startsWith("/")
+      ? target.slice(1).split("/")
+      : [...folder.split("/"), ...target.split("/")];
+    const resolved: string[] = [];
+    let escaped = false;
+    for (const part of parts) {
+      if (part === "" || part === ".") continue;
+      if (part === "..") {
+        if (resolved.length === 0) escaped = true;
+        resolved.pop();
+      } else resolved.push(part);
+    }
+    if (!escaped) found.set(id, { type, target: resolved.join("/") });
+  }
+  return found;
+}
+
+const paragraphLines = (node: XmlNode): string[] =>
+  findAll(node, "p")
+    .map((paragraph) =>
+      normaliseWhitespace(
+        findAll(paragraph, "t")
+          .map((t) => t.text)
+          .join(""),
+      ),
+    )
+    .filter((line) => line.length > 0);
+
+/** The speaker notes: the notes page's body placeholder, nothing else. */
+function notesText(xml: string, limits: XmlLimits): string {
+  const lines: string[] = [];
+  for (const shape of findAll(parseXml(xml, limits), "sp")) {
+    const body = findAll(shape, "ph").some(
+      (ph) => ph.attributes.get("type") === "body",
+    );
+    if (body) lines.push(...paragraphLines(shape));
+  }
+  return lines.join("\n");
+}
+
+/** Cached point values of a chart reference, in index order. */
+function pointValues(node: XmlNode | undefined): string[] {
+  if (node === undefined) return [];
+  return findAll(node, "pt")
+    .map((pt) => ({
+      idx: Number(pt.attributes.get("idx") ?? "0"),
+      value: normaliseWhitespace(findAll(pt, "v").map(textOf).join("")),
+    }))
+    .sort((a, b) => a.idx - b.idx)
+    .map((pt) => pt.value)
+    .slice(0, 60);
+}
+
+/**
+ * A chart as text: its title, then each series as "name: category =
+ * value; ...". The cached values the file carries, as written; nothing is
+ * computed or estimated, and a chart with no cached values says so by
+ * having none.
+ */
+function chartText(xml: string, limits: XmlLimits): string {
+  const root = parseXml(xml, limits);
+  const first = (node: XmlNode, name: string) => findAll(node, name)[0];
+  const titleNode = first(root, "title");
+  const title =
+    titleNode === undefined
+      ? ""
+      : normaliseWhitespace(
+          findAll(titleNode, "t")
+            .map((t) => t.text)
+            .join(" "),
+        );
+  const lines: string[] = [`Chart${title.length > 0 ? `: ${title}` : ""}`];
+  for (const series of findAll(root, "ser").slice(0, 12)) {
+    const nameNode = first(series, "tx");
+    const name =
+      nameNode === undefined
+        ? ""
+        : normaliseWhitespace(
+            findAll(nameNode, "v").map(textOf).join(" ") ||
+              findAll(nameNode, "t")
+                .map((t) => t.text)
+                .join(" "),
+          );
+    const categories = pointValues(first(series, "cat"));
+    const values = pointValues(first(series, "val") ?? first(series, "yVal"));
+    if (values.length === 0) continue;
+    const points = values.map((value, at) =>
+      categories[at] === undefined ? value : `${categories[at]} = ${value}`,
+    );
+    lines.push(`${name.length > 0 ? `${name}: ` : ""}${points.join("; ")}`);
+  }
+  return lines.length > 1 ? lines.join("\n") : "";
+}
 
 const PRESENTATION_MIME =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -366,19 +495,43 @@ export function createPptxExtractor(): ContentExtractor {
           maxNodes: context.limits.maxXmlNodes,
           maxDepth: context.limits.maxXmlDepth,
         });
-        // Paragraph-level text, so slide lines stay separate lines.
-        const lines = findAll(parsed, "p")
-          .map((paragraph) =>
-            normaliseWhitespace(
-              findAll(paragraph, "t")
-                .map((node) => node.text)
-                .join(""),
-            ),
-          )
-          .filter((line) => line.length > 0);
-        if (lines.length === 0) continue;
+        // Paragraph-level text, so slide lines stay separate lines. Chart
+        // frames hold no paragraphs of their own; their data is read below.
+        const lines = paragraphLines(parsed);
+        const xmlLimits = {
+          maxNodes: context.limits.maxXmlNodes,
+          maxDepth: context.limits.maxXmlDepth,
+        };
+        const rels = relationshipsOf(pkg, slide.name, xmlLimits);
+        const charts: string[] = [];
+        for (const chart of findAll(parsed, "chart")) {
+          const id =
+            chart.attributes.get("r:id") ??
+            [...chart.attributes.entries()].find(([key]) =>
+              key.endsWith(":id"),
+            )?.[1];
+          const rel = id === undefined ? undefined : rels.get(id);
+          if (rel === undefined || !rel.type.endsWith("/chart")) continue;
+          const chartXml = pkg.read(rel.target);
+          const text = chartXml === null ? "" : chartText(chartXml, xmlLimits);
+          if (text.length > 0) charts.push(text);
+        }
+        const notesRel = [...rels.values()].find((rel) =>
+          rel.type.endsWith("/notesSlide"),
+        );
+        const notesXml =
+          notesRel === undefined ? null : pkg.read(notesRel.target);
+        const notes = notesXml === null ? "" : notesText(notesXml, xmlLimits);
+        if (lines.length === 0 && charts.length === 0 && notes.length === 0)
+          continue;
         const title = lines[0];
-        const text = builder.clip(lines.join("\n"));
+        const text = builder.clip(
+          [
+            ...lines,
+            ...charts,
+            ...(notes.length === 0 ? [] : [`Speaker notes: ${notes}`]),
+          ].join("\n"),
+        );
         builder.add(
           {
             kind: "slide",
@@ -408,40 +561,13 @@ export function createPptxExtractor(): ContentExtractor {
 // PDF
 // ---------------------------------------------------------------------------
 
-export const PDF_EXTRACTOR_VERSION = "1.0.0";
-
-type PdfTextItem = { readonly str?: unknown; readonly transform?: unknown };
-
-/** Groups a page's text items into lines by vertical position, then paragraphs. */
-function pageParagraphs(items: readonly PdfTextItem[]): readonly string[] {
-  const lines = new Map<number, string[]>();
-  for (const item of items) {
-    if (typeof item.str !== "string" || item.str.length === 0) continue;
-    const transform = Array.isArray(item.transform) ? item.transform : [];
-    const y = typeof transform[5] === "number" ? Math.round(transform[5]) : 0;
-    const existing = lines.get(y);
-    if (existing === undefined) lines.set(y, [item.str]);
-    else existing.push(item.str);
-  }
-  const ordered = [...lines.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([, parts]) => normaliseWhitespace(parts.join(" ")))
-    .filter((line) => line.length > 0);
-
-  const paragraphs: string[] = [];
-  let current: string[] = [];
-  for (const line of ordered) {
-    current.push(line);
-    // A short line that ends a sentence closes the paragraph; anything more
-    // clever would be guessing at layout we cannot see.
-    if (/[.!?:]$/.test(line) && current.join(" ").length > 120) {
-      paragraphs.push(current.join(" "));
-      current = [];
-    }
-  }
-  if (current.length > 0) paragraphs.push(current.join(" "));
-  return paragraphs;
-}
+/**
+ * 2.0.0: reading order rebuilt from geometry (pdf-layout.ts): lines sorted
+ * left to right (right to left for RTL scripts), table cells kept apart,
+ * columns read one at a time, paragraphs split on vertical gaps, larger
+ * short lines emitted as headings.
+ */
+export const PDF_EXTRACTOR_VERSION = "2.0.0";
 
 export function createPdfExtractor(
   loadPdf: (bytes: Uint8Array) => Promise<{
@@ -463,18 +589,34 @@ export function createPdfExtractor(
       const document = await loadPdf(new Uint8Array(input));
       const builder = new BlockBuilder(context.limits);
       const pageCount = Math.min(document.numPages, context.limits.maxPages);
+      // Pages that are pictures (scans, slides exported as one image):
+      // recorded, so a reader is told rather than handed silence.
+      const lowTextPages: number[] = [];
       try {
         for (let page = 1; page <= pageCount; page += 1) {
           const loaded = await document.getPage(page);
           const content = await loaded.getTextContent();
-          for (const paragraph of pageParagraphs(content.items)) {
-            const clipped = builder.clip(paragraph);
+          if (
+            pageTextCharacters(content.items) < LOW_TEXT_PAGE_CHARACTERS &&
+            lowTextPages.length < EXTRACTION_LIMITS.maxPageList
+          ) {
+            lowTextPages.push(page);
+          }
+          for (const block of pageBlocks(content.items)) {
+            const clipped = builder.clip(block.text);
             builder.add(
-              {
-                kind: "paragraph",
-                text: clipped,
-                locator: { index: builder.index, page },
-              },
+              block.kind === "heading"
+                ? {
+                    kind: "heading",
+                    level: 1,
+                    text: clipped,
+                    locator: { index: builder.index, page },
+                  }
+                : {
+                    kind: "paragraph",
+                    text: clipped,
+                    locator: { index: builder.index, page },
+                  },
               clipped.length,
             );
           }
@@ -496,11 +638,59 @@ export function createPdfExtractor(
           parser: "pdf",
           parserVersion: PDF_EXTRACTOR_VERSION,
           pageCount: document.numPages,
+          ...(lowTextPages.length === 0 ? {} : { lowTextPages }),
           ...(builder.truncated || pageCount < document.numPages
             ? { truncated: true }
             : {}),
         },
       };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Images
+// ---------------------------------------------------------------------------
+
+export const IMAGE_EXTRACTOR_VERSION = "1.0.0";
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/**
+ * An uploaded PNG or JPEG: a picture has no text layer, so the extraction
+ * is honest about that (one low-text page, no blocks) instead of refusing
+ * the file as unsupported. The page's text can then be transcribed from
+ * the picture through the model gateway; without a vision provider the
+ * founder is told the picture could not be read. The bytes must be what
+ * the type claims: a file whose signature disagrees is malformed.
+ */
+export function createImageExtractor(): ContentExtractor {
+  return {
+    id: "image",
+    version: IMAGE_EXTRACTOR_VERSION,
+    supports: (descriptor) =>
+      descriptor.mimeType === "image/png" ||
+      descriptor.mimeType === "image/jpeg",
+    extract: (input) => {
+      const png = PNG_SIGNATURE.every((byte, at) => input[at] === byte);
+      const jpeg = input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff;
+      if (!png && !jpeg) {
+        return Promise.reject(
+          new OoxmlRefusedError(
+            "MALFORMED_PACKAGE",
+            "image signature mismatch",
+          ),
+        );
+      }
+      return Promise.resolve({
+        blocks: [],
+        metadata: {
+          parser: "image",
+          parserVersion: IMAGE_EXTRACTOR_VERSION,
+          pageCount: 1,
+          lowTextPages: [1],
+        },
+      });
     },
   };
 }

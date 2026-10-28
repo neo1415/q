@@ -128,6 +128,8 @@ export type ResearchCompositionDependencies = {
   readonly dataPosture?: ModelDataPosture | undefined;
   /** Test seam: a provider instead of the configured vendor. */
   readonly provider?: PublicWebResearchProvider | undefined;
+  /** A planned job's page-read budget (Q_RESEARCH_PLANNED_EXTRACT_MS). */
+  readonly plannedExtractBudgetMs?: number | undefined;
 };
 
 const COMPANY = "COMPANY" as const;
@@ -419,6 +421,9 @@ export function composeResearch(
           provider,
           evidence: createResearchEvidenceRecorder(evidence),
           ...(logger === undefined ? {} : { logger }),
+          ...(dependencies.plannedExtractBudgetMs === undefined
+            ? {}
+            : { plannedExtractBudgetMs: dependencies.plannedExtractBudgetMs }),
         });
 
   const gate = createKnowledgeWriteGate({

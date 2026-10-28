@@ -45,3 +45,58 @@ export function buildPdf(pages: readonly (readonly string[])[]): Buffer {
   body += `trailer\n<< /Size ${String(fontId + 1)} /Root 1 0 R >>\nstartxref\n${String(xrefOffset)}\n%%EOF\n`;
   return Buffer.from(body, "latin1");
 }
+
+/** One positioned run of text: PDF points from the bottom-left corner. */
+export type PlacedText = {
+  readonly x: number;
+  readonly y: number;
+  readonly text: string;
+  readonly size?: number;
+};
+
+/**
+ * Like buildPdf, but every run is placed explicitly, so a test can lay out
+ * columns, tables and headings the way an exported deck does. A page with
+ * no runs is an image-only page as far as text extraction can tell.
+ */
+export function buildPlacedPdf(
+  pages: readonly (readonly PlacedText[])[],
+): Buffer {
+  const objects: string[] = [];
+  const pageIds = pages.map((_page, index) => 3 + index * 2);
+  const fontId = 3 + pages.length * 2;
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[2] = `<< /Type /Pages /Kids [${pageIds
+    .map((id) => `${String(id)} 0 R`)
+    .join(" ")}] /Count ${String(pages.length)} >>`;
+  const escape = (value: string) => value.replace(/([\\()])/g, "\\$1");
+  pages.forEach((runs, index) => {
+    const pageId = pageIds[index] ?? 0;
+    const contentId = pageId + 1;
+    objects[pageId] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ` +
+      `/Contents ${String(contentId)} 0 R /Resources << /Font << /F1 ${String(fontId)} 0 R >> >> >>`;
+    const text = runs
+      .map(
+        (run) =>
+          `BT /F1 ${String(run.size ?? 11)} Tf ${String(run.x)} ${String(run.y)} Td (${escape(run.text)}) Tj ET`,
+      )
+      .join("\n");
+    objects[contentId] =
+      `<< /Length ${String(text.length)} >>\nstream\n${text}\nendstream`;
+  });
+  objects[fontId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  let body = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  for (let id = 1; id <= fontId; id += 1) {
+    offsets[id] = body.length;
+    body += `${String(id)} 0 obj\n${objects[id] ?? ""}\nendobj\n`;
+  }
+  const xrefOffset = body.length;
+  body += `xref\n0 ${String(fontId + 1)}\n0000000000 65535 f \n`;
+  for (let id = 1; id <= fontId; id += 1) {
+    body += `${String(offsets[id] ?? 0).padStart(10, "0")} 00000 n \n`;
+  }
+  body += `trailer\n<< /Size ${String(fontId + 1)} /Root 1 0 R >>\nstartxref\n${String(xrefOffset)}\n%%EOF\n`;
+  return Buffer.from(body, "latin1");
+}

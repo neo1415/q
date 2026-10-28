@@ -1032,6 +1032,32 @@ export function documentReading(
 }
 
 /**
+ * What Q could not read in one document (deck reading 2026-10-28): pages
+ * that were pictures nobody could transcribe, and a reading a size limit
+ * cut short. Said plainly, never hidden behind "nothing new". Null when
+ * the document was read in full.
+ */
+export function documentReadingNote(
+  view: Pick<OnboardingSessionView, "documentNotes"> | undefined,
+  documentId: string,
+): string | null {
+  const note = view?.documentNotes?.find((n) => n.documentId === documentId);
+  if (note === undefined) return null;
+  const parts: string[] = [];
+  if (note.unreadPages > 0) {
+    parts.push(
+      note.unreadPages === 1
+        ? "1 page was an image I couldn't read."
+        : `${String(note.unreadPages)} pages were images I couldn't read.`,
+    );
+  }
+  if (note.truncated) {
+    parts.push("It was too long to read in full; I read the first part.");
+  }
+  return parts.length === 0 ? null : parts.join(" ");
+}
+
+/**
  * The file they already shared, when this one is the same bytes (live e2e
  * 25 Oct: each re-upload of one deck made a new document, read and
  * reviewed again at a model's cost). Matched by content hash only.
@@ -1130,13 +1156,19 @@ export function uploadFindingsNote(
   filename: string,
   reading: "FOUND" | "NOTHING_NEW",
   found: readonly { readonly label: string; readonly value: string }[],
+  /** What Q could not read in it (documentReadingNote), if anything. */
+  unread: string | null = null,
 ): string {
   const name = filename.replace(/"/g, "'");
+  const limits =
+    unread === null
+      ? ""
+      : ` Q could not read all of it: ${unread} Tell them so plainly, and ask for a text version if it matters.`;
   if (reading === "NOTHING_NEW" || found.length === 0) {
-    return `The person just uploaded "${name}"; Q read it and found nothing new for their setup.`;
+    return `The person just uploaded "${name}"; Q read it and found nothing new for their setup.${limits}`;
   }
   const list = found.map((item) => `${item.label}: ${item.value}`).join("; ");
-  return `The person just uploaded "${name}". Q read it and found: ${list} (not confirmed yet). Don't ask them for these again; when it fits, say briefly what you found and ask if it's right.`;
+  return `The person just uploaded "${name}". Q read it and found: ${list} (not confirmed yet). Don't ask them for these again; when it fits, say briefly what you found and ask if it's right.${limits}`;
 }
 
 /**

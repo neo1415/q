@@ -287,6 +287,30 @@ describe("the document reading card", () => {
     expect(screen.getByRole("status").textContent).toBe("Reading");
   });
 
+  it("says what it could not read once the reading lands, not while reading", () => {
+    const note = "3 pages were images I couldn't read.";
+    const { rerender } = render(
+      <DocumentReadingCard
+        fileName="Scan.pdf"
+        stage="READING"
+        note={note}
+        reducedMotion
+      />,
+    );
+    expect(document.querySelector("[data-document-reading-note]")).toBeNull();
+    rerender(
+      <DocumentReadingCard
+        fileName="Scan.pdf"
+        stage="NOTHING_NEW"
+        note={note}
+        reducedMotion
+      />,
+    );
+    expect(
+      document.querySelector("[data-document-reading-note]")?.textContent,
+    ).toBe(note);
+  });
+
   it("keeps the skeleton still for reduced motion", () => {
     render(
       <DocumentReadingCard fileName="Deck.pdf" stage="READING" reducedMotion />,

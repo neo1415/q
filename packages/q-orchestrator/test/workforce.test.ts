@@ -8,6 +8,8 @@ import {
   ALL_EXECUTORS,
   UNREGISTERED_ROLE_REASONS,
   boundPlan,
+  DILIGENCE_RESEARCH_GOAL,
+  withDiligenceResearch,
   executorRosterText,
   planIsValid,
   registeredExecutors,
@@ -318,21 +320,90 @@ describe("boundPlan: investor documents (2026-10-12)", () => {
   it("binds the memo to the company the goal named, never one a model wrote", () => {
     const bound = boundPlan([memo, critique], {
       permitted,
-      budgetUsd: 1,
+      budgetUsd: 3,
       executors,
       namedCompanyId: company,
     });
     expect(bound.refused).toEqual([]);
-    expect(bound.steps[0]?.document).toEqual({
+    // Diligence audit 2026-10-28: a named-company memo is a diligence
+    // analysis that waits on research code adds when the plan has none.
+    expect(bound.steps.map((step) => step.key)).toEqual([
+      "diligence_research",
+      "memo",
+      "critique",
+    ]);
+    expect(bound.steps[0]).toMatchObject({
+      executor: "RESEARCH",
+      goal: DILIGENCE_RESEARCH_GOAL,
+      tools: ["public_web.search"],
+    });
+    expect(bound.steps[1]?.document).toEqual({
       operation: "PREPARE",
-      kind: "MEMO",
+      kind: "ANALYSIS",
       scope: "NAMED_COMPANY",
       companyId: company,
+      profile: "DILIGENCE",
     });
-    expect(bound.steps[1]).toMatchObject({
+    expect(bound.steps[1]?.dependsOn).toEqual(["diligence_research"]);
+    expect(bound.steps[2]).toMatchObject({
       agentName: "Reviewer",
       document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
     });
+  });
+
+  it("links a diligence memo to research the plan already has, and adds none", () => {
+    const research = {
+      key: "dig",
+      role: "RESEARCH",
+      agentName: null,
+      goal: "Ledgerfold's founders, customers and litigation",
+      tools: ["public_web.search"],
+      dependsOn: [],
+    };
+    const bound = boundPlan(
+      [
+        research,
+        { ...memo, document: { ...memo.document, kind: "INVESTMENT_BRIEF" } },
+      ],
+      { permitted, budgetUsd: 3, executors, namedCompanyId: company },
+    );
+    expect(bound.refused).toEqual([]);
+    expect(bound.steps.map((step) => step.key)).toEqual(["dig", "memo"]);
+    expect(bound.steps[1]?.dependsOn).toEqual(["dig"]);
+    expect(bound.steps[1]?.document).toMatchObject({
+      kind: "ANALYSIS",
+      profile: "DILIGENCE",
+    });
+  });
+
+  it("keeps a one-pager and an approved (already bound) memo as they are", () => {
+    const onePager = {
+      ...memo,
+      key: "one",
+      document: { ...memo.document, kind: "ONE_PAGER" },
+    };
+    const approved = {
+      ...memo,
+      key: "approved",
+      document: { ...memo.document, companyId: company },
+    };
+    const steps = withDiligenceResearch([onePager, approved], {
+      permitted,
+      executors,
+    });
+    expect(steps).toEqual([onePager, approved]);
+  });
+
+  it("adds no research where research cannot run, and the memo is still a diligence analysis", () => {
+    const bound = boundPlan([memo], {
+      permitted: new Set(["documents.own.prepare"]),
+      budgetUsd: 3,
+      executors,
+      namedCompanyId: company,
+    });
+    expect(bound.refused).toEqual([]);
+    expect(bound.steps.map((step) => step.key)).toEqual(["memo"]);
+    expect(bound.steps[0]?.document).toMatchObject({ profile: "DILIGENCE" });
   });
 
   it("refuses a named-company memo when the goal names no company on record", () => {
@@ -345,7 +416,7 @@ describe("boundPlan: investor documents (2026-10-12)", () => {
   it("refuses a model-written company id outright", () => {
     const bound = boundPlan(
       [{ ...memo, document: { ...memo.document, companyId: "elsewhere" } }],
-      { permitted, budgetUsd: 1, executors, namedCompanyId: company },
+      { permitted, budgetUsd: 3, executors, namedCompanyId: company },
     );
     expect(bound.refused).toEqual([
       { key: "memo", reason: "INVALID_DOCUMENT_REQUEST" },
@@ -355,7 +426,7 @@ describe("boundPlan: investor documents (2026-10-12)", () => {
   it("refuses a critique that does not wait on an earlier preparation", () => {
     const bound = boundPlan([memo, { ...critique, dependsOn: [] }], {
       permitted,
-      budgetUsd: 1,
+      budgetUsd: 3,
       executors,
       namedCompanyId: company,
     });

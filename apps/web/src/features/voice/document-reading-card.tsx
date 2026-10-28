@@ -28,6 +28,11 @@ export type DocumentReadingCardProps = {
   readonly stage: DocumentReadingStage;
   /** What the reading found, not confirmed yet; shown once it is DONE. */
   readonly found?: readonly DocumentFinding[] | undefined;
+  /**
+   * What Q could not read (pages that were pictures, a reading cut short),
+   * said once the reading lands; never folded into "nothing new".
+   */
+  readonly note?: string | null | undefined;
   /** Overrides the person's motion preference (tests). */
   readonly reducedMotion?: boolean | undefined;
 };
@@ -50,6 +55,7 @@ export function DocumentReadingCard({
   fileName,
   stage,
   found = [],
+  note = null,
   reducedMotion,
 }: DocumentReadingCardProps) {
   const preferReduced = useReducedMotion() === true;
@@ -127,6 +133,14 @@ export function DocumentReadingCard({
           </ul>
         )}
       </div>
+      {!working && note !== null ? (
+        <p
+          className="cq-caption text-(--cq-text-secondary)"
+          data-document-reading-note
+        >
+          {note}
+        </p>
+      ) : null}
     </div>
   );
 }

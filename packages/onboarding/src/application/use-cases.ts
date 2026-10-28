@@ -188,6 +188,27 @@ export type OnboardingRuntimeDependencies = {
   readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
   /** Optional; absent means the view names no reviewed documents. */
   readonly documentReviews?: OnboardingDocumentReviewRepository | undefined;
+  /**
+   * Deck reading 2026-10-28: how well each reviewed document could be read
+   * (pages that were pictures nobody could read; a limit that stopped the
+   * reading early), from the document's owner context. Optional; absent
+   * means the view carries no notes.
+   */
+  readonly documentNotes?:
+    | ((
+        executor: DatabaseExecutor,
+        input: {
+          readonly tenantId: string;
+          readonly documentIds: readonly string[];
+        },
+      ) => Promise<
+        readonly {
+          readonly documentId: string;
+          readonly unreadPages: number;
+          readonly truncated: boolean;
+        }[]
+      >)
+    | undefined;
   /** Journey-supplied plain-language names for options (CQ-PRE-REC-001 §19). */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
   /**
@@ -894,10 +915,35 @@ export function createOnboardingUseCases(
         ? Promise.resolve([] as readonly string[])
         : runtime.documentReviews.listReviewedDocumentIds(executor, session.id),
     ]);
+    // A reviewed document Q could not fully read is said so (deck reading
+    // 2026-10-28): "3 pages were pictures I couldn't read". Best effort; a
+    // failed read of the notes never fails the view.
+    const notes =
+      reviewed.length === 0 ||
+      runtime.documentNotes === undefined ||
+      session.tenantId === null
+        ? []
+        : (
+            await runtime
+              .documentNotes(executor, {
+                tenantId: session.tenantId,
+                documentIds: reviewed,
+              })
+              .catch(() => [])
+          ).filter((note) => note.unreadPages > 0 || note.truncated);
     const sessionView = {
       ...toSessionView(aggregate, changes, context),
       // Only when there is one: most reads carry nothing extra.
       ...(reviewed.length === 0 ? {} : { reviewedDocumentIds: [...reviewed] }),
+      ...(notes.length === 0
+        ? {}
+        : {
+            documentNotes: notes.map((note) => ({
+              documentId: note.documentId,
+              unreadPages: note.unreadPages,
+              truncated: note.truncated,
+            })),
+          }),
     };
     if (askedOpen === undefined) return sessionView;
     return {

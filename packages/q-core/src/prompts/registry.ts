@@ -27,8 +27,10 @@ import {
   ANALYSIS_CRITIQUE_V2,
   ANALYSIS_CRITIQUE_V3,
   ANALYSIS_WRITE_V3,
+  ANALYSIS_WRITE_V4,
   RESEARCH_FACTS_V2,
   RESEARCH_PLAN_V2,
+  RESEARCH_PLAN_V3,
   RESEARCH_FACTS_V1,
   RESEARCH_PLAN_V1,
 } from "./tasks/analyst.v1.js";
@@ -178,6 +180,7 @@ import {
   JOB_PLAN_V11,
   JOB_PLAN_V12,
   JOB_PLAN_V13,
+  JOB_PLAN_V14,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
@@ -253,12 +256,14 @@ import { NAVIGATION_CHOOSER_V1 } from "./tasks/navigation-chooser.v1.js";
 import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
 import { DOCUMENT_POLISH_V2 } from "./tasks/document-polish.v2.js";
 import { DOCUMENT_CRITIQUE_V1 } from "./tasks/document-critique.v1.js";
+import { DOCUMENT_PAGE_TRANSCRIBE_V1 } from "./tasks/document-page-transcribe.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FIT_Q_VIEW_V1 } from "./tasks/fit-q-view.v1.js";
 import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
 import { FIT_Q_VIEW_V3 } from "./tasks/fit-q-view.v3.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
+import { FOUNDER_ONBOARDING_EXTRACTION_V3 } from "./tasks/founder-onboarding-extraction.v3.js";
 import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
@@ -425,7 +430,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     Q_SYSTEM_VOICE_V2,
     Q_SYSTEM_VOICE_V3,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
-    FOUNDER_ONBOARDING_EXTRACTION_V2,
+    { ...FOUNDER_ONBOARDING_EXTRACTION_V2, status: "DEPRECATED" },
+    FOUNDER_ONBOARDING_EXTRACTION_V3,
     INTERVIEW_CONDUCTOR_V1,
     INTERVIEW_CONDUCTOR_V2,
     INTERVIEW_CONDUCTOR_V3,
@@ -601,17 +607,21 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     JOB_PLAN_V10,
     { ...JOB_PLAN_V11, status: "DEPRECATED" },
     { ...JOB_PLAN_V12, status: "DEPRECATED" },
-    JOB_PLAN_V13,
+    { ...JOB_PLAN_V13, status: "DEPRECATED" },
     RESEARCH_PLAN_V1,
     RESEARCH_FACTS_V1,
     ANALYSIS_WRITE_V1,
     ANALYSIS_CRITIQUE_V1,
     ANALYSIS_WRITE_V2,
     ANALYSIS_CRITIQUE_V2,
-    RESEARCH_PLAN_V2,
+    { ...RESEARCH_PLAN_V2, status: "DEPRECATED" },
     RESEARCH_FACTS_V2,
-    ANALYSIS_WRITE_V3,
+    { ...ANALYSIS_WRITE_V3, status: "DEPRECATED" },
     ANALYSIS_CRITIQUE_V3,
+    // Diligence audit 2026-10-28.
+    JOB_PLAN_V14,
+    RESEARCH_PLAN_V3,
+    ANALYSIS_WRITE_V4,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,
@@ -660,6 +670,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DOCUMENT_POLISH_V1,
     DOCUMENT_POLISH_V2,
     DOCUMENT_CRITIQUE_V1,
+    DOCUMENT_PAGE_TRANSCRIBE_V1,
     { ...GATEQ_INTERVIEWER_V1, status: "DEPRECATED" },
     { ...GATEQ_INTERVIEWER_V2, status: "DEPRECATED" },
     GATEQ_INTERVIEWER_V3,

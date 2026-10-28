@@ -342,12 +342,12 @@ describe("determinism, versions and bounds", () => {
 
   it("stamps an explicit chunking version and accepts a deliberate newer one", () => {
     fresh();
-    expect(planChunks([paragraph("x.")]).chunkingVersion).toBe("q-chunking-v1");
+    expect(planChunks([paragraph("x.")]).chunkingVersion).toBe("q-chunking-v2");
     fresh();
     expect(
-      planChunks([paragraph("x.")], { chunkingVersion: "q-chunking-v2" })
+      planChunks([paragraph("x.")], { chunkingVersion: "q-chunking-v3" })
         .chunkingVersion,
-    ).toBe("q-chunking-v2");
+    ).toBe("q-chunking-v3");
   });
 
   it("selects mixed for a document with slides and prose, and orders by block", () => {

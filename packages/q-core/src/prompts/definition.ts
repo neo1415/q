@@ -76,6 +76,8 @@ export const PROMPT_IDS = [
   "DOCUMENT_POLISH",
   /** Deck wave 8: the vision check of a rendered deck. */
   "DOCUMENT_CRITIQUE",
+  /** Deck reading 2026-10-28: verbatim text of image-only pages. */
+  "DOCUMENT_PAGE_TRANSCRIBE",
   // DAILY block: The Q Daily's story writer and Q's take column.
   "DAILY_STORY_WRITER",
   "DAILY_Q_TAKE",
@@ -192,6 +194,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   // DOCS block.
   DOCUMENT_POLISH: "document-polish",
   DOCUMENT_CRITIQUE: "document-critique",
+  DOCUMENT_PAGE_TRANSCRIBE: "document-page-transcribe",
   // DAILY block
   DAILY_STORY_WRITER: "daily-story-writer",
   DAILY_Q_TAKE: "daily-q-take",
