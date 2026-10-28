@@ -326,7 +326,9 @@ export type LiveBrokerDependencies = {
   readonly spend: DuplexSpendLedger;
   readonly usage: ModelUsageRepository;
   /** OpenAI is UNREVIEWED: PUBLIC unless the deployment is synthetic. */
-  readonly providerCeiling: ModelSensitivity;
+  /** As the realtime gateway's: fixed, or read from the provider's review. */
+  readonly providerCeiling:
+    ModelSensitivity | (() => Promise<ModelSensitivity>);
   readonly syntheticDemo: boolean;
   readonly logger: Logger;
   /**
@@ -1185,11 +1187,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       });
       if (decision.outcome === "DENIED")
         return { kind: "REFUSED", reason: "DENIED" };
+      const ceiling =
+        typeof deps.providerCeiling === "function"
+          ? await deps.providerCeiling().catch(() => "PUBLIC" as const)
+          : deps.providerCeiling;
       if (
-        !sensitivityWithin(
-          decision.plan.maxSensitivity,
-          deps.providerCeiling,
-        ) &&
+        !sensitivityWithin(decision.plan.maxSensitivity, ceiling) &&
         !deps.syntheticDemo
       ) {
         return { kind: "REFUSED", reason: "INELIGIBLE" };

@@ -142,6 +142,8 @@ function setup(
     /** Q says `first`, then waits for `until`, then `rest` (a streamed answer). */
     stream?: { first: string; rest: string; until: Promise<void> };
     rehearsalLine?: Parameters<typeof createLiveBroker>[0]["rehearsalLine"];
+    /** The provider's ceiling, as main.ts reads it from the review. */
+    ceiling?: () => Promise<"PUBLIC" | "INTERNAL" | "CONFIDENTIAL">;
     onboardingConversation?: Parameters<
       typeof createLiveBroker
     >[0]["onboardingConversation"];
@@ -208,7 +210,7 @@ function setup(
     turn,
     spend: { spentTodayUsd: () => Promise.resolve(options.spent ?? 0) },
     usage,
-    providerCeiling: "PUBLIC",
+    providerCeiling: options.ceiling ?? "PUBLIC",
     syntheticDemo: options.synthetic === true,
     logger,
     now: () => clock,
@@ -489,6 +491,25 @@ describe("GPT-Live line", () => {
     });
     expect(created[0]?.voice).toBe("marin");
     expect(created[0]?.instructions).toContain("Delegation policy:");
+  });
+
+  it("carries a person's confidential onboarding when the provider's review allows it, with no demo attestation (launch 2026-10-28)", async () => {
+    // OpenAI reviewed: no training, zero retention -> CONFIDENTIAL.
+    const reviewed = () => Promise.resolve("CONFIDENTIAL" as const);
+    expect(
+      (
+        await open(
+          setup({ sensitivity: "CONFIDENTIAL", ceiling: reviewed }).broker,
+        )
+      ).kind,
+    ).toBe("OPEN");
+    // A review that does not allow it still refuses, attestation or not.
+    const unreviewed = () => Promise.resolve("PUBLIC" as const);
+    expect(
+      await open(
+        setup({ sensitivity: "CONFIDENTIAL", ceiling: unreviewed }).broker,
+      ),
+    ).toEqual({ kind: "REFUSED", reason: "INELIGIBLE" });
   });
 
   it("refuses a rehearsal, a denied plan, an ineligible plan and a spent cap", async () => {

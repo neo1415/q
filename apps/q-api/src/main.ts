@@ -338,6 +338,7 @@ import {
   qRehearsalVideoEventsBasePath,
   createEventRegistry,
   type ModelDataPosture,
+  type ModelSensitivity,
   type QViewingMoment,
 } from "@capital-q/contracts";
 import {
@@ -430,6 +431,8 @@ import {
   createModelProviderRegistry,
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
+  indexCatalog,
+  providerJustifiedCeiling,
   createPostgresModelUsageRepository,
   createPostgresUsageReader,
   createProcessLocalProviderHealth,
@@ -7110,6 +7113,22 @@ const rehearsalVoiceTurn = createRehearsalAwareTurn({
   performance: speechPerformance,
 });
 /**
+ * What a voice line through OpenAI may carry: the same ceiling the model
+ * gateway justifies from the provider's recorded review (privacy class and
+ * zero retention). The voice lines held a constant PUBLIC from before the
+ * review was recorded, so only the synthetic-demo attestation let them
+ * carry a person's own onboarding; a real-customer deployment would have
+ * refused every one (launch preparation 2026-10-28).
+ */
+const openaiVoiceCeiling = async (): Promise<ModelSensitivity> => {
+  const catalog = indexCatalog(await modelCatalog.load());
+  const openai = catalog.providerByCode.get("openai");
+  return openai === undefined || openai.status !== "ACTIVE"
+    ? "PUBLIC"
+    : providerJustifiedCeiling(openai);
+};
+
+/**
  * DUPLEX: full-duplex voice (CQ_VOICE_REALTIME, off by default). Composed
  * only when the flag is on and the OpenAI key exists; otherwise every
  * voice session is the standard line, exactly as before. The broker plans
@@ -7127,9 +7146,9 @@ const duplexBroker =
           }),
           enabled: true,
           usage: createPostgresModelUsageRepository({ sql: database.sql }),
-          // ai_ops.providers: openai is UNREVIEWED, so PUBLIC unless this
-          // deployment is attested synthetic (as for text routing).
-          providerCeiling: "PUBLIC",
+          // OpenAI's own recorded review (ai_ops.providers), as text
+          // routing reads it: never a constant that outlives the review.
+          providerCeiling: openaiVoiceCeiling,
           syntheticDemo,
           onFailure: (failure) =>
             logger.warn(failure, "duplex voice secret not minted"),
@@ -7250,8 +7269,7 @@ const liveBroker =
         }),
         onboardingConversation,
         usage: createPostgresModelUsageRepository({ sql: database.sql }),
-        // ai_ops.providers: openai is UNREVIEWED, as for the duplex line.
-        providerCeiling: "PUBLIC",
+        providerCeiling: openaiVoiceCeiling,
         syntheticDemo: syntheticDemo?.permitted === true,
         logger,
         // Public external personas retain their prepared line; other owned

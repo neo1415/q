@@ -81,6 +81,7 @@ export {
 } from "./policy/cost.js";
 export {
   planRoute,
+  providerJustifiedCeiling,
   selectRoutingPolicy,
   type EligibilityInput,
   type EligibleCandidate,

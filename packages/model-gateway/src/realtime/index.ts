@@ -230,8 +230,11 @@ export function createRealtimeVoiceGateway(options: {
   /**
    * The provider's justified data-use ceiling. PUBLIC for a provider whose
    * terms were not reviewed (ai_ops.providers privacy class UNREVIEWED).
+   * A function reads it from the provider's current review each time, so a
+   * review recorded in the catalogue takes effect without a redeploy.
    */
-  readonly providerCeiling: ModelSensitivity;
+  readonly providerCeiling:
+    ModelSensitivity | (() => Promise<ModelSensitivity>);
   /** The composition root's attestation; its presence is the proof. */
   readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
   readonly mintTimeoutMs?: number | undefined;
@@ -259,8 +262,12 @@ export function createRealtimeVoiceGateway(options: {
       // Context Firewall decision ≠ provider data-use eligibility: the plan
       // says what this line may carry, and the provider must be cleared for
       // it. A synthetic deployment lifts the provider's ceiling only.
+      const ceiling =
+        typeof options.providerCeiling === "function"
+          ? await options.providerCeiling().catch(() => "PUBLIC" as const)
+          : options.providerCeiling;
       if (
-        !sensitivityWithin(request.sensitivity, options.providerCeiling) &&
+        !sensitivityWithin(request.sensitivity, ceiling) &&
         options.syntheticDemo?.permitted !== true
       ) {
         return { status: "INELIGIBLE" };
