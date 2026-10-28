@@ -223,8 +223,14 @@ export function QAnswer({
         <div
           ref={objectsRef}
           className="flex flex-col gap-3"
+          // The floor holds while the answer streams; once it lands the
+          // region takes its own height (live run 2026-10-28, desktop
+          // chat: a preview's 350px stayed as a blank band under the
+          // person's bubble after the words arrived).
           style={
-            objectsFloor === undefined ? undefined : { minHeight: objectsFloor }
+            objectsFloor === undefined || !turn.streaming
+              ? undefined
+              : { minHeight: objectsFloor }
           }
           data-q-answer-objects
         >

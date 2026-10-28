@@ -732,7 +732,14 @@ function ComparisonTable({
   const nameOf = useSubjectNames(block.subjects);
   return (
     <QResultCard label={t("Side by side")}>
-      <div className="relative overflow-x-auto">
+      {/* Wider than a phone, the table scrolls inside the card and says so
+          (live 2026-10-28, 390px: the second column was cut with no cue). */}
+      {block.subjects.length > 1 ? (
+        <p className="cq-caption text-(--cq-text-tertiary) sm:hidden">
+          {t("Swipe sideways to see every column.")}
+        </p>
+      ) : null}
+      <div className="cq-q-table-scroll relative overflow-x-auto">
         <table className="w-full border-collapse text-start">
           <thead>
             <tr>

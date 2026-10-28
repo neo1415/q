@@ -886,6 +886,12 @@ export type AnswerCanvasProps = AnswerCardActions & {
   readonly asked?: string | undefined;
   /** What Q is saying now; omitted in a static view (chat, Board). */
   readonly said?: string | undefined;
+  /**
+   * The presence and the X only, no words over the cards: the captions
+   * above already carry the question and the answer (live 2026-10-28,
+   * 390px: the same sentence twice).
+   */
+  readonly quietLine?: boolean | undefined;
   /** The card Q is talking about; -1 for none (the overview). */
   readonly focus: number;
   /** Q's presence, small, beside what it says. */
@@ -914,6 +920,7 @@ export function AnswerCanvas({
   answerKey,
   asked,
   said,
+  quietLine,
   focus,
   presence,
   dismissed,
@@ -951,14 +958,21 @@ export function AnswerCanvas({
         data-ac
       >
         {said === undefined ? null : (
-          <div className="cq-ac-speakline">
+          <div
+            className="cq-ac-speakline"
+            data-ac-quiet={quietLine === true ? "" : undefined}
+          >
             <div className="cq-ac-mini">{presence}</div>
-            <div className="min-w-0">
-              <p className="cq-ac-asked">{asked ?? block.title}</p>
-              <p className="cq-ac-said" aria-live="polite" data-ac-said>
-                {said}
-              </p>
-            </div>
+            {quietLine === true ? (
+              <span />
+            ) : (
+              <div className="min-w-0">
+                <p className="cq-ac-asked">{asked ?? block.title}</p>
+                <p className="cq-ac-said" aria-live="polite" data-ac-said>
+                  {said}
+                </p>
+              </div>
+            )}
             {onCloseAll === undefined ? (
               <span />
             ) : (

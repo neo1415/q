@@ -875,6 +875,12 @@
   .cq-q-bubble.is-live {
     color: var(--cq-stage-text-muted);
   }
+  /* A table wider than its card scrolls inside it, scrollbar shown. */
+  .cq-q-table-scroll {
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    padding-bottom: 4px;
+  }
   .cq-q-chip {
     display: inline-flex;
     min-height: 32px;
@@ -1106,6 +1112,19 @@
   .cq-q-aside {
     background: var(--cq-stage-canvas);
     scrollbar-width: thin;
+  }
+  /* A panel beside the thread (ADR 0017 Stage + Board), one column. */
+  @media (min-width: 1024px) {
+    .cq-q-aside {
+      width: clamp(360px, 40%, 520px);
+    }
+    .cq-q-aside .cq-board-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+    }
+    .cq-q-aside .cq-board {
+      padding-inline: 20px;
+    }
   }
   .cq-q-board-object {
     display: flex;
@@ -3292,6 +3311,8 @@
     inset: 0;
     z-index: var(--cq-z-presence);
     pointer-events: none;
+    /* Nothing of a strip ever reaches past the viewport (live 2026-10-28). */
+    overflow: hidden;
     opacity: 0;
     transition: opacity var(--cq-motion-slow) var(--cq-ease);
   }
@@ -3989,6 +4010,7 @@
     gap: 6px;
   }
   .cq-stage-quiet {
+    position: relative;
     min-height: 36px;
     border-radius: var(--cq-radius-md);
     padding: 0 12px;
@@ -4002,11 +4024,26 @@
       color var(--cq-motion-fast) var(--cq-ease),
       background-color var(--cq-motion-fast) var(--cq-ease);
   }
-  /* Dense on a desktop; a 44 px touch target below it (R30 #12). */
+  /* Dense on a desktop, with a 44 px hit area around it (doc 18); a 44 px
+     touch target below it (R30 #12), narrower at a phone's width so the
+     Q page's top line fits in 360 px. */
+  .cq-stage-quiet::after {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
+  }
   @media (max-width: 1023px) {
     .cq-stage-quiet {
       min-height: 44px;
       min-width: 44px;
+    }
+    .cq-stage-quiet::after {
+      inset: 0;
+    }
+  }
+  @media (max-width: 639px) {
+    .cq-stage-quiet {
+      padding: 0 8px;
     }
   }
   .cq-stage-quiet:hover,

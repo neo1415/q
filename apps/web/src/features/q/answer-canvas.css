@@ -48,6 +48,10 @@
   gap: 12px;
   align-items: start;
 }
+/* The quiet line: the presence and the X, nothing between (captions on). */
+.cq-ac-speakline[data-ac-quiet] {
+  min-height: 44px;
+}
 .cq-ac-mini {
   width: 52px;
   height: 52px;
@@ -1248,10 +1252,9 @@ body:has([data-arrival-dock]:not([data-tucked]) > div:not(:empty))
   .cq-board-open-q {
     display: none;
   }
+  /* Wrapped, so no chip is clipped with nothing to say more follow
+     (live 2026-10-28, 390px). */
   .cq-board-minis {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
     margin-inline-end: 0;
   }
   .cq-board-mini {
