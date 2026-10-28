@@ -664,6 +664,7 @@ import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
 import { createHeldWritesStore } from "./voice/held-writes.js";
 import { createOnboardingConversation } from "./voice/onboarding-conversation.js";
+import { createTypedOnboarding } from "./voice/typed-onboarding.js";
 import { createOnboardingTranscriptPort } from "./composition/onboarding-transcript.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
 import { createOnboardingConductor } from "./voice/onboarding-conductor.js";
@@ -6908,8 +6909,34 @@ const onboardingConversation =
         research: { investor: investorResearch, founder: founderResearch },
         logger,
       });
+/**
+ * Owner 2026-10-28: typed onboarding is the same conversation (DECISIONS
+ * 39): a typed line is kept and read in the background like a spoken one,
+ * and Q replies in one call. Off with the voice conversation.
+ */
+const typedOnboarding =
+  onboardingConversation === undefined
+    ? undefined
+    : createTypedOnboarding({
+        conversation: onboardingConversation,
+        gateway: modelGateway,
+        delegation: createQDelegationReader({
+          gateway: modelGateway,
+          logger,
+          dataPosture: demoDataPosture,
+        }),
+        heldWrites: createHeldWritesStore({
+          sql: database.sql,
+          repository: createPostgresPendingWriteRepository(),
+          newKey: randomUUID,
+        }),
+        recommendations: onboardingRecommendations,
+        dataPosture: demoDataPosture,
+        logger,
+      });
 const interviewAgent = createOnboardingConductor({
   introduction: onboardingConversation,
+  typed: typedOnboarding,
   agent: interviewLoop,
   // Multilingual Q: the conductor's own lines in their chosen language.
   languageOf: (actor) =>

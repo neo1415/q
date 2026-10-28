@@ -206,7 +206,7 @@ describe("F-52: a new investor's first answer is never lost to the firm not bein
     expect(world.recordedValue("I2.stages")).toBeUndefined();
     const toolResults = first.seen.join("\n");
     expect(toolResults).toContain("HELD_FOR_RETRY");
-    expect(toolResults).toContain("Kept, and saved automatically");
+    expect(toolResults).toContain("saved automatically once their firm");
     expect(toolResults).not.toContain("context isn't active");
     // ...but every answer is kept, none refused and dropped.
     expect(

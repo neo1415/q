@@ -33,7 +33,24 @@ export type PendingWrite = {
   readonly idempotencyKey: string;
   readonly attempts: number;
   readonly createdAt: Date;
+  /** When it was last tried (the row's last update); absent when unknown. */
+  readonly lastAttemptAt?: Date | undefined;
+  /** The last failure's code; `WAITING_*` while it waits on another answer. */
+  readonly lastError?: string | null | undefined;
 };
+
+/** The code prefix of a failure that only waits on another answer. */
+export const WAITING_CODE_PREFIX = "WAITING_";
+
+/** Whether the row's last failure was transient (not waiting, not none). */
+function failedTransiently(write: PendingWrite): boolean {
+  return (
+    write.attempts > 0 &&
+    typeof write.lastError === "string" &&
+    !write.lastError.startsWith(WAITING_CODE_PREFIX) &&
+    write.lastError !== "SUPERSEDED"
+  );
+}
 
 export type PendingWriteRepository = {
   /** Holds a change; supersedes (DISCARDED) an earlier PENDING one for the same step. Idempotent by key. */
@@ -102,6 +119,8 @@ export type DrainPorts = {
     code: string | null,
   ) => Promise<void>;
   readonly recordAttempt: (id: string, code: string) => Promise<void>;
+  /** The clock, for backoff (tests pin it). */
+  readonly now?: () => Date;
 };
 
 export type DrainResult = {
@@ -113,24 +132,50 @@ export type DrainResult = {
   readonly stillPending: readonly string[];
   /** Steps still held until their firm or company is set up. */
   readonly waiting: readonly string[];
+  /**
+   * Steps that kept failing and are no longer tried (settled REFUSED with
+   * `GAVE_UP_<code>`, the schema having no FAILED state): the person is
+   * told plainly that this one thing could not be saved, and asked again.
+   */
+  readonly failed?: readonly { stepKey: string; code: string }[];
 };
 
 /**
- * Replays every held change, oldest first. Stops at the first transient
- * failure (the dependency is still down; hammering it helps nobody) and
- * leaves the rest held. A change waiting on its firm or company is kept
- * and the drain carries on, and it is tried again after a pass that saved
- * something, so the order they were held in does not matter. Never throws
- * for a replay failure.
+ * A change that fails for a reason no answer explains (a 500, a timeout) is
+ * tried this many times, with backoff, then given up on and the person told.
+ */
+export const TRANSIENT_ATTEMPTS_MAX = 5;
+
+/** The wait before trying a change again after `attempts` failures. */
+export function retryBackoffMs(attempts: number): number {
+  if (attempts <= 0) return 0;
+  return Math.min(60_000, 2_000 * 2 ** (attempts - 1));
+}
+
+/**
+ * Replays every held change, oldest first. One change that fails never
+ * holds back the others (live 2026-10-28: one website answer answered 500
+ * seven times and nine mandate answers behind it were never saved): a
+ * transient failure is recorded on that row, which is tried again after a
+ * backoff, and the drain carries on. Only two transient failures in a row
+ * read as the dependency being down, and then the rest wait (hammering a
+ * service that is down helps nobody). A row that has failed
+ * TRANSIENT_ATTEMPTS_MAX times is given up on and reported. A change
+ * waiting on its firm or company is kept and the drain carries on, and it
+ * is tried again after a pass that saved something, so the order they were
+ * held in does not matter. Never throws for a replay failure.
  */
 export async function drainPendingWrites(
   ports: DrainPorts,
 ): Promise<DrainResult> {
   const applied: string[] = [];
   const refused: { stepKey: string; code: string }[] = [];
+  const failed: { stepKey: string; code: string }[] = [];
   const stillPending: string[] = [];
   let waiting: PendingWrite[];
   let down = false;
+  let failedInARow = 0;
+  const now = (ports.now ?? (() => new Date()))().getTime();
   let open = await ports.pending();
   // Each pass after the first only follows progress: at most one pass a row.
   for (;;) {
@@ -138,6 +183,16 @@ export async function drainPendingWrites(
     waiting = [];
     for (const write of open) {
       if (down) {
+        stillPending.push(write.stepKey);
+        continue;
+      }
+      // Failed before for no reason an answer explains: not again until
+      // its backoff has passed. A row waiting on its firm is always tried.
+      if (
+        write.lastAttemptAt !== undefined &&
+        failedTransiently(write) &&
+        now - write.lastAttemptAt.getTime() < retryBackoffMs(write.attempts)
+      ) {
         stillPending.push(write.stepKey);
         continue;
       }
@@ -163,8 +218,10 @@ export async function drainPendingWrites(
         await ports.submit(write);
         await ports.settle(write.id, "APPLIED", null);
         applied.push(write.stepKey);
+        failedInARow = 0;
       } catch (error: unknown) {
         const failure = ports.classify(error);
+        if (failure.kind !== "TRANSIENT") failedInARow = 0;
         if (failure.kind === "REFUSED") {
           await ports
             .settle(write.id, "REFUSED", failure.code)
@@ -183,9 +240,21 @@ export async function drainPendingWrites(
             } else {
               waiting.push(write);
             }
+          } else if (
+            write.attempts + 1 >= TRANSIENT_ATTEMPTS_MAX &&
+            (write.attempts === 0 || failedTransiently(write))
+          ) {
+            // Kept failing: no longer tried; the person is told plainly.
+            const code = `GAVE_UP_${failure.code}`.slice(0, 64);
+            await ports
+              .settle(write.id, "REFUSED", code)
+              .catch(() => undefined);
+            failed.push({ stepKey: write.stepKey, code: failure.code });
           } else {
             stillPending.push(write.stepKey);
-            down = true;
+            // One failure is that change's; two in a row is the service.
+            failedInARow += 1;
+            if (failedInARow >= 2) down = true;
           }
         }
       }
@@ -201,6 +270,7 @@ export async function drainPendingWrites(
     refused,
     stillPending: down ? [...stillPending, ...kept] : stillPending,
     waiting: down ? [] : kept,
+    failed,
   };
 }
 

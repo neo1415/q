@@ -109,6 +109,7 @@ import {
   onboardingFlowFor,
   pausingLine,
   withNextQuestion,
+  withStillSaving,
   withoutUnbackedFieldClaims,
   withoutUnbackedReadingClaims,
   withoutUnbackedCategoryClaims,
@@ -162,6 +163,20 @@ const AcceptResultsSchema = z.union([
     data: z.object({ results: z.array(z.object({ outcome: z.string() })) }),
   }),
 ]);
+/** Steps whose save this turn's recording only queued (HELD_FOR_RETRY). */
+function heldStepsIn(
+  actions: readonly { readonly tool: string; readonly result: unknown }[],
+): string[] {
+  return actions.flatMap((action) => {
+    if (action.tool !== "record_answers") return [];
+    const parsed = RecordedResultsSchema.safeParse(action.result);
+    return parsed.success
+      ? parsed.data.results
+          .filter((r) => r.outcome === "HELD_FOR_RETRY")
+          .map((r) => r.stepKey)
+      : [];
+  });
+}
 /** Whether an accept wrote anything to the record. */
 function acceptedIn(result: unknown): boolean {
   const parsed = AcceptResultsSchema.safeParse(result);
@@ -614,6 +629,7 @@ export function turnNotesFor(input: {
   readonly finishing?: boolean | undefined;
   /** Required steps they declined for now, by label: not asked again this conversation. */
   readonly declinedForNow?: readonly string[] | undefined;
+
   /** Research first (BIZ-009): what to say about it this turn, once. */
   readonly research?: "STARTED" | "NOTHING_FOUND" | null | undefined;
   readonly lookup:
@@ -653,6 +669,8 @@ export function turnNotesFor(input: {
         readonly refused: readonly string[];
         readonly stillPending: readonly string[];
         readonly waiting?: readonly string[];
+        /** Kept failing and no longer tried: they are told, and asked again. */
+        readonly failed?: readonly string[];
       }
     | undefined;
 }): string {
@@ -683,14 +701,19 @@ export function turnNotesFor(input: {
         `What they confirmed earlier could not be saved after all, because it was not accepted: ${list(held.refused)}. Say so plainly and ask for it again.`,
       );
     }
+    if ((held.failed ?? []).length > 0) {
+      notes.push(
+        `Could NOT be saved after several tries: ${list(held.failed ?? [])}. Tell them plainly, in one short sentence, that this one thing could not be saved, and ask for it again later in the conversation; everything else stands.`,
+      );
+    }
     if (held.stillPending.length > 0) {
       notes.push(
-        `Still held and NOT saved yet (a service is briefly unavailable): ${list(held.stillPending)}. Never say these are saved, and do not ask them again.`,
+        `Still saving, NOT saved yet: ${list(held.stillPending)}. Say only that it is still being saved ("saving…"), never that it is saved or kept, and do not ask them again.`,
       );
     }
     if ((held.waiting ?? []).length > 0) {
       notes.push(
-        `Kept from what they told you, NOT saved yet because another answer comes first (their firm or company being set up, or a question it depends on): ${list(held.waiting ?? [])}. They save by themselves once it is answered. Never say these are saved and never ask them again; ask only for what comes first.`,
+        `From what they told you, NOT saved yet because another answer comes first (their firm or company being set up, or a question it depends on): ${list(held.waiting ?? [])}. They are saved by themselves once it is answered. Say they will be saved then, never that they are saved or kept, and never ask them again; ask only for what comes first.`,
       );
     }
   }
@@ -709,6 +732,7 @@ export function turnNotesFor(input: {
       `Set aside for now at their request, and not to be asked again in this conversation (required, so it stays open and is listed when they finish): ${input.declinedForNow.join("; ")}. Move on to the next question.`,
     );
   }
+
   switch (input.lookup?.kind) {
     case "RUN":
       notes.push(
@@ -876,6 +900,7 @@ export function createInterviewAgent(
    * conversation, and listed when they finish.
    */
   const declinedForNow = createInMemoryRaisedChecks();
+
   // The step each session's last reply asked, for the independent reading
   // of the answer to it (DELEGATION_READER v4).
   const lastAsked = new Map<string, string>();
@@ -1511,7 +1536,8 @@ export function createInterviewAgent(
       replay.applied.length +
         replay.refused.length +
         replay.stillPending.length +
-        replay.waiting.length ===
+        replay.waiting.length +
+        (replay.failed?.length ?? 0) ===
         0
         ? undefined
         : {
@@ -1519,6 +1545,7 @@ export function createInterviewAgent(
             refused: replay.refused.map((r) => questionOf(r.stepKey)),
             stillPending: replay.stillPending.map(questionOf),
             waiting: replay.waiting.map(questionOf),
+            failed: (replay.failed ?? []).map((r) => questionOf(r.stepKey)),
           };
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
@@ -2299,7 +2326,8 @@ export function createInterviewAgent(
     const completeStatedByCode = async (): Promise<void> => {
       if (opening || reading === null) return;
       const stated = reading.authority.stated;
-      const done = new Set(port.recorded());
+      // A held answer is answered, still saving: never kept again as a note.
+      const done = new Set([...port.recorded(), ...heldStepsIn(actions)]);
       const open = unrecordedStatedIn(state, stated).filter(
         (key) => !done.has(key),
       );
@@ -2949,7 +2977,26 @@ export function createInterviewAgent(
         "interview reply claimed their unmatched words as a category; removed",
       );
     }
-    let reply = notVerbatim(categoryBackedReply, lastQTurn ?? null, {
+    // Only COMMITTED writes are confirmed (live 2026-10-28): what this turn
+    // only queued, or what is still queued from before, is said as still
+    // saving, by code, and the next turn confirms it.
+    const savingKeys = new Set([
+      ...heldStepsIn(actions),
+      ...(replay?.stillPending ?? []),
+    ]);
+    for (const key of [...savingKeys]) {
+      if (recorded.includes(key) || onRecord.has(key)) savingKeys.delete(key);
+    }
+    const savingBackedReply =
+      codeSpeaksEnglish && savingKeys.size > 0
+        ? withStillSaving(
+            categoryBackedReply,
+            [...savingKeys].map(
+              (key) => profileFields[key]?.label ?? questionOf(key),
+            ),
+          )
+        : categoryBackedReply;
+    let reply = notVerbatim(savingBackedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         // An English rewording only where the reply is English or will be
@@ -3036,6 +3083,10 @@ export function createInterviewAgent(
     let askedOpen =
       askedStep === undefined ||
       covered.has(askedStep.stepKey) ||
+      // Answered and still saving: not the question this reply asks.
+      stateAfter?.steps.some(
+        (row) => row.stepKey === askedStep.stepKey && row.savePending === true,
+      ) === true ||
       handingOver ||
       pausing
         ? null

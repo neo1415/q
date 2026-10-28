@@ -147,8 +147,17 @@ export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
 export { DELEGATION_READER_V4 } from "./prompts/tasks/delegation-reader.v4.js";
 export { DELEGATION_READER_V5 } from "./prompts/tasks/delegation-reader.v5.js";
 export { DELEGATION_READER_V6 } from "./prompts/tasks/delegation-reader.v6.js";
+export { DELEGATION_READER_V7 } from "./prompts/tasks/delegation-reader.v7.js";
 export { ONBOARDING_TRANSCRIPT_READER_V1 } from "./prompts/tasks/onboarding-transcript-reader.v1.js";
 export { ONBOARDING_TRANSCRIPT_READER_V2 } from "./prompts/tasks/onboarding-transcript-reader.v2.js";
+export { ONBOARDING_TYPED_REPLY_V1 } from "./prompts/tasks/onboarding-typed-reply.v1.js";
+export {
+  ONBOARDING_TYPED_REPLY_SCHEMA_NAME,
+  OnboardingTypedReplyResultSchema,
+  OnboardingTypedReplyVariablesSchema,
+  type OnboardingTypedReplyResult,
+  type OnboardingTypedReplyVariables,
+} from "./prompts/schemas/onboarding-typed-reply.js";
 export {
   ONBOARDING_TRANSCRIPT_READER_SCHEMA_NAME,
   ONBOARDING_TRANSCRIPT_READER_SCHEMA_VERSION,

@@ -89,12 +89,16 @@ describe("the delegation reading", () => {
     expect(calls.n).toBe(1);
   });
 
-  it("stated is limited to offered steps, and a required step is never declined", async () => {
+  it("stated and declined are limited to offered steps; a required step may be declined for now", async () => {
     const reader = createQDelegationReader({
       gateway: gatewayReturning(
         {
           stated: [{ stepKey: "I2.stages" }, { stepKey: "I3.geography" }],
-          declined: [{ stepKey: "I7.avoid" }, { stepKey: "I2.stages" }],
+          declined: [
+            { stepKey: "I7.avoid" },
+            { stepKey: "I2.stages" },
+            { stepKey: "I9.not_offered" },
+          ],
           finishing: true,
         },
         { n: 0 },
@@ -113,6 +117,7 @@ describe("the delegation reading", () => {
     ]);
     expect(authority === null ? null : [...authority.declined]).toEqual([
       "I7.avoid",
+      "I2.stages",
     ]);
     expect(authority?.finishing).toBe(true);
   });

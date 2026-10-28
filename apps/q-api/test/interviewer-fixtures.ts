@@ -43,6 +43,11 @@ export type InvestorWorld = {
   /** Put a value on the record directly, standing in for an earlier turn. */
   readonly record: (stepKey: string, value: OnboardingResponseValue) => void;
   readonly skippedSteps: () => readonly string[];
+  /** The onboarding thread the API keeps, oldest first. */
+  readonly thread: () => readonly {
+    readonly role: "PERSON" | "Q";
+    readonly text: string;
+  }[];
   /** Every submission attempt, accepted or not, in order. */
   readonly attempts: () => readonly string[];
   /** Each batch submission, by the steps it carried. */
@@ -108,6 +113,11 @@ export type WorldOptions = {
    * then, as the journey's branching does.
    */
   readonly opensAfter?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Steps whose save fails with a 500 every time (live 2026-10-28: the
+   * website). A batch carrying one fails whole, as one transaction does.
+   */
+  readonly failing?: readonly string[] | undefined;
   readonly mandates?:
     | {
         readonly candidates: readonly string[];
@@ -312,6 +322,26 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       { status: 422, headers: { "content-type": "application/problem+json" } },
     );
 
+  /** The onboarding thread, as the API keeps it (oldest first). */
+  const thread: {
+    role: "PERSON" | "Q";
+    text: string;
+    channel: string;
+    createdAt: string;
+  }[] = [];
+
+  const serverError = () =>
+    new Response(
+      JSON.stringify({
+        type: "about:blank",
+        title: "Internal server error",
+        status: 500,
+        code: "INTERNAL_ERROR",
+        requestId: "req_test",
+      }),
+      { status: 500, headers: { "content-type": "application/problem+json" } },
+    );
+
   const fetchFake: typeof fetch = (input, init) => {
     const url =
       typeof input === "string"
@@ -403,6 +433,24 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           },
         }),
       );
+    }
+
+    if (/\/turns(\?limit=\d+)?$/.test(url)) {
+      if (method === "POST") {
+        const body = JSON.parse(readBody(init)) as {
+          turns: { role: "PERSON" | "Q"; text: string; channel: string }[];
+        };
+        for (const t of body.turns) {
+          thread.push({
+            role: t.role,
+            text: t.text,
+            channel: t.channel,
+            createdAt: new Date().toISOString(),
+          });
+        }
+        return Promise.resolve(Response.json({ written: true }));
+      }
+      return Promise.resolve(Response.json({ items: [...thread] }));
     }
 
     const withdraw = /\/steps\/([^/]+)\/withdraw$/.exec(url);
@@ -499,6 +547,9 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       response: { value: OnboardingResponseValue; note?: string };
     }): Promise<Response> => {
       tried.push(body.stepKey);
+      if (options.failing?.includes(body.stepKey) === true) {
+        return Promise.resolve(serverError());
+      }
       const opensAfter = options.opensAfter?.[body.stepKey];
       if (
         options.ineligible?.includes(body.stepKey) === true ||
@@ -614,6 +665,13 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         }[];
       };
       batches.push(body.responses.map((r) => r.stepKey));
+      if (
+        body.responses.some(
+          (r) => options.failing?.includes(r.stepKey) === true,
+        )
+      ) {
+        return Promise.resolve(serverError());
+      }
       return (async () => {
         const results = new Map<
           number,
@@ -680,6 +738,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       version += 1;
     },
     skippedSteps: () => [...setAside],
+    thread: () => thread.map((t) => ({ role: t.role, text: t.text })),
     attempts: () => [...tried],
     batches: () => batches.map((b) => [...b]),
     recommendations: {

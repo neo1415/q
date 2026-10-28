@@ -32,7 +32,7 @@ export const DELEGATION_READER_V6: PromptDefinition<
 > = {
   ...DELEGATION_READER_V5,
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Typed onboarding 2026-10-28 (D5): a decline is read for a required step too; the journey, not the reader, decides what it means.",
   effectiveFrom: "2026-10-28",

@@ -102,6 +102,7 @@ describe("replaying answers that wait for their firm", () => {
       refused: [],
       stillPending: [],
       waiting: ["I0.business_title", "I2.stages"],
+      failed: [],
     });
     expect(settled).toEqual([]);
   });

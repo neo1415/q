@@ -23,6 +23,11 @@ const Row = z.object({
   idempotency_key: z.string().uuid(),
   attempts: z.coerce.number().int().min(0),
   created_at: z.union([z.date(), z.string()]).transform((v) => new Date(v)),
+  updated_at: z
+    .union([z.date(), z.string()])
+    .transform((v) => new Date(v))
+    .optional(),
+  last_error: z.string().nullable().optional(),
 });
 
 function toWrite(raw: unknown): PendingWrite {
@@ -40,6 +45,8 @@ function toWrite(raw: unknown): PendingWrite {
     idempotencyKey: row.idempotency_key,
     attempts: row.attempts,
     createdAt: row.created_at,
+    ...(row.updated_at === undefined ? {} : { lastAttemptAt: row.updated_at }),
+    lastError: row.last_error ?? null,
   };
 }
 
@@ -80,7 +87,8 @@ export function createPostgresPendingWriteRepository(): PendingWriteRepository {
     listPending: async (executor, sessionId, userId) => {
       const rows = await executor`
         select id, session_id, user_id, step_key, response, origin,
-               idempotency_key, attempts, created_at from onboarding.pending_writes
+               idempotency_key, attempts, created_at, updated_at, last_error
+          from onboarding.pending_writes
          where session_id = ${sessionId}
            and user_id = ${userId}
            and status = 'PENDING'
