@@ -3839,29 +3839,33 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    transform: translate(-50%, -50%) scale(1);
+    /* Scaled to the box the arrival gave the room (fitRoomPresence), in
+       the one transform so it scales about Q's centre. */
+    transform: translate(-50%, -50%) scale(var(--cq-room-fit, 1));
     transition: transform 900ms var(--cq-ease);
   }
   .cq-room-presence.is-gathered > * {
-    transform: translate(-50%, -50%) scale(var(--cq-room-gather));
+    transform: translate(-50%, -50%)
+      scale(calc(var(--cq-room-gather) * var(--cq-room-fit, 1)));
   }
   /*
-   * Live 2026-10-29 (desktop Home, 1440x900): with "Here's what changed
-   * this week" under the welcome, the room-sized Q pushed Talk to Q below
-   * the fold, half behind the composer. With the briefing shown, the
-   * resting room is two thirds the size, so Q, the welcome, the cards and
-   * Talk to Q all fit above the composer.
+   * Live 2026-10-29 (desktop Home): Q's room was a fixed square, so any
+   * welcome taller than what was left of the stage (the weekly briefing,
+   * the readiness lowdown, Finish setup, the returning cards) pushed
+   * Talk to Q past the stage's bottom edge, clipped behind the composer.
+   * Q's room yields height first, whatever the welcome holds: it is the
+   * arrival's one flexible item (basis 0, grows up to its full size, never
+   * below a third), so the arrival is as tall as the welcome needs with
+   * Q at its smallest, then Q takes the rest. Should even that not fit, the
+   * arrival grows past the stage (min-height, not height) and the stage
+   * scrolls to Talk to Q. ArrivalRoom's wrappers step out of the layout
+   * (display: contents) so the room is a direct item of the arrival.
    */
-  @media (min-width: 1024px) {
-    .cq-arrival:has([data-q-welcome-line] [data-q-briefing]) .cq-room-presence {
-      width: calc(var(--cq-room-box) * 2 / 3);
-      height: calc(var(--cq-room-box) * 2 / 3);
-    }
-    .cq-arrival:has([data-q-welcome-line] [data-q-briefing])
-      .cq-room-presence:not(.is-gathered)
-      > * {
-      scale: 0.667;
-    }
+  .cq-arrival .cq-room-presence {
+    flex: 1 1 0;
+    height: auto;
+    min-height: calc(var(--cq-room-box) / 3);
+    max-height: var(--cq-room-box);
   }
   @media (prefers-reduced-motion: reduce) {
     .cq-room-presence > * {

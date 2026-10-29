@@ -1621,6 +1621,7 @@ export function QConversationPanel({
                     // Q, the room at rest is a large, dim Q that gathers
                     // into the stage's cloud the moment Q listens or works.
                     <div
+                      ref={fitRoomPresence}
                       className={cx(
                         "cq-room-presence",
                         roomGathered && "is-gathered",
@@ -2022,6 +2023,29 @@ function phoneWidth(): boolean {
 const CAPTIONS_KEY = "cq.q.captions";
 /** The room's Q at rest is drawn this much larger than the stage's cloud. */
 const ROOM_GATHER = 0.64;
+
+/*
+ * Live 2026-10-29: the room's box is sized by the arrival's layout, which
+ * gives Q only the height the welcome leaves (globals.css, .cq-arrival),
+ * so nothing is pushed under the composer. The canvas keeps its pixel size
+ * and is scaled to the box it got; the box is square at full size, so the
+ * fit is its height over its width. Scale never changes layout, so this
+ * cannot feed back into the size it reads.
+ */
+function fitRoomPresence(
+  node: HTMLDivElement | null,
+): (() => void) | undefined {
+  if (node === null || typeof ResizeObserver !== "function") return undefined;
+  const observer = new ResizeObserver(() => {
+    const { clientWidth, clientHeight } = node;
+    // Hidden (a phone's Home hides the room): nothing to fit.
+    if (clientWidth === 0 || clientHeight === 0) return;
+    const fit = Math.min(1, clientHeight / clientWidth);
+    node.style.setProperty("--cq-room-fit", fit.toFixed(3));
+  });
+  observer.observe(node);
+  return () => observer.disconnect();
+}
 const CAPTIONS_EVENT = "cq:q-captions";
 let captionsInMemory: boolean | null = null;
 
