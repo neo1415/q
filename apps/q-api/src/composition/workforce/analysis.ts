@@ -279,6 +279,51 @@ function clausesOf(sentence: string): readonly string[] {
 
 const RECORD_MARK = /\(Capital Q record\)/iu;
 
+const RECORD_CITED_PROBLEM = "A Capital Q record is cited as a web source";
+
+/** A record's name, as a whole word (it comes from code's own records). */
+function recordPatterns(recordNames: readonly string[]): readonly RegExp[] {
+  return recordNames
+    .map((name) => name.trim())
+    .filter((name) => name.length >= 3)
+    .map(
+      (name) =>
+        new RegExp(
+          `(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
+          "iu",
+        ),
+    );
+}
+
+/** Whether a clause names a record and cites [S n], unmarked. */
+const mixes = (clause: string, named: readonly RegExp[]) =>
+  ANY_CITATION.test(clause) &&
+  !RECORD_MARK.test(clause) &&
+  named.some((pattern) => pattern.test(clause));
+
+/** The sentences of `text` with a clause that mixes a record and [S n]. */
+function mixedSentences(
+  text: string,
+  named: readonly RegExp[],
+): readonly string[] {
+  return sentencesOf(text).filter((sentence) =>
+    clausesOf(sentence).some((clause) => mixes(clause, named)),
+  );
+}
+
+/** A draft's filed parts, as recordsCitedAsWeb reads them. */
+function filedParts(draft: AnalysisDocumentResult) {
+  return [
+    { heading: "Summary", body: draft.summary },
+    ...draft.sections,
+    { heading: "Gaps", body: draft.gaps.join("\n") },
+    {
+      heading: "Top recommendations",
+      body: draft.topRecommendations.join("\n"),
+    },
+  ];
+}
+
 /**
  * Live case A (2026-10-29): sentences about a Capital Q record carried web
  * citations ("Their reported pricing [S22] increases the burden on
@@ -290,42 +335,23 @@ export function recordsCitedAsWeb(
   draft: AnalysisDocumentResult,
   recordNames: readonly string[],
 ): readonly AnalysisIssue[] {
-  const names = recordNames
-    .map((name) => name.trim())
-    .filter((name) => name.length >= 3);
-  if (names.length === 0) return [];
-  const named = names.map((name) => ({
-    name,
-    pattern: new RegExp(
-      `(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
-      "iu",
-    ),
-  }));
+  const named = recordPatterns(recordNames);
+  if (named.length === 0) return [];
   const issues: AnalysisIssue[] = [];
-  for (const section of [
-    { heading: "Summary", body: draft.summary },
-    ...draft.sections,
-    {
-      heading: "Top recommendations",
-      body: draft.topRecommendations.join("\n"),
-    },
-  ]) {
+  for (const section of filedParts(draft)) {
     // The record's own claim carries no web citation: a clause naming it
     // and citing [S n], unless marked as the record.
     const mixed = sentencesOf(section.body)
       .flatMap((sentence) => clausesOf(sentence))
-      .filter(
-        (clause) =>
-          ANY_CITATION.test(clause) &&
-          !RECORD_MARK.test(clause) &&
-          named.some((one) => one.pattern.test(clause)),
-      );
+      .filter((clause) => mixes(clause, named));
     if (mixed.length === 0) continue;
     issues.push({
       kind: "UNSUPPORTED",
       section: section.heading.slice(0, 120),
+      // The quote without its citations: the point is filed in the
+      // report's gaps when the last draft still has it.
       problem:
-        `A Capital Q record is cited as a web source: "${(mixed[0] ?? "").slice(0, 200)}"`.slice(
+        `${RECORD_CITED_PROBLEM}: "${withoutCitations(mixed[0] ?? "").slice(0, 200)}"`.slice(
           0,
           400,
         ),
@@ -333,6 +359,85 @@ export function recordsCitedAsWeb(
     });
   }
   return issues;
+}
+
+const CITATION_MARK = /\s*\[S\d{1,3}(?:\s*[,;]\s*S?\d{1,3})*\]/gu;
+const withoutCitations = (text: string) =>
+  text.replace(CITATION_MARK, "").replace(/\s+([.,;:])/gu, "$1");
+
+/**
+ * The filed draft keeps Capital Q records apart, whatever the rewrites
+ * did (live case F, 2026-10-29: the last of three drafts still cited [S38]
+ * in a sentence naming LedgerBridge, and the report was filed with it,
+ * the reviewer's open point quoting it a second time). A sentence that
+ * still mixes a record with a web citation is removed -- its web figure
+ * cannot keep a citation it shares with the record, nor stand without
+ * one -- and the person is told; the open points no longer quote it.
+ */
+export function keepRecordsApart(
+  draft: AnalysisDocumentResult,
+  open: readonly AnalysisIssue[],
+  recordNames: readonly string[],
+): {
+  readonly draft: AnalysisDocumentResult;
+  readonly open: readonly AnalysisIssue[];
+  readonly removed: number;
+} {
+  const named = recordPatterns(recordNames);
+  if (named.length === 0) return { draft, open, removed: 0 };
+  let removed = 0;
+  const clean = (text: string) => {
+    const mixed = mixedSentences(text, named);
+    if (mixed.length === 0) return text;
+    removed += mixed.length;
+    let out = text;
+    for (const sentence of mixed) out = out.replace(sentence, "");
+    return out
+      .split("\n")
+      .map((line) => line.replace(/[ \t]{2,}/gu, " ").trimEnd())
+      .filter((line) => !/^\s*(?:[-*\u2022]|\d+[.)])?\s*$/u.test(line))
+      .join("\n")
+      .replace(/\n{3,}/gu, "\n\n")
+      .trim();
+  };
+  const list = (items: readonly string[]) =>
+    items.map(clean).filter((item) => item.length > 0);
+  const next: AnalysisDocumentResult = {
+    ...draft,
+    summary: clean(draft.summary),
+    sections: draft.sections.map((section) => ({
+      ...section,
+      body: clean(section.body),
+    })),
+    topRecommendations: list(draft.topRecommendations),
+    gaps: list(draft.gaps),
+  };
+  const quoteSafe = (text: string) =>
+    sentencesOf(text).some((sentence) =>
+      clausesOf(sentence).some((clause) => mixes(clause, named)),
+    )
+      ? withoutCitations(text)
+      : text;
+  return {
+    draft:
+      removed === 0
+        ? next
+        : {
+            ...next,
+            gaps: [
+              ...next.gaps,
+              `Q removed ${String(removed)} sentence${removed === 1 ? "" : "s"} that cited public sources for a Capital Q record; what Capital Q records say is kept apart from web evidence.`,
+            ],
+          },
+    open: open
+      .filter((issue) => !issue.problem.startsWith(RECORD_CITED_PROBLEM))
+      .map((issue) => ({
+        ...issue,
+        problem: quoteSafe(issue.problem),
+        fix: quoteSafe(issue.fix),
+      })),
+    removed,
+  };
 }
 
 /** Code's own checks: figures without a basis, sources that do not exist. */
@@ -570,10 +675,11 @@ export async function writeAnalysisWithReview(dependencies: {
     ].join("\n");
   }
   if (draft === null) return null;
-  report({ stage: "FILING", openPoints: passes ? 0 : open.length });
+  const apart = keepRecordsApart(draft, open, inputs.recordNames ?? []);
+  report({ stage: "FILING", openPoints: passes ? 0 : apart.open.length });
   return {
-    draft,
-    review: { passes, score, drafts, found, open: passes ? [] : open },
+    draft: apart.draft,
+    review: { passes, score, drafts, found, open: passes ? [] : apart.open },
   };
 }
 
