@@ -337,6 +337,7 @@ import {
 import {
   afterLeadLines,
   ASKS_ABOUT_OWN_TEAM,
+  heldBackDocumentsFact,
   ownReadinessFact,
   ownTeamFact,
 } from "./own-readiness.js";
@@ -5706,6 +5707,7 @@ export function createModelGatewayQAnswer(
         );
       };
       let ownReadiness: AuthorisedFact | null = null;
+      let ownHeldBack: AuthorisedFact | null = null;
       const prefetchable = new Set(
         offeredForRun.map((tool) => tool.definition.name),
       );
@@ -5745,6 +5747,7 @@ export function createModelGatewayQAnswer(
             lead: request.questionKind === "ADVICE" && !aboutSomeoneElse,
             alreadySaid: leadLines !== undefined,
           });
+          ownHeldBack = heldBackDocumentsFact(outcome.result.data);
         }
         took("own-readiness");
       }
@@ -5794,6 +5797,7 @@ export function createModelGatewayQAnswer(
         const facts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
+          ...(ownHeldBack === null ? [] : [ownHeldBack]),
           ...(ownTeam === null ? [] : [ownTeam]),
           ...w.onboardingFacts,
           ...(ownProfile === null ? [] : [ownProfile]),

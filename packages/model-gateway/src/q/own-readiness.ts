@@ -258,3 +258,37 @@ export function ownTeamFact(read: unknown): AuthorisedFact | null {
     source: "your company's team facts on Capital Q",
   };
 }
+
+/**
+ * Live 2026-10-29 (S02-F, twice): asked for their actual MRR, Q quoted the
+ * deck and never said their September management accounts are held back.
+ * read_my_record carries `heldBackDocuments` beside the record, but the
+ * prepared answer kept only the readiness data. Titles and the compliant
+ * path only -- never contents (no model reads these documents).
+ */
+export function heldBackDocumentsFact(read: unknown): AuthorisedFact | null {
+  if (typeof read !== "object" || read === null) return null;
+  const held = (read as { heldBackDocuments?: unknown }).heldBackDocuments;
+  if (!Array.isArray(held) || held.length === 0) return null;
+  const lines = held
+    .flatMap((one: unknown) => {
+      if (typeof one !== "object" || one === null) return [];
+      const { title, qUse } = one as { title?: unknown; qUse?: unknown };
+      return typeof title === "string" && typeof qUse === "string"
+        ? [`"${title.slice(0, 160)}": ${qUse.slice(0, 500)}`]
+        : [];
+    })
+    .slice(0, 4);
+  if (lines.length === 0) return null;
+  return {
+    scope: "COMPANY_PROFILE",
+    statement:
+      `THEIR DOCUMENTS HELD BACK FROM Q (Capital Q's classification; say so plainly whenever their figures, revenue or the deck's reliability come up, with how to confirm the figures): ${lines.join(" ")}`.slice(
+        0,
+        1_800,
+      ),
+    truthClass: "VERIFIED",
+    evidenceStatus: "PLATFORM_VERIFIED",
+    source: "Capital Q document classification",
+  };
+}
