@@ -34,6 +34,17 @@ export function TractionStep({
   const [missing, setMissing] = useState<
     { readonly id: string; readonly message: string } | undefined
   >(undefined);
+  // The questions on screen when Continue was pressed. An answer can open
+  // a follow-up (paying customers after "Paying customers"); the screen
+  // then stays, and says why, instead of looking as if nothing happened
+  // (sweep D3, 2026-10-29).
+  const [submittedIds, setSubmittedIds] = useState<readonly string[] | null>(
+    null,
+  );
+  const opened =
+    submittedIds === null
+      ? []
+      : step.metrics.filter((metric) => !submittedIds.includes(metric.id));
 
   function set(id: string, answer: MetricAnswer | undefined) {
     setAnswers((current) => {
@@ -70,6 +81,7 @@ export function TractionStep({
         metrics[id] = { unknown: true };
       }
     }
+    setSubmittedIds(step.metrics.map((metric) => metric.id));
     void actions.submit({ kind: "traction", metrics });
   }
 
@@ -81,6 +93,15 @@ export function TractionStep({
       data-traction-variant={step.variant}
     >
       <StepHeading title={step.title} prompt={step.prompt} help={step.intro} />
+      {opened.length === 0 ? null : (
+        <p
+          role="status"
+          className="cq-body-sm text-(--cq-text-primary)"
+          data-traction-opened
+        >
+          {openedLine(opened.map((metric) => metric.label))}
+        </p>
+      )}
       {step.metrics.map((metric) => (
         <MetricField
           key={metric.id}
@@ -182,4 +203,12 @@ function MetricField({
       {unknownToggle}
     </div>
   );
+}
+
+/** Why the screen stayed after Continue: what their answer opened. */
+export function openedLine(labels: readonly string[]): string {
+  const named = labels.map((label) => `“${label}”`).join(", ");
+  return labels.length === 1
+    ? `Your answer opened one more question: ${named}. Answer it, or leave it blank, and press Continue.`
+    : `Your answers opened ${String(labels.length)} more questions: ${named}. Answer them, or leave them blank, and press Continue.`;
 }

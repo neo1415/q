@@ -1139,6 +1139,12 @@ const textOrSkip = (stepKey: string, value: string | undefined) =>
 export function planSubmissions(
   group: JourneyGroup,
   response: StepResponse,
+  /** The session the screen was drawn from: which questions it showed. */
+  view?: {
+    readonly progress: {
+      readonly eligibleSteps: readonly { readonly stepKey: string }[];
+    };
+  },
 ): readonly Submission[] {
   if (response.kind !== group.kind) {
     throw new SubmissionPlanError(
@@ -1210,7 +1216,18 @@ export function planSubmissions(
       return group.stepKeys.map((stepKey) => {
         const answer = response.metrics[stepKey];
         if (answer === undefined) {
-          return { stepKey, action: "leave" };
+          // Sweep D3 (2026-10-29): an optional question shown on this
+          // screen and left blank was "left", so the screen held on it and
+          // Continue did nothing. Optional means optional: blank is set
+          // aside, unknown, and the screen moves on. A question the screen
+          // did not show (one an answer here opens during the save) is
+          // left, so it is shown next rather than skipped unseen.
+          const shown =
+            view?.progress.eligibleSteps.some((s) => s.stepKey === stepKey) ??
+            false;
+          return shown && !config(stepKey).required
+            ? skip(stepKey)
+            : { stepKey, action: "leave" };
         }
         if ("unknown" in answer) {
           return skip(stepKey);

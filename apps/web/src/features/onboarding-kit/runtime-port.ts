@@ -626,7 +626,10 @@ export function createRuntimeClient<
                 channel: "FORM",
               }),
             );
-          } else if (status !== "SKIPPED") {
+          } else if (status !== "SKIPPED" && status !== "COMPLETED") {
+            // An answer on record is not set aside by a blank or "not
+            // sure": the runtime refuses that skip (STEP_NOT_ELIGIBLE,
+            // sweep D3 "That step isn't open yet"), and the answer stays.
             view = remember(
               await port.skip({
                 sessionId: view.session.id,
@@ -646,7 +649,13 @@ export function createRuntimeClient<
         let view = await session();
         for (const stepKey of group.stepKeys) {
           const status = eligibleStatus(view, stepKey);
-          if (status === undefined || status === "SKIPPED") {
+          // Answered steps keep their answer; the runtime refuses to skip
+          // them, which failed the whole screen.
+          if (
+            status === undefined ||
+            status === "SKIPPED" ||
+            status === "COMPLETED"
+          ) {
             continue;
           }
           view = remember(

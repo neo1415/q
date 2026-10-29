@@ -3,7 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { FounderOnboardingActions } from "../src/features/founder-onboarding/controller/use-founder-onboarding";
-import { TractionStep } from "../src/features/founder-onboarding/steps/traction-step";
+import {
+  openedLine,
+  TractionStep,
+} from "../src/features/founder-onboarding/steps/traction-step";
 import type { StepProps } from "../src/features/founder-onboarding/steps/step-props";
 
 /**
@@ -112,5 +115,36 @@ describe("an unanswered required metric on the form", () => {
       kind: "traction",
       metrics: { revenue_trend: { value: "up" } },
     });
+  });
+});
+
+describe("a follow-up question an answer opened (sweep D3)", () => {
+  it("says why the screen stayed, naming what was opened", () => {
+    const p = props();
+    const { rerender } = render(<TractionStep {...p} />);
+    fireEvent.click(screen.getByLabelText("Flat"));
+    fireEvent.submit(document.getElementById("f") as HTMLFormElement);
+    expect(p.submit).toHaveBeenCalledTimes(1);
+    rerender(
+      <TractionStep
+        {...p}
+        step={{
+          ...p.step,
+          metrics: [
+            ...p.step.metrics,
+            {
+              id: "customers",
+              kind: "number",
+              label: "Paying customers",
+              optional: true,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toBe(
+      openedLine(["Paying customers"]),
+    );
+    expect(openedLine(["Paying customers"])).toContain("“Paying customers”");
   });
 });

@@ -370,6 +370,38 @@ describe("founder journey over the runtime contract", () => {
     );
   });
 
+  it("sets aside a blank optional question it showed, and leaves one it did not (sweep D3)", () => {
+    const traction = requireGroup("traction");
+    const shown = {
+      progress: {
+        eligibleSteps: [
+          { stepKey: FOUNDER_STEPS.signal },
+          { stepKey: FOUNDER_FINANCIAL_STEPS.monthlyBurn },
+          { stepKey: FOUNDER_FINANCIAL_STEPS.cash },
+        ],
+      },
+    };
+    const plan = planSubmissions(
+      traction,
+      {
+        kind: "traction",
+        metrics: {
+          [FOUNDER_STEPS.signal]: { value: "paying" },
+          [FOUNDER_FINANCIAL_STEPS.cash]: { unknown: true },
+        },
+      },
+      shown,
+    );
+    const actionOf = (key: string) =>
+      plan.find((s) => s.stepKey === key)?.action;
+    expect(actionOf(FOUNDER_STEPS.signal)).toBe("submit");
+    // Blank and shown: optional, so set aside and the screen moves on.
+    expect(actionOf(FOUNDER_FINANCIAL_STEPS.monthlyBurn)).toBe("skip");
+    expect(actionOf(FOUNDER_FINANCIAL_STEPS.cash)).toBe("skip");
+    // Opened by this save (paying customers): shown next, never skipped unseen.
+    expect(actionOf(FOUNDER_STEPS.customers)).toBe("leave");
+  });
+
   it("plans every composite screen onto its runtime steps in definition order", () => {
     const team = requireGroup("team");
     expect(
