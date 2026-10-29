@@ -13,6 +13,7 @@ import { expectedOf } from "../src/composition/workforce/progress.js";
 import { createInMemoryAgentWorkQueue } from "../src/composition/workforce/queue.js";
 import { createOutwardReview } from "../src/composition/workforce/review.js";
 import { createAgentWorkRunner } from "../src/composition/workforce/runner.js";
+import { stepRuntimes } from "../src/composition/workforce/plan-thread.js";
 import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
 import {
   createPlans,
@@ -434,6 +435,43 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     });
     expect(again.message).toContain("already on your board");
     expect(w.board).toHaveLength(3);
+  });
+
+  it("Put on my board, then Execute, starts what Execute alone starts (live 2026-10-29: nothing started)", async () => {
+    const run = async (boardFirst: boolean) => {
+      const w = world();
+      const { block } = await offered(w);
+      if (boardFirst) {
+        await w.plans.decide(founder, block.planId, {
+          affordance: "PUT_ON_BOARD",
+          version: 1,
+        });
+      }
+      const view = await w.plans.view(owner, block.planId);
+      if (view === null) throw new Error("no view");
+      expect(
+        await w.plans.execute(
+          founder,
+          executePayloadOf(founder.userId, view.plan, view.bodySha256),
+        ),
+      ).toBe("EXECUTED");
+      const states = [
+        ...stepRuntimes(
+          w.plansStore.thread.filter((one) => one.planId === block.planId),
+        ).entries(),
+      ]
+        .map(
+          ([key, one]) =>
+            `${key}:${one.status}:${one.jobId === null ? "" : "job"}`,
+        )
+        .sort();
+      return { states, board: w.board.length, cards: w.cards.length };
+    };
+    const alone = await run(false);
+    const afterBoard = await run(true);
+    expect(afterBoard.states).toEqual(alone.states);
+    expect(afterBoard.board).toBe(alone.board);
+    expect(afterBoard.cards).toBe(alone.cards);
   });
 
   it("a board that refuses is said as a failure, never 'already there'", async () => {

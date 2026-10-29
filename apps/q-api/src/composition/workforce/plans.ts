@@ -810,7 +810,7 @@ export function createPlans(dependencies: PlansDependencies) {
     const runtimes = await thread.runtimes(owner, plan.planId);
     for (const step of plan.steps) {
       if (!payload.stepKeys.includes(step.key)) continue;
-      if (runtimeOf(runtimes, step.key).status !== "TODO") continue;
+      if (!awaitsGo(step, runtimeOf(runtimes, step.key))) continue;
       if (!conditionsHold(step.waitsFor, runtimes, now())) continue;
       await fireStep(approver, plan, step, trace);
     }
@@ -1095,6 +1095,22 @@ type LinkedState = {
   readonly jobs: ReadonlyMap<string, string>;
   readonly actions: ReadonlyMap<string, string>;
 };
+
+/**
+ * Whether Execute still has to fire this step (live 2026-10-29, plan
+ * 6505af77): "Put on my board" parks Q's steps as PROPOSED (waiting for
+ * go) and moves the person's to WAITING_YOU, so an Execute that fired only
+ * TODO steps started nothing while saying it had. A step awaits go until
+ * something was started for it: a job or an approval card. The person's
+ * own step awaits only its board task; placing it again is a replay.
+ */
+export function awaitsGo(step: QPlanStep, runtime: StepRuntime): boolean {
+  if (runtime.status === "DONE" || runtime.status === "SKIPPED") return false;
+  if (runtime.status === "DOING") return false;
+  if (runtime.jobId !== null || runtime.actionId !== null) return false;
+  if (step.owner === "YOU") return runtime.boardItemId === null;
+  return true;
+}
 
 /** A step's own record says it is done: what was verified, in plain words. */
 export function verifiedDone(
