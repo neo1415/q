@@ -1256,3 +1256,50 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Coordinator review reversals:** a bare-"yes" English regex that approved the only waiting card (could approve the wrong action) was reverted; the data-room pre-read keyword gate (English only) was replaced by "on the company page" (any language).
 - **Owner rules recorded:** DECISIONS 42–46 (real sign-ups; search credits rationed for testing; deep research as investigation; planning bar; old HC stated figures).
 - **Open:** see ACTIVE-TASKS live board (29 Oct).
+
+## 2026-10-29 — Deep research acceptance gate (Claude worker, branch `feat/research-acceptance-gate`)
+
+- **Why:** live runs A and B scored 4/10 and 2/10 while every offline test was green. The tests used an invented market ("Zedland"); none sent a real request through the real egress filter, planner, tiering and report. Run A's saved state shows every planned query losing "Nigeria" at egress.
+- **What is built:**
+  - `packages/q-research/src/providers/recorded.ts`, subpath `@capital-q/q-research/providers/recorded`:
+    - a recording wrapper keeps only what the provider returned;
+    - a replay provider serves it by normalised query;
+    - a query or page it does not hold is a loud miss.
+  - `apps/q-api/test/research-acceptance/`:
+    - `cases/*.json`: 7 golden cases (A–G). Each holds a full situation dossier (QSituationDossierSchema), with real markets and our fictional accounts.
+    - `expectations.ts`: the checks, all code-asserted.
+    - `recorded-gateway.ts`: Model Gateway record/replay by request hash.
+    - `pipeline.ts`: the real deep-research step plus the real report assembly.
+    - `replay.test.ts`: the CI gate.
+    - `round-trip.test.ts`: proves record→replay is deterministic through the real code.
+    - `drive.ts`: the live driver.
+  - `scripts/research-acceptance/record.mjs` and `eval.mjs`, both with `--dry-run`.
+- **State:** **no case is recorded yet.** The replay cases are skipped with that reason. The gate's own tests run in `pnpm test`:
+  - case validity;
+  - the checks fail on a run-A-shaped result;
+  - the gateway round trip;
+  - the synthetic record→replay.
+- **Wiring point for the brief/dossier lane:** `researchContext()` in `pipeline.ts` is the one place that maps a case's situation onto the deep-research step. Today it maps only a founder's own company (ownSubject) and the Capital Q records. When the step takes the dossier, pass `one.situation` there.
+  - The brief checks find the brief as the model call whose structured schema name contains "Brief". Keep that naming, or update `BRIEF_SCHEMA` in `expectations.ts`.
+  - The planner check reads the `ResearchPlanResult` call's prompt.
+
+### How a new live failure becomes a case (record → assert → commit)
+
+1. **Write the case.** Add `apps/q-api/test/research-acceptance/cases/<Letter>-<slug>.json` with:
+   - the person's words and earlier turns;
+   - the step goal;
+   - the public-safe context;
+   - a full situation dossier: our fictional account, with real public companies only as context;
+   - the expectations;
+   - `why`: the live run it comes from.
+
+   Run `pnpm exec vitest run apps/q-api/test/research-acceptance` and confirm the case validates and skips as "not recorded".
+
+2. **Record once,** after the fix it guards is deployed. This spends search credits once (DECISIONS 43).
+   - Dry run: `node scripts/research-acceptance/record.mjs --dry-run`.
+   - Then: `NODE_USE_ENV_PROXY=1 node scripts/research-acceptance/record.mjs --case <id>`.
+   - Needs `RAILWAY_API_TOKEN` (q-api variables `BRAVE_API`, `SERPER_API_KEY`/`SERP_API_KEY`, `OPENAI_API_KEY`; read by name, never printed) and `SUPABASE_ACCESS_TOKEN` (read-only model catalog snapshot). No production private data is read.
+3. **Review the fixtures.** Check that `fixtures/<id>.web.json` and `fixtures/<id>.models.json` hold only public pages and synthetic context. Read the printed verdicts: a FAIL is the bug the case guards.
+4. **Assert.** The replay must fail before the fix and pass after it. Commit the case and its fixtures.
+5. **Re-record only on purpose.** A miss in CI means code changed a query, a page read or a prompt. Re-record with `--force` only when the change is intended.
+6. **Evaluate a prompt or model change cheaply:** `NODE_USE_ENV_PROXY=1 node scripts/research-acceptance/eval.mjs`. It replays the recorded web pages, runs the models live, and scores with code checks plus a rubric. It spends no search credits.
