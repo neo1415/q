@@ -2,7 +2,9 @@ import type { QSituationDossier, QSituationFact } from "@capital-q/contracts";
 import {
   countryForms,
   countryName,
+  isConnective,
   placeCountries,
+  RESEARCH_VOCABULARY,
   tokenise,
 } from "@capital-q/q-research";
 import { z } from "zod";
@@ -34,6 +36,11 @@ import { situationText } from "./plan-job.js";
  */
 
 const TERM_MAX = 80;
+
+/** Words an official body's name carries (as source-tier.ts reads them). */
+const OFFICIAL =
+  /\b(?:authority|commission|central bank|bank of|reserve bank|regulator[a-z]*|registry|registrar|ministry|securities and exchange|stock exchange|corporate affairs|monetary|supervisory|bureau|statistics)\b/iu;
+const SMALL_WORDS = new Set(["of", "and", "the", "for", "de", "du", "la"]);
 
 export const GroundedBriefSchema = z
   .object({
@@ -124,9 +131,16 @@ export function groundBrief(input: {
     );
   for (const fact of publicFacts)
     for (const token of tokenise(fact.statement)) vocabulary.add(token);
+  // The generic words of research and joining words describe a kind of
+  // page, never anyone: public too, though never informative on their own.
+  const generic = (word: string) =>
+    RESEARCH_VOCABULARY.has(word) || isConnective(word);
   const isPublic = (term: string) => {
     const words = tokenise(term);
-    return words.length > 0 && words.every((word) => vocabulary.has(word));
+    return (
+      words.some((word) => vocabulary.has(word)) &&
+      words.every((word) => vocabulary.has(word) || generic(word))
+    );
   };
 
   const names = (items: readonly { readonly name: string }[]) =>
@@ -150,6 +164,18 @@ export function groundBrief(input: {
   ]) {
     if (!isPublic(term)) continue;
     terms.add(term);
+  }
+  // An official body the brief names in full, in public words, may also
+  // travel by its initials ("Central Bank of Nigeria" -> "CBN"): the same
+  // public name, as search and the press write it.
+  for (const subject of subjects) {
+    if (!isPublic(subject) || !OFFICIAL.test(subject)) continue;
+    const initials = subject
+      .split(/[^\p{L}]+/u)
+      .filter((word) => word.length > 0 && !SMALL_WORDS.has(word.toLowerCase()))
+      .map((word) => word[0] ?? "")
+      .join("");
+    if (initials.length >= 2) terms.add(initials.toUpperCase());
   }
   for (const place of places) {
     if (!isPublic(place)) continue;

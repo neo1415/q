@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { QArtifactContent } from "@capital-q/contracts";
+import type { QArtifactContent, QSituationDossier } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import type { AnalysisDocumentResult } from "@capital-q/q-core";
@@ -42,10 +42,10 @@ import type { AcceptanceCase } from "./case.js";
  * passes as live, recording or replaying.
  *
  * The person's context reaches the step through `researchContext`: the
- * single place that maps a case's situation onto the step's dependencies.
- * Today the step reads a founder's own company (ownSubject); when the
- * step consumes the situation dossier and its research brief, wire the
- * dossier here and nowhere else.
+ * single place that maps a case's situation onto the step's dependencies,
+ * as production does (main.ts): the assembled situation dossier, from
+ * which the step writes its research brief; their earlier messages; and,
+ * only when no brief can be written, a founder's own company.
  */
 
 /** A stable UUID for a case: same case, same ids, same prompts. */
@@ -71,6 +71,8 @@ export function caseActor(one: AcceptanceCase): ActorContext {
 
 /** The person's context as the deep-research step's dependencies take it. */
 export function researchContext(one: AcceptanceCase): {
+  readonly situation: () => Promise<QSituationDossier>;
+  readonly earlierUserText: () => Promise<readonly string[]>;
   readonly ownSubject?: (
     actor: ActorContext,
   ) => Promise<OwnResearchSubject | null>;
@@ -80,6 +82,8 @@ export function researchContext(one: AcceptanceCase): {
 } {
   const company = one.public.company;
   return {
+    situation: () => Promise.resolve(one.situation),
+    earlierUserText: () => Promise.resolve(one.earlierTurns),
     ...(one.actor === "founder" && company !== undefined
       ? {
           ownSubject: () =>

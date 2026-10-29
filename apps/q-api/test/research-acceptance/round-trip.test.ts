@@ -82,6 +82,27 @@ function scriptedGateway(): ModelGateway {
   let plans = 0;
   const answer = (schemaName: string | null): unknown => {
     switch (schemaName ?? "TEXT") {
+      // The research brief, from the case's situation dossier: the market
+      // from the mandate, the regulator by its full public name.
+      case "ResearchBriefResult":
+        return {
+          question:
+            "The Nigerian B2B payments sector against their seed fintech mandate.",
+          market: {
+            places: [{ name: "Nigeria", from: '"Nigerian"' }],
+            sectors: [{ name: "B2B payments", from: "F13" }],
+            stage: null,
+            subjects: [{ name: "Central Bank of Nigeria", from: "F2" }],
+          },
+          relevant: [
+            { ref: "F13", why: "Their mandate." },
+            { ref: "F11", why: "A Nigerian payments company they watch." },
+          ],
+          unknowns: [],
+          angles: ["payment service provider licensing"],
+          irrelevant: ["agritech in Kenya"],
+          summary: "Nigerian B2B payments against your fintech mandate.",
+        };
       case "ResearchPlanResult":
         plans += 1;
         return plans > 1
@@ -199,12 +220,20 @@ describe("research acceptance: record, then replay", () => {
     expect(replayed.queries.map((query) => query.toLowerCase()).sort()).toEqual(
       fixtures.web.searches.map((search) => search.key).sort(),
     );
-    // The checks run over the replay; no brief exists in this script.
+    // The checks run over the replay: the brief was written, and the
+    // planned regulator query left whole (live run A sent it without its
+    // place).
     const ids = replayed.checks.map((check) => check.id);
     expect(ids).toContain("PLACE_IN_EVERY_QUERY");
     expect(
       replayed.checks.find((check) => check.id === "BRIEF_WRITTEN")?.ok,
-    ).toBe(false);
+    ).toBe(true);
+    expect(fixtures.web.searches.map((search) => search.query)).toContain(
+      "nigeria cbn payment service provider licensing",
+    );
+    expect(
+      replayed.checks.find((check) => check.id === "NO_PRIVATE_IN_QUERIES")?.ok,
+    ).toBe(true);
     expect(
       checkCase({
         case: caseA,
