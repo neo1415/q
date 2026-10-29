@@ -1303,3 +1303,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 4. **Assert.** The replay must fail before the fix and pass after it. Commit the case and its fixtures.
 5. **Re-record only on purpose.** A miss in CI means code changed a query, a page read or a prompt. Re-record with `--force` only when the change is intended.
 6. **Evaluate a prompt or model change cheaply:** `NODE_USE_ENV_PROXY=1 node scripts/research-acceptance/eval.mjs`. It replays the recorded web pages, runs the models live, and scores with code checks plus a rubric. It spends no search credits.
+
+
+## 2026-10-29 evening — two-step, email verification, deep research case A (Claude coordinator)
+
+- Deployed `ee1f98792` (see STATE). Live-verified two-step (TOTP) end to end incl. API refusal of aal1; email verification switched ON after a live sign-up/confirm run; resume fix verified.
+- Planning: TOGETHER steps wait on the person's part (`qPartDone`/`verifiedDone(…, owner)` in `plans.ts`); Execute announces `cq:q-approval-prepared` and the conversation reads its thread (`use-q-conversation.ts`).
+- Deep research case A (Nigeria B2B payments, investor): live 13/18 → 18/18 after fixes (brief selected a private board card and the report became a LedgerBridge memo; planner saw private facts; records cited as web; snippet facts cited as pages; CBN queries without Nigeria). Recorder fix: a read the caller abandoned is recorded as TIMEOUT. Remaining: replay non-determinism (deadline/time-dependent control flow), gate holes (a degraded one-query run passed; PRIMARY_FROM_PLACE dropped instead of failing), and a transient PLAN failure silently degrading research to one query — lane `fix/research-replay`. Searches spent on case A today: ~73 (four recordings; one degraded by OpenAI TRANSIENT failures).
+- Next: merge `fix/research-replay`, record all 7 cases once (≤280 searches), CI + deploy `dfb93de82`+, one live research run; then plans to 99 and voice onboarding on a real device. Owner deferred: domain purchase, Google consent screen publishing, Turnstile, integrations.

@@ -1,5 +1,14 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED ee1f98792 — 29 October 2026, 20:40 UTC (Claude coordinator, owner's standing permission)
+
+- **Railway:** api, q-api, web, workers SUCCESS at `ee1f98792` (`build/int-rc` = `recovery/2026-09-12`). CI run 40941548864 green. No migration in this deploy (hosted 264).
+- **In this deploy (since db3abc52f):** typed onboarding resumes on the question it asked (ONBOARDING_TYPED_REPLY v3); two-step verification (TOTP, Settings → Security, /auth/two-step; api/q-api refuse an aal1 token of a user with a verified factor, in `packages/security` session liveness); resend for unconfirmed email; Home keeps Talk to Q above the composer; deep research on the situation dossier + RESEARCH_BRIEF v1 (egress from the brief's public terms); a shared (TOGETHER) plan step waits on the person's board item (WAITING_YOU) instead of Done; a plan's approval card shows as soon as Execute prepares it.
+- **Live verified on ee1f98792 (fictional `founder.resume-1029`):** two-step on → API `/v1/me` aal1 401, aal2 200 → fresh password sign-in goes to /auth/two-step, /home redirects there until the code → off again. Resume: reopened setup asked the open question. Evidence: scratchpad `twostep/`, `resume/`.
+- **Hosted auth config (2026-10-29):** `mailer_autoconfirm=false` (email verification ON, live-tested: sign-up → check-email → unconfirmed sign-in says confirm + resend → Brevo email in ~2 s → link lands on /welcome signed in); `password_min_length=8`; leaked-password protection on; MFA enrolled/removed notification emails on. Sender is still the Gmail address via Brevo (rewritten to brevosend.com): move to the owner's domain with SPF/DKIM/DMARC once bought; turn off Brevo click tracking for auth emails.
+- **Integrated, in CI, not deployed:** `dfb93de82` on `recovery/2026-09-12-8y2j4w` — deep research case-A fixes (RESEARCH_BRIEF v2, ANALYSIS_WRITE v6, RESEARCH_FACTS v4: facts only from pages read, one primary-source re-read, every query carries the market's place, planner sees only public selected facts, Capital Q records never cited [S n] (clause-level), MANDATE facts to the job plan) and the recorder keeping an abandoned read as TIMEOUT. Case A recorded live at 18/18 code checks; replay is not yet deterministic (time-dependent paths) — lane `fix/research-replay` in progress; no fixtures committed.
+- **Test accounts left on production:** two throwaway `@maxxspace.com` accounts (mail delivery tests) and `founder.resume-1029@fictional.capitalq.local`.
+
 ## DEPLOYED 29759dfe0 — 29 October 2026, 07:59 UTC (Claude coordinator, owner's standing permission)
 
 - **Railway:** api, q-api, web, workers SUCCESS at `29759dfe0` (`speed/q-oct20` = `build/int-rc` = both `recovery/*`). CI run 40833861267 green (build, typecheck, format+lint, test, pgTAP, quality).
