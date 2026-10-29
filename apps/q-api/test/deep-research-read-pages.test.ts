@@ -15,6 +15,7 @@ import {
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
+  FIRST_ROUND_GAPS,
   leadsText,
   pagesFor,
   withMarketPlace,
@@ -210,7 +211,7 @@ describe("deep research reads before it states (case A)", () => {
         Promise.resolve({
           costUsd: 0.01,
           output:
-            input.gaps.length > 0
+            input.gaps !== FIRST_ROUND_GAPS
               ? { questions: [], internalQuery: null }
               : {
                   questions: [

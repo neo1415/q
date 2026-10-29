@@ -31,6 +31,7 @@ import type {
   ResearchPlanOutput,
   WorkforceModels,
 } from "../src/composition/workforce/models.js";
+import { FIRST_ROUND_GAPS } from "../src/composition/workforce/deep-research.js";
 import { progressOf } from "../src/composition/workforce/progress.js";
 import {
   checkpointKey,
@@ -440,7 +441,7 @@ describe("an investigation (owner 2026-10-29)", () => {
           return Promise.resolve({
             costUsd: 0.01,
             output:
-              input.gaps === ""
+              input.gaps === FIRST_ROUND_GAPS
                 ? {
                     questions: [
                       q("LINE_A", "zedland widget payments nothing alpha"),
@@ -909,6 +910,31 @@ describe("a research plan that fails (live 2026-10-29)", () => {
     expect(researchStepSummary(found)).toMatch(/^Read /u);
   });
 
+  // Re-recorded case A (twice in four live runs): round one's empty OPEN
+  // QUESTIONS reached the planner as "(not provided)" and it planned none.
+  it("tells the planner it is the first round, and asks again when round one plans nothing", async () => {
+    const sent: string[] = [];
+    const inputs: ResearchPlanInput[] = [];
+    const planResearch: WorkforceModels["planResearch"] = (_w, _t, input) => {
+      inputs.push(input);
+      return Promise.resolve({
+        costUsd: 0.01,
+        output: inputs.length === 1 ? { questions: [] } : ROUND_ONE,
+      });
+    };
+    const found = await run(planResearch, sent);
+    expect(found.status).toBe("OK");
+    expect(inputs[0]?.gaps).toBe(FIRST_ROUND_GAPS);
+    expect(inputs[0]?.asked).toBe("Nothing yet.");
+    expect(inputs[1]).toEqual(inputs[0]);
+    expect(sent).toEqual(
+      expect.arrayContaining(["zedland widget payments market size"]),
+    );
+    if (found.status === "OK") {
+      expect(found.dossier?.investigation?.reduced).toBeUndefined();
+    }
+  });
+
   it("says plainly, in the report and on the card, that it ran reduced when the retry fails too", async () => {
     const sent: string[] = [];
     const inputs: ResearchPlanInput[] = [];
@@ -961,6 +987,8 @@ describe("a research plan that fails (live 2026-10-29)", () => {
       /^This investigation ran in a reduced form: the research plan could not be written, so/u,
     );
     // Round one asked once; nothing was retried.
-    expect(inputs.filter((input) => input.gaps === "")).toHaveLength(1);
+    expect(
+      inputs.filter((input) => input.gaps === FIRST_ROUND_GAPS),
+    ).toHaveLength(1);
   });
 });

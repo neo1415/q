@@ -123,6 +123,9 @@ export const MODEL_CALLS_MAX = 24;
 const FACT_CALLS_AT_ONCE = 4;
 const PAGES_PER_LANE = 4;
 const PAGE_CHARS = 2_200;
+/** Round one's OPEN QUESTIONS, said plainly (see planOnce). */
+export const FIRST_ROUND_GAPS =
+  "None yet: this is the first round. Plan the full investigation the request needs.";
 const FOLLOW_UPS_MAX = 4;
 const REQUEST_MAX = 4_000;
 const PLAN_CEILING_USD = 0.04;
@@ -1117,8 +1120,18 @@ export function workforceDeepResearch(dependencies: {
             brief?.planner ??
             "No brief: Q could not read their situation for this question. Plan from the request alone; when it names no place, keep the queries global.",
           today,
-          gaps: gaps.map(gapText).join("\n").slice(0, 4_000),
-          asked: state.asked.join("\n").slice(0, 6_000),
+          // Said, never left empty: an empty field reaches the prompt as
+          // "(not provided)", which the planner sometimes read as a later
+          // round with nothing open and planned no questions (re-recorded
+          // case A, twice in four runs).
+          gaps:
+            gaps.length === 0
+              ? FIRST_ROUND_GAPS
+              : gaps.map(gapText).join("\n").slice(0, 4_000),
+          asked:
+            state.asked.length === 0
+              ? "Nothing yet."
+              : state.asked.join("\n").slice(0, 6_000),
         },
         {
           onFailed: (failureClass) => {
@@ -1133,10 +1146,17 @@ export function workforceDeepResearch(dependencies: {
     // the job's spend and round one's share of its deadline.
     const planCall = async (gaps: readonly OpenGap[]) => {
       const first = await planOnce(gaps);
+      // A first round with no questions is a failed plan, not a finding:
+      // the request asked for research. Asked once more, as a transient.
+      const empty =
+        gaps.length === 0 &&
+        first.planned !== null &&
+        first.planned.output.questions.length === 0;
       const transient =
-        first.planned === null &&
-        first.failure !== undefined &&
-        RETRIED_PLAN_FAILURES.has(first.failure ?? "");
+        empty ||
+        (first.planned === null &&
+          first.failure !== undefined &&
+          RETRIED_PLAN_FAILURES.has(first.failure ?? ""));
       if (
         !transient ||
         modelCalls >= MODEL_CALLS_MAX ||
