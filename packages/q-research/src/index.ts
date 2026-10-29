@@ -275,6 +275,7 @@ export {
 // decided by code.
 export {
   officialBodyMatch,
+  domainCountry,
   PRIMARY_KINDS,
   registrableDomain,
   SOURCE_TIERS,

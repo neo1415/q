@@ -13,7 +13,10 @@ import {
 } from "@capital-q/q-research";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { workforceDeepResearch } from "../src/composition/workforce/deep-research.js";
+import {
+  isOwnSiteOf,
+  workforceDeepResearch,
+} from "../src/composition/workforce/deep-research.js";
 import type {
   ResearchBriefInput,
   ResearchBriefOutput,
@@ -369,5 +372,15 @@ describe("deep research from the person's situation", () => {
     expect(sent.join(" ").toLowerCase()).toContain("nigeria");
     if (found?.status !== "OK") throw new Error("not OK");
     expect(found.dossier?.investigation?.scope).toContain("Nigeria");
+  });
+});
+
+describe("a company's own site (live 2026-10-29, run A)", () => {
+  it("is a proper name's own domain, never a market label's prefix", () => {
+    expect(isOwnSiteOf("www.paymentsdive.com", "payments")).toBe(false);
+    expect(isOwnSiteOf("www.paymentsdive.com", "Payments")).toBe(false);
+    expect(isOwnSiteOf("www.payoneer.com", "Payoneer")).toBe(true);
+    expect(isOwnSiteOf("paystackhq.com", "Paystack")).toBe(true);
+    expect(isOwnSiteOf("www.corpay.com", "global payments")).toBe(false);
   });
 });

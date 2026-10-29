@@ -10,7 +10,6 @@ import {
   createSearchBudget,
   crossCheck,
   gapText,
-  looksLikeOwnDomain,
   openGaps,
   publicTermsOf,
   rankFacts,
@@ -502,13 +501,38 @@ type TieredFact = VerifiedFact & {
   readonly tierKind: PrimaryKind | null;
 };
 
+/** Words a site's name may add to a company's ("paystackhq", "rampapp"). */
+const OWN_SITE_SUFFIXES = ["", "hq", "app", "inc", "group", "global", "online"];
+
+/**
+ * Whether `domain` is the own site of the organisation `name`: a proper
+ * name (as the page writes it, capitalised: "Payoneer", never a market
+ * label like "payments"), and the site's first label is that name run
+ * together, or it with a short corporate suffix. Live 2026-10-29 (run A):
+ * the label "payments" made paymentsdive.com a company's own disclosure.
+ */
+export function isOwnSiteOf(domain: string, name: string): boolean {
+  const trimmed = name.trim();
+  if (!/^\p{Lu}/u.test(trimmed)) return false;
+  const compact = trimmed.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  if (compact.length < 3) return false;
+  const label = (registrableDomain(domain).split(".")[0] ?? "").replace(
+    /-/gu,
+    "",
+  );
+  return OWN_SITE_SUFFIXES.some((suffix) => label === `${compact}${suffix}`);
+}
+
 /**
  * Each fact's publisher tier. A page on the site of a company the facts
  * name (or the subject's) is that company's own disclosure: its claim.
+ * An official source counts as primary for the market in question
+ * (`countries`; none: a global question).
  */
 function tiered(
   facts: readonly z.infer<typeof StoredFactSchema>[],
   subjectName: string | null,
+  countries: ReadonlySet<string>,
 ): readonly TieredFact[] {
   const named = [
     ...new Set(
@@ -519,9 +543,7 @@ function tiered(
   ];
   const companyDomains = new Set(
     facts
-      .filter((fact) =>
-        named.some((name) => looksLikeOwnDomain(fact.domain, name)),
-      )
+      .filter((fact) => named.some((name) => isOwnSiteOf(fact.domain, name)))
       .map((fact) => registrableDomain(fact.domain)),
   );
   return facts.map((fact) => {
@@ -530,6 +552,7 @@ function tiered(
       domain: fact.domain,
       title: fact.title,
       companyDomains,
+      countries,
     });
     return { ...fact, tier: tier.tier, tierKind: tier.kind };
   });
@@ -540,9 +563,10 @@ function checkedFacts(
   facts: readonly z.infer<typeof StoredFactSchema>[],
   subjectName: string | null,
   today: Date,
+  countries: ReadonlySet<string>,
 ): readonly CrossChecked<TieredFact & { readonly id: string }>[] {
   return crossCheck(
-    tiered(facts, subjectName).map((fact, position) => ({
+    tiered(facts, subjectName, countries).map((fact, position) => ({
       ...fact,
       id: `V${String(position + 1)}`,
     })),
@@ -857,6 +881,15 @@ export function workforceDeepResearch(dependencies: {
     const subjectName =
       named?.name ?? ownSubject?.name ?? brief?.subjects[0] ?? null;
     const scope = brief?.scope ?? scopeOfWords([request, ...context.earlier]);
+    // The market in question's countries, for source relevance: the
+    // brief's places, else the person's own words.
+    const marketCountries = new Set(
+      placeCountries(
+        brief !== null
+          ? brief.places.join("\n")
+          : [request, ...context.earlier].join("\n"),
+      ),
+    );
 
     const plannedLane = (one: {
       readonly lane: string;
@@ -891,7 +924,8 @@ export function workforceDeepResearch(dependencies: {
     let stop: StopReason | null = null;
     // What stayed open when it stopped (set after each round).
     let open: readonly OpenGap[];
-    const checkedNow = () => checkedFacts(state.facts, subjectName, todayDate);
+    const checkedNow = () =>
+      checkedFacts(state.facts, subjectName, todayDate, marketCountries);
     const gapsNow = () =>
       openGaps({
         lanes: state.plan.map((question) => ({
@@ -1281,6 +1315,7 @@ export function workforceDeepResearch(dependencies: {
               url: source.url,
               domain: source.domain,
               title: source.title,
+              countries: marketCountries,
             });
             return { tier: own.tier, tierKind: own.kind };
           })();

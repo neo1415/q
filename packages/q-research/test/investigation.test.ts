@@ -63,6 +63,40 @@ describe("source tiers", () => {
     }
   });
 
+  it("an official source is primary for the market in question, other governments are other (live 2026-10-29)", () => {
+    const nigeria = new Set(["NG"]);
+    for (const url of [
+      "https://www.cbn.gov.ng/circulars",
+      "https://www.irs.gov/payments",
+      "https://www.congress.gov/bill",
+      "https://www.mas.gov.sg/regulation",
+      "https://www.worldbank.org/en/country/nigeria",
+    ]) {
+      const tier = sourceTier({ url, countries: nigeria }).tier;
+      expect([url, tier]).toEqual([
+        url,
+        url.includes(".ng/") || url.includes("worldbank") ? "PRIMARY" : "OTHER",
+      ]);
+    }
+    // An official body off a government domain: its own country.
+    expect(
+      sourceTier({
+        url: "https://www.fca.org.uk/news",
+        title: "Financial Conduct Authority | News",
+        countries: nigeria,
+      }).tier,
+    ).toBe("OTHER");
+    expect(
+      sourceTier({
+        url: "https://www.fca.org.uk/news",
+        title: "Financial Conduct Authority | News",
+        countries: new Set(["GB"]),
+      }).tier,
+    ).toBe("PRIMARY");
+    // A global question: every official source is primary.
+    expect(sourceTier({ url: "https://www.irs.gov/x" }).tier).toBe("PRIMARY");
+  });
+
   it("an official body off a government domain needs its name AND matching domain", () => {
     expect(
       sourceTier({
@@ -79,12 +113,19 @@ describe("source tiers", () => {
     ).toBe("OTHER");
   });
 
-  it("a company's own disclosure is primary, marked as its claim", () => {
+  it("a company's own disclosure is primary, marked as its claim -- only on its own site", () => {
+    // Live 2026-10-29: an investors path is not a company's own site.
     expect(
       sourceTier({
         url: "https://widgetco.test/investor-relations/annual-report",
       }),
-    ).toEqual({ tier: "PRIMARY", kind: "COMPANY_DISCLOSURE" });
+    ).toEqual({ tier: "OTHER", kind: null });
+    expect(
+      sourceTier({
+        url: "https://www.paymentsdive.com/news/stablecoin-startups/832871/",
+        companyDomains: new Set(["widgetco.test"]),
+      }).tier,
+    ).toBe("OTHER");
     expect(
       sourceTier({
         url: "https://widgetco.test/about",
