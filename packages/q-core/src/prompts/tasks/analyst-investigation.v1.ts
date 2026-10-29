@@ -245,3 +245,90 @@ export const RESEARCH_BRIEF_V1: PromptDefinition<
   },
   template: RESEARCH_BRIEF_TEMPLATE,
 };
+
+/**
+ * Live case A (2026-10-29): asked to investigate a sector, the brief
+ * selected a private board card about one company and the report became
+ * that company's diligence memo. v2: the brief selects what shapes the
+ * research the person asked for; deal records about one company only
+ * when the request or their earlier messages are about it.
+ */
+export const RESEARCH_BRIEF_RELEVANCE_RULE = `- relevant: the facts that shape the research the person asked for, and why, by F ref only -- a short list (at most 12), never everything. Ask of each fact: would the researcher plan different searches, or the writer reach a different conclusion about THIS question, without it?
+  - A question about a sector, market or topic is shaped by their declared mandate or thesis (geographies, sectors, stage, what it prefers and excludes), their stated preferences about sources, and companies in their pipeline that operate in that market (as market participants: competitors, benchmarks).
+  - Records about one deal or company -- a board card, a deal code name, an IC or ticket note, a meeting, a message thread, a memo, a relationship state -- are selected only when the request or their earlier messages are about that company or deal (by name, or "this company", "the deal"). A sector question that mentions their thesis is not about any one company.
+  - A mandate exclusion matters only when the question touches the excluded sector; a pipeline company outside the market in question does not matter; private figures never matter for planning.
+- subjects (in market): the companies, products or official bodies the research is about -- the request's own subjects and the market's participants and regulators -- never a company only because Q holds a deal record about it.
+`;
+
+export const RESEARCH_BRIEF_V2: PromptDefinition<
+  ResearchBriefVariables,
+  ResearchBriefResult
+> = {
+  ...RESEARCH_BRIEF_V1,
+  version: 2,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-29",
+  changeDescription:
+    "Live case A 2026-10-29: v1 selected a private board card about one company for a sector question and the report became that company's memo. v2 selects what shapes the research asked for (mandate, thesis, geography, pipeline companies in the market as participants) and selects deal records about one company only when the request or earlier messages are about it.",
+  template: RESEARCH_BRIEF_V1.template.replace(
+    /- relevant: [^\n]*\n/u,
+    RESEARCH_BRIEF_RELEVANCE_RULE,
+  ),
+};
+
+if (
+  !RESEARCH_BRIEF_V2.template.includes(
+    "shape the research the person asked for",
+  )
+) {
+  throw new Error("RESEARCH_BRIEF v2 extends v1's template, which changed");
+}
+
+/** Live case A: facts were taken from snippets of pages never read. */
+export const RESEARCH_FACTS_UNREAD_RULE = `- A NOT READ block lists pages whose read failed, known only from a search snippet, with no source number. Never take a fact from it: a snippet is not the page. It may suggest a followUp (to find that page's content another way).
+`;
+
+export const RESEARCH_FACTS_V4: PromptDefinition<
+  ResearchFactsVariables,
+  ResearchFactsResultV3
+> = {
+  ...RESEARCH_FACTS_V3,
+  version: 4,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-29",
+  changeDescription:
+    "Live case A 2026-10-29: v3 plus the NOT READ block -- snippets of pages whose read failed, unnumbered, never a fact, at most a follow-up lead (code admits facts only against pages actually read).",
+  template: RESEARCH_FACTS_V3.template.replace(
+    "- At most 12 facts",
+    `${RESEARCH_FACTS_UNREAD_RULE}- At most 12 facts`,
+  ),
+};
+
+if (!RESEARCH_FACTS_V4.template.includes("NOT READ block")) {
+  throw new Error("RESEARCH_FACTS v4 extends v3's template, which changed");
+}
+
+/** Live case A: a sector report pivoted to one company of the person's. */
+export const ANALYSIS_WRITE_QUESTION_RULE = `- ANSWER THE QUESTION ASKED: when the person asked about a sector, market or topic, every section is about that sector, market or topic -- the summary, developments, regulation, competition, opportunities and top recommendations. A company they are looking at appears only as a market participant (a row in the competitive table) and, at most, in one short closing paragraph of Implications for your thesis headed "What this means for companies you are looking at". Never turn a sector report into one company's diligence memo or next steps unless the request is about that company.
+- CAPITAL Q RECORDS stay apart from web evidence: a sentence that names a company from CAPITAL Q RECORDS (or from WHO THIS IS FOR's own records) cites no [S n]; it is marked (Capital Q record) or (company record). Put web evidence about the market in its own sentence.
+`;
+
+export const ANALYSIS_WRITE_V6: PromptDefinition<
+  AnalysisWriteVariables,
+  AnalysisDocumentResultV3
+> = {
+  ...ANALYSIS_WRITE_V5,
+  version: 6,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-29",
+  changeDescription:
+    "Live case A 2026-10-29: v5 plus answering the question asked (a sector report stays about the sector; a company they are looking at is a market participant and at most a short closing note) and keeping Capital Q records out of any sentence that cites a web source.",
+  template: ANALYSIS_WRITE_V5.template.replace(
+    "- Unknown stays unknown:",
+    `${ANALYSIS_WRITE_QUESTION_RULE}- Unknown stays unknown:`,
+  ),
+};
+
+if (!ANALYSIS_WRITE_V6.template.includes("ANSWER THE QUESTION ASKED")) {
+  throw new Error("ANALYSIS_WRITE v6 extends v5's rules, which changed");
+}
