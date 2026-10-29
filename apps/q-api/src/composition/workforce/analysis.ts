@@ -377,7 +377,63 @@ export function basisProblems(
       });
     }
   }
+  // The gaps and recommendations are filed too: they cite only real
+  // sources (re-recorded case A, 2026-10-29: [S47] and [S55] reached the
+  // report with 41 sources).
+  for (const part of [
+    { heading: "Gaps", text: draft.gaps.join("\n") },
+    {
+      heading: "Top recommendations",
+      text: draft.topRecommendations.join("\n"),
+    },
+  ]) {
+    const missing = unknownCitations(part.text, sourceIndices);
+    if (missing.length > 0)
+      issues.push({
+        kind: "UNSUPPORTED",
+        section: part.heading,
+        problem: `Cites sources that do not exist: ${missing
+          .map((index) => `S${String(index)}`)
+          .join(", ")}.`.slice(0, 400),
+        fix: "Cite only the numbered sources given, or label the point as an estimate or Q's inference.",
+      });
+  }
   return issues.slice(0, 10);
+}
+
+/** The [S n] in `text` that name no source in the list. */
+export function unknownCitations(
+  text: string,
+  sourceIndices: ReadonlySet<number>,
+): readonly number[] {
+  return [
+    ...new Set(
+      [...text.matchAll(CITED)]
+        .map((match) => Number(match[1]))
+        .filter((index) => !sourceIndices.has(index)),
+    ),
+  ];
+}
+
+/**
+ * The reviewer's findings that rest on sources that exist. A finding
+ * citing an [S n] not in the list is not evidence of anything (re-recorded
+ * case A, 2026-10-29: the reviewer read fact numbers F47 and F55 as
+ * sources [S47] and [S55], told the writer a correct citation was wrong,
+ * and the point was filed in the report's gaps citing sources that do not
+ * exist). It is neither sent to the writer nor filed.
+ */
+export function foundedIssues(
+  issues: readonly AnalysisIssue[],
+  sourceIndices: ReadonlySet<number>,
+): readonly AnalysisIssue[] {
+  return issues.filter(
+    (issue) =>
+      unknownCitations(
+        `${issue.section} ${issue.problem} ${issue.fix}`,
+        sourceIndices,
+      ).length === 0,
+  );
 }
 
 export type AnalysisReview = {
@@ -492,7 +548,10 @@ export async function writeAnalysisWithReview(dependencies: {
       spend.charge(critique?.costUsd ?? null, CRITIQUE_CEILING_USD);
       verdict = critique?.output ?? null;
     }
-    const issues = [...(verdict?.issues ?? []), ...coded].slice(0, 12);
+    const issues = [
+      ...foundedIssues(verdict?.issues ?? [], inputs.sourceIndices),
+      ...coded,
+    ].slice(0, 12);
     found.push(...issues);
     open = issues;
     score = verdict?.score ?? null;
