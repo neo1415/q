@@ -20,7 +20,11 @@ import type { DocumentFigures } from "../local-figures.js";
  *              (founder-onboarding financial-claims.ts): a figure the
  *              founder stated or confirmed is their own claim, which Q may
  *              use in their own answers; this plan is personal_private and
- *              never reaches an investor or a ranking.
+ *              never reaches an investor or a ranking. That decision covers
+ *              figures stored CONFIDENTIAL from then on; a row still stored
+ *              HIGHLY_CONFIDENTIAL (everything said before it) is outside
+ *              every firewall plan, so only its measure is named as held
+ *              back -- never its words or figure -- until they say it again.
  *   held back  documents classified highly confidential: by title only,
  *              with how many figures wait for their confirmation -- never
  *              a word of the contents (no model reads them).
@@ -63,6 +67,16 @@ export function toldStatement(statement: string): string {
   return `You told Q: ${said}.`;
 }
 
+/** "financial.cash_balance" -> "cash balance"; the measure only. */
+export function heldBackToldStatement(knowledgeKey: string): string {
+  const measure = knowledgeKey
+    .replace(/^financial\./u, "")
+    .replace(/[^a-z0-9]+/giu, " ")
+    .trim()
+    .slice(0, 60);
+  return `You told Q your ${measure} earlier; it is stored as highly confidential, so Q does not use it. Tell Q again and Q will use it as yours.`;
+}
+
 export function createPlanFiguresRead(sources: PlanFigureSources) {
   return async (
     actor: ActorContext,
@@ -82,10 +96,12 @@ export function createPlanFiguresRead(sources: PlanFigureSources) {
         {
           knowledge_key: string;
           statement: string;
+          sensitivity_class: string;
           recorded_at: Date | string | null;
         }[]
       >`
-        select o.knowledge_key, o.statement, o.recorded_at
+        select o.knowledge_key, o.statement,
+               o.sensitivity_class::text as sensitivity_class, o.recorded_at
           from q_knowledge.objects o
          where o.tenant_id = ${actor.tenantId}
            and o.subject_type = 'COMPANY'
@@ -115,6 +131,19 @@ export function createPlanFiguresRead(sources: PlanFigureSources) {
     for (const row of told) {
       if (seen.has(row.knowledge_key)) continue;
       seen.add(row.knowledge_key);
+      if (row.sensitivity_class !== "CONFIDENTIAL") {
+        // Never the statement: its class keeps it from every model.
+        facts.push({
+          statement: heldBackToldStatement(row.knowledge_key),
+          truthClass: "UNKNOWN",
+          evidenceStatus: "NO_EVIDENCE",
+          asOf: day(row.recorded_at),
+          provenance: PROVENANCE,
+          label: "founder_private",
+          category: null,
+        });
+        continue;
+      }
       facts.push({
         statement: toldStatement(row.statement).slice(0, 1_000),
         truthClass: "USER_CLAIM",
