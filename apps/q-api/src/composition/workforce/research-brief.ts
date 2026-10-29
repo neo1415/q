@@ -119,7 +119,20 @@ export function groundBrief(input: {
   const topics = dossier.publicTopics.join(" \n ");
   const said = input.words.join(" \n ");
   const vocabulary = new Set<string>([...tokenise(topics), ...tokenise(said)]);
-  for (const code of placeCountries(`${topics}\n${said}`)) {
+  // A founder's public topics carry their company's country as its ISO
+  // code, last ("B2B payments NG": situationTopics in q-specialists, from
+  // the company's headquarters_country). Live 2026-10-29 (cases B, G):
+  // read as words only, "NG" named no country, so "Nigeria" was not
+  // public-safe, the planner was told the place was private and every
+  // query left without it. Code reads the code it wrote.
+  const topicCodes = dossier.publicTopics.flatMap((topic) => {
+    const last = topic.trim().split(/\s+/u).at(-1) ?? "";
+    return /^[A-Z]{2}$/u.test(last) && countryName(last) !== null ? [last] : [];
+  });
+  for (const code of new Set([
+    ...placeCountries(`${topics}\n${said}`),
+    ...topicCodes,
+  ])) {
     for (const form of countryForms(code)) {
       for (const token of tokenise(form)) vocabulary.add(token);
     }
@@ -250,7 +263,7 @@ export function groundBrief(input: {
   // the writer only.
   const plannerMarket = [
     places.length === 0
-      ? "MARKET: no place in the request or their situation: research globally, never an assumed country."
+      ? "MARKET: global. No place is named in the request or their situation: plan the investigation worldwide, with no country assumed in any query."
       : (() => {
           const shown = places.filter(isPublic);
           return shown.length === 0
@@ -268,9 +281,10 @@ export function groundBrief(input: {
     })(),
   ];
   const publicLines = publicFacts.map(factLine);
+  const shownAngles = raw.angles.filter(isPublic);
   const planner = [
     ...plannerMarket,
-    ...list("ANGLES", raw.angles.filter(isPublic)),
+    ...list("ANGLES", shownAngles),
     ...list(
       "NOT KNOWN (research can establish it)",
       unknowns
@@ -281,7 +295,11 @@ export function groundBrief(input: {
     ...list("MUST NOT DRIVE THE RESEARCH", raw.irrelevant.filter(isPublic)),
     "SELECTED PUBLIC FACTS",
     ...(publicLines.length === 0 ? ["(none)"] : publicLines),
-    "Their private context is not shown here: plan for the request, this market and these angles only.",
+    // Live case E (2026-10-29): with no angle shown, "these angles only"
+    // read as nothing to plan, and the first plan came back empty.
+    shownAngles.length === 0
+      ? "Their private context is not shown here. No angle is singled out: plan the full investigation the request asks for, in this market."
+      : "Their private context is not shown here: plan the full investigation the request asks for, in this market, these angles first.",
   ]
     .join("\n")
     .slice(0, 8_000);

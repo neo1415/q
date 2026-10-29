@@ -257,7 +257,7 @@ describe("research brief grounding", () => {
       words: [REQUEST],
     });
     expect(brief.scope).toMatch(/^Scope: global/u);
-    expect(brief.planner).toContain("research globally");
+    expect(brief.planner).toContain("MARKET: global");
   });
 });
 
