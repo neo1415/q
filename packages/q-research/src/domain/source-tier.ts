@@ -224,7 +224,7 @@ export function sourceTier(input: {
   if (input.companyDomains?.has(publisher) === true) {
     return { tier: "PRIMARY", kind: "COMPANY_DISCLOSURE" };
   }
-  let path = "";
+  let path: string;
   try {
     path = new URL(input.url).pathname;
   } catch {

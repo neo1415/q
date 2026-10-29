@@ -746,7 +746,8 @@ export function workforceDeepResearch(dependencies: {
     };
 
     let stop: StopReason | null = null;
-    let open: readonly OpenGap[] = [];
+    // What stayed open when it stopped (set after each round).
+    let open: readonly OpenGap[];
     const checkedNow = () => checkedFacts(state.facts, subjectName, todayDate);
     const gapsNow = () =>
       openGaps({

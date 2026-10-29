@@ -278,6 +278,11 @@ export function stepLine(
         : `Draft ${String(stage.draft)}`;
     case "REVIEWING_PLAN":
       return "Two reviews";
+    // Shown on the research and reading steps (SHOWN_ON), never their own.
+    case "PLANNING_RESEARCH":
+      return "Planning";
+    case "CROSS_CHECKING":
+      return "Reading";
   }
 }
 
@@ -612,6 +617,8 @@ function StepInView({
     case "READING_DOCUMENTS":
     case "PLANNING":
     case "REVIEWING_PLAN":
+    case "PLANNING_RESEARCH":
+    case "CROSS_CHECKING":
       body = skeleton;
       break;
     case "READING":
