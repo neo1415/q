@@ -1,0 +1,3477 @@
+{
+ "version": 2,
+ "recordedAt": "2026-10-29T23:11:14.479Z",
+ "calls": [
+  {
+   "hash": "c8536ae659e294049287e7f9f9b513b960256368c05ed071fb6e63b609d28c93",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "ResearchBriefResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 3198,
+     "outputTokens": 899,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 9137,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0017184,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 9138,
+      "usage": {
+       "inputTokens": 3198,
+       "outputTokens": 899,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0017184,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0280dece48794177016ae3d292dd5087d29d9f8d0a22d26f2a",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:23.643Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "question": "Assess the competitive landscape and applicable regulation for LedgerBridge’s Nigerian B2B payments and fintech market, including the implications for its business and fundraising position over the next 12 months.",
+      "market": {
+       "places": [
+        {
+         "name": "Nigeria",
+         "from": "F9"
+        }
+       ],
+       "sectors": [
+        {
+         "name": "B2B payments",
+         "from": "F9"
+        },
+        {
+         "name": "fintech",
+         "from": "F9"
+        }
+       ],
+       "stage": {
+        "name": "seed",
+        "from": "F9"
+       },
+       "subjects": [
+        {
+         "name": "LedgerBridge Ltd",
+         "from": "F9"
+        },
+        {
+         "name": "Paystack",
+         "from": "F6"
+        },
+        {
+         "name": "Flutterwave",
+         "from": "F6"
+        },
+        {
+         "name": "Moniepoint business accounts",
+         "from": "F6"
+        },
+        {
+         "name": "Central Bank of Nigeria",
+         "from": "F3"
+        },
+        {
+         "name": "Nigeria Payments System Supervisory framework and relevant licensing authorities",
+         "from": "F5"
+        }
+       ]
+      },
+      "relevant": [
+       {
+        "ref": "F9",
+        "why": "Defines the company, Nigerian market, sectors, customer use case and stage that frame the competitive and regulatory research."
+       },
+       {
+        "ref": "F6",
+        "why": "Identifies the competitors and adjacent benchmark products that should be assessed in the landscape."
+       },
+       {
+        "ref": "F3",
+        "why": "Shows that CBN licensing status is already material to investor diligence and should be researched as a regulatory issue."
+       },
+       {
+        "ref": "F5",
+        "why": "Indicates that payment-system licensing and renewal requirements may affect operations and the next-12-month plan."
+       },
+       {
+        "ref": "F12",
+        "why": "Shows that licensing evidence is currently missing, making regulatory verification and compliance implications central to the analysis."
+       },
+       {
+        "ref": "F2",
+        "why": "Indicates active investor interest, so the research should address how competition and regulation may affect investor scrutiny and financing readiness."
+       },
+       {
+        "ref": "F4",
+        "why": "Creates a near-term investor discussion in which licensing, competitive positioning and regulatory exposure are likely to matter."
+       }
+      ],
+      "unknowns": [
+       {
+        "what": "Which exact licences LedgerBridge holds or requires, the licence holder or partner structure, current status, renewal obligations and any pending applications",
+        "establish": "PERSON"
+       },
+       {
+        "what": "The current Nigerian regulatory rules, guidance, enforcement posture and announced changes relevant to payment services, switching, wallets, merchant acquiring, data, AML/KYC and fintech operations",
+        "establish": "RESEARCH"
+       },
+       {
+        "what": "The current products, pricing, distribution models, licences, customer segments, funding and reported traction of the named competitors and relevant adjacent providers",
+        "establish": "RESEARCH"
+       },
+       {
+        "what": "LedgerBridge’s actual product architecture, flow of funds, settlement arrangements, use of agents or distributors, and allocation of compliance responsibility",
+        "establish": "PERSON"
+       },
+       {
+        "what": "The competitive overlap between LedgerBridge and each named competitor, including whether they compete directly or primarily serve different customer segments",
+        "establish": "RESEARCH"
+       },
+       {
+        "what": "The likely regulatory milestones, compliance costs, operational constraints and strategic opportunities for LedgerBridge over the next 12 months",
+        "establish": "RESEARCH"
+       },
+       {
+        "what": "Whether LedgerBridge’s distributor and retailer activities create additional licensing, consumer-protection, tax, data or AML obligations",
+        "establish": "RESEARCH"
+       },
+       {
+        "what": "Which regulatory and competitive evidence investors are likely to request in the upcoming financing process",
+        "establish": "RESEARCH"
+       }
+      ],
+      "angles": [],
+      "irrelevant": [
+       "Other sectors outside B2B payments and fintech",
+       "Companies unrelated to the Nigerian payments market",
+       "Private financial figures and internal operating metrics",
+       "Unrelated prospect-list information",
+       "Internal data-room document contents except where they identify a regulatory or competitive research question"
+      ],
+      "summary": "The research will map Nigeria’s B2B payments and fintech competition, with particular attention to Paystack, Flutterwave and Moniepoint’s business accounts, and assess the regulatory requirements affecting LedgerBridge. It will translate those findings into the competitive, compliance, operating and investor-diligence implications most relevant over the next 12 months."
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "4fa532c0eee24c99389ca03a502f2b38564456a4234e6891048129b7716a5626",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchPlanResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 2800,
+     "outputTokens": 676,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 6485,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0013712,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 6485,
+      "usage": {
+       "inputTokens": 2800,
+       "outputTokens": 676,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0013712,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_06e17e8802a0c4ed016ae3d29c12d087d291e64ddd2fe0a7e4",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:30.178Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "questions": [
+       {
+        "lane": "COMPETITORS",
+        "query": "Nigeria B2B payments fintech competitors 2026",
+        "alsoQuery": "Nigeria business payments providers market",
+        "recent": true,
+        "primary": false
+       },
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria CBN payment services regulation circular 2026",
+        "alsoQuery": "Nigeria CBN fintech licensing framework 2026",
+        "recent": true,
+        "primary": true
+       },
+       {
+        "lane": "LICENSING",
+        "query": "Nigeria CBN payment licence requirements 2026",
+        "alsoQuery": "Nigeria payment service provider licence categories CBN",
+        "recent": false,
+        "primary": true
+       },
+       {
+        "lane": "MARKET_SIZE",
+        "query": "Nigeria B2B payments market size growth",
+        "alsoQuery": "Nigeria digital payments transaction value business payments",
+        "recent": false,
+        "primary": true
+       },
+       {
+        "lane": "ALTERNATIVES",
+        "query": "Nigeria businesses bank transfers cash payments alternatives",
+        "alsoQuery": "Nigeria SME payment methods digital wallets fintech",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "PRICING_UNIT_ECONOMICS",
+        "query": "Nigeria B2B payments fees pricing fintech",
+        "alsoQuery": "Nigeria payment gateway transaction fees businesses",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "site:cbn.gov.ng Nigeria payment fintech enforcement sanctions 2025 2026",
+        "alsoQuery": "Nigeria CBN fintech compliance enforcement payment providers",
+        "recent": true,
+        "primary": true
+       },
+       {
+        "lane": "NEWS_FUNDING",
+        "query": "Nigeria B2B payments fintech funding news 2025 2026",
+        "alsoQuery": "Nigeria fintech payments partnerships launches 2026",
+        "recent": true,
+        "primary": false
+       }
+      ],
+      "internalQuery": "B2B payments Nigeria market"
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "f68a3c3f138e4d0191affc4f08fe5671ce752b0a226485a5a32d59a5d4877fb4",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 4215,
+     "outputTokens": 837,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 6763,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0018474,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 6764,
+      "usage": {
+       "inputTokens": 4215,
+       "outputTokens": 837,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0018474,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0152625a3548364d016ae3d2b0d4f087d2947f8cad6b3f0128",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:50.926Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's NIBSS processed more than 11.2 billion instant-payment transactions valued at over N1.07 quadrillion in 2024.",
+        "figure": "more than 11.2 billion",
+        "asOf": "2024",
+        "source": 1,
+        "kind": "FIGURE",
+        "measure": "instant-payment transactions",
+        "entity": "Nigeria"
+       },
+       {
+        "statement": "Nigeria's fintech market in 2026 is described as concentrated among a few large agent and merchant networks.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 8,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "Nigeria fintech market"
+       },
+       {
+        "statement": "OPay is implied at around $3.1 billion by its shareholder Opera, according to MobiBank's 2026 market overview.",
+        "figure": "around $3.1 billion",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "COMPETITOR",
+        "measure": "implied valuation",
+        "entity": "OPay"
+       },
+       {
+        "statement": "Moniepoint raised a $200 million Series C, according to MobiBank's 2026 market overview.",
+        "figure": "$200 million",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "COMPETITOR",
+        "measure": "Series C funding",
+        "entity": "Moniepoint"
+       },
+       {
+        "statement": "PalmPay is reported to be raising at a valuation above $1 billion, according to MobiBank's 2026 market overview.",
+        "figure": "above $1 billion",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "COMPETITOR",
+        "measure": "reported valuation",
+        "entity": "PalmPay"
+       },
+       {
+        "statement": "The Central Bank of Nigeria upgraded OPay, Moniepoint, PalmPay and Kuda to national microfinance licences in January 2026.",
+        "figure": null,
+        "asOf": "January 2026",
+        "source": 8,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "OPay, Moniepoint, PalmPay and Kuda"
+       },
+       {
+        "statement": "Nigeria recorded 15.7B point-of-sale transactions in 2025, up 19.8%, according to MobiBank.",
+        "figure": "15.7B",
+        "asOf": "2025",
+        "source": 8,
+        "kind": "FIGURE",
+        "measure": "point-of-sale transactions",
+        "entity": "Nigeria"
+       },
+       {
+        "statement": "TechCabal describes Nigeria's business fintech landscape in 2026 as highly competitive, serving millions of business owners and high-scaling teams.",
+        "figure": "millions",
+        "asOf": "2026",
+        "source": 9,
+        "kind": "TREND",
+        "measure": "business customers",
+        "entity": "Nigeria business fintech market"
+       },
+       {
+        "statement": "TechCabal identifies Platnova among the top ten B2B fintech businesses in Nigeria in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 9,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Platnova"
+       },
+       {
+        "statement": "CareerBuddy lists Paystack as a Nigerian payment gateway for startups and e-commerce and says it is trusted by 60,000+ businesses.",
+        "figure": "60,000+",
+        "asOf": "2026",
+        "source": 13,
+        "kind": "COMPETITOR",
+        "measure": "business customers",
+        "entity": "Paystack"
+       },
+       {
+        "statement": "CareerBuddy lists Flutterwave as a Nigerian payment gateway with pan-African reach and says it processed $31B in 2024.",
+        "figure": "$31B",
+        "asOf": "2024",
+        "source": 13,
+        "kind": "COMPETITOR",
+        "measure": "processed payment value",
+        "entity": "Flutterwave"
+       },
+       {
+        "statement": "CareerBuddy lists Monnify, Fincra, Remita and Squad as Nigerian business payment gateways serving bank-transfer-heavy B2B, API-first, enterprise or GTBank-linked use cases.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 13,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Monnify, Fincra, Remita and Squad"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "COMPETITORS",
+        "query": "Nigeria CBN payment service provider licences 2026"
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "Nigeria B2B fintech market share 2026"
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "Nigeria payment gateway transaction volumes 2026"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "437a73ed51953e3365b6884bad1478e04a613d65574391a86c960b66b48f3a82",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3711,
+     "outputTokens": 700,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 6628,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00131022,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 6628,
+      "usage": {
+       "inputTokens": 3711,
+       "outputTokens": 700,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00131022,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0cf924044ed2ffd0016ae3d2b0e35887d297186afff88f2608",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:50.790Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's CBN issued Circular PSS/DIR/PUB/CIR/001/004 on June 15, 2026, covering banks and licensed payment operators.",
+        "figure": null,
+        "asOf": "June 15, 2026",
+        "source": 16,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "Nigeria's payment participants must store and manage payment transaction data generated within Nigeria in Nigeria, with full compliance required by January 1, 2027.",
+        "figure": "January 1, 2027",
+        "asOf": "January 1, 2027",
+        "source": 16,
+        "kind": "REGULATION",
+        "measure": "compliance deadline",
+        "entity": "Nigeria payments system"
+       },
+       {
+        "statement": "Nigeria's localisation requirement covers transaction records, BVN data, card data, settlement records, payment instructions, authentication credentials and associated metadata.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 16,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payments system"
+       },
+       {
+        "statement": "Nigeria's data-localisation requirement also covers systems consuming payment data, including fraud models, analytics pipelines and risk-scoring engines.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 16,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payments system"
+       },
+       {
+        "statement": "Nigeria's CBN circular introduces market share caps, payment data localisation, ultimate beneficial ownership disclosure and systemic oversight measures.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 16,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "Nigeria's CBN circular applies to deposit money banks, microfinance banks, mobile money operators, switching and processing companies, payment terminal and solution service providers, super agents and other licensed payment operators.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 16,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria licensed payment operators"
+       },
+       {
+        "statement": "Nigeria's CBN licenses fintechs in categories including switching and processing, mobile money operators, payment solution service providers, payment terminal service providers, super agents, payment service banks and digital microfinance banks.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "Nigeria fintech licensing requires both minimum paid-up share capital and a distinct refundable escrow deposit, which are separate financial requirements.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech licensing"
+       },
+       {
+        "statement": "Nigeria fintech licensing follows two stages: Approval-in-Principle first, followed by the Final Licence after inspection.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech licensing"
+       },
+       {
+        "statement": "Nigeria fintechs must comply with the Nigeria Data Protection Act and Anti-Money Laundering rules; those crossing the data-processing threshold are treated as Data Controllers of Major Importance.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintechs"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "REGULATION",
+        "query": "CBN Circular PSS DIR PUB CIR 001 004"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria CBN market share caps payment operators"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria CBN payment data localisation guidance"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "72109eb06a57970aed99b6b6970e9ce7586d0159d4c2d3ee3e1538c7afadbb19",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3589,
+     "outputTokens": 715,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 6909,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00130382,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 6910,
+      "usage": {
+       "inputTokens": 3589,
+       "outputTokens": 715,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00130382,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0016839ec0f84fb9016ae3d2b0e39887d2824037e497f4b213",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:51.072Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's Central Bank states that Payments System Supervision enforces rules and guidelines to ensure the payments system's soundness and safety.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payments system"
+       },
+       {
+        "statement": "Nigeria's Central Bank states that Payments System Supervision promotes internal controls, transparency and accountability in fintechs.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintechs"
+       },
+       {
+        "statement": "Nigeria's Central Bank states that it conducts effective offsite and onsite supervision of fintechs.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintechs"
+       },
+       {
+        "statement": "Nigeria's Central Bank lists licensed organisations across card/payment schemes, mobile money operator, switching and processing, and payment solution services categories.",
+        "figure": null,
+        "asOf": null,
+        "source": 3,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payment service providers"
+       },
+       {
+        "statement": "Nigeria's Central Bank lists Mastercard International, Visa International Service Association and Verve International under card/payment schemes.",
+        "figure": null,
+        "asOf": null,
+        "source": 3,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Nigeria card/payment schemes"
+       },
+       {
+        "statement": "Nigeria's Central Bank lists 17 organisations under the mobile money operator licence category.",
+        "figure": "17",
+        "asOf": null,
+        "source": 3,
+        "kind": "FIGURE",
+        "measure": "licensed operators",
+        "entity": "Nigeria mobile money operators"
+       },
+       {
+        "statement": "Nigeria's Central Bank lists Flutterwave Technology Solutions Limited, Interswitch Limited and Paystack Payment Limited under switching and processing.",
+        "figure": null,
+        "asOf": null,
+        "source": 3,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Nigeria switching and processing providers"
+       },
+       {
+        "statement": "Nigeria's Central Bank lists 19 organisations under the switching and processing licence category.",
+        "figure": "19",
+        "asOf": null,
+        "source": 3,
+        "kind": "FIGURE",
+        "measure": "licensed operators",
+        "entity": "Nigeria switching and processing providers"
+       },
+       {
+        "statement": "Nigeria's Central Bank lists payment solution service provider authorisation within the payment solution services licence category.",
+        "figure": null,
+        "asOf": null,
+        "source": 3,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payment solution services"
+       },
+       {
+        "statement": "A 2025 guide states that a PSSP licence is legal authorisation from Nigeria's Central Bank to process electronic payments.",
+        "figure": null,
+        "asOf": "2025",
+        "source": 22,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria PSSP licensing"
+       },
+       {
+        "statement": "A 2025 guide states that a PSSP licence does not permit holding customer funds or issuing digital wallets.",
+        "figure": null,
+        "asOf": "2025",
+        "source": 22,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria PSSP licensing"
+       },
+       {
+        "statement": "A 2025 guide states that holding customer funds or issuing digital wallets requires separate licences such as Mobile Money Operator or Switching & Processing licences.",
+        "figure": null,
+        "asOf": "2025",
+        "source": 22,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payment licensing"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "LICENSING",
+        "query": "CBN official PSSP licensing requirements Nigeria"
+       },
+       {
+        "lane": "LICENSING",
+        "query": "CBN payment services licence capital requirements Nigeria"
+       },
+       {
+        "lane": "LICENSING",
+        "query": "CBN licensing approval request portal payment licence"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "58f12c85e1a9fafa2d70542902e9b6e45063311873584395fde64ba8e0478c52",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 4042,
+     "outputTokens": 411,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 4235,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00102962,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 4235,
+      "usage": {
+       "inputTokens": 4042,
+       "outputTokens": 411,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00102962,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_079a57bc79a55459016ae3d2b0e09087d2982c73d41c980df2",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:48.397Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's B2B BNPL market was described as exceeding $1.75 billion in 2026 in a paid press release distributed through Yahoo Finance UK.",
+        "figure": "$1.75+ Billion",
+        "asOf": "2026",
+        "source": 18,
+        "kind": "FIGURE",
+        "measure": "market size",
+        "entity": "Nigeria B2B BNPL market"
+       },
+       {
+        "statement": "Nigeria's B2B payment providers include switching companies, payment gateways and cross-border services, according to Nilos's October 2026 market guide.",
+        "figure": null,
+        "asOf": "October 2026",
+        "source": 6,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "Nigeria B2B payments market"
+       },
+       {
+        "statement": "Nilos's Nigeria guide identifies TradeDepot, Sabi and Moniepoint as platforms scaling embedded SME credit, while major banks leverage data and funding advantages.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 18,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "TradeDepot, Sabi, Moniepoint and major banks"
+       },
+       {
+        "statement": "Nilos offers pay-ins, payouts, pay-on-behalf-of, virtual accounts and foreign-exchange services for businesses and payment service providers in Nigeria.",
+        "figure": null,
+        "asOf": "October 2026",
+        "source": 6,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Nilos"
+       },
+       {
+        "statement": "The Nigeria B2B BNPL market is described as being driven by demand for flexible payments amid naira volatility and supported by fintech platforms and digital trade.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 18,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "Nigeria B2B BNPL market"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "MARKET_SIZE",
+        "query": "Nigeria B2B payments market growth forecast"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria B2B payments CBN regulations 2026"
+       },
+       {
+        "lane": "COMPETITOR",
+        "query": "Nigeria B2B payment providers market share"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "2f0fee4f4728c43814162b036c77a091bf6023a3aefd9230abd71caa354fa56e",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3698,
+     "outputTokens": 711,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 5935,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00132082,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5935,
+      "usage": {
+       "inputTokens": 3698,
+       "outputTokens": 711,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00132082,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_02c39572e39426fb016ae3d2b4c5c087d2b67e0c92395c9da9",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:54.335Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "RevenueBase identified 279 fintech payment-platform company matches associated with Nigeria as of October 2026, and Lagos is the largest hub.",
+        "figure": "279",
+        "asOf": "October 2026",
+        "source": 5,
+        "kind": "COMPETITOR",
+        "measure": "company matches",
+        "entity": "fintech payment platforms associated with Nigeria"
+       },
+       {
+        "statement": "RevenueBase tracked 5,882 professional contacts across Nigeria-associated fintech payment platforms as of October 2026.",
+        "figure": "5,882",
+        "asOf": "October 2026",
+        "source": 5,
+        "kind": "FIGURE",
+        "measure": "professional contacts",
+        "entity": "fintech payment platforms associated with Nigeria"
+       },
+       {
+        "statement": "RevenueBase recorded 1,880 verified work emails across Nigeria-associated fintech payment platforms as of October 2026.",
+        "figure": "1,880",
+        "asOf": "October 2026",
+        "source": 5,
+        "kind": "FIGURE",
+        "measure": "verified work emails",
+        "entity": "fintech payment platforms associated with Nigeria"
+       },
+       {
+        "statement": "NIBSS reported that cash scarcity was driving growing popularity of alternative payment options in Nigeria in July 2024.",
+        "figure": null,
+        "asOf": "July 2024",
+        "source": 12,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "alternative payment options in Nigeria"
+       },
+       {
+        "statement": "NIBSS identified NIBSS Instant Payment, USSD, NQR, mCash+, Central Pay and e-BillsPay among payment services available in Nigeria in July 2024.",
+        "figure": null,
+        "asOf": "July 2024",
+        "source": 12,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "payment services in Nigeria"
+       },
+       {
+        "statement": "NIBSS stated that cash had remained the most preferred means of transaction in Nigeria before the cash-scarcity period described in July 2024.",
+        "figure": null,
+        "asOf": "July 2024",
+        "source": 12,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "cash transactions in Nigeria"
+       },
+       {
+        "statement": "NIBSS stated that Nigeria had experienced an influx of digital payment methods while maintaining a position as a fintech hub in Africa by July 2024.",
+        "figure": null,
+        "asOf": "July 2024",
+        "source": 12,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "digital payments in Nigeria"
+       },
+       {
+        "statement": "Cleva's January 2026 article stated that Nigeria's digital-payments sector processed over ₦1 quadrillion ($754 billion) annually.",
+        "figure": "over ₦1 quadrillion ($754 billion) annually",
+        "asOf": "January 2026",
+        "source": 19,
+        "kind": "FIGURE",
+        "measure": "annual transaction value",
+        "entity": "Nigeria's digital-payments sector"
+       },
+       {
+        "statement": "Cleva's January 2026 article stated that PayPal had announced its return to Nigeria through a partnership with Paga.",
+        "figure": null,
+        "asOf": "January 2026",
+        "source": 19,
+        "kind": "NEWS",
+        "measure": null,
+        "entity": "PayPal and Paga"
+       },
+       {
+        "statement": "Cleva's January 2026 article presented local fintech companies as alternatives for Nigerians during PayPal's absence.",
+        "figure": null,
+        "asOf": "January 2026",
+        "source": 19,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "local fintech companies in Nigeria"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "ALTERNATIVES",
+        "query": "NIBSS five cash alternatives details Nigeria"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria payment service provider regulations CBN"
+       },
+       {
+        "lane": "COMPETITOR",
+        "query": "Nigeria fintech payment platforms ranked list"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "85506cf308cdaa31202385f95a56f0374644d6a20fb30a4712ded1c2d116601d",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 4067,
+     "outputTokens": 927,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 7026,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00165382,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 7027,
+      "usage": {
+       "inputTokens": 4067,
+       "outputTokens": 927,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00165382,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0f0cb75f5fff4e22016ae3d2b72ddc87d2a184baf4183a1a01",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:57.821Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's B2B payment landscape includes switching companies, payment gateways and cross-border services, according to Nilos's market guide updated 13 Oct 2026.",
+        "figure": null,
+        "asOf": "13 Oct 2026",
+        "source": 6,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "Nigeria's B2B payment market"
+       },
+       {
+        "statement": "Nilos presents pay-ins, payouts, POBO, virtual accounts and FX as payment capabilities for businesses and fintechs serving Nigeria.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 6,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Nilos"
+       },
+       {
+        "statement": "Nigeria's business payment gateway landscape includes Paystack, Flutterwave, Monnify, Interswitch, Squad by GTCO, eTranzact and Remita, according to Awajis in May 2026.",
+        "figure": null,
+        "asOf": "May 2026",
+        "source": 20,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Nigeria payment gateways"
+       },
+       {
+        "statement": "Nigeria's gateway providers cover cards, NIP bank transfers, USSD, virtual accounts and recurring billing, according to Awajis's May 2026 guide.",
+        "figure": null,
+        "asOf": "May 2026",
+        "source": 20,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "Nigeria payment gateways"
+       },
+       {
+        "statement": "Nigeria's local card fees sit around 1.5%, with a cap of about N2,000, while international card fees are 3.5–3.9%, according to Awajis in May 2026.",
+        "figure": "1.5%; N2,000; 3.5–3.9%",
+        "asOf": "May 2026",
+        "source": 20,
+        "kind": "FIGURE",
+        "measure": "payment processing fees",
+        "entity": "Nigeria payment gateways"
+       },
+       {
+        "statement": "Nigeria's bank-transfer payment fees can be as low as flat fees, according to Awajis's May 2026 guide.",
+        "figure": null,
+        "asOf": "May 2026",
+        "source": 20,
+        "kind": "FIGURE",
+        "measure": "bank transfer fees",
+        "entity": "Nigeria payment gateways"
+       },
+       {
+        "statement": "Paystack is described as serving startups and e-commerce, Flutterwave as serving cross-border and multi-currency businesses, and Monnify as serving bank-transfer-heavy B2B businesses in Nigeria.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 13,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Paystack, Flutterwave and Monnify"
+       },
+       {
+        "statement": "CareerBuddy says Paystack is trusted by 60,000+ businesses in Nigeria, but this is the publication's claim rather than independently verified evidence.",
+        "figure": "60,000+ businesses",
+        "asOf": "2026",
+        "source": 13,
+        "kind": "FIGURE",
+        "measure": "business users",
+        "entity": "Paystack"
+       },
+       {
+        "statement": "CareerBuddy says Flutterwave supports 150+ currencies and processed $31B in 2024, but these are the publication's claims rather than independently verified evidence.",
+        "figure": "150+ currencies; $31B",
+        "asOf": "2024",
+        "source": 13,
+        "kind": "FIGURE",
+        "measure": "currencies and processed value",
+        "entity": "Flutterwave"
+       },
+       {
+        "statement": "CareerBuddy says Fincra has processed $10B+ and offers fiat and crypto rails through one integration, but these are the publication's claims rather than independently verified evidence.",
+        "figure": "$10B+",
+        "asOf": "2026",
+        "source": 13,
+        "kind": "FIGURE",
+        "measure": "processed value",
+        "entity": "Fincra"
+       },
+       {
+        "statement": "Nigeria's payment-focused solutions have surged over the past two years, which Paymentwall attributes partly to the central bank's financial-inclusion drive and favourable regulatory policies.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 25,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "Nigeria payment-focused solutions"
+       },
+       {
+        "statement": "Nigeria's payment market includes mobile money services such as Paga and Tingg, alongside mobile banking applications and bank USSD channels for transfers and bill payments.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 25,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "Nigeria payment methods"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "PRICING_UNIT_ECONOMICS",
+        "query": "Nigeria fintech gateway fee schedules 2026"
+       },
+       {
+        "lane": "PRICING_UNIT_ECONOMICS",
+        "query": "CBN payment service provider regulations Nigeria"
+       },
+       {
+        "lane": "PRICING_UNIT_ECONOMICS",
+        "query": "Nigeria NIBSS transfer pricing merchant fees"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "aaf85a053801693326b8a9d4a47ac937ec11104ee8d425dadd320d89fe3fdad0",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3777,
+     "outputTokens": 753,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 5761,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00138702,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5762,
+      "usage": {
+       "inputTokens": 3777,
+       "outputTokens": 753,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00138702,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0d56992fda903a3f016ae3d2b751fc87d284c1698916f55a35",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:56.696Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's Central Bank licenses fintechs in categories including Switching and Processing, Mobile Money Operator, Payment Solution Service Provider, Payment Terminal Service Provider, Super Agent, Payment Service Bank and digital Microfinance Bank under BOFIA 2020.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech licensing"
+       },
+       {
+        "statement": "Nigeria fintech licensing requires both minimum paid-up share capital and a separate refundable escrow deposit; the escrow is not a fee and cannot be spent on operations.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech licensing"
+       },
+       {
+        "statement": "Nigeria fintech licensing follows a two-stage process: Approval-in-Principle first, then the Final Licence after inspection.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech licensing"
+       },
+       {
+        "statement": "Nigeria fintechs must comply with the Nigeria Data Protection Act and Anti-Money Laundering rules; those crossing the data-processing threshold are treated as Data Controllers of Major Importance.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 2,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech compliance"
+       },
+       {
+        "statement": "Nigeria fintechs may need to satisfy the Central Bank of Nigeria, Securities and Exchange Commission and Nigeria Deposit Insurance Corporation simultaneously, depending on their activities.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 14,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech regulation"
+       },
+       {
+        "statement": "Nigeria's regulatory boundaries for fintechs shifted following the Investment and Securities Act 2025 and recent regulatory circulars.",
+        "figure": null,
+        "asOf": "2025-2026",
+        "source": 14,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria fintech regulation"
+       },
+       {
+        "statement": "Nigeria's principal non-bank payment licences include Payment Solution Service Provider, which covers payment gateways, processing and merchant integration.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 14,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigeria payment licensing"
+       },
+       {
+        "statement": "Nigeria's fintech ecosystem comprised more than 430 fintech companies in 2025.",
+        "figure": "more than 430",
+        "asOf": "2025",
+        "source": 26,
+        "kind": "FIGURE",
+        "measure": "fintech companies",
+        "entity": "Nigeria fintech ecosystem"
+       },
+       {
+        "statement": "Nigeria accounted for 28% of all African fintech companies in 2025.",
+        "figure": "28%",
+        "asOf": "2025",
+        "source": 26,
+        "kind": "FIGURE",
+        "measure": "regional company share",
+        "entity": "Nigeria fintech ecosystem"
+       },
+       {
+        "statement": "Nigeria captured roughly 36% of fintech funding in African fintech companies between 2020 and H1 2024.",
+        "figure": "roughly 36%",
+        "asOf": "2020 and H1 2024",
+        "source": 26,
+        "kind": "FIGURE",
+        "measure": "African fintech funding share",
+        "entity": "Nigeria fintech ecosystem"
+       },
+       {
+        "statement": "OPay, PiggyVest and Moniepoint were identified as leaders among Nigeria's fintechs in 2025 across payments, personal banking and investment.",
+        "figure": null,
+        "asOf": "2025",
+        "source": 26,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "OPay, PiggyVest and Moniepoint"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "CBN Nigeria fintech sanctions enforcement 2025"
+       },
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "CBN Nigeria payment licence circulars 2026"
+       },
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "Nigeria fintech NDPA compliance enforcement 2026"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "d5c2692deadce422323fa0164d57fa3f5b6ffa466c7e0ac4512acd27a1133bfb",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3919,
+     "outputTokens": 880,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 7043,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00156782,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 7043,
+      "usage": {
+       "inputTokens": 3919,
+       "outputTokens": 880,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00156782,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_089623efe725f146016ae3d2b7718087d2a1ee0844c0e0e5a8",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:11:58.120Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's fintech startups raised $214M in H1 2026, the highest amount among African countries, according to Africa: The Big Deal as cited by MobiBank.",
+        "figure": "$214M",
+        "asOf": "H1 2026",
+        "source": 8,
+        "kind": "FIGURE",
+        "measure": "equity raised",
+        "entity": "Nigerian startups"
+       },
+       {
+        "statement": "Nigeria recorded 15.7B point-of-sale transactions in 2025, up 19.8%, according to MobiBank.",
+        "figure": "15.7B",
+        "asOf": "2025",
+        "source": 8,
+        "kind": "FIGURE",
+        "measure": "transaction volume",
+        "entity": "Point-of-sale transactions in Nigeria"
+       },
+       {
+        "statement": "Moniepoint raised a $200 million Series C, according to MobiBank's 2026 Nigeria fintech market review.",
+        "figure": "$200 million",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "NEWS",
+        "measure": "funding raised",
+        "entity": "Moniepoint"
+       },
+       {
+        "statement": "TradeDepot, Sabi and Moniepoint are identified as scaling embedded SME credit in Nigeria's B2B buy-now-pay-later market in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 18,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "TradeDepot, Sabi and Moniepoint"
+       },
+       {
+        "statement": "Nigeria's B2B buy-now-pay-later market is described as exceeding $1.75 billion in 2026, in a paid Research and Markets press release.",
+        "figure": "$1.75+ Billion",
+        "asOf": "2026",
+        "source": 18,
+        "kind": "FIGURE",
+        "measure": "market size",
+        "entity": "Nigeria B2B BNPL market"
+       },
+       {
+        "statement": "Major banks are described as leveraging data and funding advantages in Nigeria's B2B buy-now-pay-later market in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 18,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Major banks in Nigeria"
+       },
+       {
+        "statement": "MobiBank says Nigerian fintech demand is driven by tens of millions of adults moving from cash to digital payments in 2026.",
+        "figure": "tens of millions",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "TREND",
+        "measure": "adults shifting digitally",
+        "entity": "Nigerian adults"
+       },
+       {
+        "statement": "MobiBank says Nigeria's payments system was processing quadrillions of naira in 2026.",
+        "figure": "quadrillions of naira",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "FIGURE",
+        "measure": "payment processing",
+        "entity": "Nigeria's payments system"
+       },
+       {
+        "statement": "MobiBank describes Nigeria's fintech supply side as consolidating around a handful of operators with street cash-in and cash-out networks in 2026.",
+        "figure": "a handful",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "TREND",
+        "measure": "market concentration",
+        "entity": "Nigerian fintech operators"
+       },
+       {
+        "statement": "The Central Bank of Nigeria upgraded OPay, Moniepoint, PalmPay and Kuda to national microfinance licences in January 2026, according to MobiBank.",
+        "figure": null,
+        "asOf": "January 2026",
+        "source": 8,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "OPay is implied at around $3.1 billion by shareholder Opera and reportedly explored a US listing near $4 billion, according to MobiBank.",
+        "figure": "$3.1 billion; near $4 billion",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "NEWS",
+        "measure": "valuation and listing size",
+        "entity": "OPay"
+       },
+       {
+        "statement": "PalmPay was reported to be raising at a valuation above $1 billion with a Hong Kong listing in view, according to MobiBank.",
+        "figure": "above $1 billion",
+        "asOf": "2026",
+        "source": 8,
+        "kind": "NEWS",
+        "measure": "fundraising valuation",
+        "entity": "PalmPay"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "NEWS_FUNDING",
+        "query": "Nigeria fintech funding 2025 Moniepoint TradeDepot Sabi"
+       },
+       {
+        "lane": "NEWS_FUNDING",
+        "query": "CBN national microfinance licence fintech January 2026"
+       },
+       {
+        "lane": "NEWS_FUNDING",
+        "query": "Nigeria fintech B2B payments competitors 2026"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "fd43ab68309b7bbcd6bba540604178806649b0e9e74fb4bcc1a6718bbe4db282",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchPlanResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 2979,
+     "outputTokens": 345,
+     "cachedInputTokens": 1428
+    },
+    "latencyMs": 3793,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00075276,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 3794,
+      "usage": {
+       "inputTokens": 2979,
+       "outputTokens": 345,
+       "cachedInputTokens": 1428
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00075276,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_01b896fdb442ab2c016ae3d2be88f487d2b37d31ddc1003244",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:12:01.955Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "questions": [
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria CBN payment services regulations 2026",
+        "alsoQuery": "Nigeria CBN official payment systems circulars",
+        "recent": true,
+        "primary": true
+       },
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "Nigeria CBN fintech enforcement sanctions 2026",
+        "alsoQuery": "Nigeria CBN official payment services enforcement",
+        "recent": true,
+        "primary": true
+       },
+       {
+        "lane": "MARKET_SIZE",
+        "query": "Nigeria CBN payment systems statistics 2025",
+        "alsoQuery": "Nigeria official payment transactions statistics 2025",
+        "recent": false,
+        "primary": true
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "Nigeria B2B payments fintech companies 2026",
+        "alsoQuery": "Nigeria business payments providers fintech 2026",
+        "recent": true,
+        "primary": false
+       },
+       {
+        "lane": "CUSTOMER_DEMAND",
+        "query": "Nigeria business payments transaction trends 2025",
+        "alsoQuery": "Nigeria SMEs digital payments adoption 2025",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "ALTERNATIVES",
+        "query": "Nigeria business payments bank transfers cash 2025",
+        "alsoQuery": "Nigeria SME payment methods digital alternatives",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "PRICING_UNIT_ECONOMICS",
+        "query": "Nigeria fintech business payments fees 2025",
+        "alsoQuery": "Nigeria B2B payment processing pricing tariffs",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "NEWS_FUNDING",
+        "query": "Nigeria B2B payments fintech funding 2025 2026",
+        "alsoQuery": "Nigeria payments fintech partnerships launches 2026",
+        "recent": true,
+        "primary": false
+       }
+      ],
+      "internalQuery": "B2B payments Nigeria market"
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "32cc213cca34787ee6b7521e73a17eef1bec47777deb5ddb94393f177299b3d5",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 2776,
+     "outputTokens": 65,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 1540,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00036122,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 1540,
+      "usage": {
+       "inputTokens": 2776,
+       "outputTokens": 65,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00036122,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0cd091c630607ddf016ae3d2ca095087d28a53963bab8eedf2",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:12:10.897Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [],
+      "followUps": [
+       {
+        "lane": "REGULATION",
+        "query": "CBN payment services regulations Nigeria 2026"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "PwC analysis CBN payment rules Nigeria"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "CBN fintech licensing requirements Nigeria"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "30959949d4198990c267b31f1e5ff5d51a7c4dc6b20817a367deed2332fc7033",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3486,
+     "outputTokens": 726,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 5764,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00129642,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5764,
+      "usage": {
+       "inputTokens": 3486,
+       "outputTokens": 726,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00129642,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0c705b08be3fee9b016ae3d2ca0d4087d298ddc3ab3f4718a0",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:12:15.122Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's Central Bank reminded banks, payment service banks and fintech companies in April 2025 to comply with applicable international and national sanctions regimes.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "Nigeria's applicable sanctions regimes include the United Nations Consolidated Sanctions List and the Nigerian Sanctions List under the Terrorism (Prevention and Prohibition) Act 2022.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigerian financial institutions"
+       },
+       {
+        "statement": "Nigeria's Central Bank directed financial institutions in April 2025 to regularly update systems to identify designated persons or entities and prevent misuse of financial platforms.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "Nigeria's financial institutions were required in April 2025 to maintain a robust and dynamic sanctions compliance framework covering applicable sanctions-list updates.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigerian financial institutions"
+       },
+       {
+        "statement": "Nigeria's financial institutions were required in April 2025 to prevent transactions involving designated individuals or entities and conduct real-time screening of customers, transactions and beneficial owners.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigerian financial institutions"
+       },
+       {
+        "statement": "Nigeria's financial institutions were required in April 2025 to file appropriate reports with Nigerian authorities, according to the Central Bank's sanctions-compliance letter.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Nigerian financial institutions"
+       },
+       {
+        "statement": "Nigeria's Central Bank guidance in April 2025 covered banks, payment service banks and fintech companies.",
+        "figure": null,
+        "asOf": "April 2025",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Central Bank of Nigeria"
+       },
+       {
+        "statement": "Nigeria's Terrorism (Prevention and Prohibition) Act 2022 is identified as the basis for the Nigerian Sanctions List referenced by the Central Bank.",
+        "figure": null,
+        "asOf": "2022",
+        "source": 31,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "Terrorism (Prevention and Prohibition) Act"
+       },
+       {
+        "statement": "ZIGRAM's Nigeria AML guide page, published in June 2026, presents name screening, transaction monitoring, customer risk rating and fraud monitoring as AML capabilities.",
+        "figure": null,
+        "asOf": "June 2026",
+        "source": 28,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "ZIGRAM"
+       },
+       {
+        "statement": "PayAtlas's Nigeria page, published in February 2026, lists regulatory compliance solutions, AML and KYC services and fraud prevention services among payment-sector categories.",
+        "figure": null,
+        "asOf": "February 2026",
+        "source": 35,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "PayAtlas"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "CBN Nigeria fintech sanctions enforcement 2025"
+       },
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "CBN Nigeria fintech penalties sanctions 2026"
+       },
+       {
+        "lane": "POLICY_ENFORCEMENT",
+        "query": "Nigeria sanctions compliance fintech CBN letter"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "1cd9bbc6aa60e0ef45869f2b9f1fc02fa9aaf2b369948d0e63f8b190331cf39a",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 4141,
+     "outputTokens": 922,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 7181,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00166262,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 7181,
+      "usage": {
+       "inputTokens": 4141,
+       "outputTokens": 922,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00166262,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_01a0455125386a24016ae3d2ca0ee087d2a5071ccc560b73a5",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:12:16.539Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria recorded 22,419,710,555 total e-payment transactions valued at 1,558,905,734,175,560.00 from January to June 2024, according to the Central Bank of Nigeria.",
+        "figure": "22,419,710,555; 1,558,905,734,175,560.00",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria e-payment transactions"
+       },
+       {
+        "statement": "Nigeria recorded 38,730,537,534 total e-payment transactions valued at 2,240,794,454,444,110.00 during January to December 2023, according to the Central Bank of Nigeria.",
+        "figure": "38,730,537,534; 2,240,794,454,444,110.00",
+        "asOf": "January to December 2023",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria e-payment transactions"
+       },
+       {
+        "statement": "In Nigeria from January to June 2024, internet web transfers had volume of 11,638,142,074 and value of 825,500,108,736,661.00, according to the Central Bank of Nigeria.",
+        "figure": "11,638,142,074; 825,500,108,736,661.00",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "internet web transfers"
+       },
+       {
+        "statement": "In Nigeria from January to June 2024, POS transactions had volume of 6,395,670,571 and value of 85,914,704,798,833.20, according to the Central Bank of Nigeria.",
+        "figure": "6,395,670,571; 85,914,704,798,833.20",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "POS transactions"
+       },
+       {
+        "statement": "In Nigeria from January to June 2024, mobile app transfers excluding mobile money had volume of 3,493,116,888 and value of 159,419,658,081,137.00.",
+        "figure": "3,493,116,888; 159,419,658,081,137.00",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "mobile app transfers"
+       },
+       {
+        "statement": "In Nigeria from January to June 2024, mobile money operators had transaction volume of 7,181,494,209 and value of 78,203,693,683,958.50.",
+        "figure": "7,181,494,209; 78,203,693,683,958.50",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "mobile money operators"
+       },
+       {
+        "statement": "In Nigeria from January to June 2024, USSD transfers had volume of 252,059,346 and value of 2,188,099,220,103.11, according to the Central Bank of Nigeria.",
+        "figure": "252,059,346; 2,188,099,220,103.11",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "USSD transfers"
+       },
+       {
+        "statement": "The Central Bank of Nigeria states that its e-payment measure includes ATM, POS, web or online or internet, NEFT, RTGS, USSD, mobile app and direct debit channels.",
+        "figure": null,
+        "asOf": null,
+        "source": 29,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "Nigeria e-payment statistics"
+       },
+       {
+        "statement": "The Central Bank of Nigeria's Data & Statistics page lists financial data, statistics databases, annual and quarterly statistical bulletins, and a statistics repository.",
+        "figure": null,
+        "asOf": null,
+        "source": 36,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "Central Bank of Nigeria Data & Statistics"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "MARKET_SIZE",
+        "query": "CBN Nigeria payment systems 2025 statistics"
+       },
+       {
+        "lane": "MARKET_SIZE",
+        "query": "NIBSS instant payment transactions 2024"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "CBN Nigeria payment systems regulatory framework 2025"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "abea22ba5d35a131f03e9b38e13420d8c0058c7049d292c1965b6f37d7384c28",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 4140,
+     "outputTokens": 833,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 6401,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00155562,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 6402,
+      "usage": {
+       "inputTokens": 4140,
+       "outputTokens": 833,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00155562,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_03e530330990ac0c016ae3d2ca0cec87d28aa12c388781260b",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:12:15.760Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Nigeria's total e-payment transactions were 22,419,710,555, valued at 1,558,905,734,175,560.00, from January to June 2024.",
+        "figure": "22,419,710,555; 1,558,905,734,175,560.00",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria total e-payment transactions"
+       },
+       {
+        "statement": "Nigeria's total e-payment transactions were 38,730,537,534, valued at 2,240,794,454,444,110.00, from January to December 2023.",
+        "figure": "38,730,537,534; 2,240,794,454,444,110.00",
+        "asOf": "January to December 2023",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria total e-payment transactions"
+       },
+       {
+        "statement": "Nigeria's internet web transfers totalled 11,638,142,074 transactions valued at 825,500,108,736,661.00 from January to June 2024.",
+        "figure": "11,638,142,074; 825,500,108,736,661.00",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria internet web transfers"
+       },
+       {
+        "statement": "Nigeria's mobile app transfers, excluding mobile money, totalled 3,493,116,888 transactions valued at 159,419,658,081,137.00 from January to June 2024.",
+        "figure": "3,493,116,888; 159,419,658,081,137.00",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria mobile app transfers"
+       },
+       {
+        "statement": "Nigeria's POS transactions totalled 6,395,670,571 and were valued at 85,914,704,798,833.20 from January to June 2024.",
+        "figure": "6,395,670,571; 85,914,704,798,833.20",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria POS transactions"
+       },
+       {
+        "statement": "Nigeria's mobile money operator transactions totalled 7,181,494,209 and were valued at 78,203,693,683,958.50 from January to June 2024.",
+        "figure": "7,181,494,209; 78,203,693,683,958.50",
+        "asOf": "January to June 2024",
+        "source": 29,
+        "kind": "FIGURE",
+        "measure": "transaction volume and value",
+        "entity": "Nigeria mobile money operator transactions"
+       },
+       {
+        "statement": "Nigeria's total e-payment transactions were 2,240,794,454,444,110.00 in value from January to December 2023, across channels including ATM, POS, web, NEFT, RTGS, USSD, mobile app and direct debit.",
+        "figure": "2,240,794,454,444,110.00",
+        "asOf": "January to December 2023",
+        "source": 29,
+        "kind": "FACT",
+        "measure": "transaction value",
+        "entity": "Nigeria total e-payment transactions"
+       },
+       {
+        "statement": "The Central Bank of Nigeria's data and statistics repository includes financial data, statistics databases, annual and quarterly statistical bulletins, and a payments-related statistics database.",
+        "figure": null,
+        "asOf": null,
+        "source": 36,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "Central Bank of Nigeria data and statistics repository"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "MARKET_SIZE",
+        "query": "NIBSS instant payment transactions 2024"
+       },
+       {
+        "lane": "MARKET_SIZE",
+        "query": "Nigeria BNPL market forecast 2030"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "Nigeria CBN payment service bank regulation"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "7e0135db5aba9bd20b074c55c38bea54ff5af34320733765ce6b557fa62b88c6",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "AnalysisDocumentResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 9435,
+     "outputTokens": 4527,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 40083,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0073194,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 40083,
+      "usage": {
+       "inputTokens": 9435,
+       "outputTokens": 4527,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0073194,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_09a1677d6db717c2016ae3d2d1522487d28619f94be131e4e1",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:12:56.711Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "title": "LedgerBridge: Nigerian B2B Payments Competitive and Regulatory Outlook — Next 12 Months",
+      "summary": "Nigeria is a large and expanding digital-payments market, but LedgerBridge’s immediate constraint is not market demand; it is proving that its licensing, flow-of-funds and compliance model is appropriate for its payables, receivables and reconciliation product. Competition is substantial, with licensed processors and scaled business-fintech platforms able to bundle payments, accounts, acquiring and credit. LedgerBridge should make regulatory evidence investor-ready before the 4 November Aster Africa Ventures call, then narrow its differentiation around FMCG distribution workflows rather than compete as a general payment gateway.",
+      "sections": [
+       {
+        "heading": "Executive summary",
+        "body": "The market opportunity is evidenced by 22,419,710,555 Nigerian e-payment transactions valued at ₦1,558,905,734,175,560 in January–June 2024 [S29]. Internet transfers alone represented 11,638,142,074 transactions valued at ₦825,500,108,736,661 over the same period [S29]. These figures establish payment scale, not LedgerBridge’s addressable market or achievable share.\n\nThe competitive field is crowded and increasingly consolidated. The Central Bank of Nigeria lists 19 switching and processing organisations and 17 mobile money operators [S3]. Public market mapping identifies more than 430 fintech companies in Nigeria in 2025 [S26], while RevenueBase records 279 Nigeria-associated fintech payment-platform matches as of October 2026 [S5]; these counts use different definitions and should not be combined as a precise market total.\n\nRegulation is the highest-priority execution issue. A reported CBN circular dated 15 June 2026 applies to banks and licensed payment operators [S16] and is described as introducing market-share caps, payment-data localisation, ultimate-beneficial-owner disclosure and systemic-oversight measures [S16]. The same source reports a 1 January 2027 deadline for full data-localisation compliance [S16]. Because LedgerBridge’s licence evidence is missing in its current readiness record and its PSSP paperwork is due for renewal on 1 December 2026 (company record, self-reported), investors are likely to treat regulatory status as a gating diligence issue rather than a routine checklist item."
+       },
+       {
+        "heading": "Market and sizing",
+        "body": "Nigeria’s official January–June 2024 e-payment statistics provide the strongest public evidence of market scale: 22,419,710,555 transactions worth ₦1,558,905,734,175,560 [S29]. The reported mix included 11,638,142,074 internet-web transfers worth ₦825,500,108,736,661 [S29], 3,493,116,888 mobile-app transfers worth ₦159,419,658,081,137 [S29], 6,395,670,571 POS transactions worth ₦85,914,704,798,833.20 [S29], and 7,181,494,209 mobile-money-operator transactions worth ₦78,203,693,683,958.50 [S29]. These category figures should not be summed independently because the relationship between reporting categories and the total is not established in the supplied evidence.\n\nA top-down LedgerBridge market size cannot be responsibly calculated from the evidence. The public figures cover Nigerian e-payments broadly, whereas LedgerBridge targets payables, receivables and reconciliation for FMCG distributors and retailers (company record, self-reported). No public evidence supplied here gives the number of target distributors or retailers, their payment volume, LedgerBridge’s take rate, or the proportion of national payment activity attributable to FMCG distribution.\n\nA defensible bottom-up estimate requires: target distributor count by relevant FMCG sub-sector and geography; average active retailers per distributor; monthly payment volume and value per retailer; addressable share of those flows; expected revenue per transaction or account; and implementation and compliance costs. The arithmetic should be: addressable annual payment value = target distributors × active retailers per distributor × annual payment value per retailer × eligible-flow percentage; annual revenue = addressable payment value × net take rate plus recurring software fees. None of these inputs is available in the record, so a range would still be speculative."
+       },
+       {
+        "heading": "Customer segments",
+        "body": "LedgerBridge’s recorded customer focus is FMCG distributors and their retailers, using payables, receivables and reconciliation workflows (company record, self-reported). This is a narrower operating problem than the general payment-gateway market described by public sources, which includes switching, gateways and cross-border services [S6].\n\nThe likely strategic segment is therefore not ‘all Nigerian businesses’. It is distributors that need collection visibility, retailer-level reconciliation and controlled outbound payments across fragmented trade relationships. That focus could reduce direct comparison with broad gateways, but the evidence supplied does not establish LedgerBridge’s current customer count, geography, transaction volumes, retention, pricing or measured reconciliation savings.\n\nThe most important segmentation questions for the next 12 months are whether LedgerBridge sells primarily to distributors, retailers or both; whether it holds or merely orchestrates funds; whether customers require embedded credit; and whether distributors use LedgerBridge as a system of record or only as a payment initiation tool. These distinctions affect both licensing exposure and competitive overlap."
+       },
+       {
+        "heading": "Competitors and alternatives",
+        "body": "The sources identify a broad set of payment gateways, processors, business-fintech platforms and infrastructure providers. Public evidence is uneven: CBN licensing data is primary, while several scale and product figures are company or publisher claims and should not be treated as independently verified.\n\nName | What they offer | Where | Price or scale | Source\nPaystack | Payment gateway for startups and e-commerce; listed by CBN under switching and processing | Nigeria; CBN-listed entity | CareerBuddy claims 60,000+ businesses in Nigeria; not independently verified | [S13], [S3]\nFlutterwave | Payment processing and gateway services; listed by CBN under switching and processing | Nigeria and international markets | CareerBuddy claims support for 150+ currencies and $31B processed in 2024; not independently verified | [S13], [S3]\nMoniepoint business accounts | Business-fintech and account/payment services; public market coverage places it among major Nigerian operators | Nigeria | Reported $200M Series C; funding figure is secondary-source reporting | [S8]\nOPay | Large consumer and merchant payments network | Nigeria | Shareholder Opera is reported to imply approximately $3.1B valuation; secondary-source report | [S8]\nPalmPay | Large payments and fintech platform | Nigeria | Reported to be raising at a valuation above $1B; secondary-source report | [S8]\nInterswitch | Payment processing and gateway services | Nigeria | CBN lists Interswitch Limited under switching and processing; no comparable scale or price supplied | [S3], [S20]\nMonnify | Business payment gateway | Nigeria | No price or scale supplied in the evidence | [S20]\nSquad by GTCO | Business payment gateway | Nigeria | No price or scale supplied in the evidence | [S20]\neTranzact | Business payment gateway and payments services | Nigeria | No price or scale supplied in the evidence | [S20]\nRemita | Business payment gateway and payment services | Nigeria | No price or scale supplied in the evidence | [S20]\nFincra | Fiat and crypto payment rails through one integration | Nigeria and cross-border use cases | CareerBuddy claims $10B+ processed; company scale claim cited by a secondary publisher and not independently verified | [S13]\nNilos | Pay-ins, payouts, POBO, virtual accounts and FX for businesses and fintechs | Nigeria and cross-border use cases | Product capabilities are the company’s own claims; no price supplied | [S6]\nPlatnova | Identified as a leading B2B fintech business | Nigeria | No price or scale supplied | [S9]\nTradeDepot | Embedded B2B credit and distribution-related fintech activity | Nigeria | Identified in a 2026 B2B BNPL market report; no company-specific scale supplied | [S4]\nSabi | Embedded B2B credit and distribution-related fintech activity | Nigeria | Identified in a 2026 B2B BNPL market report; no company-specific scale supplied | [S4]\nPayPal/Paga | PayPal access through a reported partnership with Paga | Nigeria | No price or scale supplied; reported by a secondary source | [S19]"
+       },
+       {
+        "heading": "Our position",
+        "body": "LedgerBridge’s recorded strength is its specific workflow focus: payables, receivables and reconciliation for FMCG distributors and retailers (company record, self-reported). That focus gives it a potential basis for differentiation from broad gateways and payment processors, but the evidence does not show whether the product is materially better, cheaper or more embedded than alternatives.\n\nThe principal exposure is regulatory readiness. LedgerBridge’s record says licence evidence is missing and financials are self-reported (company record, self-reported). Its board also has a task to renew PSSP licence paperwork by 1 December 2026 (company record, self-reported). Aster Africa Ventures has specifically requested CBN licence status and distributor contracts after an NDA (company record, self-reported), indicating that these items are already material to the fundraising process.\n\nLedgerBridge may also face platform risk if larger operators bundle payments, accounts, merchant acceptance, reconciliation or credit. Moniepoint’s reported $200M Series C [S8], the scale claims associated with Paystack and Flutterwave [S13], and the reported concentration of supply around a handful of operators with cash-in and cash-out networks [S8] suggest that distribution and balance-sheet capacity could be difficult to match. The evidence does not establish direct product overlap with each named competitor, so the competitive conclusion should remain segment-specific rather than categorical."
+       },
+       {
+        "heading": "Regulatory implications",
+        "body": "**Licensing and scope.** CBN licensing categories described in the supplied research include switching and processing, mobile money operator, payment solution service provider, payment terminal service provider, super agent, payment service bank and digital microfinance bank [S2]. The CBN states that Payments System Supervision enforces rules and guidelines for payment-system safety and soundness [S11], promotes internal controls, transparency and accountability [S11], and conducts offsite and onsite supervision [S11].\n\nThe applicable category for LedgerBridge cannot be determined from the record. It depends on whether LedgerBridge initiates payments, operates wallets or accounts, acquires merchants, processes or switches transactions, uses agents, settles funds, or relies on a licensed partner. The company must confirm the exact licence holder, contractual structure, permitted activities, renewal status and responsibility allocation.\n\n**Data localisation.** The supplied research reports that payment participants must store and manage payment transaction data generated within Nigeria in Nigeria, with full compliance required by 1 January 2027 [S16]. It also describes coverage of transaction records, BVN data, card data, settlement records, payment instructions, authentication credentials and associated metadata [S16], including systems consuming payment data such as fraud models, analytics pipelines and risk-scoring engines [S16]. This creates a near-term architecture and vendor-governance workstream. The underlying source is not an official CBN publication in the supplied evidence, so LedgerBridge should verify the circular and its applicability directly through official CBN materials or counsel.\n\n**Governance and market conduct.** The reported 2026 circular is described as applying to deposit money banks, microfinance banks, mobile-money operators, switching and processing companies, payment-terminal and payment-solution service providers, super agents and other licensed operators [S16]. It is also reported to introduce market-share caps, ultimate-beneficial-owner disclosure and systemic-oversight measures [S16]. These points are material but rest on one secondary legal source and should not be treated as fully verified until the primary circular is obtained.\n\n**AML/KYC and controls.** A public compliance provider describes name screening, transaction monitoring, customer risk rating and fraud monitoring as AML capabilities [S28]. That demonstrates the control categories being marketed in the sector, not LedgerBridge’s compliance obligations or current capability. LedgerBridge should map customer onboarding, beneficial ownership, sanctions screening, suspicious-transaction escalation, fraud monitoring, record retention and audit responsibility across itself, distributors, retailers, banks and any licensed partners.\n\n**Multiple regulators.** Depending on activities, Nigerian fintechs may need to satisfy CBN, SEC and NDIC requirements simultaneously [S14]. The supplied evidence does not show that LedgerBridge undertakes securities, deposit-taking or credit activities, so no conclusion can be drawn that SEC or NDIC approvals are required. The business should obtain a written scope analysis tied to its actual product architecture and flow of funds."
+       },
+       {
+        "heading": "Recommendations and sequencing",
+        "body": "1. **Close the licensing evidence gap first.** By 4 November 2026, the Chief Executive Officer and external regulatory counsel should prepare a short operating-model memo and evidence pack covering licence category, licence holder, partner arrangements, permitted activities, renewal status, CBN correspondence, flow of funds, settlement accounts, distributor contracts and responsibility for KYC/AML, fraud, complaints and safeguarding. Complete the PSSP renewal paperwork by 1 December 2026 (company record, self-reported). The metric is a complete pack with no unresolved high-risk licensing question before the Aster Africa Ventures call.\n\n2. **Verify the 2026 circular and implement the 1 January 2027 data plan.** During November–December 2026, the Head of Engineering and Compliance Lead should obtain the primary CBN text, inventory every payment-data field and processing location, review cloud and analytics vendors, and document remediation. The metric is signed-off data lineage, vendor assessment and tested Nigerian-hosting or compliant-processing design before 1 January 2027, subject to confirmation of the primary rule.\n\n3. **Make the fundraising narrative segment-specific.** By December 2026, the Chief Commercial Officer should define LedgerBridge’s advantage for FMCG distributors and retailers in terms of measurable reconciliation accuracy, collection visibility, payment-control improvements or working-capital outcomes. The metric is a repeatable customer case study and pipeline qualification showing why a distributor needs LedgerBridge rather than a general gateway or business account.\n\n4. **Map direct and indirect competition by workflow.** In Q1 2027, Product and Commercial should test LedgerBridge against Paystack, Flutterwave, Moniepoint business accounts, Interswitch and relevant distribution-fintech alternatives across onboarding, collections, payables, reconciliation, settlement, integrations, support and pricing. The metric is a documented win/loss matrix based on at least 10 target-customer interviews; the number of interviews is a proposed operating target, not an evidence-backed market fact.\n\n5. **Create a compliance operating cadence.** By Q1 2027, Compliance and Operations should maintain a control register covering KYC, AML, sanctions, fraud, complaints, access control, incident response, audit evidence, partner oversight and licence renewals. The metric is monthly completion of all critical controls, with zero overdue high-risk actions. This recommendation reflects the CBN’s stated supervisory emphasis on internal controls, transparency, accountability and onsite/offsite supervision [S11].\n\n6. **Defer adjacent credit or wallet expansion unless scope is proven.** During the next 12 months, the board should not add lending, stored-value or agent-led activity without a separate licensing and capital assessment. The metric is a written go/no-go decision for each adjacent product before commercial launch. The reason is that the supplied evidence shows multiple licensing categories and separate paid-up capital and refundable escrow requirements [S2], while LedgerBridge’s current product architecture is not established in the record."
+       },
+       {
+        "heading": "Metrics to track",
+        "body": "- Licence status: licence category, holder, expiry, renewal milestone and unresolved regulator query; source should be LedgerBridge’s official documents and CBN records.\n- Regulatory readiness: percentage of critical controls evidenced, number of overdue high-risk actions, data fields mapped, vendors assessed and incidents closed.\n- Product-market fit: active distributors, active retailers, payment volume, payment value, reconciliation completion rate, exception rate, time to reconcile and retention; none of these figures is currently supplied.\n- Commercial quality: qualified distributor pipeline, conversion, implementation time, net revenue per customer, gross margin after payment and compliance costs, and concentration by distributor.\n- Competitive position: win rate against named alternatives, reasons for loss, feature adoption and switching or expansion rate.\n- Fundraising readiness: completion of the licence pack, distributor-contract pack, flow-of-funds diagram, customer references and evidence-backed unit economics before investor diligence."
+       },
+       {
+        "heading": "Risks and mitigations",
+        "body": "**Licence or scope mismatch.** LedgerBridge may be conducting activities outside its confirmed permission or relying on a partner without clear responsibility allocation. Mitigation: obtain counsel’s activity-by-activity mapping and complete the renewal and evidence pack before fundraising.\n\n**Data-localisation execution risk.** The reported 1 January 2027 deadline may require changes to hosting, analytics, fraud and risk systems [S16]. Mitigation: verify the primary rule, inventory data flows and test remediation before the deadline.\n\n**Competitive bundling.** Larger operators may combine payments, accounts, acceptance, distribution and credit. Evidence includes reported funding for Moniepoint [S8] and public descriptions of market concentration [S8]. Mitigation: defend a narrow FMCG workflow with measurable customer outcomes and integrations.\n\n**Partner dependency.** If LedgerBridge depends on a bank, processor or licensed payment partner, a change in pricing, risk appetite or access could interrupt service. The record does not state whether such dependencies exist. Mitigation: document partner obligations, service levels, contingency routing and termination rights.\n\n**Fundraising delay.** Aster Africa Ventures has already requested licence status and distributor contracts (company record, self-reported), while LedgerBridge reports missing licence evidence (company record, self-reported). Mitigation: treat regulatory evidence as the first financing workstream, not a later diligence response.\n\n**Unverified market and competitor claims.** Several public figures, including customer counts, processing volumes and valuations, come from secondary or company-claimed sources [S8], [S13]. Mitigation: use them as directional context only and verify counterparties, licences, contracts and customer references directly."
+       },
+       {
+        "heading": "Evidence gaps",
+        "body": "- LedgerBridge’s exact licence, licence holder, expiry, renewal submission and any CBN correspondence. Needed: licence certificate, CBN registry extract, renewal filing and counsel’s activity mapping.\n- LedgerBridge’s flow of funds, settlement accounts, safeguarding arrangements and partner contracts. Needed: architecture diagram, settlement agreement, bank/processor contracts and responsibility matrix.\n- Whether LedgerBridge uses agents, distributors, retailers, wallets, virtual accounts, merchant acquiring or credit. Needed: product specification, process maps and commercial contracts.\n- The primary text and applicability of the reported June 2026 CBN circular. Needed: official CBN circular or regulator confirmation, then legal applicability memo.\n- Current data-hosting and vendor locations, including analytics, fraud and risk systems. Needed: data inventory, processing register, cloud contracts and technical architecture.\n- LedgerBridge’s customer count, payment volume, revenue, take rate, retention, gross margin and reconciliation outcomes. Needed: transaction ledger, cohort analysis, contracts, invoices and management accounts; current financials are self-reported (company record, self-reported).\n- Direct overlap with Paystack, Flutterwave and Moniepoint business accounts. Needed: product tear-downs, current pricing sheets, customer interviews and win/loss evidence.\n- FMCG distributor and retailer market size. Needed: a defined target segment, distributor census or industry dataset, average account and transaction assumptions, and a bottom-up model.\n- Whether distributor activities create additional tax, consumer-protection, AML or data obligations. Needed: transaction-flow review with Nigerian regulatory and tax counsel.\n- Investor-specific evidence likely to be requested at the 4 November call. Needed: ask Aster Africa Ventures for its diligence checklist and prepare licence, contracts, compliance, customer and unit-economics materials against it."
+       }
+      ],
+      "topRecommendations": [
+       "Complete a documented licensing and operating-model assessment before the 4 November 2026 investor call, including the PSSP renewal due 1 December, licence holder or partner structure, flow of funds, settlement, KYC/AML ownership and distributor responsibilities; success is a complete evidence pack accepted by the board and usable in investor diligence.",
+       "Position LedgerBridge as the reconciliation and working-capital-control layer for FMCG distributors and retailers, with proof of workflow outcomes and integrations, rather than as another undifferentiated payments rail; success is qualified pipeline and retained usage attributable to this segment-specific proposition.",
+       "Build a 12-month regulatory delivery plan covering data localisation by 1 January 2027, beneficial-ownership and market-share obligations, transaction monitoring, internal controls and vendor oversight; success is on-time completion of each control, with no unresolved high-risk finding or licence interruption."
+      ],
+      "gaps": [
+       "LedgerBridge’s exact licence and renewal status are not verified.",
+       "The supplied regulatory evidence for the 2026 circular and 1 January 2027 localisation deadline is secondary rather than primary; the official text and applicability remain to be confirmed.",
+       "LedgerBridge’s flow of funds, partner structure, customer traction, pricing, unit economics, data architecture and direct competitor overlap are not in the record.",
+       "The public evidence does not support a LedgerBridge-specific TAM or market-share estimate.",
+       "Competitor product, pricing, scale and funding evidence is uneven and frequently based on secondary reporting or company claims."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "04151c663acb604eccfc23a5c166a900249900be4700d4a875f95c3385fa8fe3",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "AnalysisCritiqueResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 11219,
+     "outputTokens": 960,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 11730,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0033958,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 11730,
+      "usage": {
+       "inputTokens": 11219,
+       "outputTokens": 960,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0033958,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0173a34f270177f3016ae3d2f91ec887d28593770cc84821e2",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:13:08.449Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "passes": false,
+      "score": 68,
+      "issues": [
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Competitors and alternatives",
+        "problem": "The table introduces TradeDepot and Sabi with citations to [S4], but no [S4] evidence is present in the supplied research.",
+        "fix": "Remove TradeDepot and Sabi or cite evidence that actually appears in the research; do not imply their activities or relevance without support."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Competitors and alternatives",
+        "problem": "The table describes Paystack, Flutterwave and other providers' products and markets more specifically than the cited evidence supports, particularly Flutterwave's gateway services and Interswitch, Monnify, Squad, eTranzact and Remita offerings.",
+        "fix": "Limit each entry to the exact supported claim, label broader descriptions as unverified, or obtain primary product and licence evidence."
+       },
+       {
+        "kind": "CONTRADICTION",
+        "section": "Regulatory implications / Recommendations",
+        "problem": "The document says the applicable licence category cannot be determined and the 1 January 2027 localisation rule is unverified, but recommendations treat the PSSP renewal and localisation deadline as established deliverables.",
+        "fix": "Make both conditional: verify LedgerBridge's actual licence and the primary rule first, then set deadlines; do not state completion of a renewal unless the record confirms it occurred."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Regulatory implications / Risks and mitigations",
+        "problem": "The analysis does not adequately address the specific risk that distributor and retailer activities may create consumer-protection, tax, AML/KYC or additional licensing obligations, despite the brief identifying this as a central research question.",
+        "fix": "Add a distinct risk and 12-month workstream covering distributor/retailer role classification, customer and merchant responsibility, complaints, tax treatment, safeguarding and AML/KYC allocation."
+       },
+       {
+        "kind": "MISSING_SECTION",
+        "section": "Regulatory implications",
+        "problem": "The request asks for applicable regulation, but the document mainly repeats a secondary report and does not cover the broader relevant regulatory areas with sufficient specificity, including data protection, AML framework, consumer protection and tax.",
+        "fix": "Separate verified rules from open legal questions and cover each relevant regime, naming the authority and the business activity that triggers it; where evidence is absent, state that it remains unknown."
+       },
+       {
+        "kind": "WEAK_SIZING",
+        "section": "Market and sizing",
+        "problem": "The section correctly refuses to calculate TAM, but it does not provide a usable market-sizing framework tied to a defined FMCG segment, geography, period or scenario assumptions.",
+        "fix": "Retain the explicit unknown conclusion, then specify a bounded bottom-up model with clearly labelled assumptions and an evidence plan; do not present national payment volume as a proxy for LedgerBridge's market."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Metrics to track",
+        "problem": "Several proposed metrics, such as retention, gross margin, win rate and customer references, are generic and are not prioritised against the immediate licensing and Aster diligence decision.",
+        "fix": "Rank metrics by the next-12-month decision sequence: licence status and renewal, regulatory scope, localisation readiness, distributor-contract coverage, proof of workflow value and fundraising readiness."
+       },
+       {
+        "kind": "UNCLEAR_CONCLUSION",
+        "section": "Top recommendations",
+        "problem": "The final recommendations are truncated with ellipses, leaving success criteria and the conclusion incomplete.",
+        "fix": "Replace the truncated text with complete recommendations and explicit outcomes, owners and dates, or remove the duplicated summary section."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Recommendations and sequencing",
+        "problem": "Assigning specific owners such as Chief Executive Officer, external regulatory counsel, Head of Engineering and Compliance Lead assumes an organisational structure not contained in the record.",
+        "fix": "Use role placeholders only if confirmed, or state that ownership must be assigned by LedgerBridge; distinguish proposed owners from known company roles."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Risks and mitigations",
+        "problem": "The document does not sufficiently discuss the fundraising risk created by relying on self-reported financials and unverified competitor claims when Aster has already requested diligence materials.",
+        "fix": "Add a financing-readiness risk covering evidence quality, reconciliation of management accounts to source records, customer references and a clear separation between company claims and verified evidence."
+       }
+      ],
+      "strengths": [
+       "It correctly identifies licensing evidence, flow-of-funds analysis and compliance responsibility as the immediate gating issues for LedgerBridge and the Aster Africa Ventures process.",
+       "It appropriately avoids converting national Nigerian payment volumes into a LedgerBridge TAM and explicitly states that the relevant inputs are unknown.",
+       "The recommendations are generally sequenced around the 4 November investor call, the 1 December PSSP paperwork date and the reported 1 January 2027 localisation deadline, while often flagging the need for primary-source verification."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "22875d91500fe50de856cb2947d56c568699dfe5aadff271037c5106eec57f87",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "AnalysisDocumentResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 14622,
+     "outputTokens": 4539,
+     "cachedInputTokens": 1428
+    },
+    "latencyMs": 36445,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00811416,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 36445,
+      "usage": {
+       "inputTokens": 14622,
+       "outputTokens": 4539,
+       "cachedInputTokens": 1428
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00811416,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_06a2c3d9d009d76d016ae3d304e23887d2b4ec33ecd47ed3a3",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:13:44.898Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "title": "LedgerBridge: Nigerian B2B Payments Competitive and Regulatory Outlook — Next 12 Months",
+      "summary": "LedgerBridge operates in a large, competitive Nigerian payments market, but the immediate determinant of fundraising readiness is not market size; it is proving the company’s licence scope, flow of funds, compliance allocation and distributor model. The evidence supports a focused strategy around FMCG distributor and retailer reconciliation, but the reported 2027 localisation requirement and June 2026 CBN circular must be verified from primary sources before being treated as committed obligations.",
+      "sections": [
+       {
+        "heading": "Executive summary",
+        "body": "Nigeria recorded 22,419,710,555 e-payment transactions valued at ₦1,558,905,734,175,560 during January–June 2024 [S29]. This demonstrates payment-system scale, not LedgerBridge’s addressable market or achievable share. Competition includes CBN-listed switching and processing organisations, business-payment gateways and larger fintech platforms; the CBN lists 19 organisations under switching and processing and 17 under mobile money operator licences [S3].\n\nLedgerBridge’s strongest recorded strategic position is its focus on payables, receivables and reconciliation for FMCG distributors and retailers (company record, self-reported). Its most material weakness is evidence readiness: the company record says licence evidence is missing and financials are self-reported (company record, self-reported), while Aster Africa Ventures has requested CBN licence status and distributor contracts (company record, self-reported). The next 12 months should therefore prioritise regulatory verification and investor evidence before broad product expansion."
+       },
+       {
+        "heading": "Market and sizing",
+        "body": "Official CBN data recorded 22,419,710,555 Nigerian e-payment transactions worth ₦1,558,905,734,175,560 in January–June 2024 [S29]. Internet-web transfers accounted for 11,638,142,074 transactions worth ₦825,500,108,736,661 over the same period [S29]; mobile-app transfers, excluding mobile money, accounted for 3,493,116,888 transactions worth ₦159,419,658,081,137 [S29]; POS transactions accounted for 6,395,670,571 transactions worth ₦85,914,704,798,833.20 [S29]. These categories should not be summed independently because the supplied evidence does not establish whether reporting categories overlap.\n\nA defensible LedgerBridge TAM cannot be calculated from the available evidence. The national figures cover all e-payments, while LedgerBridge targets FMCG distributors and retailers (company record, self-reported). The record does not provide the number of target distributors, retailer density, eligible payment flows, LedgerBridge’s pricing or current transaction value.\n\nThe appropriate bottom-up model is: eligible annual payment value = target distributors × active retailers per distributor × annual payment value per retailer × eligible-flow percentage; annual revenue = eligible payment value × net take rate plus recurring software fees. To make this usable, LedgerBridge should define a geographic scope, FMCG sub-segments and 12-month period, then obtain distributor counts, retailer counts, payment-flow data and observed pricing. Until those inputs are available, national payment volume should remain market context rather than a LedgerBridge valuation or revenue proxy."
+       },
+       {
+        "heading": "Customer segments",
+        "body": "LedgerBridge’s recorded customer segment is FMCG distributors and their retailers, with payables, receivables and reconciliation as the stated use case (company record, self-reported). This is narrower than the broader Nigerian payments market, which includes switching, payment gateways and cross-border services [S6].\n\nThe strategic question is whether LedgerBridge is primarily a distributor operating system, a retailer collections tool, or a payment-orchestration layer. The answer affects direct competitor overlap, licence scope, data obligations and the value proposition. The record does not establish customer count, geography, pricing, payment volume, retention or measured reconciliation benefits."
+       },
+       {
+        "heading": "Competitors and alternatives",
+        "body": "Public evidence is uneven. CBN licensing information is primary; several product, scale and funding statements are secondary reporting or company claims and are labelled accordingly.\n\nName | What they offer | Where | Scale or funding | Source\nPaystack | Described by a secondary publisher as a payment gateway for startups and e-commerce; CBN lists Paystack Payment Limited under switching and processing | Nigeria; CBN-listed entity | CareerBuddy claims 60,000+ businesses in Nigeria; not independently verified | [S13], [S3]\nFlutterwave | CBN lists Flutterwave Technology Solutions Limited under switching and processing | Nigeria; CBN-listed entity | CareerBuddy claims support for 150+ currencies and $31B processed in 2024; not independently verified | [S3], [S13]\nMoniepoint business accounts | Identified in secondary market coverage as a major Nigerian business-fintech operator | Nigeria | Reported $200M Series C; secondary-source report | [S8]\nOPay | Identified in secondary market coverage as a major Nigerian payments operator | Nigeria | Shareholder Opera is reported to imply approximately $3.1B valuation; secondary-source report | [S8]\nPalmPay | Identified in secondary market coverage as a major Nigerian payments operator | Nigeria | Reported to be raising at a valuation above $1B; secondary-source report | [S8]\nInterswitch | CBN lists Interswitch Limited under switching and processing; a secondary gateway list includes it among Nigerian business-payment providers | Nigeria; CBN-listed entity | No comparable scale or price supplied | [S3], [S20]\nMonnify | Included in a secondary list of Nigerian business payment gateways | Nigeria | No price or scale supplied | [S20]\nSquad by GTCO | Included in a secondary list of Nigerian business payment gateways | Nigeria | No price or scale supplied | [S20]\neTranzact | Included in a secondary list of Nigerian business payment gateways | Nigeria | No price or scale supplied | [S20]\nRemita | Included in a secondary list of Nigerian business payment gateways | Nigeria | No price or scale supplied | [S20]\nFincra | CareerBuddy describes it as offering fiat and crypto rails through one integration | Nigeria and cross-border use cases | CareerBuddy claims $10B+ processed; not independently verified | [S13]\nNilos | Its own market guide presents pay-ins, payouts, POBO, virtual accounts and FX as capabilities for businesses and fintechs | Nigeria and cross-border use cases | No price supplied; capabilities are company claims | [S6]\nPlatnova | TechCabal identifies it among the top ten B2B fintech businesses in Nigeria in 2026 | Nigeria | No price or scale supplied | [S9]\nPayPal/Paga | Cleva reports a PayPal return to Nigeria through a partnership with Paga | Nigeria | No price or scale supplied; secondary report | [S19]"
+       },
+       {
+        "heading": "Our position",
+        "body": "LedgerBridge’s recorded strength is a defined workflow focus: payables, receivables and reconciliation for FMCG distributors and retailers (company record, self-reported). That focus may create differentiation from broad payment gateways and general business accounts, but the evidence does not establish superior functionality, pricing, retention or customer outcomes.\n\nThe principal exposure is regulatory and diligence readiness. LedgerBridge’s record says licence evidence is missing and financials are self-reported (company record, self-reported). A board card states “Renew PSSP licence paperwork” with a 1 December 2026 due date (company record, self-reported); this does not establish that a PSSP licence is held, that renewal is required, or that renewal has been completed. Aster Africa Ventures’ request for CBN licence status and distributor contracts makes these issues immediate fundraising gates (company record, self-reported).\n\nLarger operators may have greater distribution, funding and ability to bundle payment, account, acceptance or credit services. Moniepoint’s reported $200M Series C and wider reports of consolidation around a handful of operators are secondary evidence [S8]. Direct overlap with LedgerBridge is not established and should be tested by workflow rather than assumed from brand category."
+       },
+       {
+        "heading": "Regulatory implications",
+        "body": "**Licence scope and authority.** The CBN licensing categories reported in the research include switching and processing, mobile money operator, payment solution service provider, payment terminal service provider, super agent, payment service bank and digital microfinance bank [S2]. The CBN states that Payments System Supervision enforces payment-system rules, promotes internal controls, transparency and accountability, and conducts onsite and offsite supervision [S11].\n\nLedgerBridge’s applicable category cannot be determined from the record. It depends on whether the company initiates or processes payments, holds or controls funds, operates wallets or accounts, acquires merchants, uses agents, settles transactions or relies on a licensed partner. The first regulatory task is therefore to obtain the exact licence certificate or partner arrangement and map every product activity to the relevant permission.\n\n**Payment-data localisation and reported 2026 circular.** A secondary legal source reports that a CBN circular dated 15 June 2026 applies to banks and licensed payment operators and addresses market-share caps, ultimate-beneficial-owner disclosure, systemic oversight and payment-data localisation [S16]. The same source reports that full localisation compliance is required by 1 January 2027 and may cover transaction records, BVN data, card data, settlement records, payment instructions, authentication credentials, metadata and systems consuming payment data [S16]. Because the supplied evidence is not the primary CBN circular, LedgerBridge should treat these as reported requirements pending direct verification. No renewal or localisation deadline should be treated as completed or binding solely on this evidence.\n\n**AML/KYC and financial crime controls.** A compliance provider describes name screening, transaction monitoring, customer risk rating and fraud monitoring as AML capabilities [S28]. This does not prove LedgerBridge’s obligations or current controls. LedgerBridge needs an activity-based allocation of customer identification, beneficial-owner checks, sanctions screening, suspicious-activity escalation, transaction monitoring, fraud monitoring, record retention and audit responsibility across LedgerBridge, distributors, retailers, banks and payment partners.\n\n**Distributor and retailer obligations.** The record does not establish whether distributors and retailers are customers, agents, merchants, beneficiaries, payment intermediaries or parties that receive funds. That classification may affect licensing, AML/KYC ownership, complaints handling, safeguarding, consumer-protection responsibilities, data processing and tax treatment. This is a distinct 12-month workstream, not an assumption that distributor contracts alone resolve the issue.\n\n**Data protection.** The supplied research discusses payment-data localisation but does not establish the full application of Nigeria’s data-protection regime to LedgerBridge. LedgerBridge should obtain a product-specific assessment covering controller/processor roles, lawful basis, privacy notices, cross-border transfers, retention, security, breach response and vendor processing. The relevant authority and filing obligations should be confirmed against the actual architecture.\n\n**Consumer protection and complaints.** The evidence does not specify which consumer-protection rules apply to LedgerBridge’s distributor and retailer model. The company should determine who bears responsibility for failed payments, unauthorised transactions, refunds, complaints, disclosures and service outages, and document escalation obligations in customer and partner contracts.\n\n**Tax.** No supplied source establishes LedgerBridge’s tax treatment. A Nigerian tax adviser should review payment fees, software fees, withholding, VAT, settlement flows, distributor commissions and any agency or principal relationship. This cannot be inferred from the product description.\n\n**Other regulators.** Secondary legal commentary states that fintechs may need to satisfy CBN, SEC and NDIC requirements depending on their activities [S14]. The record does not establish that LedgerBridge undertakes securities, deposit-taking or lending activities. Those regulatory implications remain conditional on the operating model."
+       },
+       {
+        "heading": "Recommendations and sequencing",
+        "body": "1. **Build the regulatory evidence pack before the Aster call.** By 4 November 2026, LedgerBridge should assign an internal owner and, if needed, external Nigerian regulatory counsel to prepare the licence certificate or partner licence, licence holder, permitted activities, expiry and renewal status, flow-of-funds diagram, settlement arrangements, CBN correspondence, distributor contracts and responsibility matrix. The 1 December PSSP paperwork date should be treated as a company-record deadline to verify, not evidence that renewal is required or complete. Success metric: every high-risk licensing question has an attached primary document or a named unresolved item before the call.\n\n2. **Verify the reported CBN circular before committing to localisation or other deadlines.** In November–December 2026, obtain the primary circular or regulator confirmation, then inventory payment data, cloud locations, analytics, fraud systems, vendors and cross-border access. If the reported 1 January 2027 requirement applies, approve and test the remediation plan before that date. Success metric: a signed applicability memo, complete data lineage and documented remediation status; no claim of compliance until tested evidence exists.\n\n3. **Classify the distributor and retailer model.** By December 2026, document whether each party is a customer, merchant, agent, beneficiary, payment intermediary or service provider, and allocate KYC/AML, complaints, safeguarding, data and tax responsibilities. Proposed owner: the person LedgerBridge assigns to regulatory/compliance operations. Success metric: executed contract templates and a responsibility matrix covering every participant and payment flow.\n\n4. **Position the company around measurable FMCG workflow value.** By Q1 2027, define the narrowest defensible proposition for distributors and retailers—such as reconciliation accuracy, exception reduction, collection visibility or payment control—and support it with customer records. Proposed owner: the person LedgerBridge assigns to commercial and product strategy. Success metric: evidence-backed customer case studies and a quantified comparison against a gateway or business-account alternative.\n\n5. **Run a workflow-based competitor test.** In Q1 2027, compare LedgerBridge with Paystack, Flutterwave, Moniepoint business accounts and other relevant providers across onboarding, collections, payables, reconciliation, settlement, integrations, support and pricing. Use customer interviews and current provider materials rather than unsupported assumptions. Proposed owner: the person LedgerBridge assigns to product/commercial analysis. Success metric: a documented win/loss matrix and a verified list of reasons target customers choose or reject LedgerBridge.\n\n6. **Defer new regulated activities until scope is cleared.** Over the next 12 months, do not add stored value, wallet, agent-led or credit functionality without a separate written licensing, capital, AML, safeguarding and consumer-protection assessment. The reported licensing framework includes paid-up capital and a distinct refundable escrow requirement [S2]. Success metric: a documented go/no-go decision before each adjacent product launch."
+       },
+       {
+        "heading": "Metrics to track",
+        "body": "Ranked for the immediate regulatory and fundraising sequence:\n\n1. **Licence evidence:** licence category, holder, permitted activities, expiry, renewal submission, regulator correspondence and unresolved scope questions. This is the first metric because Aster has requested licence status and current evidence is missing (company record, self-reported).\n2. **Regulatory-scope completion:** percentage of payment flows classified; distributor and retailer roles documented; KYC/AML, complaints, safeguarding, tax and data responsibilities assigned.\n3. **Localisation readiness, conditional on verification:** percentage of payment-data fields inventoried, vendors assessed, systems mapped and remediation tests completed. Do not label the business compliant until the primary rule and testing support that conclusion.\n4. **Fundraising evidence readiness:** completed licence pack, distributor-contract pack, flow-of-funds diagram, reconciled management accounts, customer references and source-linked unit-economics schedule before the 4 November call and subsequent diligence.\n5. **Workflow proof:** reconciliation completion rate, exception rate, time to reconcile, payment value and active distributors/retailers. These figures are not in the current record and must be sourced from company systems.\n6. **Competitive proof:** verified win/loss reasons, feature adoption, customer switching or expansion and price objections against named alternatives.\n7. **Financial quality:** management accounts reconciled to bank, processor and transaction records; revenue recognition, payment costs, compliance costs and gross margin documented. Current financials are self-reported (company record, self-reported)."
+       },
+       {
+        "heading": "Risks and mitigations",
+        "body": "**Licence or scope mismatch.** LedgerBridge may hold a different licence than assumed, rely on a partner, or conduct activities requiring additional permission. Mitigation: obtain primary licence evidence and complete activity-by-activity mapping before fundraising claims are made.\n\n**Unverified localisation and circular requirements.** The reported June 2026 circular and 1 January 2027 deadline come from one secondary source [S16]. Mitigation: obtain the primary CBN text and document applicability before setting final delivery commitments.\n\n**Distributor and retailer classification risk.** The operating model may create additional licensing, AML/KYC, consumer-protection, safeguarding, data or tax obligations depending on whether participants act as agents, merchants, beneficiaries or intermediaries. Mitigation: complete role classification, contract review and responsibility mapping before scaling the network.\n\n**Competitive bundling.** Larger operators may combine payments, accounts, distribution and credit. Moniepoint’s reported $200M Series C and secondary reports of market concentration indicate potential scale asymmetry [S8]. Mitigation: focus on measurable FMCG reconciliation outcomes and integrations rather than undifferentiated payment access.\n\n**Partner dependency.** If LedgerBridge relies on a bank, processor or licensed partner, changes to pricing, risk appetite or access could interrupt service. The record does not establish whether such dependency exists. Mitigation: review partner contracts, service levels, settlement rights, audit access, contingency routing and termination provisions.\n\n**Fundraising evidence quality.** Aster has requested licence status and distributor contracts while LedgerBridge reports missing licence evidence; financials are also self-reported (company record, self-reported). Mitigation: reconcile management accounts to bank, processor and transaction records; provide executed contracts, customer references and a clear separation between company claims and independently verified evidence.\n\n**Unverified competitor claims.** Public customer counts, processing volumes, valuations and funding figures rely in several cases on secondary reporting or company claims [S8], [S13]. Mitigation: use them directionally only and verify competitor pricing, licences and product overlap through primary materials or customer research."
+       },
+       {
+        "heading": "Evidence gaps",
+        "body": "- Exact LedgerBridge licence, licence holder, permitted activities, expiry, renewal submission and regulator correspondence. Request the licence certificate, CBN registry evidence and renewal filing; confirm with Nigerian regulatory counsel.\n- LedgerBridge’s flow of funds, settlement accounts, safeguarding arrangements and partner structure. Request an architecture diagram, bank/processor agreements and a responsibility matrix.\n- Whether LedgerBridge uses agents, wallets, virtual accounts, merchant acquiring, distributors as intermediaries or credit. Request product specifications, process maps and executed contracts.\n- Primary text and applicability of the reported June 2026 CBN circular. Obtain the official CBN publication or regulator confirmation and obtain a written applicability memo.\n- Current hosting and processing locations for transaction, identity, card, settlement, authentication, analytics, fraud and risk data. Request a data inventory, vendor register, cloud contracts and architecture diagrams.\n- Distributor and retailer obligations. Obtain counsel’s written assessment covering licensing, AML/KYC, complaints, safeguarding, consumer protection, data roles and tax treatment.\n- Customer count, transaction volume, revenue, pricing, retention, gross margin and reconciliation outcomes. Request processor statements, transaction ledgers, invoices, contracts, cohort analysis and management accounts; current financials are self-reported (company record, self-reported).\n- Direct overlap with Paystack, Flutterwave, Moniepoint business accounts and other relevant providers. Obtain current product and pricing materials and conduct structured customer interviews.\n- FMCG segment size. Define the target geography and sub-segments, then obtain distributor and retailer counts, average account sizes, payment flows and observed pricing for a bottom-up model.\n- Aster Africa Ventures’ diligence checklist. Ask Aster for the checklist before or during the 4 November 2026 call and map each requested item to an evidence owner and document."
+       }
+      ],
+      "topRecommendations": [
+       "Before the 4 November 2026 Aster Africa Ventures call, assemble primary evidence for LedgerBridge’s licence scope, holder or partner structure, flow of funds, settlement, distributor contracts and compliance responsibilities; treat the 1 December PSSP item as a company-record deadline requiring verification, not as proof that renewal is complete.",
+       "Verify the primary CBN source and applicability of the reported June 2026 circular before committing to a 1 January 2027 localisation or other regulatory deadline; in parallel, classify distributor and retailer roles and allocate AML/KYC, complaints, safeguarding, data and tax responsibilities.",
+       "Defend the next 12 months around measurable FMCG distributor and retailer reconciliation value, supported by reconciled financials, customer evidence and workflow-based competitor comparisons, rather than broad claims about the Nigerian payments market."
+      ],
+      "gaps": [
+       "LedgerBridge’s exact licence, renewal status, licence holder or partner structure and permitted activities are not verified.",
+       "The primary CBN text and applicability of the reported June 2026 circular and 1 January 2027 localisation deadline are not present in the supplied evidence.",
+       "LedgerBridge’s flow of funds, settlement, data architecture, distributor and retailer roles, customer traction, pricing, unit economics and direct competitor overlap are unknown.",
+       "The supplied evidence does not support a LedgerBridge-specific TAM or market-share estimate.",
+       "The regulatory treatment of LedgerBridge’s distributor and retailer activities under licensing, AML/KYC, consumer protection, data and tax regimes requires a product-specific legal assessment.",
+       "Competitor product, pricing, scale and funding evidence is uneven and often based on secondary reporting or company claims."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "a16a790f6574b2d02d888107b95f6ed90d5bdc12d4a65b2c9e8e2aa1c657d35d",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "AnalysisCritiqueResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 11238,
+     "outputTokens": 824,
+     "cachedInputTokens": 1454
+    },
+    "latencyMs": 10049,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00297468,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 10050,
+      "usage": {
+       "inputTokens": 11238,
+       "outputTokens": 824,
+       "cachedInputTokens": 1454
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00297468,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0f62f8e8c8a97bb1016ae3d3294aec87d2a82d9d569fabe0f8",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:13:54.954Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "passes": false,
+      "score": 72,
+      "issues": [
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Regulatory implications — Payment-data localisation and reported 2026 circular",
+        "problem": "It repeats detailed scope claims about the circular, including systems consuming payment data and specific data categories, from a single secondary source without showing that the source actually supports each detail or that the rule remains current and applicable.",
+        "fix": "Reduce this to a clearly attributed reported claim, identify each element as unverified, and do not state the detailed scope as an implication until the primary CBN text and applicability are confirmed."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Competitors and alternatives",
+        "problem": "Several entries present providers as relevant competitors or alternatives without evidence of overlap with LedgerBridge’s FMCG distributor-retailer workflow, including OPay, PalmPay, Fincra, Nilos, Platnova and PayPal/Paga.",
+        "fix": "Separate direct competitors, adjacent infrastructure providers and general market participants; retain a provider only where the evidence establishes relevant product overlap, otherwise label the relationship as unknown and explain the required comparison."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Risks and mitigations",
+        "problem": "The analysis does not sufficiently address the risk that the cited market, competitor and regulatory sources are stale or unreliable, despite the research containing numerous single-source secondary claims and future-dated material.",
+        "fix": "Add source-quality and staleness risk, especially for the 2026 circular, licensing categories, competitor funding, market concentration and product claims; specify primary-source verification as the mitigation."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Regulatory implications — Data protection, Consumer protection and Tax",
+        "problem": "These sections provide broadly applicable legal checklists but do not tie specific obligations to any established LedgerBridge activity because the architecture and participant roles are unknown.",
+        "fix": "Keep the conditional framing but shorten the generic checklists and link each potential obligation to a concrete unknown in LedgerBridge’s flow of funds, data architecture or contracts."
+       },
+       {
+        "kind": "WEAK_SIZING",
+        "section": "Market and sizing",
+        "problem": "The bottom-up model is directionally appropriate but provides no explicit scenario assumptions, decision-useful sizing range or clear distinction between TAM, SAM and near-term obtainable market.",
+        "fix": "Do not invent figures; label the market size as unknown and specify the exact inputs and scenario assumptions required to calculate TAM, SAM and a 12-month serviceable opportunity."
+       },
+       {
+        "kind": "MISSING_SECTION",
+        "section": "Recommendations and sequencing",
+        "problem": "The recommendations include owners only as placeholders such as “the person LedgerBridge assigns,” so they do not provide actionable accountable ownership as requested by the plan-like structure.",
+        "fix": "Assign roles rather than unnamed people, for example founder/CEO, compliance lead, counsel, product lead and finance lead, while noting that named individuals remain unknown."
+       },
+       {
+        "kind": "UNCLEAR_CONCLUSION",
+        "section": "Top recommendations",
+        "problem": "The first top recommendation ends with an ellipsis (“requiring…”), leaving the final conclusion incomplete and weakening the document’s decision usefulness.",
+        "fix": "Complete the recommendation and ensure the three top recommendations exactly reflect the fully specified actions, owners, deadlines and dependencies above."
+       },
+       {
+        "kind": "CONTRADICTION",
+        "section": "Executive summary and Regulatory implications",
+        "problem": "The executive summary says the 2027 localisation requirement and June 2026 circular must be verified before being treated as committed obligations, but later language describes the circular’s reported scope and deadline in a way that may read as an operational requirement.",
+        "fix": "Use consistently conditional language throughout, distinguishing “reported by [S16]” from “confirmed regulatory obligation,” including in metrics and recommendations."
+       }
+      ],
+      "strengths": [
+       "It correctly avoids converting national payment volumes into LedgerBridge TAM or traction and explicitly keeps a LedgerBridge-specific market size unknown.",
+       "It identifies licensing evidence, flow of funds, distributor contracts and compliance allocation as the immediate fundraising issues, directly tied to Aster’s request and the 4 November call.",
+       "It distinguishes company-record claims and secondary research from verified evidence and includes useful conditional sequencing around licence scope, data localisation and participant classification."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "38fb68072115d6c5b5d645361c2b6f0a44d6ccd30548aa7676a94c6e95f76b0f",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "AnalysisDocumentResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 14529,
+     "outputTokens": 4274,
+     "cachedInputTokens": 14526
+    },
+    "latencyMs": 32656,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00541992,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "TRANSIENT",
+      "latencyMs": 9154,
+      "candidateIndex": 0
+     },
+     {
+      "attempt": 2,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 32656,
+      "usage": {
+       "inputTokens": 14529,
+       "outputTokens": 4274,
+       "cachedInputTokens": 14526
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00541992,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0d9b0ca0c22cbace016ae3d33d394487d287ea952d63b822c2",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:14:37.118Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "title": "LedgerBridge: Nigerian B2B Payments Competitive and Regulatory Outlook — Next 12 Months",
+      "summary": "LedgerBridge operates in a large but crowded Nigerian payments market. Its recorded focus on payables, receivables and reconciliation for FMCG distributors and retailers could provide a defensible niche, but the immediate constraint on both operations and fundraising is evidence readiness: licence scope, flow of funds, partner responsibilities, distributor contracts and financial records are not yet verified. The next 12 months should prioritise regulatory verification and fundraising evidence before expansion.",
+      "sections": [
+       {
+        "heading": "Executive summary",
+        "body": "Nigeria recorded 22,419,710,555 e-payment transactions valued at ₦1,558,905,734,175,560 during January–June 2024 [S29]. This establishes payment-system scale, not LedgerBridge’s addressable market or achievable share. The CBN lists 19 organisations under switching and processing and 17 under mobile money operator licences [S3], while secondary sources describe a highly competitive business-fintech market [S9].\n\nLedgerBridge’s recorded strength is its defined FMCG distributor-retailer workflow: payables, receivables and reconciliation (company record, self-reported). Its main weakness is diligence readiness: licence evidence is missing and financials are self-reported (company record, self-reported). Aster Africa Ventures has specifically requested CBN licence status and distributor contracts (company record, self-reported), making these near-term fundraising gates.\n\nThe reported June 2026 CBN circular and 1 January 2027 payment-data localisation deadline come from a single secondary source [S16]. They should remain conditional until the primary CBN text and applicability to LedgerBridge are confirmed. The preferred strategy is to verify regulatory scope first, prove measurable workflow value second, and defer new regulated activities until both are complete."
+       },
+       {
+        "heading": "Market and sizing",
+        "body": "Official CBN data recorded 22,419,710,555 Nigerian e-payment transactions worth ₦1,558,905,734,175,560 from January to June 2024 [S29]. Internet-web transfers accounted for 11,638,142,074 transactions worth ₦825,500,108,736,661 over the same period [S29]; mobile-app transfers excluding mobile money accounted for 3,493,116,888 transactions worth ₦159,419,658,081,137 [S29]; POS transactions accounted for 6,395,670,571 transactions worth ₦85,914,704,798,833.20 [S29]. These categories should not be added independently because the supplied evidence does not establish whether they overlap.\n\nThe evidence does not support a LedgerBridge-specific TAM, SAM or 12-month obtainable-market figure. The national statistics cover all e-payments, whereas LedgerBridge targets FMCG distributors and retailers (company record, self-reported). Missing inputs include the number of target distributors, active retailers per distributor, eligible payment flows, annual payment value, geographic scope, pricing, take rate and software-fee structure.\n\nThe required bottom-up model is:\n- TAM payment value = all eligible Nigerian FMCG distributor-retailer payment flows.\n- SAM payment value = TAM limited to LedgerBridge’s geography, customer type, product capabilities and licensed activity.\n- 12-month obtainable revenue = target accounts × active retailers per account × eligible annual payment value per retailer × expected penetration × net take rate, plus recurring software fees.\n\nLedgerBridge should build low, base and high cases using observed distributor counts, retailer counts, payment values, penetration, pricing and churn. Until those inputs are obtained, national transaction volume is market context only, not a revenue or valuation proxy."
+       },
+       {
+        "heading": "Customer segments",
+        "body": "LedgerBridge’s recorded customer segment is FMCG distributors and their retailers, with payables, receivables and reconciliation as the stated use case (company record, self-reported). The public evidence describes a broader market spanning switching companies, payment gateways and cross-border services [S6].\n\nThe key unresolved positioning question is whether LedgerBridge is primarily a distributor operating system, a retailer collections tool or a payment-orchestration layer. That distinction affects competitor overlap, licensing, data responsibilities and pricing. The record does not establish customer count, geography, pricing, payment volume, retention or measured reconciliation benefits."
+       },
+       {
+        "heading": "Competitors and alternatives",
+        "body": "Direct overlap with LedgerBridge’s FMCG distributor-retailer workflow is not established for most named providers. The table therefore separates likely workflow competitors from adjacent infrastructure and broader market participants. A direct comparison requires current product, pricing, integration, settlement and customer-use evidence.\n\nName | What they offer | Where | Scale or funding | Source\nPaystack | Secondary coverage describes a payment gateway for startups and e-commerce; CBN lists Paystack Payment Limited under switching and processing. Direct overlap with LedgerBridge’s reconciliation workflow is unknown. | Nigeria; CBN-listed entity | CareerBuddy claims 60,000+ businesses in Nigeria; not independently verified | [S13], [S3]\nFlutterwave | CBN lists Flutterwave Technology Solutions Limited under switching and processing. Direct overlap with LedgerBridge’s distributor-retailer workflow is unknown. | Nigeria; CBN-listed entity | CareerBuddy claims support for 150+ currencies and $31B processed in 2024; not independently verified | [S3], [S13]\nMoniepoint business accounts | Identified in secondary market coverage as a major business-fintech operator. Whether its business-account functionality replaces LedgerBridge’s payables, receivables and reconciliation workflow is unknown. | Nigeria | Reported $200M Series C; secondary-source report | [S8]\nInterswitch | CBN-listed switching and processing provider and included in a secondary list of Nigerian business-payment providers. Its direct FMCG workflow overlap is unknown. | Nigeria; CBN-listed entity | No comparable scale or price supplied | [S3], [S20]\nMonnify | Included in a secondary list of Nigerian business-payment gateways. Product overlap with LedgerBridge is unknown. | Nigeria | No price or scale supplied | [S20]\nSquad by GTCO | Included in a secondary list of Nigerian business-payment gateways. Product overlap with LedgerBridge is unknown. | Nigeria | No price or scale supplied | [S20]\neTranzact | Included in a secondary list of Nigerian business-payment gateways. Product overlap with LedgerBridge is unknown. | Nigeria | No price or scale supplied | [S20]\nRemita | Included in a secondary list of Nigerian business-payment gateways. Product overlap with LedgerBridge is unknown. | Nigeria | No price or scale supplied | [S20]\nFincra | Described by a secondary publisher as offering fiat and crypto rails through one integration. This is adjacent infrastructure, not proven direct competition. | Nigeria and cross-border use cases | CareerBuddy claims $10B+ processed; not independently verified | [S13]\nNilos | Its own guide presents pay-ins, payouts, POBO, virtual accounts and FX for businesses and fintechs. This is adjacent infrastructure; overlap with LedgerBridge is unknown. | Nigeria and cross-border use cases | No price supplied; company claim | [S6]\nPlatnova | TechCabal identifies it among Nigeria’s top ten B2B fintech businesses in 2026, but the supplied evidence does not specify its product or overlap with LedgerBridge. | Nigeria | No price or scale supplied | [S9]\nOPay | Identified in secondary market coverage as a major Nigerian payments operator. Relevance to LedgerBridge’s specific workflow is unknown. | Nigeria | Shareholder Opera is reported to imply approximately $3.1B valuation; secondary-source report | [S8]\nPalmPay | Identified in secondary market coverage as a major Nigerian payments operator. Relevance to LedgerBridge’s specific workflow is unknown. | Nigeria | Reported to be raising at a valuation above $1B; secondary-source report | [S8]"
+       },
+       {
+        "heading": "Our position",
+        "body": "LedgerBridge’s recorded strength is a focused workflow for FMCG distributors and retailers (company record, self-reported). That focus may differentiate it from broad gateways and business-account products, but the evidence does not establish superior functionality, pricing, retention, payment volume or reconciliation outcomes.\n\nThe principal exposure is regulatory and diligence readiness. The company record says licence evidence is missing and financials are self-reported (company record, self-reported). A board card says “Renew PSSP licence paperwork” is due on 1 December 2026 (company record, self-reported); this does not establish that a PSSP licence is held, that renewal is required, or that renewal is complete. Aster’s request for licence status and distributor contracts makes these issues immediate fundraising gates (company record, self-reported).\n\nLarger operators may have more funding and distribution capacity. Moniepoint’s reported $200M Series C and secondary commentary about consolidation indicate potential scale asymmetry [S8], but direct product overlap with LedgerBridge is not demonstrated."
+       },
+       {
+        "heading": "Regulatory implications",
+        "body": "**Licence scope and authority.** The supplied secondary legal source reports CBN categories including switching and processing, mobile money operator, payment solution service provider, payment terminal service provider, super agent, payment service bank and digital microfinance bank [S2]. The CBN states that Payments System Supervision enforces payment-system rules and conducts onsite and offsite supervision [S11]. LedgerBridge’s applicable category cannot be determined from the record. It depends on whether LedgerBridge initiates or processes payments, holds or controls funds, operates wallets or accounts, acquires merchants, uses agents, settles transactions or relies on a licensed partner.\n\n**Reported 2026 circular and localisation.** A secondary legal source reports that a 15 June 2026 CBN circular applies to banks and licensed payment operators and addresses market-share caps, ultimate-beneficial-owner disclosure, systemic oversight and payment-data localisation [S16]. The same source reports a 1 January 2027 compliance date and a broad scope of payment-related data and systems [S16]. These details are not confirmed by the supplied primary CBN text. They must be treated as reported claims, not established obligations, until the official circular and LedgerBridge-specific applicability are verified.\n\n**AML/KYC.** A compliance provider presents name screening, transaction monitoring, customer risk rating and fraud monitoring as AML capabilities [S28]. This does not establish LedgerBridge’s current controls or exact obligations. The company must allocate customer identification, beneficial-owner checks, sanctions screening, suspicious-activity escalation, transaction monitoring, fraud monitoring, record retention and audit responsibilities across LedgerBridge, distributors, retailers, banks and payment partners.\n\n**Distributor and retailer model.** The record does not establish whether distributors and retailers are customers, agents, merchants, beneficiaries, payment intermediaries or service providers. That classification may affect licensing, AML/KYC, complaints, safeguarding, data and tax responsibilities. The contracts and flow-of-funds diagram are required before the exposure can be assessed.\n\n**Data protection, consumer protection and tax.** These remain conditional. The relevant questions are tied to unknowns: who controls customer and transaction data; where it is hosted; whether any data crosses borders; who handles failed payments, refunds and complaints; whether LedgerBridge is principal or agent; and how payment fees, software fees, commissions and settlements are treated for tax. A product-specific legal assessment is needed rather than a generic compliance checklist.\n\n**Other regulators.** Secondary commentary says CBN, SEC and NDIC requirements may apply depending on activities [S14]. The record does not establish that LedgerBridge undertakes securities, deposit-taking or lending activities, so those regimes should not be assumed to apply."
+       },
+       {
+        "heading": "Recommendations and sequencing",
+        "body": "1. **Assemble the regulatory and fundraising evidence pack before 4 November 2026.** Owner: founder/CEO, supported by compliance lead and Nigerian regulatory counsel. Include the licence certificate or partner arrangement, licence holder, permitted activities, expiry and renewal status, flow-of-funds diagram, settlement arrangements, regulator correspondence and distributor contracts. Treat the 1 December PSSP board date as a company-record deadline requiring verification. Metric: each high-risk diligence question has a primary document or a named unresolved item before the Aster call.\n\n2. **Verify the reported CBN circular before committing to localisation or other deadlines.** Owner: compliance lead with external counsel. In November–December 2026, obtain the primary circular or regulator confirmation, determine applicability, and map LedgerBridge’s data and vendors. Metric: signed applicability memo, complete data lineage and documented remediation status; no claim of compliance before testing.\n\n3. **Classify all distributor and retailer roles.** Owner: compliance lead, with counsel and commercial lead. By December 2026, document whether each participant is a customer, merchant, agent, beneficiary, intermediary or service provider, and allocate AML/KYC, complaints, safeguarding, data and tax responsibilities in executed contracts. Metric: completed role matrix and contract coverage for every payment flow.\n\n4. **Prove the FMCG workflow proposition.** Owner: product lead and commercial lead. By Q1 2027, quantify reconciliation accuracy, exception reduction, collection visibility or payment-control benefits using customer records. Metric: verified case studies and customer evidence showing measurable improvement.\n\n5. **Run a workflow-based competitor comparison.** Owner: product lead, supported by commercial lead. In Q1 2027, compare LedgerBridge with Paystack, Flutterwave, Moniepoint business accounts and relevant alternatives across onboarding, collections, payables, reconciliation, settlement, integrations, support and pricing. Metric: evidence-backed win/loss matrix and verified reasons target customers choose or reject LedgerBridge.\n\n6. **Defer new regulated activities until scope is cleared.** Owner: founder/CEO and compliance lead. Over the next 12 months, do not add stored value, wallet, agent-led or credit functionality without a written licensing, capital, AML, safeguarding and consumer-protection assessment. Secondary commentary reports separate paid-up-capital and refundable-escrow requirements [S2], but those requirements must be verified for the relevant activity. Metric: documented go/no-go approval before each adjacent product launch."
+       },
+       {
+        "heading": "Metrics to track",
+        "body": "1. Licence category, holder, permitted activities, expiry, renewal submission and unresolved scope questions.\n2. Percentage of payment flows classified and percentage of participant responsibilities documented.\n3. Conditional localisation readiness: data fields inventoried, vendors assessed, systems mapped and remediation tested, only after the primary rule is verified.\n4. Fundraising evidence readiness: licence pack, distributor-contract pack, flow-of-funds diagram, reconciled management accounts, customer references and unit-economics schedule.\n5. Workflow proof: reconciliation completion rate, exception rate, time to reconcile, payment value and active distributors and retailers. These figures are not in the current record.\n6. Competitive proof: verified win/loss reasons, feature adoption, customer switching or expansion and price objections.\n7. Financial quality: management accounts reconciled to bank, processor and transaction records, with revenue recognition, payment costs, compliance costs and gross margin documented. Current financials are self-reported (company record, self-reported)."
+       },
+       {
+        "heading": "Risks and mitigations",
+        "body": "**Licence or scope mismatch.** LedgerBridge may hold a different licence, rely on a partner or conduct activities requiring additional permission. Mitigation: obtain primary evidence and complete activity mapping before fundraising claims.\n\n**Unverified circular and localisation claims.** The June 2026 circular, detailed scope and 1 January 2027 deadline rest on one secondary source [S16]. Mitigation: obtain the primary CBN text and applicability confirmation; do not present the deadline as confirmed until then.\n\n**Distributor and retailer classification risk.** Participant roles may create additional licensing, AML/KYC, safeguarding, data, complaints or tax obligations. Mitigation: review contracts and flow of funds with counsel.\n\n**Source-quality and staleness risk.** Several competitor, funding, pricing and market-concentration claims rely on one secondary source or company self-report, and future-dated or rapidly changing regulatory information may become stale. Mitigation: verify licences and rules against CBN primary pages, verify competitor products and prices directly, date every comparison and avoid using unverified funding or processing claims as core assumptions.\n\n**Competitive bundling.** Larger operators may combine payments, accounts, distribution and credit. Moniepoint’s reported $200M Series C is secondary evidence [S8]. Mitigation: focus on measurable FMCG reconciliation outcomes and integrations.\n\n**Partner dependency.** If LedgerBridge relies on a bank, processor or licensed partner, changes to pricing, risk appetite or access could interrupt service. The record does not establish whether such dependency exists. Mitigation: review partner contracts, settlement rights, service levels, audit access and contingency routing.\n\n**Fundraising evidence quality.** Aster has requested licence status and distributor contracts while licence evidence is missing and financials are self-reported (company record, self-reported). Mitigation: reconcile financials and transaction records and provide executed contracts, customer references and clear claim/evidence separation."
+       },
+       {
+        "heading": "Evidence gaps",
+        "body": "- Exact LedgerBridge licence, licence holder, permitted activities, expiry, renewal submission and regulator correspondence. Request the licence certificate, CBN registry evidence and renewal filing; confirm with Nigerian regulatory counsel.\n- Flow of funds, settlement accounts, safeguarding arrangements and partner structure. Request architecture diagrams, bank and processor agreements and a responsibility matrix.\n- Use of agents, wallets, virtual accounts, merchant acquiring, distributors as intermediaries or credit. Request product specifications, process maps and executed contracts.\n- Primary text and applicability of the reported June 2026 CBN circular. Obtain the official CBN publication or regulator confirmation and a written applicability memo.\n- Hosting and processing locations for transaction, identity, card, settlement, authentication, analytics, fraud and risk data. Request the data inventory, vendor register, cloud contracts and architecture diagrams.\n- Distributor and retailer obligations. Obtain counsel’s written assessment covering licensing, AML/KYC, complaints, safeguarding, data roles and tax treatment.\n- Customer count, transaction volume, revenue, pricing, retention, gross margin and reconciliation outcomes. Request processor statements, transaction ledgers, invoices, contracts, cohort analysis and management accounts; current financials are self-reported (company record, self-reported).\n- Direct overlap with Paystack, Flutterwave, Moniepoint business accounts and other relevant providers. Obtain current product and pricing materials and conduct structured customer interviews.\n- FMCG segment size. Define geography and sub-segments, then obtain distributor and retailer counts, average account sizes, payment flows, penetration assumptions and observed pricing for low, base and high cases.\n- Aster’s diligence checklist. Ask Aster for the checklist before or during the 4 November 2026 call and assign each item to an evidence owner."
+       }
+      ],
+      "topRecommendations": [
+       "Before the 4 November 2026 Aster Africa Ventures call, assemble primary evidence for LedgerBridge’s licence scope, holder or partner structure, flow of funds, settlement, distributor contracts and compliance responsibilities; treat the 1 December 2026 PSSP item as a company-record deadline requiring verification, not proof that renewal is required or complete.",
+       "Verify the primary CBN source and applicability of the reported June 2026 circular before committing to a 1 January 2027 localisation or other regulatory deadline; in parallel, classify distributor and retailer roles and allocate AML/KYC, complaints, safeguarding, data and tax responsibilities.",
+       "Defend the next 12 months around measurable FMCG distributor and retailer reconciliation value, supported by reconciled financials, customer evidence and workflow-based competitor comparisons, rather than broad claims about Nigerian payments-market scale."
+      ],
+      "gaps": [
+       "LedgerBridge’s exact licence, renewal status, licence holder or partner structure and permitted activities are not verified.",
+       "The primary CBN text and applicability of the reported June 2026 circular and 1 January 2027 localisation deadline are not present in the supplied evidence.",
+       "LedgerBridge’s flow of funds, settlement, data architecture, distributor and retailer roles, customer traction, pricing, unit economics and direct competitor overlap are unknown.",
+       "The evidence does not support a LedgerBridge-specific TAM, SAM or 12-month obtainable-market estimate.",
+       "The regulatory treatment of LedgerBridge’s distributor and retailer activities requires a product-specific legal assessment.",
+       "Competitor product, pricing, scale and funding evidence is uneven, often relying on single-source secondary reporting or company claims, and should be verified before use in fundraising materials."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "6bc4415285d3c41500e0036d2e39b8269cf8aa43ac7807b390df876284ff8dc5",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "AnalysisCritiqueResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 10974,
+     "outputTokens": 722,
+     "cachedInputTokens": 1454
+    },
+    "latencyMs": 8599,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00279948,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 8599,
+      "usage": {
+       "inputTokens": 10974,
+       "outputTokens": 722,
+       "cachedInputTokens": 1454
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00279948,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_02604dad341cd025016ae3d35d8b8087d2b4e5cab688c5d11c",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:14:45.725Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "passes": false,
+      "score": 78,
+      "issues": [
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Competitors and alternatives",
+        "problem": "The table says Moniepoint is identified in secondary market coverage as a major business-fintech operator, but the supplied evidence does not establish that claim; it only supports a reported funding round.",
+        "fix": "Remove the characterization or cite the specific supporting evidence and label it as secondary reporting."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Competitors and alternatives",
+        "problem": "The table states that OPay and PalmPay are major Nigerian payments operators, but the supplied record only supports valuation or fundraising reports, not the broader operator characterization.",
+        "fix": "Replace with the narrower supported claims or add evidence for their Nigerian operating relevance."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Recommendations and sequencing",
+        "problem": "The metric requiring a signed applicability memo and complete data lineage by November–December 2026 is an internally proposed deliverable, but its feasibility and authority are not established.",
+        "fix": "Label it explicitly as a proposed internal target and avoid implying that regulator confirmation or a signed legal conclusion can necessarily be obtained within that period."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Risks and mitigations",
+        "problem": "The analysis does not clearly address the risk that the reported market-share caps could constrain LedgerBridge or its licensed partners if applicable, despite identifying them as a feature of the reported circular.",
+        "fix": "Add market-share-cap exposure, including the need to identify the relevant metric, affected entity, remediation options and possible partner concentration effects."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Regulatory implications",
+        "problem": "The treatment of data protection is only a list of questions and does not identify the Nigerian data-protection compliance risk or likely operational implications as a distinct issue.",
+        "fix": "Add a clearly conditional data-protection workstream covering controller/processor roles, lawful basis, security, breach response, retention and cross-border processing, without asserting obligations not supported by the evidence."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Evidence gaps",
+        "problem": "Several requests for primary CBN registry evidence and regulator confirmation are appropriate but do not distinguish what LedgerBridge can obtain itself from what only counsel, a regulator or a licensed partner can confirm.",
+        "fix": "Assign each evidence item to LedgerBridge, partner, counsel or regulator and identify the fallback evidence if primary confirmation is unavailable."
+       },
+       {
+        "kind": "UNCLEAR_CONCLUSION",
+        "section": "Executive summary",
+        "problem": "The conclusion says to defer new regulated activities, but the evidence does not establish that LedgerBridge plans to launch them or that deferral is preferable to a partner-led route.",
+        "fix": "Frame this as a conditional recommendation: pause launches that alter the regulatory perimeter until scope is cleared, while evaluating compliant partner-led alternatives."
+       },
+       {
+        "kind": "WEAK_SIZING",
+        "section": "Market and sizing",
+        "problem": "The proposed TAM formula is directionally useful but does not define whether TAM is payment volume, software revenue or payments revenue, making later cases potentially incomparable.",
+        "fix": "Separate payment-volume TAM from revenue TAM and state the conversion assumptions, including take rate, software fees, eligibility and overlap treatment."
+       }
+      ],
+      "strengths": [
+       "It carefully separates national payment-system scale from LedgerBridge-specific market size and correctly refuses to invent TAM, traction or revenue figures.",
+       "It handles the missing licence evidence, self-reported financials, Aster’s diligence request and the 4 November call as fundraising-relevant facts without overstating readiness.",
+       "It appropriately treats the reported 2026 CBN circular and localisation deadline as unverified secondary claims and sequences verification before making compliance assertions."
+      ]
+     }
+    }
+   },
+   "failure": null
+  }
+ ]
+}
