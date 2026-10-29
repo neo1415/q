@@ -9,6 +9,11 @@ import type { StepResult } from "@capital-q/q-orchestrator";
 import type { WorkforceJobPort } from "@capital-q/app-actions";
 import { z } from "zod";
 
+import {
+  compactDossier,
+  jsonBytes,
+  ResearchDossierSchema,
+} from "./deep-research.js";
 import type { Owner, WorkforceStore } from "./store.js";
 
 /**
@@ -62,6 +67,80 @@ export const LIVE_RESULT_KEY = "_live";
  */
 export function checkpointKey(stepKey: string): string {
   return `_checkpoint:${stepKey}`;
+}
+
+/** results' cap: pg_column_size(results) <= 131072 (migration 20261220180000). */
+export const RESULTS_MAX_BYTES = 131_072;
+/**
+ * One step's kept result, so the job's other steps, its live stage and a
+ * running step's checkpoint still fit beside it.
+ */
+export const STEP_RESULT_MAX_BYTES = 48_000;
+
+type StoredStep = {
+  readonly status: StepResult["status"];
+  readonly summary: string;
+  readonly outputs?: Readonly<Record<string, unknown>>;
+  readonly runId?: string;
+};
+
+/**
+ * Production 2026-10-29: a finished research step's dossier (with its own
+ * checkpoint still on the row) broke results' cap, the write threw and the
+ * step that had succeeded was marked FAILED. What is kept for a step fits
+ * STEP_RESULT_MAX_BYTES: a dossier is compacted, and any other output too
+ * large to keep is left out by name. The step's own result, handed on to the
+ * steps after it, is never touched; only a resumed job reads this copy.
+ */
+export function storedStepResult(
+  result: StepResult,
+  runId?: string,
+): StoredStep {
+  const base = {
+    status: result.status,
+    summary: result.summary.slice(0, 500),
+    ...(runId === undefined ? {} : { runId }),
+  };
+  const outputs = result.outputs;
+  if (outputs === undefined) return base;
+  if (jsonBytes({ ...base, outputs }) <= STEP_RESULT_MAX_BYTES) {
+    return { ...base, outputs };
+  }
+  const kept: Record<string, unknown> = { ...outputs };
+  const omitted: string[] = [];
+  const dossier = ResearchDossierSchema.safeParse(outputs["dossier"]);
+  if (dossier.success) {
+    const others = jsonBytes({ ...base, outputs: { ...kept, dossier: null } });
+    const compact = compactDossier(
+      dossier.data,
+      STEP_RESULT_MAX_BYTES - others - 256,
+    );
+    if (compact === null) {
+      delete kept["dossier"];
+      omitted.push("dossier");
+    } else {
+      kept["dossier"] = compact;
+      kept["dossierCompacted"] = true;
+    }
+  }
+  // Largest first, until what is left fits.
+  const bySize = Object.keys(kept)
+    .map((key) => ({ key, bytes: jsonBytes(kept[key]) }))
+    .sort((a, b) => b.bytes - a.bytes);
+  for (const { key } of bySize) {
+    if (
+      jsonBytes({ ...base, outputs: { ...kept, omittedOutputs: omitted } }) <=
+      STEP_RESULT_MAX_BYTES
+    ) {
+      break;
+    }
+    delete kept[key];
+    omitted.push(key);
+  }
+  return {
+    ...base,
+    outputs: omitted.length === 0 ? kept : { ...kept, omittedOutputs: omitted },
+  };
 }
 
 const LiveEntrySchema = z.object({
@@ -241,17 +320,28 @@ export function createPostgresAgentWorkQueue(
       ).length > 0,
 
     recordStep: async (jobId, workerId, stepKey, result, runId) => {
+      const stored = storedStepResult(result, runId);
+      // The step's checkpoint goes as its result lands (a finished step is
+      // never resumed). Should the row still have no room, the result is
+      // kept without its outputs, or not at all: a write that cannot fit
+      // costs a resume, never the step (results' cap is a check).
       await sql`
-        update q_runtime.agent_work_queue
-           set results = results || jsonb_build_object(${stepKey}::text, ${sql.json(
-             asJson({
-               status: result.status,
-               summary: result.summary.slice(0, 500),
-               outputs: result.outputs,
-               runId,
-             }),
-           )}::jsonb)
-         where job_id = ${jobId} and locked_by = ${workerId} and state = 'RUNNING'`;
+        update q_runtime.agent_work_queue q
+           set results = (
+             select case
+                      when pg_column_size(c.base || c.full_entry) <= ${RESULTS_MAX_BYTES}::int
+                        then c.base || c.full_entry
+                      when pg_column_size(c.base || c.bare_entry) <= ${RESULTS_MAX_BYTES}::int
+                        then c.base || c.bare_entry
+                      else c.base
+                    end
+               from (select q.results - ${checkpointKey(stepKey)}::text as base,
+                            jsonb_build_object(${stepKey}::text, ${sql.json(asJson(stored))}::jsonb)
+                              as full_entry,
+                            jsonb_build_object(${stepKey}::text, ${sql.json(
+                              asJson({ ...stored, outputs: undefined }),
+                            )}::jsonb) as bare_entry) c)
+         where q.job_id = ${jobId} and q.locked_by = ${workerId} and q.state = 'RUNNING'`;
     },
 
     recordLive: async (jobId, workerId, live) => {
@@ -416,7 +506,25 @@ export function createInMemoryAgentWorkQueue(
     recordStep: (jobId, workerId, stepKey, result, runId) => {
       const row = rows.find((one) => one.job_id === jobId);
       if (row !== undefined && held(row, workerId)) {
-        row.results = { ...row.results, [stepKey]: { ...result, runId } };
+        // As the Postgres queue keeps it: bounded, the checkpoint gone.
+        const rest = Object.fromEntries(
+          Object.entries(row.results).filter(
+            ([key]) => key !== checkpointKey(stepKey),
+          ),
+        );
+        const { outputs, ...bare } = storedStepResult(result, runId);
+        const full = {
+          ...rest,
+          [stepKey]: JSON.parse(
+            JSON.stringify({ ...bare, outputs }),
+          ) as unknown,
+        };
+        row.results =
+          jsonBytes(full) <= RESULTS_MAX_BYTES
+            ? full
+            : jsonBytes({ ...rest, [stepKey]: bare }) <= RESULTS_MAX_BYTES
+              ? { ...rest, [stepKey]: bare }
+              : rest;
       }
       return Promise.resolve();
     },
@@ -433,13 +541,20 @@ export function createInMemoryAgentWorkQueue(
     recordCheckpoint: (jobId, workerId, stepKey, value) => {
       const row = rows.find((one) => one.job_id === jobId);
       if (row !== undefined && held(row, workerId)) {
-        row.results = {
+        const next = {
           ...row.results,
           // Stored as jsonb stores it: a copy, never the live object.
           [checkpointKey(stepKey)]: JSON.parse(
             JSON.stringify(value),
           ) as unknown,
         };
+        // As Postgres refuses it: results' cap is a check.
+        if (jsonBytes(next) > RESULTS_MAX_BYTES) {
+          return Promise.reject(
+            new Error("agent_work_queue_results_check (in memory)"),
+          );
+        }
+        row.results = next;
       }
       return Promise.resolve();
     },

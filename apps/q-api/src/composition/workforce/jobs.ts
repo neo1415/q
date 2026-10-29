@@ -1415,6 +1415,7 @@ export function createWorkforceJobs(dependencies: {
           checkpoints: options.durable?.checkpoint,
         }),
         options.durable,
+        dependencies.logger,
       ),
       recorder: {
         ...recorderFor(store, owner),
@@ -1590,6 +1591,7 @@ export function jobStatusOf(
 function withDurableResults(
   executors: Partial<Record<QAgentRole, AgentExecutor>>,
   durable: DurableSteps | undefined,
+  logger?: Logger,
 ): Partial<Record<QAgentRole, AgentExecutor>> {
   if (durable === undefined) return executors;
   return Object.fromEntries(
@@ -1606,7 +1608,18 @@ function withDurableResults(
             : { ...step, goal: withDirection(step.goal, direction) },
           context,
         );
-        await durable.record(step.key, result, context.runId);
+        // Production 2026-10-29: the write of a finished research step's
+        // result threw and the step that had succeeded was marked FAILED.
+        // A result that cannot be kept costs a resume (the step runs again
+        // after a restart), never the work done.
+        await durable
+          .record(step.key, result, context.runId)
+          .catch((error: unknown) =>
+            logger?.warn(
+              { err: error, stepKey: step.key, runId: context.runId },
+              "workforce step result could not be kept; it stands, a restart redoes it",
+            ),
+          );
         return result;
       },
     ]),

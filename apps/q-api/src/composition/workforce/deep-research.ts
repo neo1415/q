@@ -291,6 +291,75 @@ export const ResearchDossierSchema = z
   .strict();
 export type ResearchDossier = z.infer<typeof ResearchDossierSchema>;
 
+/** Bytes a value takes as JSON text (what jsonb keeps is about the same). */
+export function jsonBytes(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value) ?? "", "utf8");
+}
+
+/** Facts and writer text a compacted dossier keeps at the least. */
+const COMPACT_FACTS_MIN = 12;
+const COMPACT_WRITER_CHARS = 4_000;
+
+/**
+ * Production 2026-10-29: a 40-source dossier, kept with its step on the
+ * job's row, broke the row's size cap and the finished research was marked
+ * FAILED. The copy kept on the row (read back only when a restarted job
+ * resumes after this step) is made to fit `maxBytes`: the lowest-ranked
+ * facts go first (both sides of a contradiction stay), then the sources no
+ * kept fact cites, then the writer's brief is shortened. Null: it cannot
+ * fit at all. The step's own result, handed to the next step, is untouched.
+ */
+export function compactDossier(
+  dossier: ResearchDossier,
+  maxBytes: number,
+): ResearchDossier | null {
+  if (jsonBytes(dossier) <= maxBytes) return dossier;
+  const shape = (keep: number, writerChars: number): ResearchDossier => {
+    const facts = dossier.facts.filter(
+      (fact, index) => index < keep || fact.lifecycleStatus === "CONTRADICTORY",
+    );
+    const kept = new Set(facts.map((fact) => fact.id));
+    const cited = new Set(facts.map((fact) => fact.source));
+    return {
+      ...dossier,
+      sources: dossier.sources.filter((source) => cited.has(source.index)),
+      facts: facts.map((fact) => ({
+        ...fact,
+        ...(fact.corroboratedBy === undefined
+          ? {}
+          : {
+              corroboratedBy: fact.corroboratedBy.filter((id) => kept.has(id)),
+            }),
+        ...(fact.contradicts === undefined
+          ? {}
+          : { contradicts: fact.contradicts.filter((id) => kept.has(id)) }),
+      })),
+      ...(dossier.brief === undefined
+        ? {}
+        : {
+            brief: {
+              summary: dossier.brief.summary,
+              writer: dossier.brief.writer.slice(0, writerChars),
+            },
+          }),
+    };
+  };
+  const writerFull = dossier.brief?.writer.length ?? 0;
+  for (
+    let keep = dossier.facts.length;
+    keep >= COMPACT_FACTS_MIN;
+    keep =
+      keep === COMPACT_FACTS_MIN
+        ? -1
+        : Math.max(COMPACT_FACTS_MIN, Math.floor(keep * 0.75))
+  ) {
+    const candidate = shape(keep, writerFull);
+    if (jsonBytes(candidate) <= maxBytes) return candidate;
+  }
+  const smallest = shape(COMPACT_FACTS_MIN, COMPACT_WRITER_CHARS);
+  return jsonBytes(smallest) <= maxBytes ? smallest : null;
+}
+
 /** Jobs whose search budgets are held at once (one process). */
 const JOB_BUDGETS_MAX = 500;
 
