@@ -179,6 +179,33 @@ describe("research record/replay (acceptance gate)", () => {
     expect(replay.misses).toEqual([]);
   });
 
+  // Re-recorded case A: the merged indexes answered 10-12 hits for 6
+  // asked; a replay cut to maxResults chose other pages to read.
+  it("serves every hit the provider returned, past maxResults", async () => {
+    const many: PublicWebResearchProvider = {
+      ...live,
+      search: () =>
+        Promise.resolve({
+          hits: Array.from({ length: 9 }, (_, index) => ({
+            url: `https://www.cbn.gov.ng/page-${String(index)}`,
+            title: null,
+            snippet: "Payments.",
+            publishedAt: null,
+            relevance: null,
+          })),
+          latencyMs: 1,
+        }),
+    };
+    const recording = createRecordingResearchProvider({ provider: many });
+    const live9 = await recording.search(search("nigeria payments"), {});
+    const replay = createReplayResearchProvider({
+      fixture: recording.fixture(),
+    });
+    const again = await replay.search(search("nigeria payments"), {});
+    expect(again.hits).toEqual(live9.hits);
+    expect(again.hits).toHaveLength(9);
+  });
+
   it("fails loudly on a query or page the recording does not hold", async () => {
     const replay = createReplayResearchProvider({ fixture: await recorded() });
     // A code change that lost the country: not silently answered.

@@ -598,7 +598,6 @@ export function createReplayResearchProvider(input: {
     time === undefined ? outcome() : time.track(label, outcome);
 
   const searchOutcome = (
-    request: PublicWebSearchRequest,
     key: string,
   ): (() => Promise<PublicWebSearchResult>) => {
     const list = searchesByKey.get(key) ?? [];
@@ -616,7 +615,10 @@ export function createReplayResearchProvider(input: {
       const failureClass = held.failure.failureClass;
       return () => Promise.reject(failure(failureClass));
     }
-    const hits = held.hits.slice(0, request.maxResults).map(copyHit);
+    // Every hit the provider returned, as it returned them: the merged
+    // indexes answer past maxResults (10-12 for 6 asked, re-recorded case
+    // A), and cutting them to maxResults changed which pages were read.
+    const hits = held.hits.map(copyHit);
     return () => Promise.resolve({ hits, latencyMs: 0 });
   };
 
@@ -677,7 +679,7 @@ export function createReplayResearchProvider(input: {
     search: (request) => {
       sent.push(request);
       const key = recordedSearchKey(request);
-      return tracked(searchLabel(key), searchOutcome(request, key));
+      return tracked(searchLabel(key), searchOutcome(key));
     },
     extract: (request) =>
       tracked(extractLabel(request.urls), extractOutcome(request.urls)),
