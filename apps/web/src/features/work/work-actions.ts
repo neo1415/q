@@ -9,6 +9,7 @@ import {
   getPushKey,
   getQWork,
   listNotifications,
+  listPendingQApprovals,
   listQWork,
   markNotificationsRead,
   saveNotificationSettings,
@@ -170,6 +171,31 @@ export async function listNoticesAction(
     (session) => listNotifications(session, { before: cursor }),
     "Notifications couldn't load. Try again in a moment.",
   );
+}
+
+/**
+ * The shell's one read (notice-store): the newest notices and how many
+ * approvals wait on the person, side by side in one action, so every
+ * "waiting on you" count is the Work page's own sum (live 2026-10-29: the
+ * Work badge read 7 while the page listed 8, an approval card with no
+ * notice). A failed approvals read is null: the count is notices only.
+ */
+export async function listShellNoticesAction(): Promise<
+  WorkResult<NotificationList & { readonly waitingApprovals: number | null }>
+> {
+  const [notices, waitingApprovals] = await Promise.all([
+    listNoticesAction(),
+    qApiSession()
+      .then((session) =>
+        session === null
+          ? null
+          : listPendingQApprovals(session).then((list) => list.items.length),
+      )
+      .catch(() => null),
+  ]);
+  return notices.ok
+    ? { ok: true, value: { ...notices.value, waitingApprovals } }
+    : notices;
 }
 
 export async function markReadAction(

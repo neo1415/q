@@ -18,7 +18,10 @@ import {
 
 import type { NotificationDto } from "@capital-q/contracts";
 
-import { groupNotices } from "../src/features/work/notice-groups";
+import {
+  groupNotices,
+  waitingOnYouCount,
+} from "../src/features/work/notice-groups";
 
 const list = vi.fn<() => Promise<unknown>>();
 const markRead = vi.fn<(ids: readonly string[]) => Promise<unknown>>();
@@ -27,6 +30,7 @@ const names = vi.fn<() => Promise<unknown>>(() =>
 );
 vi.mock("../src/features/work/work-actions", () => ({
   listNoticesAction: () => list(),
+  listShellNoticesAction: () => list(),
   markReadAction: (ids: readonly string[]) => markRead(ids),
   noticeNamesAction: () => names(),
 }));
@@ -230,5 +234,32 @@ describe("a resolved notice leaves Needs you (live QA: Brightkloof)", () => {
         groups: [expect.objectContaining({ ids: [resolved.id] })],
       }),
     ]);
+  });
+});
+
+describe("one count of what waits on the person (live 2026-10-29)", () => {
+  it("is the Work page's sum: folded notices plus approvals, a card summary standing for its cards", () => {
+    const seven = Array.from({ length: 7 }, (_, at) =>
+      notice({ priority: "NEEDS_YOU", title: `Ready ${String(at)}` }),
+    );
+    // Live: the badge said 7 (notices); the page said 8 (one approval
+    // card no notice announced).
+    expect(waitingOnYouCount({ items: seven, approvals: 1 })).toBe(8);
+    // Approvals not known: notices only.
+    expect(waitingOnYouCount({ items: seven, approvals: null })).toBe(7);
+    // A summary of the cards is not counted beside the cards it stands for.
+    const summary = notice({ priority: "NEEDS_YOU", title: ASK });
+    expect(waitingOnYouCount({ items: [summary], approvals: 5 })).toBe(5);
+    expect(waitingOnYouCount({ items: [summary], approvals: null })).toBe(1);
+    // Read notices and updates wait on no one.
+    expect(
+      waitingOnYouCount({
+        items: [
+          notice({ priority: "NEEDS_YOU", read: true }),
+          notice({ priority: "UPDATE" }),
+        ],
+        approvals: 0,
+      }),
+    ).toBe(0);
   });
 });

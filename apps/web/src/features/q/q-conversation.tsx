@@ -1594,7 +1594,7 @@ export function QConversationPanel({
             ) : (
               <div
                 className={cx(
-                  "mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6",
+                  "cq-arrival mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6",
                   // The arrival room: decision cards either side of Q.
                   room.filled && "lg:max-w-6xl",
                 )}

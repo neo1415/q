@@ -14,7 +14,7 @@ import {
 } from "@/features/relationships/hub-navigation";
 import type { HubSide } from "@/features/relationships/hub-view";
 
-import { useNotices } from "./notice-store";
+import { useWaitingOnYou } from "./notice-store";
 import { workTabs, type WorkView } from "./work-tabs";
 
 /**
@@ -49,10 +49,7 @@ export function WorkNavigation({
   const chosen = useChosenTab(view);
   useOpenTabInView(ref, chosen.open);
 
-  const notices = useNotices();
-  const needsYou = (notices.items ?? []).filter(
-    (item) => item.priority === "NEEDS_YOU" && !item.read,
-  ).length;
+  const needsYou = useWaitingOnYou();
 
   return (
     <nav ref={ref} aria-label={t("Work")} className={TAB_STRIP_CLASS}>

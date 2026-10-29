@@ -358,7 +358,9 @@ export function NotificationCenter({
                 aria-hidden="true"
                 className="cq-caption cq-numeric absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-(--cq-accent) px-1 text-center leading-4 text-(--cq-canvas)"
               >
-                {unread > 9 ? "9+" : unread}
+                {/* Live 2026-10-29: "9+" beside a Work badge of 19 read
+                    as two different counts; the number itself up to 99. */}
+                {unread > 99 ? "99+" : unread}
               </span>
             )}
           </IconButton>

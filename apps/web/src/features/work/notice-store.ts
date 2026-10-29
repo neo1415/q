@@ -7,7 +7,8 @@ import type { NotificationDto } from "@capital-q/contracts";
 import { startPacedPoll, type PacedPoll } from "@/features/polling/paced-poll";
 import { retryWithBackoff } from "@/pwa/resilient";
 
-import { listNoticesAction } from "./work-actions";
+import { waitingOnYouCount } from "./notice-groups";
+import { listNoticesAction, listShellNoticesAction } from "./work-actions";
 
 /**
  * One notification read for the whole shell (design-48).
@@ -41,6 +42,11 @@ export type NoticeState = {
   readonly failed: boolean;
   /** P3: the cursor for older notices; null when there are none. */
   readonly nextBefore?: string | null;
+  /**
+   * Approvals waiting on the person, read beside the notices (live
+   * 2026-10-29); null or absent: not known, the count is notices only.
+   */
+  readonly waitingApprovals?: number | null;
 };
 
 let state: NoticeState = { items: null, unread: 0, failed: false };
@@ -63,7 +69,7 @@ export function refreshNotices(force = false): Promise<void> {
   if (!force && Date.now() - loadedAt < FRESH_MS) return Promise.resolve();
   // A dropped connection is retried with backoff (and waits while the
   // browser is offline); what was shown stays shown meanwhile.
-  inFlight = retryWithBackoff(() => listNoticesAction(), {
+  inFlight = retryWithBackoff(() => listShellNoticesAction(), {
     attempts: 3,
     timeoutMs: 20_000,
   })
@@ -79,6 +85,7 @@ export function refreshNotices(force = false): Promise<void> {
               unread: result.value.unread,
               failed: false,
               nextBefore: result.value.nextBefore ?? null,
+              waitingApprovals: result.value.waitingApprovals,
             }
           : { ...state, failed: true },
       );
@@ -162,6 +169,19 @@ function subscribe(listener: () => void): () => void {
 }
 
 const EMPTY: NoticeState = { items: null, unread: 0, failed: false };
+
+/**
+ * "Waiting on you", the one count every badge shows and the Work page
+ * lists: notices that need the person (one per thread, a card summary
+ * standing for its cards) plus the approvals waiting on them.
+ */
+export function useWaitingOnYou(): number {
+  const notices = useNotices();
+  return waitingOnYouCount({
+    items: notices.items ?? [],
+    approvals: notices.waitingApprovals ?? null,
+  });
+}
 
 export function useNotices(): NoticeState {
   return useSyncExternalStore(

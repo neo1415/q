@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const list = vi.fn<() => Promise<unknown>>();
 vi.mock("../src/features/work/work-actions", () => ({
   listNoticesAction: () => list(),
+  listShellNoticesAction: () => list(),
   markReadAction: vi.fn(),
 }));
 vi.mock("../src/features/work/push-setting", () => ({

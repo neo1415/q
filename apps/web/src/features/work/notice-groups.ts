@@ -105,6 +105,26 @@ export function groupNotices(
   return { needsYou, days };
 }
 
+/**
+ * "Waiting on you" as the Work page lists it (live 2026-10-29: the Work
+ * badge said 7 while the page said "8 waiting on you"; the eighth was an
+ * approval card no notice announced, and the badges counted raw notices
+ * where the page folds them). The badges, the Tasks tab and the page's
+ * heading all read this: the folded notices that need the person, less a
+ * notice that only summarises the approval cards when those are counted,
+ * plus the approvals themselves. Approvals not known: notices only, as
+ * the page shows when its approvals could not be read.
+ */
+export function waitingOnYouCount(input: {
+  readonly items: readonly NotificationDto[];
+  readonly approvals: number | null;
+}): number {
+  const groups = groupNotices(input.items).needsYou.filter(
+    (group) => input.approvals === null || !summarisesCards(group.notice),
+  );
+  return groups.length + (input.approvals ?? 0);
+}
+
 /** One organisation's notices on the rail: what needs the person, then updates. */
 export type RailGroup = {
   readonly key: string;

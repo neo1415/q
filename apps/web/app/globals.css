@@ -3845,6 +3845,24 @@
   .cq-room-presence.is-gathered > * {
     transform: translate(-50%, -50%) scale(var(--cq-room-gather));
   }
+  /*
+   * Live 2026-10-29 (desktop Home, 1440x900): with "Here's what changed
+   * this week" under the welcome, the room-sized Q pushed Talk to Q below
+   * the fold, half behind the composer. With the briefing shown, the
+   * resting room is two thirds the size, so Q, the welcome, the cards and
+   * Talk to Q all fit above the composer.
+   */
+  @media (min-width: 1024px) {
+    .cq-arrival:has([data-q-welcome-line] [data-q-briefing]) .cq-room-presence {
+      width: calc(var(--cq-room-box) * 2 / 3);
+      height: calc(var(--cq-room-box) * 2 / 3);
+    }
+    .cq-arrival:has([data-q-welcome-line] [data-q-briefing])
+      .cq-room-presence:not(.is-gathered)
+      > * {
+      scale: 0.667;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .cq-room-presence > * {
       transition: none;

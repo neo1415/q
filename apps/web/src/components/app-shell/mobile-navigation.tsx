@@ -21,7 +21,7 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { MoreOrganisationSwitcher } from "@/features/team/org-switcher";
 import { useHomeHref } from "@/features/q/active-conversation";
-import { useNotices } from "@/features/work/notice-store";
+import { useWaitingOnYou } from "@/features/work/notice-store";
 import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
 import type { VerifyNudge } from "@/features/verification/verify-state";
 
@@ -227,10 +227,8 @@ export function MobileMenu() {
 
 /** Unread notices that wait on the person, from the shell's one read. */
 function useNeedsYou(): number {
-  const notices = useNotices();
-  return (notices.items ?? []).filter(
-    (item) => item.priority === "NEEDS_YOU" && !item.read,
-  ).length;
+  // The one "waiting on you" count (notice-store), as the Work page lists it.
+  return useWaitingOnYou();
 }
 
 /**

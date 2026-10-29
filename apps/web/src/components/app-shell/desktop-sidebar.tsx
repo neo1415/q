@@ -18,7 +18,7 @@ import { NotificationCenter } from "@/features/work/notification-center";
 import { useHomeHref } from "@/features/q/active-conversation";
 
 import type { ShellContext } from "./app-shell";
-import { useNotices } from "@/features/work/notice-store";
+import { useWaitingOnYou } from "@/features/work/notice-store";
 
 import {
   isActiveRoute,
@@ -229,10 +229,8 @@ export function DesktopSidebar({
 
 /** Unread notices that wait on the person, for the Work entry's count. */
 function useNeedsYouCount(): number {
-  const notices = useNotices();
-  return (notices.items ?? []).filter(
-    (item) => item.priority === "NEEDS_YOU" && !item.read,
-  ).length;
+  // The one "waiting on you" count (notice-store), as the Work page lists it.
+  return useWaitingOnYou();
 }
 
 function SidebarLink({
