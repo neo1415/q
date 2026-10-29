@@ -34,7 +34,7 @@ describe("JOB_PLAN v15", () => {
 
   it("is active on v14's result, with Q's earlier answer before the job", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(15);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(16);
     expect(JOB_PLAN_V15.output).toBe(JOB_PLAN_V14.output);
     expect(JOB_PLAN_V15.variables.untrusted).toContain("priorAnswer");
     expect(JOB_PLAN_V15.template).toContain(V15_PRIOR_ANSWER);

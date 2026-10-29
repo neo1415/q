@@ -15,7 +15,7 @@ import {
 describe("JOB_PLAN v11", () => {
   it("is active, on v10's template and result, plus the rule", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(15);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(16);
     expect(registry.get("JOB_PLAN", 10)?.definition.status).toBe("DEPRECATED");
     expect(JOB_PLAN_V11.output).toBe(JOB_PLAN_V10.output);
     expect(JOB_PLAN_V11.template).toBe(

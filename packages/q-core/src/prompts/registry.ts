@@ -197,6 +197,7 @@ import {
   JOB_PLAN_V13,
   JOB_PLAN_V14,
   JOB_PLAN_V15,
+  JOB_PLAN_V16,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
@@ -685,7 +686,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEETING_OUTCOME_READER_V1,
     UTTERANCE_CHECK_V1,
     // Live 2026-10-28 (run 8b649d10): Q's earlier answer beside the job.
-    JOB_PLAN_V15,
+    { ...JOB_PLAN_V15, status: "DEPRECATED" },
+    // Live 2026-10-29 (sweep I16): a plan always has steps.
+    JOB_PLAN_V16,
     DOCUMENT_KIND_READER_V1,
     INVESTOR_PERSONA_V1,
     INVESTOR_TWIN_TURN_V1,

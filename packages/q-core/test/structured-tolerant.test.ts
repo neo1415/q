@@ -23,7 +23,7 @@ import {
 describe("tolerant deep-work results", () => {
   it("are the active versions", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(15);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(16);
     // Investigation-grade research (2026-10-29) superseded these.
     expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(6);
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(4);

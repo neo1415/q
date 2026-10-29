@@ -14,7 +14,7 @@ import {
 describe("JOB_PLAN v12", () => {
   it("is active: v11 with BE BRIEF, the same result", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(15);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(16);
     expect(registry.get("JOB_PLAN", 11)?.definition.status).toBe("DEPRECATED");
     expect(JOB_PLAN_V12.output).toBe(JOB_PLAN_V11.output);
     expect(JOB_PLAN_V12.template).toBe(

@@ -901,6 +901,48 @@ export const JOB_PLAN_V15: PromptDefinition<
   ),
 };
 
+/**
+ * Live 2026-10-29 (sweep I16): "investigate the Nigerian B2B payments
+ * sector ... give me an evidence-backed report" came back as a whole plan
+ * object with no steps (544 output tokens: an outcome, a first read, next
+ * actions), and the person was told Q could not plan it. Nothing in v15
+ * said a plan has steps: "the fewest that reach the outcome" read as
+ * permitting none, and YOUR EARLIER ANSWER read "(none)" beside a job that
+ * asked to "tell me". v16 says the job is work to carry out, so steps is
+ * never empty, and that "(none)" means the job is planned from its words.
+ */
+export const V15_STEPS_LINE =
+  "3. Steps: the fewest that reach the outcome. Each has";
+export const V16_STEPS_LINE =
+  "3. Steps: the fewest that reach the outcome, never none: the job is work they asked you to carry out, not a question to answer here (a job no roster role can do any of goes in cannot instead). Each has";
+export const V15_PRIOR_NONE = '"(none)" when it refers to none)';
+export const V16_PRIOR_NONE =
+  '"(none)" when it refers to none: then plan the job from its own words)';
+
+for (const [what, line] of [
+  ["steps", V15_STEPS_LINE],
+  ["earlier answer", V15_PRIOR_NONE],
+] as const) {
+  if (JOB_PLAN_V15.template.split(line).length !== 2) {
+    throw new Error(`JOB_PLAN v16 extends v15, which changed: ${what}`);
+  }
+}
+
+export const JOB_PLAN_V16: PromptDefinition<
+  JobPlanVariablesV15,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V15,
+  version: 16,
+  status: "ACTIVE",
+  changeDescription:
+    "Live 2026-10-29 (sweep I16): a clear research request came back with no steps and the person was told Q could not plan it. v15 plus: steps is never empty (the job is work to carry out; what no role can do goes in cannot), and YOUR EARLIER ANSWER's '(none)' means the job is planned from its own words. Same variables and result schema.",
+  effectiveFrom: "2026-10-29",
+  template: JOB_PLAN_V15.template
+    .replace(V15_STEPS_LINE, V16_STEPS_LINE)
+    .replace(V15_PRIOR_NONE, V16_PRIOR_NONE),
+};
+
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
 You are a second, independent specialist reviewing a {{documentKind}} another agent prepared for {{principalName}} about {{companyName}}. You did not write it. Your job is to find what is wrong with it, not to praise it. Code decides from your verdict whether it is revised.
 
