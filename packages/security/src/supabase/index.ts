@@ -16,6 +16,8 @@ export {
 
 export {
   createLocalJwtAccessTokenAuthenticator,
+  tokenAssurance,
+  type AssuranceLevel,
   type FreshnessAwareAuthenticator,
   type LocalJwtAuthenticatorOptions,
   type SessionLiveness,

@@ -158,4 +158,79 @@ describe("local access-token verification (SUB-SECOND Phase 4)", () => {
     );
     expect(state.fallbacks).toBe(2);
   });
+
+  describe("two-step verification", () => {
+    /**
+     * The liveness double plays the database: whether the user has a
+     * verified factor is its knowledge, never the token's. Only the level
+     * the sign-in reached comes from the (signed) token.
+     */
+    function enrolledBuild(
+      keys: Parameters<
+        typeof createLocalJwtAccessTokenAuthenticator
+      >[0]["keys"],
+      enrolled: boolean,
+    ) {
+      const seen: string[] = [];
+      const authenticator = createLocalJwtAccessTokenAuthenticator({
+        url: URL_BASE,
+        keys,
+        sessions: {
+          isLive: ({ assurance }) => {
+            seen.push(assurance);
+            return Promise.resolve(!enrolled || assurance === "aal2");
+          },
+        },
+        fallback: { authenticate: () => Promise.resolve(null) },
+      });
+      return { authenticator, seen };
+    }
+
+    it("refuses an aal1 token of a user with a verified factor", async () => {
+      const { privateKey, keys } = await keyset();
+      const { authenticator, seen } = enrolledBuild(keys, true);
+      await expect(
+        authenticator.authenticate(await token(privateKey, { aal: "aal1" })),
+      ).resolves.toBeNull();
+      // No claim, or an unexpected one, is never a passed second step.
+      await expect(
+        authenticator.authenticate(await token(privateKey)),
+      ).resolves.toBeNull();
+      await expect(
+        authenticator.authenticate(await token(privateKey, { aal: "AAL2" })),
+      ).resolves.toBeNull();
+      expect(seen).toEqual(["aal1", "aal1", "aal1"]);
+    });
+
+    it("accepts an aal2 token of a user with a verified factor", async () => {
+      const { privateKey, keys } = await keyset();
+      const { authenticator } = enrolledBuild(keys, true);
+      await expect(
+        authenticator.authenticate(await token(privateKey, { aal: "aal2" })),
+      ).resolves.toEqual({ authUserId: USER });
+    });
+
+    it("accepts an aal1 token of a user with no verified factor", async () => {
+      const { privateKey, keys } = await keyset();
+      const { authenticator } = enrolledBuild(keys, false);
+      await expect(
+        authenticator.authenticate(await token(privateKey, { aal: "aal1" })),
+      ).resolves.toEqual({ authUserId: USER });
+    });
+
+    it("never lets a cached aal2 check serve an aal1 token of the same session", async () => {
+      const { privateKey, keys } = await keyset();
+      const { authenticator } = enrolledBuild(keys, true);
+      await authenticator.authenticateWith(
+        await token(privateKey, { aal: "aal2" }),
+        { freshSession: false },
+      );
+      await expect(
+        authenticator.authenticateWith(
+          await token(privateKey, { aal: "aal1" }),
+          { freshSession: false },
+        ),
+      ).resolves.toBeNull();
+    });
+  });
 });

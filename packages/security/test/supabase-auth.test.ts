@@ -114,6 +114,71 @@ describe("createSupabaseAccessTokenAuthenticator", () => {
     await expect(authenticator.authenticate(TOKEN)).resolves.toBeNull();
   });
 
+  describe("two-step verification", () => {
+    function unsignedToken(claims: Record<string, unknown>): string {
+      const part = (value: unknown) =>
+        Buffer.from(JSON.stringify(value)).toString("base64url");
+      return `${part({ alg: "HS256" })}.${part(claims)}.c2lnbmF0dXJl`;
+    }
+    const enrolled = {
+      id: AUTH_USER_ID,
+      aud: "authenticated",
+      role: "authenticated",
+      factors: [{ id: "f1", factor_type: "totp", status: "verified" }],
+    };
+
+    it("refuses an aal1 token of a user with a verified factor", async () => {
+      const server = fakeFetch(() => json(200, enrolled));
+      const authenticator = createSupabaseAccessTokenAuthenticator({
+        url: URL_BASE,
+        publishableKey: PUBLISHABLE_KEY,
+        fetch: server.fetch,
+      });
+      await expect(
+        authenticator.authenticate(
+          unsignedToken({ sub: AUTH_USER_ID, aal: "aal1" }),
+        ),
+      ).resolves.toBeNull();
+      // A token with no aal claim at all is not a passed second step.
+      await expect(
+        authenticator.authenticate(unsignedToken({ sub: AUTH_USER_ID })),
+      ).resolves.toBeNull();
+    });
+
+    it("accepts an aal2 token of a user with a verified factor", async () => {
+      const server = fakeFetch(() => json(200, enrolled));
+      const authenticator = createSupabaseAccessTokenAuthenticator({
+        url: URL_BASE,
+        publishableKey: PUBLISHABLE_KEY,
+        fetch: server.fetch,
+      });
+      await expect(
+        authenticator.authenticate(
+          unsignedToken({ sub: AUTH_USER_ID, aal: "aal2" }),
+        ),
+      ).resolves.toEqual({ authUserId: AUTH_USER_ID });
+    });
+
+    it("accepts an aal1 token of a user whose only factor is unverified", async () => {
+      const server = fakeFetch(() =>
+        json(200, {
+          ...enrolled,
+          factors: [{ id: "f1", factor_type: "totp", status: "unverified" }],
+        }),
+      );
+      const authenticator = createSupabaseAccessTokenAuthenticator({
+        url: URL_BASE,
+        publishableKey: PUBLISHABLE_KEY,
+        fetch: server.fetch,
+      });
+      await expect(
+        authenticator.authenticate(
+          unsignedToken({ sub: AUTH_USER_ID, aal: "aal1" }),
+        ),
+      ).resolves.toEqual({ authUserId: AUTH_USER_ID });
+    });
+  });
+
   it("never contacts the server for something that is not a token", async () => {
     const server = fakeFetch(() => json(200, { id: AUTH_USER_ID }));
     const authenticator = createSupabaseAccessTokenAuthenticator({

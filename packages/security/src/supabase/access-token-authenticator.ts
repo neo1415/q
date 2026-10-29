@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { decodeJwt } from "jose";
 
 import { AuthUserIdSchema } from "../identity/ids.js";
 import type { AuthenticatedPrincipal } from "../identity/principal.js";
@@ -84,9 +85,29 @@ export function createSupabaseAccessTokenAuthenticator(
         return null;
       }
 
+      // Two-step verification. The factor list comes from the Auth server's
+      // answer, not from the client; the level reached comes from the token
+      // the Auth server has just accepted, so reading its payload here is
+      // reading a verified claim. A user with a verified factor whose token
+      // is only aal1 has not finished signing in.
+      const hasVerifiedFactor = (data.user.factors ?? []).some(
+        (factor) => factor.status === "verified",
+      );
+      if (hasVerifiedFactor && assuranceOf(accessToken) !== "aal2") {
+        return null;
+      }
+
       return { authUserId: authUserId.data };
     },
   };
+}
+
+function assuranceOf(accessToken: string): "aal1" | "aal2" {
+  try {
+    return decodeJwt(accessToken)["aal"] === "aal2" ? "aal2" : "aal1";
+  } catch {
+    return "aal1";
+  }
 }
 
 /**

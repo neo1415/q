@@ -41,10 +41,33 @@ import {
  * cannot be fetched. Failing closed on a bad signature is never a fallback.
  */
 
+/**
+ * The assurance level an access token was issued at (its signed `aal`
+ * claim). Anything that is not exactly `aal2` is treated as `aal1`: a
+ * missing or unexpected claim never counts as a passed second step.
+ */
+export type AssuranceLevel = "aal1" | "aal2";
+
+export function tokenAssurance(claim: unknown): AssuranceLevel {
+  return claim === "aal2" ? "aal2" : "aal1";
+}
+
+/**
+ * "Is this session still alive, at the assurance the user requires?"
+ *
+ * Two-step verification is enforced here, on the server, not by the web
+ * app's routing: a user with a verified second factor whose token is only
+ * `aal1` (password, link or Google passed, the code not yet entered) is not
+ * signed in as far as the API is concerned. Whether the user has a verified
+ * factor is decided from the database (`auth.mfa_factors`), never from the
+ * token or anything the client sent, because a client that skipped the
+ * challenge is exactly the one that would lie about it.
+ */
 export type SessionLiveness = {
   readonly isLive: (input: {
     readonly sessionId: string;
     readonly authUserId: string;
+    readonly assurance: AssuranceLevel;
   }) => Promise<boolean>;
 };
 
@@ -92,12 +115,19 @@ export function createLocalJwtAccessTokenAuthenticator(
   async function sessionLive(
     sessionId: string,
     authUserId: string,
+    assurance: AssuranceLevel,
     fresh: boolean,
   ): Promise<boolean> {
-    const key = `${sessionId}:${authUserId}`;
+    // The assurance is part of the key: an aal2 check never serves an aal1
+    // token of the same session, nor the other way round.
+    const key = `${sessionId}:${authUserId}:${assurance}`;
     const cached = liveUntil.get(key);
     if (!fresh && cached !== undefined && cached > now()) return true;
-    const live = await options.sessions.isLive({ sessionId, authUserId });
+    const live = await options.sessions.isLive({
+      sessionId,
+      authUserId,
+      assurance,
+    });
     if (live) {
       if (liveUntil.size >= SESSION_CACHE_MAX) liveUntil.clear();
       liveUntil.set(key, now() + ttl);
@@ -154,7 +184,12 @@ export function createLocalJwtAccessTokenAuthenticator(
     ) {
       return null;
     }
-    const live = await sessionLive(sessionId, authUserId.data, freshSession);
+    const live = await sessionLive(
+      sessionId,
+      authUserId.data,
+      tokenAssurance(claims["aal"]),
+      freshSession,
+    );
     return live ? { authUserId: authUserId.data } : null;
   }
 
