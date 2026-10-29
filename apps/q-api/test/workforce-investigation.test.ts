@@ -10,6 +10,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   analysisContent,
+  investigationGaps,
   investigationSections,
   mergeDossiers,
   recordsText,
@@ -21,6 +22,8 @@ import {
   workforceDeepResearch,
   type ResearchDossier,
 } from "../src/composition/workforce/deep-research.js";
+import { deliveryText } from "../src/composition/workforce/delivery.js";
+import { researchStepSummary } from "../src/composition/workforce/jobs.js";
 import type { LivePatch } from "../src/composition/workforce/live.js";
 import type {
   ResearchFactsOutput,
@@ -856,5 +859,108 @@ describe("the investigation report", () => {
     expect(
       content.sections.every((s) => !/\d+\s?% confiden/u.test(s.body)),
     ).toBe(true);
+  });
+});
+
+describe("a research plan that fails (live 2026-10-29)", () => {
+  /** Fails its first calls with the classes given, then plans `then`. */
+  function failing(
+    failures: readonly (string | null)[],
+    then: ResearchPlanOutput,
+    inputs: ResearchPlanInput[],
+  ): WorkforceModels["planResearch"] {
+    return (_who, _trace, input, options) => {
+      inputs.push(input);
+      const failure = failures[inputs.length - 1];
+      if (failure !== undefined) {
+        options?.onFailed?.(failure);
+        return Promise.resolve(null);
+      }
+      return Promise.resolve({ costUsd: 0.01, output: then });
+    };
+  }
+  const run = (planResearch: WorkforceModels["planResearch"], sent: string[]) =>
+    research({
+      sent,
+      models: { planResearch, researchFacts: readerOf([]) },
+    })({
+      actor,
+      runId: randomUUID(),
+      request: REQUEST,
+      query: "x",
+      budgetUsd: 2,
+    });
+
+  it("asks once more after a transient failure, and investigates as planned", async () => {
+    const sent: string[] = [];
+    const inputs: ResearchPlanInput[] = [];
+    const found = await run(failing(["TRANSIENT"], ROUND_ONE, inputs), sent);
+    expect(found.status).toBe("OK");
+    if (found.status !== "OK") return;
+    // The retry is the same question.
+    expect(inputs[1]).toEqual(inputs[0]);
+    expect(sent).toEqual(
+      expect.arrayContaining([
+        "zedland widget payments market size",
+        "zedland widget payments competitors",
+      ]),
+    );
+    expect(found.dossier?.investigation?.reduced).toBeUndefined();
+    expect(researchStepSummary(found)).toMatch(/^Read /u);
+  });
+
+  it("says plainly, in the report and on the card, that it ran reduced when the retry fails too", async () => {
+    const sent: string[] = [];
+    const inputs: ResearchPlanInput[] = [];
+    const found = await run(
+      failing(["TRANSIENT", "RATE_LIMIT"], { questions: [] }, inputs),
+      sent,
+    );
+    expect(found.status).toBe("OK");
+    if (found.status !== "OK" || found.dossier === undefined) return;
+    // One generic search, as before -- but no longer passed off as whole.
+    expect(sent).toHaveLength(1);
+    const reduced = found.dossier.investigation?.reduced ?? "";
+    expect(reduced).toMatch(
+      /ran in a reduced form: the research plan could not be written because the model service failed with a temporary error, twice, so it searched the request's own words as a single query/u,
+    );
+    // The report's gaps open with it.
+    expect(
+      investigationGaps(mergeDossiers([found.dossier]).investigations)[0],
+    ).toBe(reduced);
+    // The job's card says it first.
+    expect(researchStepSummary(found)).toMatch(
+      /^Ran in a reduced form: no research plan could be made, so it searched the request as one query\. Read /u,
+    );
+    // The delivery card says it, after the summary.
+    const text = deliveryText({
+      artifactId: randomUUID(),
+      delivery: {
+        title: "Zedland widget payments",
+        artifactType: "ANALYSIS",
+        summary: "A summary.",
+        topRecommendations: [],
+        passed: true,
+        openIssues: 0,
+        reducedResearch: reduced,
+      },
+    });
+    expect(text.split("\n\n")[2]).toBe(reduced);
+  });
+
+  it("does not ask again after a failure that is not transient, and says it ran reduced", async () => {
+    const sent: string[] = [];
+    const inputs: ResearchPlanInput[] = [];
+    const found = await run(
+      failing(["INVALID_REQUEST"], { questions: [] }, inputs),
+      sent,
+    );
+    expect(
+      found.status === "OK" && found.dossier?.investigation?.reduced,
+    ).toMatch(
+      /^This investigation ran in a reduced form: the research plan could not be written, so/u,
+    );
+    // Round one asked once; nothing was retried.
+    expect(inputs.filter((input) => input.gaps === "")).toHaveLength(1);
   });
 });
