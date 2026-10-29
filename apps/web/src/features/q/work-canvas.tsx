@@ -595,14 +595,26 @@ function StepBar({
 function StepInView({
   step,
   stage,
+  filed = false,
 }: {
+  /**
+   * The job is done and its document filed (live 2026-10-29, run A: the
+   * card said Done while its line still read "Filing the document · 8
+   * review points still open"). The reviewer's points left open are in
+   * the document, not still being worked.
+   */
+  readonly filed?: boolean | undefined;
   readonly step: WorkforceLiveStageName;
   readonly stage: WorkforceLiveStage | null;
 }) {
   const t = useT();
   const read = stage?.read ?? [];
   const sections = stage?.sections ?? [];
-  const line = t(stepInViewLine(step, stage));
+  const line = t(
+    filed && step === "FILING"
+      ? "Filed the document"
+      : stepInViewLine(step, stage),
+  );
   // Owner 2026-10-29: what Q decided to look into, from its research brief.
   const brief =
     RESEARCH_VIEW.has(step) && stage?.brief != null && stage.brief.length > 0
@@ -715,9 +727,13 @@ function StepInView({
                 ? points === 1
                   ? "1 review point to close"
                   : `${String(points)} review points to close`
-                : points === 1
-                  ? "1 review point still open"
-                  : `${String(points)} review points still open`,
+                : filed
+                  ? points === 1
+                    ? "1 review point noted in the document"
+                    : `${String(points)} review points noted in the document`
+                  : points === 1
+                    ? "1 review point still open"
+                    : `${String(points)} review points still open`,
             )}
           </span>
         ) : null}
@@ -763,10 +779,12 @@ export function WorkInProgressCard({
   // Someone else's job, or one that no longer exists: nothing to follow.
   if (missing) return null;
 
+  // Done once Filing is in view: the chip and the filed line agree (live
+  // 2026-10-29, run A: Done underneath, "Working · Filing…" on screen).
   const status: Status =
     live === null
       ? "WORKING"
-      : live.state === "DONE" && shown < steps.length
+      : live.state === "DONE" && shown < steps.length - 1
         ? "WORKING"
         : live.state;
   const title = live?.document?.title ?? live?.stage?.title ?? block.title;
@@ -908,7 +926,11 @@ export function WorkInProgressCard({
           )}
         </div>
       ) : finishedBare ? null : (
-        <StepInView step={inView} stage={live?.stage ?? null} />
+        <StepInView
+          step={inView}
+          stage={live?.stage ?? null}
+          filed={live?.state === "DONE"}
+        />
       )}
     </section>
   );

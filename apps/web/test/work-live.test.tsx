@@ -310,10 +310,22 @@ describe("the card", () => {
       // Walk time forward: Filing comes into view (revising skipped), and
       // only after its own time does the card become the document.
       const seen: string[] = [];
+      const filedLines: string[] = [];
       for (let tick = 0; tick < 40 && documentCard() === null; tick += 1) {
         await vi.advanceTimersByTimeAsync(150);
         seen.push(JSON.stringify(stepsShown()));
+        const line = window.document.querySelector(
+          '[data-q-work-line="FILING"]',
+        );
+        if (line !== null)
+          filedLines.push(
+            `${window.document.querySelector("[data-q-work-status]")?.getAttribute("data-q-work-status") ?? ""}|${line.textContent}`,
+          );
       }
+      // Filed: the chip says Done and the line says filed, never "Filing…".
+      expect(filedLines.length).toBeGreaterThan(0);
+      for (const shown of filedLines)
+        expect(shown.startsWith("DONE|Filed the document")).toBe(true);
       expect(seen).toContain(
         JSON.stringify(["DONE", "DONE", "DONE", "DONE", "SKIPPED", "CURRENT"]),
       );

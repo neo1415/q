@@ -616,6 +616,7 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "Revising the draft": "تنقيح المسودة",
   "Revising: draft {n} of {n2}": "التنقيح: المسودة {n} من {n2}",
   "Filing the document": "حفظ المستند",
+  "Filed the document": "تم حفظ المستند",
   "Step {n} of {n2}": "الخطوة {n} من {n2}",
   Progress: "التقدّم",
   "Sections so far": "الأقسام حتى الآن",
@@ -640,6 +641,9 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "{n} review points to close": "{n} نقاط مراجعة لإغلاقها",
   "1 review point still open": "نقطة مراجعة واحدة ما زالت مفتوحة",
   "{n} review points still open": "{n} نقاط مراجعة ما زالت مفتوحة",
+  "1 review point noted in the document": "نقطة مراجعة واحدة مدوّنة في المستند",
+  "{n} review points noted in the document":
+    "{n} نقاط مراجعة مدوّنة في المستند",
   "This work is waiting for you on the Work page.":
     "هذا العمل بانتظارك في صفحة المهام.",
   "Open Work": "فتح المهام",

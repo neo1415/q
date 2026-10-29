@@ -92,6 +92,17 @@ describe("a Q reply in the chat thread", () => {
     expect(sources.getAttribute("aria-controls")).toBe(panel?.id);
   });
 
+  it("counts only sources on the Sources chip (live 2026-10-29, run B)", () => {
+    render(
+      <QAnswer
+        turn={turn({ sourceCount: 0, publicSources: [] })}
+        mark={false}
+      />,
+    );
+    // Findings and open questions sit behind it, but they are not sources.
+    expect(screen.getByRole("button", { name: /^Sources$/ })).toBeTruthy();
+  });
+
   it("expands a chip in place and collapses it again", async () => {
     const user = userEvent.setup();
     const { container } = render(<QAnswer turn={turn()} mark={false} />);
