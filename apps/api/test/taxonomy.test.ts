@@ -116,6 +116,7 @@ function fakeQuery(overrides: Partial<TaxonomyQueryPort> = {}) {
     listChildren: notUnderTest,
     listAncestors: notUnderTest,
     listDescendants: notUnderTest,
+    listNarrower: notUnderTest,
     listAliases: notUnderTest,
     findNodesByAlias: notUnderTest,
     getVersionSet: () => Promise.resolve({ industry: 1 }),
