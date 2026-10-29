@@ -1,0 +1,245 @@
+{
+  "id": "G-founder-kenya-agri-fintech",
+  "why": "A second real market (Kenyan agri-fintech) from the founder's company country, with no place in the words.",
+  "actor": "founder",
+  "request": "What changed in our market this year, and who are we up against?",
+  "earlierTurns": [],
+  "stepGoal": "Learn this year's developments and the competitors in the company's own market.",
+  "public": {
+    "company": {
+      "name": "ShambaPay",
+      "country": "KE",
+      "sectors": ["agri-fintech", "payments"],
+      "description": "Input-credit and payments for smallholder co-operatives over M-Pesa."
+    }
+  },
+  "situation": {
+    "version": "situation/v1",
+    "side": "FOUNDER",
+    "asOf": "2026-10-29T09:00:00.000Z",
+    "sections": [
+      {
+        "source": "ACTIVITY",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "RELATIONSHIPS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "MESSAGES",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "SCHEDULE",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "BOARD",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "Q_WORK",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "MEMORY",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F1",
+            "statement": "Sees Apollo Agriculture and Pula as the closest comparables.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "memory_recall",
+              "record": {
+                "kind": "MEMORY_ITEM",
+                "id": "memory-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "Q_DAILY",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PUBLIC",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "INTEREST",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PROSPECTS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PROFILE",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F2",
+            "statement": "ShambaPay Ltd, Nairobi, Kenya. Sectors: agri-fintech, payments. Stage: pre-seed. What it does: input-credit and payments for smallholder co-operatives over M-Pesa.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_company_profile",
+              "record": {
+                "kind": "COMPANY",
+                "id": "profile-1"
+              },
+              "url": null
+            },
+            "label": "network_visible",
+            "category": "COMPANY_IDENTITY"
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "DECK",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F3",
+            "statement": "Deck v2: 3,200 farmers active, KES 18 million disbursed (founder claim).",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_deck",
+              "record": {
+                "kind": "DOCUMENT",
+                "id": "deck-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": "COMPANY_IDENTITY"
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "DATA_ROOM",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PITCH_VIDEO",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "READINESS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "CLAIMS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "CAPITAL",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F4",
+            "statement": "Raising USD 400,000 pre-seed; runway 5 months.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_capital",
+              "record": {
+                "kind": "COMPANY",
+                "id": "capital-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": "BURN_RATE"
+          }
+        ],
+        "truncated": false
+      }
+    ],
+    "unknowns": [],
+    "publicTopics": ["agri-fintech KE", "payments KE", "ShambaPay"]
+  },
+  "capitalQRecords": [],
+  "expect": {
+    "places": ["KE"],
+    "regionTerms": ["east africa"],
+    "primaryDomains": [".go.ke", "centralbank.go.ke", "cma.or.ke"],
+    "privateMarkers": ["3,200", "18 million", "400,000"],
+    "sections": [
+      "DEVELOPMENTS",
+      "COMPETITIVE",
+      "CONTRADICTIONS",
+      "CANNOT_ESTABLISH",
+      "GAPS_NEXT"
+    ],
+    "mandateTerms": [],
+    "pipelineCompanies": [],
+    "statesGlobal": false,
+    "brief": {
+      "required": true,
+      "select": ["F2"],
+      "exclude": ["F4", "F3"]
+    }
+  }
+}
