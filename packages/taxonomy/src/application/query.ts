@@ -84,6 +84,15 @@ export type TaxonomyQueryPort = {
     nodeId: TaxonomyNodeId,
     maxDepth?: number,
   ) => Promise<readonly TaxonomyNode[]>;
+  /**
+   * Nodes this node is declared `broader_than` (a reference edge, usually
+   * across vocabularies: Healthcare is broader than Telehealth), each with
+   * its own primary descendants. Never `related_to` or `overlaps`: only a
+   * declared narrower-than relation makes a node "under" another.
+   */
+  readonly listNarrower: (
+    nodeId: TaxonomyNodeId,
+  ) => Promise<readonly TaxonomyNode[]>;
   readonly listAliases: (
     nodeId: TaxonomyNodeId,
   ) => Promise<readonly TaxonomyAlias[]>;
@@ -178,6 +187,29 @@ export function createTaxonomyQueryPort(dependencies: {
           TAXONOMY_DESCENDANTS_MAX_DEPTH,
         ),
       ),
+    listNarrower: async (nodeId) => {
+      const edges = await reference.listEdges(sql, nodeId);
+      const narrower = [
+        ...new Set(
+          edges
+            .filter(
+              (edge) =>
+                edge.edgeType === "broader_than" && edge.fromNodeId === nodeId,
+            )
+            .map((edge) => edge.toNodeId),
+        ),
+      ].sort();
+      if (narrower.length === 0) return [];
+      const [nodes, below] = await Promise.all([
+        reference.findNodesByIds(sql, narrower),
+        Promise.all(
+          narrower.map((id) =>
+            reference.listDescendants(sql, id, TAXONOMY_DESCENDANTS_MAX_DEPTH),
+          ),
+        ),
+      ]);
+      return [...nodes, ...below.flat()];
+    },
     listAliases: (nodeId) => reference.listAliases(sql, nodeId),
     findNodesByAlias: (alias, locale) =>
       reference.findNodesByNormalizedAlias(sql, normalizeAlias(alias), locale),

@@ -19,6 +19,7 @@ import type {
   CompanyFeatureProjectionPort,
   PreferenceHierarchyPort,
 } from "../features/ports.js";
+import { nodesUnder } from "./taxonomy-expansion.js";
 
 /**
  * Feature sources, assembled from the owning contexts' public ports and
@@ -102,7 +103,7 @@ export function createDomainFeaturePorts(
               node.canonicalCode === UNRESTRICTED_GEOGRAPHY_CODE;
             const descendants = unrestricted
               ? []
-              : await taxonomy.listDescendants(node.id);
+              : await nodesUnder(taxonomy, node);
             return [
               {
                 preferredNodeId: node.id,
