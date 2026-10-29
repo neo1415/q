@@ -52,6 +52,8 @@ export type InvestorWorld = {
   readonly attempts: () => readonly string[];
   /** Each batch submission, by the steps it carried. */
   readonly batches: () => readonly (readonly string[])[];
+  /** Every value a step held, in order: its answer history. */
+  readonly history: (stepKey: string) => readonly OnboardingResponseValue[];
   /**
    * Q's recommendations as the onboarding service keeps them (P0-2): a
    * durable store the world owns, so a second interviewer instance (a
@@ -87,6 +89,15 @@ export type WorldOptions = {
   readonly refuseSkipOfAnswered?: boolean | undefined;
   /** Taxonomy nodes the classifier returns, by phrase. */
   readonly taxonomy?: Readonly<Record<string, string>> | undefined;
+  /** Phrases the classifier finds ambiguous, with its candidates. */
+  readonly taxonomyAmbiguous?:
+    | Readonly<
+        Record<
+          string,
+          readonly { readonly nodeId: string; readonly displayName: string }[]
+        >
+      >
+    | undefined;
   /**
    * The category look-up is refused (400, no organisation context) until
    * this step holds an answer, as for a brand-new investor (live AI).
@@ -177,7 +188,9 @@ export function investorSession(options: WorldOptions): InvestorWorld {
   const setAside = new Set<string>();
   /** When each answer was given in this run (seeded answers: NOW). */
   const answeredAt = new Map<string, string>();
+  const versions: { stepKey: string; value: OnboardingResponseValue }[] = [];
   const answer = (stepKey: string, value: OnboardingResponseValue) => {
+    versions.push({ stepKey, value });
     held.set(stepKey, value);
     answeredAt.set(stepKey, new Date().toISOString());
   };
@@ -404,6 +417,34 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       };
       const phrase = (body.text ?? "").toLowerCase();
       const node = options.taxonomy?.[phrase];
+      const several = options.taxonomyAmbiguous?.[phrase];
+      if (node === undefined && several !== undefined) {
+        // Several categories the word could mean: the lookup abstains
+        // from choosing (live 2026-10-28: "health").
+        return Promise.resolve(
+          Response.json({
+            resolution: "AMBIGUOUS",
+            candidates: several.map((c, index) => ({
+              nodeId: c.nodeId,
+              vocabularyCode: "industry",
+              canonicalCode: c.displayName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_"),
+              displayName: c.displayName,
+              rank: index + 1,
+              confidence: "0.6000",
+              matchTypes: ["LEXICAL"],
+              rationaleSummary: "test fixture",
+            })),
+            taxonomyVersions: { industry: 1 },
+            classifier: {
+              provider: "capital_q",
+              model: "deterministic_lexical",
+              version: "test",
+            },
+          }),
+        );
+      }
       return Promise.resolve(
         Response.json({
           resolution: node === undefined ? "ABSTAINED" : "EXACT",
@@ -741,6 +782,8 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     thread: () => thread.map((t) => ({ role: t.role, text: t.text })),
     attempts: () => [...tried],
     batches: () => batches.map((b) => [...b]),
+    history: (stepKey) =>
+      versions.filter((v) => v.stepKey === stepKey).map((v) => v.value),
     recommendations: {
       recommend: (input) => {
         for (const earlier of kept) {

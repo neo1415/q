@@ -570,6 +570,10 @@ export {
   type WordsWho,
 } from "./words-readers.js";
 export {
+  createTaxonomyChooser,
+  type TaxonomyChooser,
+} from "./taxonomy-chooser.js";
+export {
   createQDelegationReader,
   NO_TURN_AUTHORITY,
   type QDelegationReader,

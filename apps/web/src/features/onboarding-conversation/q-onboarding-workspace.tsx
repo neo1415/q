@@ -99,6 +99,7 @@ import {
   contentHashOf,
   nothingNewLine,
   canOfferFinish,
+  chipsBelongTo,
   findingsFromDocument,
   findingsNotFromDocuments,
   publicFindingsNote,
@@ -550,6 +551,8 @@ export function QOnboardingWorkspace({
   );
   const isFinal =
     prompt !== null && vocabulary.finalStepKeys.includes(prompt.stepKey);
+  /** What the Finish control says to Q for them: their "that's all". */
+  const finishWords = t("That's everything for now. Please finish my setup.");
   const taxonomy = useMemo(
     () =>
       view === undefined || prompt === null || prompt.control !== "taxonomy"
@@ -730,7 +733,9 @@ export function QOnboardingWorkspace({
         // Came for one section of their profile: Q opens on it, whatever
         // it was last waiting on.
         const pending =
-          focus === undefined ? questionOnReturn(kept, lastActivityAt) : null;
+          focus === undefined
+            ? questionOnReturn(kept, lastActivityAt, Date.now(), greeted)
+            : null;
         // The question on the table is shown as the question, not also as
         // the thread's last line (QA F-50: Q's line twice after a reload),
         // as it was before the reload.
@@ -810,6 +815,7 @@ export function QOnboardingWorkspace({
     actions,
     focus,
     greeting,
+    greeted,
   ]);
 
   const settleReading = useCallback(() => {
@@ -2025,8 +2031,11 @@ export function QOnboardingWorkspace({
     qStream?.stage === null || qStream?.stage === undefined
       ? "Thinking"
       : Q_VISIBLE_STAGE_LABELS[qStream.stage];
+  // The cursor step's chips only while Q's question is about that step
+  // (production re-test 2026-10-28: the investor-type chips stayed under
+  // three later questions about currency, until the answer was saved).
   const visibleChips =
-    prompt === null
+    prompt === null || !chipsBelongTo(prompt.stepKey, qAsking)
       ? []
       : prompt.chips.filter(
           (chip) =>
@@ -2562,10 +2571,18 @@ export function QOnboardingWorkspace({
         </div>
       ) : null}
 
-      {isFinal ? (
-        <div className="flex flex-wrap items-center gap-2">
+      {isFinal && !(coverage !== null && canOfferFinish(coverage)) ? (
+        // Re-test #3 (shot 27, 390 px): the review's whole question was the
+        // button's label and ran off the screen. The question is a line that
+        // wraps; the button says what it does.
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          {prompt?.text === undefined ? null : (
+            <p className="cq-body min-w-0 break-words text-(--cq-text-primary)">
+              {prompt.text}
+            </p>
+          )}
           <Button disabled={working} onClick={onFinish}>
-            {prompt?.text ?? "Finish"}
+            {t("Looks right, finish")}
           </Button>
         </div>
       ) : null}
@@ -2626,13 +2643,26 @@ export function QOnboardingWorkspace({
         </section>
       ) : null}
 
-      {!isFinal && coverage !== null && canOfferFinish(coverage) ? (
+      {coverage !== null && canOfferFinish(coverage) ? (
         // D3 (live typed run 2026-10-28): "that's all for now" paused the
         // interview and nothing on screen could finish it. Once coverage
         // says every essential is in, finishing is one visible tap; the
         // runtime still decides whether the session may complete.
+        // Re-test #3: the tap is their "that's all": said to Q, which reads
+        // the record back and finishes on their yes, as typed or spoken.
         <div className="flex flex-wrap items-center gap-3" data-q-finish-offer>
-          <Button disabled={working} onClick={onFinish} data-q-finish>
+          <Button
+            disabled={working}
+            onClick={() => {
+              const words = finishWords;
+              if (voiceActive) {
+                voiceSendText(words);
+                return;
+              }
+              void say(words);
+            }}
+            data-q-finish
+          >
             {t("Finish setup")}
           </Button>
           <span className="cq-caption text-(--cq-text-secondary)">

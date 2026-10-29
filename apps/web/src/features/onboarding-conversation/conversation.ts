@@ -687,10 +687,30 @@ export function questionOnReturn(
   }[],
   lastActivityAt: string,
   now: number = Date.now(),
+  /**
+   * They came back to continue (Home's "Finish setup with Q"): a last line
+   * of Q's that asks nothing (the pause line, "Pick this up whenever you
+   * like") is history, and Q opens again with the open question
+   * (production re-test 2026-10-28: the resumed thread ended on the pause
+   * line and asked nothing).
+   */
+  returned = false,
 ): string | null {
   const pending = pendingQuestion(turns, lastActivityAt);
+  if (returned && pending !== null && !pending.includes("?")) return null;
   const said = Date.parse(turns.at(-1)?.createdAt ?? "");
   return pending !== null && now - said < RESUME_AFTER_MS ? pending : null;
+}
+
+/**
+ * Whether the step's chips belong under Q's current question: before Q
+ * has said what it asks (null) they do; after, only when Q asks that step.
+ */
+export function chipsBelongTo(
+  stepKey: string,
+  asking: readonly string[] | null,
+): boolean {
+  return asking === null || asking.includes(stepKey);
 }
 
 /**
@@ -1206,9 +1226,13 @@ export function canOfferFinish(coverage: {
 }): boolean {
   if (coverage.summary.canComplete) return true;
   if (coverage.summary.contradictory > 0) return false;
+  // The journey's review checkpoints are not coverage fields, and they are
+  // confirmed on Finish itself (read back, then their yes): every essential
+  // fact in is enough to offer it (production re-test 2026-10-28: no
+  // Finish on either side, because canComplete waits for those reviews).
   const required = coverage.fields.filter((f) => f.applicable && f.required);
   return (
-    required.some((f) => f.savePending) &&
+    required.length > 0 &&
     required.every(
       (f) =>
         f.savePending ||

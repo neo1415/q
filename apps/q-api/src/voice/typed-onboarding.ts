@@ -117,7 +117,7 @@ export function createTypedOnboarding(dependencies: {
           journeyType: input.journeyType,
         },
       };
-      const portOf = (finishing: boolean, startedOn: string | null = null) =>
+      const portOf = (finishing: boolean) =>
         createOnboardingPort({
           session: input.session,
           onboardingSessionId: input.onboardingSessionId,
@@ -140,11 +140,12 @@ export function createTypedOnboarding(dependencies: {
             userId: actor.userId,
             sessionId: input.onboardingSessionId,
           }),
-          // A record review is confirmed only once shown: read back by
-          // code, or the step the journey stood on (its question on screen).
-          reviewShown: (stepKey) =>
-            readBackShown.has(input.onboardingSessionId) ||
-            startedOn === stepKey,
+          // A record review is confirmed only once code read the record
+          // back in this conversation and they then said yes (production
+          // re-test 2026-10-28: the raise confirmation was saved on "that's
+          // all" because the journey's cursor stood on it; a cursor is not
+          // something the person saw in a typed conversation).
+          reviewShown: () => readBackShown.has(input.onboardingSessionId),
         });
       const port = portOf(false);
       // Their words go in the thread first, so leaving now loses nothing;
@@ -158,7 +159,6 @@ export function createTypedOnboarding(dependencies: {
         input.onboardingSessionId,
         THREAD_LIMIT,
       ).catch(() => ({ items: [] }));
-      const startedOn = port.view()?.session.currentStepKey ?? null;
       const turns = thread.items.map((turn) => ({
         role: turn.role,
         text: turn.text,
@@ -227,7 +227,7 @@ export function createTypedOnboarding(dependencies: {
         path = "PAUSING";
       } else if (authority?.finishing === true) {
         await conversation.flush?.(line);
-        const finishing = portOf(true, startedOn);
+        const finishing = portOf(true);
         const finished = await finishing.finish();
         const now = await finishing.state();
         const review =
@@ -402,7 +402,60 @@ export function reviewOf(
         ?.configuration.stepType === "confirmation",
   );
   if (reviewStep === undefined) return undefined;
-  return { stepKey: reviewStep.stepKey, saved: savedLines(state, labelOf) };
+  return {
+    stepKey: reviewStep.stepKey,
+    saved: groupedSaved(state, journey, labelOf),
+  };
+}
+
+/** The most answers one read-back carries: every essential, then the rest. */
+const READ_BACK_ITEMS = 40;
+
+/**
+ * What is saved, grouped by the setup's own sections ("Raise: Raising now:
+ * Yes; Target: $400,000"), every essential always in, optional answers
+ * after them up to READ_BACK_ITEMS (production re-test 2026-10-28: a
+ * read-back cut at fourteen lines left out the revenue and the raise).
+ */
+export function groupedSaved(
+  state: OnboardingState,
+  journey: "founder" | "investor",
+  labelOf: (stepKey: string) => string | undefined,
+): string[] {
+  const definition = definitionFor(journey);
+  const manifests = new Map(definition.steps.map((s) => [s.stepKey, s]));
+  const rows = state.steps.filter(
+    (row) =>
+      row.status === "ANSWERED" && row.kind !== "YES_NO" && row.value !== null,
+  );
+  const essential = rows.filter((row) => row.required);
+  const optional = rows.filter((row) => !row.required);
+  const kept = new Set(
+    [
+      ...essential,
+      ...optional.slice(0, Math.max(0, READ_BACK_ITEMS - essential.length)),
+    ].map((row) => row.stepKey),
+  );
+  const plain = (value: string) => value.trim().replace(/[.;\s]+$/u, "");
+  const groups = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!kept.has(row.stepKey)) continue;
+    const phase = manifests.get(row.stepKey)?.configuration.phaseKey ?? "";
+    const items = groups.get(phase) ?? [];
+    items.push(
+      `${labelOf(row.stepKey) ?? row.question}: ${plain(row.value ?? "")}`,
+    );
+    groups.set(phase, items);
+  }
+  const titles = new Map(
+    definition.schema.phases.map((p) => [p.phaseKey, p.label] as const),
+  );
+  return [...groups.entries()].map(([phase, items]) => {
+    const title = titles.get(phase);
+    return title === undefined
+      ? items.join("; ")
+      : `${title}: ${items.join("; ")}`;
+  });
 }
 
 function savedLines(
@@ -417,7 +470,8 @@ function savedLines(
         row.value !== null,
     )
     .map(
-      (row) => `${labelOf(row.stepKey) ?? row.question}: ${row.value ?? ""}`,
+      (row) =>
+        `${labelOf(row.stepKey) ?? row.question}: ${(row.value ?? "").trim().replace(/[.;\s]+$/u, "")}`,
     );
 }
 
@@ -426,7 +480,7 @@ export function savedSoFar(
   state: OnboardingState,
   labelOf: (stepKey: string) => string | undefined,
 ): string {
-  const saved = savedLines(state, labelOf).slice(0, 16);
+  const saved = savedLines(state, labelOf).slice(0, READ_BACK_ITEMS);
   const saving = state.steps
     .filter((row) => row.savePending === true && row.status !== "ANSWERED")
     .map((row) => (labelOf(row.stepKey) ?? row.question).toLowerCase());

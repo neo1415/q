@@ -115,6 +115,11 @@ const STILL_SAVING_REASON =
  * company snapshot, the mandate review): confirmed only once shown.
  */
 const RECORD_REVIEWS: ReadonlySet<string> = new Set([
+  // Production re-test 2026-10-28: the company review and the raise
+  // confirmation were confirmed on "that's all" before anything was read
+  // back; every review the person confirms is shown first.
+  FOUNDER_STEPS.review,
+  FOUNDER_STEPS.raiseConfirm,
   FOUNDER_STEPS.snapshot,
   INVESTOR_STEPS.review,
 ]);
@@ -212,6 +217,20 @@ export type HeldOnboardingWrites = {
   ) => Promise<void>;
   /** Step keys with a held change, not yet saved. */
   readonly pendingSteps: () => Promise<ReadonlySet<string>>;
+  /**
+   * The held changes themselves, oldest first: a correction to one is
+   * written after it, so the record keeps both versions (production
+   * re-test 2026-10-28: 25000 corrected to 50000 left no history).
+   */
+  readonly pendingValues?:
+    | (() => Promise<
+        readonly {
+          readonly stepKey: string;
+          readonly value: unknown;
+          readonly note?: string | undefined;
+        }[]
+      >)
+    | undefined;
   readonly drain?:
     | ((ports: {
         readonly currentValue: (stepKey: string) => Promise<unknown>;
@@ -314,6 +333,18 @@ export function addedTo(
         ],
       },
       note: notes(onRecord.note, note),
+    };
+  }
+  // Words never replace a list on the record (production re-test
+  // 2026-10-28): the list stays, their words beside it.
+  if (
+    (onRecord.value.type === "MULTI_SELECT" ||
+      onRecord.value.type === "RESOURCE_REFERENCE") &&
+    value.type === "TEXT"
+  ) {
+    return {
+      value: onRecord.value,
+      note: notes(onRecord.note, note, value.text.slice(0, 200)),
     };
   }
   if (
@@ -673,6 +704,23 @@ export function createOnboardingPort(input: {
    * the whole list. Absent: an answer replaces, as a typed one does.
    */
   readonly addsTo?: ReadonlySet<string> | undefined;
+  /**
+   * A category word the taxonomy lookup found ambiguous, chosen among the
+   * lookup's own candidates by meaning (TAXONOMY_MAPPING). Null or empty:
+   * their word is kept in their words, as before. Absent: likewise.
+   */
+  readonly chooseCategories?:
+    | ((choice: {
+        readonly field: string;
+        readonly phrase: string;
+        readonly sentence: string;
+        readonly candidates: readonly {
+          readonly nodeId: string;
+          readonly displayName: string;
+          readonly vocabularyCode: string;
+        }[];
+      }) => Promise<readonly string[] | null>)
+    | undefined;
   /**
    * Whether the person has been shown what this review step confirms (Q
    * asked it, or read back the whole record). A review is confirmed only
@@ -1355,6 +1403,33 @@ export function createOnboardingPort(input: {
           continue;
         }
         if (found.resolution !== "EXACT" && found.candidates.length > 1) {
+          // Production re-test 2026-10-28: "health" matched Healthcare,
+          // Digital Health and Health Access, and was never saved as a
+          // sector. Which of the lookup's own candidates their word names
+          // is read by meaning (TAXONOMY_MAPPING); never outside them.
+          const chosen =
+            input.chooseCategories === undefined
+              ? null
+              : await input
+                  .chooseCategories({
+                    field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(
+                      0,
+                      200,
+                    ),
+                    phrase,
+                    sentence: answer.quote ?? phrase,
+                    candidates: found.candidates.slice(0, 12),
+                  })
+                  .catch(() => null);
+          if (chosen !== null && chosen.length > 0) {
+            for (const id of chosen) {
+              const node = found.candidates.find((cand) => cand.nodeId === id);
+              if (node === undefined) continue;
+              if (!ids.includes(id)) ids.push(id);
+              nodeNames.set(id, node.displayName);
+            }
+            continue;
+          }
           // Their own words, kept beside the categories that did match,
           // when Q marks them so (live 2026-09-30: "AI infrastructure"
           // came back as ambiguous three times running).
@@ -1410,6 +1485,25 @@ export function createOnboardingPort(input: {
                   600,
                 ),
             },
+          };
+        }
+        // Categories already on the record are never replaced by words
+        // (production re-test 2026-10-28: the sectors on record became the
+        // free text "fintech and health" on a later reading, and Discover
+        // matched without sectors). The categories stay; their words are
+        // kept beside them as a note.
+        const onRecord = (await current()).responses.find(
+          (response) => response.stepKey === step.stepKey,
+        );
+        if (
+          onRecord?.value.type === "RESOURCE_REFERENCE" &&
+          onRecord.value.resourceIds.length > 0
+        ) {
+          return {
+            ok: true,
+            step,
+            value: onRecord.value,
+            note: ownWordsFor(unmatched.join(", ")).slice(0, 200),
           };
         }
         // No category holds their words: kept as they said them, like
@@ -2609,14 +2703,21 @@ export function createOnboardingPort(input: {
     // in one turn, each a revision and a round trip).
     const adding = input.addsTo?.has(resolved.step.stepKey) === true;
     const onRecord = (
-      adding ? (latest ?? (await current())) : latest
+      adding || resolved.value.type === "TEXT"
+        ? (latest ?? (await current()))
+        : latest
     )?.responses.find((r) => r.stepKey === resolved.step.stepKey);
     // A list they add to (owner 2026-10-28: "crypto and gambling" replaced
     // by "adult content" on a later reading): what is on the record stays,
     // with the new items beside it, unless the reading found they meant
     // this as the whole list.
+    const structuredList =
+      onRecord !== undefined &&
+      (onRecord.value.type === "MULTI_SELECT" ||
+        onRecord.value.type === "RESOURCE_REFERENCE") &&
+      resolved.value.type === "TEXT";
     const added =
-      onRecord !== undefined && adding
+      onRecord !== undefined && (adding || structuredList)
         ? addedTo(onRecord, resolved.value, resolved.note)
         : null;
     const value = added?.value ?? resolved.value;
@@ -2697,26 +2798,64 @@ export function createOnboardingPort(input: {
       trusted = false;
       readAt = null;
       try {
-        const out = await onFreshVersion((version) =>
-          submitOnboardingResponses(
-            input.session,
-            input.onboardingSessionId,
-            {
-              responses: ready.map((item) => ({
-                stepKey: item.plan.step.stepKey,
-                response: {
-                  value: item.value,
-                  ...(item.plan.note === undefined
-                    ? {}
-                    : { note: item.plan.note }),
-                  channel: "CONVERSATION" as const,
-                },
-              })),
-              expectedSessionVersion: version,
-            },
-            randomUUID(),
-          ),
+        type BatchItem = {
+          readonly stepKey: string;
+          readonly value: OnboardingResponseValue;
+          readonly note?: string | undefined;
+        };
+        const submitBatch = (items: readonly BatchItem[]) =>
+          onFreshVersion((version) =>
+            submitOnboardingResponses(
+              input.session,
+              input.onboardingSessionId,
+              {
+                responses: items.map((item) => ({
+                  stepKey: item.stepKey,
+                  response: {
+                    value: item.value,
+                    ...(item.note === undefined ? {} : { note: item.note }),
+                    channel: "CONVERSATION" as const,
+                  },
+                })),
+                expectedSessionVersion: version,
+              },
+              randomUUID(),
+            ),
+          );
+        const asItem = (item: (typeof ready)[number]): BatchItem => ({
+          stepKey: item.plan.step.stepKey,
+          value: item.value,
+          note: item.plan.note,
+        });
+        // A correction to an answer still held (waiting for the firm):
+        // the original is written first, then the correction, so the
+        // record keeps both (production re-test 2026-10-28: "25 to 100k",
+        // then "make that 50": the 25000 was never on the record).
+        const originals = await heldOriginals(ready.map(asItem));
+        const first = await submitBatch(
+          ready.map((item, index) => originals.get(index) ?? asItem(item)),
         );
+        const corrected = [...originals.keys()].sort((a, b) => a - b);
+        const second =
+          corrected.length === 0
+            ? null
+            : await submitBatch(
+                corrected.flatMap((index) => {
+                  const item = ready[index];
+                  return item === undefined ? [] : [asItem(item)];
+                }),
+              );
+        const out = {
+          view: (second ?? first).view,
+          results: {
+            at: (index: number) => {
+              const at = corrected.indexOf(index);
+              return second !== null && at >= 0
+                ? (second.results[at] ?? first.results[index])
+                : first.results[index];
+            },
+          },
+        };
         latest = await settle(out.view);
         trusted = true;
         const after = latest;
@@ -2725,7 +2864,7 @@ export function createOnboardingPort(input: {
           item: (typeof ready)[number],
           index: number,
         ): Promise<OnboardingRecordResult> => {
-          const outcome = out.results[index];
+          const outcome = out.results.at(index);
           const stepKey = item.plan.step.stepKey;
           if (outcome?.outcome !== "COMMITTED") {
             const problem = outcome?.refusal ?? {
@@ -2929,6 +3068,59 @@ export function createOnboardingPort(input: {
       // Not recordable yet (another step first): Q asks as before.
       return false;
     }
+  };
+
+  /**
+   * For each write that changes an answer still held (not yet on the
+   * record), the held original, by the write's index: written first, so
+   * the correction is a new version beside it, never folded into it.
+   */
+  const heldOriginals = async (
+    items: readonly {
+      readonly stepKey: string;
+      readonly value: OnboardingResponseValue;
+    }[],
+  ): Promise<
+    Map<
+      number,
+      {
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+        readonly note?: string | undefined;
+      }
+    >
+  > => {
+    const originals = new Map<
+      number,
+      {
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+        readonly note?: string | undefined;
+      }
+    >();
+    const listed = input.held?.pendingValues;
+    if (listed === undefined) return originals;
+    const pending = await listed().catch(() => []);
+    if (pending.length === 0) return originals;
+    const onRecord = new Set(
+      (latest ?? (await current())).responses.map((r) => r.stepKey),
+    );
+    for (const [index, item] of items.entries()) {
+      // Only an answer never on the record: one that is on it already
+      // has its history there.
+      if (onRecord.has(item.stepKey)) continue;
+      const held = pending.findLast((p) => p.stepKey === item.stepKey);
+      if (held === undefined) continue;
+      // The held row is data, not a trusted value: validated again.
+      const value = OnboardingResponseValueSchema.safeParse(held.value);
+      if (!value.success || sameValue(value.data, item.value)) continue;
+      originals.set(index, {
+        stepKey: item.stepKey,
+        value: value.data,
+        ...(held.note === undefined ? {} : { note: held.note }),
+      });
+    }
+    return originals;
   };
 
   /** Replays held changes (lane ob1) through the ordinary submit. */
@@ -3663,8 +3855,22 @@ export function createOnboardingPort(input: {
       );
       // At most ONBOARDING_RESPONSES_BATCH_MAX a transaction; a longer
       // answer is saved in consecutive batches, in order.
+      // One write correcting a held answer goes the batch way too: the
+      // original is written first there, then the correction.
+      const correctsHeld = async (): Promise<boolean> => {
+        const only = writes[0]?.plan;
+        return (
+          writes.length === 1 &&
+          only?.kind === "WRITE" &&
+          (
+            await heldOriginals([
+              { stepKey: only.step.stepKey, value: only.value },
+            ]).catch(() => new Map())
+          ).size > 0
+        );
+      };
       const committedBatch =
-        writes.length > 1
+        writes.length > 1 || (await correctsHeld())
           ? await (async () => {
               const all: OnboardingRecordResult[] = [];
               for (let at = 0; at < writes.length; at += BATCH_MAX) {

@@ -119,6 +119,8 @@ export const PROMPT_IDS = [
   "UTTERANCE_CHECK",
   /** QA QO-23 2026-10-23: an upload's kind from its opening pages. */
   "DOCUMENT_KIND_READER",
+  /** Production re-test 2026-10-28: an ambiguous category word, by meaning. */
+  "TAXONOMY_CHOICE",
   /** Founder brief B4 2026-10-05 (ADR 0052): Q's view beside a computed fit. */
   "FIT_Q_VIEW",
   /** Overnight A5 2026-10-06: a pitch deck into the twelve standard sections. */
@@ -225,6 +227,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEETING_OUTCOME_READER: "meeting-outcome-reader",
   UTTERANCE_CHECK: "utterance-check",
   DOCUMENT_KIND_READER: "document-kind-reader",
+  TAXONOMY_CHOICE: "taxonomy-choice",
   SMALL_TALK: "small-talk",
   CONVERSATION_RECALL: "conversation-recall",
   TURN_SKIM: "turn-skim",

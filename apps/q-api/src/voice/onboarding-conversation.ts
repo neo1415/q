@@ -9,6 +9,7 @@ import {
 import type {
   OnboardingTranscriptReader,
   QDelegationReader,
+  TaxonomyChooser,
 } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import type { OnboardingState, OnboardingStepState } from "@capital-q/q-tools";
@@ -118,6 +119,8 @@ export function createOnboardingConversation(dependencies: {
   readonly apiBaseUrl: string;
   readonly reader: OnboardingTranscriptReader;
   readonly delegation?: QDelegationReader | undefined;
+  /** An ambiguous category word, chosen among the lookup's candidates by meaning. */
+  readonly categories?: TaxonomyChooser | undefined;
   readonly heldWrites?: HeldWritesStore | undefined;
   readonly recommendations?: RecommendationStore | undefined;
   /**
@@ -158,6 +161,17 @@ export function createOnboardingConversation(dependencies: {
   ) =>
     createOnboardingPort({
       addsTo,
+      chooseCategories:
+        dependencies.categories === undefined
+          ? undefined
+          : (choice) =>
+              (dependencies.categories ?? (() => Promise.resolve(null)))({
+                who: {
+                  tenantId: line.actor.tenantId,
+                  userId: line.actor.userId,
+                },
+                ...choice,
+              }),
       session: sessionOf(line),
       onboardingSessionId: line.onboarding.sessionId,
       journeyType: line.onboarding.journeyType,
@@ -749,9 +763,14 @@ export function briefOf(state: OnboardingState): string {
         ? `already saved: ${step.value ?? "answered"}`
         : step.status === "SET_ASIDE"
           ? "they chose to skip this"
-          : (step.pendingRecommendation ?? step.offered) !== undefined
-            ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
-            : "not covered yet";
+          : // Production re-test 2026-10-28: "Are those US dollars?" after
+            // "dollars" was typed, and "currency unspecified" while USD was
+            // being saved: an answer still saving is theirs already.
+            step.savePending === true
+            ? "they already told you this and it is being saved: never ask it again or call it unknown"
+            : (step.pendingRecommendation ?? step.offered) !== undefined
+              ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
+              : "not covered yet";
     return `- ${step.required ? "Needed" : "Optional"}: ${topic}${
       options.length === 0 ? "" : ` (choices: ${options})`
     } [${status}]`;

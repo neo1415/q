@@ -581,9 +581,15 @@ export function finishingLine(
     finished.reason === REVIEW_NOT_SHOWN_REASON &&
     copy.review !== undefined
   ) {
-    const saved = copy.review.saved.slice(0, 14);
+    // Every saved essential, grouped by the setup's own sections (bounded
+    // by reviewOf), never a prefix cut at a count (production re-test
+    // 2026-10-28: the founder's read-back stopped at paying customers and
+    // left out revenue, its currency, the raise and the instrument).
+    const saved = copy.review.saved
+      .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
+      .filter((line) => line.length > 0);
     return {
-      reply: `Here's what I have saved: ${saved.length === 0 ? "nothing yet" : saved.join("; ")}. Is that all right? Say yes and I'll finish, or tell me what to change.`,
+      reply: `Here's what I have saved: ${saved.length === 0 ? "nothing yet" : saved.join(". ")}. Is that all right? Say yes and I'll finish, or tell me what to change.`,
       asking: copy.review.stepKey,
     };
   }
@@ -605,17 +611,16 @@ export function finishingLine(
   }
   const [first] = finished.missing;
   if (first === undefined) return null;
-  const names = finished.missing
-    .slice(0, 8)
-    .map((item) => copy.labelOf(item.stepKey)?.toLowerCase() ?? item.question);
-  const more = finished.missing.length - names.length;
+  // The setup's own spoken question, never its internal field labels
+  // (production re-test 2026-10-28: "I still need 2 things: discovery and
+  // inbound"). The rest are asked in turn, one at a time.
   const count =
     finished.missing.length === 1
-      ? "one thing"
-      : `${String(finished.missing.length)} things`;
+      ? "one more answer from you"
+      : `${String(finished.missing.length)} more answers from you, starting with this one`;
   const question = (copy.questionOf(first.stepKey) ?? first.question).trim();
   return {
-    reply: `Before I can finish, I still need ${count}: ${spokenList(names)}${more > 0 ? ` and ${String(more)} more` : ""}. ${question.endsWith("?") ? question : `${question}?`}`,
+    reply: `Before I can finish, I still need ${count}. ${question.endsWith("?") ? question : `${question}?`}`,
     asking: first.stepKey,
   };
 }

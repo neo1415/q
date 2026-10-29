@@ -462,6 +462,7 @@ import {
   createQDelegationReader,
   createOnboardingTranscriptReader,
   createWordsReaders,
+  createTaxonomyChooser,
   CLEAR_QUESTION,
   createQTurnReader,
   type QReceiptPort,
@@ -7182,6 +7183,12 @@ const onboardingConversation =
           gateway: modelGateway,
           logger,
           dataPosture: demoDataPosture,
+        }),
+        // Production re-test 2026-10-28: "health" was never a sector.
+        categories: createTaxonomyChooser({
+          gateway: modelGateway,
+          dataPosture: demoDataPosture,
+          logger,
         }),
         heldWrites: createHeldWritesStore({
           sql: database.sql,

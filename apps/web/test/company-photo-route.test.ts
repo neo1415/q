@@ -41,7 +41,8 @@ describe("the company photo route", () => {
   it("keeps the API's 'no photo' briefly, privately", async () => {
     photo.mockResolvedValue({ photoUrl: null });
     const response = await ask();
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-capital-q-picture")).toBe("none");
     expect(response.headers.get("cache-control")).toBe("private, max-age=300");
   });
 
@@ -49,7 +50,8 @@ describe("the company photo route", () => {
     // What the route's own catch makes of a failed read: no answer at all.
     photo.mockResolvedValue(null);
     const response = await ask();
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-capital-q-picture")).toBe("none");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 

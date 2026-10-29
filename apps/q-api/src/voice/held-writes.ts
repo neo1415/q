@@ -65,6 +65,12 @@ export function createHeldWritesStore(dependencies: {
             (w) => w.stepKey,
           ),
         ),
+      pendingValues: async () =>
+        (await repository.listPending(sql, sessionId, userId)).map((w) => ({
+          stepKey: w.stepKey,
+          value: w.response.value,
+          ...(w.response.note === undefined ? {} : { note: w.response.note }),
+        })),
       drain: (ports) =>
         drainPendingWrites({
           pending: () => repository.listPending(sql, sessionId, userId),

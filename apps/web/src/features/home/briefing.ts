@@ -278,7 +278,23 @@ export function readinessItems(
 ): BriefingItem[] {
   const outstanding = gaps ?? [];
   const first = outstanding[0];
-  if (first === undefined) return [];
+  if (first === undefined) {
+    // Production re-test 2026-10-28: right after "I'll continue this later"
+    // the readiness read had not answered within its budget, so no gaps
+    // were known and Home showed no way back into setup (it appeared on the
+    // next load). An open setup is its own reason for the card.
+    return setupOpen
+      ? [
+          {
+            id: "setup:open",
+            title: "Your company setup is still open",
+            description: "Q picks up where you left off.",
+            href: "/onboarding/founder?from=home",
+            cta: "Finish setup with Q",
+          },
+        ]
+      : [];
+  }
   return [
     {
       id: `readiness:${outstanding.map((g) => g.requirement).join(",")}`,

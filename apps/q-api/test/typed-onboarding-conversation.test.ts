@@ -269,7 +269,10 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     });
     const outcome = await say("that's all");
     expect(outcome.reply).toMatch(/^Before I can finish, I still need /u);
-    expect(outcome.reply).toMatch(/stages/iu);
+    // Re-test #3: the open count and the first one's own question, never
+    // field labels ("discovery and inbound").
+    expect(outcome.reply).toMatch(/\d+ more answers from you/u);
+    expect(outcome.reply).toMatch(/\?$/u);
     expect(outcome.navigate).toBeNull();
     // "that's all" is nobody's answer.
     expect(world.attempts()).toEqual([]);
