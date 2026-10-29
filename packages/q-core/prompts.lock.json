@@ -185,6 +185,7 @@
     "onboarding-transcript-reader/v3": "8815a3aac9a218544e32853744e1d4254e596d2dde4072b423eb0153f704eecf",
     "onboarding-typed-reply/v1": "fe7213a65c1d603df816392730f4deca3771a9c31c3b44a000f882228ee1d0f9",
     "onboarding-typed-reply/v2": "d32ab540ac5a2ea4dec6b418ad3821e8319c0682bc081190cfeb970ba21a3ded",
+    "onboarding-typed-reply/v3": "ca73a3ca8ffdf57cf6239c6d99302c5eb357b5e7e3809d6bbed5c88c6ba8a0e3",
     "person-brief-reader/v1": "4db761b3caa47f7ca34a4cc06133c5c1f2857a23a9bebb4f5178ef8303d65aaa",
     "pitch-section-extraction/v1": "8bae363bbcdd26d4219955f825aad22271c613442325fa79be5ac14e826e3460",
     "plan-read/v1": "03331832d4b4946c88c6a0dc2d608e4e53cfd2dd86c92398bb4278e410e1fae1",

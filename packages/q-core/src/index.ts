@@ -155,6 +155,7 @@ export { TAXONOMY_CHOICE_V1 } from "./prompts/tasks/taxonomy-choice.v1.js";
 export * from "./prompts/schemas/taxonomy-choice.js";
 export { ONBOARDING_TYPED_REPLY_V1 } from "./prompts/tasks/onboarding-typed-reply.v1.js";
 export { ONBOARDING_TYPED_REPLY_V2 } from "./prompts/tasks/onboarding-typed-reply.v2.js";
+export { ONBOARDING_TYPED_REPLY_V3 } from "./prompts/tasks/onboarding-typed-reply.v3.js";
 export {
   ONBOARDING_TYPED_REPLY_SCHEMA_NAME,
   OnboardingTypedReplyResultSchema,

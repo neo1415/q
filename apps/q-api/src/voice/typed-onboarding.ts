@@ -255,7 +255,7 @@ export function createTypedOnboarding(dependencies: {
           `${written.reply.trim()} ${savedSoFar(await portOf(false).state(), labelOf)}`.trim();
         path = "READ_BACK";
       } else if (written !== null) {
-        text = written.reply.trim();
+        text = withoutStepIds(written.reply, input.journeyType).trim();
         asking = written.asking;
         path = "REPLY";
       } else {
@@ -335,7 +335,7 @@ export function createTypedOnboarding(dependencies: {
         "You write Q's next message in an onboarding chat; Capital Q saves what the person says from the conversation, never from your message.",
       variables: {
         journey: input.journeyType,
-        checklist: briefOf(state).slice(0, 12_000),
+        checklist: briefOf(state, { withIds: true }).slice(0, 12_000),
         transcript,
       },
     });
@@ -371,6 +371,25 @@ export function createTypedOnboarding(dependencies: {
 }
 
 /** The step a line asked, when it is one of this journey's steps. */
+/**
+ * The checklist shows each topic's id so the reply can name what it asks;
+ * an id is never shown to the person, even if the model writes one.
+ */
+export function withoutStepIds(
+  reply: string,
+  journeyType: "founder" | "investor",
+): string {
+  let text = reply;
+  for (const step of definitionFor(journeyType).steps) {
+    const escaped = step.stepKey.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    text = text.replace(
+      new RegExp(`\\s*\\(?(?:id:\\s*)?${escaped}\\)?`, "gu"),
+      "",
+    );
+  }
+  return text.replace(/\s{2,}/gu, " ");
+}
+
 export function keptStepOf(
   journeyType: "founder" | "investor",
   stepKey: string | null,

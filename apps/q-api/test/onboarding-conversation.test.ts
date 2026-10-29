@@ -603,6 +603,17 @@ describe("voice onboarding, owner live run 2026-10-28 (Tiara)", () => {
     expect(world.recordedValue(INVESTOR_STEPS.currency)).toBeUndefined();
   });
 
+  it("the typed checklist carries each topic's id; voice's never does (live 2026-10-29)", async () => {
+    const world = investorSession({
+      currentStepKey: INVESTOR_STEPS.hardExclusions,
+    });
+    const state = await stateOf(world);
+    expect(briefOf(state, { withIds: true })).toContain(
+      `(id: ${INVESTOR_STEPS.hardExclusions})`,
+    );
+    expect(briefOf(state)).not.toContain("(id: ");
+  });
+
   it("briefOf lists the optional topics in groups, every one to be asked", async () => {
     const world = investorSession({
       currentStepKey: INVESTOR_STEPS.investmentRole,

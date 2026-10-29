@@ -808,12 +808,21 @@ function readableSteps(state: OnboardingState) {
   }));
 }
 
-/** The checklist the live voice holds for the whole call. */
-export function briefOf(state: OnboardingState): string {
+/**
+ * The checklist the live voice holds for the whole call. `withIds` (typed
+ * only): each topic carries its step id, so the reply can say which topic
+ * its question asks (live 2026-10-29: the checklist had no ids, every
+ * typed reply said asking=null, and a reopened setup asked the wrong
+ * question). Voice speaks its lines, so it never sees ids.
+ */
+export function briefOf(
+  state: OnboardingState,
+  options: { readonly withIds?: boolean } = {},
+): string {
   const topics = topicsOf(state.steps);
   const lines = state.steps.filter(isConversational).map((step) => {
     const topic = topics.get(step.stepKey) ?? step.question;
-    const options = optionLabels(step);
+    const choices = optionLabels(step);
     const status =
       step.status === "ANSWERED"
         ? `already saved: ${step.value ?? "answered"}`
@@ -828,8 +837,8 @@ export function briefOf(state: OnboardingState): string {
               ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
               : "not covered yet";
     return `- ${step.required ? "Needed" : "Optional"}: ${topic}${
-      options.length === 0 ? "" : ` (choices: ${options})`
-    } [${status}]`;
+      choices.length === 0 ? "" : ` (choices: ${choices})`
+    } [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
   });
   const documents = state.steps.some((step) => step.kind === "DOCUMENT");
   const minutes = state.minutesLeft ?? null;
