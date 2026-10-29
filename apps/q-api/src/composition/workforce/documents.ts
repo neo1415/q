@@ -404,6 +404,7 @@ export function createWorkforceDocuments(dependencies: {
         research: researchText(merged.facts, input.publicSources ?? null),
         sources: sourcesText(merged.sources),
         sourceIndices: new Set(merged.sources.map((source) => source.index)),
+        recordNames: merged.records.map((record) => record.name),
       },
     });
     if (written === null)
