@@ -126,6 +126,24 @@ const PAGE_CHARS = 2_200;
 /** Round one's OPEN QUESTIONS, said plainly (see planOnce). */
 export const FIRST_ROUND_GAPS =
   "None yet: this is the first round. Plan the full investigation the request needs.";
+/**
+ * Live case E (2026-10-29): the first plan came back with no questions
+ * and the retry, byte-identical, was refused by the provider (a 400 on a
+ * request that had just succeeded). A first round asked again says why:
+ * a different request, and the planner is told what went wrong.
+ */
+export const FIRST_ROUND_RETRY_GAPS =
+  "None yet: this is the first round. An earlier answer to this same request planned no questions, but the request asks for research: plan the full investigation it needs, between 6 and 12 questions.";
+/**
+ * Live case E: round one ran without a plan (reduced) and round two's
+ * planner, asked only for the one GENERAL line's gap, wrote eight good
+ * lines that were all dropped as not GENERAL. A run with no plan asks for
+ * the plan once more after round one, as a first round.
+ */
+export const RECOVERY_ROUND_GAPS =
+  "None yet: round one ran without a plan (only the request's own words were searched, as one query). Plan the full investigation the request needs now, between 6 and 12 questions, as a first round.";
+/** Questions a recovered plan may run (round one's own cap). */
+const PLAN_QUESTIONS_MAX = 12;
 const FOLLOW_UPS_MAX = 4;
 const REQUEST_MAX = 4_000;
 const PLAN_CEILING_USD = 0.04;
@@ -1106,7 +1124,10 @@ export function workforceDeepResearch(dependencies: {
       recent: one.recent,
       primary: one.primary === true,
     });
-    const planOnce = async (gaps: readonly OpenGap[]) => {
+    const planOnce = async (
+      gaps: readonly OpenGap[],
+      firstRound: string = FIRST_ROUND_GAPS,
+    ) => {
       modelCalls += 1;
       let failure: string | null | undefined;
       const planned = await models.planResearch(
@@ -1126,7 +1147,7 @@ export function workforceDeepResearch(dependencies: {
           // case A, twice in four runs).
           gaps:
             gaps.length === 0
-              ? FIRST_ROUND_GAPS
+              ? firstRound
               : gaps.map(gapText).join("\n").slice(0, 4_000),
           asked:
             state.asked.length === 0
@@ -1144,8 +1165,11 @@ export function workforceDeepResearch(dependencies: {
     };
     // A transient failure is asked once more, inside the model-call cap,
     // the job's spend and round one's share of its deadline.
-    const planCall = async (gaps: readonly OpenGap[]) => {
-      const first = await planOnce(gaps);
+    const planCall = async (
+      gaps: readonly OpenGap[],
+      firstRound: string = FIRST_ROUND_GAPS,
+    ) => {
+      const first = await planOnce(gaps, firstRound);
       // A first round with no questions is a failed plan, not a finding:
       // the request asked for research. Asked once more, as a transient.
       const empty =
@@ -1168,7 +1192,13 @@ export function workforceDeepResearch(dependencies: {
         { jobId: input.jobId, runId: input.runId, failure: first.failure },
         "deep research plan failed transiently; asked once more",
       );
-      const second = await planOnce(gaps);
+      // An empty first round is asked again with what went wrong, never
+      // the same request (see FIRST_ROUND_RETRY_GAPS); a transient
+      // failure, the same request.
+      const second = await planOnce(
+        gaps,
+        empty ? FIRST_ROUND_RETRY_GAPS : firstRound,
+      );
       return {
         ...second,
         retried: true,
@@ -1266,7 +1296,10 @@ export function workforceDeepResearch(dependencies: {
         } else {
           // 2. After a round: code's open questions decide whether to go on.
           open = gapsNow();
-          if (open.length === 0) stop = "NO_GAPS";
+          // A run that had no plan (state.reduced) asks for one once more
+          // after round one, whatever round one found.
+          const recovering = state.reduced !== undefined && state.round === 1;
+          if (open.length === 0 && !recovering) stop = "NO_GAPS";
           else if (state.round >= INVESTIGATION_ROUNDS_MAX) stop = "ROUND_CAP";
           else if (budget.remaining() === 0) {
             budget.markLimited();
@@ -1295,7 +1328,24 @@ export function workforceDeepResearch(dependencies: {
             const planned = state.plan.find((one) => one.lane === gap.lane);
             if (planned !== undefined) take(planned);
           }
-          if (open.some((gap) => gap.reason !== "COULD_NOT_RUN")) {
+          if (recovering) {
+            report({ stage: "PLANNING_RESEARCH", round: state.round + 1 });
+            const { planned } = await planCall([], RECOVERY_ROUND_GAPS);
+            const recovered = (planned?.output.questions ?? [])
+              .slice(0, PLAN_QUESTIONS_MAX)
+              .map(plannedLane)
+              .filter((question) => !asked.has(question.query.toLowerCase()));
+            if (recovered.length > 0) {
+              // Planned lines run from here on: the investigation is no
+              // longer the request's own words alone.
+              state.plan = [...state.plan, ...recovered];
+              state.reduced = undefined;
+              for (const question of recovered) {
+                asked.add(question.query.toLowerCase());
+                next.push(question);
+              }
+            }
+          } else if (open.some((gap) => gap.reason !== "COULD_NOT_RUN")) {
             report({
               stage: "PLANNING_RESEARCH",
               round: state.round + 1,
