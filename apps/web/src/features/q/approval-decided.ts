@@ -13,3 +13,18 @@ export function announceApprovalDecided(): void {
     // No window: nothing to announce.
   }
 }
+
+/**
+ * Live 2026-10-29: Execute on a plan card prepared its approval card as a
+ * new message of the conversation, which showed only after a reload. The
+ * conversation reads its thread again when told; the event carries nothing.
+ */
+export const Q_APPROVAL_PREPARED_EVENT = "cq:q-approval-prepared";
+
+export function announceApprovalPrepared(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(Q_APPROVAL_PREPARED_EVENT));
+  } catch {
+    // No window: nothing to announce.
+  }
+}

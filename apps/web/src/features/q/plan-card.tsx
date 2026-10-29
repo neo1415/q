@@ -9,7 +9,10 @@ import { ICON_SIZE, ICON_STROKE, ListChecks } from "@capital-q/ui/icons";
 import { useT } from "@/features/i18n/language";
 import { startPacedPoll } from "@/features/polling/paced-poll";
 
-import { Q_APPROVAL_DECIDED_EVENT } from "./approval-decided";
+import {
+  announceApprovalPrepared,
+  Q_APPROVAL_DECIDED_EVENT,
+} from "./approval-decided";
 import { decidePlanAction, readPlanAction } from "./plan-actions";
 import { WorkInProgressCard } from "./work-canvas";
 import { useWorkLive } from "./work-live";
@@ -297,6 +300,8 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
       ) {
         setVersion(decided.version);
       }
+      // The approval card is a new message of the conversation: read it now.
+      if (decided.outcome === "AWAITING_APPROVAL") announceApprovalPrepared();
       if (decided.outcome === "CHANGING") {
         setChanging(false);
         setNote("");

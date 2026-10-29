@@ -38,7 +38,10 @@ import {
   documentAsked,
   navigationHeard,
 } from "./control/fast-navigation";
-import { announceApprovalDecided } from "./approval-decided";
+import {
+  announceApprovalDecided,
+  Q_APPROVAL_PREPARED_EVENT,
+} from "./approval-decided";
 import { askQ } from "./ask-route";
 import { noteLiveRun, noteTypedRun } from "./follow-navigation";
 import { loadWire } from "./wire";
@@ -778,6 +781,17 @@ export function useQConversation(
     setRunState(createQStreamState());
     return recordSettled(read.latestRun);
   }, []);
+
+  // A card on this page prepared an approval as a new message (a plan's
+  // Execute): read the thread so the approval shows without a reload.
+  useEffect(() => {
+    const onPrepared = () => {
+      void refresh();
+    };
+    window.addEventListener(Q_APPROVAL_PREPARED_EVENT, onPrepared);
+    return () =>
+      window.removeEventListener(Q_APPROVAL_PREPARED_EVENT, onPrepared);
+  }, [refresh]);
 
   // A decision on the open run's proposal. The run resumes on the server
   // after a yes and its remaining events are followed again from the
