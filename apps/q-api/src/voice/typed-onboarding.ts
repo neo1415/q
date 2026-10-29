@@ -269,7 +269,14 @@ export function createTypedOnboarding(dependencies: {
         path = "DEGRADED";
       }
 
-      void conversation.said(line, "Q", text).catch(() => undefined);
+      // Live e11: the step this line asks is kept with it, so a reopening
+      // asks the question the conversation had open (the line asked about
+      // full-time founders; kept with no step, the resume asked team size).
+      // Only a step of this journey; whether it is still open is decided
+      // when it is read back.
+      void conversation
+        .said(line, "Q", text, keptStepOf(input.journeyType, asking))
+        .catch(() => undefined);
       const viewPort = portOf(false);
       await viewPort.state().catch(() => null);
       const view =
@@ -361,6 +368,17 @@ export function createTypedOnboarding(dependencies: {
     );
     return parsed.success ? parsed.data : null;
   }
+}
+
+/** The step a line asked, when it is one of this journey's steps. */
+export function keptStepOf(
+  journeyType: "founder" | "investor",
+  stepKey: string | null,
+): string | null {
+  if (stepKey === null) return null;
+  return definitionFor(journeyType).steps.some((s) => s.stepKey === stepKey)
+    ? stepKey
+    : null;
 }
 
 /** The step a reply asks, with its options, when it is open on their path. */

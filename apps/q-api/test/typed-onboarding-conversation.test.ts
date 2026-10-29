@@ -198,6 +198,9 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     // Their line and Q's are in the thread, typed.
     await settled(() => world.thread().length >= 2);
     expect(world.thread().map((t) => t.role)).toEqual(["PERSON", "Q"]);
+    // Live e11: Q's line is kept with the step it asked, so a reopening
+    // asks the question the conversation had open.
+    expect(world.keptSteps()).toEqual([null, "I3.sectors"]);
     await settled(
       () => world.recordedValue("I10.inbound_preference") !== undefined,
     );

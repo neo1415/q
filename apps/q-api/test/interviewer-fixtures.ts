@@ -48,6 +48,8 @@ export type InvestorWorld = {
     readonly role: "PERSON" | "Q";
     readonly text: string;
   }[];
+  /** The step each kept line was kept with (Q's asked step), in order. */
+  readonly keptSteps: () => readonly (string | null)[];
   /** Every submission attempt, accepted or not, in order. */
   readonly attempts: () => readonly string[];
   /** Each batch submission, by the steps it carried. */
@@ -341,6 +343,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     text: string;
     channel: string;
     createdAt: string;
+    stepKey?: string;
   }[] = [];
 
   const serverError = () =>
@@ -479,7 +482,12 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     if (/\/turns(\?limit=\d+)?$/.test(url)) {
       if (method === "POST") {
         const body = JSON.parse(readBody(init)) as {
-          turns: { role: "PERSON" | "Q"; text: string; channel: string }[];
+          turns: {
+            role: "PERSON" | "Q";
+            text: string;
+            channel: string;
+            stepKey?: string;
+          }[];
         };
         for (const t of body.turns) {
           thread.push({
@@ -487,11 +495,17 @@ export function investorSession(options: WorldOptions): InvestorWorld {
             text: t.text,
             channel: t.channel,
             createdAt: new Date().toISOString(),
+            ...(t.stepKey === undefined ? {} : { stepKey: t.stepKey }),
           });
         }
         return Promise.resolve(Response.json({ written: true }));
       }
-      return Promise.resolve(Response.json({ items: [...thread] }));
+      // The plain thread, as the browser reads it: no bookkeeping.
+      return Promise.resolve(
+        Response.json({
+          items: thread.map(({ stepKey: _kept, ...turn }) => turn),
+        }),
+      );
     }
 
     const withdraw = /\/steps\/([^/]+)\/withdraw$/.exec(url);
@@ -780,6 +794,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     },
     skippedSteps: () => [...setAside],
     thread: () => thread.map((t) => ({ role: t.role, text: t.text })),
+    keptSteps: () => thread.map((t) => t.stepKey ?? null),
     attempts: () => [...tried],
     batches: () => batches.map((b) => [...b]),
     history: (stepKey) =>

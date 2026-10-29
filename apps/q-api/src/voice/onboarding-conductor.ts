@@ -5,6 +5,7 @@ import {
   getOnboardingSession,
   getTaxonomyNode,
   listOnboardingInterviewTurns,
+  listOnboardingInterviewTurnSteps,
   type ApiSession,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
@@ -316,6 +317,25 @@ export function stepStillAsked(
   return step === undefined
     ? null
     : nextUnansweredStep(view, journeyType, [step.stepKey]);
+}
+
+/**
+ * The step Q's last asking line asked, as kept with it: the newest Q line
+ * that carries a step or asks something decides. A later line that asks
+ * nothing (the pause's "pick this up whenever you like") changes nothing;
+ * an asking line kept with no step means it is not known (null).
+ */
+export function lastAskedStep(
+  items: readonly {
+    readonly role: string;
+    readonly text: string;
+    readonly stepKey?: string | undefined;
+  }[],
+): string | null {
+  const asking = items.findLast(
+    (t) => t.role === "Q" && (t.stepKey !== undefined || asksSomething(t.text)),
+  );
+  return asking?.stepKey ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -923,8 +943,8 @@ export function createOnboardingConductor(
     input: InterviewAgentTurnInput,
   ): Promise<InterviewTurnOutcome | null> => {
     // Only a conversation already under way resumes; a first opening is
-    // the loop's own greeting.
-    const kept = await listOnboardingInterviewTurns(
+    // the loop's own greeting. With each Q line's asked step (live e11).
+    const kept = await listOnboardingInterviewTurnSteps(
       input.session,
       input.onboardingSessionId,
     ).catch(() => null);
@@ -988,9 +1008,17 @@ export function createOnboardingConductor(
     const spoken =
       kept?.items.some((t) => t.role !== "Q") ??
       input.recentTurns.some((t) => t.role === "person");
+    // Live e11: "I'll continue this later" right after Q asked whether the
+    // founders are full-time; the reopening asked coverage's first gap
+    // (team size) instead. The step Q's last asking line was kept with is
+    // the question the conversation had open, while it is still open.
+    const openAsked = lastAskedStep(kept?.items ?? []);
     const pending =
       focused === null && view.session.status !== "COMPLETED"
         ? (stepStillAsked(view, input.journeyType, lastQ) ??
+          (openAsked === null
+            ? null
+            : nextUnansweredStep(view, input.journeyType, [openAsked])) ??
           (coverageNext === undefined
             ? null
             : nextUnansweredStep(view, input.journeyType, [coverageNext])))

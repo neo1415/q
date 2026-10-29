@@ -25,6 +25,7 @@ import {
   createTurnSerializer,
   dispatchTurn,
   isSelfLookup,
+  lastAskedStep,
   nextUnansweredStep,
   stepStillAsked,
   resumeLine,
@@ -134,7 +135,11 @@ function outcomeOf(
 
 /** The onboarding API, as far as the conductor calls it. */
 function api(options: {
-  readonly kept?: readonly { role: "PERSON" | "Q"; text: string }[];
+  readonly kept?: readonly {
+    role: "PERSON" | "Q";
+    text: string;
+    stepKey?: string;
+  }[];
   readonly view?: OnboardingSessionView;
 }) {
   const appended: string[] = [];
@@ -667,6 +672,76 @@ describe("Q leads", () => {
     expect(outcome.askingAbout).toEqual([open]);
     expect(outcome.reply).toMatch(/^Picking up where we left off\./u);
     await tick();
+  });
+
+  it("reopens on the step Q's last asking line was kept with, before coverage's own order (live e11: team size instead of full-time)", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
+    const openKeys = FOUNDER_KEYS.slice(0, 6).filter(
+      (key, at) => at > 1 && key !== "F1.website",
+    );
+    const [coverageFirst, asked] = openKeys;
+    if (coverageFirst === undefined || asked === undefined) {
+      throw new Error("two open steps needed");
+    }
+    const base = fakePorts();
+    const portFor: ConductorPortFactory = (context) => ({
+      ...base.portFor(context),
+      state: () =>
+        Promise.resolve({
+          journey: "founder",
+          currentStepKey: null,
+          canComplete: false,
+          completed: false,
+          steps: [],
+          checks: [],
+          next: [{ stepKey: coverageFirst, reason: "ESSENTIAL_MISSING" }],
+        }),
+    });
+    const { fetch: f } = api({
+      kept: [
+        // The model's own words, kept with the step they asked.
+        {
+          role: "Q",
+          text: "Thanks. Is everyone on it full-time?",
+          stepKey: asked,
+        },
+        { role: "PERSON", text: "I'll continue this later" },
+        {
+          role: "Q",
+          text: "Of course. Pick this up whenever you like; your home page is ready.",
+        },
+      ],
+    });
+    const outcome = await createOnboardingConductor({
+      agent,
+      portFor,
+      logger,
+    }).turn(input(f, ""));
+    expect(outcome.resumed).toBe(true);
+    expect(outcome.askingAbout).toEqual([asked]);
+    await tick();
+  });
+
+  it("the last asking line decides; a line that asks nothing changes nothing", () => {
+    expect(
+      lastAskedStep([
+        { role: "Q", text: "What stage?", stepKey: "F1.stage" },
+        {
+          role: "Q",
+          text: "Are the founders full-time?",
+          stepKey: "F4.full_time",
+        },
+        { role: "PERSON", text: "later" },
+        { role: "Q", text: "Of course. Pick this up whenever you like." },
+      ]),
+    ).toBe("F4.full_time");
+    // An asking line kept with no step: not known.
+    expect(
+      lastAskedStep([
+        { role: "Q", text: "What stage?", stepKey: "F1.stage" },
+        { role: "Q", text: "Are the founders full-time?" },
+      ]),
+    ).toBeNull();
   });
 
   it("opens a first conversation with the loop's own greeting", async () => {

@@ -95,6 +95,12 @@ export type OnboardingConversation = {
     line: ConversationLine,
     role: "PERSON" | "Q",
     text: string,
+    /**
+     * Q's line: the step it asked, kept with it (live e11: a typed reply
+     * asked whether the founders are full-time, was kept with no step,
+     * and the reopening asked the team size instead).
+     */
+    stepKey?: string | null,
   ) => Promise<void>;
   /** Everything said is read and saved now, waited for (bounded). */
   readonly flush?: (line: ConversationLine) => Promise<void>;
@@ -228,6 +234,7 @@ export function createOnboardingConversation(dependencies: {
     role: "PERSON" | "Q",
     text: string,
     channel: "VOICE" | "TEXT" = "VOICE",
+    stepKey: string | null = null,
   ) => {
     const words = text.replace(/\s+/g, " ").trim();
     if (words.length === 0) return;
@@ -239,7 +246,14 @@ export function createOnboardingConversation(dependencies: {
           line.onboarding.sessionId,
           {
             turnRef: randomUUID(),
-            turns: [{ role, text: words.slice(0, 4_000), channel }],
+            turns: [
+              {
+                role,
+                text: words.slice(0, 4_000),
+                channel,
+                ...(role === "Q" && stepKey !== null ? { stepKey } : {}),
+              },
+            ],
           },
         ),
       )
@@ -499,9 +513,9 @@ export function createOnboardingConversation(dependencies: {
       }
     },
 
-    said: async (line, role, text) => {
+    said: async (line, role, text, stepKey = null) => {
       finishUtterance(line);
-      keep(line, role, text, "TEXT");
+      keep(line, role, text, "TEXT", stepKey);
       if (role === "PERSON") schedule(line);
       await (writes.get(line.voiceSessionId) ?? Promise.resolve());
     },
