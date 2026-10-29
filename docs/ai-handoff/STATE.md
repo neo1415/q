@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED 29759dfe0 — 29 October 2026, 07:59 UTC (Claude coordinator, owner's standing permission)
+
+- **Railway:** api, q-api, web, workers SUCCESS at `29759dfe0` (`speed/q-oct20` = `build/int-rc` = both `recovery/*`). CI run 40833861267 green (build, typecheck, format+lint, test, pgTAP, quality).
+- **Hosted migrations:** `20261231150000_q_plans` applied 2026-10-29 03:58 UTC; hosted 262/262.
+- **In this deploy (since f87847eac):** planning (situation dossier, plan job, two reviews, Execute/board/reminders, team thread) with the live-run fixes (board keys UUID, PLAN v2 schemas tolerant of overlong lists, EVIDENCE_SYNTHESIS with reasoning, reader v71 routing); local figure extraction for highly confidential financial documents; Excel/xlsx fixes; typed onboarding fixes (sectors, cheque history, Finish, read-back); stress fixes (held-back documents named, investor chat reads a shared deck on the company page in any language, relationship history, named-company fit line); a settled onboarding answer changes only on words said after it; `read_my_record` carries held-back documents; highly confidential stated figures never reach a plan.
+- **Search providers (probed 2026-10-29 07:50):** Brave OK; q-api `SERP_API_KEY` is a serper.dev key with credit; workers `SERP_API_KEY` is a different serper.dev key with no credit; `RESERP_API` is refused by serper.dev and SerpApi and is not read by code; Tavily 432 (credit); ScrapingBee 401. Owner asked to fix the variables (see HANDOFF-LOG).
+- **Live verification of 29759dfe0:** running (planning re-run, F03, investor plan, CFO, S02-F, onboarding role). Evidence: scratchpad `live-run/plan-2`.
+
 ## DEPLOYED 77068698d — 22 October 2026, 22:21 UTC (Claude coordinator, owner's go)
 
 - **Railway:** all four services are SUCCESS at `77068698d` (`speed/q-oct20` = `build/int-rc` = both `recovery/*`). CI was green on the same tree before the int-rc visibility fix merge; that fix was checked locally with web tsc, eslint and its tests.

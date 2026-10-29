@@ -1241,3 +1241,18 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Open measurements:**
   - typed turns take 8–12 s;
   - the time to findings needs re-measuring once #422 is live.
+
+## 2026-10-28/29 — Planning, local figures, stress and onboarding rounds (Claude coordinator, session_01Wncmn2hVzNK1rHd5FweHwt)
+
+- **Deployed:** f87847eac (10-28), d79f70f3e (10-29 04:09; planning + local figures; migration 20261231150000 applied first), 216373017 (06:07; Excel, typed onboarding 4, stress 3), 29759dfe0 (07:59; planning live fixes + coordinator fixes).
+- **Root causes found from production logs/DB (not symptoms):**
+  - Board "already there" with 0 rows: `workspace.board_items.idempotency_key` is uuid; plans passed a text key; the insert failed and the error was swallowed.
+  - PLAN_WRITE refused 7/19: one step with >5 `evidenceNeeded` or >8 `cites`, or an extra key, rejected the whole plan; the retry resent the same prompt. `why` clipped at 300 chars mid-word. OpenAI structured output is sent `strict: false`, so lengths are hints.
+  - Plans and both reviewers ran on one STANDARD model under STRUCTURED_EXTRACTION (extraction budget); one redraft allowed.
+  - F03 routing: the reader correctly read DOCUMENT_REVIEW; code sent every DOCUMENT_REVIEW to the plan job with a hard-coded old start line; reader v70 itself labelled the F03 sentence that way.
+  - Investor plans: any named company routed away from planning, which excludes almost every investor plan.
+  - Onboarding answer flip ("follow" → "follow, lead"): each turn re-reads the whole thread with a model; only identical values were skipped. Now a settled answer changes only on a turn said at or after it was saved.
+  - S02-F held-back silence: answered from the company record (prepared context, no tools); the held-back notice lived only in `list_uploaded_documents`.
+- **Coordinator review reversals:** a bare-"yes" English regex that approved the only waiting card (could approve the wrong action) was reverted; the data-room pre-read keyword gate (English only) was replaced by "on the company page" (any language).
+- **Owner rules recorded:** DECISIONS 42–46 (real sign-ups; search credits rationed for testing; deep research as investigation; planning bar; old HC stated figures).
+- **Open:** see ACTIVE-TASKS live board (29 Oct).
