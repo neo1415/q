@@ -542,6 +542,7 @@ export {
   createQTurnReader,
   readerActions,
   TURN_READER_ACTIONS_MAX,
+  TURN_READER_SAME_MODEL_HEDGE_MS,
   type QTurnReader,
   type QTurnReading,
 } from "./turn-reader.js";
@@ -1677,7 +1678,7 @@ export const VIEWING_NOT_DISCLOSED_NOTE =
   "VIEWING IS NOT INTEREST: founders never see who viewed or played their pitch or profile, by design. Asked who looked, say so as how Capital Q works (never as a missing record), then give what they can see: investors who expressed interest or asked to connect, counted from list_incoming_interest or list_my_relationships, never estimated.";
 
 export const TURN_UNREAD_NOTE =
-  "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
+  "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, research, investigation, screen change or record change can be started on this turn, and no public search is run. If they asked for any of those, say plainly that you could not read the request just now and offer to start it: asking again in a moment should work. Never write a requested document's or report's content into the chat instead, never present an answer from what you hold as the research they asked for, and never say it is done.";
 
 /**
  * They asked for this answer as a document (Q_REPORT, founder live
@@ -5190,15 +5191,21 @@ export function createModelGatewayQAnswer(
       // YC-backed companies that fit my mandate" was read as a question
       // about options, the tool was taken away, and Q answered from what
       // little it held). Only a turn that asks nothing loses it.
-      let offered = reRender
-        ? offeredForRun.filter(
-            (tool) => !PUBLIC_WEB_TOOLS.has(tool.definition.name),
-          )
-        : research?.mode === "NEVER" && research.fallback !== true
+      // Live 2026-10-29 (run B): an unread "proper evidence-backed brief"
+      // became a two-search chat answer, because the unread turn kept the
+      // web in the model's hands. Research a request no reader understood
+      // is never run inline: Q says it could not read it and offers to
+      // start it (TURN_UNREAD_NOTE).
+      let offered =
+        reRender || request.turnUnread === true
           ? offeredForRun.filter(
-              (tool) => tool.definition.name !== "research_public_web",
+              (tool) => !PUBLIC_WEB_TOOLS.has(tool.definition.name),
             )
-          : offeredForRun;
+          : research?.mode === "NEVER" && research.fallback !== true
+            ? offeredForRun.filter(
+                (tool) => tool.definition.name !== "research_public_web",
+              )
+            : offeredForRun;
       // K8: the cheapest correct path. A question about what is already
       // prepared for this turn is answered over that context with no tool
       // round; everything uncertain keeps the full path.
@@ -8311,7 +8318,12 @@ export function createModelGatewayQAnswer(
             const loaded = (availableForRun ?? []).filter(
               (tool) =>
                 names.includes(tool.definition.name) &&
-                !offeredByName.has(tool.definition.name),
+                !offeredByName.has(tool.definition.name) &&
+                // An unread turn never loads the public web either.
+                !(
+                  request.turnUnread === true &&
+                  PUBLIC_WEB_TOOLS.has(tool.definition.name)
+                ),
             );
             if (loaded.length === 0) return [];
             offered = [...offered, ...loaded].slice(0, MODEL_TOOLS_MAX);

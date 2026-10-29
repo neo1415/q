@@ -19,7 +19,10 @@ import {
   type QAppActionPort,
 } from "../src/app-action-turn.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
-import type { QTurnReader } from "@capital-q/model-gateway/q";
+import {
+  TURN_READER_SAME_MODEL_HEDGE_MS,
+  type QTurnReader,
+} from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 import type {
   TurnReaderV24Result,
@@ -44,6 +47,7 @@ import {
   asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
+  TURN_REREAD_DEADLINE_MS,
   unknownScreenLine,
 } from "../src/answer.js";
 import {
@@ -508,6 +512,8 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       },
       outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
       deltas,
+      // The reading lands as none; its re-read is not what these test.
+      turnRereadDeadlineMs: 40,
     });
     const answering = run.answer.answer(request());
     return { deltas, answering, land: () => landReading() };
@@ -1543,6 +1549,41 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     expect(Date.now() - started).toBeLessThan(2_000);
     expect(run.unread).toEqual([true]);
   });
+
+  it("the extra reading has the reader's own time: a slow second read (2.8 s) still reads the turn (live 2026-10-29, run B)", async () => {
+    // Run B: the 2.5 s re-read was cancelled before its model answered
+    // (p90 4.2 s), so a research ask was answered unread.
+    expect(TURN_REREAD_DEADLINE_MS).toBeGreaterThan(
+      TURN_READER_SAME_MODEL_HEDGE_MS,
+    );
+    let reads = 0;
+    const run = seam({
+      said: "let's have a look at discover",
+      reading: null,
+      outcomes: [],
+      read: () => {
+        reads += 1;
+        if (reads === 1) return Promise.reject(new Error("both timed out"));
+        return new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve(
+                toolReading({
+                  kind: "NAVIGATE",
+                  destination: "DISCOVER",
+                  visibility: null,
+                }),
+              ),
+            2_800,
+          ),
+        );
+      },
+    });
+    await run.answer.answer(request());
+    expect(reads).toBe(2);
+    expect(run.unread).toEqual([]);
+    expect(run.stored[0]?.blocks?.[0]).toMatchObject({ kind: "UI_INTENT" });
+  }, 10_000);
 
   it("a run already aborted gets no extra reading", async () => {
     const controller = new AbortController();
