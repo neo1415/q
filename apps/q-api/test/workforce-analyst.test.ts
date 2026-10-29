@@ -1077,9 +1077,16 @@ describe("deep research for the Maji Loop request", () => {
     });
     expect(found.status).toBe("OK");
     // The person watching sees the questions, then what was read and kept.
-    expect(researchStages[0]).toEqual({ stage: "SEARCHING", questions: 6 });
+    // Investigation (2026-10-29): planning, then round one's searches, and
+    // the cross-check closes with what was kept.
+    expect(researchStages[0]).toEqual({ stage: "PLANNING_RESEARCH", round: 1 });
+    expect(researchStages[1]).toEqual({
+      stage: "SEARCHING",
+      questions: 6,
+      round: 1,
+    });
     expect(researchStages.at(-1)).toMatchObject({
-      stage: "READING",
+      stage: "CROSS_CHECKING",
       facts: 1,
     });
     if (found.status !== "OK" || found.dossier === undefined) return;

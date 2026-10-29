@@ -34,6 +34,11 @@ import {
   RESEARCH_FACTS_V1,
   RESEARCH_PLAN_V1,
 } from "./tasks/analyst.v1.js";
+import {
+  ANALYSIS_WRITE_V5,
+  RESEARCH_FACTS_V3,
+  RESEARCH_PLAN_V4,
+} from "./tasks/analyst-investigation.v1.js";
 import { Q_SYSTEM_VOICE_V1 } from "./charter/q-system-voice.v1.js";
 import { Q_SYSTEM_VOICE_V2 } from "./charter/q-system-voice.v2.js";
 import { Q_SYSTEM_VOICE_V3 } from "./charter/q-system-voice.v3.js";
@@ -643,13 +648,17 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     ANALYSIS_WRITE_V2,
     ANALYSIS_CRITIQUE_V2,
     { ...RESEARCH_PLAN_V2, status: "DEPRECATED" },
-    RESEARCH_FACTS_V2,
+    { ...RESEARCH_FACTS_V2, status: "DEPRECATED" },
     { ...ANALYSIS_WRITE_V3, status: "DEPRECATED" },
     ANALYSIS_CRITIQUE_V3,
     // Diligence audit 2026-10-28.
     { ...JOB_PLAN_V14, status: "DEPRECATED" },
-    RESEARCH_PLAN_V3,
-    ANALYSIS_WRITE_V4,
+    { ...RESEARCH_PLAN_V3, status: "DEPRECATED" },
+    { ...ANALYSIS_WRITE_V4, status: "DEPRECATED" },
+    // Investigation-grade research 2026-10-29.
+    RESEARCH_PLAN_V4,
+    RESEARCH_FACTS_V3,
+    ANALYSIS_WRITE_V5,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,

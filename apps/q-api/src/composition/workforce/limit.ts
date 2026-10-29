@@ -87,7 +87,13 @@ function boundedInteger(
  * `Q_WORKFORCE_JOB_SEARCH_BUDGET`, bounded. A provider's own fail-over or
  * fan-out behind one search counts as that one search.
  */
-export const DEFAULT_WORKFORCE_JOB_SEARCH_BUDGET = 8;
+/**
+ * Owner 2026-10-29: people may research fully (DECISIONS 43); a full
+ * investigation is 12 questions x 2 phrasings, then two rounds of 4 x 2 on
+ * the gaps -- 40 at most. A job sends only what its planned questions
+ * need (typically 12-24), so the cap is the investigation's, not a target.
+ */
+export const DEFAULT_WORKFORCE_JOB_SEARCH_BUDGET = 40;
 
 export function workforceJobSearchBudget(
   env: Readonly<Record<string, string | undefined>>,

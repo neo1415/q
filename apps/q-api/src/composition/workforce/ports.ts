@@ -18,6 +18,7 @@ import type {
   WorkforceDiligenceInput,
   WorkforceDiligenceResult,
 } from "./diligence.js";
+import type { ResearchCheckpoint } from "./deep-research.js";
 import type { LiveReport } from "./live.js";
 import type { Owner } from "./store.js";
 
@@ -112,6 +113,8 @@ export type WorkforcePortServices = {
         readonly progress?: LiveReport | undefined;
         /** Diligence: the company the job's diligence document is about. */
         readonly subject?: { readonly companyId: string } | undefined;
+        /** Investigation: kept on the job's row after each round's phase. */
+        readonly checkpoint?: ResearchCheckpoint | undefined;
       }) => Promise<ResearchFound>)
     | undefined;
   readonly findSlots: (input: {
@@ -319,6 +322,9 @@ export function createWorkforcePorts(
                 ...(input.subject === undefined
                   ? {}
                   : { subject: input.subject }),
+                ...(input.checkpoint === undefined
+                  ? {}
+                  : { checkpoint: input.checkpoint }),
               });
             },
           }),

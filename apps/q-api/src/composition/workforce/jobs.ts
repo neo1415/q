@@ -34,6 +34,7 @@ import { z } from "zod";
 
 import {
   ResearchDossierSchema,
+  type ResearchCheckpoint,
   type ResearchDossier,
 } from "./deep-research.js";
 
@@ -225,6 +226,11 @@ export type WorkforcePorts = {
            * in this approved plan is about (bound by code, never a model).
            */
           readonly subject?: { readonly companyId: string } | undefined;
+          /**
+           * Investigation (2026-10-29): the step's checkpoint on the job's
+           * durable row, so a restarted worker resumes the investigation.
+           */
+          readonly checkpoint?: ResearchCheckpoint | undefined;
         },
       ) => Promise<ResearchFound>)
     | undefined;
@@ -365,6 +371,8 @@ export function createWorkforceExecutors(dependencies: {
    */
   readonly steps?: readonly BoundStep[] | undefined;
   readonly documentContext?: DocumentExecutionContext | undefined;
+  /** D3 + investigation: a step's own checkpoint on the durable row. */
+  readonly checkpoints?: DurableSteps["checkpoint"] | undefined;
   readonly documentPolling?:
     | {
         readonly now: () => number;
@@ -700,6 +708,18 @@ export function createWorkforceExecutors(dependencies: {
               budgetUsd: step.budgetUsd,
               progress: dependencies.documentContext?.progress,
               ...(subject === null ? {} : { subject }),
+              ...(dependencies.checkpoints === undefined
+                ? {}
+                : {
+                    checkpoint: {
+                      load: () =>
+                        dependencies.checkpoints?.load(step.key) ??
+                        Promise.resolve(null),
+                      save: (value: unknown) =>
+                        dependencies.checkpoints?.save(step.key, value) ??
+                        Promise.resolve(),
+                    },
+                  }),
             })
             .catch(() => null);
           // Production 2026-10-25: every research-backed document job failed
@@ -1043,6 +1063,17 @@ export type DurableSteps = {
     runId: string,
   ) => Promise<void>;
   /**
+   * Investigation (2026-10-29): a running step's own checkpoint, kept on
+   * the row beside the step results (never read as one), so a restarted
+   * worker resumes a research step's rounds instead of repeating them.
+   */
+  readonly checkpoint?:
+    | {
+        readonly load: (stepKey: string) => Promise<unknown>;
+        readonly save: (stepKey: string, value: unknown) => Promise<void>;
+      }
+    | undefined;
+  /**
    * Situation-first planning, S6: the person's direction to this work
    * since it began, re-read from the team thread before each step acts
    * (bounded by the thread's reading bound). Null: none.
@@ -1361,6 +1392,7 @@ export function createWorkforceJobs(dependencies: {
           goal: input.goal,
           steps: planned.steps,
           documentContext: options.documentContext,
+          checkpoints: options.durable?.checkpoint,
         }),
         options.durable,
       ),

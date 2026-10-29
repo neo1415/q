@@ -28,9 +28,11 @@ describe("diligence prompts", () => {
     expect(V14_NAMED_COMPANY_KINDS).toMatch(/litigation/u);
   });
 
-  it("RESEARCH_PLAN v3 and ANALYSIS_WRITE v4 are active on their predecessors' variables and results", () => {
+  it("RESEARCH_PLAN v3 and ANALYSIS_WRITE v4 kept their predecessors' variables and results (superseded by v4 and v5, 2026-10-29)", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(3);
+    expect(registry.get("RESEARCH_PLAN", 3)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("RESEARCH_PLAN", 2)?.definition.status).toBe(
       "DEPRECATED",
     );
@@ -45,7 +47,9 @@ describe("diligence prompts", () => {
     ]) {
       expect(RESEARCH_PLAN_DILIGENCE_RULE).toContain(lane);
     }
-    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(4);
+    expect(registry.get("ANALYSIS_WRITE", 4)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("ANALYSIS_WRITE", 3)?.definition.status).toBe(
       "DEPRECATED",
     );

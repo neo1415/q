@@ -1524,6 +1524,15 @@ export {
   RESEARCH_FACTS_V1,
   RESEARCH_PLAN_V1,
 } from "./prompts/tasks/analyst.v1.js";
+// Investigation-grade research 2026-10-29.
+export {
+  ANALYSIS_WRITE_INVESTIGATION_RULE,
+  ANALYSIS_WRITE_V5,
+  RESEARCH_FACTS_MEASURE_RULE,
+  RESEARCH_FACTS_V3,
+  RESEARCH_PLAN_INVESTIGATION_RULES,
+  RESEARCH_PLAN_V4,
+} from "./prompts/tasks/analyst-investigation.v1.js";
 export * from "./prompts/schemas/analyst.js";
 export {
   DRAFT_CHANNELS,
