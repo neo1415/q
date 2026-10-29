@@ -88,6 +88,7 @@ import type {
 import {
   acknowledgeValue,
   BRIDGE_LINE,
+  liveQuestionShown,
   splitForQ,
   gapValue,
   isTaxonomySuggestion,
@@ -330,6 +331,11 @@ export function QOnboardingWorkspace({
    * about; the definition's prompt is what a fresh screen falls back to.
    */
   const [qQuestion, setQQuestion] = useState<QQuestion | null>(null);
+  /** The question a typed answer just took into the thread (live e11, c7). */
+  const [answeredLine, setAnsweredLine] = useState<{
+    readonly text: string;
+    readonly question: QQuestion | null;
+  } | null>(null);
   /**
    * The steps Q's last turn asked about (its `askingAbout`), so the
    * composer's hint follows Q's question, not the form's step cursor (live
@@ -498,6 +504,12 @@ export function QOnboardingWorkspace({
   /** What is put on screen as Q's question; nothing at all on a silent step. */
   const liveQuestion: string | null =
     questionText ?? (silentStep ? null : (prompt?.text ?? null));
+  /** The live line as shown: not the question just answered (live e11). */
+  const shownQuestion = liveQuestionShown(
+    liveQuestion,
+    answeredLine,
+    qQuestion,
+  );
 
   /** The thread so far, as the interviewer reads it. Words, never authority. */
   const recentTurns = useCallback(
@@ -984,6 +996,8 @@ export function QOnboardingWorkspace({
       if (prompt !== null) {
         if (liveQuestion !== null) {
           push("Q", liveQuestion);
+          // Not shown again below while Q answers (live e11, c7).
+          setAnsweredLine({ text: liveQuestion, question: qQuestion });
         }
       }
       const personLine = newId();
@@ -1040,7 +1054,13 @@ export function QOnboardingWorkspace({
         // line says so and can be sent again; it is never left looking
         // heard while nothing of it was taken in.
         markUnsent(personLine);
+        setAnsweredLine(null);
         return;
+      }
+      // Only a reply Q is about to show replaces the answered question;
+      // any other ending puts the question back as it was.
+      if (turn.reply === null || turn.researching !== null) {
+        setAnsweredLine(null);
       }
       setQAsking(turn.askingAbout ?? null);
       setQAskedStep(turn.askedStep ?? null);
@@ -1150,6 +1170,7 @@ export function QOnboardingWorkspace({
       prompt,
       pendingReply,
       liveQuestion,
+      qQuestion,
       push,
       recentTurns,
       vocabulary,
@@ -2172,11 +2193,11 @@ export function QOnboardingWorkspace({
           founder={vocabulary.subject === "founder"}
           readingLanded={readingLanded}
         />
-        {prompt !== null && !isFinal && !askingQ && liveQuestion !== null ? (
+        {prompt !== null && !isFinal && !askingQ && shownQuestion !== null ? (
           <QLine
             id={`prompt:${prompt.stepKey}`}
             kind="Q"
-            text={liveQuestion}
+            text={shownQuestion}
             heading
           />
         ) : null}

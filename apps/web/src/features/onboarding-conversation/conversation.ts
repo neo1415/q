@@ -887,6 +887,32 @@ export function splitForQ(
  */
 export const BRIDGE_LINE = "Back to where we were.";
 
+/**
+ * The question Q is asking, as the live line under the thread. Live e11
+ * (c7): the person corrected their cheque; Q's question joined the thread
+ * with their answer, and the same question then stayed as the live line
+ * below it until Q's reply landed, so Q seemed to say the same thing twice.
+ * The question just answered is not shown again while its reply is
+ * pending: `answered` is the line that joined the thread and the question
+ * object it came from; once the reply binds a new question object, it
+ * shows (even when Q's words are the same).
+ */
+export function liveQuestionShown<Q>(
+  live: string | null,
+  answered: { readonly text: string; readonly question: Q } | null,
+  question: Q,
+): string | null {
+  if (live === null) return null;
+  if (
+    answered !== null &&
+    answered.question === question &&
+    answered.text === live
+  ) {
+    return null;
+  }
+  return live;
+}
+
 /** The value a review line shows, or a plain "not yet" (§29). */
 /**
  * Whether what Q understood is on screen (QA F-130, 25 Oct): "Here's what

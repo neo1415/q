@@ -62,6 +62,49 @@ const SWIPE_THRESHOLD = 48;
 /** Sideways far enough to decide (founder direction 2026-09-29). */
 const DECIDE_THRESHOLD = 110;
 const AXIS_LOCK = 12;
+/** A panel that scrolled more than this was being read, not swiped. */
+const PANEL_SCROLL_SLOP = 4;
+
+/**
+ * Live e11 (2026-10-29): a swipe that began on the company's text panel
+ * did not move the feed; only one on the picture did. The panel is part
+ * of the card: a vertical swipe on it moves the feed unless it scrolled
+ * the panel (the person was reading further down it) or ended with text
+ * selected (they were selecting it). Nothing is prevented, so links,
+ * buttons and selection keep working: a finger that moved never clicks.
+ */
+export function panelSwipeMoves(input: {
+  readonly panelScrolledPx: number;
+  readonly selecting: boolean;
+}): boolean {
+  return (
+    Math.abs(input.panelScrolledPx) <= PANEL_SCROLL_SLOP && !input.selecting
+  );
+}
+
+/** The scrollable panel a touch began in, inside the stage, if any. */
+export function scrollingPanelOf(
+  target: EventTarget | null,
+  stage: Element,
+): HTMLElement | null {
+  let at: Element | null = target instanceof Element ? target : null;
+  while (at !== null && at !== stage) {
+    if (at instanceof HTMLElement && at.scrollHeight > at.clientHeight) {
+      const overflow = window.getComputedStyle(at).overflowY;
+      if (overflow === "auto" || overflow === "scroll") return at;
+    }
+    at = at.parentElement;
+  }
+  return null;
+}
+
+/** Text selected inside the stage: the gesture was a selection. */
+function selectingIn(stage: Element): boolean {
+  const selection = window.getSelection();
+  if (selection === null || selection.isCollapsed) return false;
+  const node = selection.anchorNode;
+  return node !== null && stage.contains(node);
+}
 
 /**
  * Which cards hold a player, by offset from the one in view: the one
@@ -351,6 +394,9 @@ export function PitchStage({
     dx: number;
     /** Decided by the first few pixels: up/down browses, sideways decides. */
     axis: "x" | "y" | null;
+    /** The scrollable text panel the touch began in, and where it stood. */
+    readonly panel: HTMLElement | null;
+    readonly panelTop: number;
   } | null>(null);
 
   /**
@@ -591,10 +637,19 @@ export function PitchStage({
     const y = event.touches[0]?.clientY;
     // A touch without an x (some synthetic events) browses up and down.
     const x = event.touches[0]?.clientX ?? 0;
+    const panel = scrollingPanelOf(event.target, event.currentTarget);
     drag.current =
       y === undefined
         ? null
-        : { startY: y, startX: x, dy: 0, dx: 0, axis: null };
+        : {
+            startY: y,
+            startX: x,
+            dy: 0,
+            dx: 0,
+            axis: null,
+            panel,
+            panelTop: panel?.scrollTop ?? 0,
+          };
   }, []);
 
   /** The card follows a sideways finger, tilting like a card in a hand. */
@@ -647,9 +702,38 @@ export function PitchStage({
       let dy = y - current.startY;
       if ((dy > 0 && !canRetreat) || (dy < 0 && !canAdvance)) dy = 0;
       current.dy = dy;
-      setDrag(dy);
+      // The panel is scrolling under the finger: the card stays put.
+      const scrolled =
+        current.panel === null ? 0 : current.panel.scrollTop - current.panelTop;
+      setDrag(Math.abs(scrolled) > PANEL_SCROLL_SLOP ? null : dy);
     },
     [canAdvance, canRetreat, setDrag, setSideways, decides],
+  );
+
+  /** A vertical swipe that travelled far enough moves the feed (live e11: also on the panel). */
+  const browse = useCallback(
+    (
+      current: NonNullable<typeof drag.current>,
+      travelled: number,
+      stage: Element,
+    ) => {
+      // A swipe, not a tap or a scroll nudge.
+      if (Math.abs(travelled) < SWIPE_THRESHOLD) return;
+      if (
+        !panelSwipeMoves({
+          panelScrolledPx:
+            current.panel === null
+              ? 0
+              : current.panel.scrollTop - current.panelTop,
+          selecting: selectingIn(stage),
+        })
+      ) {
+        return;
+      }
+      if (travelled > 0) next();
+      else previous();
+    },
+    [next, previous],
   );
 
   const onTouchEnd = useCallback(
@@ -668,20 +752,25 @@ export function PitchStage({
       }
       const end = event.changedTouches[0]?.clientY;
       const travelled = end === undefined ? -current.dy : current.startY - end;
-
-      // A swipe, not a tap or a scroll nudge.
-      if (Math.abs(travelled) < SWIPE_THRESHOLD) return;
-      if (travelled > 0) next();
-      else previous();
+      browse(current, travelled, event.currentTarget);
     },
-    [next, previous, setDrag, setSideways, onDecide],
+    [setDrag, setSideways, onDecide, browse],
   );
 
-  const onTouchCancel = useCallback(() => {
-    drag.current = null;
-    setDrag(null);
-    setSideways(null);
-  }, [setDrag, setSideways]);
+  // A browser that takes a swipe on a scrollable panel for its own scroll
+  // cancels the touch; when the panel did not scroll, it was still a swipe.
+  const onTouchCancel = useCallback(
+    (event: React.TouchEvent) => {
+      const current = drag.current;
+      drag.current = null;
+      setDrag(null);
+      setSideways(null);
+      if (current === null || current.panel === null || current.axis !== "y")
+        return;
+      browse(current, -current.dy, event.currentTarget);
+    },
+    [setDrag, setSideways, browse],
+  );
 
   const shownPitch = card?.pitch ?? null;
 

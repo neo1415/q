@@ -2897,6 +2897,9 @@
       position: static;
       align-self: stretch;
       overflow-y: auto;
+      /* Its scroll never carries on into the page: a swipe past its end
+         is the feed's (live e11). */
+      overscroll-behavior: contain;
       gap: 16px;
       /* Clear of the tabs above it, with a reading margin on both sides. */
       padding: 72px 24px 24px;
