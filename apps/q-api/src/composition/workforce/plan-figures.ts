@@ -105,9 +105,9 @@ export function createPlanFiguresRead(sources: PlanFigureSources) {
            and d.sensitivity_class in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')
          order by d.title
          limit 6`.catch(() => []),
-      sources.documentFigures(actor, companyId).catch(
-        () => new Map<string, DocumentFigures>(),
-      ),
+      sources
+        .documentFigures(actor, companyId)
+        .catch(() => new Map<string, DocumentFigures>()),
     ]);
     const facts: RawFact[] = [];
     // One per measure: the newest thing they said about it.

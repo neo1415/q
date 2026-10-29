@@ -44,9 +44,7 @@ export function createApprovedContinuation(dependencies: {
    * will continue), so the screen watching it settles. Live 2026-10-29: a
    * plan's Execute card stayed on Approve after it was approved and run.
    */
-  readonly complete?:
-    | ((ref: QRunRef) => Promise<unknown>)
-    | undefined;
+  readonly complete?: ((ref: QRunRef) => Promise<unknown>) | undefined;
   readonly logger?: Logger | undefined;
 }): ApprovedContinuation {
   const { actions, logger } = dependencies;

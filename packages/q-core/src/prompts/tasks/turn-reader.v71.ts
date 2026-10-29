@@ -29,7 +29,9 @@ export const V71_PLAN_ASK = `PLAN ASK: planAsk is set when they ask you for a pl
 `;
 
 if (TURN_READER_V70.template.split(V70_PLAN_ASK).length !== 2) {
-  throw new Error("TURN_READER v71 replaces v70's PLAN ASK rule, which changed");
+  throw new Error(
+    "TURN_READER v71 replaces v70's PLAN ASK rule, which changed",
+  );
 }
 
 export const TURN_READER_V71: PromptDefinition<
@@ -40,7 +42,7 @@ export const TURN_READER_V71: PromptDefinition<
   version: 71,
   status: "ACTIVE",
   changeDescription:
-    "Plan live run 1 (2026-10-29): v70 with PLAN ASK read by what the person wants at the end. An investor's company in their own pipeline, feed or relationships is OWN (\"plan my next two weeks on Ledgerline\"); asking Q to sort out, organise or handle a multi-step goal is a PLAN (the CFO ask); asking for a review, analysis or answer is that work (deliverable ANALYSIS with teamJob), never a plan whose first step is the ask; DOCUMENT_REVIEW only for extracting and confirming the facts in their own documents; kind NONE for non-plan work on their own company. Output schema v70, unchanged.",
+    'Plan live run 1 (2026-10-29): v70 with PLAN ASK read by what the person wants at the end. An investor\'s company in their own pipeline, feed or relationships is OWN ("plan my next two weeks on Ledgerline"); asking Q to sort out, organise or handle a multi-step goal is a PLAN (the CFO ask); asking for a review, analysis or answer is that work (deliverable ANALYSIS with teamJob), never a plan whose first step is the ask; DOCUMENT_REVIEW only for extracting and confirming the facts in their own documents; kind NONE for non-plan work on their own company. Output schema v70, unchanged.',
   effectiveFrom: "2026-10-29",
   output: {
     kind: "STRUCTURED",

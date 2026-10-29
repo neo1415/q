@@ -361,7 +361,11 @@ describe("the exact F03 ask (addendum 3)", () => {
     expect(routesToPlan(reading)).toBe(false);
     expect(routesToPlan({ ...reading, deliverable: "ANALYSIS" })).toBe(false);
     expect(
-      routesToPlan({ ...reading, kind: "GOAL", deliverable: "DOCUMENT_REVIEW" }),
+      routesToPlan({
+        ...reading,
+        kind: "GOAL",
+        deliverable: "DOCUMENT_REVIEW",
+      }),
     ).toBe(false);
     // The CFO curveball and an investor's two weeks on a pipeline company
     // are plans of their own.

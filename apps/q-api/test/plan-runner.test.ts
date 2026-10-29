@@ -347,9 +347,9 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     expect(status).toContain(
       "Q will prepare it for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
     );
-    expect(status?.some((line) => line.startsWith("Ready for your approval"))).toBe(
-      false,
-    );
+    expect(
+      status?.some((line) => line.startsWith("Ready for your approval")),
+    ).toBe(false);
     expect(status).toContain(
       "Your part: Add a Business model slide showing revenue per clinic",
     );

@@ -1573,9 +1573,8 @@ export function personPoint(
   const key = match?.[1] ?? null;
   const body = match?.[2] ?? point.trim();
   const [problem = "", fix] = body.split(/\s*Fix:\s*/u);
-  const wanted = withoutRefs((fix ?? problem).trim()).replace(
-    /^./u,
-    (letter) => letter.toUpperCase(),
+  const wanted = withoutRefs((fix ?? problem).trim()).replace(/^./u, (letter) =>
+    letter.toUpperCase(),
   );
   const index = key === null ? -1 : steps.findIndex((one) => one.key === key);
   return sentenceClip(
@@ -1622,7 +1621,9 @@ export function planReadyLine(
         : `It's a draft: the two reviews didn't pass it yet. What they still want: ${open
             .slice(0, 2)
             .map((point) => point.replace(/[.\s]+$/u, ""))
-            .join("; ")}${open.length > 2 ? `; and ${String(open.length - 2)} more on the card` : ""}.`,
+            .join(
+              "; ",
+            )}${open.length > 2 ? `; and ${String(open.length - 2)} more on the card` : ""}.`,
     );
   }
   if (clarification !== null) {

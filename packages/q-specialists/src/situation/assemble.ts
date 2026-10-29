@@ -449,26 +449,27 @@ export function createSituationAssembler(
       status: "READ",
       reason: null,
       facts: activityOnce(items).map(({ item, times }) => ({
-          // Live 2026-10-29: "You approved an action" four times over, and
-          // "You skipped a step" four more, filled the section. Each act
-          // once, with how many times and the newest.
-          statement: `You ${item.what.trim().slice(0, 900)}${times > 1 ? ` (${String(times)} times; latest ${item.at.slice(0, 10)})` : ""}`,
-          truthClass: "VERIFIED",
-          evidenceStatus: "PLATFORM_VERIFIED",
-          label: "personal_private",
-          category: null,
-          asOf: Number.isNaN(Date.parse(item.at))
-            ? null
-            : new Date(item.at).toISOString(),
-          provenance: { tool: "my_activity", record: item.record, url: null },
-        })),
+        // Live 2026-10-29: "You approved an action" four times over, and
+        // "You skipped a step" four more, filled the section. Each act
+        // once, with how many times and the newest.
+        statement: `You ${item.what.trim().slice(0, 900)}${times > 1 ? ` (${String(times)} times; latest ${item.at.slice(0, 10)})` : ""}`,
+        truthClass: "VERIFIED",
+        evidenceStatus: "PLATFORM_VERIFIED",
+        label: "personal_private",
+        category: null,
+        asOf: Number.isNaN(Date.parse(item.at))
+          ? null
+          : new Date(item.at).toISOString(),
+        provenance: { tool: "my_activity", record: item.record, url: null },
+      })),
     };
   }
 
   /** Each kind of act once, newest first, with how many times it happened. */
-  function activityOnce(
-    items: readonly SituationActivityItem[],
-  ): readonly { readonly item: SituationActivityItem; readonly times: number }[] {
+  function activityOnce(items: readonly SituationActivityItem[]): readonly {
+    readonly item: SituationActivityItem;
+    readonly times: number;
+  }[] {
     const out = new Map<
       string,
       { item: SituationActivityItem; times: number }

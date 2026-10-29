@@ -120,9 +120,9 @@ describe("defect 1: the board's key is a UUID", () => {
     expect(
       boardMessage({ placed: 2, already: 0, failed: 1, waiting: 0 }),
     ).toContain("On your board: 2 tasks");
-    expect(
-      boardMessage({ placed: 0, already: 3, failed: 0, waiting: 0 }),
-    ).toBe("Your 3 tasks are already on your board.");
+    expect(boardMessage({ placed: 0, already: 3, failed: 0, waiting: 0 })).toBe(
+      "Your 3 tasks are already on your board.",
+    );
   });
 });
 
@@ -178,7 +178,8 @@ describe("defect 2: PLAN_WRITE's output is accepted the way the model writes it"
   });
 
   it("a why of two full sentences fits (live: clipped at 300, 'payback,…')", () => {
-    const why = `${"Aster asked about the business model and its unit economics. ".repeat(5)}`.trim();
+    const why =
+      `${"Aster asked about the business model and its unit economics. ".repeat(5)}`.trim();
     const accepted = acceptStructuredOutput(
       plan([{ ...step, why }]),
       PlanWriteResultV2Schema,
@@ -191,10 +192,7 @@ describe("defect 2: PLAN_WRITE's output is accepted the way the model writes it"
 
   it("a refused write is asked once more with the refused fields, within the six calls", async () => {
     const { outcome, calls } = run({
-      writes: [
-        { refused: ["steps.6.evidenceNeeded:too_big"] },
-        FOUNDER_PLAN,
-      ],
+      writes: [{ refused: ["steps.6.evidenceNeeded:too_big"] }, FOUNDER_PLAN],
       reviews: [review(0)],
     });
     const done = await outcome;
@@ -236,7 +234,7 @@ describe("defect 3: what the reviewers still want is said plainly", () => {
   it("the plan's ready line names what is still wanted", () => {
     const line = planReadyLine(
       {
-        ...(FOUNDER_PLAN as never),
+        goal: FOUNDER_PLAN.goal,
         planId: "d44f3d6c-6fb4-4761-be99-ee2154bfc67e",
         version: 1,
         steps: [],
@@ -265,7 +263,9 @@ describe("defect 4: reader v71 reads what they want at the end", () => {
     expect(text).toContain(
       '"I need to hire a CFO before our seed close, sort it out"',
     );
-    expect(text).toContain('"plan my next two weeks on Ledgerline" from an investor is OWN');
+    expect(text).toContain(
+      '"plan my next two weeks on Ledgerline" from an investor is OWN',
+    );
     expect(text).toContain(
       "Review the pitch deck and financial documents I've uploaded and tell me what investors will push back on\" is planAsk {kind NONE, subject OWN, deliverable ANALYSIS}",
     );
@@ -327,7 +327,10 @@ describe("defect 8: their own figures are in the situation, as theirs", () => {
     );
     const capital = (
       stored?.situation as {
-        sections: { source: string; facts: { statement: string; truthClass: string }[] }[];
+        sections: {
+          source: string;
+          facts: { statement: string; truthClass: string }[];
+        }[];
       }
     ).sections.find((section) => section.source === "CAPITAL");
     expect(capital?.facts).toContainEqual(
@@ -373,7 +376,14 @@ describe("code checks before the reviewers spend points", () => {
         situationRefs: [],
         openQuestions: [],
         steps: [
-          { key: "s1", due: "2026-11-05", waitsFor: [], cites: [], action: { kind: "TASK" }, needsApproval: false },
+          {
+            key: "s1",
+            due: "2026-11-05",
+            waitsFor: [],
+            cites: [],
+            action: { kind: "TASK" },
+            needsApproval: false,
+          },
           {
             key: "s2",
             due: "2026-11-01",
@@ -387,6 +397,8 @@ describe("code checks before the reviewers spend points", () => {
       { ...FOUNDER_DOSSIER, sections: [] },
       { droppedCites: 0, droppedSteps: 0 },
     );
-    expect(fixes[0]).toContain("[s2] It needs s1 done first but is due before it");
+    expect(fixes[0]).toContain(
+      "[s2] It needs s1 done first but is due before it",
+    );
   });
 });
