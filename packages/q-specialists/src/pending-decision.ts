@@ -537,10 +537,9 @@ export function startPendingDecision(
       // when the turn was not read.
       const reply = turn?.replyTo ?? null;
       if (
-        !bareYesToOnlyCard(input, stage) &&
-        (reply !== null
+        reply !== null
           ? reply.kind !== "WAITING_CARD"
-          : !aboutWaitingCards(input, stage.allPending))
+          : !aboutWaitingCards(input, stage.allPending)
       ) {
         controller.abort();
         return { kind: "NONE" };
@@ -800,8 +799,7 @@ async function decideByWords(
   } else if (
     words.strength === "EXPLICIT" ||
     asked === words.kind ||
-    answersCardAsk(words, lastQ, stage) ||
-    (words.kind === "APPROVE" && bareYesToOnlyCard(input, stage))
+    answersCardAsk(words, lastQ, stage)
   ) {
     decision = words.kind;
   } else {
@@ -895,34 +893,6 @@ function answersCardAsk(
     stage.allPending.length === 1 &&
     CARD_ASK.test(lastQ)
   );
-}
-
-/**
- * A turn that is nothing but a yes: "yes", "ok", "approve", "go ahead",
- * "yes please, do it". Punctuation and case aside, no other word.
- */
-const BARE_YES =
-  /^(?:(?:yes|yeah|yep|yup|ok|okay|sure|approve|approved|go ahead|go for it|do it|please|please do|proceed|confirm|confirmed|sounds good|that's fine|fine)[\s,.!]*)+$/iu;
-
-/**
- * Stress 2026-10-28 (J7-I; the acceptance bank's rule): the investor's
- * meeting-prep card waited, Q then asked "Want me to open it?" about
- * something else, and a bare "yes" answered that question -- a research
- * job started -- while the card stayed waiting until "go ahead". The rule:
- * "yes", "approve" or "go ahead", typed or spoken, approves the one card
- * waiting when exactly one is waiting in this conversation; only when
- * none is waiting does it answer Q's question. Anything more than the bare
- * decision, several cards, or a card from another conversation stays with
- * the readings of meaning.
- */
-function bareYesToOnlyCard(
-  input: Pick<PendingDecisionInput, "utterance">,
-  stage: PendingStage,
-): boolean {
-  if (stage.kind !== "WAITING") return false;
-  if (stage.elsewhere || stage.only === undefined) return false;
-  if (stage.allPending.length !== 1) return false;
-  return BARE_YES.test(input.utterance.trim().replace(/[’]/gu, "'"));
 }
 
 /** Q's line asked about a waiting card (its own approval wording). */

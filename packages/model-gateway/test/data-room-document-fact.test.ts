@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { QPageManifest } from "@capital-q/contracts";
 
 import {
-  asksAboutMaterial,
   dataRoomDocumentFacts,
   dataRoomDocumentReads,
 } from "../src/q/data-room-document-fact.js";
@@ -44,21 +43,23 @@ describe("which data-room documents a turn reads", () => {
     ).toEqual([{ companyId: COMPANY, documentId: DECK, open: true }]);
   });
 
-  it("the page's data room, for a question about what documents or figures say", () => {
+  it("the page's data room, whatever the words and in any language", () => {
+    for (const question of [
+      "what is their actual MRR, and can I trust the deck? Show source and date",
+      "Book a call with them on Tuesday",
+      "qu'est-ce qu'ils m'ont envoyé ?",
+      "ماذا أرسلوا لي؟",
+    ]) {
+      expect(dataRoomDocumentReads({ screen: { manifest }, question })).toEqual(
+        [{ companyId: COMPANY, documentId: DECK, open: false }],
+      );
+    }
+  });
+
+  it("nothing outside a company page", () => {
     expect(
-      dataRoomDocumentReads({
-        screen: { manifest },
-        question:
-          "what is their actual MRR, and can I trust the deck? Show source and date",
-      }),
-    ).toEqual([{ companyId: COMPANY, documentId: DECK, open: false }]);
-    expect(
-      dataRoomDocumentReads({
-        screen: { manifest },
-        question: "Book a call with them on Tuesday",
-      }),
+      dataRoomDocumentReads({ screen: undefined, question: "the deck?" }),
     ).toEqual([]);
-    expect(asksAboutMaterial("B2B")).toBe(false);
   });
 });
 

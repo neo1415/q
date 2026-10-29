@@ -22,17 +22,6 @@ export const DATA_ROOM_FACTS_MAX_CHARS = 7_000;
 export const DATA_ROOM_READS_MAX = 2;
 const STATEMENT_MAX = 7_800;
 
-/**
- * Whether a question is about what documents or figures say: only then
- * are the data room's documents read when none is open on screen.
- */
-const ABOUT_MATERIAL =
-  /\b(?:deck|decks|documents?|data ?room|files?|report|accounts|financials?|financial|mrr|arr|revenue|traction|figures?|numbers?|metrics?|customers?|merchants?|burn|runway|cash|trust|claims?|says?|stated?|shared|pitch|contradict\w*|push ?back|challenge)\b/iu;
-
-export function asksAboutMaterial(question: string): boolean {
-  return ABOUT_MATERIAL.test(question);
-}
-
 /** One read to make: a company's data-room document, by id. */
 export type DataRoomDocumentRead = {
   readonly companyId: string;
@@ -43,9 +32,12 @@ export type DataRoomDocumentRead = {
 
 /**
  * Which data-room documents to read for this turn: the one open in a
- * viewer always; otherwise, only when the question is about material, the
- * documents the page's data-room section lists for its company (at most
- * DATA_ROOM_READS_MAX). Ids only; every one is re-authorised by the read.
+ * viewer always; otherwise the documents the page's data-room section
+ * lists for its company (at most DATA_ROOM_READS_MAX), whatever the words:
+ * being on the company's page with its room in view is the signal, not a
+ * keyword list over what they typed (DECISIONS 40; any language). Ids only;
+ * every one is re-authorised by the read, and the total is capped at
+ * DATA_ROOM_FACTS_MAX_CHARS.
  */
 export function dataRoomDocumentReads(input: {
   readonly screen:
@@ -72,12 +64,7 @@ export function dataRoomDocumentReads(input: {
     manifest?.focus?.kind === "COMPANY"
       ? manifest.focus.id.toLowerCase()
       : (screen.companyId?.toLowerCase() ?? null);
-  if (
-    reads.length === 0 &&
-    manifest !== undefined &&
-    company !== null &&
-    asksAboutMaterial(input.question)
-  ) {
+  if (reads.length === 0 && manifest !== undefined && company !== null) {
     const room = manifest.sections.find(
       (section) => section.kind === "DATA_ROOM",
     );

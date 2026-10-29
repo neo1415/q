@@ -1165,11 +1165,9 @@ describe("the reading decides whether a card is decided (v65 replyTo)", () => {
         text: "Update your mandate. Not saved yet: tap Approve on the card, or tell me to go ahead.",
       },
     ];
-    // More than a bare yes (stress 2026-10-28: a bare yes now approves the
-    // one card waiting, whatever it was read as answering).
     const notCard = await decidePending(port, {
       context,
-      utterance: "yes, Kenya too",
+      utterance: "yes",
       recentTurns: asked,
       turn: {
         kind: "ANSWER",
@@ -1193,101 +1191,5 @@ describe("the reading decides whether a card is decided (v65 replyTo)", () => {
     });
     expect(card.kind).not.toBe("NONE");
     expect(approved).toBe(1);
-  });
-});
-
-// Stress 2026-10-28 (J7-I; the acceptance bank's rule): with exactly one
-// card waiting, a bare yes approves it, even after Q asked something else.
-describe("a bare yes with one card waiting approves that card", () => {
-  const card = {
-    proposalId: "job1",
-    summary: "Prepare the LedgerBridge meeting analysis",
-    status: "PENDING" as const,
-  };
-  const context = {
-    actor: {} as never,
-    runId: "r",
-    correlationId: "c",
-    tenantId: "t",
-    userId: "u",
-  };
-  const offer = [
-    { role: "Q" as const, text: card.summary },
-    {
-      role: "Q" as const,
-      text: "The next useful step is to read the shared deck's revenue page. Want me to open it?",
-    },
-  ];
-  const portWith = (
-    proposals: readonly {
-      proposalId: string;
-      summary: string;
-      status: "PENDING";
-    }[],
-  ) => {
-    const approved: string[] = [];
-    const port: PendingDecisionPort = {
-      proposals: () => Promise.resolve(proposals),
-      read: () =>
-        Promise.resolve({
-          decision: "YES",
-          remainder: null,
-          onlyDecision: true,
-        }),
-      approve: (_c, id) => {
-        approved.push(id);
-        return Promise.resolve({ status: "SAVING" });
-      },
-      decline: () => Promise.resolve({ status: "DECLINED" }),
-    };
-    return { port, approved };
-  };
-  const answersOffer = {
-    kind: "ANSWER",
-    addressedToQ: true,
-    namesAction: false,
-    replyTo: { kind: "Q_QUESTION" as const, card: null },
-  };
-
-  it.each(["yes", "Yes.", "go ahead", "approve", "ok, go ahead"])(
-    "%s approves the one waiting card, not Q's newest question",
-    async (said) => {
-      const { port, approved } = portWith([card]);
-      const outcome = await decidePending(port, {
-        context,
-        utterance: said,
-        recentTurns: offer,
-        turn: answersOffer,
-      });
-      expect(approved).toEqual(["job1"]);
-      expect(outcome.kind).toBe("REPLY");
-    },
-  );
-
-  it("answers Q's question when no card is waiting", async () => {
-    const { port, approved } = portWith([]);
-    const outcome = await decidePending(port, {
-      context,
-      utterance: "yes",
-      recentTurns: offer,
-      turn: answersOffer,
-    });
-    expect(outcome).toEqual({ kind: "NONE" });
-    expect(approved).toEqual([]);
-  });
-
-  it("with two cards waiting, a bare yes answering Q's question decides neither", async () => {
-    const { port, approved } = portWith([
-      card,
-      { ...card, proposalId: "job2", summary: "Message Aster" },
-    ]);
-    const outcome = await decidePending(port, {
-      context,
-      utterance: "yes",
-      recentTurns: offer,
-      turn: answersOffer,
-    });
-    expect(outcome).toEqual({ kind: "NONE" });
-    expect(approved).toEqual([]);
   });
 });
