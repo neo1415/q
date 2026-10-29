@@ -134,7 +134,15 @@ function asOfWords(asOf: string | null): string | null {
  * facts, or that it has stated none. How the mandate weighs them belongs
  * to the fit rows.
  */
-export const NOT_STATED = "Not stated";
+export const NOT_STATED = "";
+/**
+ * Live 2026-10-29: "Not stated" as cell text went into the spreadsheet as
+ * words while its Sources sheet says a blank cell is not known. The TABLE
+ * contract's own "not known" is the empty cell (the screen says it in
+ * words), so a fact row the company stated nothing for is empty, and the
+ * row stays even when every cell is: an unknown is said, never dropped.
+ */
+const ALWAYS_SHOWN: ReadonlySet<string> = new Set(["Traction", "Team"]);
 
 function teamCell(team: ReadCompanyFacts["team"]): string {
   if (team === undefined || team.length === 0) return NOT_STATED;
@@ -377,7 +385,11 @@ export function comparisonTableBlock(input: {
     },
   ];
   const rows = candidates
-    .filter((one) => one.cells.some((cell) => cell.length > 0))
+    .filter(
+      (one) =>
+        ALWAYS_SHOWN.has(one.label) ||
+        one.cells.some((cell) => cell.length > 0),
+    )
     .map((one) => ({
       label: one.label,
       cells: one.cells.map((cell) => cell.slice(0, 500)),

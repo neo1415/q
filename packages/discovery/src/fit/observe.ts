@@ -46,6 +46,19 @@ export type DeclaredFitFacts = {
   readonly companyPlace?: string | undefined;
 
   /**
+   * Parameters the investor declared as "Must match" (live 2026-10-29:
+   * Mizan, Cairo, read "8.3/10 · Good fit" against a mandate whose
+   * geography must match Nigeria, Ghana or Kenya). Their own declared
+   * requirement, never inferred; see `mustMatchRuleFrom`.
+   */
+  readonly mustMatch?:
+    | {
+        readonly stage?: boolean | undefined;
+        readonly geography?: boolean | undefined;
+      }
+    | undefined;
+
+  /**
    * What the company has STATED about its round where this reader may see
    * it -- said in a pitch they may play, or in a deck section the founder
    * confirmed -- but not formally shared as its raise. Context for the
@@ -192,6 +205,45 @@ export function hardRuleFrom(
   return null;
 }
 
+const MUST_MATCH_RULES = {
+  STAGE: {
+    code: "STAGE_OUTSIDE_STRICT_RANGE",
+    label:
+      "Outside a rule you set: their stage is not one you said must match.",
+  },
+  GEOGRAPHY: {
+    code: "EXCLUDED_GEOGRAPHY",
+    label:
+      "Outside a rule you set: their location is not one you said must match.",
+  },
+} as const satisfies Partial<Record<FitParameter, FitHardRuleDto>>;
+
+/**
+ * A parameter the investor declared "Must match" that the company's own
+ * declared facts positively miss is their declared rule failing, so the
+ * fit is OUTSIDE_MANDATE (no score), never a weighted miss inside a "Good
+ * fit". Only a MISMATCH counts: an UNKNOWN never excludes (ADR 0020), and
+ * a region-level PARTIAL still meets a country list's region. Eligibility
+ * (Discover) is unchanged: there MUST stays a ranking preference
+ * (eligibility.v3); this is the fit's own reading of a declared rule.
+ */
+export function mustMatchRuleFrom(
+  observations: Readonly<Record<FitParameter, FitObservation>>,
+  must: DeclaredFitFacts["mustMatch"],
+): FitHardRuleDto | null {
+  if (must === undefined) return null;
+  if (must.stage === true && observations.STAGE.outcome === "MISMATCH") {
+    return MUST_MATCH_RULES.STAGE;
+  }
+  if (
+    must.geography === true &&
+    observations.GEOGRAPHY.outcome === "MISMATCH"
+  ) {
+    return MUST_MATCH_RULES.GEOGRAPHY;
+  }
+  return null;
+}
+
 const SECTOR_OUTCOME = {
   EXACT: "STRONG",
   DESCENDANT: "PARTIAL",
@@ -289,7 +341,9 @@ export function observeFit(input: ObserveFitInput): FitInputs {
   return {
     companyId: input.companyId,
     observations,
-    hardRule: hardRuleFrom(input.eligibilityReasons),
+    hardRule:
+      hardRuleFrom(input.eligibilityReasons) ??
+      mustMatchRuleFrom(observations, d.mustMatch),
   };
 }
 
