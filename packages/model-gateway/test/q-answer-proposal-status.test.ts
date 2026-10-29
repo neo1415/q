@@ -521,3 +521,68 @@ describe("saving is not verifying (live 2026-10-02, Nixo)", () => {
     );
   });
 });
+
+// Live 2026-10-29: a bare "yes" answered Q's other offer (open Settings to
+// connect the calendar) while a card waited; Q opened Settings and never
+// said the card was still waiting.
+describe("a reply that acted elsewhere says the card still waiting", () => {
+  const OPENED = {
+    answer: "Once it's connected, we can prepare the meeting at a set time.",
+  };
+  const settings = {
+    kind: "UI_INTENT",
+    intent: { kind: "NAVIGATE", destination: "SETTINGS" },
+  };
+
+  it("adds the engine's waiting line after the turn's own words", async () => {
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      OPENED,
+      [{ id: PROPOSAL, status: "PENDING" }],
+      { said: "yes" },
+    );
+    const asked = {
+      ...request,
+      turnKind: "ANSWER",
+      leadBlocks: [settings],
+    } as unknown as typeof request;
+    expect((await seam.answer(asked)).kind).toBe("ANSWERED");
+    const reply = stored.at(-1) ?? "";
+    expect(reply).toContain(OPENED.answer);
+    expect(reply).toContain(
+      '"Reminder: call Ada at 3pm" is waiting for your approval, not saved yet.',
+    );
+  });
+
+  it("says nothing of it when nothing waits, or when the turn only talked", async () => {
+    const none = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      OPENED,
+      [],
+      { said: "yes" },
+    );
+    await none.seam.answer({
+      ...none.request,
+      turnKind: "ANSWER",
+      leadBlocks: [settings],
+    } as unknown as typeof none.request);
+    expect(none.stored.at(-1) ?? "").not.toMatch(/waiting for your approval/u);
+
+    const talked = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      OPENED,
+      [{ id: PROPOSAL, status: "PENDING" }],
+      { said: "yes" },
+    );
+    await talked.seam.answer({
+      ...talked.request,
+      turnKind: "ANSWER",
+    });
+    expect(talked.stored.at(-1) ?? "").not.toMatch(
+      /waiting for your approval/u,
+    );
+  });
+});
