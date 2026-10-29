@@ -1,0 +1,454 @@
+{
+  "id": "F-investor-pipeline-sector-news",
+  "why": "The pipeline in the situation (real public companies) must be considered when the ask is about it.",
+  "actor": "investor",
+  "request": "How does the sector news affect my pipeline?",
+  "earlierTurns": [
+    "Q, I've been following Nigerian payments closely this month."
+  ],
+  "stepGoal": "Learn the recent sector news relevant to the investor's pipeline companies and mandate, and what it implies for each.",
+  "public": {
+    "mandate": {
+      "geographies": ["NG", "GH", "KE"],
+      "sectors": ["fintech", "B2B payments", "embedded finance"],
+      "stages": ["seed", "Series A"]
+    },
+    "pipelineNames": ["Moniepoint", "Apollo Agriculture"]
+  },
+  "situation": {
+    "version": "situation/v1",
+    "side": "INVESTOR",
+    "asOf": "2026-10-29T09:00:00.000Z",
+    "sections": [
+      {
+        "source": "ACTIVITY",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F1",
+            "statement": "saved LedgerBridge in Discover (2 times; latest 2026-10-24)",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_activity",
+              "record": null,
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          },
+          {
+            "ref": "F2",
+            "statement": "opened the Q Daily item on Nigerian payment service provider licensing",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_activity",
+              "record": null,
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "RELATIONSHIPS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F3",
+            "statement": "LedgerBridge (Capital Q company, Lagos): relationship state INTERESTED; diligence not started.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_relationships",
+              "record": {
+                "kind": "RELATIONSHIP",
+                "id": "relationships-1"
+              },
+              "url": null
+            },
+            "label": "relationship_shared",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "MESSAGES",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F4",
+            "statement": "LedgerBridge founder wrote: 'Happy to share our CBN licence status and our largest distributor contracts once an NDA is in place.'",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_messages",
+              "record": {
+                "kind": "MESSAGE",
+                "id": "messages-1"
+              },
+              "url": null
+            },
+            "label": "relationship_shared",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "SCHEDULE",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F5",
+            "statement": "Call with LedgerBridge founder on 2026-11-04 (30 minutes).",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_schedule",
+              "record": {
+                "kind": "MEETING",
+                "id": "schedule-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "BOARD",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F6",
+            "statement": "Board card 'Project Kola': internal code name for the LedgerBridge opportunity; status 'first look'.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_board",
+              "record": {
+                "kind": "BOARD_ITEM",
+                "id": "board-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": "NEGOTIATION_STATE"
+          },
+          {
+            "ref": "F7",
+            "statement": "IC note: target ticket USD 1.75 million across Project Kola and one follow-on.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_board",
+              "record": {
+                "kind": "BOARD_ITEM",
+                "id": "board-2"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": "NEGOTIATION_STATE"
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "Q_WORK",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F8",
+            "statement": "Q prepared a first-look memo on LedgerBridge on 2026-10-22 (approved by you).",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_q_work",
+              "record": {
+                "kind": "WORK_JOB",
+                "id": "q_work-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "MEMORY",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F9",
+            "statement": "Prefers reports that separate primary regulator sources from press coverage.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "memory_recall",
+              "record": {
+                "kind": "MEMORY_ITEM",
+                "id": "memory-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "Q_DAILY",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F10",
+            "statement": "Q Daily 2026-10-27: Nigerian payments news item saved for later.",
+            "truthClass": "Q_INFERENCE",
+            "evidenceStatus": "NO_EVIDENCE",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_q_daily",
+              "record": {
+                "kind": "DAILY_ITEM",
+                "id": "q_daily-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "PUBLIC",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PROSPECTS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F11",
+            "statement": "Pipeline: Moniepoint (Lagos, Nigeria; business payments and banking; public company information only; no relationship on Capital Q) -- watching for a later-stage secondary.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_prospects",
+              "record": {
+                "kind": "INVESTOR_ORGANISATION",
+                "id": "prospects-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": "INVESTOR_THESIS"
+          },
+          {
+            "ref": "F12",
+            "statement": "Pipeline: Apollo Agriculture (Nairobi, Kenya; farm input financing; public company information only; no relationship on Capital Q) -- tracked for an agri-credit thesis.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_prospects",
+              "record": {
+                "kind": "INVESTOR_ORGANISATION",
+                "id": "prospects-2"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "MANDATE",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F13",
+            "statement": "Mandate 'Aster Seed Fintech' (ACTIVE): seed to Series A, cheque USD 250,000 to USD 1,000,000; geographies Nigeria, Ghana, Kenya; sectors fintech, B2B payments, embedded finance; excludes consumer lending.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_mandates",
+              "record": {
+                "kind": "MANDATE",
+                "id": "mandate-1"
+              },
+              "url": null
+            },
+            "label": "organisation_private",
+            "category": "INVESTOR_THESIS"
+          },
+          {
+            "ref": "F14",
+            "statement": "Thesis note: back infrastructure that owns a recurring business workflow (payables, receivables, reconciliation) rather than pure transaction volume.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_mandates",
+              "record": {
+                "kind": "MANDATE",
+                "id": "mandate-2"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": "INVESTOR_THESIS"
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "GATEQ",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F15",
+            "statement": "GateQ inbox: 3 inbound applications this month, 1 matched the Aster Seed Fintech mandate.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_gateq_inbox",
+              "record": {
+                "kind": "COMPANY",
+                "id": "gateq-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "FEED_DECISIONS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F16",
+            "statement": "Passed on a consumer lending company in Kenya (reason: excluded sector).",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_feed_decisions",
+              "record": {
+                "kind": "COMPANY",
+                "id": "feed_decisions-1"
+              },
+              "url": null
+            },
+            "label": "investor_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      }
+    ],
+    "unknowns": [],
+    "publicTopics": [
+      "fintech Nigeria",
+      "B2B payments Nigeria",
+      "fintech Ghana",
+      "fintech Kenya",
+      "Aster Africa Ventures"
+    ]
+  },
+  "capitalQRecords": [
+    {
+      "companyId": "cq-ledgerbridge",
+      "name": "LedgerBridge",
+      "stage": "seed",
+      "country": "NG",
+      "description": "B2B payables and reconciliation for Nigerian distributors (synthetic Capital Q account)."
+    }
+  ],
+  "expect": {
+    "places": ["NG", "GH", "KE"],
+    "regionTerms": ["africa", "african"],
+    "primaryDomains": [
+      ".gov.ng",
+      "cbn.gov.ng",
+      "sec.gov.ng",
+      "cac.gov.ng",
+      "nibss-plc.com.ng",
+      ".gov.gh",
+      "bog.gov.gh",
+      ".go.ke",
+      "centralbank.go.ke",
+      "cma.or.ke"
+    ],
+    "privateMarkers": ["Project Kola", "USD 1.75 million", "1.75"],
+    "sections": [
+      "DEVELOPMENTS",
+      "PIPELINE",
+      "CONTRADICTIONS",
+      "CANNOT_ESTABLISH",
+      "GAPS_NEXT"
+    ],
+    "mandateTerms": [
+      "Nigeria",
+      "Ghana",
+      "Kenya",
+      "seed",
+      "Series A",
+      "USD 250,000",
+      "USD 1,000,000",
+      "B2B payments",
+      "embedded finance",
+      "recurring business workflow"
+    ],
+    "pipelineCompanies": ["Moniepoint", "Apollo Agriculture"],
+    "statesGlobal": false,
+    "brief": {
+      "required": true,
+      "select": ["F11", "F12", "F13"],
+      "exclude": ["F7", "F6"]
+    }
+  }
+}

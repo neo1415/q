@@ -16,6 +16,10 @@
     "vitest.config.ts",
     "vitest.integration.config.ts",
     "vitest.live-model.config.ts",
+    "vitest.research-acceptance.config.ts",
+    // The research acceptance gate's live driver: not a *.test.ts, so
+    // `pnpm test` never runs it, but typechecked like one.
+    "apps/q-api/test/research-acceptance/drive.ts",
     "playwright.config.ts",
     "tests/**/*.ts",
     "apps/**/*.test.ts",
