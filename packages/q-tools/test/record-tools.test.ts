@@ -900,7 +900,7 @@ describe("their company record names documents held back from Q (S02-F, 2026-10-
         ...fakePorts(),
         ownRecords: records,
         evidenceDocuments,
-      } as unknown as Parameters<typeof createOwnRecordTools>[0]),
+      }),
     ),
   });
 
