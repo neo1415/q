@@ -283,7 +283,7 @@ export function promptFor(
           maxSelections: presentation.maxItems,
           // Journey-neutral: an investor choosing sectors has no company
           // to describe (adversarial round 1, #7).
-          placeholder: "Or say it in your own words",
+          placeholder: "Or type your answer",
         };
       }
       if (candidates.length > 0) {
@@ -748,7 +748,7 @@ export function composerHint(
     prompt.control === "multi_chips" ||
     prompt.control === "confirm"
   ) {
-    return "Or say it in your own words";
+    return "Or type your answer";
   }
   // A step with no hint of its own is still an answer to Q's question,
   // never the general "Ask Q about companies…" (live 25 Oct, run b9-0746:
@@ -1241,4 +1241,17 @@ export function canOfferFinish(coverage: {
         f.state === "EVIDENCE_NEEDED",
     )
   );
+}
+
+/**
+ * Q's read-back as the blocks it was written in (live 2026-10-29: one
+ * run-on paragraph in heading type, two screens tall at 390): blank lines
+ * part the blocks, each block's lines are its lines. Structure only; the
+ * words are never read for meaning.
+ */
+export function readBackBlocks(text: string): string[][] {
+  return text
+    .split(/\n{2,}/u)
+    .map((block) => block.split("\n").filter((line) => line.trim() !== ""))
+    .filter((lines) => lines.length > 0);
 }

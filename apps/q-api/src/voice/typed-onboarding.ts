@@ -440,21 +440,24 @@ export function groupedSaved(
   const groups = new Map<string, string[]>();
   for (const row of rows) {
     if (!kept.has(row.stepKey)) continue;
+    // Live 2026-10-29: "Welcome: What brings you to Capital Q: are you
+    // raising…?: I'm raising". A step with no plain label is the journey's
+    // own move (the intent), not a fact about them; it is not read back.
+    const label = labelOf(row.stepKey);
+    if (label === undefined) continue;
     const phase = manifests.get(row.stepKey)?.configuration.phaseKey ?? "";
     const items = groups.get(phase) ?? [];
-    items.push(
-      `${labelOf(row.stepKey) ?? row.question}: ${plain(row.value ?? "")}`,
-    );
+    items.push(`${label}: ${plain(row.value ?? "")}`);
     groups.set(phase, items);
   }
   const titles = new Map(
     definition.schema.phases.map((p) => [p.phaseKey, p.label] as const),
   );
+  // One block a group: its section's name on a line, then one line an
+  // answer (the screen lists it in body type, never one paragraph).
   return [...groups.entries()].map(([phase, items]) => {
     const title = titles.get(phase);
-    return title === undefined
-      ? items.join("; ")
-      : `${title}: ${items.join("; ")}`;
+    return [...(title === undefined ? [] : [title]), ...items].join("\n");
   });
 }
 

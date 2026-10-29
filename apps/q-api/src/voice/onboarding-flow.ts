@@ -618,11 +618,22 @@ export function finishingLine(
     // by reviewOf), never a prefix cut at a count (production re-test
     // 2026-10-28: the founder's read-back stopped at paying customers and
     // left out revenue, its currency, the raise and the instrument).
+    // One block a group, a blank line between (live 2026-10-29: one run-on
+    // paragraph two screens tall at 390); the screen lists each block.
     const saved = copy.review.saved
-      .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
-      .filter((line) => line.length > 0);
+      .map((block) =>
+        block
+          .split("\n")
+          .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
+          .filter((line) => line.length > 0)
+          .join("\n"),
+      )
+      .filter((block) => block.length > 0);
     return {
-      reply: `Here's what I have saved: ${saved.length === 0 ? "nothing yet" : saved.join(". ")}. Is that all right? Say yes and I'll finish, or tell me what to change.`,
+      reply:
+        saved.length === 0
+          ? "Here's what I have saved: nothing yet. Is that all right? Say yes and I'll finish, or tell me what to change."
+          : `Here's what I have saved:\n\n${saved.join("\n\n")}\n\nIs that all right? Say yes and I'll finish, or tell me what to change.`,
       asking: copy.review.stepKey,
     };
   }

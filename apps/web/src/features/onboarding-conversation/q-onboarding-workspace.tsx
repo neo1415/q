@@ -119,6 +119,7 @@ import {
   notKeptLine,
   type ListedReading,
   stillWaiting,
+  readBackBlocks,
   questionOnReturn,
   redrawnThread,
   welcomeBack,
@@ -2946,6 +2947,49 @@ function QLine({
   readonly onSendAgain?: (() => void) | undefined;
 }) {
   const t = useT();
+  if (heading && text.includes("\n")) {
+    // A read-back is blocks: an opening line, groups (a section name, then
+    // one answer a line) and the question (live 2026-10-29: one run-on
+    // paragraph in heading type, two screens tall at 390). Body type, a
+    // list per group; the opening line stays the page's heading.
+    const [opening, ...rest] = readBackBlocks(text);
+    return (
+      <li data-turn={id} className="flex flex-col gap-3 pt-2" data-read-back>
+        <h2 className="cq-body font-medium text-(--cq-text-primary)">
+          {opening?.join(" ")}
+        </h2>
+        {rest.map((lines, at) =>
+          lines.length === 1 ? (
+            <p
+              key={`${id}-${String(at)}`}
+              className="cq-body cq-prose text-(--cq-text-primary)"
+            >
+              {lines[0]}
+            </p>
+          ) : (
+            <section
+              key={`${id}-${String(at)}`}
+              className="flex flex-col gap-1"
+            >
+              <h3 className="cq-label text-(--cq-text-secondary)">
+                {lines[0]}
+              </h3>
+              <ul className="flex flex-col gap-1 ps-4">
+                {lines.slice(1).map((line, row) => (
+                  <li
+                    key={`${id}-${String(at)}-${String(row)}`}
+                    className="cq-body list-disc break-words text-(--cq-text-primary)"
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ),
+        )}
+      </li>
+    );
+  }
   if (heading) {
     return (
       <li data-turn={id} className="flex flex-col gap-1 pt-2">

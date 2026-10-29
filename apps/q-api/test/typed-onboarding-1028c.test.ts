@@ -427,7 +427,7 @@ describe("defect 4: a review is confirmed only after its read-back, which lists 
     });
     const say = typedWorld({ world, authority: reading({ finishing: true }) });
     const first = await say("that's all");
-    expect(first.reply).toMatch(/^Here's what I have saved: /u);
+    expect(first.reply).toMatch(/^Here's what I have saved:\n/u);
     expect(world.recordedValue("I11.review")).toBeUndefined();
     const second = await say("yes");
     expect(second.view.session.status).toBe("COMPLETED");
@@ -454,14 +454,18 @@ describe("defect 4: a review is confirmed only after its read-back, which lists 
     });
     const say = typedWorld({ world, authority: reading({ finishing: true }) });
     const outcome = await say("that's all");
-    expect(outcome.reply).toMatch(/^Here's what I have saved: /u);
+    expect(outcome.reply).toMatch(/^Here's what I have saved:\n/u);
     expect(world.recordedValue("F6.confirm")).toBeUndefined();
-    expect(outcome.reply).toMatch(/Traction: /u);
-    expect(outcome.reply).toMatch(/Raise: /u);
+    // Live 2026-10-29: a grouped list, a section name then one line an
+    // answer, never one paragraph; and no raw question as a label.
+    expect(outcome.reply).toMatch(/\n\nTraction\n/u);
+    expect(outcome.reply).toMatch(/\n\nRaise\n/u);
     expect(outcome.reply).toMatch(/SAFE/u);
     expect(outcome.reply).toMatch(/Kenyan shilling/u);
     expect(outcome.reply).toMatch(/400/u);
     expect(outcome.reply).not.toMatch(/\.\./u);
+    expect(outcome.reply).not.toMatch(/What brings you/u);
+    expect(outcome.reply).not.toMatch(/\?:/u);
   });
 });
 
@@ -511,7 +515,7 @@ describe("defect 6: wording", () => {
         },
       },
     );
-    expect(reviewed?.reply).toContain("6 deals a year. Is that all right?");
+    expect(reviewed?.reply).toContain("6 deals a year\n\nIs that all right?");
     expect(reviewed?.reply).not.toMatch(/\.\./u);
   });
 
