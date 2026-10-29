@@ -1005,8 +1005,28 @@ export function createPlans(dependencies: PlansDependencies) {
     for (const step of plan.steps) {
       const runtime = runtimeOf(runtimes, step.key);
       if (runtime.status === "DONE" || runtime.status === "SKIPPED") continue;
-      const verified = verifiedDone(runtime, facts);
-      if (verified === null) continue;
+      const verified = verifiedDone(runtime, facts, step.owner);
+      if (verified === null) {
+        // A shared step whose Q part finished first now waits on theirs.
+        const ours = qPartDone(runtime, facts);
+        if (
+          step.owner === "TOGETHER" &&
+          runtime.boardItemId !== null &&
+          ours !== null &&
+          runtime.status !== "WAITING_YOU"
+        ) {
+          await thread.move(owner, plan, step, "WAITING_YOU");
+          await thread.finding(
+            owner,
+            planId,
+            step.key,
+            `${ours} Your part is still open on your board.`,
+            `${String(plan.version)}:${step.key}:our-part-done`,
+          );
+          moved += 1;
+        }
+        continue;
+      }
       await thread.move(owner, plan, step, "DONE");
       await thread.finding(
         owner,
@@ -1163,6 +1183,7 @@ const UUID_TEXT =
 export function verifiedDone(
   runtime: StepRuntime,
   state: LinkedState,
+  owner?: QPlanStep["owner"],
 ): string | null {
   if (
     runtime.boardItemId !== null &&
@@ -1170,6 +1191,18 @@ export function verifiedDone(
   ) {
     return "You marked it done on your board.";
   }
+  // A shared step is done when their part is (live 2026-10-29: Done while
+  // the founder's part was still open on their board). Without a board item
+  // there is no part of theirs to wait on.
+  if (owner === "TOGETHER" && runtime.boardItemId !== null) return null;
+  return qPartDone(runtime, state);
+}
+
+/** Q's own part of a step finished, verified from its record. */
+export function qPartDone(
+  runtime: StepRuntime,
+  state: LinkedState,
+): string | null {
   if (runtime.jobId !== null && state.jobs.get(runtime.jobId) === "COMPLETED") {
     return "Q's work on it finished.";
   }
