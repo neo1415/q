@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createRecordingResearchProvider,
+  createRecordingTime,
   createReplayResearchProvider,
+  createReplayTime,
+  createVirtualTime,
   RecordedFixtureMiss,
   RecordedResearchFixtureSchema,
   recordedSearchKey,
@@ -187,7 +190,26 @@ describe("research record/replay (acceptance gate)", () => {
     ).rejects.toThrow(/not in the recorded fixture/u);
     expect(replay.misses).toEqual([
       { kind: "SEARCH", key: "payments circular" },
-      { kind: "PAGE", url: "https://www.irs.gov/payments" },
+      { kind: "EXTRACT", urls: ["https://www.irs.gov/payments"] },
+    ]);
+  });
+
+  // Re-recorded case A: replay served pages by URL from anywhere in the
+  // recording, so a read live never made was answered. A read is served
+  // only as the same request was recorded.
+  it("serves a page read per request, never a page recorded under another", async () => {
+    const replay = createReplayResearchProvider({ fixture: await recorded() });
+    await expect(
+      replay.extract(
+        { urls: ["https://www.cbn.gov.ng/circulars/payments"] },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(RecordedFixtureMiss);
+    expect(replay.misses).toEqual([
+      {
+        kind: "EXTRACT",
+        urls: ["https://www.cbn.gov.ng/circulars/payments"],
+      },
     ]);
   });
 
@@ -198,5 +220,61 @@ describe("research record/replay (acceptance gate)", () => {
     });
     expect((await replay.search(search("something new"), {})).hits).toEqual([]);
     expect(replay.misses).toHaveLength(1);
+  });
+});
+
+describe("research record/replay: the schedule", () => {
+  /** A deadline raced against a slow call, then a clock reading. */
+  async function raced(
+    time:
+      | ReturnType<typeof createRecordingTime>
+      | ReturnType<typeof createReplayTime>,
+    call: () => Promise<string>,
+  ): Promise<string> {
+    const deadline = time.timeout(8_000);
+    const winner = await Promise.race([
+      time.track("WEB SEARCH slow", call),
+      new Promise<string>((resolve) => {
+        deadline.signal.addEventListener("abort", () => resolve("timed out"));
+      }),
+    ]);
+    deadline.cancel();
+    return `${winner} at ${String(time.now())}`;
+  }
+
+  it("replays a deadline that beat a slow call, with the same clock, and no time passing", async () => {
+    const clock = createVirtualTime(1_000);
+    const recording = createRecordingTime(clock);
+    const live = await clock.drive(() =>
+      raced(recording, async () => {
+        await clock.sleep(30_000);
+        return "answered";
+      }),
+    );
+    expect(live).toBe("timed out at 9000");
+    const schedule = recording.schedule();
+    expect(schedule.begun).toEqual(["TIMER 8000", "WEB SEARCH slow"]);
+
+    const replay = createReplayTime(schedule);
+    const again = await replay.drive(() =>
+      raced(replay, () => Promise.resolve("answered")),
+    );
+    expect(again).toBe(live);
+    expect(replay.misses).toEqual([]);
+  });
+
+  it("names where a replay leaves the recorded schedule", async () => {
+    const clock = createVirtualTime(0);
+    const recording = createRecordingTime(clock);
+    await clock.drive(() =>
+      recording.track("WEB SEARCH a", () => Promise.resolve("a")),
+    );
+    const replay = createReplayTime(recording.schedule());
+    await replay.drive(() =>
+      replay.track("WEB SEARCH b", () => Promise.resolve("b")),
+    );
+    expect(replay.misses).toEqual([
+      'began "WEB SEARCH b" where the recording began "WEB SEARCH a"',
+    ]);
   });
 });

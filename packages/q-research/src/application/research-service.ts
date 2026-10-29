@@ -26,6 +26,11 @@ import {
 import { countryName, mentionedCountries } from "../domain/geography.js";
 import { textNamesEntity } from "../domain/names.js";
 import {
+  rejectOnAbort,
+  SYSTEM_RESEARCH_TIME,
+  type ResearchTime,
+} from "../time.js";
+import {
   mergePlannedHits,
   matchOf,
   rankForReading,
@@ -295,6 +300,11 @@ export type PublicWebResearchServiceDependencies = {
   readonly provider: PublicWebResearchProvider;
   readonly evidence?: ResearchEvidenceRecorder | undefined;
   readonly clock?: (() => Date) | undefined;
+  /**
+   * The clock and deadlines the page reads are bounded by (time.ts); the
+   * system's by default. When given without `clock`, it is the clock too.
+   */
+  readonly time?: ResearchTime | undefined;
   readonly logger?: Logger | undefined;
   /** How long the page reads may hold the answer (EXTRACT_BUDGET_MS). */
   readonly extractBudgetMs?: number | undefined;
@@ -433,7 +443,12 @@ export function createPublicWebResearchService(
   const turnExtractBudgetMs = dependencies.extractBudgetMs ?? EXTRACT_BUDGET_MS;
   const plannedExtractBudgetMs =
     dependencies.plannedExtractBudgetMs ?? PLANNED_EXTRACT_BUDGET_MS;
-  const clock = dependencies.clock ?? (() => new Date());
+  const time = dependencies.time ?? SYSTEM_RESEARCH_TIME;
+  const clock =
+    dependencies.clock ??
+    (dependencies.time === undefined
+      ? () => new Date()
+      : () => new Date(time.now()));
   const meter = getMeter("@capital-q/q-research");
   const metrics = {
     requested: meter.createCounter("q.research.requested"),
@@ -960,31 +975,26 @@ export function createPublicWebResearchService(
       if (chosen.length > 0) {
         // Its own deadline: the reads never hold the answer past it (also
         // raced, for a provider that does not heed its signal).
-        const deadline = AbortSignal.timeout(extractBudgetMs);
+        const deadline = time.timeout(extractBudgetMs);
         const reading = {
           ...context,
           signal:
             context.signal === undefined
-              ? deadline
-              : AbortSignal.any([context.signal, deadline]),
+              ? deadline.signal
+              : AbortSignal.any([context.signal, deadline.signal]),
         };
-        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
           extractCalls += 1;
           const extracted = await Promise.race([
             provider.extract({ urls: chosen.map((hit) => hit.url) }, reading),
-            new Promise<never>((_, reject) => {
-              timer = setTimeout(
-                () =>
-                  reject(
-                    new ResearchProviderFailure({
-                      providerCode: provider.code,
-                      failureClass: "TIMEOUT",
-                    }),
-                  ),
-                extractBudgetMs,
-              );
-            }),
+            rejectOnAbort(
+              deadline.signal,
+              () =>
+                new ResearchProviderFailure({
+                  providerCode: provider.code,
+                  failureClass: "TIMEOUT",
+                }),
+            ),
           ]);
           metrics.extractLatency.record(extracted.latencyMs, {
             provider: provider.code,
@@ -1009,7 +1019,7 @@ export function createPublicWebResearchService(
             providerUnavailable(error, "extract");
           }
         } finally {
-          if (timer !== undefined) clearTimeout(timer);
+          deadline.cancel();
         }
       }
 

@@ -7,6 +7,7 @@ import type { AnalysisDocumentResult } from "@capital-q/q-core";
 import {
   createPublicWebResearchService,
   type PublicWebResearchProvider,
+  type ResearchTime,
 } from "@capital-q/q-research";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
@@ -119,8 +120,11 @@ export async function runCase(input: {
   readonly case: AcceptanceCase;
   readonly provider: PublicWebResearchProvider;
   readonly gateway: ModelGateway;
-  /** The clock: a replay runs at its recording's time. */
-  readonly now: () => number;
+  /**
+   * The clock and deadlines of the whole run: the system's (recorded) when
+   * live, the recording's when replayed, virtual in a scripted run.
+   */
+  readonly time: ResearchTime;
   /** Why a model call was not made, when a run needs explaining. */
   readonly logger?: Logger | undefined;
 }): Promise<CaseRun> {
@@ -130,9 +134,12 @@ export async function runCase(input: {
   const logging = input.logger === undefined ? {} : { logger: input.logger };
   const models = createWorkforceModels({ gateway: input.gateway, ...logging });
   const research = workforceDeepResearch({
-    service: createPublicWebResearchService({ provider: input.provider }),
+    service: createPublicWebResearchService({
+      provider: input.provider,
+      time: input.time,
+    }),
     models,
-    now: input.now,
+    time: input.time,
     ...logging,
     ...researchContext(one),
   });
@@ -168,7 +175,7 @@ export async function runCase(input: {
   const company = [context, records]
     .filter((part) => part.length > 0)
     .join("\n\n");
-  const today = new Date(input.now()).toISOString().slice(0, 10);
+  const today = new Date(input.time.now()).toISOString().slice(0, 10);
   const written = await writeAnalysisWithReview({
     models,
     who: { tenantId: actor.tenantId, userId: actor.userId },

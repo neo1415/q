@@ -33,7 +33,10 @@ import {
   type OpenGap,
   type PrimaryKind,
   type ProposedFact,
+  rejectOnAbort,
+  SYSTEM_RESEARCH_TIME,
   type PublicWebResearchService,
+  type ResearchTime,
   type SearchBudget,
   type SourceTier,
   type VerifiedFact,
@@ -397,6 +400,8 @@ export async function rereadPrimary(input: {
   readonly sources: readonly DeepResearchSource[];
   readonly countries: ReadonlySet<string>;
   readonly budgetMs: number;
+  /** The deadline's timer (the system's by default). */
+  readonly time?: ResearchTime | undefined;
 }): Promise<
   ReadonlyMap<
     string,
@@ -426,7 +431,7 @@ export async function rereadPrimary(input: {
     .slice(0, PRIMARY_REREADS_MAX)
     .map((source) => source.url);
   if (urls.length === 0) return none;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = (input.time ?? SYSTEM_RESEARCH_TIME).timeout(input.budgetMs);
   try {
     const outcome = await Promise.race([
       input.service.extract({
@@ -434,14 +439,12 @@ export async function rereadPrimary(input: {
         runId: input.runId,
         correlationId: input.correlationId,
         urls,
-        signal: AbortSignal.timeout(input.budgetMs),
+        signal: deadline.signal,
       }),
       // Raced too, for a provider that does not heed its signal.
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), input.budgetMs);
-      }),
+      rejectOnAbort(deadline.signal, () => new Error("re-read timed out")),
     ]);
-    if (outcome === null || outcome.status !== "OK") return none;
+    if (outcome.status !== "OK") return none;
     for (const source of outcome.sources) {
       if (source.excerpt.trim().length === 0) continue;
       none.set(urlKey(source.url), {
@@ -454,7 +457,7 @@ export async function rereadPrimary(input: {
   } catch {
     return none;
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    deadline.cancel();
   }
 }
 
@@ -795,6 +798,12 @@ export function workforceDeepResearch(dependencies: {
   readonly models: Pick<WorkforceModels, "planResearch" | "researchFacts"> &
     Partial<Pick<WorkforceModels, "researchBrief">>;
   readonly now?: (() => number) | undefined;
+  /**
+   * The clock and deadlines of the whole research path (q-research
+   * time.ts): the acceptance gate records and replays them. The system's
+   * by default; it is the clock too when `now` is absent.
+   */
+  readonly time?: ResearchTime | undefined;
   readonly deadlineMs?: number | undefined;
   readonly logger?: Logger | undefined;
   /**
@@ -852,7 +861,8 @@ export function workforceDeepResearch(dependencies: {
 }): WorkforcePortServices["research"] {
   const service = dependencies.service;
   if (service === undefined) return undefined;
-  const now = dependencies.now ?? Date.now;
+  const time = dependencies.time ?? SYSTEM_RESEARCH_TIME;
+  const now = dependencies.now ?? time.now;
   const deep = createDeepResearch({
     service,
     clock: now,
@@ -1269,6 +1279,7 @@ export function workforceDeepResearch(dependencies: {
           correlationId,
           sources: found,
           countries: marketCountries,
+          time,
           budgetMs: Math.min(
             PRIMARY_REREAD_MS,
             started + deadlineMs * 0.8 - now(),

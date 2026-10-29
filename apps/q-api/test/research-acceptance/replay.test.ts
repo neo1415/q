@@ -143,7 +143,7 @@ describe("research acceptance: the checks bite on the live failure", () => {
         "nigeria cbn payments regulation circular",
       ],
       web: {
-        version: 1,
+        version: 2,
         providerCode: "brave",
         recordedAt: "2026-10-29T12:00:00.000Z",
         searches: [
@@ -172,6 +172,8 @@ describe("research acceptance: the checks bite on the live failure", () => {
         ],
         failedUrls: [],
         extractFailures: [],
+        extracts: [],
+        schedule: null,
       },
       modelCalls: [],
     })

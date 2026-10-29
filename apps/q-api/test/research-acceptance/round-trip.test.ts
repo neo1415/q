@@ -5,13 +5,26 @@ import type {
   ModelGateway,
   ModelGatewayExecuteOptions,
 } from "@capital-q/model-gateway";
-import { createRecordingResearchProvider } from "@capital-q/q-research/providers/recorded";
+import {
+  SYSTEM_RESEARCH_TIME,
+  type PublicWebResearchProvider,
+} from "@capital-q/q-research";
+import {
+  createRecordingResearchProvider,
+  createRecordingTime,
+  createReplayResearchProvider,
+  createVirtualTime,
+  type VirtualTime,
+} from "@capital-q/q-research/providers/recorded";
 import { createFakeResearchProvider } from "@capital-q/q-research/testing";
 
 import { loadCases } from "./case.js";
 import { checkCase } from "./expectations.js";
 import { runCase } from "./pipeline.js";
-import { createRecordingModelGateway } from "./recorded-gateway.js";
+import {
+  createRecordingModelGateway,
+  createReplayModelGateway,
+} from "./recorded-gateway.js";
 import { replayCase } from "./replay.js";
 
 /**
@@ -77,8 +90,35 @@ const metadata = {
   taskClass: "EVIDENCE_SYNTHESIS";
 };
 
+type PlannedLine = {
+  readonly lane: string;
+  readonly query: string;
+  readonly alsoQuery: null;
+  readonly recent: boolean;
+  readonly primary: boolean;
+};
+
+const TWO_LINES: readonly PlannedLine[] = [
+  {
+    lane: "REGULATION",
+    query: "Nigeria CBN payment service provider licensing",
+    alsoQuery: null,
+    recent: true,
+    primary: true,
+  },
+  {
+    lane: "COMPETITORS",
+    query: "Nigerian B2B payments competitors",
+    alsoQuery: null,
+    recent: true,
+    primary: false,
+  },
+];
+
 /** A scripted model: one answer per schema, the plan once then nothing. */
-function scriptedGateway(): ModelGateway {
+function scriptedGateway(
+  lines: readonly PlannedLine[] = TWO_LINES,
+): ModelGateway {
   let plans = 0;
   const answer = (schemaName: string | null): unknown => {
     switch (schemaName ?? "TEXT") {
@@ -107,25 +147,7 @@ function scriptedGateway(): ModelGateway {
         plans += 1;
         return plans > 1
           ? { questions: [], internalQuery: null }
-          : {
-              questions: [
-                {
-                  lane: "REGULATION",
-                  query: "Nigeria CBN payment service provider licensing",
-                  alsoQuery: null,
-                  recent: true,
-                  primary: true,
-                },
-                {
-                  lane: "COMPETITORS",
-                  query: "Nigerian B2B payments competitors",
-                  alsoQuery: null,
-                  recent: true,
-                  primary: false,
-                },
-              ],
-              internalQuery: "B2B payments",
-            };
+          : { questions: lines, internalQuery: "B2B payments" };
       case "ResearchFactsResult":
         return {
           facts: [
@@ -195,20 +217,22 @@ describe("research acceptance: record, then replay", () => {
   if (caseA === undefined) throw new Error("case A is missing");
 
   it("replays a recording through the real code with no miss and the same queries", async () => {
+    const time = createRecordingTime(SYSTEM_RESEARCH_TIME);
     const web = createRecordingResearchProvider({
       provider: createFakeResearchProvider({ pages: PAGES }),
       clock: () => new Date(RECORDED_AT),
+      time,
     });
     const models = createRecordingModelGateway({
       gateway: scriptedGateway(),
       clock: () => new Date(RECORDED_AT),
+      time,
     });
-    const started = Date.now();
     const recorded = await runCase({
       case: caseA,
       provider: web,
       gateway: models,
-      now: () => Date.parse(RECORDED_AT) + (Date.now() - started),
+      time,
     });
     expect(recorded.content).not.toBeNull();
     const fixtures = { web: web.fixture(), models: models.fixture() };
@@ -243,5 +267,125 @@ describe("research acceptance: record, then replay", () => {
         modelCalls: models.seen,
       }).find((check) => check.id === "CITATIONS_RESOLVE")?.ok,
     ).toBe(true);
+  }, 60_000);
+});
+
+/** The scripted model, slow in virtual time: each answer takes a while. */
+function slowGateway(clock: VirtualTime): ModelGateway {
+  const inner = scriptedGateway([
+    ...TWO_LINES,
+    {
+      lane: "MARKET_SIZE",
+      query: "Nigerian B2B payments market",
+      alsoQuery: null,
+      recent: false,
+      primary: false,
+    },
+    {
+      lane: "DEVELOPMENTS",
+      query: "Nigerian B2B payments developments",
+      alsoQuery: null,
+      recent: true,
+      primary: false,
+    },
+    {
+      lane: "INVESTMENT",
+      query: "Nigerian fintech investment",
+      alsoQuery: null,
+      recent: true,
+      primary: false,
+    },
+    {
+      lane: "OPPORTUNITIES",
+      query: "Nigerian B2B payments opportunities",
+      alsoQuery: null,
+      recent: true,
+      primary: false,
+    },
+  ]);
+  const SECONDS: Readonly<Record<string, number>> = {
+    ResearchBriefResult: 3,
+    ResearchPlanResult: 3,
+    ResearchFactsResult: 5,
+  };
+  return {
+    execute: async (request, options) => {
+      const schemaName =
+        request.output.kind === "STRUCTURED" ? request.output.schemaName : "";
+      await clock.sleep((SECONDS[schemaName] ?? 8) * 1_000);
+      return inner.execute(request, options);
+    },
+  };
+}
+
+describe("research acceptance: a replay follows the recorded schedule", () => {
+  const caseA = loadCases().find((one) => one.id.startsWith("A-"));
+  if (caseA === undefined) throw new Error("case A is missing");
+
+  // Re-recorded case A (2026-10-29): a fresh recording replayed with
+  // misses, because the live run hit deadlines a one-second replay never
+  // did. Scripted here on a virtual clock: searches take 70 s, the first
+  // page read 30 s (past its 8 s budget), so round one gives a read up and
+  // skips two lines at its deadline, round two's facts are skipped at the
+  // job's, and the replay must take exactly that path.
+  it("records a run that hit its deadlines and replays it with zero misses", async () => {
+    const clock = createVirtualTime(Date.parse(RECORDED_AT));
+    const time = createRecordingTime(clock);
+    const fake = createFakeResearchProvider({ pages: PAGES });
+    let reads = 0;
+    const slow: PublicWebResearchProvider = {
+      code: fake.code,
+      search: async (request, context) => {
+        await clock.sleep(70_000);
+        return fake.search(request, context);
+      },
+      extract: async (request, context) => {
+        reads += 1;
+        await clock.sleep(reads === 1 ? 30_000 : 1_000);
+        return fake.extract(request, context);
+      },
+    };
+    const web = createRecordingResearchProvider({
+      provider: slow,
+      clock: () => new Date(RECORDED_AT),
+      time,
+    });
+    const models = createRecordingModelGateway({
+      gateway: slowGateway(clock),
+      clock: () => new Date(RECORDED_AT),
+      time,
+    });
+    const recorded = await clock.drive(() =>
+      runCase({ case: caseA, provider: web, gateway: models, time }),
+    );
+    const fixtures = { web: web.fixture(), models: models.fixture() };
+
+    // The live path took its deadlines.
+    expect(fixtures.web.extracts[0]?.failure).toEqual({
+      failureClass: "TIMEOUT",
+    });
+    const skipped = (recorded.dossier?.lanes ?? []).filter(
+      (lane) => lane.status === "SKIPPED_DEADLINE",
+    );
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(recorded.content).not.toBeNull();
+
+    const replayed = await replayCase(caseA, fixtures);
+    expect(replayed.misses).toEqual([]);
+    expect(replayed.queries).toEqual(
+      fixtures.web.searches.map((search) => search.query),
+    );
+    expect(replayed.run?.dossier).toEqual(recorded.dossier);
+    expect(replayed.run?.content).toEqual(recorded.content);
+
+    // The control: the same recording answered all at once on the
+    // system's clock (the old replay) takes another path and misses.
+    const unscheduled = await runCase({
+      case: caseA,
+      provider: createReplayResearchProvider({ fixture: fixtures.web }),
+      gateway: createReplayModelGateway({ fixture: fixtures.models }),
+      time: SYSTEM_RESEARCH_TIME,
+    }).catch(() => null);
+    expect(unscheduled?.dossier ?? null).not.toEqual(recorded.dossier);
   }, 60_000);
 });
