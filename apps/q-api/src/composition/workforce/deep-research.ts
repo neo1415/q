@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-import { CorrelationIdSchema } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  type QSituationDossier,
+} from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createDeepResearch,
   createSearchBudget,
   crossCheck,
   gapText,
-  looksLikeOwnDomain,
   openGaps,
   publicTermsOf,
   rankFacts,
@@ -17,6 +19,8 @@ import {
   tierRank,
   verifyFacts,
   factKey,
+  countryName,
+  placeCountries,
   CHECKED_EVIDENCE_STATUSES,
   CHECKED_LIFECYCLE_STATUSES,
   DOSSIER_MAX_FACTS,
@@ -37,6 +41,12 @@ import {
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
+import {
+  briefSituation,
+  groundBrief,
+  GroundedBriefSchema,
+  type GroundedBrief,
+} from "./research-brief.js";
 import type { ResearchFound } from "./jobs.js";
 import { safeReport } from "./live.js";
 import {
@@ -113,8 +123,12 @@ const PAGE_CHARS = 2_200;
 const FOLLOW_UPS_MAX = 4;
 const REQUEST_MAX = 4_000;
 const PLAN_CEILING_USD = 0.04;
+const BRIEF_CEILING_USD = 0.05;
 const FACTS_CEILING_USD = 0.05;
 const RECORDS_MAX = 12;
+/** The person's earlier messages a job reads, and each one's length. */
+const EARLIER_MAX = 4;
+const EARLIER_CHARS = 1_000;
 
 const Tier = z.enum(SOURCE_TIERS);
 const TierKind = z.enum(PRIMARY_KINDS).nullable();
@@ -183,6 +197,12 @@ export const InvestigationSummarySchema = z
     searches: z.number().int().min(0),
     modelCalls: z.number().int().min(0),
     ms: z.number().int().min(0),
+    /**
+     * Owner 2026-10-29: the market the research covered and where that came
+     * from (their words, the conversation, their declared context), or that
+     * it is global because no place was named. Absent: an older dossier.
+     */
+    scope: z.string().max(400).optional(),
   })
   .strict();
 export type InvestigationSummary = z.infer<typeof InvestigationSummarySchema>;
@@ -214,6 +234,18 @@ export const ResearchDossierSchema = z
     investigation: InvestigationSummarySchema.optional(),
     /** Capital Q records the person may see, kept apart from web facts. */
     records: z.array(CapitalQRecordSchema).max(RECORDS_MAX).optional(),
+    /**
+     * Owner 2026-10-29: the research brief, for the writer: what Q decided
+     * the question needs, the facts it selected and the sections of their
+     * situation it drew on (private; never sent outside).
+     */
+    brief: z
+      .object({
+        summary: z.string().max(600),
+        writer: z.string().max(12_000),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ResearchDossier = z.infer<typeof ResearchDossierSchema>;
@@ -417,6 +449,15 @@ export const InvestigationCheckpointSchema = z
     internalQuery: z.string().max(200).nullable(),
     records: z.array(CapitalQRecordSchema).max(RECORDS_MAX).nullable(),
     budgetLimited: z.boolean(),
+    /** The context read once for the job (owner 2026-10-29). Absent: older. */
+    context: z
+      .object({
+        earlier: z.array(z.string().max(EARLIER_CHARS)).max(EARLIER_MAX),
+        /** The grounded research brief; null: none could be written. */
+        brief: GroundedBriefSchema.nullable(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type InvestigationCheckpoint = z.infer<
@@ -460,13 +501,38 @@ type TieredFact = VerifiedFact & {
   readonly tierKind: PrimaryKind | null;
 };
 
+/** Words a site's name may add to a company's ("paystackhq", "rampapp"). */
+const OWN_SITE_SUFFIXES = ["", "hq", "app", "inc", "group", "global", "online"];
+
+/**
+ * Whether `domain` is the own site of the organisation `name`: a proper
+ * name (as the page writes it, capitalised: "Payoneer", never a market
+ * label like "payments"), and the site's first label is that name run
+ * together, or it with a short corporate suffix. Live 2026-10-29 (run A):
+ * the label "payments" made paymentsdive.com a company's own disclosure.
+ */
+export function isOwnSiteOf(domain: string, name: string): boolean {
+  const trimmed = name.trim();
+  if (!/^\p{Lu}/u.test(trimmed)) return false;
+  const compact = trimmed.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  if (compact.length < 3) return false;
+  const label = (registrableDomain(domain).split(".")[0] ?? "").replace(
+    /-/gu,
+    "",
+  );
+  return OWN_SITE_SUFFIXES.some((suffix) => label === `${compact}${suffix}`);
+}
+
 /**
  * Each fact's publisher tier. A page on the site of a company the facts
  * name (or the subject's) is that company's own disclosure: its claim.
+ * An official source counts as primary for the market in question
+ * (`countries`; none: a global question).
  */
 function tiered(
   facts: readonly z.infer<typeof StoredFactSchema>[],
   subjectName: string | null,
+  countries: ReadonlySet<string>,
 ): readonly TieredFact[] {
   const named = [
     ...new Set(
@@ -477,9 +543,7 @@ function tiered(
   ];
   const companyDomains = new Set(
     facts
-      .filter((fact) =>
-        named.some((name) => looksLikeOwnDomain(fact.domain, name)),
-      )
+      .filter((fact) => named.some((name) => isOwnSiteOf(fact.domain, name)))
       .map((fact) => registrableDomain(fact.domain)),
   );
   return facts.map((fact) => {
@@ -488,6 +552,7 @@ function tiered(
       domain: fact.domain,
       title: fact.title,
       companyDomains,
+      countries,
     });
     return { ...fact, tier: tier.tier, tierKind: tier.kind };
   });
@@ -498,9 +563,10 @@ function checkedFacts(
   facts: readonly z.infer<typeof StoredFactSchema>[],
   subjectName: string | null,
   today: Date,
+  countries: ReadonlySet<string>,
 ): readonly CrossChecked<TieredFact & { readonly id: string }>[] {
   return crossCheck(
-    tiered(facts, subjectName).map((fact, position) => ({
+    tiered(facts, subjectName, countries).map((fact, position) => ({
       ...fact,
       id: `V${String(position + 1)}`,
     })),
@@ -568,9 +634,22 @@ export function dossierFacts(
   }));
 }
 
+/**
+ * Without a brief, the scope the report states: the countries the
+ * person's own words name (a state or city counts as its country), or
+ * global.
+ */
+export function scopeOfWords(words: readonly string[]): string {
+  const countries = placeCountries(words.join("\n"));
+  return countries.length === 0
+    ? "Scope: global. No place was named in the request or earlier in the conversation, and Q's brief of their situation was not available, so no country was assumed."
+    : `Scope: ${countries.map((code) => countryName(code) ?? code).join(", ")} (from their words).`;
+}
+
 export function workforceDeepResearch(dependencies: {
   readonly service: PublicWebResearchService | undefined;
-  readonly models: Pick<WorkforceModels, "planResearch" | "researchFacts">;
+  readonly models: Pick<WorkforceModels, "planResearch" | "researchFacts"> &
+    Partial<Pick<WorkforceModels, "researchBrief">>;
   readonly now?: (() => number) | undefined;
   readonly deadlineMs?: number | undefined;
   readonly logger?: Logger | undefined;
@@ -605,6 +684,27 @@ export function workforceDeepResearch(dependencies: {
     | undefined;
   /** Searches one job may send, planned ones included (default 8). */
   readonly jobSearchBudget?: number | undefined;
+  /**
+   * Owner 2026-10-29: the person's own earlier messages in the
+   * conversation the job came from (their words, never Q's), most recent
+   * last. Absent or failing: the request alone.
+   */
+  readonly earlierUserText?:
+    | ((actor: ActorContext, runId: string) => Promise<readonly string[]>)
+    | undefined;
+  /**
+   * Owner 2026-10-29: every Q capability starts from everything Q knows
+   * about the account. The person's situation dossier (the assembler
+   * planning uses, read as them; cached per actor), once per job, from
+   * which the research brief is written. Null: no situation readable.
+   */
+  readonly situation?:
+    | ((
+        actor: ActorContext,
+        runId: string,
+        ask: string,
+      ) => Promise<QSituationDossier | null>)
+    | undefined;
 }): WorkforcePortServices["research"] {
   const service = dependencies.service;
   if (service === undefined) return undefined;
@@ -694,9 +794,66 @@ export function workforceDeepResearch(dependencies: {
       await input.checkpoint.save(value).catch(() => undefined);
     };
 
-    // The subject, as the planner reads it and egress may send it: for
-    // their own company its name, country and declared sectors; for a
-    // company being diligenced, its name and country as they may read it.
+    // The context an analyst would use, read once for the job and kept
+    // with it (owner 2026-10-29): their earlier words, and the research
+    // brief Q writes from their whole situation -- what THIS question
+    // needs. One brief call per job, inside the model-call cap.
+    if (state.context === undefined) {
+      const earlier = await (
+        dependencies.earlierUserText?.(input.actor, input.runId) ??
+        Promise.resolve([])
+      ).catch((): readonly string[] => []);
+      const kept = earlier
+        .slice(-EARLIER_MAX)
+        .map((text) => text.slice(0, EARLIER_CHARS));
+      let brief: GroundedBrief | null = null;
+      const situation =
+        models.researchBrief === undefined
+          ? null
+          : await (
+              dependencies.situation?.(input.actor, input.runId, request) ??
+              Promise.resolve(null)
+            ).catch(() => null);
+      if (
+        situation !== null &&
+        models.researchBrief !== undefined &&
+        modelCalls < MODEL_CALLS_MAX &&
+        spend.canAfford(BRIEF_CEILING_USD)
+      ) {
+        modelCalls += 1;
+        const raw = await models
+          .researchBrief(who, trace, {
+            request,
+            earlier: kept.join("\n---\n").slice(0, 4_000),
+            today,
+            situation: briefSituation(situation).slice(0, 24_000),
+          })
+          .catch(() => null);
+        spend.charge(raw?.costUsd ?? null, BRIEF_CEILING_USD);
+        if (raw !== null) {
+          try {
+            brief = groundBrief({
+              raw: raw.output,
+              dossier: situation,
+              words: [request, ...kept],
+            });
+          } catch {
+            brief = null;
+          }
+        }
+      }
+      state.context = { earlier: kept, brief };
+      await save();
+    }
+    const context = state.context;
+    const brief = context.brief;
+    if (brief !== null && brief.summary.length > 0)
+      report({ stage: "PLANNING_RESEARCH", round: 1, brief: brief.summary });
+
+    // The subject, as the planner reads it and egress may send it. A
+    // company being diligenced: its name and country as they may read it.
+    // Their own company: from the brief when there is one (it drew on
+    // their whole situation); otherwise its name, country and sectors.
     const named =
       input.subject === undefined
         ? null
@@ -704,7 +861,7 @@ export function workforceDeepResearch(dependencies: {
             .namedSubject?.(input.actor, input.subject.companyId)
             .catch(() => null)) ?? null);
     const ownSubject =
-      input.subject === undefined
+      input.subject === undefined && brief === null
         ? ((await dependencies.ownSubject?.(input.actor).catch(() => null)) ??
           null)
         : null;
@@ -715,8 +872,24 @@ export function workforceDeepResearch(dependencies: {
         ? named === null
           ? subjectLines(null)
           : diligenceSubjectLines(named)
-        : subjectLines(ownSubject);
-    const subjectName = named?.name ?? ownSubject?.name ?? null;
+        : brief !== null
+          ? {
+              text: "Their own situation, as far as this question needs it, is in THE RESEARCH BRIEF.",
+              terms: [] as readonly string[],
+            }
+          : subjectLines(ownSubject);
+    const subjectName =
+      named?.name ?? ownSubject?.name ?? brief?.subjects[0] ?? null;
+    const scope = brief?.scope ?? scopeOfWords([request, ...context.earlier]);
+    // The market in question's countries, for source relevance: the
+    // brief's places, else the person's own words.
+    const marketCountries = new Set(
+      placeCountries(
+        brief !== null
+          ? brief.places.join("\n")
+          : [request, ...context.earlier].join("\n"),
+      ),
+    );
 
     const plannedLane = (one: {
       readonly lane: string;
@@ -737,6 +910,9 @@ export function workforceDeepResearch(dependencies: {
         request,
         purpose: input.query.slice(0, 600),
         subject: own.text.slice(0, 1_200),
+        brief:
+          brief?.planner ??
+          "No brief: Q could not read their situation for this question. Plan from the request alone; when it names no place, keep the queries global.",
         today,
         gaps: gaps.map(gapText).join("\n").slice(0, 4_000),
         asked: state.asked.join("\n").slice(0, 6_000),
@@ -748,7 +924,8 @@ export function workforceDeepResearch(dependencies: {
     let stop: StopReason | null = null;
     // What stayed open when it stopped (set after each round).
     let open: readonly OpenGap[];
-    const checkedNow = () => checkedFacts(state.facts, subjectName, todayDate);
+    const checkedNow = () =>
+      checkedFacts(state.facts, subjectName, todayDate, marketCountries);
     const gapsNow = () =>
       openGaps({
         lanes: state.plan.map((question) => ({
@@ -912,7 +1089,14 @@ export function workforceDeepResearch(dependencies: {
           // Their own company's identity may travel (their own facts), a
           // diligenced company's name and country, and the public words
           // earlier rounds read. Capital Q records never.
-          publicTerms: [...own.terms, ...state.publicTerms],
+          // Owner 2026-10-29: and what the brief judged relevant AND public
+          // (research-brief.ts) -- nothing else of their situation.
+          publicTerms: [
+            ...own.terms,
+            ...(brief?.terms ?? []),
+            ...state.publicTerms,
+          ],
+          earlierUserText: context.earlier,
           known: state.sources,
           deadlineAt: started + deadlineMs * (state.round === 1 ? 0.45 : 0.75),
           pagesPerQuestion: state.round === 1 ? PAGES_PER_LANE : 3,
@@ -1131,6 +1315,7 @@ export function workforceDeepResearch(dependencies: {
               url: source.url,
               domain: source.domain,
               title: source.title,
+              countries: marketCountries,
             });
             return { tier: own.tier, tierKind: own.kind };
           })();
@@ -1160,10 +1345,14 @@ export function workforceDeepResearch(dependencies: {
         searches,
         modelCalls,
         ms,
+        scope: scope.slice(0, 400),
       },
       ...(state.records === null || state.records.length === 0
         ? {}
         : { records: state.records }),
+      ...(brief === null
+        ? {}
+        : { brief: { summary: brief.summary, writer: brief.writer } }),
     };
     return {
       status: "OK",

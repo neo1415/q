@@ -38,6 +38,8 @@ import {
   ANALYSIS_WRITE_V5,
   RESEARCH_FACTS_V3,
   RESEARCH_PLAN_V4,
+  RESEARCH_BRIEF_V1,
+  RESEARCH_PLAN_V5,
 } from "./tasks/analyst-investigation.v1.js";
 import { Q_SYSTEM_VOICE_V1 } from "./charter/q-system-voice.v1.js";
 import { Q_SYSTEM_VOICE_V2 } from "./charter/q-system-voice.v2.js";
@@ -658,9 +660,12 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...RESEARCH_PLAN_V3, status: "DEPRECATED" },
     { ...ANALYSIS_WRITE_V4, status: "DEPRECATED" },
     // Investigation-grade research 2026-10-29.
-    RESEARCH_PLAN_V4,
+    { ...RESEARCH_PLAN_V4, status: "DEPRECATED" },
     RESEARCH_FACTS_V3,
     ANALYSIS_WRITE_V5,
+    // Situation-first research 2026-10-29.
+    RESEARCH_PLAN_V5,
+    RESEARCH_BRIEF_V1,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,

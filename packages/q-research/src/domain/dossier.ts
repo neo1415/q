@@ -58,7 +58,11 @@ export type AdmittedFact = VerifiedFact & {
 };
 
 export type FactRefusal =
-  "UNKNOWN_SOURCE" | "FIGURE_NOT_IN_SOURCE" | "DUPLICATE" | "EMPTY";
+  | "UNKNOWN_SOURCE"
+  | "FIGURE_NOT_IN_SOURCE"
+  | "ENTITY_NOT_IN_SOURCE"
+  | "DUPLICATE"
+  | "EMPTY";
 
 export type FactRefusals = readonly {
   readonly statement: string;
@@ -84,17 +88,80 @@ export function numbersIn(text: string): readonly string[] {
     .filter((value) => value.length > 0);
 }
 
-/** Whether every number a fact states occurs in its source's text. */
+/** The scale a figure is written in: "bn", "m", "%" ... null: none said. */
+type Scale = "T" | "B" | "M" | "K" | "%" | null;
+
+const SCALED =
+  /\d[\d,]*(?:\.\d+)?(?:\s?(%|percent\b|per cent\b|trillion\b|tn\b|billion\b|bn\b|b\b|million\b|mn\b|m\b|mil\b|thousand\b|k\b))?/giu;
+
+function scaleOf(raw: string | undefined): Scale {
+  const unit = (raw ?? "").toLowerCase();
+  if (unit === "") return null;
+  if (unit === "%" || unit.startsWith("per")) return "%";
+  if (unit === "trillion" || unit === "tn") return "T";
+  if (unit === "billion" || unit === "bn" || unit === "b") return "B";
+  if (unit === "million" || unit === "mn" || unit === "m" || unit === "mil")
+    return "M";
+  return "K";
+}
+
+/** Each number in a text with the scale written after it. */
+function scaledNumbersIn(
+  text: string,
+): readonly { readonly value: string; readonly scale: Scale }[] {
+  return [...text.matchAll(SCALED)].flatMap((match) => {
+    const value = numbersIn(match[0])[0];
+    return value === undefined ? [] : [{ value, scale: scaleOf(match[1]) }];
+  });
+}
+
+/**
+ * Whether every number a fact states occurs in its source's text. A
+ * figure written with a scale ("$778m", "32%") is matched only by the same
+ * number written with the same scale or with none ("778" in a table
+ * headed "$m"); the same digits at another scale ("778 billion", "778%")
+ * are a different figure.
+ */
 export function numbersSupported(
   fact: Pick<ProposedFact, "statement" | "figure">,
   sourceText: string,
 ): boolean {
-  const available = new Set(numbersIn(sourceText));
+  const available = scaledNumbersIn(sourceText);
   const stated = [
-    ...numbersIn(fact.figure ?? ""),
-    ...numbersIn(fact.statement),
+    ...scaledNumbersIn(fact.figure ?? ""),
+    ...scaledNumbersIn(fact.statement),
   ];
-  return stated.every((value) => available.has(value));
+  return stated.every((one) =>
+    available.some(
+      (page) =>
+        page.value === one.value &&
+        (one.scale === null || page.scale === null || page.scale === one.scale),
+    ),
+  );
+}
+
+/**
+ * The organisation a fact is about, when the reader named one as a proper
+ * name ("Corpay", "Yellow Card"; never a market label like "global B2B
+ * payments"): it must be named on the fact's own page. Live 2026-10-29
+ * (run A): Corpay's and Payoneer's revenues were filed under an FXC
+ * Intelligence page that names neither -- a fact carried across pages
+ * the reader read together.
+ */
+export function entityOnPage(
+  entity: string | null | undefined,
+  sourceText: string,
+): boolean {
+  const name = entity?.trim() ?? "";
+  const words = name.split(/\s+/u).filter((word) => word.length > 0);
+  const proper =
+    words.length > 0 &&
+    words.length <= 3 &&
+    words.every((word) => /^[\p{Lu}\p{N}]/u.test(word));
+  if (!proper) return true;
+  const compact = (text: string) =>
+    text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  return compact(sourceText).includes(compact(name));
 }
 
 /** One key per statement, however it is spaced or punctuated. */
@@ -140,8 +207,13 @@ export function verifyFacts(
       refused.push({ statement, reason: "UNKNOWN_SOURCE" });
       continue;
     }
-    if (!numbersSupported(fact, `${source.title ?? ""} ${source.excerpt}`)) {
+    const page = `${source.title ?? ""} ${source.excerpt}`;
+    if (!numbersSupported(fact, page)) {
       refused.push({ statement, reason: "FIGURE_NOT_IN_SOURCE" });
+      continue;
+    }
+    if (!entityOnPage(fact.entity, page)) {
+      refused.push({ statement, reason: "ENTITY_NOT_IN_SOURCE" });
       continue;
     }
     const key = factKey(statement);

@@ -20,6 +20,7 @@ import {
 } from "../src/features/q/conversation";
 import {
   nextStep,
+  stepInViewLine,
   stepLine,
   stepStates,
   WorkInProgressCard,
@@ -239,6 +240,33 @@ describe("the work canvas's step bar", () => {
     expect(stepLine("REVISING", "SKIPPED", null)).toBe("Not needed");
     expect(stepLine("FILING", "LATER", null)).toBe("");
   });
+
+  it("the step in view says the investigation's own stage, live (run A, 2026-10-29)", () => {
+    // Planning shows on the research step: its own line, never the step's.
+    expect(
+      stepInViewLine(
+        "SEARCHING",
+        stage({ stage: "PLANNING_RESEARCH", round: 1 }),
+      ),
+    ).toBe("Planning the investigation");
+    // Round 2 while the view holds Reading (it never steps back).
+    expect(
+      stepInViewLine(
+        "READING",
+        stage({ stage: "SEARCHING", round: 2, questions: 3, sources: 33 }),
+      ),
+    ).toBe("Round 2: checking 3 open questions");
+    expect(
+      stepInViewLine(
+        "READING",
+        stage({ stage: "CROSS_CHECKING", sources: 33, facts: 35 }),
+      ),
+    ).toBe("Cross-checking sources");
+    // Outside research, the step's own line as before.
+    expect(
+      stepInViewLine("DRAFTING", stage({ stage: "READING", sources: 3 })),
+    ).toBe("Writing the first draft");
+  });
 });
 
 describe("the card", () => {
@@ -282,10 +310,22 @@ describe("the card", () => {
       // Walk time forward: Filing comes into view (revising skipped), and
       // only after its own time does the card become the document.
       const seen: string[] = [];
+      const filedLines: string[] = [];
       for (let tick = 0; tick < 40 && documentCard() === null; tick += 1) {
         await vi.advanceTimersByTimeAsync(150);
         seen.push(JSON.stringify(stepsShown()));
+        const line = window.document.querySelector(
+          '[data-q-work-line="FILING"]',
+        );
+        if (line !== null)
+          filedLines.push(
+            `${window.document.querySelector("[data-q-work-status]")?.getAttribute("data-q-work-status") ?? ""}|${line.textContent}`,
+          );
       }
+      // Filed: the chip says Done and the line says filed, never "Filing…".
+      expect(filedLines.length).toBeGreaterThan(0);
+      for (const shown of filedLines)
+        expect(shown.startsWith("DONE|Filed the document")).toBe(true);
       expect(seen).toContain(
         JSON.stringify(["DONE", "DONE", "DONE", "DONE", "SKIPPED", "CURRENT"]),
       );

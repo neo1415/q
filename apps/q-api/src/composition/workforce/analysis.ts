@@ -70,6 +70,8 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
   readonly investigations: readonly InvestigationSummary[];
   /** Capital Q records the person may see, kept apart from web facts. */
   readonly records: readonly CapitalQRecord[];
+  /** Owner 2026-10-29: each research step's brief, for the writer. */
+  readonly briefs: readonly string[];
 } {
   const sources: AnalysisSource[] = [];
   const facts: AnalysisFact[] = [];
@@ -122,6 +124,13 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
       dossier.investigation === undefined ? [] : [dossier.investigation],
     ),
     records,
+    briefs: [
+      ...new Set(
+        dossiers.flatMap((dossier) =>
+          dossier.brief === undefined ? [] : [dossier.brief.writer],
+        ),
+      ),
+    ],
   };
 }
 
@@ -454,10 +463,13 @@ function findingsFor(
           0,
           2_000,
         ),
-      // What a public page says: supported by that document (or several
-      // independent ones, or only the company's own), never verified by
+      // What a public page says is its publisher's claim (ADR-001
+      // USER_CLAIM: a party's own statement, as the platform's other
+      // public findings label it -- live 2026-10-29, run A filed them
+      // UNKNOWN), supported by that document, by several independent
+      // ones, or only by the company's own word; never verified by
       // Capital Q. Code's cross-check decided the evidence and status.
-      truthClass: "UNKNOWN" as const,
+      truthClass: "USER_CLAIM" as const,
       evidenceStatus: fact.evidenceStatus ?? ("DOCUMENT_SUPPORTED" as const),
       lifecycleStatus: fact.lifecycleStatus ?? ("CURRENT" as const),
       confidence:
@@ -655,7 +667,17 @@ export function investigationSections(input: {
   const stale = input.facts.filter(
     (fact) => fact.lifecycleStatus === "STALE",
   ).length;
+  // Owner 2026-10-29: the market covered, and from what context (or that
+  // it is global because no place was named), in code's words.
+  const scopes = [
+    ...new Set(
+      input.investigations.flatMap((one) =>
+        one.scope === undefined ? [] : [one.scope],
+      ),
+    ),
+  ];
   const limits = [
+    ...scopes,
     "Public search reaches what is published. It cannot establish:",
     ...PUBLIC_SEARCH_LIMITS.map((line) => `- ${line}`),
     ...(couldNotRun.length === 0

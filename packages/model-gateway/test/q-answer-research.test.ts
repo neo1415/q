@@ -561,6 +561,23 @@ describe("answer seam: Q decides to research", () => {
     }
   });
 
+  it("never runs research inline on a turn no reader could read (live 2026-10-29, run B)", async () => {
+    const quiet = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
+    const unread = build({
+      script: [researchCall, { kind: "JSON", value: analystResult("unread") }],
+      tools: quiet.port,
+      userText:
+        "Research the competitive landscape and regulation for our market -- a proper evidence-backed brief.",
+    });
+    await unread.seam.answer({ ...unread.request, turnUnread: true });
+    expect(quiet.executed).toHaveLength(0);
+    for (const call of unread.alpha.calls) {
+      expect((call.request.tools ?? []).map((tool) => tool.name)).not.toContain(
+        "research_public_web",
+      );
+    }
+  });
+
   it("says so when an answer about their own records had to go to the public web", async () => {
     const tools = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
     const own = build({

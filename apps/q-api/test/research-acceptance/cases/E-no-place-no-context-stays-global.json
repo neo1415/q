@@ -1,0 +1,137 @@
+{
+  "id": "E-no-place-no-context-stays-global",
+  "why": "Neither the words nor the situation name a place: the research stays global and the report says so.",
+  "actor": "investor",
+  "request": "Research the embedded finance market and give me a short evidence-backed report.",
+  "earlierTurns": [],
+  "stepGoal": "Learn the embedded finance market's size, developments, competitors and opportunities.",
+  "public": {
+    "mandate": {
+      "geographies": [],
+      "sectors": [],
+      "stages": []
+    }
+  },
+  "situation": {
+    "version": "situation/v1",
+    "side": "INVESTOR",
+    "asOf": "2026-10-29T09:00:00.000Z",
+    "sections": [
+      {
+        "source": "ACTIVITY",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "RELATIONSHIPS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "MESSAGES",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "SCHEDULE",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "BOARD",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "Q_WORK",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "MEMORY",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "Q_DAILY",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PUBLIC",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PROSPECTS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "MANDATE",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "GATEQ",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "FEED_DECISIONS",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      }
+    ],
+    "unknowns": [],
+    "publicTopics": []
+  },
+  "capitalQRecords": [],
+  "expect": {
+    "places": [],
+    "regionTerms": [],
+    "primaryDomains": [],
+    "privateMarkers": [],
+    "sections": [
+      "DEVELOPMENTS",
+      "COMPETITIVE",
+      "CONTRADICTIONS",
+      "CANNOT_ESTABLISH",
+      "GAPS_NEXT"
+    ],
+    "mandateTerms": [],
+    "pipelineCompanies": [],
+    "statesGlobal": true,
+    "brief": {
+      "required": true,
+      "select": [],
+      "exclude": []
+    }
+  }
+}

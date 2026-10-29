@@ -1,3 +1,4 @@
+import { mentionedCountries } from "./geography.js";
 import { publicDomainOf } from "./url-safety.js";
 
 /**
@@ -16,9 +17,18 @@ import { publicDomainOf } from "./url-safety.js";
  *
  * The market's own regulator and registry are found by search (the
  * planner asks for them by name); code recognises them by their domain:
- * a government-style domain anywhere, or an official body whose domain is
- * the initials of its own name ("Financial Conduct Authority" at fca.org.uk).
+ * a government-style domain, or an official body whose domain is the
+ * initials of its own name ("Financial Conduct Authority" at fca.org.uk).
  * No per-country list: the generic set below is supranational bodies only.
+ *
+ * Relevance (live 2026-10-29, run A: irs.gov, ssa.gov and congress.gov were
+ * counted as regulators for a Nigerian question): an official source is
+ * PRIMARY for the investigation's own countries -- its country-code domain
+ * (".gov.ng", ".ng") or, without one, the country its own title names --
+ * and supranational bodies are PRIMARY for every market. Another
+ * country's government is OTHER: still citable, never the market's
+ * regulator. With no country in question (a global question), every
+ * official source is primary.
  */
 
 export const SOURCE_TIERS = ["PRIMARY", "SECONDARY", "OTHER"] as const;
@@ -82,6 +92,20 @@ export function registrableDomain(domain: string): string {
     return parts.slice(-3).join(".");
   }
   return parts.slice(-2).join(".");
+}
+
+/**
+ * The country a domain's own suffix places it in: its country code
+ * (".ng", ".gov.ng"; ".uk" is GB), or the United States for the bare
+ * ".gov" and ".mil" it alone uses. Null for a generic suffix.
+ */
+export function domainCountry(domain: string): string | null {
+  const parts = domain.toLowerCase().replace(/\.$/u, "").split(".");
+  const last = parts.at(-1) ?? "";
+  if (last === "gov" || last === "mil") return "US";
+  if (/^[a-z]{2}$/u.test(last))
+    return last === "uk" ? "GB" : last.toUpperCase();
+  return null;
 }
 
 /** Government-style domains, in any country: the state publishes there. */
@@ -190,10 +214,6 @@ export function officialBodyMatch(
   return false;
 }
 
-/** A path a company publishes its own disclosures under. */
-const DISCLOSURE_PATH =
-  /\/(?:investor[-_]?relations|investors?|ir|annual[-_]?reports?|financial[-_]?(?:statements|results|reports)|results[-_]?centre|filings)(?:\/|$|\.)/iu;
-
 /**
  * A page's tier from its address (and, for an official body, its title).
  * `companyDomains`: the registrable domains of companies the investigation
@@ -204,6 +224,11 @@ export function sourceTier(input: {
   readonly domain?: string | null | undefined;
   readonly title?: string | null | undefined;
   readonly companyDomains?: ReadonlySet<string> | undefined;
+  /**
+   * The ISO codes of the countries the investigation is about. Absent or
+   * empty: a global question, where every official source is relevant.
+   */
+  readonly countries?: ReadonlySet<string> | undefined;
 }): SourceTiering {
   const domain = (
     input.domain ??
@@ -212,25 +237,32 @@ export function sourceTier(input: {
   ).toLowerCase();
   if (domain.length === 0) return { tier: "OTHER", kind: null };
   const publisher = registrableDomain(domain);
-  if (isGovernmentDomain(domain) || SUPRANATIONAL.has(publisher)) {
+  const countries = input.countries ?? new Set<string>();
+  // An official source of another country is still citable, as OTHER.
+  const ofTheMarket = (country: string | null) =>
+    countries.size === 0 || (country !== null && countries.has(country));
+  if (SUPRANATIONAL.has(publisher) || domain.endsWith(".int")) {
     return { tier: "PRIMARY", kind: "GOVERNMENT_OR_REGULATOR" };
+  }
+  if (isGovernmentDomain(domain)) {
+    return ofTheMarket(domainCountry(domain))
+      ? { tier: "PRIMARY", kind: "GOVERNMENT_OR_REGULATOR" }
+      : { tier: "OTHER", kind: null };
   }
   // An accountable publisher is never re-read as an official body ("news
   // agency" in a press title).
   if (SECONDARY.has(publisher)) return { tier: "SECONDARY", kind: null };
   if (officialBodyMatch(domain, input.title ?? null)) {
-    return { tier: "PRIMARY", kind: "OFFICIAL_BODY" };
+    const country =
+      domainCountry(domain) ?? mentionedCountries(input.title ?? "")[0] ?? null;
+    return ofTheMarket(country)
+      ? { tier: "PRIMARY", kind: "OFFICIAL_BODY" }
+      : { tier: "OTHER", kind: null };
   }
+  // A company's own disclosure only on its own site (live 2026-10-29: trade
+  // press was read as one). An investor-relations path elsewhere is not
+  // a company's own page.
   if (input.companyDomains?.has(publisher) === true) {
-    return { tier: "PRIMARY", kind: "COMPANY_DISCLOSURE" };
-  }
-  let path: string;
-  try {
-    path = new URL(input.url).pathname;
-  } catch {
-    path = "";
-  }
-  if (DISCLOSURE_PATH.test(path)) {
     return { tier: "PRIMARY", kind: "COMPANY_DISCLOSURE" };
   }
   return { tier: "OTHER", kind: null };

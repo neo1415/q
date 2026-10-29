@@ -1664,7 +1664,15 @@ const ANSWER_LIMIT_CHARS = 32_000;
  * the turn for another full gateway budget (production: a failed reading
  * plus its retry stacked past 10 s).
  */
-const TURN_REREAD_DEADLINE_MS = 2_500;
+/**
+ * Live 2026-10-29 (run B): both first attempts timed out on a slow spell,
+ * and the 2.5 s re-read was cancelled before its model answered (p50
+ * 2.0 s, p90 4.2 s, p99 5.5 s) -- shorter than the reader's own hedge
+ * (3.5 s), so it could never get a second chance. One fresh reading gets
+ * the reader's whole attempt (6 s): its hedge can fire, and an unread
+ * request costs at most this, never a silent downgrade.
+ */
+export const TURN_REREAD_DEADLINE_MS = 6_000;
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).

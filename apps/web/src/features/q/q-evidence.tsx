@@ -98,10 +98,12 @@ export function evidenceSummary(
     turn.publicSources.length;
   const sourceTotal = turn.sourceCount + turn.publicSources.length;
   if (count === 0 && sourceTotal === 0) return null;
+  // The label counts sources only (live 2026-10-29, run B: "Sources · 11"
+  // over 5 findings and 6 open questions, with no source kept). Findings
+  // and uncertainties still sit behind the control; they are not sources.
   return {
     count,
-    label:
-      sourceTotal > 0 ? sources(sourceTotal) : count > 0 ? String(count) : "",
+    label: sourceTotal > 0 ? sources(sourceTotal) : "",
   };
 }
 

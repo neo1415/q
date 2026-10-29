@@ -246,6 +246,11 @@ export const WorkforceLiveStageSchema = z
      * later round's SEARCHING counts the open questions it checks. Additive.
      */
     round: z.number().int().min(1).max(10).nullable().optional(),
+    /**
+     * Owner 2026-10-29: what Q is looking into, from its research brief
+     * (plain words, no refs), shown as "What I'm looking into". Additive.
+     */
+    brief: z.string().max(600).nullable().optional(),
     at: UtcTimestampSchema,
   })
   .strict();

@@ -55,6 +55,14 @@ export type SituationSourceSpec = {
   readonly reads: (subject: SituationSubject) => readonly SituationRead[];
   /** Null: the output did not validate; the source is not known. */
   readonly format: SituationFormat;
+  /**
+   * Public-safe topics the source's reads yield (owner 2026-10-29: the
+   * places and sectors of the person's own declared context are public
+   * vocabulary, not private facts). Words only: never a figure, a name of
+   * someone they deal with, or a document's content.
+   */
+  readonly topics?:
+    ((data: readonly unknown[]) => readonly string[]) | undefined;
 };
 
 // --- shared words -------------------------------------------------------------
@@ -779,6 +787,58 @@ function formatDaily(data: readonly unknown[]): SituationRawFact[] | null {
   ];
 }
 
+/** Taxonomy vocabularies whose codes name a market, never a figure or a name. */
+const MARKET_VOCABULARIES = new Set([
+  "industry",
+  "product_category",
+  "technology",
+  "business_model",
+  "customer_type",
+  "impact_theme",
+]);
+
+const TOPIC_COUNTRIES_MAX = 4;
+const TOPIC_SECTORS_MAX = 4;
+
+/**
+ * An investor's research topics from their declared mandates in force:
+ * their sectors in each of their geographies ("fintech payments nigeria"),
+ * or their sectors alone. Exclusions, cheques, stages and the
+ * organisation's name never become a topic (CQ-Q-RESEARCH-001 §9).
+ */
+export function mandateTopics(data: readonly unknown[]): readonly string[] {
+  const read = parsed(GetInvestorMandateOutputSchema, data[0]);
+  if (read === null) return [];
+  const plain = (code: string) =>
+    code
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  const places = new Set<string>();
+  const sectors = new Set<string>();
+  for (const mandate of read.mandates) {
+    if (mandate.status === "CLOSED") continue;
+    for (const preference of mandate.taxonomyPreferences) {
+      if (preference.isExclusion) continue;
+      const word = plain(preference.canonicalCode);
+      if (word.length < 2) continue;
+      if (preference.vocabularyCode === "geography") places.add(word);
+      else if (MARKET_VOCABULARIES.has(preference.vocabularyCode))
+        sectors.add(word);
+    }
+  }
+  const market = [...sectors].slice(0, TOPIC_SECTORS_MAX).join(" ");
+  const topics =
+    places.size === 0
+      ? [market]
+      : [...places]
+          .slice(0, TOPIC_COUNTRIES_MAX)
+          .map((place) => `${market} ${place}`.trim());
+  return topics
+    .filter((topic) => topic.length >= 2)
+    .map((topic) => topic.slice(0, 120));
+}
+
 function formatMandate(data: readonly unknown[]): SituationRawFact[] | null {
   const read = parsed(GetInvestorMandateOutputSchema, data[0]);
   if (read === null) return null;
@@ -1005,6 +1065,7 @@ export const SITUATION_SOURCE_SPECS: readonly SituationSourceSpec[] = [
       },
     ]),
     format: (d) => formatMandate(d),
+    topics: (d) => mandateTopics(d),
   },
   {
     source: "GATEQ",

@@ -57,6 +57,10 @@
       "types": "./dist/providers/cached.d.ts",
       "default": "./dist/providers/cached.js"
     },
+    "./providers/recorded": {
+      "types": "./dist/providers/recorded.d.ts",
+      "default": "./dist/providers/recorded.js"
+    },
     "./vetted-http": {
       "types": "./dist/vetted-http.d.ts",
       "default": "./dist/vetted-http.js"

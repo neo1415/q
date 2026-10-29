@@ -13,6 +13,7 @@ import {
   InvestorOrganisationIdSchema,
   isInvestorNetworkVisible,
   toNetworkVisibleInvestorProfile,
+  type InvestorMandate,
   type InvestorService,
 } from "@capital-q/investors";
 import type { VisibilityCentre } from "@capital-q/permissions";
@@ -43,6 +44,40 @@ export type OwnRecordsDependencies = {
   readonly visibility: VisibilityCentre;
   readonly profileFindings: ProfileFindingsReader;
 };
+
+/** Mandates whose criteria are read in full for one record. */
+const MANDATE_DETAIL_MAX = 3;
+
+/**
+ * A mandate's declared criteria, as the investor declared them: cheque,
+ * stage, constraints and taxonomy preferences (sector, geography,
+ * exclusions). The raw narrative is left out (investor-private, never
+ * emitted); an unset value stays null, never zero.
+ */
+function declaredCriteria(mandate: InvestorMandate) {
+  return {
+    declared: true,
+    cheque: {
+      min: mandate.minCheque,
+      max: mandate.maxCheque,
+      currency: mandate.currencyCode,
+    },
+    stage: { min: mandate.minStageCode, max: mandate.maxStageCode },
+    constraints: mandate.constraints.map((constraint) => ({
+      dimension: constraint.dimension,
+      operator: constraint.operator,
+      value: constraint.value,
+      importance: constraint.importance,
+      hardExclusion: constraint.isHardExclusion,
+    })),
+    preferences: mandate.taxonomyPreferences.map((preference) => ({
+      vocabulary: preference.vocabularyCode,
+      code: preference.canonicalCode,
+      strength: preference.preferenceStrength,
+      exclusion: preference.isExclusion,
+    })),
+  };
+}
 
 export function createOwnRecordsPort(
   deps: OwnRecordsDependencies,
@@ -141,12 +176,40 @@ export function createOwnRecordsPort(
             investorOrganisationId: investorOrganisationId(),
           });
         case "INVESTOR_MANDATES": {
+          const organisation = investorOrganisationId();
           const page = await deps.investorService.listInvestorMandates({
             actor,
-            investorOrganisationId: investorOrganisationId(),
+            investorOrganisationId: organisation,
             limit: 10,
           });
-          return { items: page.items };
+          // Live 2026-10-29 (deep research, run A): the list holds only
+          // each mandate's name and status, so a report written for an
+          // investor with an ACTIVE $250k-1M seed NG/GH/KE mandate said
+          // their cheque, stage, sector and geography "are not recorded".
+          // The criteria of each mandate still in force are read through
+          // the same service, as them (investor.mandate.view again).
+          const inForce = page.items
+            .filter((item) => item.status !== "CLOSED")
+            .slice(0, MANDATE_DETAIL_MAX);
+          const details = await Promise.all(
+            inForce.map((item) =>
+              deps.investorService
+                .getInvestorMandate({
+                  actor,
+                  investorOrganisationId: organisation,
+                  mandateId: item.id,
+                })
+                .then(declaredCriteria)
+                .catch(() => null),
+            ),
+          );
+          return {
+            items: page.items.map((item) => {
+              const at = inForce.indexOf(item);
+              const criteria = at < 0 ? null : (details[at] ?? null);
+              return criteria === null ? item : { ...item, ...criteria };
+            }),
+          };
         }
       }
     },

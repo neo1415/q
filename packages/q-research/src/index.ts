@@ -92,10 +92,16 @@ export {
 } from "./domain/ranking.js";
 export {
   COUNTRIES,
+  SUBNATIONAL,
+  countryForms,
   countryName,
+  countryOfCode,
   mentionedCountries,
+  placeCountries,
+  placesNamed,
   regionCountries,
   type CountryEntry,
+  type PlaceMention,
 } from "./domain/geography.js";
 export {
   boundExcerpt,
@@ -255,6 +261,7 @@ export {
   factKey,
   numbersIn,
   numbersSupported,
+  entityOnPage,
   rankFacts,
   verifyFacts,
   type AdmittedFact,
@@ -269,6 +276,7 @@ export {
 // decided by code.
 export {
   officialBodyMatch,
+  domainCountry,
   PRIMARY_KINDS,
   registrableDomain,
   SOURCE_TIERS,

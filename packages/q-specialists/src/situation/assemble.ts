@@ -171,6 +171,8 @@ type SectionResult = {
   readonly status: QSituationSection["status"];
   readonly reason: QSituationUnavailableReason | null;
   readonly facts: readonly SituationRawFact[];
+  /** Public-safe topics the section's reads yield (sources.ts `topics`). */
+  readonly topics?: readonly string[] | undefined;
 };
 
 const unavailable = (reason: QSituationUnavailableReason): SectionResult => ({
@@ -357,9 +359,12 @@ export function createSituationAssembler(
         outcomes.map((outcome) => (outcome.ok ? outcome.data : undefined)),
         side,
       );
-      return facts === null
-        ? unavailable("FAILED")
-        : { status: "READ", reason: null, facts };
+      if (facts === null) return unavailable("FAILED");
+      const topics =
+        spec.topics?.(
+          outcomes.map((outcome) => (outcome.ok ? outcome.data : undefined)),
+        ) ?? [];
+      return { status: "READ", reason: null, facts, topics };
     };
 
     const sources = Q_SITUATION_SOURCES;
@@ -396,7 +401,18 @@ export function createSituationAssembler(
       sections: keep,
     });
 
-    return build(side, results, situationTopics(request.publicProfile), now());
+    // Public-safe topics: the public profile's (a founder's own company),
+    // then what read sources yield (an investor's declared mandate).
+    const topics = [
+      ...situationTopics(request.publicProfile),
+      ...[...results.values()].flatMap((result) => result.topics ?? []),
+    ];
+    return build(
+      side,
+      results,
+      [...new Set(topics)].slice(0, Q_SITUATION_TOPICS_MAX),
+      now(),
+    );
   }
 
   async function readMemory(

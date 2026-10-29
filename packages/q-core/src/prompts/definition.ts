@@ -109,6 +109,8 @@ export const PROMPT_IDS = [
   "DILIGENCE_QUESTIONS_SHORTEN",
   /** Owner 2026-10-23: Q as an analyst doing deep work. */
   "RESEARCH_PLAN",
+  /** Owner 2026-10-29: what a research question needs, from the situation. */
+  "RESEARCH_BRIEF",
   "RESEARCH_FACTS",
   "ANALYSIS_WRITE",
   "ANALYSIS_CRITIQUE",
@@ -218,6 +220,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DILIGENCE_QUESTIONS: "diligence-questions",
   DILIGENCE_QUESTIONS_SHORTEN: "diligence-questions-shorten",
   RESEARCH_PLAN: "research-plan",
+  RESEARCH_BRIEF: "research-brief",
   RESEARCH_FACTS: "research-facts",
   ANALYSIS_WRITE: "analysis-write",
   ANALYSIS_CRITIQUE: "analysis-critique",

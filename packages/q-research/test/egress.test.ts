@@ -114,3 +114,75 @@ describe("composeEgressQuery", () => {
     ]);
   });
 });
+
+describe("deep research keeps the country they named (live 2026-10-29, run A)", () => {
+  const userText =
+    "Q, investigate the Nigerian B2B payments sector and how it affects my fintech thesis";
+
+  it("'Nigerian' allows Nigeria and regulator words; private markers still never leave", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: `Nigeria central bank payments regulation circular ${PRIVATE_MARKER} 250k`,
+      userText,
+      publicIdentity: [],
+      researchVocabulary: true,
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.query).toBe(
+      "nigeria central bank payments regulation circular",
+    );
+    expect(containsAny(outcome.query, [PRIVATE_MARKER, "250k"])).toBe(false);
+  });
+
+  it("a country they never named does not leave", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: "Kenya payments regulation",
+      userText,
+      publicIdentity: [],
+      researchVocabulary: true,
+    });
+    expect(outcome.ok && outcome.query.includes("kenya")).toBe(false);
+  });
+
+  it("everyday research is unchanged: exact words only", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: "Nigeria payments",
+      userText,
+      publicIdentity: [],
+    });
+    expect(outcome.ok && outcome.query.includes("nigeria")).toBe(false);
+  });
+});
+
+describe("a subnational place counts as its country (owner 2026-10-29)", () => {
+  it("'Lagos State' and 'Kano' allow Nigeria; 'Western Cape' South Africa", () => {
+    for (const [userText, query, country] of [
+      [
+        "Lagos State fintech regulation",
+        "Nigeria fintech regulation",
+        "nigeria",
+      ],
+      ["fintech regulation in Kano", "Nigeria fintech regulation", "nigeria"],
+      ["Western Cape payments", "South Africa payments regulation", "south"],
+      ["Kisumu county payments", "Kenya payments", "kenya"],
+    ] as const) {
+      const outcome = composeEgressQuery({
+        requestedQuery: query,
+        userText,
+        publicIdentity: [],
+        researchVocabulary: true,
+      });
+      expect(outcome.ok && outcome.query.includes(country)).toBe(true);
+    }
+  });
+
+  it("an everyday word that names a state alone ('delta') places nothing", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: "Nigeria payments delta",
+      userText: "payments delta between providers",
+      publicIdentity: [],
+      researchVocabulary: true,
+    });
+    expect(outcome.ok && outcome.query.includes("nigeria")).toBe(false);
+  });
+});

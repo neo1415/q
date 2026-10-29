@@ -1,0 +1,434 @@
+{
+  "id": "B-founder-nigeria-competition-regulation",
+  "why": "Live 2026-10-29 run B scored 2/10: 'our market' was not resolved to the company's country, so queries went global.",
+  "actor": "founder",
+  "request": "Research the competitive landscape and regulation for our market, and tell me what it means for the next 12 months.",
+  "earlierTurns": [],
+  "stepGoal": "Learn the competitors and the regulation in the company's own market, and their implications for the company's next 12 months.",
+  "public": {
+    "company": {
+      "name": "LedgerBridge",
+      "country": "NG",
+      "sectors": ["B2B payments", "fintech"],
+      "description": "Payables, receivables and reconciliation for FMCG distributors and their retailers."
+    }
+  },
+  "situation": {
+    "version": "situation/v1",
+    "side": "FOUNDER",
+    "asOf": "2026-10-29T09:00:00.000Z",
+    "sections": [
+      {
+        "source": "ACTIVITY",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F1",
+            "statement": "updated the data room (2 times; latest 2026-10-25)",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_activity",
+              "record": null,
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "RELATIONSHIPS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F2",
+            "statement": "Aster Africa Ventures: relationship state INTERESTED.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_relationships",
+              "record": {
+                "kind": "RELATIONSHIP",
+                "id": "relationships-1"
+              },
+              "url": null
+            },
+            "label": "relationship_shared",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "MESSAGES",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F3",
+            "statement": "Aster Africa Ventures asked for the CBN licence status and distributor contracts after an NDA.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_messages",
+              "record": {
+                "kind": "MESSAGE",
+                "id": "messages-1"
+              },
+              "url": null
+            },
+            "label": "relationship_shared",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "SCHEDULE",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F4",
+            "statement": "Call with Aster Africa Ventures on 2026-11-04.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_schedule",
+              "record": {
+                "kind": "MEETING",
+                "id": "schedule-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "BOARD",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F5",
+            "statement": "Board card 'Renew PSSP licence paperwork' due 2026-12-01.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_board",
+              "record": {
+                "kind": "BOARD_ITEM",
+                "id": "board-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "Q_WORK",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "MEMORY",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F6",
+            "statement": "Calls its main rivals Paystack, Flutterwave and Moniepoint's business accounts.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "memory_recall",
+              "record": {
+                "kind": "MEMORY_ITEM",
+                "id": "memory-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "Q_DAILY",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "PUBLIC",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "INTEREST",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F7",
+            "statement": "2 investors saved LedgerBridge this month.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_interest",
+              "record": {
+                "kind": "INVESTOR_ORGANISATION",
+                "id": "interest-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "PROSPECTS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F8",
+            "statement": "Prospect list: 6 seed funds focused on West African fintech.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_prospects",
+              "record": {
+                "kind": "INVESTOR_ORGANISATION",
+                "id": "prospects-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "PROFILE",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F9",
+            "statement": "LedgerBridge Ltd, Lagos, Nigeria. Sectors: B2B payments, fintech. Stage: seed. What it does: payables, receivables and reconciliation for FMCG distributors and their retailers.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_company_profile",
+              "record": {
+                "kind": "COMPANY",
+                "id": "profile-1"
+              },
+              "url": null
+            },
+            "label": "network_visible",
+            "category": "COMPANY_IDENTITY"
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "DECK",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F10",
+            "statement": "Deck v4: monthly processed value NGN 412 million in September 2026 (founder claim).",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_deck",
+              "record": {
+                "kind": "DOCUMENT",
+                "id": "deck-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": "COMPANY_IDENTITY"
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "DATA_ROOM",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F11",
+            "statement": "Data room: 9 documents, including the distributor contract with Okeke Distribution Ltd.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_data_room",
+              "record": {
+                "kind": "DOCUMENT",
+                "id": "data_room-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "PITCH_VIDEO",
+        "status": "READ",
+        "reason": null,
+        "facts": [],
+        "truncated": false
+      },
+      {
+        "source": "READINESS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F12",
+            "statement": "Readiness: licence evidence missing; financials self-reported.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_readiness",
+              "record": {
+                "kind": "COMPANY",
+                "id": "readiness-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "CLAIMS",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F13",
+            "statement": "Claim: 140 distributors live (self-reported, no document yet).",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_claims",
+              "record": {
+                "kind": "COMPANY",
+                "id": "claims-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": null
+          }
+        ],
+        "truncated": false
+      },
+      {
+        "source": "CAPITAL",
+        "status": "READ",
+        "reason": null,
+        "facts": [
+          {
+            "ref": "F14",
+            "statement": "Raising USD 1.2 million seed; runway 9 months at USD 86,000 monthly burn.",
+            "truthClass": "USER_CLAIM",
+            "evidenceStatus": "SELF_REPORTED",
+            "asOf": "2026-10-20",
+            "provenance": {
+              "tool": "my_capital",
+              "record": {
+                "kind": "COMPANY",
+                "id": "capital-1"
+              },
+              "url": null
+            },
+            "label": "founder_private",
+            "category": "BURN_RATE"
+          }
+        ],
+        "truncated": false
+      }
+    ],
+    "unknowns": [],
+    "publicTopics": ["B2B payments NG", "fintech NG", "LedgerBridge"]
+  },
+  "capitalQRecords": [],
+  "expect": {
+    "places": ["NG"],
+    "regionTerms": [],
+    "primaryDomains": [
+      ".gov.ng",
+      "cbn.gov.ng",
+      "sec.gov.ng",
+      "cac.gov.ng",
+      "nibss-plc.com.ng"
+    ],
+    "privateMarkers": [
+      "412",
+      "86,000",
+      "1.2 million",
+      "Okeke Distribution",
+      "140 distributors"
+    ],
+    "sections": [
+      "REGULATORY",
+      "COMPETITIVE",
+      "CONTRADICTIONS",
+      "CANNOT_ESTABLISH",
+      "GAPS_NEXT"
+    ],
+    "mandateTerms": [],
+    "pipelineCompanies": [],
+    "statesGlobal": false,
+    "brief": {
+      "required": true,
+      "select": ["F9"],
+      "exclude": ["F14", "F10", "F11"]
+    }
+  }
+}
