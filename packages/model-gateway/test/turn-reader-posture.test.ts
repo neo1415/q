@@ -4,7 +4,10 @@ import { createLogger } from "@capital-q/observability";
 
 import type { ModelGateway } from "../src/index.js";
 import { createQTurnReader } from "../src/q/index.js";
-import { TURN_READER_FAST_FIRST_ATTEMPT_MS } from "../src/q/turn-reader.js";
+import {
+  TURN_READER_FAST_FIRST_ATTEMPT_MS,
+  TURN_READER_SAME_MODEL_HEDGE_MS,
+} from "../src/q/turn-reader.js";
 
 /**
  * The turn reader declares the deployment's data posture like every other
@@ -99,5 +102,16 @@ describe("the turn reader's data posture", () => {
       dataPosture: "REAL_CUSTOMER",
     }).read(input);
     expect(real.options[0]).not.toHaveProperty("firstAttemptTimeoutMs");
+  });
+
+  // Live 2026-10-29: a real customer's read has one eligible model, so a
+  // stalled read hedges to the same model instead of leaving the turn unread.
+  it("a real customer's read hedges to the same model when it stalls", async () => {
+    const { gateway, options } = recording();
+    await createQTurnReader({ gateway, logger }).read(input);
+    expect(options[0]?.sameModelHedgeAfterMs).toBe(
+      TURN_READER_SAME_MODEL_HEDGE_MS,
+    );
+    expect(TURN_READER_SAME_MODEL_HEDGE_MS).toBeLessThan(6_000);
   });
 });

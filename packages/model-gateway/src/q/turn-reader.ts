@@ -192,6 +192,17 @@ const TURN_READER_BUDGET = {
 } as const;
 
 /**
+ * Live 2026-10-29: 26 of 548 reads failed in 24 h (17 TIMEOUT), and an
+ * unread planning ask became a research memo. A real customer's turn is
+ * CONFIDENTIAL, and only gpt-5.6-luna may carry it (both Gemini models are
+ * PUBLIC; Groq's on-demand tier refuses a request this size, 413), so the
+ * policy's hedge never had a second model. Still waiting at 3.5 s (p50
+ * 2.0 s, p90 4.2 s, p99 5.5 s), the same model is asked again and the
+ * first valid answer wins: about one read in six, ~USD 0.002 each.
+ */
+export const TURN_READER_SAME_MODEL_HEDGE_MS = 3_500;
+
+/**
  * How long the first model gets when a synthetic-demo posture routes the
  * read to the fast shared model first and another waits behind it. Measured
  * 2026-10-01 (ai_ops.model_usage, 72 h, Gemini flash-lite): 66 reads
@@ -462,6 +473,7 @@ export function createQTurnReader(dependencies: {
               // malformed hand costs the hand (read as none), never the
               // reading: its kind, appAction and askedAction still route it.
               lenientFields: TURN_READER_LENIENT_FIELDS,
+              sameModelHedgeAfterMs: TURN_READER_SAME_MODEL_HEDGE_MS,
               ...(input.signal === undefined ? {} : { signal: input.signal }),
               ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
                 ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
