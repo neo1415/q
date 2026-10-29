@@ -1,5 +1,10 @@
+import type { RelationshipBrief } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
-import type { OwnRecordsPort, OwnRelationships } from "@capital-q/q-tools";
+import {
+  briefFacts,
+  type OwnRecordsPort,
+  type OwnRelationships,
+} from "@capital-q/q-tools";
 
 /**
  * Owner QA 2026-10-23 (QO-07): investor Zino asked "Write me a 12-month
@@ -13,6 +18,44 @@ import type { OwnRecordsPort, OwnRelationships } from "@capital-q/q-tools";
 
 const RECORD_MAX = 4_000;
 const PIPELINE_MAX = 40;
+/** Relationships whose history is read in full for one document. */
+const HISTORY_MAX = 2;
+
+/** What the document is about: its company, and the words of the ask. */
+export type OwnContextFocus = {
+  readonly companyId: string | null;
+  readonly goal: string;
+};
+
+/**
+ * The relationships a document is about: the one with its company, or
+ * those whose counterpart the ask names (exact name, whole words).
+ */
+export function relationshipsInFocus(
+  own: OwnRelationships,
+  focus: OwnContextFocus | undefined,
+): OwnRelationships["items"] {
+  if (focus === undefined) return [];
+  const goal = focus.goal.toLowerCase();
+  const named = (name: string) => {
+    const wanted = name.toLowerCase().trim();
+    if (wanted.length < 3) return false;
+    const at = goal.indexOf(wanted);
+    if (at < 0) return false;
+    const before = at === 0 ? " " : (goal[at - 1] ?? " ");
+    const after = goal[at + wanted.length] ?? " ";
+    return !/[\p{L}\p{N}]/u.test(before) && !/[\p{L}\p{N}]/u.test(after);
+  };
+  return own.items
+    .filter(
+      (item) =>
+        (focus.companyId !== null &&
+          item.counterpart.id.toLowerCase() ===
+            focus.companyId.toLowerCase()) ||
+        named(item.counterpart.name),
+    )
+    .slice(0, HISTORY_MAX);
+}
 
 function compact(data: unknown): string | null {
   if (data === null || data === undefined) return null;
@@ -28,8 +71,24 @@ export function createOwnContextReader(dependencies: {
   readonly records: Pick<OwnRecordsPort, "read">;
   readonly relationships?:
     ((actor: ActorContext) => Promise<OwnRelationships | null>) | undefined;
+  /**
+   * Stress 2026-10-28 (J7-I, J7-F): both meeting briefs said "no prior
+   * interaction recorded" over an interest with its note and a shared
+   * deck, because a document saw only the pipeline's state. The Relationship
+   * Brief (the Network context's own read, as the person, for their side)
+   * of the relationship the document is about. Absent: not composed.
+   */
+  readonly brief?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<RelationshipBrief | null>)
+    | undefined;
 }) {
-  return async (actor: ActorContext): Promise<string | null> => {
+  return async (
+    actor: ActorContext,
+    focus?: OwnContextFocus,
+  ): Promise<string | null> => {
     const lines: string[] = [];
     const investorId = await dependencies
       .ownInvestorOrganisation(actor)
@@ -80,6 +139,22 @@ export function createOwnContextReader(dependencies: {
                 : []),
             ].join("\n"),
       );
+      const brief = dependencies.brief;
+      if (brief !== undefined) {
+        for (const item of relationshipsInFocus(own, focus)) {
+          const read = await brief(actor, item.relationshipId).catch(
+            () => undefined,
+          );
+          lines.push(
+            read === undefined || read === null
+              ? `What has happened with ${item.counterpart.name}: the relationship history could not be read just now (unknown, not "nothing").`
+              : [
+                  `What has happened with ${item.counterpart.name} (the relationship history as their side may see it, in order; recorded facts, never "no prior interaction" when steps are listed):`,
+                  ...briefFacts(read).map((fact) => `- ${fact}`),
+                ].join("\n"),
+          );
+        }
+      }
     }
     return lines.length === 0 ? null : lines.join("\n");
   };

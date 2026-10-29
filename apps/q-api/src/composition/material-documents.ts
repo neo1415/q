@@ -23,8 +23,24 @@ const TEXT_CHARS = 16_000;
 type Row = {
   readonly id: string;
   readonly document_type: string | null;
+  readonly sensitivity_class: string | null;
   readonly text: string | null;
 };
+
+/**
+ * Stress 2026-10-28 (F03, S02-F): a HIGHLY_CONFIDENTIAL (or RESTRICTED)
+ * document -- management accounts, a financial model -- is outside every
+ * firewall plan and no model provider may receive it. The data room's own
+ * view lists it for its team (and for anyone it is shared with), so these
+ * reads withheld nothing: its text could reach a model through Q. It is
+ * now named as held back and never read, whoever asks.
+ */
+export function heldBackClass(sensitivityClass: string | null): boolean {
+  return (
+    sensitivityClass === "HIGHLY_CONFIDENTIAL" ||
+    sensitivityClass === "RESTRICTED"
+  );
+}
 
 export function createMaterialDocumentReads(dependencies: {
   readonly sql: DatabaseExecutor;
@@ -44,6 +60,7 @@ export function createMaterialDocumentReads(dependencies: {
     const rows = await sql<Row[]>`
       select d.id::text as id,
              d.document_type,
+             d.sensitivity_class::text as sensitivity_class,
              (select string_agg(x.content, ' ' order by x.chunk_index)
                 from (select k.content, k.chunk_index
                         from q_knowledge.chunk_sets s
@@ -110,15 +127,20 @@ export function createMaterialDocumentReads(dependencies: {
       );
       return entries.map((entry) => {
         const row = all.get(entry.documentId);
+        const heldBack = heldBackClass(row?.sensitivity_class ?? null);
         return {
           ...entry,
           documentType: row?.document_type ?? null,
           // The opening only where they may open it: a title they may
-          // know exists says nothing more of what is inside.
+          // know exists says nothing more of what is inside. Never for a
+          // document held back from Q.
           opening:
-            openable.includes(entry.documentId) && row?.text != null
+            !heldBack &&
+            openable.includes(entry.documentId) &&
+            row?.text != null
               ? row.text.slice(0, OPENING_CHARS)
               : null,
+          ...(heldBack ? { heldBack: true } : {}),
         };
       });
     },
@@ -141,6 +163,7 @@ export function createMaterialDocumentReads(dependencies: {
         return null;
       }
       const row = (await lookup(companyId, [id], 60)).get(id);
+      if (heldBackClass(row?.sensitivity_class ?? null)) return null;
       const text = row?.text?.trim() ?? "";
       if (text.length === 0) return null;
       return {
@@ -175,6 +198,11 @@ export function createMaterialDocumentReads(dependencies: {
       ) {
         return null;
       }
+      const held = await sql<{ sensitivity_class: string | null }[]>`
+        select d.sensitivity_class::text as sensitivity_class
+          from evidence.documents d
+         where d.company_id = ${companyId} and d.id = ${id}`;
+      if (heldBackClass(held[0]?.sensitivity_class ?? null)) return null;
       const rows = await sql<
         { page_number: number; text: string | null; page_count: number }[]
       >`

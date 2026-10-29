@@ -537,8 +537,13 @@ async function discoverWith(
         ask.count !== null && block.cards.length < count && total >= count
           ? ` Only ${counted(block.cards.length)} of them could be scored.`
           : "";
-      const head =
-        total === 1
+      // Stress 2026-10-28 (I03): "five companies that match my mandate"
+      // opened with "464 companies on Capital Q", the platform's total,
+      // which says nothing about their mandate. With nothing to narrow by,
+      // the head is the ranking alone.
+      const head = !narrows
+        ? `Ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.${scoredNote}`
+        : total === 1
           ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
           : total < count && ask.count !== null
             ? `Capital Q has only ${counted(total)} ${listKind}${seen}, ranked by fit with your mandate: ${listed(named)}.`

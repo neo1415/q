@@ -34,7 +34,11 @@ import {
   deliveryText,
 } from "../src/composition/workforce/delivery.js";
 import { createWorkforceDocuments } from "../src/composition/workforce/documents.js";
-import { createOwnContextReader } from "../src/composition/workforce/own-context.js";
+import {
+  createOwnContextReader,
+  relationshipsInFocus,
+} from "../src/composition/workforce/own-context.js";
+import type { DataRoomReads } from "../src/composition/workforce/diligence-memo.js";
 import { withWaitingPlans } from "../src/composition/workforce/waiting-plans.js";
 import {
   createOwnWorkStarter,
@@ -897,7 +901,8 @@ describe("own-account deep work starts with no approval card", () => {
         steps: [step(["diligence.questions.prepare"])],
         permitted: ["diligence.questions.prepare"],
       }),
-    ).toBe(false);
+      // Drafts only: every question is its own card before it is sent.
+    ).toBe(true);
   });
 
   it("says it is under way and gives Q's first read, as one Q", () => {
@@ -1152,6 +1157,8 @@ function analysisWorld(options: {
   readonly ownContext?: string | undefined;
   readonly critiques: readonly AnalysisCritiqueResult[];
   readonly drafts: readonly AnalysisDocumentResult[];
+  /** The company's data room as the person may read it. */
+  readonly dataRoom?: DataRoomReads | undefined;
 }) {
   const filed: {
     content: QArtifactContent;
@@ -1169,6 +1176,7 @@ function analysisWorld(options: {
     ...(options.ownContext === undefined
       ? {}
       : { ownContext: () => Promise.resolve(options.ownContext ?? null) }),
+    ...(options.dataRoom === undefined ? {} : { dataRoom: options.dataRoom }),
     firewall: {
       plan: () =>
         Promise.resolve(
@@ -1512,6 +1520,207 @@ describe("delivery to the conversation", () => {
       /^Your Maji Loop: 12-month growth plan is ready — here it is\./u,
     );
     expect(text).toContain("1. Instrument every kiosk");
+  });
+});
+
+// Stress 2026-10-28 (F03): "review the pitch deck and financial documents
+// I've uploaded" filed a document saying the material held no deck. The
+// founder's own analysis now reads their data room as them: the deck's
+// words reach the writer; the highly confidential report is held back,
+// never read, and said so with how its figures become usable.
+describe("F03: the founder's own analysis reads their documents", () => {
+  it("the deck reaches the writer and the held-back report is named", async () => {
+    const read: string[] = [];
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+      dataRoom: {
+        documents: () =>
+          Promise.resolve([
+            {
+              documentId: "deck",
+              title: "LedgerBridge seed deck",
+              folder: "Fundraising summary",
+              documentType: "PITCH_DECK",
+              access: "OWNER" as const,
+              pageCount: 2,
+              updatedAt: "2026-10-28T00:00:00.000Z",
+              opening: null,
+            },
+            {
+              documentId: "accounts",
+              title: "LedgerBridge financial report Sept 2026",
+              folder: "Finance",
+              documentType: "MANAGEMENT_ACCOUNTS",
+              access: "OWNER" as const,
+              pageCount: 2,
+              updatedAt: "2026-10-28T00:00:00.000Z",
+              opening: null,
+              heldBack: true,
+            },
+          ]),
+        documentText: (_a, _c, id) => {
+          read.push(id);
+          return Promise.resolve({
+            text: "Monthly recurring revenue: $65,000 (September 2026). 140 active merchants.",
+            truncated: false,
+          });
+        },
+      },
+    });
+    const result = await world.documents(world.input);
+    expect(result.status).toBe("READY");
+    expect(read).toEqual(["deck"]);
+    const company = world.writes[0]?.company ?? "";
+    expect(company).toContain("Monthly recurring revenue: $65,000");
+    expect(company).toContain(
+      "HELD BACK FROM Q (classified highly confidential",
+    );
+    expect(company).toContain('"LedgerBridge financial report Sept 2026"');
+    expect(JSON.stringify(world.filed[0]?.content)).toMatch(
+      /held back from Q.*become usable once you confirm them/su,
+    );
+  });
+});
+
+// Stress 2026-10-28 (J7-I, J7-F): a meeting brief said "no prior
+// interaction recorded" over an interest with its note and a shared deck.
+// The document about a relationship now reads its history, as them.
+describe("J7: a document about a relationship carries its history", () => {
+  const RELATIONSHIP = "94eb9286-666a-4145-92d5-9e6f3beef321";
+  const LEDGERBRIDGE = "31633da0-87f9-4c5f-bd9a-a892a9251207";
+  const pipeline = {
+    side: "INVESTOR" as const,
+    items: [
+      {
+        relationshipId: RELATIONSHIP,
+        counterpart: {
+          kind: "COMPANY",
+          id: LEDGERBRIDGE,
+          name: "LedgerBridge",
+        },
+        state: "CONNECTED",
+        stateSince: "2026-10-28T17:27:19.798Z",
+        nextStep: "SCHEDULE_MEETING",
+        milestones: [],
+      },
+      {
+        relationshipId: randomUUID(),
+        counterpart: { kind: "COMPANY", id: randomUUID(), name: "Ledgerline" },
+        state: "INTEREST_EXPRESSED",
+        stateSince: "2026-10-20T00:00:00.000Z",
+        nextStep: "WAIT_FOR_RESPONSE",
+        milestones: [],
+      },
+    ],
+  };
+  const brief = {
+    relationshipId: RELATIONSHIP,
+    yourSide: "INVESTOR",
+    counterparty: { kind: "COMPANY", id: LEDGERBRIDGE, name: "LedgerBridge" },
+    generatedAt: "2026-10-28T22:37:48.920Z",
+    state: {
+      state: "CONNECTED",
+      stateSince: "2026-10-28T17:27:19.798Z",
+      milestones: [],
+      nextStep: "SCHEDULE_MEETING",
+    },
+    messages: {
+      count: 0,
+      latest: { status: "OK", message: null, fromThem: null },
+    },
+    noShows: [],
+    meetings: { status: "OK", items: [], nextScheduled: null },
+    pendingDecisions: { items: [], complete: true },
+    obligations: { status: "OK", openRequests: [], answeredCount: 0 },
+    documents: { status: "OK", items: [] },
+    history: [
+      {
+        kind: "INTEREST_EXPRESSED",
+        at: "2026-10-28T17:21:38.752Z",
+        by: "YOUR_SIDE",
+        note: "I'd welcome an initial conversation.",
+        document: null,
+      },
+      {
+        kind: "CONNECTION_ACCEPTED",
+        at: "2026-10-28T17:27:19.798Z",
+        by: "OTHER_SIDE",
+        note: null,
+        document: null,
+      },
+      {
+        kind: "DOCUMENT_SHARED",
+        at: "2026-10-28T17:28:24.730Z",
+        by: "OTHER_SIDE",
+        note: null,
+        document: "LedgerBridge seed deck",
+      },
+    ],
+    sourceVersions: {
+      projector: "relationship-state.v2",
+      historySequence: 4,
+      brief: "relationship-brief.v1",
+    },
+  };
+
+  it("picks the relationship the document is about, by company or by name", () => {
+    expect(
+      relationshipsInFocus(pipeline as never, {
+        companyId: LEDGERBRIDGE,
+        goal: "Prepare our next meeting",
+      }).map((item) => item.counterpart.name),
+    ).toEqual(["LedgerBridge"]);
+    expect(
+      relationshipsInFocus(pipeline as never, {
+        companyId: null,
+        goal: "Prepare for our meeting with LedgerBridge",
+      }).map((item) => item.counterpart.name),
+    ).toEqual(["LedgerBridge"]);
+    expect(relationshipsInFocus(pipeline as never, undefined)).toEqual([]);
+  });
+
+  it("writes the interest with its note, the acceptance and the shared deck", async () => {
+    const asked: string[] = [];
+    const read = createOwnContextReader({
+      ownInvestorOrganisation: () => Promise.resolve(null),
+      records: { read: () => Promise.resolve(null) },
+      relationships: () => Promise.resolve(pipeline as never),
+      brief: (_actor, relationshipId) => {
+        asked.push(relationshipId);
+        return Promise.resolve(brief as never);
+      },
+    });
+    const text =
+      (await read(actor, {
+        companyId: LEDGERBRIDGE,
+        goal: "Prepare our next meeting with LedgerBridge",
+      })) ?? "";
+    expect(asked).toEqual([RELATIONSHIP]);
+    expect(text).toContain("What has happened with LedgerBridge");
+    expect(text).toContain(
+      'Your side expressed interest on 2026-10-28 17:21 UTC, with this note: "I\'d welcome an initial conversation."',
+    );
+    expect(text).toContain(
+      'LedgerBridge shared "LedgerBridge seed deck" on 2026-10-28 17:28 UTC.',
+    );
+    expect(text).toContain(
+      "No messages have been sent in the chat with LedgerBridge.",
+    );
+  });
+
+  it("says unknown, never 'nothing', when the history cannot be read", async () => {
+    const read = createOwnContextReader({
+      ownInvestorOrganisation: () => Promise.resolve(null),
+      records: { read: () => Promise.resolve(null) },
+      relationships: () => Promise.resolve(pipeline as never),
+      brief: () => Promise.reject(new Error("down")),
+    });
+    const text =
+      (await read(actor, { companyId: LEDGERBRIDGE, goal: "" })) ?? "";
+    expect(text).toMatch(
+      /could not be read just now \(unknown, not "nothing"\)/u,
+    );
   });
 });
 

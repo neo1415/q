@@ -112,7 +112,46 @@ type Grant = {
   readonly canonical: unknown;
   readonly names: Readonly<Record<string, string>>;
   readonly context: AppActionContext;
+  /** Said before the card: the document it holds was the closest match. */
+  readonly closest?: string | undefined;
 };
+
+/**
+ * Stress 2026-10-28 (S05): "send the confidential financial model to Aster
+ * right now" -- Aster CONNECTED, nothing called that, one document clearly
+ * the closest ("LedgerBridge financial report Sept 2026") -- was refused
+ * with no way forward. A share to a connected relationship is a
+ * per-document grant: the closest of their own documents goes on the card,
+ * named exactly, and nothing is shared until they approve that card. Only
+ * for a consequential action (always a card), only one document field
+ * unmatched, and only one document clearly closest; otherwise nothing.
+ */
+export async function closestDocument(
+  candidates: ReferenceCandidates,
+  kind: ReferenceKind,
+  actor: ActorContext,
+  said: string,
+): Promise<{ readonly id: string; readonly name: string } | null> {
+  if (kind !== "UPLOAD" && kind !== "DOCUMENT") return null;
+  const all = await candidates(kind, actor, "").catch(() => []);
+  const scored = all
+    .map((candidate) => ({
+      ...candidate,
+      score: documentScore(said, {
+        title: candidate.name,
+        documentType: null,
+        folder: "",
+        opening: null,
+      }),
+    }))
+    .filter((entry) => entry.score >= 0.3)
+    .sort((a, b) => b.score - a.score);
+  const [first, second] = scored;
+  if (first === undefined) return null;
+  // Clearly the one: alone, or well ahead of the next.
+  if (second !== undefined && second.score >= first.score * 0.8) return null;
+  return { id: first.id, name: first.name };
+}
 
 function ownConversation(
   actor: ActorContext,
@@ -348,6 +387,7 @@ function toolFor(
       const unmatched: {
         readonly kind: ReferenceKind;
         readonly said: string;
+        readonly field: string;
       }[] = [];
       for (const [field, kind] of Object.entries(references)) {
         const said = resolved[field];
@@ -384,7 +424,7 @@ function toolFor(
           );
         }
         if (found.kind === "NONE") {
-          unmatched.push({ kind, said });
+          unmatched.push({ kind, said, field });
           continue;
         }
         resolved[field] = found.id;
@@ -392,6 +432,26 @@ function toolFor(
           (await candidates(kind, actor, said).catch(() => [])).find(
             (candidate) => candidate.id === found.id,
           )?.name ?? said;
+      }
+      let closest: string | undefined;
+      const [onlyMiss] = unmatched;
+      if (
+        unmatched.length === 1 &&
+        onlyMiss !== undefined &&
+        action.classification === "CONSEQUENTIAL"
+      ) {
+        const near = await closestDocument(
+          candidates,
+          onlyMiss.kind,
+          actor,
+          onlyMiss.said,
+        );
+        if (near !== null) {
+          resolved[onlyMiss.field] = near.id;
+          names[onlyMiss.field] = near.name;
+          closest = `Nothing is called "${onlyMiss.said.slice(0, 80)}"; the closest of theirs is "${near.name.slice(0, 120)}", so that is the document on the card.`;
+          unmatched.length = 0;
+        }
       }
       if (unmatched.length > 0) {
         return deny(
@@ -445,7 +505,12 @@ function toolFor(
           ? deny("NOT_AVAILABLE", verdict.reason)
           : deny("NOT_AVAILABLE");
       }
-      return allow("CONFIDENTIAL", { canonical: parsed.data, names, context });
+      return allow("CONFIDENTIAL", {
+        canonical: parsed.data,
+        names,
+        context,
+        ...(closest === undefined ? {} : { closest }),
+      });
     },
     execute: async (_input, execution, grant) => {
       if (
@@ -467,7 +532,10 @@ function toolFor(
             : {}),
           says:
             status === "PREPARED"
-              ? `${action.card(grant.canonical).summary}: it's on the card for your approval; nothing changes until you approve it.`
+              ? `${grant.closest === undefined ? "" : `${grant.closest} `}${action.card(grant.canonical).summary}: it's on the card for your approval; nothing changes until you approve it.`.slice(
+                  0,
+                  600,
+                )
               : "Another change is already waiting for your approval in this answer; approve or decline it first.",
         };
       }

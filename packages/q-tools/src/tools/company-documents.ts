@@ -236,7 +236,7 @@ const CandidateSchema = z
 
 const NotOneSchema = z
   .object({
-    status: z.enum(["WHICH_ONE", "NONE", "ON_REQUEST"]),
+    status: z.enum(["WHICH_ONE", "NONE", "ON_REQUEST", "HELD_BACK"]),
     candidates: z.array(CandidateSchema).max(3),
     /** What Q says; nothing has opened. */
     say: z.string(),
@@ -265,6 +265,8 @@ type Resolved =
       readonly kind: "ONE";
       readonly companyId: string;
       readonly document: MaterialDocument;
+      /** The company's other documents held back from Q, by title. */
+      readonly heldBack: readonly string[];
     }
   | z.infer<typeof NotOneSchema>;
 
@@ -311,6 +313,15 @@ async function resolve(
     .documents(context.actor, company.id)
     .catch(() => null);
   if (documents === null) return null;
+  const heldBack = (except: MaterialDocument) =>
+    documents
+      .filter(
+        (document) =>
+          document.heldBack === true &&
+          document.documentId !== except.documentId,
+      )
+      .map((document) => document.title)
+      .slice(0, 5);
   if (input.documentId !== undefined) {
     const id = input.documentId.toLowerCase();
     const found = documents.find(
@@ -319,7 +330,12 @@ async function resolve(
     return found === undefined
       ? { status: "NONE", candidates: [], say: NONE_LINE }
       : readable(found)
-        ? { kind: "ONE", companyId: company.id, document: found }
+        ? {
+            kind: "ONE",
+            companyId: company.id,
+            document: found,
+            heldBack: heldBack(found),
+          }
         : {
             status: "ON_REQUEST",
             candidates: [candidate(found)],
@@ -341,7 +357,12 @@ async function resolve(
     };
   }
   return readable(match.document)
-    ? { kind: "ONE", companyId: company.id, document: match.document }
+    ? {
+        kind: "ONE",
+        companyId: company.id,
+        document: match.document,
+        heldBack: heldBack(match.document),
+      }
     : {
         status: "ON_REQUEST",
         candidates: [candidate(match.document)],
@@ -351,6 +372,43 @@ async function resolve(
 
 const NONE_LINE =
   "No document they can see at this company matches. Say so plainly; nothing opened.";
+/**
+ * Stress 2026-10-28 (F03, S02-F): what Q says of a document held back by
+ * its classification. The policy and its compliant path are
+ * heldBackFromQ's; this names where the figures become usable.
+ */
+export const HELD_BACK_LINE =
+  "This document is classified highly confidential (management accounts, a financial model): Q does not read its contents and never sends them to a model. Say plainly that it is held back from Q, and that its figures become usable once the founder confirms them (on their setup screen) or states them; never guess what it says.";
+
+/** The held-back answer for one resolved document. */
+function heldBackAnswer(document: MaterialDocument) {
+  return {
+    status: "HELD_BACK" as const,
+    candidates: [candidate(document)],
+    say: HELD_BACK_LINE,
+  };
+}
+
+/** Beside a read: the company's other documents Q may not read. */
+function alsoHeldBack(titles: readonly string[]) {
+  return titles.length === 0
+    ? {}
+    : {
+        alsoHeldBack: {
+          titles: titles.map((title) => title.slice(0, 200)),
+          say: `Also on record and held back from Q by classification (not read, no model received them): ${titles.map((title) => `"${title.slice(0, 120)}"`).join(", ")}. Whenever figures, contradictions or "my documents" come up, say these are held back and that their figures become usable once the founder confirms them; never assume they agree with what was read.`,
+        },
+      };
+}
+
+const ALSO_HELD_BACK = z
+  .object({
+    titles: z.array(z.string().max(200)).max(5),
+    say: z.string().max(1600),
+  })
+  .strict()
+  .optional();
+
 const ON_REQUEST_LINE =
   "That document is listed on request: they cannot open it yet. Say so, and offer to ask the company for it (request_data_room_access). Nothing opened.";
 
@@ -418,6 +476,7 @@ const ReadOutputSchema = z.union([
       truncated: z.boolean(),
       truthClass: z.literal("USER_CLAIM"),
       evidenceStatus: z.literal("DOCUMENT_SUPPORTED"),
+      alsoHeldBack: ALSO_HELD_BACK,
     })
     .strict(),
   NotOneSchema,
@@ -460,6 +519,12 @@ export function createReadCompanyDocumentTool(
       if ("status" in resolved) {
         return allow<ReadOutput>("CONFIDENTIAL", resolved);
       }
+      if (resolved.document.heldBack === true) {
+        return allow<ReadOutput>(
+          "CONFIDENTIAL",
+          heldBackAnswer(resolved.document),
+        );
+      }
       const read = await material
         .documentText(
           context.actor,
@@ -480,6 +545,7 @@ export function createReadCompanyDocumentTool(
         truncated: read.truncated || read.text.length > TEXT_MAX_CHARS,
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
+        ...alsoHeldBack(resolved.heldBack),
       });
     },
     execute: (_input, _context, grant) => Promise.resolve(grant),
@@ -526,6 +592,7 @@ const PagesOutputSchema = z.union([
       truncated: z.boolean(),
       truthClass: z.literal("USER_CLAIM"),
       evidenceStatus: z.literal("DOCUMENT_SUPPORTED"),
+      alsoHeldBack: ALSO_HELD_BACK,
     })
     .strict(),
   z
@@ -599,6 +666,12 @@ export function createReadDocumentPagesTool(
       if ("status" in resolved) {
         return allow<PagesOutput>("CONFIDENTIAL", resolved);
       }
+      if (resolved.document.heldBack === true) {
+        return allow<PagesOutput>(
+          "CONFIDENTIAL",
+          heldBackAnswer(resolved.document),
+        );
+      }
       const documentId = resolved.document.documentId.toLowerCase();
       const read = await material
         .documentPages(
@@ -640,6 +713,7 @@ export function createReadDocumentPagesTool(
         truncated: truncated || read.pages.length > PAGES_MAX,
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
+        ...alsoHeldBack(resolved.heldBack),
       });
     },
     execute: (_input, _context, grant) => Promise.resolve(grant),

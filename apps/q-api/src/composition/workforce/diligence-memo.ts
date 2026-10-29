@@ -167,13 +167,22 @@ export async function readDataRoom(
   readonly passages: readonly DataRoomPassage[];
   readonly notOpen: number;
   readonly available: boolean;
+  /** Titles open to them but held back from Q by classification; never read. */
+  readonly heldBack: readonly string[];
 }> {
   const listed = await reads.documents(actor, companyId).catch(() => null);
-  if (listed === null) return { passages: [], notOpen: 0, available: false };
+  if (listed === null)
+    return { passages: [], notOpen: 0, available: false, heldBack: [] };
   // Defence in depth: the port already withholds text, and only these are read.
-  const open = listed.filter(
+  const openable = listed.filter(
     (document) => document.access === "OPEN" || document.access === "OWNER",
   );
+  // Stress 2026-10-28 (F03): a highly confidential document is never read
+  // here (the port refuses its text too); it is named as held back.
+  const heldBack = openable
+    .filter((document) => document.heldBack === true)
+    .map((document) => document.title);
+  const open = openable.filter((document) => document.heldBack !== true);
   const chosen = [...open]
     .sort(
       (a, b) =>
@@ -221,9 +230,21 @@ export async function readDataRoom(
   }
   return {
     passages,
-    notOpen: listed.length - open.length,
+    notOpen: listed.length - openable.length,
     available: true,
+    heldBack,
   };
+}
+
+/**
+ * The line a document says for each held-back title (F03): held back, not
+ * read, and usable once the founder confirms its figures. Its words come
+ * from code, never a model.
+ */
+export function heldBackGap(title: string, own: boolean): string {
+  return own
+    ? `"${title.slice(0, 160)}" is held back from Q: it is classified highly confidential, so its contents were not read and no model received them. Its figures become usable once you confirm them on your setup screen (or state them yourself); until then nothing here is checked against it.`
+    : `"${title.slice(0, 160)}" is held back from Q: it is classified highly confidential, so its contents were not read and no model received them. Nothing here is checked against it.`;
 }
 
 /** The passages as the writer reads them, each with its truth axes. */

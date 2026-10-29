@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -62,6 +63,7 @@ import {
   type OpenedFile,
 } from "./material-actions";
 import { RequestSheet, type RoomRequestTarget } from "./request-sheet";
+import { setMaterialDocument } from "@/features/q/screen";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -548,6 +550,16 @@ function ConnectedDataRoom({
   const [opening, setOpening] = useState<string | null>(null);
   const latest = useRef(0);
   const [now] = useState(() => Date.now());
+  // Stress 2026-10-28 (S02-post): the document open in this viewer is on
+  // screen for Q ("this deck", "what does it say"), as when Q opens one.
+  // An id, never authority: the server reads it as them or not at all.
+  const openedId = opened?.file == null ? null : opened.documentId;
+  useEffect(() => {
+    setMaterialDocument(
+      openedId === null ? null : { companyId, documentId: openedId },
+    );
+    return () => setMaterialDocument(null);
+  }, [companyId, openedId]);
 
   const documents = useMemo(
     () =>

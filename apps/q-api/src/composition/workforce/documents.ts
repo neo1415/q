@@ -47,12 +47,14 @@ import {
   NO_RESEARCH_GAP,
   dataRoomText,
   diligenceContent,
+  heldBackGap,
   diligencePurpose,
   orderDiligenceDraft,
   readDataRoom,
   type DataRoomReads,
 } from "./diligence-memo.js";
 import { safeReport } from "./live.js";
+import type { OwnContextFocus } from "./own-context.js";
 import type { WorkforceModels } from "./models.js";
 
 /** The marker a reviewer's revision carries, so a retry never revises twice. */
@@ -118,7 +120,8 @@ export function createWorkforceDocuments(dependencies: {
    * read as them (own-context.ts). An analysis is written for them.
    */
   readonly ownContext?:
-    ((actor: ActorContext) => Promise<string | null>) | undefined;
+    | ((actor: ActorContext, focus?: OwnContextFocus) => Promise<string | null>)
+    | undefined;
   /**
    * Diligence (2026-10-28): the company's data room, through its own view
    * read AS the person. Absent: a diligence memo says none was read.
@@ -306,34 +309,49 @@ export function createWorkforceDocuments(dependencies: {
         recordContradictions.push(
           ...read.contradictions.map((set) => set.statements),
         );
-        // The data room, as THIS person may open it (its own view decides,
-        // read as them; never a privileged read, never founder-private).
-        if (dependencies.dataRoom !== undefined) {
-          if (!(await input.canContinue())) return unavailable();
-          const room = await readDataRoom(
-            dependencies.dataRoom,
-            actor,
-            subject.companyId,
-          );
-          dataRoomPassages = room.passages.length;
+      }
+      // The data room, as THIS person may open it (its own view decides,
+      // read as them; never a privileged read, never founder-private).
+      // Stress 2026-10-28 (F03, S02 follow-up): read for every analysis of
+      // a company. The founder's review of "the deck and financials I
+      // uploaded" said the material held no deck, and an investor's "can I
+      // trust the deck?" job said no MRR was available, because only a
+      // diligence memo read the room. Claims are matched only there.
+      if (dependencies.dataRoom !== undefined) {
+        if (!(await input.canContinue())) return unavailable();
+        const room = await readDataRoom(
+          dependencies.dataRoom,
+          actor,
+          subject.companyId,
+        );
+        dataRoomPassages = room.passages.length;
+        if (diligence)
           claims.push(...room.passages.flatMap((one) => one.claims));
-          const text = dataRoomText(room.passages);
-          if (text.length > 0) company = `${company}\n\n${text}`;
-          if (room.passages.length === 0)
-            codeGaps.push(
-              room.available
-                ? "No data-room document open to you held readable text, so none was read."
-                : "The company's data room could not be read as you, so none of its documents were used.",
-            );
-          if (room.notOpen > 0)
-            codeGaps.push(
-              `${String(room.notOpen)} data-room document${room.notOpen === 1 ? " is" : "s are"} listed but not open to you, so ${room.notOpen === 1 ? "it was" : "they were"} not read.`,
-            );
-        }
+        for (const title of room.heldBack)
+          codeGaps.push(heldBackGap(title, request.scope === "OWN_COMPANY"));
+        if (room.heldBack.length > 0)
+          company = `${company}\n\nHELD BACK FROM Q (classified highly confidential; never read, no model received them; say so wherever figures or contradictions come up, and that their figures become usable once the founder confirms them): ${room.heldBack.map((title) => `"${title.slice(0, 160)}"`).join(", ")}`;
+        const text = dataRoomText(room.passages);
+        if (text.length > 0) company = `${company}\n\n${text}`;
+        if (room.passages.length === 0)
+          codeGaps.push(
+            room.available
+              ? "No data-room document open to you held readable text, so none was read."
+              : "The company's data room could not be read as you, so none of its documents were used.",
+          );
+        if (room.notOpen > 0)
+          codeGaps.push(
+            `${String(room.notOpen)} data-room document${room.notOpen === 1 ? " is" : "s are"} listed but not open to you, so ${room.notOpen === 1 ? "it was" : "they were"} not read.`,
+          );
       }
     }
     // Whoever it is for: their own context, read as them.
-    const theirs = await dependencies.ownContext?.(actor).catch(() => null);
+    const theirs = await dependencies
+      .ownContext?.(actor, {
+        companyId,
+        goal: `${input.personRequest ?? ""} ${input.goal}`,
+      })
+      .catch(() => null);
     if (theirs != null && theirs.length > 0) {
       company = `${company}\n\nWHO THIS IS FOR (${input.principalName ?? "the person"}), from their own records:\n${theirs}`;
     }
