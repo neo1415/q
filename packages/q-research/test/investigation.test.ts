@@ -11,6 +11,7 @@ import {
   registrableDomain,
   sourceTier,
   tierRank,
+  numbersSupported,
   verifyFacts,
   type CheckableFact,
 } from "../src/index.js";
@@ -429,5 +430,80 @@ describe("cross-source validation in code", () => {
       { lane: "COMPETITORS", reason: "NO_FACT" },
       { lane: "FUNDING", reason: "COULD_NOT_RUN" },
     ]);
+  });
+});
+
+describe("a fact is on its own page (live 2026-10-29, run A)", () => {
+  const page =
+    "B2B cross-border payments in 2025: Wise reported revenue of $1.2bn; transaction volumes grew 32% and 778 firms responded.";
+  const fact = (
+    statement: string,
+    figure: string | null,
+    entity: string | null,
+  ) => ({
+    statement,
+    figure,
+    asOf: "2025",
+    source: 1,
+    lane: "COMPETITORS",
+    kind: "COMPETITOR" as const,
+    measure: "revenue",
+    entity,
+  });
+  const source = {
+    index: 1,
+    url: "https://www.fxcintel.test/report",
+    domain: "fxcintel.test",
+    title: "B2B cross-border payments in 2025",
+    publishedAt: null,
+    excerpt: page,
+  };
+
+  it("refuses an organisation its page never names, however its numbers fall", () => {
+    const { verified, refused } = verifyFacts(
+      [
+        fact(
+          "Corpay's revenue grew 32% to $1.15bn in 2025.",
+          "$1.15bn",
+          "Corpay",
+        ),
+      ],
+      [source],
+    );
+    expect(verified).toHaveLength(0);
+    expect(refused[0]?.reason).toBe("FIGURE_NOT_IN_SOURCE");
+    const named = verifyFacts(
+      [fact("Payoneer grew 32% in 2025.", "32%", "Payoneer")],
+      [source],
+    );
+    expect(named.refused[0]?.reason).toBe("ENTITY_NOT_IN_SOURCE");
+    // A market label is not a name to find.
+    expect(
+      verifyFacts(
+        [fact("Volumes grew 32% in 2025.", "32%", "global B2B payments")],
+        [source],
+      ).verified,
+    ).toHaveLength(1);
+  });
+
+  it("matches a figure only at its own scale", () => {
+    expect(
+      numbersSupported(
+        { statement: "Wise made $1.2bn.", figure: "$1.2bn" },
+        page,
+      ),
+    ).toBe(true);
+    expect(
+      numbersSupported(
+        { statement: "There are 778 million users.", figure: "778 million" },
+        page,
+      ),
+    ).toBe(true);
+    expect(
+      numbersSupported(
+        { statement: "Volumes grew 1.2%.", figure: "1.2%" },
+        page,
+      ),
+    ).toBe(false);
   });
 });

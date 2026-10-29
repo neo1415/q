@@ -261,6 +261,7 @@ export {
   factKey,
   numbersIn,
   numbersSupported,
+  entityOnPage,
   rankFacts,
   verifyFacts,
   type AdmittedFact,
