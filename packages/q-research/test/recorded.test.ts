@@ -6,7 +6,9 @@ import {
   createReplayResearchProvider,
   createReplayTime,
   createVirtualTime,
+  EMAIL_REDACTED,
   RecordedFixtureMiss,
+  redactEmails,
   RecordedResearchFixtureSchema,
   recordedSearchKey,
 } from "../src/providers/recorded.js";
@@ -303,5 +305,78 @@ describe("research record/replay: the schedule", () => {
     expect(replay.misses).toEqual([
       'began "WEB SEARCH b" where the recording began "WEB SEARCH a"',
     ]);
+  });
+});
+
+describe("research record/replay: no email address is kept", () => {
+  const ADDRESS = "jane.doe@example-regulator.gov.ng";
+  const withAddress: PublicWebResearchProvider = {
+    code: "brave",
+    search: () =>
+      Promise.resolve({
+        hits: [
+          {
+            url: "https://www.example.ng/contact",
+            title: `Contact ${ADDRESS}`,
+            snippet: `Write to ${ADDRESS} for licensing questions.`,
+            publishedAt: null,
+            relevance: 0.9,
+          },
+        ],
+        latencyMs: 1,
+      }),
+    extract: (request) =>
+      Promise.resolve({
+        pages: request.urls.map((url) => ({
+          url,
+          title: "Contact",
+          text: `Licensing desk: ${ADDRESS}. Press: press@example.ng.`,
+        })),
+        failedUrls: [],
+        latencyMs: 1,
+      }),
+  };
+
+  it("redacts addresses in snippets and page text at record time, and the caller sees the same as the replay", async () => {
+    const recording = createRecordingResearchProvider({
+      provider: withAddress,
+    });
+    const searched = await recording.search(
+      search("nigeria licensing contact"),
+      {},
+    );
+    const read = await recording.extract(
+      { urls: ["https://www.example.ng/contact"] },
+      {},
+    );
+    const fixture = recording.fixture();
+    const stored = JSON.stringify(fixture);
+    expect(stored).not.toContain("@");
+    expect(stored).toContain(EMAIL_REDACTED);
+    // The caller during recording saw exactly what replay will serve.
+    expect(JSON.stringify(searched)).not.toContain("@");
+    expect(JSON.stringify(read)).not.toContain("@");
+    const replay = createReplayResearchProvider({
+      fixture: RecordedResearchFixtureSchema.parse(fixture),
+    });
+    const replayedSearch = await replay.search(
+      search("nigeria licensing contact"),
+      {},
+    );
+    const replayedRead = await replay.extract(
+      { urls: ["https://www.example.ng/contact"] },
+      {},
+    );
+    expect(replayedSearch.hits).toEqual(searched.hits);
+    expect(replayedRead.pages).toEqual(read.pages);
+    expect(read.pages[0]?.text).toBe(
+      `Licensing desk: ${EMAIL_REDACTED}. Press: ${EMAIL_REDACTED}.`,
+    );
+  });
+
+  it("leaves text without an address as it was", () => {
+    expect(redactEmails("CBN circular 2026/04 @ 10:00, see cbn.gov.ng")).toBe(
+      "CBN circular 2026/04 @ 10:00, see cbn.gov.ng",
+    );
   });
 });

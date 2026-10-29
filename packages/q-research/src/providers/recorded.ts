@@ -136,11 +136,26 @@ export type RecordedResearchFixture = z.infer<
 /** Bounds on what a fixture keeps of a page: enough for the gate's checks. */
 const PAGE_TEXT_MAX = 60_000;
 
+/**
+ * An email address in a recorded page or snippet (2026-10-29: case D's
+ * fixture held a real person's address from a public page). Recordings
+ * are committed; a person's address is never kept in one. Matched by its
+ * shape alone: an address is a mechanical token, not anyone's meaning.
+ */
+const EMAIL =
+  /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/gu;
+export const EMAIL_REDACTED = "[email redacted]";
+
+/** `text` with every email address replaced, at record time. */
+export function redactEmails(text: string): string {
+  return text.replace(EMAIL, EMAIL_REDACTED);
+}
+
 function copyHit(hit: PublicWebSearchResult["hits"][number]) {
   return {
     url: hit.url,
-    title: hit.title,
-    snippet: hit.snippet,
+    title: hit.title === null ? null : redactEmails(hit.title).slice(0, 300),
+    snippet: redactEmails(hit.snippet),
     publishedAt: hit.publishedAt,
     relevance: hit.relevance,
   };
@@ -466,7 +481,16 @@ export function createRecordingResearchProvider(input: {
           provider.search(request, context),
         );
         entry.hits = result.hits.map(copyHit);
-        return result;
+        // The caller sees what the recording holds: replay serves the
+        // same redacted hits, so a recorded run and its replay agree.
+        return {
+          ...result,
+          hits: result.hits.map((hit, index) => ({
+            ...hit,
+            title: entry.hits[index]?.title ?? null,
+            snippet: entry.hits[index]?.snippet ?? "",
+          })),
+        };
       } catch (error) {
         if (isResearchProviderFailure(error))
           entry.failure = { failureClass: error.failureClass };
@@ -502,9 +526,22 @@ export function createRecordingResearchProvider(input: {
         const result = await tracked(extractLabel(request.urls), () =>
           provider.extract(request, context),
         );
-        if (settled) return result;
+        // Email addresses never reach a recording, nor the caller while
+        // recording (the replay serves the redacted page).
+        const redacted = {
+          ...result,
+          pages: result.pages.map((page) => ({
+            ...page,
+            title:
+              page.title === null
+                ? null
+                : redactEmails(page.title).slice(0, 300),
+            text: redactEmails(page.text),
+          })),
+        };
+        if (settled) return redacted;
         settled = true;
-        for (const page of result.pages) {
+        for (const page of redacted.pages) {
           entry.read.push(page.url);
           pages.set(page.url, {
             url: page.url,
@@ -516,7 +553,7 @@ export function createRecordingResearchProvider(input: {
           entry.failedUrls.push(url);
           failed.add(url);
         }
-        return result;
+        return redacted;
       } catch (error) {
         if (!settled && isResearchProviderFailure(error))
           failWhole(error.failureClass);
