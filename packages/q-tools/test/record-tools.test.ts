@@ -864,3 +864,80 @@ describe("figures read locally from a held-back document", () => {
     expect(item?.confirmedFigures).toEqual([line]);
   });
 });
+
+describe("their company record names documents held back from Q (S02-F, 2026-10-29)", () => {
+  const records: OwnRecordsPort = {
+    read: () => Promise.resolve({ state: "UNVERIFIED" }),
+    reassessReadiness: () => Promise.resolve({ state: "NOT_READY" }),
+  };
+  const evidenceDocuments = {
+    list: () =>
+      Promise.resolve([
+        {
+          documentId: "d1",
+          title: "LedgerBridge seed deck",
+          documentType: "PITCH_DECK",
+          status: "ACTIVE",
+          processing: "COMPLETED",
+          updatedAt: "2026-10-28T10:00:00Z",
+          sensitivityClass: "CONFIDENTIAL",
+        },
+        {
+          documentId: "d2",
+          title: "Management accounts Sept 2026",
+          documentType: "FINANCIAL_STATEMENT",
+          status: "ACTIVE",
+          processing: "COMPLETED",
+          updatedAt: "2026-10-28T10:00:00Z",
+          sensitivityClass: "HIGHLY_CONFIDENTIAL",
+          figures: { pending: 2, confirmed: [] },
+        },
+      ]),
+  };
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry(
+      createOwnRecordTools({
+        ...fakePorts(),
+        ownRecords: records,
+        evidenceDocuments,
+      } as unknown as Parameters<typeof createOwnRecordTools>[0]),
+    ),
+  });
+
+  it("title and the compliant path, never contents, when their plan admits their documents", async () => {
+    const base = ownPlan();
+    const plan = {
+      ...base,
+      scopes: [
+        ...base.scopes,
+        {
+          ...base.scopes[0],
+          kind: "EVIDENCE_DOCUMENTS",
+        },
+      ],
+    } as unknown as PermittedContextPlan;
+    const out = dataOf(
+      await executor.execute(
+        call("read_my_record", { record: "VERIFICATION_STATUS" }),
+        contextFor(actorA, plan),
+      ),
+    );
+    expect(out.data).toEqual({ state: "UNVERIFIED" });
+    const held = out.heldBackDocuments as { title: string; qUse: string }[];
+    expect(held.map((one) => one.title)).toEqual([
+      "Management accounts Sept 2026",
+    ]);
+    expect(held[0]?.qUse).toContain("Held back from Q");
+    expect(held[0]?.qUse).toContain("ready for your confirmation");
+  });
+
+  it("nothing about documents where the plan does not admit them", async () => {
+    const out = dataOf(
+      await executor.execute(
+        call("read_my_record", { record: "VERIFICATION_STATUS" }),
+        contextFor(actorA, ownPlan()),
+      ),
+    );
+    expect(out.heldBackDocuments).toBeUndefined();
+  });
+});

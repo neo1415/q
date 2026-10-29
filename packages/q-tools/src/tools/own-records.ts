@@ -104,6 +104,15 @@ export const OwnRecordOutputSchema = z
   .object({
     status: z.enum(["FOUND", "NONE", "TOO_LARGE"]),
     data: z.unknown(),
+    /** Their company's documents Q may not read: title and the compliant path. */
+    heldBackDocuments: z
+      .array(
+        z
+          .object({ title: z.string().max(300), qUse: z.string().max(600) })
+          .strict(),
+      )
+      .max(6)
+      .optional(),
   })
   .strict();
 export type OwnRecordOutput = z.infer<typeof OwnRecordOutputSchema>;
@@ -124,11 +133,38 @@ function subjectKind(input: ReadMyRecordInput): Subject["subjectType"] {
     : "COMPANY";
 }
 
+/**
+ * Stress re-score 3 (2026-10-29, S02-F): asked from Home "what is our
+ * actual MRR? can I trust the deck?", Q answered from their own company
+ * record with the deck's $65K and never said their September management
+ * accounts are held back -- that notice lived only in
+ * list_uploaded_documents, which an answer from the record never calls.
+ * Their company record now carries the held-back documents (title and the
+ * compliant path only, never contents) wherever their plan admits their
+ * own evidence documents.
+ */
+type RecordGrant = Subject & { readonly documents: boolean };
+
+async function heldBackDocuments(
+  evidence: EvidenceDocumentsPort,
+  actor: Parameters<EvidenceDocumentsPort["list"]>[0],
+  companyId: string,
+): Promise<readonly { readonly title: string; readonly qUse: string }[]> {
+  const items = await evidence.list(actor, companyId).catch(() => []);
+  return items
+    .flatMap((item) => {
+      const qUse = heldBackFromQ(item.sensitivityClass, item.figures);
+      return qUse === null ? [] : [{ title: item.title.slice(0, 300), qUse }];
+    })
+    .slice(0, 6);
+}
+
 export function createReadMyRecordTool(
   ports: Pick<QToolPorts, "companies" | "investors">,
   records: OwnRecordsPort,
+  evidence?: EvidenceDocumentsPort,
 ): AnyQToolDefinition {
-  return defineQTool<ReadMyRecordInput, OwnRecordOutput, Subject>({
+  return defineQTool<ReadMyRecordInput, OwnRecordOutput, RecordGrant>({
     ...READ,
     id: READ_MY_RECORD,
     supportedPurposes: [
@@ -144,16 +180,27 @@ export function createReadMyRecordTool(
     input: ReadMyRecordInputSchema,
     output: OwnRecordOutputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) return deny<Subject>("NOT_AVAILABLE");
+      if (!ownConversation(actor, plan)) {
+        return deny<RecordGrant>("NOT_AVAILABLE");
+      }
       const subjectType = subjectKind(input);
       const subjectId = await ownSubject(ports, actor, plan, subjectType);
+      // Firewall: titles of their documents only where the plan admits
+      // their organisation's evidence documents (as list_uploaded_documents).
+      const documents =
+        subjectType === "COMPANY" &&
+        plan.scopes.some((scope) => scope.kind === "EVIDENCE_DOCUMENTS");
       return subjectId === null
-        ? deny<Subject>("NOT_AVAILABLE")
-        : allow<Subject>("CONFIDENTIAL", { subjectType, subjectId });
+        ? deny<RecordGrant>("NOT_AVAILABLE")
+        : allow<RecordGrant>("CONFIDENTIAL", {
+            subjectType,
+            subjectId,
+            documents,
+          });
     },
-    execute: async (input, context, grant) =>
-      bounded(
-        await records
+    execute: async (input, context, grant) => {
+      const [data, held] = await Promise.all([
+        records
           .read(context.actor, {
             record: input.record,
             subjectType: grant.subjectType,
@@ -162,7 +209,15 @@ export function createReadMyRecordTool(
             relationshipId: input.relationshipId,
           })
           .catch(() => null),
-      ),
+        grant.documents && evidence !== undefined
+          ? heldBackDocuments(evidence, context.actor, grant.subjectId)
+          : Promise.resolve([]),
+      ]);
+      const read = bounded(data);
+      return held.length === 0
+        ? read
+        : { ...read, heldBackDocuments: held.map((one) => ({ ...one })) };
+    },
   });
 }
 
@@ -453,7 +508,7 @@ export function createOwnRecordTools(
     ...(records === undefined
       ? []
       : [
-          createReadMyRecordTool(ports, records),
+          createReadMyRecordTool(ports, records, evidence),
           createReassessReadinessTool(ports, records),
         ]),
     ...(evidence === undefined
