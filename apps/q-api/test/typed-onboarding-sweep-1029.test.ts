@@ -12,6 +12,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { createOnboardingConversation } from "../src/voice/onboarding-conversation.js";
 import {
   createTypedOnboarding,
+  savedSoFar,
   tappedReview,
 } from "../src/voice/typed-onboarding.js";
 
@@ -175,5 +176,53 @@ describe("sweep D1: confirming the read-back finishes", () => {
     expect(tappedReview("investor", "I2.cheque_max")).toBeNull();
     expect(tappedReview("investor", undefined)).toBeNull();
     expect(tappedReview("founder", "F3.review")).toBe("F3.review");
+  });
+});
+
+describe("sweep D7: what is saved so far, read back", () => {
+  const row = (
+    stepKey: string,
+    question: string,
+    status: "ANSWERED" | "OPEN",
+    value: string | null,
+    required = true,
+  ) => ({
+    stepKey,
+    question,
+    kind: "ONE_OF" as const,
+    required,
+    status,
+    value,
+  });
+  const labels: Record<string, string> = {
+    "F1.company_name": "Company",
+    "F4.team_size": "Team size",
+  };
+  it("never reads a step back by its internal question, and lists by section", () => {
+    const said = savedSoFar(
+      {
+        journey: "founder",
+        currentStepKey: null,
+        canComplete: false,
+        completed: false,
+        checks: [],
+        steps: [
+          row(
+            "F0.intent",
+            "What brings you to Capital Q: are you raising…?",
+            "ANSWERED",
+            "I'm raising for a company",
+          ),
+          row("F1.company_name", "Company name?", "ANSWERED", "Ferrowick"),
+          row("F4.team_size", "How big is the team?", "OPEN", null),
+        ],
+      },
+      "founder",
+      (key) => labels[key],
+    );
+    expect(said).not.toMatch(/What brings you/u);
+    expect(said).toMatch(/^Here's what I have saved so far:\n\n/u);
+    expect(said).toContain("Company: Ferrowick");
+    expect(said).toMatch(/\n\nStill to cover: team size\.$/u);
   });
 });

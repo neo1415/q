@@ -321,8 +321,14 @@ export function createTypedOnboarding(dependencies: {
       } else if (written?.readBack === true) {
         // Read back from Capital Q's own record, once what they said is in.
         await conversation.flush?.(line);
-        text =
-          `${written.reply.trim()} ${savedSoFar(await portOf(false).state(), labelOf)}`.trim();
+        // The record speaks for itself, from code; the model's one line
+        // (a lead-in, or a question asked before the list) is not put
+        // around it (sweep D7: the summary came after Q's question).
+        text = savedSoFar(
+          await portOf(false).state(),
+          input.journeyType,
+          labelOf,
+        );
         path = "READ_BACK";
       } else if (written !== null) {
         text = withoutStepIds(written.reply, input.journeyType).trim();
@@ -595,51 +601,47 @@ export function groupedSaved(
   });
 }
 
-function savedLines(
-  state: OnboardingState,
-  labelOf: (stepKey: string) => string | undefined,
-): string[] {
-  return state.steps
-    .filter(
-      (row) =>
-        row.status === "ANSWERED" &&
-        row.kind !== "YES_NO" &&
-        row.value !== null,
-    )
-    .map(
-      (row) =>
-        `${labelOf(row.stepKey) ?? row.question}: ${(row.value ?? "").trim().replace(/[.;\s]+$/u, "")}`,
-    );
-}
-
-/** What is saved, what is still saving, and what is still needed. */
+/**
+ * What is saved, what is still saving, and what is still needed, read back
+ * from the record by code (sweep D7, 2026-10-29): the setup's own labels
+ * grouped by section, as the finish's read-back is; a step with no plain
+ * label (the journey's own "what brings you here") is never read back by
+ * its internal question.
+ */
 export function savedSoFar(
   state: OnboardingState,
+  journey: "founder" | "investor",
   labelOf: (stepKey: string) => string | undefined,
 ): string {
-  const saved = savedLines(state, labelOf).slice(0, READ_BACK_ITEMS);
-  const saving = state.steps
-    .filter((row) => row.savePending === true && row.status !== "ANSWERED")
-    .map((row) => (labelOf(row.stepKey) ?? row.question).toLowerCase());
-  const needed = state.steps
-    .filter(
+  const saved = groupedSaved(state, journey, labelOf);
+  const named = (rows: readonly OnboardingState["steps"][number][]) =>
+    rows.flatMap((row) => {
+      const label = labelOf(row.stepKey);
+      return label === undefined ? [] : [label.toLowerCase()];
+    });
+  const saving = named(
+    state.steps.filter(
+      (row) => row.savePending === true && row.status !== "ANSWERED",
+    ),
+  );
+  const needed = named(
+    state.steps.filter(
       (row) =>
         row.status === "OPEN" &&
         row.required &&
         row.kind !== "YES_NO" &&
         row.savePending !== true,
-    )
-    .map((row) => (labelOf(row.stepKey) ?? row.question).toLowerCase())
-    .slice(0, 6);
+    ),
+  ).slice(0, 6);
   return [
     saved.length === 0
       ? "Nothing is saved yet."
-      : `Saved so far: ${saved.join("; ")}.`,
+      : `Here's what I have saved so far:\n\n${saved.join("\n\n")}`,
     saving.length === 0 ? "" : `Still saving: ${saving.join(", ")}.`,
     needed.length === 0 ? "" : `Still to cover: ${needed.join(", ")}.`,
   ]
     .filter((part) => part.length > 0)
-    .join(" ");
+    .join("\n\n");
 }
 
 /**

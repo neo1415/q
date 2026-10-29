@@ -362,7 +362,10 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
       script: [{ reply: "Here's where we are.", readBack: true }],
     });
     const outcome = await say("what do you have so far?");
-    expect(outcome.reply).toMatch(/^Here's where we are\. Saved so far: /u);
+    // Sweep D7: the record, from code, with the setup's own labels; the
+    // model's line is not put around it.
+    expect(outcome.reply).toMatch(/^Here's what I have saved so far:\n\n/u);
+    expect(outcome.reply).not.toContain("Here's where we are");
     expect(outcome.reply).toContain("Harmattan Angels");
     expect(outcome.reply).toMatch(/Still to cover: .*stages/iu);
   });

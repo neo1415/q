@@ -88,3 +88,21 @@ describe("D4: where finishing goes", () => {
     ).toContain('primaryActionLabel: "Continue",');
   });
 });
+
+describe("D7: Keep all answers the line it is under", () => {
+  it("moves Q's live line into the thread before saying it is kept, then asks what the session moved to", () => {
+    const source = read(
+      "../src/features/onboarding-conversation/q-onboarding-workspace.tsx",
+    );
+    const keepAll = source.slice(
+      source.indexOf("const keepAll = async () => {"),
+      source.indexOf("/** A gap answered in place"),
+    );
+    const live = keepAll.indexOf('push("Q", shownQuestion)');
+    const reset = keepAll.indexOf("answeredByTap();");
+    const kept = keepAll.indexOf('push("Q", said)');
+    expect(live).toBeGreaterThan(-1);
+    expect(live).toBeLessThan(reset);
+    expect(reset).toBeLessThan(kept);
+  });
+});

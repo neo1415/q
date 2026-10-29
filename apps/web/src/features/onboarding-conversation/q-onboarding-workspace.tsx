@@ -1554,7 +1554,15 @@ export function QOnboardingWorkspace({
       outcomes.push(await keep(item.suggestion.id));
     }
     const said = keptAllLine(outcomes);
-    if (said !== null) push("Q", said);
+    if (said === null) return;
+    // Sweep D7 (2026-10-29): "All kept. Thank you." landed in the thread
+    // above Q's line it answered, which stayed below as the live question
+    // ("Still to cover: team size" after team size was kept). The line
+    // joins the thread first, as a tapped answer's does, and the screen
+    // then asks what the session moved to.
+    if (shownQuestion !== null) push("Q", shownQuestion);
+    answeredByTap();
+    push("Q", said);
   };
 
   /** A gap answered in place, through the question's own path (§16, §21). */
