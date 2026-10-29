@@ -143,18 +143,21 @@
     scroll-snap-type: x proximity;
     scroll-padding-inline: 16px;
   }
-  /* A phone shows the strip's edge (D7, 390 px): the last visible tab fades
-     out, so a strip that scrolls looks like one, and a hidden scrollbar
-     is not the only cue. */
+  /* A phone wraps the tabs onto a second row rather than scrolling them
+     past the screen's edge (re-test #3, 390 px: "Pitch deck" and "Team"
+     sat beyond the right edge, behind a fade). The sliding ink cannot
+     follow a second row, so the current tab carries its own underline. */
   @media (max-width: 640px) {
     .cq-brief-tabs {
-      gap: 20px;
-      padding-inline-end: 40px;
-      mask-image: linear-gradient(
-        to right,
-        black calc(100% - 48px),
-        transparent
-      );
+      flex-wrap: wrap;
+      gap: 0 20px;
+      overflow-x: visible;
+    }
+    .cq-brief-tabs .cq-brief-ink {
+      display: none;
+    }
+    .cq-brief-tab[aria-current="page"] {
+      box-shadow: inset 0 -2px 0 var(--cq-text-primary);
     }
   }
   .cq-brief-tab {

@@ -150,7 +150,11 @@ export { DELEGATION_READER_V6 } from "./prompts/tasks/delegation-reader.v6.js";
 export { DELEGATION_READER_V7 } from "./prompts/tasks/delegation-reader.v7.js";
 export { ONBOARDING_TRANSCRIPT_READER_V1 } from "./prompts/tasks/onboarding-transcript-reader.v1.js";
 export { ONBOARDING_TRANSCRIPT_READER_V2 } from "./prompts/tasks/onboarding-transcript-reader.v2.js";
+export { ONBOARDING_TRANSCRIPT_READER_V3 } from "./prompts/tasks/onboarding-transcript-reader.v3.js";
+export { TAXONOMY_CHOICE_V1 } from "./prompts/tasks/taxonomy-choice.v1.js";
+export * from "./prompts/schemas/taxonomy-choice.js";
 export { ONBOARDING_TYPED_REPLY_V1 } from "./prompts/tasks/onboarding-typed-reply.v1.js";
+export { ONBOARDING_TYPED_REPLY_V2 } from "./prompts/tasks/onboarding-typed-reply.v2.js";
 export {
   ONBOARDING_TYPED_REPLY_SCHEMA_NAME,
   OnboardingTypedReplyResultSchema,

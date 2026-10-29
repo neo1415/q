@@ -14,6 +14,9 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "{n} steps before investors can find you": "{n} خطوات قبل أن يجدك المستثمرون",
   // D6 (2026-10-28): the readiness card's way back into setup.
   "Finish setup with Q": "أنهِ الإعداد مع Q",
+  // Re-test #3: the way back into an open setup, without readiness gaps.
+  "Your company setup is still open": "إعداد شركتك ما زال مفتوحاً",
+  "Q picks up where you left off.": "يتابع Q من حيث توقفت.",
   "A pitch from {name}": "عرض من {name}",
   "{n} pitches that match your mandate": "{n} عروض تطابق تفويضك",
   "Setup: {n} of {n2} done — {minutes}":

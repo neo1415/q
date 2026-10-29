@@ -2351,11 +2351,11 @@
   /* On a phone the swipe is the move; the explicit Previous and Next stay
      reachable by keyboard and switch access, shown when focused. */
   @media (max-width: 1023px) {
+    /* Clipped, never squashed: re-test #3 measured the buttons at 44x22
+       and past the right edge inside a 1px box. Their own size and place
+       stay (44px, inside the viewport); only the paint is clipped. */
     .cq-feed-nav:not(:focus-within) {
       clip-path: inset(50%);
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
     }
     .cq-feed-nav {
       top: calc(56px + var(--cq-safe-top));
@@ -2364,8 +2364,10 @@
   }
   .cq-feed-nav-button {
     display: inline-flex;
+    flex-shrink: 0;
     width: 44px;
     height: 44px;
+    min-height: 44px;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--cq-stage-border);

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   appendOnboardingInterviewTurns,
   getOnboardingSession,
+  getTaxonomyNode,
   listOnboardingInterviewTurns,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -194,6 +195,8 @@ export function confirmedContent(
   view: OnboardingSessionView,
   journeyType: "founder" | "investor",
   stepKey: string,
+  /** Category names by node id, so a read-back names them (never "1 selected"). */
+  names: ReadonlyMap<string, string> = new Map(),
 ): string | null {
   const phases = CONFIRMS[stepKey];
   if (phases === undefined) return null;
@@ -220,7 +223,7 @@ export function confirmedContent(
       const label = (labels[s.stepKey]?.label ?? s.configuration.prompt)
         .replace(/[?:]$/u, "")
         .trim();
-      return [`${label}: ${confirmedValue(s, value, currency)}`];
+      return [`${label}: ${confirmedValue(s, value, currency, names)}`];
     })
     .slice(0, CONFIRMED_ITEMS);
   return items.length === 0 ? null : items.join("; ");
@@ -236,7 +239,15 @@ function confirmedValue(
   step: OnboardingStepManifest,
   value: OnboardingSessionView["responses"][number]["value"],
   currency: string | null,
+  names: ReadonlyMap<string, string> = new Map(),
 ): string {
+  // Production re-test 2026-10-28: "Sector: 1 selected" in the review.
+  if (value.type === "RESOURCE_REFERENCE") {
+    const named = value.resourceIds.map((id) => names.get(id));
+    if (named.length > 0 && named.every((n) => n !== undefined)) {
+      return named.join(", ");
+    }
+  }
   if (value.type === "RANGE" && MONEY_STEP.test(step.stepKey)) {
     const figure = Number.parseFloat(String(value.value));
     if (Number.isFinite(figure)) {
@@ -276,8 +287,9 @@ function askLines(
   view: OnboardingSessionView,
   journeyType: "founder" | "investor",
   step: NextStep,
+  names: ReadonlyMap<string, string> = new Map(),
 ): readonly Line[] {
-  const content = confirmedContent(view, journeyType, step.stepKey);
+  const content = confirmedContent(view, journeyType, step.stepKey, names);
   return [
     ...(content === null ? [] : [{ text: `Here's what I have: ${content}.` }]),
     { text: step.question, stepKey: step.stepKey },
@@ -315,6 +327,7 @@ const PICKING_UP = "Picking up where we left off.";
 export function resumeLines(
   view: OnboardingSessionView,
   journeyType: "founder" | "investor",
+  names: ReadonlyMap<string, string> = new Map(),
 ): readonly Line[] {
   if (view.session.status === "COMPLETED") {
     return [
@@ -331,8 +344,37 @@ export function resumeLines(
   }
   return [
     { text: PICKING_UP },
-    ...askLines(view, journeyType, resumeAsk(view, journeyType, chosen)),
+    ...askLines(view, journeyType, resumeAsk(view, journeyType, chosen), names),
   ];
+}
+
+/**
+ * The names of the categories on the record (taxonomy reference data), for
+ * a read-back; bounded, and an unreadable one is simply left out.
+ */
+export async function categoryNames(
+  session: ApiSession,
+  view: OnboardingSessionView,
+): Promise<ReadonlyMap<string, string>> {
+  const ids = [
+    ...new Set(
+      view.responses.flatMap((r) =>
+        r.value.type === "RESOURCE_REFERENCE" &&
+        r.value.resourceType === "TAXONOMY_NODE"
+          ? r.value.resourceIds
+          : [],
+      ),
+    ),
+  ].slice(0, 16);
+  const found = await Promise.all(
+    ids.map((id) =>
+      getTaxonomyNode(session, id).then(
+        (node) => [id, node.displayName] as const,
+        () => null,
+      ),
+    ),
+  );
+  return new Map(found.filter((pair) => pair !== null));
 }
 
 /** What Q says when a conversation already under way is opened again. */
@@ -937,12 +979,15 @@ export function createOnboardingConductor(
     const chosen = ask ?? nextUnansweredStep(view, input.journeyType);
     const next =
       chosen === null ? null : resumeAsk(view, input.journeyType, chosen);
+    const names = await categoryNames(input.session, view).catch(
+      () => new Map<string, string>(),
+    );
     let lines: readonly Line[] =
       ask === null
-        ? resumeLines(view, input.journeyType)
+        ? resumeLines(view, input.journeyType, names)
         : [
             ...(spoken || focused !== null ? [{ text: PICKING_UP }] : []),
-            ...askLines(view, input.journeyType, ask),
+            ...askLines(view, input.journeyType, ask, names),
           ];
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);

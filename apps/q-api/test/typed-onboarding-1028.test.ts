@@ -475,7 +475,7 @@ describe("D3: 'that's all for now' finishes, or says exactly what is still neede
     expect(outcome.reply).not.toMatch(/pause/iu);
   });
 
-  it("says the open things in one line, by label, and asks the first", () => {
+  it("says how many answers are open and asks the first in its own words (re-test #3: no field labels)", () => {
     const line = finishingLine(
       "investor",
       {
@@ -493,7 +493,7 @@ describe("D3: 'that's all for now' finishes, or says exactly what is still neede
     );
     expect(line).toEqual({
       reply:
-        "Before I can finish, I still need 2 things: stages and Strict or broad?. Which stages do you like to back?",
+        "Before I can finish, I still need 2 more answers from you, starting with this one. Which stages do you like to back?",
       asking: "I2.stages",
     });
   });

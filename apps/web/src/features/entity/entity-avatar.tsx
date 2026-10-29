@@ -130,6 +130,14 @@ export function entityImageSources(input: {
   return [first];
 }
 
+/**
+ * Whether a loaded image is the photo routes' "no picture" placeholder
+ * (1x1): nothing to show, the fallback stays.
+ */
+export function isNoPicture(width: number, height: number): boolean {
+  return width === 1 && height === 1;
+}
+
 /** Wider than this, a company picture is a wordmark, not a mark. */
 const WORDMARK_RATIO = 1.8;
 
@@ -240,6 +248,12 @@ export function EntityAvatar({
           decoding="async"
           onLoad={(event) => {
             const { naturalWidth, naturalHeight } = event.currentTarget;
+            // The routes' "no picture" placeholder (1x1, no 404 in the
+            // console): the next picture, else the fallback.
+            if (isNoPicture(naturalWidth, naturalHeight)) {
+              setState({ chain, at: current.at + 1, loaded: false });
+              return;
+            }
             // A wide wordmark in a round frame reads as a fragment ("lo C",
             // live 24 Oct): try the next picture, else the initials/mark.
             if (

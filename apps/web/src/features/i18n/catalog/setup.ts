@@ -60,6 +60,10 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   "Finish setup": "أنهِ الإعداد",
   "Everything essential is in. You can add the rest later.":
     "كل الأساسيات موجودة. يمكنك إضافة الباقي لاحقاً.",
+  // Re-test #3 (2026-10-28): Finish is their "that's all", said to Q.
+  "That's everything for now. Please finish my setup.":
+    "هذا كل شيء الآن. من فضلك أنهِ إعدادي.",
+  "Looks right, finish": "يبدو صحيحاً، أنهِ",
   "Everything important is answered or waiting on your review. Add anything else below, or continue.":
     "كل ما هو مهم أُجيب عنه أو بانتظار مراجعتك. أضف أي شيء آخر أدناه، أو تابع.",
   "Excluded sectors": "القطاعات المستبعدة",

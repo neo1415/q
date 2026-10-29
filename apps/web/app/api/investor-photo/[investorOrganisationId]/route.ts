@@ -4,6 +4,7 @@ import { getDiscoveredInvestorPhoto } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
+import { noPicture } from "@/features/entity/no-picture";
 
 /**
  * An investor organisation's logo where a page knows the investor only by
@@ -23,16 +24,13 @@ export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function notFound(kept = false): NextResponse {
-  return new NextResponse(null, {
-    status: 404,
-    headers: {
-      // Perf lane 2026-10-16: the API's answer "no photo for you" is kept
-      // briefly in this browser, like a photo's redirect, so every list and
-      // page view does not ask again (hosted: ten 404s per Pipeline view).
-      // A missing session or a malformed id is never kept.
-      "Cache-Control": kept ? "private, max-age=300" : "private, no-store",
-    },
-  });
+  // Re-test #3 (2026-10-28): a 1x1 placeholder, never a 404 in the
+  // console; the avatar reads it as no picture.
+  // Perf lane 2026-10-16: the API's answer "no photo for you" is kept
+  // briefly in this browser, like a photo's redirect, so every list and
+  // page view does not ask again (hosted: ten 404s per Pipeline view).
+  // A missing session or a malformed id is never kept.
+  return noPicture(kept ? "private, max-age=300" : "private, no-store");
 }
 
 export async function GET(
