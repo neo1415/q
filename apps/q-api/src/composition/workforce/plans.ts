@@ -4,6 +4,8 @@ import {
   QActionTypeSchema,
   Q_PLAN_EXECUTE,
   QPlanExecutePayloadSchema,
+  QSituationDossierSchema,
+  situationFacts,
   UuidSchema,
   WorkforceJobStartPayloadSchema,
   type QPlan,
@@ -21,6 +23,7 @@ import type { BoardService } from "@capital-q/board";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
+import { boardKey } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
@@ -70,16 +73,16 @@ export type PlanAskReading = {
 
 /**
  * A plan job takes the turn when the reader read a plan ask about the
- * person's OWN situation whose deliverable is a plan or a review of their
- * own documents. A named other company, or a written analysis/document,
- * stays with the team job that makes documents.
+ * person's OWN situation whose deliverable is a plan. A review of their
+ * documents, an analysis or a document is that work, done by the team job
+ * that makes documents -- never a plan whose first step is the ask (live
+ * 2026-10-29, F03) -- as is work for someone they named.
  */
 export function routesToPlan(
   planAsk: PlanAskReading | null | undefined,
 ): boolean {
   if (planAsk === null || planAsk === undefined) return false;
   if (planAsk.subject === "NAMED") return false;
-  if (planAsk.deliverable === "DOCUMENT_REVIEW") return true;
   return planAsk.kind !== "NONE" && planAsk.deliverable === "PLAN";
 }
 
@@ -325,9 +328,12 @@ export function createPlans(dependencies: PlansDependencies) {
           outputs: { plan: { block: outcome.block, line: outcome.line } },
         };
       case "ANSWERED":
+        // Live 2026-10-29: planning failed, yet the job ended DONE and its
+        // card read "Two reviews · Ready · Filed". No plan was made, so the
+        // job FAILED; the person still gets Q's answer from what it holds.
         return {
-          state: "COMPLETED",
-          reason: null,
+          state: "FAILED",
+          reason: "The plan couldn't be finished",
           outputs: { answer: { line: outcome.line } },
         };
       case "FAILED":
@@ -355,6 +361,7 @@ export function createPlans(dependencies: PlansDependencies) {
       headVersion: stored.headVersion,
       status: stored.status,
       lines: lines.map((entry) => ({ at: entry.createdAt, text: entry.text })),
+      facts: citedFacts(stored.plan, stored.situation),
     };
   };
 
@@ -422,7 +429,8 @@ export function createPlans(dependencies: PlansDependencies) {
             conversationId: trace.conversationId,
             actionType: PLAN_EXECUTE,
             payload,
-            words: `Run the plan: ${stored.plan.goal}`,
+            // Q's own line on the card's run (the person pressed Execute).
+            words: `Here is your plan to approve before anything runs: ${stored.plan.goal}`,
             key: `plan-execute:${planId}:${String(stored.plan.version)}`,
           })
           .catch((error: unknown) => {
@@ -447,15 +455,15 @@ export function createPlans(dependencies: PlansDependencies) {
         );
       }
       case "PUT_ON_BOARD": {
-        const placed = await putOnBoard(actor, stored.plan);
+        const board = await putOnBoard(actor, stored.plan);
+        // Live 2026-10-29: a failed write was reported as "already there".
+        // Success is said only for rows the board returned; a failure is
+        // said as a failure, and the plan stays where it was.
+        if (board.failed > 0 && board.placed === 0) {
+          return result("FAILED", boardMessage(board), head.currentVersion);
+        }
         await store.setStatus(owner, planId, "ON_BOARD");
-        return result(
-          "ON_BOARD",
-          placed === 0
-            ? "Nothing new to put on your board: it's already there."
-            : `On your board: ${String(placed)} task${placed === 1 ? "" : "s"}, with reminders where a step has a date. My steps wait until you say go.`,
-          head.currentVersion,
-        );
+        return result("ON_BOARD", boardMessage(board), head.currentVersion);
       }
       case "CHANGE": {
         const direction = await thread.direct(
@@ -524,26 +532,34 @@ export function createPlans(dependencies: PlansDependencies) {
   const putOnBoard = async (
     actor: ActorContext,
     plan: QPlan,
-  ): Promise<number> => {
+  ): Promise<BoardPlacement> => {
     const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
     const runtimes = await thread
       .runtimes(owner, plan.planId)
       .catch(() => new Map<string, StepRuntime>());
-    let placed = 0;
+    const out = { placed: 0, already: 0, failed: 0, waiting: 0 };
     for (const step of plan.steps) {
       const runtime = runtimeOf(runtimes, step.key);
       if (step.owner === "Q") {
         if (runtime.status === "TODO") {
+          // Nothing is prepared yet: it waits until they say go.
           await thread
-            .move(owner, plan, step, "PROPOSED")
+            .move(owner, plan, step, "PROPOSED", { prepared: false })
             .catch(() => undefined);
         }
+        out.waiting += 1;
         continue;
       }
-      if (runtime.boardItemId !== null) continue;
-      if (await boardTask(actor, plan, step)) placed += 1;
+      if (runtime.boardItemId !== null) {
+        out.already += 1;
+        continue;
+      }
+      const placed = await boardTask(actor, plan, step);
+      if (placed === "PLACED") out.placed += 1;
+      else if (placed === "ALREADY") out.already += 1;
+      else out.failed += 1;
     }
-    return placed;
+    return out;
   };
 
   /** One board task (and its reminder when dated) for a step of theirs. */
@@ -551,9 +567,9 @@ export function createPlans(dependencies: PlansDependencies) {
     actor: ActorContext,
     plan: QPlan,
     step: QPlanStep,
-  ): Promise<boolean> => {
+  ): Promise<"PLACED" | "ALREADY" | "FAILED"> => {
     const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
-    if (dependencies.board === undefined) return false;
+    if (dependencies.board === undefined) return "FAILED";
     const key = `plan:${plan.planId}:${String(plan.version)}:${step.key}`;
     const added = await dependencies.board
       .add(
@@ -575,10 +591,25 @@ export function createPlans(dependencies: PlansDependencies) {
             .slice(0, 8_000),
           ...(step.due === null ? {} : { dueOn: step.due }),
         },
-        { by: "Q", idempotencyKey: `${key}:board` },
+        // The board's key is a UUID (workspace.board_items): derived from
+        // this step and version, so a retried placement writes nothing new.
+        { by: "Q", idempotencyKey: planBoardKey(key) },
       )
-      .catch(() => null);
-    if (added === null || added.outcome !== "OK") return false;
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, planId: plan.planId, stepKey: step.key },
+          "plan step not put on the board",
+        );
+        return null;
+      });
+    if (added === null) return "FAILED";
+    if (added.outcome !== "OK") {
+      logger?.warn(
+        { planId: plan.planId, stepKey: step.key, code: added.code },
+        "plan step not put on the board",
+      );
+      return "FAILED";
+    }
     await thread.link(owner, plan, step.key, "board_item", added.value.id);
     if (step.due !== null && dependencies.reminder !== undefined) {
       const reminderId = await dependencies
@@ -597,7 +628,7 @@ export function createPlans(dependencies: PlansDependencies) {
       }
     }
     await thread.move(owner, plan, step, "WAITING_YOU");
-    return true;
+    return added.replayed ? "ALREADY" : "PLACED";
   };
 
   /** A Q-owned step's own-account job on the durable queue (one per step and version). */
@@ -656,11 +687,15 @@ export function createPlans(dependencies: PlansDependencies) {
   ): Promise<void> => {
     const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
     if (step.owner === "YOU") {
-      await boardTask(actor, plan, step);
+      if ((await boardTask(actor, plan, step)) === "FAILED") {
+        await thread.notPlaced(owner, plan, step).catch(() => undefined);
+      }
       return;
     }
     if (step.owner === "TOGETHER") {
-      await boardTask(actor, plan, step);
+      if ((await boardTask(actor, plan, step)) === "FAILED") {
+        await thread.notPlaced(owner, plan, step).catch(() => undefined);
+      }
       // Their part, asked of them once (the card asks; the thread keeps it).
       await store
         .appendThread(owner, {
@@ -685,7 +720,7 @@ export function createPlans(dependencies: PlansDependencies) {
       );
       const payload = stepJobPayload(actor.userId, plan, step);
       if (payload === null) {
-        await thread.move(owner, plan, step, "PROPOSED");
+        await thread.move(owner, plan, step, "PROPOSED", { prepared: false });
         return;
       }
       if (!outward) {
@@ -722,10 +757,13 @@ export function createPlans(dependencies: PlansDependencies) {
           key: `plan-step:${plan.planId}:${String(plan.version)}:${step.key}`,
         })
         .catch(() => null);
-      if (card !== null && card !== undefined) {
+      const prepared = card !== null && card !== undefined;
+      if (prepared) {
         await thread.link(owner, plan, step.key, "action", card.qActionId);
       }
-      await thread.move(owner, plan, step, "PROPOSED");
+      // "Ready for your approval" only when the card exists (live
+      // 2026-10-29: said with no approval behind it).
+      await thread.move(owner, plan, step, "PROPOSED", { prepared });
       return;
     }
     if (
@@ -734,14 +772,15 @@ export function createPlans(dependencies: PlansDependencies) {
       step.owner === "Q"
     ) {
       // Q's own note on their board: instant and theirs to remove.
-      if (await boardTask(actor, plan, step)) {
+      if ((await boardTask(actor, plan, step)) !== "FAILED") {
         await thread.move(owner, plan, step, "DONE");
       }
       return;
     }
     // A single proposal Q prepares when they say go: its card names the
-    // exact message, meeting or change, approved on its own.
-    await thread.move(owner, plan, step, "PROPOSED");
+    // exact message, meeting or change, approved on its own. Nothing is
+    // prepared yet, so it is never said to be ready for approval.
+    await thread.move(owner, plan, step, "PROPOSED", { prepared: false });
   };
 
   /**
@@ -821,8 +860,10 @@ export function createPlans(dependencies: PlansDependencies) {
               .join(""),
           ),
       }),
+      // Said before the steps run: it promises only what is about to be
+      // tried; the plan card shows each step as it lands (or fails).
       confirm: () =>
-        "On it. My steps are starting, yours are on your board, and anything that goes out comes to you first.",
+        "Approved. I'm starting my steps and putting yours on your board; the plan card shows each one as it lands, and anything that goes out comes to you first.",
       authorize: (payload, actor) =>
         Promise.resolve(
           actor.actorType !== "HUMAN"
@@ -1269,6 +1310,79 @@ export function stepJobPayload(
     cannot: [],
   });
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * The facts a plan cites, from the situation it was written from: what a
+ * step's "why" opens on the card. Only cited refs; the person's own
+ * situation, read as them when the plan was made.
+ */
+export function citedFacts(
+  plan: QPlan,
+  situation: unknown,
+): NonNullable<QPlanView["facts"]> {
+  const dossier = QSituationDossierSchema.safeParse(situation);
+  if (!dossier.success) return [];
+  const cited = new Set([
+    ...plan.situationRefs,
+    ...plan.steps.flatMap((step) => step.cites),
+  ]);
+  return situationFacts(dossier.data)
+    .filter((fact) => cited.has(fact.ref))
+    .slice(0, 120)
+    .map((fact) => ({
+      ref: fact.ref,
+      statement: fact.statement.slice(0, 1_000),
+      truthClass: fact.truthClass,
+    }));
+}
+
+/** A plan step's board key as the UUID the board requires (stable per key). */
+export function planBoardKey(key: string): string {
+  return boardKey(key, "plan-step", null);
+}
+
+export type BoardPlacement = {
+  readonly placed: number;
+  readonly already: number;
+  readonly failed: number;
+  /** Q's steps, waiting until they say go. */
+  readonly waiting: number;
+};
+
+function countWords(n: number, noun = "task"): string {
+  return `${String(n)} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+/** What the person is told after Put on my board: only what landed. */
+export function boardMessage(board: BoardPlacement): string {
+  const parts: string[] = [];
+  if (board.placed > 0) {
+    parts.push(
+      `On your board: ${countWords(board.placed)}, with reminders where a step has a date.`,
+    );
+  }
+  if (board.already > 0) {
+    parts.push(
+      board.placed > 0 || board.failed > 0
+        ? `${countWords(board.already)} ${board.already === 1 ? "was" : "were"} already there.`
+        : `Your ${countWords(board.already)} ${board.already === 1 ? "is" : "are"} already on your board.`,
+    );
+  }
+  if (board.failed > 0) {
+    parts.push(
+      board.placed === 0
+        ? `I couldn't put ${board.failed === 1 ? "your step" : `your ${countWords(board.failed, "step")}`} on your board just now, so ${board.already > 0 ? "nothing new" : "nothing"} was added. Try again in a moment.`
+        : `I couldn't add ${countWords(board.failed, "step")}; try again in a moment.`,
+    );
+  }
+  if (board.placed + board.already + board.failed === 0) {
+    parts.push(
+      "None of the steps is yours to do, so nothing went on your board.",
+    );
+  }
+  if (board.waiting > 0) parts.push("My steps wait until you say go.");
+  return parts.join(" ");
 }
 
 function summaryOf(

@@ -354,3 +354,48 @@ export const PlanReadVariablesSchema = z
   .strict();
 export type PlanReadVariables = z.infer<typeof PlanReadVariablesSchema>;
 export const PLAN_READ_UNTRUSTED = ["documentName", "documentText"] as const;
+
+// --- v2 (plan live run 1, 2026-10-29) ------------------------------------------
+
+/**
+ * PLAN_WRITE v2's output: the v1 shape with limits the model can meet and
+ * that match the stored plan's (contracts `QPlanStepSchema`): why has room
+ * for two full sentences (live: nearly every v1 why was clipped at 300,
+ * "payback,…"), evidenceNeeded and openQuestions are bounded as the stored
+ * plan is (6), and a step's unknown key is left out rather than refusing
+ * the plan (live: 7 of 19 writes refused whole for one overflowing list or
+ * one stray key). Lists over their bound are cut to their first items by
+ * the gateway (dropListItems), reported, never repaired.
+ */
+export const PLAN_WRITE_V2_SCHEMA_VERSION = 2;
+export const PLAN_WHY_MAX = 600;
+export const PLAN_LIST_MAX = 6;
+
+export const PlanWriteStepV2Schema = z.object({
+  key: stepKey,
+  title: z.string().trim().min(1).max(160),
+  why: z.string().trim().min(1).max(PLAN_WHY_MAX),
+  cites: z.array(PlanFactRefSchema).min(1).max(8),
+  owner: PlanStepOwnerSchema,
+  action: PlanStepActionSchema,
+  due: PlanLocalDateSchema.nullable(),
+  evidenceNeeded: z
+    .array(z.string().trim().min(1).max(200))
+    .max(PLAN_LIST_MAX)
+    .default([]),
+});
+export type PlanWriteStepV2 = z.infer<typeof PlanWriteStepV2Schema>;
+
+export const PlanWriteResultV2Schema = z.object({
+  goal: z.string().trim().min(1).max(300),
+  side: PlanSideSchema,
+  situationSummary: z.string().trim().min(1).max(600),
+  situationRefs: z.array(PlanFactRefSchema).min(1).max(24),
+  steps: z.array(PlanWriteStepV2Schema).min(1).max(12),
+  openQuestions: z
+    .array(z.string().trim().min(1).max(300))
+    .max(PLAN_LIST_MAX)
+    .default([]),
+  clarification: PlanClarificationSchema.nullable().default(null),
+});
+export type PlanWriteResultV2 = z.infer<typeof PlanWriteResultV2Schema>;

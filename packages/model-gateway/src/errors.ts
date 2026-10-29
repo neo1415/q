@@ -59,6 +59,8 @@ export type ModelGatewayErrorOptions = {
   readonly candidates: readonly ModelCandidateDecision[];
   readonly routingPolicyCode?: string | undefined;
   readonly cause?: unknown;
+  /** INVALID_MODEL_OUTPUT: the refused fields (paths and codes, never values). */
+  readonly refusals?: readonly string[] | undefined;
 };
 
 /**
@@ -70,6 +72,7 @@ export class ModelGatewayError extends Error {
   readonly attempts: number;
   readonly candidates: readonly ModelCandidateDecision[];
   readonly routingPolicyCode: string | undefined;
+  readonly refusals: readonly string[] | undefined;
 
   constructor(message: string, options: ModelGatewayErrorOptions) {
     super(message, options.cause === undefined ? {} : { cause: options.cause });
@@ -78,6 +81,7 @@ export class ModelGatewayError extends Error {
     this.attempts = options.attempts;
     this.candidates = options.candidates;
     this.routingPolicyCode = options.routingPolicyCode;
+    this.refusals = options.refusals;
   }
 }
 

@@ -48,6 +48,14 @@ export type CreateQRunCommand = {
    * conversation is read (`domain/utterances.ts`).
    */
   readonly utteranceRef?: string | undefined;
+  /**
+   * Server-internal, never from a client body: Q opened this run itself
+   * (an approval card Q prepares when the person pressed a button, such as
+   * a plan's Execute), so its message is Q's line, never shown as words
+   * the person typed. Live 2026-10-29: Execute showed "Run the plan: …"
+   * as the founder's own message.
+   */
+  readonly openedBy?: "Q" | undefined;
 };
 
 export type CreateQRunResult = {
@@ -338,7 +346,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         tenantId: actor.tenantId,
         conversationId: conversation.id,
         runId: run.id,
-        role: "USER",
+        role: command.openedBy === "Q" ? "Q" : "USER",
         // A spoken turn is stored as said, without the recogniser's
         // non-speech tags ("(laughter)"): production 2026-10-23.
         content:
@@ -404,14 +412,17 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         );
         // The person's question; a surface's opening line, when the run
         // was given one, is recorded before it.
-        const message = (
-          await repositories.messages.listForRun(
-            tx.sql,
-            actor.tenantId,
-            run.id,
-            2,
-          )
-        ).find((recorded) => recorded.role === "USER");
+        const recorded = await repositories.messages.listForRun(
+          tx.sql,
+          actor.tenantId,
+          run.id,
+          2,
+        );
+        // A run Q opened itself holds Q's line instead of the person's.
+        const message =
+          command.openedBy === "Q"
+            ? recorded.at(-1)
+            : recorded.find((one) => one.role === "USER");
         if (conversation === null || message === undefined) {
           throw new QRunCreationConflictError();
         }

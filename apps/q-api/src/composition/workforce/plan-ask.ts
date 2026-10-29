@@ -50,6 +50,9 @@ export function createPlanCardAsk(dependencies: {
       },
       idempotencyKey: card.key,
       correlationId,
+      // The person pressed a button; they typed nothing. The card's line is
+      // Q's own (live 2026-10-29: "Run the plan: …" read as their message).
+      openedBy: "Q",
     });
     const ref = runRef(created.run);
     const orchestration = dependencies.orchestration();

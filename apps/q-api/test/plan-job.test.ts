@@ -282,9 +282,14 @@ describe("the plan job: the founder example end to end", () => {
     expect(plan?.review?.fullyReviewed).toBe(false);
     expect(plan?.review?.openPoints.length).toBeGreaterThan(0);
     expect(outcome.block.reviewed).toBe(false);
+    // Live 2026-10-29: the card said only "draft". It says what the
+    // reviews still want, by step number, with no fact codes.
     expect(outcome.line).toContain(
-      "It's a draft I haven't been able to fully review yet",
+      "It's a draft: the two reviews didn't pass it yet. What they still want:",
     );
+    for (const point of plan?.review?.openPoints ?? []) {
+      expect(point).not.toMatch(/\[s\w*\]|\bF\d+\b|Fix:/u);
+    }
   });
 
   it("an invented fact is fatal in review whatever the total", () => {
@@ -344,15 +349,37 @@ describe("the plan job: the founder example end to end", () => {
 
 describe("the exact F03 ask (addendum 3)", () => {
   it("reads as a review of their own documents, about their own company, and starts", async () => {
-    // The reader's reading of F03 (lane B's v70 eval): GOAL / OWN / DOCUMENT_REVIEW.
+    // Live 2026-10-29: a review of their documents is that work, done by
+    // the team job -- never a plan whose first step is the review.
     const reading = {
-      kind: "GOAL",
+      kind: "NONE",
       research: "NONE",
       side: "FOUNDER",
       subject: "OWN",
       deliverable: "DOCUMENT_REVIEW",
     } as const;
-    expect(routesToPlan(reading)).toBe(true);
+    expect(routesToPlan(reading)).toBe(false);
+    expect(routesToPlan({ ...reading, deliverable: "ANALYSIS" })).toBe(false);
+    expect(
+      routesToPlan({
+        ...reading,
+        kind: "GOAL",
+        deliverable: "DOCUMENT_REVIEW",
+      }),
+    ).toBe(false);
+    // The CFO curveball and an investor's two weeks on a pipeline company
+    // are plans of their own.
+    expect(
+      routesToPlan({ ...reading, kind: "GOAL", deliverable: "PLAN" }),
+    ).toBe(true);
+    expect(
+      routesToPlan({
+        ...reading,
+        kind: "GOAL",
+        side: "INVESTOR",
+        deliverable: "PLAN",
+      }),
+    ).toBe(true);
     const start = planStartLine(reading.deliverable, reading.research);
     expect(start).toContain("going through your documents now");
     expect(start).not.toMatch(

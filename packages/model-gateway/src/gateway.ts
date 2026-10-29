@@ -208,6 +208,11 @@ type AttemptOutcome<T> =
        * attempt raises the ceiling instead of blaming the next model.
        */
       readonly truncated?: boolean;
+      /**
+       * INVALID_MODEL_OUTPUT: which fields the schema refused, as paths and
+       * Zod codes (never a value), so a caller can ask once more with them.
+       */
+      readonly refusals?: readonly string[];
     };
 
 class AbortedError extends Error {
@@ -506,6 +511,9 @@ export function createModelGateway(
                 retryAfterMs: undefined,
                 cause: undefined,
                 ...(truncated ? { truncated: true } : {}),
+                ...(accepted.refusals === undefined
+                  ? {}
+                  : { refusals: accepted.refusals }),
               };
               span.setAttribute("q.model.invalid_output_stage", accepted.stage);
               metrics.structuredRefusals.add(1, {
@@ -928,6 +936,7 @@ export function createModelGateway(
     let spentUsd = 0;
     let lastFailure: ModelFailureClass | undefined;
     let lastCause: unknown;
+    let lastRefusals: readonly string[] | undefined;
     let attemptNumber = 0;
     /**
      * An earlier answer hit the ceiling; later attempts ask for more. Held
@@ -1157,6 +1166,7 @@ export function createModelGateway(
 
         lastFailure = outcome.failureClass;
         lastCause = outcome.cause;
+        lastRefusals = outcome.refusals ?? lastRefusals;
         if (spoke.spoke) {
           // Part of the answer is already with the person. Another attempt
           // would repeat it, and on a voice call it has been said aloud.
@@ -1251,6 +1261,9 @@ export function createModelGateway(
       candidates: plan.decisions,
       routingPolicyCode: policy.code,
       cause: lastCause,
+      ...(failureClass === "INVALID_MODEL_OUTPUT" && lastRefusals !== undefined
+        ? { refusals: lastRefusals }
+        : {}),
     });
   }
 

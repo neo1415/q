@@ -54,7 +54,13 @@ import {
 } from "./active-conversation";
 import { resumeQAction } from "./actions";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
-import { turnsFrom, workingLabel, type QTurn } from "./conversation";
+import {
+  FIRST_STAGE,
+  firstStageLabel,
+  turnsFrom,
+  workingLabel,
+  type QTurn,
+} from "./conversation";
 import {
   askedSince,
   answerMove,
@@ -715,7 +721,7 @@ export function QSessionProvider({
     ? (voiceWorking ?? undefined)
     : !q.working
       ? undefined
-      : workingLabel(q.state);
+      : (workingLabel(q.state) ?? firstStageLabel());
   const typedSteps = q.state.stageHistory;
   const current = useMemo<QWorkingStage | null>(() => {
     if (voice.active) {
@@ -731,8 +737,12 @@ export function QSessionProvider({
     }
     if (!q.working) return null;
     const now = qCurrentStage(typedSteps);
+    // Plan live run 1 (2026-10-29): the first stage line came 0.9-2.1 s
+    // after the ask, with a bare "Q is working" before it. Every turn's
+    // first stage is understanding the request, so it is shown the moment
+    // the turn is sent; the server's own stages replace it as they come.
     return now === null
-      ? null
+      ? { stage: FIRST_STAGE }
       : {
           stage: now.stage,
           ...(now.about === undefined ? {} : { about: now.about }),

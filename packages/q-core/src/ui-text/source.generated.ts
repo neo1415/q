@@ -5223,6 +5223,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "What the deck says about the team",
   "What the founder told you",
   "What the person asked and what Q said are hidden.",
+  "What the reviews still want",
   "What the team found",
   "What they did",
   "What they look for",

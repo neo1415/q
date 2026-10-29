@@ -6037,7 +6037,10 @@ describe("situation-first planning: the reader's planAsk starts the plan job (S5
     return { plan, started, directed };
   }
 
-  it("the F03 ask starts at once with the work card, never 'nothing has started'", async () => {
+  // Live 2026-10-29: F03 became a plan whose first step was the review it
+  // asked for. A review of their own documents is that work, done by the
+  // team job (TURN_READER v71: deliverable ANALYSIS / DOCUMENT_REVIEW).
+  it("the F03 ask is the review itself: the team job takes it, never a plan", async () => {
     const { plan, started } = planPort();
     let proposed = 0;
     const { answer, stored } = seam({
@@ -6064,20 +6067,9 @@ describe("situation-first planning: the reader's planAsk starts the plan job (S5
       },
     });
     await answer.answer(request());
-    expect(started).toEqual([{ ask: F03, deliverable: "DOCUMENT_REVIEW" }]);
-    expect(proposed).toBe(0);
-    const last = stored.at(-1);
-    expect(last?.content).toBe(
-      "I'm on it: gathering where things stand for you now.",
-    );
-    expect(last?.content).not.toMatch(/nothing has started/u);
-    expect(last?.blocks).toEqual([
-      {
-        kind: "WORK_IN_PROGRESS",
-        jobId: "70000000-0000-4000-8000-000000000001",
-        title: "Your plan",
-      },
-    ]);
+    expect(started).toEqual([]);
+    expect(proposed).toBe(1);
+    expect(stored.length).toBeGreaterThan(0);
   });
 
   it("an ask about a company they name is not a plan of their own: the team job takes it", async () => {

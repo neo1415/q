@@ -6008,6 +6008,11 @@ export function createSpecialistQAnswer(
     ) {
       const planAsk = read?.planAsk ?? null;
       if (planAsk !== null) {
+        // Live 2026-10-29: the first specific line ("gathering your
+        // situation") came 5.6-6.9 s in, after the job was filed. It is
+        // shown the moment the reading says this is their plan, before
+        // anything is filed (one event insert; it never fails the turn).
+        await showStage(request, "GATHERING_SITUATION");
         const started = await dependencies.plan
           .start(request, { ask: latest.content, planAsk })
           .catch(() => ({ status: "FAILED" as const }));

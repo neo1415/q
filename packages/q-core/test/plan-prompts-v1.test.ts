@@ -76,10 +76,11 @@ const fullReview = (): PlanReviewResult => ({
 });
 
 describe("PLAN_WRITE v1", () => {
-  it("is registered and active, structured, under STRUCTURED_EXTRACTION", () => {
+  it("is registered (v2 is active, as reasoning work), structured", () => {
     const record = createDefaultPromptRegistry().getActive("PLAN_WRITE");
-    expect(record.versionId).toBe("plan-write/v1");
-    expect(record.definition.taskClass).toBe("STRUCTURED_EXTRACTION");
+    expect(record.versionId).toBe("plan-write/v2");
+    expect(record.definition.taskClass).toBe("EVIDENCE_SYNTHESIS");
+    expect(PLAN_WRITE_V1.taskClass).toBe("STRUCTURED_EXTRACTION");
     expect(PLAN_WRITE_V1.output).toMatchObject({
       kind: "STRUCTURED",
       schemaName: "PlanWriteResult",
@@ -323,7 +324,7 @@ describe("PLAN_REVIEW v1", () => {
   it("is registered and active, independent, and never rewrites the plan", () => {
     expect(
       createDefaultPromptRegistry().getActive("PLAN_REVIEW").versionId,
-    ).toBe("plan-review/v1");
+    ).toBe("plan-review/v2");
     const t = PLAN_REVIEW_V1.template;
     expect(t).toMatch(/independent reviewer/u);
     expect(t).toMatch(/you must not rewrite it/u);

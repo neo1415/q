@@ -88,6 +88,26 @@ export function deliveredPlan(
   return null;
 }
 
+const FailedPlanStepSchema = z.object({
+  status: z.literal("FAILED"),
+  outputs: z.object({
+    answer: z.object({ line: z.string().min(1).max(4_000) }),
+  }),
+});
+
+/**
+ * A plan job that FAILED to make a plan, with the answer Q gave from what
+ * it holds instead (addendum 3 rule 3): said once, as Q's answer, while
+ * the job's own card shows where it stopped.
+ */
+export function failedPlanAnswer(
+  row: Pick<WorkRow, "results" | "state">,
+): DeliveredPlan | null {
+  if (row.state !== "FAILED") return null;
+  const parsed = FailedPlanStepSchema.safeParse(row.results["plan"]);
+  return parsed.success ? { answer: parsed.data.outputs.answer } : null;
+}
+
 /**
  * Owner 2026-10-28: "it's done, here it is" -- the line that opens the
  * delivery says so, and the screen opens the document beside it.
@@ -335,7 +355,8 @@ export function createWorkforceDelivery(dependencies: {
   };
 
   return async (owner: Owner, row: WorkRow): Promise<boolean> => {
-    const plan = row.state === "COMPLETED" ? deliveredPlan(row) : null;
+    const plan =
+      row.state === "COMPLETED" ? deliveredPlan(row) : failedPlanAnswer(row);
     if (plan !== null) return announcePlan(owner, row, plan);
     const document = deliveredDocument(row);
     if (document === null && row.state === "COMPLETED") {

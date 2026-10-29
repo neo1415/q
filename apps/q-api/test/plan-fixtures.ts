@@ -423,8 +423,11 @@ export function review(
   };
 }
 
+/** A write the schema refused whole: its refused fields, as the gateway logs them. */
+export type RefusedWrite = { readonly refused: readonly string[] };
+
 export function fakePlanModels(input: {
-  readonly writes: readonly (PlanWriteResult | null)[];
+  readonly writes: readonly (PlanWriteResult | RefusedWrite | null)[];
   readonly reviews: readonly (PlanReviewResult | null)[];
 }) {
   const calls: {
@@ -442,6 +445,7 @@ export function fakePlanModels(input: {
         _who: unknown,
         _trace: unknown,
         variables: { readonly mode: string; readonly fixes: string },
+        onRefused?: (refusals: readonly string[]) => void,
       ) => {
         calls.push({
           task: "WRITE",
@@ -451,6 +455,10 @@ export function fakePlanModels(input: {
         const next =
           input.writes[Math.min(writes, input.writes.length - 1)] ?? null;
         writes += 1;
+        if (next !== null && "refused" in next) {
+          onRefused?.(next.refused);
+          return Promise.resolve(null);
+        }
         return Promise.resolve(next);
       },
       reviewPlan: (

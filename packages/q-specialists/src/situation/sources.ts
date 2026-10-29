@@ -414,6 +414,23 @@ function formatDataRoom(data: readonly unknown[]): SituationRawFact[] | null {
   ];
 }
 
+/** Fields whose value speaks for itself: shown without their name. */
+const SELF_SPEAKING = new Set(["oneLine", "summary", "description", "title"]);
+
+/**
+ * One detail of a record in plain words: "stage: seed", never a field name
+ * such as "oneLine:" (live 2026-10-29: "oneLine: Ledgerline checks every
+ * invoice…" reached the person).
+ */
+export function detailWords(key: string, value: string): string {
+  if (SELF_SPEAKING.has(key)) return value;
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/gu, "$1 $2")
+    .replace(/_/gu, " ")
+    .toLowerCase();
+  return `${words}: ${value}`;
+}
+
 /** read_my items: their own records exactly as their page shows them. */
 function readMyFacts(
   data: unknown,
@@ -426,7 +443,7 @@ function readMyFacts(
     const details = Object.entries(item.facts)
       .filter(([, value]) => value !== null && value !== "")
       .slice(0, 8)
-      .map(([key, value]) => `${key}: ${String(value)}`)
+      .map(([key, value]) => detailWords(key, String(value)))
       .join("; ");
     return fact(
       SITUATION_TOOLS.readMy,

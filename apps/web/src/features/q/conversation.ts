@@ -530,6 +530,14 @@ export function turnsFrom(
  * saying nothing is honest, and "Reviewing the company" when nothing was
  * reviewed is not.
  */
+/** Every turn's first stage, shown the moment it is sent (live 2026-10-29). */
+export const FIRST_STAGE = "UNDERSTANDING_REQUEST" as const;
+
+/** The first stage's approved label, once the wire's labels are in. */
+export function firstStageLabel(): string | undefined {
+  return wireNow()?.Q_VISIBLE_STAGE_LABELS[FIRST_STAGE];
+}
+
 export function workingLabel(state: QStreamState): string | undefined {
   // W7: the labels come with the wire's contracts; until those are in
   // (a moment after the first paint), nothing is said rather than a guess.

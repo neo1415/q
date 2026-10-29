@@ -407,8 +407,18 @@ export function createBoardService(dependencies: {
       };
     },
 
-    add: async (actor, request, options) =>
-      transactions.run(async ({ sql }) => {
+    add: async (actor, request, options) => {
+      // workspace.board_items.idempotency_key is a uuid column. Live
+      // 2026-10-29: a plan's "plan:<id>:<v>:<step>:board" key failed in
+      // Postgres, the caller swallowed it, and the person was told their
+      // tasks were "already there" with none on the board. Refused here,
+      // before the database, with words that name the cause.
+      if (!z.uuid().safeParse(options.idempotencyKey).success) {
+        throw new TypeError(
+          "A board item's idempotency key must be a UUID (derive one from the caller's key).",
+        );
+      }
+      return transactions.run(async ({ sql }) => {
         await lockBoard(sql, actor);
         const existing = await sql`
           select ${itemColumns(sql)} from workspace.board_items
@@ -449,7 +459,8 @@ export function createBoardService(dependencies: {
           values (${actor.tenantId}, ${actor.userId}, ${row.id}, 1, 'ADDED',
                   ${options.by}, ${status})`;
         return { outcome: "OK", value: toItem(row), replayed: false };
-      }),
+      });
+    },
 
     update: async (actor, itemId, request, options) =>
       transactions.run(async ({ sql }) => {

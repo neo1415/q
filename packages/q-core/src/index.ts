@@ -1931,6 +1931,10 @@ export {
   V70_DIRECTS_WORK,
   V70_PLAN_ASK,
 } from "./prompts/tasks/turn-reader.v70.js";
+export {
+  TURN_READER_V71,
+  V71_PLAN_ASK,
+} from "./prompts/tasks/turn-reader.v71.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {
@@ -1942,6 +1946,12 @@ export {
   PLAN_WRITE_INVESTOR_EXAMPLE,
   PLAN_WRITE_V1,
 } from "./prompts/tasks/plan.v1.js";
+export {
+  PLAN_REVIEW_V2,
+  PLAN_WRITE_V2,
+  PLAN_WRITE_V2_CHECKLIST,
+  PLAN_WRITE_V2_STEP_EXAMPLE,
+} from "./prompts/tasks/plan.v2.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";
