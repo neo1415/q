@@ -1400,7 +1400,20 @@ export function workforceDeepResearch(dependencies: {
             lanes: [...one.lanes],
           }));
         state.lanes = [...state.lanes, ...result.lanes].slice(0, 40);
+        // A line the deadline or the search budget skipped never ran: it is
+        // not asked, so the next round asks it as planned (a scripted case A
+        // run lost INVESTMENT and OPPORTUNITIES this way, NO_NEW_QUERIES).
+        const neverRan = new Set(
+          result.lanes
+            .filter(
+              (lane) =>
+                lane.status === "SKIPPED_DEADLINE" ||
+                lane.status === "SKIPPED_BUDGET",
+            )
+            .map((lane) => lane.lane),
+        );
         for (const question of state.current) {
+          if (neverRan.has(question.lane)) continue;
           state.asked.push(question.query.toLowerCase());
           state.tries[question.lane] = (state.tries[question.lane] ?? 0) + 1;
         }

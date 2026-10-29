@@ -368,6 +368,18 @@ describe("research acceptance: a replay follows the recorded schedule", () => {
       (lane) => lane.status === "SKIPPED_DEADLINE",
     );
     expect(skipped.length).toBeGreaterThan(0);
+    // A line the deadline skipped never ran, so a later round asks it.
+    const lanes = recorded.dossier?.lanes ?? [];
+    for (const one of skipped) {
+      const after = lanes.slice(lanes.indexOf(one) + 1);
+      expect(
+        after.some(
+          (lane) =>
+            lane.lane === one.lane && lane.status !== "SKIPPED_DEADLINE",
+        ),
+        `${one.lane} ran in a later round`,
+      ).toBe(true);
+    }
     expect(recorded.content).not.toBeNull();
 
     const replayed = await replayCase(caseA, fixtures);
