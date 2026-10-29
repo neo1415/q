@@ -98,11 +98,17 @@ import {
   inTurnLanguage,
 } from "@capital-q/q-core";
 import {
+  buildShownSheet,
   closestByName,
   eligibleCapabilities,
   Q_CAPABILITIES,
+  SPREADSHEET_ARTIFACT_TYPE,
+  spreadsheetReceipt,
+  spreadsheetSections,
+  tabularBlocks,
   type GetInvestorMandateOutput,
   type QCapability,
+  type TabularBlock,
   toolAreaOf,
   zoneFromWords,
 } from "@capital-q/q-tools";
@@ -2300,6 +2306,8 @@ export function createSpecialistQAnswer(
     answer: string,
     question: string | undefined,
     history?: readonly QConversationMessage[],
+    /** XLSX-002: the table the answer showed, written into the document. */
+    table?: TabularBlock,
   ): Promise<DocumentReply> {
     const document = composeAnswerDocument({
       answer,
@@ -2308,6 +2316,7 @@ export function createSpecialistQAnswer(
         history === undefined
           ? null
           : await subjectOfAnswer(request, history, question ?? ""),
+      ...(table === undefined ? {} : { table }),
     });
     if (document === null) {
       return {
@@ -2939,9 +2948,12 @@ export function createSpecialistQAnswer(
    * The answer Q gave before this turn, and what it answered: the one a
    * "put that in a PDF" means.
    */
-  function previousAnswer(
-    history: readonly QConversationMessage[],
-  ): { readonly answer: string; readonly question?: string } | null {
+  function previousAnswer(history: readonly QConversationMessage[]): {
+    readonly answer: string;
+    readonly question?: string;
+    readonly messageId: string;
+    readonly blocks: readonly QResultBlock[];
+  } | null {
     const latestUser = history.findLastIndex((m) => m.role === "USER");
     const before = latestUser < 0 ? history : history.slice(0, latestUser);
     const at = before.findLastIndex(
@@ -2954,7 +2966,94 @@ export function createSpecialistQAnswer(
     return {
       answer: answer.content,
       ...(asked === undefined ? {} : { question: asked.content }),
+      messageId: answer.id,
+      blocks: answer.blocks ?? [],
     };
+  }
+
+  /**
+   * XLSX-002 (live 2026-10-28: "put that side-by-side thing … into a file I
+   * can send to the committee" made a PDF that said the comparison was "on
+   * screen"). The reader read an export of Q's earlier answer; when that
+   * answer showed a table, a comparison or cards, its file is a
+   * spreadsheet (Excel and CSV) first, built by code from the block, and a
+   * PDF holding the same table beside it as the alternative. Null: the
+   * answer showed nothing tabular, so the PDF alone is the file.
+   */
+  async function fileTabularAnswer(
+    request: QAnswerRequest,
+    preparation: ArtifactPreparation,
+    previous: NonNullable<ReturnType<typeof previousAnswer>>,
+    history: readonly QConversationMessage[],
+  ): Promise<DocumentReply | null> {
+    const table = tabularBlocks(previous.blocks)[0];
+    if (table === undefined) return null;
+    const built = buildShownSheet(
+      [table],
+      {
+        messageId: previous.messageId,
+        today: new Date().toISOString().slice(0, 10),
+      },
+      {},
+    );
+    const pdf = await fileAnswer(
+      request,
+      preparation,
+      previous.answer,
+      previous.question,
+      history,
+      table,
+    );
+    if (built === null) return pdf;
+    await showStage(request, "PREPARING_DOCUMENT");
+    try {
+      const summary = await preparation.port.prepare({
+        actorContext: request.actor,
+        permittedContextPlan: request.plan,
+        qRunId: request.runId,
+        artifactType: SPREADSHEET_ARTIFACT_TYPE,
+        content: {
+          title: built.title,
+          summary: built.summary,
+          content: {
+            sections: spreadsheetSections(built),
+            gaps: [...built.gaps],
+            workbook: built.workbook,
+          },
+        },
+      });
+      const pdfCards = (pdf.blocks ?? []).filter(
+        (block) => block.kind === "ARTIFACT_REFERENCE",
+      );
+      return {
+        content: [
+          spreadsheetReceipt(built),
+          pdfCards.length > 0
+            ? "The second card is a PDF with the same table, if the committee would rather have one."
+            : null,
+        ]
+          .filter((line): line is string => line !== null)
+          .join(" "),
+        blocks: [
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: summary.artifactId,
+            type: summary.type,
+            status: summary.status,
+            title: summary.title,
+          },
+          ...pdfCards,
+        ],
+      };
+    } catch (error: unknown) {
+      if (request.signal?.aborted === true) throw error;
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "a shown table could not be filed as a spreadsheet",
+      );
+      // The PDF, which holds the same table, still stands.
+      return pdf;
+    }
   }
 
   /**
@@ -3041,12 +3140,15 @@ export function createSpecialistQAnswer(
             "I haven't answered anything in this conversation yet, so there's nothing to put in a document. Ask me what you want it to say and I'll write it and make the PDF.",
         };
       }
-      return fileAnswer(
-        request,
-        artifacts,
-        previous.answer,
-        previous.question,
-        history,
+      return (
+        (await fileTabularAnswer(request, artifacts, previous, history)) ??
+        fileAnswer(
+          request,
+          artifacts,
+          previous.answer,
+          previous.question,
+          history,
+        )
       );
     }
     // A Q_REPORT is written by the answer first (answerThenFile).

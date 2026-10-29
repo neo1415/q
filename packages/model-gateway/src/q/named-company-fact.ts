@@ -349,10 +349,14 @@ const REQUEST_OBJECT =
  * "Ledgerfold is raising?" still is.
  */
 function opensARequest(text: string, at: number, match: string): boolean {
-  if (/\s/u.test(match)) return false;
-  const before = text.slice(0, at);
-  if (!/(?:^|[.!?]\s+|\n\s*)$/u.test(before)) return false;
+  if (!opensASentence(text, at, match)) return false;
   return REQUEST_OBJECT.test(text.slice(at + match.length));
+}
+
+/** One word at the start of a sentence: its capital may be grammar's. */
+function opensASentence(text: string, at: number, match: string): boolean {
+  if (/\s/u.test(match)) return false;
+  return /(?:^|[.!?]\s+|\n\s*)$/u.test(text.slice(0, at));
 }
 
 /**
@@ -361,17 +365,37 @@ function opensARequest(text: string, at: number, match: string): boolean {
  * is only a search term: nothing is read unless the search, under the
  * plan, returns exactly one visible company of exactly that name.
  */
-export function companyNameCandidates(text: string, max = 2): string[] {
+export function companyNameCandidates(
+  text: string,
+  max = 2,
+  /**
+   * XLSX-002 (live 2026-10-28: "My partner wants to go through…" searched
+   * "My" as a company): the names the turn's reader heard (namedOther,
+   * the names of a comparison). Given, a single word that opens a
+   * sentence -- capitalised by grammar as much as by name -- is a
+   * candidate only when the reader heard it named; a word list never
+   * decides it. Absent: every capitalised word is, as before.
+   */
+  heard?: readonly string[],
+): string[] {
   const found: string[] = [];
   const pattern =
     /\b\p{Lu}[\p{L}\p{N}&'-]*(?:\s+(?:\p{Lu}[\p{L}\p{N}&'-]*|\p{N}+))*/gu;
   const said = text.replace(/[’]/gu, "'");
+  const named = new Set((heard ?? []).map((name) => nameKey(name)));
   for (const match of said.matchAll(pattern)) {
     if (opensARequest(said, match.index, match[0])) continue;
     const words = match[0]
       .split(/\s+/u)
       .filter((word) => !NOT_COMPANY_WORDS.has(word.toLowerCase()));
     const name = words.join(" ").replace(/'s$/u, "").trim();
+    if (
+      heard !== undefined &&
+      opensASentence(said, match.index, match[0]) &&
+      !named.has(nameKey(name))
+    ) {
+      continue;
+    }
     if (name.length < 2 || words.length > 4) continue;
     if (!found.includes(name)) found.push(name);
     if (found.length >= max) break;

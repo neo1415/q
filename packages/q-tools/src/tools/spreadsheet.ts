@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import {
+  FIT_BAND_LABELS,
+  FIT_OUTCOME_LABELS,
+  fitScoreOutOf10,
+  MoneySchema,
   Q_TASK_CLASSES,
   QArtifactIdSchema,
   QArtifactStatusSchema,
@@ -21,18 +25,24 @@ import {
   type AnyQToolDefinition,
   type QToolAuthorization,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { actorWideScope, scopesOfKind } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
 import { createReadCompanyFiguresTool } from "./company-figures.js";
+import { createGetInvestorMandateTool } from "./get-investor-mandate.js";
 import {
+  buildComparisonCardsSheet,
   buildComparisonSheet,
   buildFiguresSheet,
   buildPipelineSheet,
   buildRankedSheet,
   buildTableSheet,
+  PIPELINE_FIT_COLUMNS,
+  spreadsheetReceipt,
   spreadsheetSections,
   type BuiltSpreadsheet,
   type FigureInput,
+  type PipelineFit,
+  type PipelineFitJoin,
   type SheetChoice,
 } from "./spreadsheet-build.js";
 
@@ -122,12 +132,18 @@ export const MakeSpreadsheetInputSchema = z
       .max(31)
       .optional()
       .describe("Optional name for the sheet, in their words."),
+    withFit: z
+      .boolean()
+      .optional()
+      .describe(
+        "PIPELINE only: true when they want how each company fits their mandate in it (mandate fit, cheque fit, stage fit, the round against their cheque), by what they mean in any words. Capital Q joins the fit it computes; you never write a fit.",
+      ),
     columns: z
       .array(z.string().trim().min(1).max(40))
       .max(24)
       .optional()
       .describe(
-        "Optional: keep only these columns. PIPELINE: counterparty, kind, stage, since, nextStep, lastMessageFrom, lastMessageOn. COMPANY_FIGURES: figure, statement, amount, number, percent, asOf, truthClass, evidence. SHOWN_RANKED_LIST: rank, name, line, raise, fit, measured, reasons, view. Omit for all.",
+        "Optional: keep only these columns. PIPELINE: counterparty, kind, stage, since, nextStep, lastMessageFrom, lastMessageOn, and with fit: fitScore, fitBand, chequeFit, chequeFitWhy, stageFit, round, chequeFrom, chequeTo, fitReasons. COMPANY_FIGURES: figure, statement, amount, number, percent, asOf, truthClass, evidence. SHOWN_RANKED_LIST: rank, name, line, raise, fit, measured, reasons, view. Omit for all.",
       ),
   })
   .strict()
@@ -135,7 +151,10 @@ export const MakeSpreadsheetInputSchema = z
     (input) =>
       (input.source === "COMPANY_FIGURES") === (input.companyId !== undefined),
     { message: "companyId is for COMPANY_FIGURES, and only for it" },
-  );
+  )
+  .refine((input) => input.withFit !== true || input.source === "PIPELINE", {
+    message: "withFit is for PIPELINE",
+  });
 export type MakeSpreadsheetInput = z.infer<typeof MakeSpreadsheetInputSchema>;
 
 const SpreadsheetDocumentSchema = z
@@ -148,6 +167,13 @@ const SpreadsheetDocumentSchema = z
   })
   .strict();
 
+/**
+ * `says`: Capital Q's own line for the reply, written by code from what
+ * was built (live 2026-10-28: the reply was only an offer). The answer
+ * path says it whatever the model writes; the model adds at most one offer.
+ */
+const SaysSchema = z.string().trim().min(1).max(900);
+
 export const MakeSpreadsheetOutputSchema = z.discriminatedUnion("status", [
   // The same shape as revise_my_document's, so the answer carries the
   // spreadsheet's card (QDocumentToolResultSchema).
@@ -155,15 +181,85 @@ export const MakeSpreadsheetOutputSchema = z.discriminatedUnion("status", [
     .object({
       status: z.literal("DOCUMENT_UPDATED"),
       document: SpreadsheetDocumentSchema,
+      says: SaysSchema.optional(),
     })
     .strict(),
   z
     .object({
       status: z.enum(["NOTHING_TO_PUT_IN_IT", "FAILED"]),
+      says: SaysSchema.optional(),
     })
     .strict(),
 ]);
+
+/** The fit reads whose call in this turn means the ask is about fit. */
+const FIT_READS: ReadonlySet<string> = new Set([
+  "fit_profile",
+  "fit_top_candidates",
+  "fit_compare",
+]);
+const FIT_KEYS: ReadonlySet<string> = new Set(
+  PIPELINE_FIT_COLUMNS.map((column) => column.key),
+);
+
+export const SPREADSHEET_NOTHING_LINE =
+  "There's nothing of that kind on your record to put in a spreadsheet, so I haven't made one.";
+export const SPREADSHEET_FAILED_LINE =
+  "I couldn't file the spreadsheet just now. Ask me again in a moment and I'll make it.";
+
+/** get_investor_mandate's own output, as far as the sheet reads it. */
+const ChequeReadSchema = z.object({
+  mandates: z.array(
+    z.object({
+      cheque: z
+        .object({
+          currency: z.string(),
+          min: z.string().optional(),
+          max: z.string().optional(),
+        })
+        .nullable(),
+    }),
+  ),
+});
+
+/** The fit service reads at most FIT_IDS_MAX companies a call. */
+const FIT_BATCH = 50;
+
+const FIT_NOT_AVAILABLE: Readonly<Record<string, string>> = {
+  NOT_INVESTOR: "fit with a mandate is for investors",
+  NO_MANDATE: "there is no active mandate to measure fit against yet",
+  NOT_AVAILABLE: "fit could not be read just now",
+};
 export type MakeSpreadsheetOutput = z.infer<typeof MakeSpreadsheetOutputSchema>;
+
+type FitItem = Extract<
+  Awaited<ReturnType<NonNullable<QToolPorts["fit"]>["profiles"]>>,
+  { kind: "OK" }
+>["items"][number];
+
+/** One company's fit, in the words every fit surface uses. */
+function pipelineFitOf(item: FitItem): PipelineFit {
+  const profile = item.assessment.profile;
+  const row = (parameter: "CHEQUE_SIZE" | "STAGE") => {
+    const found = profile.parameters.find((one) => one.parameter === parameter);
+    if (found === undefined) return null;
+    return {
+      // UNKNOWN is blank (not known), never a word that reads as a verdict.
+      outcome:
+        found.outcome === "UNKNOWN" ? null : FIT_OUTCOME_LABELS[found.outcome],
+      reason: found.reason,
+    };
+  };
+  const round = MoneySchema.safeParse(item.raise ?? null);
+  return {
+    score: fitScoreOutOf10(profile),
+    band: FIT_BAND_LABELS[profile.band],
+    cheque: row("CHEQUE_SIZE"),
+    stage: row("STAGE"),
+    reasons: profile.topReasons.map((reason) => reason.reason),
+    round: round.success ? round.data : null,
+  };
+}
 
 function ownConversation(
   actor: ActorContext,
@@ -219,6 +315,91 @@ export function createMakeSpreadsheetTool(
         });
   const today = () =>
     spreadsheet.today?.() ?? new Date().toISOString().slice(0, 10);
+  // Their cheque range is read exactly as get_investor_mandate reads it:
+  // its own authorize step (their own organisation only) decides.
+  const mandateTool = createGetInvestorMandateTool(ports);
+
+  /** Their declared cheque range, as money; null when not readable. */
+  const chequeOf = async (
+    context: Parameters<AnyQToolDefinition["execute"]>[1],
+  ): Promise<Extract<PipelineFitJoin, { kind: "JOINED" }>["cheque"]> => {
+    const scope = scopesOfKind(context.plan, "INVESTOR_MANDATE").find(
+      (one) =>
+        one.subject?.kind === "INVESTOR_ORGANISATION" &&
+        one.filter.investorOrganisationId !== undefined,
+    );
+    const investorOrganisationId = scope?.filter.investorOrganisationId;
+    if (investorOrganisationId === undefined) return null;
+    const args = { investorOrganisationId };
+    const decided = await mandateTool.authorize(args, context);
+    if (decided.outcome !== "ALLOW") return null;
+    const read = ChequeReadSchema.safeParse(
+      await mandateTool.execute(args, context, decided.grant),
+    );
+    const cheque = read.success ? read.data.mandates[0]?.cheque : null;
+    if (cheque === null || cheque === undefined) return null;
+    const asMoney = (amount: string | undefined) => {
+      const parsed = MoneySchema.safeParse({
+        amount,
+        currency: cheque.currency,
+      });
+      return parsed.success ? parsed.data : null;
+    };
+    return { from: asMoney(cheque.min), to: asMoney(cheque.max) };
+  };
+
+  /**
+   * Fit with their mandate for the companies in their pipeline, joined on
+   * the company id (live 2026-10-28: "cheque fit" was asked for and left
+   * out). Read through the fit service as this actor, under the same
+   * network scope the fit tools need; what it cannot read is said, never
+   * guessed.
+   */
+  const fitJoin = async (
+    context: Parameters<AnyQToolDefinition["execute"]>[1],
+    side: "INVESTOR" | "COMPANY" | "NONE",
+    companyIds: readonly string[],
+  ): Promise<PipelineFitJoin> => {
+    const fit = ports.fit;
+    if (side === "COMPANY") {
+      return {
+        kind: "NOT_AVAILABLE",
+        detail: FIT_NOT_AVAILABLE.NOT_INVESTOR ?? "",
+      };
+    }
+    if (
+      fit === undefined ||
+      actorWideScope(context.plan, "NETWORK_VISIBLE_DATA") === undefined
+    ) {
+      return {
+        kind: "NOT_AVAILABLE",
+        detail: FIT_NOT_AVAILABLE.NOT_AVAILABLE ?? "",
+      };
+    }
+    const byCompany = new Map<string, PipelineFit>();
+    for (let at = 0; at < companyIds.length; at += FIT_BATCH) {
+      const result = await fit
+        .profiles(context.actor, companyIds.slice(at, at + FIT_BATCH))
+        .catch(() => null);
+      if (result === null || result.kind !== "OK") {
+        return {
+          kind: "NOT_AVAILABLE",
+          detail:
+            FIT_NOT_AVAILABLE[result?.kind ?? "NOT_AVAILABLE"] ??
+            FIT_NOT_AVAILABLE.NOT_AVAILABLE ??
+            "",
+        };
+      }
+      for (const item of result.items) {
+        byCompany.set(item.assessment.profile.companyId, pipelineFitOf(item));
+      }
+    }
+    return {
+      kind: "JOINED",
+      byCompany,
+      cheque: await chequeOf(context).catch(() => null),
+    };
+  };
 
   return defineQTool<MakeSpreadsheetInput, MakeSpreadsheetOutput, Grant>({
     id: MAKE_SPREADSHEET,
@@ -228,7 +409,7 @@ export function createMakeSpreadsheetTool(
     // where the turn is about documents, and whenever the reader names it.
     providerName: "make_spreadsheet",
     description:
-      "Makes a real Excel spreadsheet (.xlsx, also CSV) of their data and files it as their own private document with a download card: their pipeline, one company's stated figures, or a table, comparison or ranked list you already showed them in this conversation. Call it whenever they ask for a spreadsheet, an Excel, a sheet or a CSV of something. Code writes every cell from their records; you choose only the source, an optional sheet name and columns. NOTHING_TO_PUT_IN_IT: there is no such data (say so; never invent rows).",
+      "Makes a real Excel spreadsheet (.xlsx, also CSV) of their data and files it as their own private document with a download card: their pipeline, one company's stated figures, or a table, comparison or ranked list you already showed them in this conversation. Call it whenever they ask for a spreadsheet, an Excel, a sheet or a CSV of something. Code writes every cell from their records; you choose only the source, an optional sheet name and columns (and withFit for a pipeline with mandate or cheque fit). The result's `says` is Capital Q's own line -- what was made and what could not be filled -- and is said to them as written: do not repeat or restate it; add at most one short offer, or nothing. NOTHING_TO_PUT_IN_IT: there is no such data (never invent rows).",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [],
@@ -284,12 +465,29 @@ export function createMakeSpreadsheetTool(
                 : await ports.investorFeed
                     .decisions(context.actor, 100)
                     .catch(() => []);
+            // Fit is joined when they asked for it (the reader's call, or
+            // a fit column named) or this turn read fit already.
+            const wantFit =
+              input.withFit === true ||
+              (input.columns ?? []).some((key) => FIT_KEYS.has(key)) ||
+              (context.focus?.tools ?? []).some((name) => FIT_READS.has(name));
+            const items = own?.items ?? [];
+            const fit = wantFit
+              ? await fitJoin(context, own?.side ?? "NONE", [
+                  ...new Set(
+                    items
+                      .filter((item) => item.counterpart.kind === "COMPANY")
+                      .map((item) => item.counterpart.id),
+                  ),
+                ])
+              : undefined;
             return buildPipelineSheet(
               {
                 side: own?.side ?? "NONE",
-                relationships: own?.items ?? [],
+                relationships: items,
                 decisions,
                 today: day,
+                fit,
               },
               choice,
             );
@@ -350,7 +548,17 @@ export function createMakeSpreadsheetTool(
                   );
             }
             const shown = newestShown(answers, "COMPARISON");
-            if (shown === null) return null;
+            if (shown === null) {
+              // Named things set side by side as cards are a comparison too.
+              const cards = newestShown(answers, "COMPARISON_CARDS");
+              return cards === null
+                ? null
+                : buildComparisonCardsSheet(
+                    cards.block,
+                    { messageId: cards.messageId, today: day },
+                    choice,
+                  );
+            }
             const names =
               (await spreadsheet
                 .subjectNames?.(context.actor, shown.block.subjects)
@@ -363,7 +571,12 @@ export function createMakeSpreadsheetTool(
           }
         }
       })();
-      if (built === null) return { status: "NOTHING_TO_PUT_IN_IT" };
+      if (built === null) {
+        return {
+          status: "NOTHING_TO_PUT_IN_IT",
+          says: SPREADSHEET_NOTHING_LINE,
+        };
+      }
       const filed = await spreadsheet.file({
         actor: context.actor,
         runId: context.runId,
@@ -380,8 +593,12 @@ export function createMakeSpreadsheetTool(
         title: filed.title.slice(0, 160),
       });
       return document.success
-        ? { status: "DOCUMENT_UPDATED", document: document.data }
-        : { status: "FAILED" };
+        ? {
+            status: "DOCUMENT_UPDATED",
+            document: document.data,
+            says: spreadsheetReceipt(built),
+          }
+        : { status: "FAILED", says: SPREADSHEET_FAILED_LINE };
     },
   });
 }

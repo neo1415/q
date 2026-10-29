@@ -18,6 +18,9 @@ import {
   createMakeSpreadsheetTool,
   createQToolExecutor,
   createQToolRegistry,
+  SPREADSHEET_NOTHING_LINE,
+  spreadsheetReceipt,
+  type PipelineFit,
   type ShownAnswer,
   type SpreadsheetPort,
 } from "../src/index.js";
@@ -77,9 +80,10 @@ describe("the builders", () => {
     expect(built).not.toBeNull();
     const sheet = built?.workbook.sheets[0];
     expect(sheet?.name).toBe("Pipeline");
+    // Every counterparty is an investor: no column of one repeated word.
+    expect(sheet?.columns.map((c) => c.key)).not.toContain("kind");
     expect(sheet?.rows[0]).toEqual([
       "Zino Aviation Capital",
-      "Investor",
       "In diligence",
       "2026-10-01",
       "Decide next step",
@@ -87,7 +91,7 @@ describe("the builders", () => {
       "2026-10-07",
     ]);
     // No next step, an unread chat: blanks, not "None" or "No messages".
-    expect(sheet?.rows[1]?.slice(4)).toEqual([null, null, null]);
+    expect(sheet?.rows[1]?.slice(3)).toEqual([null, null, null]);
     expect(built?.workbook.sources[0]).toMatchObject({
       sheet: "Pipeline",
       truthClass: "VERIFIED",
@@ -421,6 +425,7 @@ describe("make_spreadsheet", () => {
     const outcome = await run({ source: "SHOWN_COMPARISON" });
     expect((outcome.result as { data: unknown }).data).toEqual({
       status: "NOTHING_TO_PUT_IN_IT",
+      says: SPREADSHEET_NOTHING_LINE,
     });
     expect(filed).toHaveLength(0);
   });
@@ -474,5 +479,369 @@ describe("make_spreadsheet's place in the offer", () => {
     expect(names({ areas: ["Documents"], tools: [] })[0]).toBe(
       "make_spreadsheet",
     );
+  });
+});
+
+// --- XLSX-002: live test of 2026-10-28 ------------------------------------
+
+/**
+ * "My partner wants to go through where we are with every company in our
+ * pipeline — stage, cheque fit, last contact and what's next": the sheet
+ * left cheque fit out though Q read fit in the same run, and the reply was
+ * only an offer. Fit is now joined on the company id, typed (money with
+ * its currency, the score a number), and the tool says what it made.
+ */
+const INV_REL_1 = "77777777-7777-4777-8777-777777777777";
+const INV_REL_2 = "88888888-8888-4888-8888-888888888888";
+const INV_REL_3 = "99999999-9999-4999-8999-999999999999";
+const CO_3 = "aaaaaaaa-0000-4000-8000-000000000003";
+
+const pipeline = [
+  {
+    relationshipId: INV_REL_1,
+    counterpart: { kind: "COMPANY" as const, id: CO_1, name: "MedTrail" },
+    state: "CONNECTED",
+    stateSince: "2026-10-03T09:00:00.000Z",
+    nextStep: "SCHEDULE_MEETING",
+    lastMessageRead: "OK" as const,
+    lastMessage: { from: "YOU" as const, at: "2026-10-04T10:00:00.000Z" },
+  },
+  {
+    relationshipId: INV_REL_2,
+    counterpart: { kind: "COMPANY" as const, id: CO_2, name: "Mizan" },
+    state: "INTEREST_EXPRESSED",
+    stateSince: "2026-10-28T09:00:00.000Z",
+    nextStep: "AWAIT_ANSWER",
+    lastMessageRead: "OK" as const,
+    lastMessage: null,
+  },
+];
+
+const fitOf = (over: Partial<PipelineFit> = {}): PipelineFit => ({
+  score: "9",
+  band: "Good fit",
+  cheque: { outcome: "Strong match", reason: "Your cheque fits the round." },
+  stage: { outcome: "Strong match", reason: "Seed is in your range." },
+  reasons: ["Stage", "Sector"],
+  round: { amount: "1500000", currency: "USD" },
+  ...over,
+});
+
+describe("XLSX-002 · the pipeline joins fit when it is asked for", () => {
+  it("joins fit on the company id: score a number, round and cheque as money with currency, unknown blank", () => {
+    const built = buildPipelineSheet(
+      {
+        side: "INVESTOR",
+        relationships: pipeline,
+        decisions: [],
+        today: TODAY,
+        fit: {
+          kind: "JOINED",
+          byCompany: new Map([
+            [CO_1, fitOf()],
+            // Mizan's round is not shared: cheque fit UNKNOWN, blank.
+            [
+              CO_2,
+              fitOf({
+                cheque: { outcome: null, reason: "Round not shared." },
+                round: null,
+              }),
+            ],
+          ]),
+          cheque: {
+            from: { amount: "250000", currency: "USD" },
+            to: { amount: "1000000", currency: "USD" },
+          },
+        },
+      },
+      // The model kept four columns; the fit asked for stays.
+      { columns: ["counterparty", "stage", "lastMessageOn", "nextStep"] },
+    );
+    const sheet = built?.workbook.sheets[0];
+    const keys = sheet?.columns.map((c) => c.key) ?? [];
+    expect(keys).toEqual([
+      "counterparty",
+      "stage",
+      "nextStep",
+      "lastMessageOn",
+      "fitScore",
+      "fitBand",
+      "chequeFit",
+      "chequeFitWhy",
+      "stageFit",
+      "round",
+      "chequeFrom",
+      "chequeTo",
+      "fitReasons",
+    ]);
+    const at = (key: string) => keys.indexOf(key);
+    expect(sheet?.columns[at("fitScore")]?.type).toBe("number");
+    expect(sheet?.rows[0]?.[at("fitScore")]).toBe("9");
+    expect(sheet?.rows[0]?.[at("chequeFit")]).toBe("Strong match");
+    expect(sheet?.rows[0]?.[at("round")]).toEqual({
+      amount: "1500000",
+      currency: "USD",
+    });
+    expect(sheet?.columns[at("chequeFrom")]).toMatchObject({
+      type: "money",
+      currency: "USD",
+    });
+    expect(sheet?.rows[1]?.[at("chequeFit")]).toBeNull();
+    expect(sheet?.rows[1]?.[at("round")]).toBeNull();
+    expect(QWorkbookSchema.safeParse(built?.workbook).success).toBe(true);
+    // Fit is sourced as Q's inference, never as verified history.
+    expect(
+      built?.workbook.sources.find((s) => s.truthClass === "Q_INFERENCE")
+        ?.columns,
+    ).toContain("Cheque fit");
+    expect(
+      built?.workbook.sources.find((s) => s.truthClass === "VERIFIED")?.columns,
+    ).not.toContain("Cheque fit");
+    // The receipt names the blanks it left.
+    expect(built).not.toBeNull();
+    if (built === null) return;
+    const said = spreadsheetReceipt(built);
+    expect(said).toMatch(/Pipeline \(2 rows; columns Counterparty, Stage/);
+    expect(said).toMatch(/Cheque fit: not known for 1 of 2 rows/);
+  });
+
+  it("says fit is not available, and why, when it cannot be joined; never a column of zeros", () => {
+    const built = buildPipelineSheet(
+      {
+        side: "INVESTOR",
+        relationships: pipeline,
+        decisions: [],
+        today: TODAY,
+        fit: {
+          kind: "NOT_AVAILABLE",
+          detail: "there is no active mandate to measure fit against yet",
+        },
+      },
+      {},
+    );
+    expect(built).not.toBeNull();
+    if (built === null) return;
+    expect(built.workbook.sheets[0]?.columns.map((c) => c.key)).not.toContain(
+      "chequeFit",
+    );
+    expect(built.unfilled).toContainEqual({
+      column: "Cheque fit",
+      why: "NOT_AVAILABLE",
+      detail: "there is no active mandate to measure fit against yet",
+    });
+    expect(spreadsheetReceipt(built)).toMatch(
+      /Cheque fit: not available \(there is no active mandate/,
+    );
+  });
+
+  it("keeps 'Company or investor' only when the pipeline holds both", () => {
+    const built = buildPipelineSheet(
+      {
+        side: "INVESTOR",
+        relationships: [
+          ...pipeline,
+          {
+            relationshipId: INV_REL_3,
+            counterpart: {
+              kind: "INVESTOR_ORGANISATION" as const,
+              id: CO_3,
+              name: "Halyard Ventures",
+            },
+            state: "CONNECTED",
+            stateSince: "2026-10-03T09:00:00.000Z",
+            nextStep: "NONE",
+            lastMessageRead: "OK" as const,
+            lastMessage: null,
+          },
+        ],
+        decisions: [],
+        today: TODAY,
+      },
+      {},
+    );
+    const sheet = built?.workbook.sheets[0];
+    expect(sheet?.columns[1]?.label).toBe("Company or investor");
+    expect(sheet?.rows.map((row) => row[1])).toEqual([
+      "Company",
+      "Company",
+      "Investor",
+    ]);
+  });
+});
+
+function investorSetUp(
+  options: { readonly fitKind?: "OK" | "NO_MANDATE" } = {},
+) {
+  const filed: { title: string; content: QArtifactContent }[] = [];
+  const asked: string[][] = [];
+  const port: SpreadsheetPort = {
+    shownAnswers: () => Promise.resolve([]),
+    file: (input) => {
+      filed.push({ title: input.title, content: input.content });
+      return Promise.resolve({
+        artifactId: ARTIFACT,
+        type: "SPREADSHEET",
+        status: "READY",
+        title: input.title,
+        currentVersion: 1,
+      });
+    },
+    today: () => TODAY,
+  };
+  const parameter = (
+    name: string,
+    outcome: "STRONG" | "UNKNOWN",
+    reason: string,
+  ) => ({
+    parameter: name,
+    outcome,
+    reason,
+    evidenceStatus: null,
+    stale: false,
+    applicable: true,
+  });
+  const profile = (companyId: string) => ({
+    companyId,
+    configVersion: "ranking-config.v4",
+    configLabel: "4",
+    band: "GOOD_FIT",
+    confidence: "MEDIUM",
+    parameters: [
+      parameter("STAGE", "STRONG", "Seed is in your range."),
+      parameter("SECTOR", "STRONG", "Health is in your sectors."),
+      parameter("GEOGRAPHY", "STRONG", "Nigeria is in your geographies."),
+      parameter(
+        "CHEQUE_SIZE",
+        companyId === CO_1 ? "STRONG" : "UNKNOWN",
+        companyId === CO_1
+          ? "Your cheque fits the round."
+          : "Round not shared.",
+      ),
+      parameter("BUSINESS_MODEL", "UNKNOWN", "Not stated."),
+      parameter("TRACTION", "UNKNOWN", "Not stated."),
+      parameter("TEAM", "UNKNOWN", "Not stated."),
+      parameter("THESIS", "UNKNOWN", "Not stated."),
+      parameter("ROUND_TERMS", "UNKNOWN", "Not stated."),
+    ],
+    topReasons: [parameter("STAGE", "STRONG", "Seed is in your range.")],
+    mainMismatch: null,
+    hardRule: null,
+    computedAt: "2026-10-28T09:00:00.000Z",
+  });
+  const fit = {
+    profiles: (_actor: unknown, ids: readonly string[]) => {
+      asked.push([...ids]);
+      return Promise.resolve(
+        options.fitKind === "NO_MANDATE"
+          ? { kind: "NO_MANDATE" }
+          : {
+              kind: "OK",
+              items: ids.map((id) => ({
+                assessment: { profile: profile(id) },
+                name: id === CO_1 ? "MedTrail" : "Mizan",
+                line: null,
+                raise:
+                  id === CO_1 ? { amount: "1500000", currency: "USD" } : null,
+              })),
+            },
+      );
+    },
+    top: () => Promise.reject(new Error("not used")),
+    compare: () => Promise.reject(new Error("not used")),
+  } as unknown as QToolPorts["fit"];
+  const ports: QToolPorts = fakePorts({
+    fit,
+    relationships: {
+      ...fakePorts().relationships,
+      ownRelationships: () =>
+        Promise.resolve({
+          side: "INVESTOR",
+          items: pipeline.map((item) => ({
+            ...item,
+            counterpart: { ...item.counterpart },
+            milestones: [],
+            nextStep: item.nextStep as "NONE",
+            state: item.state as "CONNECTED",
+          })),
+        }),
+    } as QToolPorts["relationships"],
+  });
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry([createMakeSpreadsheetTool(ports, port)]),
+  });
+  const base = planFor(actorA, "GENERAL_QUESTION", [
+    { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+    { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+  ]);
+  const plan: PermittedContextPlan = {
+    ...base,
+    scopes: base.scopes.map((scope) =>
+      scope.kind === "OWN_Q_CONVERSATION"
+        ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+        : scope,
+    ),
+  };
+  const run = (
+    args: Record<string, unknown>,
+    focus?: { areas: string[]; tools: string[] },
+  ) =>
+    executor.execute(
+      { callId: "c-1", name: "make_spreadsheet", arguments: args },
+      {
+        ...contextFor(actorA, plan),
+        ...(focus === undefined ? {} : { focus }),
+      },
+    );
+  return { run, filed, asked };
+}
+
+describe("XLSX-002 · make_spreadsheet with fit, and its receipt", () => {
+  it("joins cheque fit when the reader asks for fit, and says what it made", async () => {
+    const { run, filed, asked } = investorSetUp();
+    const outcome = await run({ source: "PIPELINE", withFit: true });
+    expect(outcome.result.ok).toBe(true);
+    expect(asked).toEqual([[CO_1, CO_2]]);
+    const sheet = filed[0]?.content.workbook?.sheets[0];
+    const at = sheet?.columns.findIndex((c) => c.key === "chequeFit") ?? -1;
+    expect(at).toBeGreaterThan(0);
+    expect(sheet?.rows.map((row) => row[at])).toEqual(["Strong match", null]);
+    const round = sheet?.columns.findIndex((c) => c.key === "round") ?? -1;
+    expect(sheet?.rows[0]?.[round]).toEqual({
+      amount: "1500000",
+      currency: "USD",
+    });
+    // The card still rides on the answer, with code's own line.
+    const card = QDocumentToolResultSchema.parse(
+      (outcome.result as { data: unknown }).data,
+    );
+    expect(card.says).toMatch(/I've made “Pipeline” as an Excel spreadsheet/);
+    expect(card.says).toMatch(/Cheque fit/);
+  });
+
+  it("joins fit when this turn already read fit, without being told", async () => {
+    const { run, filed } = investorSetUp();
+    await run({ source: "PIPELINE" }, { areas: [], tools: ["fit_profile"] });
+    expect(
+      filed[0]?.content.workbook?.sheets[0]?.columns.map((c) => c.key),
+    ).toContain("chequeFit");
+  });
+
+  it("leaves fit out when nobody asked, and says it when it cannot be read", async () => {
+    const plain = investorSetUp();
+    await plain.run({ source: "PIPELINE" });
+    expect(plain.asked).toEqual([]);
+    expect(
+      plain.filed[0]?.content.workbook?.sheets[0]?.columns.map((c) => c.key),
+    ).not.toContain("chequeFit");
+
+    const none = investorSetUp({ fitKind: "NO_MANDATE" });
+    const outcome = await none.run({ source: "PIPELINE", withFit: true });
+    const card = QDocumentToolResultSchema.parse(
+      (outcome.result as { data: unknown }).data,
+    );
+    expect(card.says).toMatch(
+      /Cheque fit: not available \(there is no active mandate/,
+    );
+    expect(none.filed[0]?.content.gaps.join(" ")).toMatch(/not in this sheet/);
   });
 });

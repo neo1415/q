@@ -29,9 +29,12 @@ import {
   type FakeBehaviour,
 } from "../src/index.js";
 import {
+  atMostOneOffer,
   CLIENT_ACTION_DONE_LINE,
   companyNameCandidates,
   createModelGatewayQAnswer,
+  documentReceiptOf,
+  heardNames,
   noAuthorisedContext,
   Q_TOOL_LOOP_MAX_CALLS,
   Q_TOOL_LOOP_MAX_ROUNDS,
@@ -844,6 +847,73 @@ describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
         status: "READY",
         title: "Alpha deck",
       },
+    ]);
+  });
+
+  it("XLSX-002: a spreadsheet's receipt is said first, and the model's words keep one offer", async () => {
+    const SHEET_OFFERED: QOfferedTool = {
+      toolName: "documents.own.spreadsheet",
+      toolVersion: 1,
+      classification: "SIDE_EFFECT",
+      definition: {
+        name: "make_spreadsheet",
+        description: "Makes a spreadsheet.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+      visibleStage: null,
+    };
+    const document = {
+      artifactId: "00000000-0000-4000-8000-00000000a112",
+      type: "SPREADSHEET",
+      status: "READY",
+      title: "Pipeline",
+      currentVersion: 1,
+    };
+    const says =
+      "I've made “Pipeline” as an Excel spreadsheet, with a CSV: Pipeline (12 rows; columns Counterparty, Stage, Cheque fit). Not filled: Cheque fit: not known for 3 of 12 rows, left blank.";
+    const tools = toolPort([SHEET_OFFERED], (p) => ({
+      ...succeeded(p, { status: "DOCUMENT_UPDATED", document, says }),
+      toolName: "documents.own.spreadsheet",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "x1",
+              name: "make_spreadsheet",
+              arguments: { source: "PIPELINE", withFit: true },
+            },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult(
+              "Should I add a tab of criteria? Want me to add the evidence gaps too?",
+            ),
+          ),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as {
+      message: { text: string; blocks?: unknown[] };
+    };
+    expect(last.message.text.startsWith(says)).toBe(true);
+    // One offer at most: the model's last question stays, the other goes.
+    expect(last.message.text).toContain(
+      "Want me to add the evidence gaps too?",
+    );
+    expect(last.message.text).not.toContain("Should I add a tab of criteria?");
+    expect(last.message.blocks).toEqual([
+      expect.objectContaining({
+        kind: "ARTIFACT_REFERENCE",
+        artifactId: document.artifactId,
+      }),
     ]);
   });
 
@@ -4039,6 +4109,74 @@ describe("a turn makes each read once", () => {
     expect(companyNameCandidates("Ledgerfold is raising?")).toEqual([
       "Ledgerfold",
     ]);
+  });
+
+  it("XLSX-002: a sentence's capitalised first word is a name only when the reader heard it", () => {
+    const ask =
+      "My partner wants to go through where we are with every company in our pipeline before Thursday.";
+    // Before the reading (a warmed read): "My" is never searched.
+    expect(companyNameCandidates(ask, 2, heardNames({}))).toEqual([]);
+    // The reader heard no company: still nothing.
+    expect(
+      companyNameCandidates(ask, 2, heardNames({ namedOther: null })),
+    ).toEqual([]);
+    // The reader heard Ledgerfold named: the opening word is a name.
+    expect(
+      companyNameCandidates(
+        "Ledgerfold is raising?",
+        2,
+        heardNames({ namedOther: { name: "Ledgerfold" } }),
+      ),
+    ).toEqual(["Ledgerfold"]);
+    // A name inside the sentence needs no reader to be a candidate.
+    expect(
+      companyNameCandidates("Tell me about Baridi", 2, heardNames({})),
+    ).toEqual(["Baridi"]);
+    // A comparison's names, heard by the reader, count too.
+    expect(
+      companyNameCandidates(
+        "Mizan or MedTrail?",
+        4,
+        heardNames({ compare: { names: ["Mizan", "MedTrail"] } }),
+      ),
+    ).toEqual(["Mizan", "MedTrail"]);
+  });
+
+  it("XLSX-002: a document tool's receipt, and one offer after it", () => {
+    const document = {
+      artifactId: "00000000-0000-4000-8000-00000000a113",
+      type: "SPREADSHEET",
+      status: "READY",
+      title: "Pipeline",
+      currentVersion: 1,
+    };
+    expect(
+      documentReceiptOf("make_spreadsheet", {
+        status: "DOCUMENT_UPDATED",
+        document,
+        says: "I've made it.",
+      }),
+    ).toBe("I've made it.");
+    expect(
+      documentReceiptOf("make_spreadsheet", {
+        status: "NOTHING_TO_PUT_IN_IT",
+        says: "Nothing to put in it.",
+      }),
+    ).toBe("Nothing to put in it.");
+    // Another tool's failure is not a document receipt.
+    expect(
+      documentReceiptOf("search_companies", { status: "FAILED", says: "x" }),
+    ).toBeNull();
+    expect(
+      documentReceiptOf("revise_my_document", {
+        status: "DOCUMENT_UPDATED",
+        document,
+      }),
+    ).toBeNull();
+    expect(atMostOneOffer("Done. Want A? Or B?")).toBe("Done. Or B?");
+    expect(atMostOneOffer("Want a tab of criteria?")).toBe(
+      "Want a tab of criteria?",
+    );
   });
 });
 

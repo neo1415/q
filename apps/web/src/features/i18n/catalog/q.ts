@@ -149,6 +149,11 @@ export const Q_AR: Readonly<Record<string, string>> = {
     "لأتمكن من معرفة أوقات فراغك وإضافة الدعوة. أحداث التقويم فقط؛ يمكنك فصله في أي وقت من الإعدادات.",
   Sources: "المصادر",
   "Swipe sideways to see every column.": "اسحب جانبياً لرؤية كل الأعمدة.",
+  "A first look. Open it for every row and column.":
+    "نظرة أولى. افتحه لرؤية كل الصفوف والأعمدة.",
+  "Nothing from this conversation yet": "لا شيء من هذه المحادثة بعد",
+  "What Q shows you here lands on this timeline. Your saved files are under Files.":
+    "ما يعرضه لك Q هنا يظهر على هذا الخط الزمني. ملفاتك المحفوظة تحت «الملفات».",
   "Still open": "ما زال مفتوحاً",
   Stop: "إيقاف",
   "Suggested questions": "أسئلة مقترحة",

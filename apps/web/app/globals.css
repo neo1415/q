@@ -4002,6 +4002,20 @@
   }
   .cq-stage-scroll {
     scrollbar-width: thin;
+    /* A row brought into view stops below the top line, never under it. */
+    scroll-padding-top: 16px;
+  }
+  /*
+   * XLSX-002 (live 2026-10-28, 390px): the Q page's top line wraps to two
+   * rows on a phone and the thread scrolled flush beneath it, so a
+   * message's first line looked covered by the Q / Chat / Board controls.
+   * The line ends with a hairline there, so the thread visibly starts
+   * below it.
+   */
+  @media (max-width: 639px) {
+    .cq-q-top-line {
+      border-bottom: 1px solid var(--cq-border-subtle);
+    }
   }
   .cq-stage-quiet,
   .cq-stage-control {

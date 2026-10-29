@@ -999,8 +999,12 @@ export function QConversationPanel({
           {/* The top line: history and the saved transcript, quiet. It
               wraps rather than overflow (live run 2026-10-28, 390px: the
               history button sat past the viewport's edge). */}
+          {/* XLSX-002 (live 2026-10-28, 390px): the thread scrolled flush
+              under the wrapped controls, so the top of a message read as
+              covered by them. The line keeps its own space below it and,
+              on a phone, a hairline where the thread begins. */}
           <div
-            className="flex flex-none flex-wrap items-center justify-between gap-x-2 gap-y-1 px-5 pt-4 sm:gap-x-3 sm:px-8"
+            className="cq-q-top-line flex flex-none flex-wrap items-center justify-between gap-x-2 gap-y-1 px-5 pt-4 pb-2 sm:gap-x-3 sm:px-8"
             data-q-top-line
           >
             {/* The scope, out of the input (R24). A phone's top bar already
