@@ -2263,6 +2263,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Memo",
   "Memo for {name}",
   "Memorandum and articles",
+  "Menu",
   "Merchant Payments",
   "Message",
   "Message Q",

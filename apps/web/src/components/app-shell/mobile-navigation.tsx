@@ -59,6 +59,9 @@ export function MobileNavigation() {
   const home = useHomeHref();
   const t = useT();
   const needsYou = useNeedsYou();
+  // Owner 2026-10-29: the tab bar stays on Discover only; everywhere else a
+  // phone opens like a chat, with the sections in the header's menu.
+  if (!isActiveRoute(pathname, "/discover")) return null;
 
   return (
     <nav aria-label={t("Primary")} className="cq-bottom-nav">
@@ -177,8 +180,7 @@ export function MobileMenu() {
             {MOBILE_NAVIGATION.map((item) => {
               const active = isActiveRoute(pathname, item.href);
               const Icon = item.icon;
-              const waiting =
-                item.href === WORK_NAVIGATION.href ? needsYou : 0;
+              const waiting = item.href === WORK_NAVIGATION.href ? needsYou : 0;
               return (
                 <li key={item.href}>
                   <IntentLink

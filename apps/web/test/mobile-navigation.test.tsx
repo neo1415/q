@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  MobileMenu,
   MobileNavigation,
   YouSheet,
 } from "../src/components/app-shell/mobile-navigation";
@@ -53,7 +54,20 @@ describe("MobileNavigation (option B, owner 2026-10-18)", () => {
     },
   );
 
-  it("marks Work current on every Work tab's own address", () => {
+  it("the tab bar is on Discover only (owner 2026-10-29); elsewhere the menu", () => {
+    pathname = "/discover";
+    const onDiscover = render(<MobileNavigation />);
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeTruthy();
+    onDiscover.unmount();
+    for (const path of ["/home", "/work", "/crm", "/explore"]) {
+      pathname = path;
+      const { container, unmount } = render(<MobileNavigation />);
+      expect(container.innerHTML).toBe("");
+      unmount();
+    }
+  });
+
+  it("the menu marks Work current on every Work tab's own address", () => {
     for (const path of [
       "/work",
       "/documents",
@@ -63,7 +77,8 @@ describe("MobileNavigation (option B, owner 2026-10-18)", () => {
       "/daily",
     ]) {
       pathname = path;
-      const { unmount } = render(<MobileNavigation />);
+      const { unmount } = render(<MobileMenu />);
+      fireEvent.click(screen.getByRole("button", { name: /Menu/u }));
       expect(
         screen.getByRole("link", { name: "Work" }).getAttribute("aria-current"),
       ).toBe("page");

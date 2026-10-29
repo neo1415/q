@@ -5524,9 +5524,15 @@
  * Owner 2026-10-28: no bottom navigation on a phone (the sections open
  * from the header's menu). Nothing reserves its height any more, so every
  * dock, composer and strip that sat above it settles at the bottom edge.
+ * Owner 2026-10-29: except Discover, which keeps the tab bar (its header
+ * hides over the video, so the menu would leave no way out); its height
+ * is reserved only while the bar is on the page.
  */
 :root {
   --cq-bottom-nav-height: 0px;
+}
+:root:has(.cq-bottom-nav) {
+  --cq-bottom-nav-height: 60px;
 }
 
 /*

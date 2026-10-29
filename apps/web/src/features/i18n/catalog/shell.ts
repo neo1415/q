@@ -4,6 +4,8 @@
  */
 export const SHELL_AR: Readonly<Record<string, string>> = {
   "Look at it": "اطّلع عليه",
+  // Mobile chat-first (owner 2026-10-29): the header's menu button.
+  Menu: "القائمة",
   // Home briefing lines with a name or a figure in them (patterns.ts).
   "{n} things wait for your approval": "{n} أمور بانتظار موافقتك",
   "You're connected with {name}": "أنت الآن على تواصل مع {name}",

@@ -17,6 +17,7 @@ import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
 import { FictionalNames } from "./fictional-names";
 import { GlobalQProvider } from "./global-q";
+import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
 import { Words } from "@/features/i18n/language";
 
@@ -119,6 +120,8 @@ export function AppShell({
             {children}
             <FictionalNames />
           </main>
+          {/* Discover only (owner 2026-10-29); null on every other page. */}
+          <MobileNavigation />
         </div>
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}
