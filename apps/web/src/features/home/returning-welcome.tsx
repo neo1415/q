@@ -69,12 +69,20 @@ function CardBody({ card }: { readonly card: ReturningCard }) {
   );
 }
 
+const RESUME_CARD: ReturningCard = {
+  id: "resume-setup",
+  title: "Finish setup with Q",
+  description: "Q picks up where you left off.",
+  action: { kind: "NAVIGATE", href: "/home" },
+};
+
 export function ReturningWelcome({
   greeting,
   cards,
   subject,
   briefing,
   setupReminders = 0,
+  resume,
 }: {
   readonly greeting: ReturningGreeting;
   readonly cards: readonly ReturningCard[];
@@ -84,6 +92,13 @@ export function ReturningWelcome({
   readonly briefing?: Promise<Briefing | null> | undefined;
   /** Today's setup reminder, as `setupRemindersWaiting` counts it. */
   readonly setupReminders?: 0 | 1 | undefined;
+  /**
+   * The way back into a setup still open, from the server's session state
+   * (live 2026-10-29: right after "continue later" Home had no way back,
+   * and on a fresh load it came only ~6 s later, with the briefing). Shown
+   * at once, never gated on the arrival read or the briefing's reads.
+   */
+  readonly resume?: { readonly href: string } | undefined;
 }) {
   const t = useT();
   const router = useRouter();
@@ -187,6 +202,17 @@ export function ReturningWelcome({
             {greeting.leftOff}
           </blockquote>
         </figure>
+      )}
+
+      {resume === undefined ||
+      shownCards.some((card) => card.id === "continue-setup") ? null : (
+        <Link
+          href={resume.href}
+          className={`${CARD_CLASS} max-w-(--cq-layout-narrow)`}
+          data-q-resume-setup
+        >
+          <CardBody card={RESUME_CARD} />
+        </Link>
       )}
 
       {/* The arrival briefing carries what waits on them; not said twice. */}

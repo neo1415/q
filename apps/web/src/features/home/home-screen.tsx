@@ -236,6 +236,11 @@ export async function HomeScreen({
           subject={askSubject(context)}
           briefing={briefing}
           setupReminders={setupRemindersWaiting(facts)}
+          resume={
+            unfinished === null
+              ? undefined
+              : { href: `/onboarding/${unfinished}?from=home` }
+          }
         />
       );
       welcomeLine = greeting.spoken;

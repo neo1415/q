@@ -270,6 +270,39 @@ export function withoutAnsweredQuestions(
     .trim();
 }
 
+/**
+ * The model's own `asking` names a step the record answered before this
+ * turn (live 2026-10-29: the deck's team size of 3 was kept, and Q still
+ * asked "how many people work at Ajali Health today, including the three
+ * founders?" -- a paraphrase no wording check matches). Decided by the
+ * step the reply declares, not by its words: its questions are taken out,
+ * and the backstop then asks what is really open. A step answered in this
+ * very turn may still be confirmed, so it is left alone.
+ */
+export function withoutAskOfAnswered(
+  reply: string,
+  asking: string | null | undefined,
+  state: OnboardingState,
+  recordedThisTurn: readonly string[],
+): string {
+  if (asking === null || asking === undefined) return reply;
+  if (recordedThisTurn.includes(asking)) return reply;
+  const step = state.steps.find((one) => one.stepKey === asking);
+  const answered =
+    step !== undefined &&
+    (step.status === "ANSWERED" ||
+      step.savePending === true ||
+      step.coveredBy !== undefined);
+  if (!answered) return reply;
+  const sentences = reply.match(/[^.?!؟]+[.?!؟]*/gu) ?? [reply];
+  return sentences
+    .filter((sentence) => !/[?؟]/u.test(sentence))
+    .filter((sentence) => sentence.trim() !== OPTIONAL_TAIL)
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Lower-case words only, single-spaced. */
 function normalWords(text: string): string {
   return text

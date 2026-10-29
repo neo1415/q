@@ -7,6 +7,7 @@ import {
   onboardingFlowFor,
   withNextQuestion,
   withoutAnsweredQuestions,
+  withoutAskOfAnswered,
 } from "../src/voice/onboarding-flow.js";
 
 const step = (
@@ -107,6 +108,34 @@ describe("onboarding flow (owner 2026-10-16)", () => {
       { "F1.description": "In a sentence or two, what does the company do?" },
     );
     expect(out).toBe("Your description and team are noted.");
+  });
+});
+
+// Live 2026-10-29: the deck's team size of 3 was kept (06:11:48), and at
+// 06:13 Q asked "how many people work at Ajali Health today, including the
+// three founders?" -- a paraphrase no wording check could match.
+describe("a reply whose declared question the record already answered", () => {
+  const answered = state(
+    [step("F4.team_size", { status: "ANSWERED" }), step("F4.full_time")],
+    [],
+  );
+  const reply =
+    "Thanks, Daniel. One final essential: how many people work at Ajali Health today, including the three founders?";
+
+  it("loses its question, so the backstop asks what is really open", () => {
+    expect(withoutAskOfAnswered(reply, "F4.team_size", answered, [])).toBe(
+      "Thanks, Daniel.",
+    );
+  });
+
+  it("keeps a question about a step still open, or answered in this turn", () => {
+    expect(withoutAskOfAnswered(reply, "F4.full_time", answered, [])).toBe(
+      reply,
+    );
+    expect(
+      withoutAskOfAnswered(reply, "F4.team_size", answered, ["F4.team_size"]),
+    ).toBe(reply);
+    expect(withoutAskOfAnswered(reply, null, answered, [])).toBe(reply);
   });
 });
 

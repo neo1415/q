@@ -117,3 +117,48 @@ describe("the setup reminder in Q's opener", () => {
     ).toBeTruthy();
   });
 });
+
+// Live 2026-10-29: right after "continue later", Home had no way back into
+// setup, and on a fresh load the card came ~6 s after "Welcome back" (it
+// waited on the arrival read and the briefing). It renders from the
+// server's session state on first paint.
+describe("the way back into an open setup", () => {
+  it("is on the first paint, before the arrival read answers", () => {
+    const quiet = { ...facts, setupReminder: undefined };
+    render(
+      <ReturningWelcome
+        greeting={returningGreeting(quiet)}
+        cards={chooseReturningCards(quiet)}
+        subject={undefined}
+        resume={{ href: "/onboarding/founder?from=home" }}
+      />,
+    );
+    const link = screen.getByRole("link", { name: /Finish setup with Q/u });
+    expect(link.getAttribute("href")).toBe("/onboarding/founder?from=home");
+  });
+
+  it("is not said twice beside today's continue card", async () => {
+    render(
+      <ReturningWelcome
+        greeting={returningGreeting(facts)}
+        cards={chooseReturningCards(facts)}
+        subject={undefined}
+        setupReminders={setupRemindersWaiting(facts)}
+        resume={{ href: "/onboarding/investor?from=home" }}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => {
+      typedOpenerAnswer("yes", false);
+    });
+    expect(
+      screen.getByRole("link", { name: /Continue your mandate/u }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("link", { name: /Finish setup with Q/u }),
+    ).toBeNull();
+  });
+});
