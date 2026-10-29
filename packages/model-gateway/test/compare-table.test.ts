@@ -594,3 +594,34 @@ describe("the table never holds strangers", () => {
     ]);
   });
 });
+
+// Stress 2026-10-28 (I06): LedgerBridge has no one-line description; its
+// "What they do" read "Not known" while its description, with "B2B" taken
+// for a number, sat under Traction.
+describe("a company with only a full description", () => {
+  it("says what it does from its description, and no traction from 'B2B'", () => {
+    const { read, fits } = run();
+    read.companyFacts.set(SILO, {
+      about: null,
+      description:
+        "LedgerBridge is a B2B payments platform for Nigerian merchants and distributors: it collects invoices, reconciles bank transfers and settles supplier payouts in one ledger. Fictional test company.",
+      stageCode: "SEED",
+      city: null,
+      country: "NG",
+      founded: null,
+      website: null,
+    });
+    const block = comparisonTableBlock({
+      question: "Compare Silo Credit and Mizan side by side",
+      read,
+      fits,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    const cells = (label: string) =>
+      block.rows.find((row) => row.label === label)?.cells;
+    expect(cells("What they do")?.[0]).toMatch(
+      /^LedgerBridge is a B2B payments platform for Nigerian merchants and distributors/u,
+    );
+    expect(cells("Traction")?.[0] ?? "").not.toMatch(/B2B payments platform/u);
+  });
+});

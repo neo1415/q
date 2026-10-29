@@ -262,12 +262,21 @@ export default async function CompanyPage({
             id="data-room"
             kind="DATA_ROOM"
             refs={
-              dataRoom.viewer === "OWNER"
-                ? dataRoom.documents.slice(0, 12).map((document) => ({
-                    kind: "UPLOADED_DOCUMENT" as const,
-                    id: document.documentId,
-                  }))
-                : []
+              // Stress 2026-10-28 (S02-post): an investor's documents open
+              // to them ride too, so Q reads a shared deck in chat as the
+              // job does. Ids only; the server reads each through the data
+              // room's own view, as them, and drops what is not theirs.
+              (dataRoom.viewer === "OWNER"
+                ? dataRoom.documents
+                : dataRoom.documents.filter(
+                    (document) => document.access === "OPEN",
+                  )
+              )
+                .slice(0, 12)
+                .map((document) => ({
+                  kind: "UPLOADED_DOCUMENT" as const,
+                  id: document.documentId,
+                }))
             }
             total={dataRoom.documents.length}
             labelOn="dataroom"

@@ -289,3 +289,74 @@ describe("read_document_pages (Q room W3)", () => {
     expect(decision.outcome).toBe("DENY");
   });
 });
+
+// Stress 2026-10-28 (F03, S02-F): the founder's highly confidential
+// management accounts are never read for Q; reading the deck says they are
+// held back, and reading them says so instead of their contents.
+describe("a held-back document beside the deck", () => {
+  const ACCOUNTS = "00000000-0000-4000-8000-00000000c009";
+  const held: MaterialDocument = {
+    ...doc(
+      ACCOUNTS,
+      "LedgerBridge financial report Sept 2026",
+      "Finance",
+      "MANAGEMENT_ACCOUNTS",
+      "OPEN",
+    ),
+    heldBack: true,
+  };
+  const read: string[] = [];
+  const withHeld: ProfileMaterialPort = {
+    ...material,
+    documents: (_actor, companyId) =>
+      Promise.resolve(companyId === COMPANY_B_NETWORK ? [...ROOM, held] : null),
+    documentPages: (_actor, _companyId, documentId) => {
+      read.push(documentId);
+      return Promise.resolve({
+        pageCount: 1,
+        pages: [{ page: 1, text: "MRR $65,000 (September 2026)" }],
+      });
+    },
+  };
+  const tool = createReadDocumentPagesTool(fakePorts(), withHeld);
+
+  it("says it is held back and reads nothing of it", async () => {
+    read.length = 0;
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({ status: "HELD_BACK" });
+    expect(JSON.stringify(decision.grant)).toMatch(/held back from Q/u);
+    expect(JSON.stringify(decision.grant)).toMatch(
+      /once the founder confirms/u,
+    );
+    expect(read).toEqual([]);
+  });
+
+  it("reading the deck names the held-back report beside it", async () => {
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: CERT },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      alsoHeldBack: { titles: ["LedgerBridge financial report Sept 2026"] },
+    });
+  });
+
+  it("read_company_document refuses its text too", async () => {
+    const reader = createReadCompanyDocumentTool(fakePorts(), withHeld);
+    const decision = await reader.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({ status: "HELD_BACK" });
+  });
+});

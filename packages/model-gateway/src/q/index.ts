@@ -397,6 +397,11 @@ import {
 } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import {
+  DATA_ROOM_FACTS_MAX_CHARS,
+  dataRoomDocumentFacts,
+  dataRoomDocumentReads,
+} from "./data-room-document-fact.js";
+import {
   attachedDocumentFacts,
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
@@ -3348,6 +3353,48 @@ export function createModelGatewayQAnswer(
     })();
     attachmentRead.catch(() => undefined);
     /**
+     * Stress 2026-10-28 (S02-post): the data-room documents on their screen
+     * -- the one open in a viewer, or, for a question about what documents
+     * or figures say, those the page's data room lists -- read for them
+     * through read_document_pages under this plan, as the asker, so a
+     * connected investor's chat reads a shared deck as the job does.
+     */
+    let dataRoomDocuments: readonly AuthorisedFact[] = [];
+    const dataRoomDocumentRead = (async (): Promise<void> => {
+      const reads = dataRoomDocumentReads({
+        screen: plan.screen,
+        question: latest?.content ?? "",
+      });
+      if (reads.length === 0) return;
+      const { names } = await prefetchToolsRead;
+      if (!names.has("read_document_pages")) return;
+      const outcomes = await Promise.all(
+        reads.map((read, index) =>
+          tools
+            .execute(
+              {
+                callId: `q-data-room-document-${String(index)}`,
+                name: "read_document_pages",
+                arguments: {
+                  companyId: read.companyId,
+                  documentId: read.documentId,
+                },
+              },
+              toolContext,
+            )
+            .catch(() => null),
+        ),
+      );
+      const share = Math.floor(DATA_ROOM_FACTS_MAX_CHARS / reads.length);
+      dataRoomDocuments = outcomes.flatMap((outcome, index) => {
+        const read = reads[index];
+        return outcome?.result.ok === true && read !== undefined
+          ? dataRoomDocumentFacts(outcome.result.data, read, share)
+          : [];
+      });
+    })();
+    dataRoomDocumentRead.catch(() => undefined);
+    /**
      * Coordinator 23 Oct 2026: "compare the top two side by side" right
      * after a list of cards read nothing, so no table. The companies it
      * means are the ones Q showed (compareTargets); each is read now, in
@@ -4481,10 +4528,16 @@ export function createModelGatewayQAnswer(
       timed("daily", dailyRead),
       timed("document", documentRead),
       timed("attachments", attachmentRead),
+      timed("data-room-documents", dataRoomDocumentRead),
       timed("compare", compareRead),
       timed("data-room", dataRoomRead),
       timed("page", pageRead),
     ]);
+    // The data room's documents ride with the attached ones: both are
+    // documents read for them, as them, before the model is asked.
+    if (dataRoomDocuments.length > 0) {
+      attachedDocuments = [...attachedDocuments, ...dataRoomDocuments];
+    }
     prepareMs["reads"] = Date.now() - prepareStarted;
     /**
      * S2: the wide reads -- their standing, the companies a message names,
@@ -7405,7 +7458,12 @@ export function createModelGatewayQAnswer(
                   tools,
                   context: toolContext,
                   // The executor authorises each read under this run's plan.
-                  available: new Set(["search_companies", "fit_profile"]),
+                  available: new Set([
+                    "search_companies",
+                    "fit_profile",
+                    "get_company",
+                  ]),
+                  mandate: prepared.ownMandateData() ?? undefined,
                 }).catch(() => null)
               : null;
           const message = await persistCodeAnswer(

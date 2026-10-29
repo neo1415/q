@@ -5206,6 +5206,18 @@ const workforceDocuments = createWorkforceDocuments({
     },
     records: ownRecords,
     relationships: errandRelationships.ownRelationships,
+    // J7 (stress 2026-10-28): the history of the relationship a document
+    // is about, from the Relationship Brief as the person's side sees it.
+    brief: (actor, relationshipId) =>
+      interestService.relationshipBrief({
+        actor,
+        relationshipId,
+        sources: createRelationshipBriefSources({
+          chat,
+          schedule,
+          diligence: diligenceService,
+        }),
+      }),
   }),
   // Diligence (2026-10-28): the data room as the Data room tab authorises
   // it for this person -- the same reads Q's chat tools use.

@@ -258,10 +258,13 @@ describe("approval by words, read by code", () => {
     expect(calls.approve).toEqual([]);
   });
 
-  it("a plain 'yes' alone is left to the reading of meaning", async () => {
+  // Stress 2026-10-28 (J7-I; the acceptance bank's rule): a bare yes with
+  // exactly one card waiting approves it by code, with no model reading.
+  it("a plain 'yes' alone approves the one card waiting, by code", async () => {
     const { value, calls } = port([FOLLOW_UP]);
     await decidePending(value, turn("yes"));
-    expect(calls.read).toBe(1);
+    expect(calls.read).toBe(0);
+    expect(calls.approve).toEqual(["f1"]);
   });
 });
 
@@ -357,11 +360,25 @@ describe("a plain yes or no to Q's own ask about the one card (live 2026-10-28, 
     });
   });
 
-  it("a yes when Q's last line asked something else answers that question, never the card", async () => {
+  // Stress 2026-10-28 (J7-I; the acceptance bank's rule): with exactly one
+  // card waiting, a bare yes approves it even after Q asked something
+  // else; more than the bare yes answers Q's question.
+  it("a bare yes when Q's last line asked something else approves the one card waiting", async () => {
+    const { value, calls } = port([MANDATE]);
+    await decidePending(
+      value,
+      turn("yes", [
+        { role: "Q", text: "Shall I also look at their latest round?" },
+      ]),
+    );
+    expect(calls.approve).toEqual(["md1"]);
+  });
+
+  it("a yes with more, after Q asked something else, answers that question, never the card", async () => {
     const { value, calls } = port([MANDATE]);
     const outcome = await decidePending(
       value,
-      turn("yes", [
+      turn("yes, and their cap table", [
         { role: "Q", text: "Shall I also look at their latest round?" },
       ]),
     );

@@ -596,6 +596,7 @@ export {
   ReadMyOutputSchema,
   referenceCandidates,
   unmatchedWords,
+  closestDocument,
   type AppApprovalPort,
   type AppToolOutput,
 } from "./tools/app-actions.js";
@@ -663,6 +664,7 @@ export {
   type FillProfileGapsOutput,
 } from "./tools/profile-gaps.js";
 export { isKnownTimeZone, zoneFromWords } from "./tools/local-time.js";
+export { briefFacts } from "./tools/relationship-brief-facts.js";
 export {
   createInboundEmailTools,
   createListMyInboundEmailsTool,

@@ -160,7 +160,10 @@ function describedTraction(description: string | null | undefined): string {
     .split(/(?<=[.!?])\s+/u)
     .filter(
       (sentence) =>
-        /\d/u.test(sentence) &&
+        // A number standing on its own ("140", "$65,000", "₦38m"), never a
+        // digit inside a word: stress 2026-10-28 (I06) put LedgerBridge's
+        // "B2B payments platform" line under Traction.
+        /(?<![\p{L}\d])\d/u.test(sentence) &&
         TRACTION_KEYS.some((pattern) => pattern.test(sentence)),
     )
     .slice(0, 2)
@@ -168,6 +171,12 @@ function describedTraction(description: string | null | undefined): string {
     .join("; ")
     .slice(0, 300);
   return said.length === 0 ? "" : `${said} (company-stated, profile)`;
+}
+
+/** A description's first sentence, for "What they do"; "" when none. */
+function openingOf(description: string | null | undefined): string {
+  const first = (description ?? "").trim().split(/(?<=[.!?])\s+/u)[0] ?? "";
+  return first.replace(/[.\s]+$/u, "");
 }
 
 function tractionCell(
@@ -291,9 +300,21 @@ export function comparisonTableBlock(input: {
   const candidates = [
     {
       label: "What they do",
+      // Stress 2026-10-28 (I06): a company with no one-line description
+      // read "Not known" here while its full description sat under
+      // Traction. Its own description's opening stands in for the line.
       cells: columns.map((id) =>
         stated(
-          (facts(id)?.about ?? fitById.get(id)?.about ?? "").slice(0, 300),
+          (
+            [
+              facts(id)?.about,
+              fitById.get(id)?.about,
+              openingOf(facts(id)?.description),
+            ].find(
+              (line): line is string =>
+                typeof line === "string" && line.trim().length > 0,
+            ) ?? ""
+          ).slice(0, 300),
         ),
       ),
     },
