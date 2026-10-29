@@ -143,6 +143,9 @@ const STAGE_WEIGHT: Readonly<Record<WorkforceLiveStageName, number>> = {
   READING_DOCUMENTS: 0.25,
   PLANNING: 0.5,
   REVIEWING_PLAN: 0.75,
+  // Investigation-grade research (2026-10-29).
+  PLANNING_RESEARCH: 0.06,
+  CROSS_CHECKING: 0.4,
 };
 
 /**
@@ -164,7 +167,23 @@ export function liveFraction(live: WorkforceLive | null): number {
 export function liveLine(stage: WorkforceLiveStage | null): string {
   if (stage === null) return "Planning the work";
   switch (stage.stage) {
+    case "PLANNING_RESEARCH":
+      return stage.round == null || stage.round <= 1
+        ? "Planning the investigation"
+        : `Round ${String(stage.round)}: planning the open questions`;
+    case "CROSS_CHECKING":
+      return "Cross-checking sources";
     case "SEARCHING":
+      // A later research round checks the questions still open.
+      if (
+        stage.round != null &&
+        stage.round > 1 &&
+        stage.questions !== null &&
+        stage.questions > 0
+      )
+        return stage.questions === 1
+          ? `Round ${String(stage.round)}: checking 1 open question`
+          : `Round ${String(stage.round)}: checking ${String(stage.questions)} open questions`;
       return stage.questions === null || stage.questions === 0
         ? "Researching the question"
         : stage.questions === 1
@@ -453,7 +472,9 @@ export function WorkLiveProgress({
   const sections = stage?.sections ?? [];
   const writing =
     stage === null ||
+    stage.stage === "PLANNING_RESEARCH" ||
     stage.stage === "SEARCHING" ||
+    stage.stage === "CROSS_CHECKING" ||
     stage.stage === "READING" ||
     stage.stage === "DRAFTING" ||
     stage.stage === "GATHERING" ||

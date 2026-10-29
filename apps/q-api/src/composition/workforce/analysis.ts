@@ -11,7 +11,18 @@ import type {
   AnalysisDocumentResult,
 } from "@capital-q/q-core";
 
-import type { ResearchDossier, Spend } from "./deep-research.js";
+import {
+  PUBLIC_SEARCH_LIMITS,
+  type PrimaryKind,
+  type SourceTier,
+} from "@capital-q/q-research";
+
+import type {
+  CapitalQRecord,
+  InvestigationSummary,
+  ResearchDossier,
+  Spend,
+} from "./deep-research.js";
 import type { PublicSourcesGap } from "./jobs.js";
 import { safeReport, type LiveReport } from "./live.js";
 import type { Trace, Who, WorkforceModels } from "./models.js";
@@ -42,6 +53,9 @@ export type AnalysisSource = {
   readonly domain: string;
   readonly title: string | null;
   readonly publishedAt: string | null;
+  /** Investigation (2026-10-29): the publisher's tier, when known. */
+  readonly tier?: SourceTier | undefined;
+  readonly tierKind?: PrimaryKind | null | undefined;
 };
 
 export type AnalysisFact = ResearchDossier["facts"][number];
@@ -52,9 +66,14 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
   readonly facts: readonly AnalysisFact[];
   /** A research step's search budget narrowed what it searched. */
   readonly budgetLimited: boolean;
+  /** Investigation (2026-10-29): how each step's investigation went. */
+  readonly investigations: readonly InvestigationSummary[];
+  /** Capital Q records the person may see, kept apart from web facts. */
+  readonly records: readonly CapitalQRecord[];
 } {
   const sources: AnalysisSource[] = [];
   const facts: AnalysisFact[] = [];
+  const records: CapitalQRecord[] = [];
   let offset = 0;
   let factNumber = 0;
   for (const dossier of dossiers) {
@@ -65,13 +84,33 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
     for (const source of dossier.sources) {
       sources.push({ ...source, index: source.index + offset });
     }
+    // A fact's cross-check names others of its own dossier: renumbered
+    // with them.
+    const renamed = new Map<string, string>();
+    dossier.facts.forEach((fact, position) => {
+      renamed.set(fact.id, `F${String(factNumber + position + 1)}`);
+    });
+    const rename = (ids: readonly string[] | undefined) =>
+      ids === undefined
+        ? undefined
+        : ids
+            .map((id) => renamed.get(id))
+            .filter((id): id is string => id !== undefined);
     for (const fact of dossier.facts) {
       factNumber += 1;
+      const corroboratedBy = rename(fact.corroboratedBy);
+      const contradicts = rename(fact.contradicts);
       facts.push({
         ...fact,
         id: `F${String(factNumber)}`,
         source: fact.source + offset,
+        ...(corroboratedBy === undefined ? {} : { corroboratedBy }),
+        ...(contradicts === undefined ? {} : { contradicts }),
       });
+    }
+    for (const record of dossier.records ?? []) {
+      if (!records.some((one) => one.companyId === record.companyId))
+        records.push(record);
     }
     offset += top;
   }
@@ -79,7 +118,49 @@ export function mergeDossiers(dossiers: readonly ResearchDossier[]): {
     sources,
     facts,
     budgetLimited: dossiers.some((dossier) => dossier.budgetLimited === true),
+    investigations: dossiers.flatMap((dossier) =>
+      dossier.investigation === undefined ? [] : [dossier.investigation],
+    ),
+    records,
   };
+}
+
+/** How a fact's tier, evidence and status read to the writer. */
+function factStanding(fact: AnalysisFact): string | null {
+  if (fact.tier === undefined && fact.evidenceStatus === undefined) return null;
+  const tier =
+    fact.tier === "PRIMARY"
+      ? fact.tierKind === "COMPANY_DISCLOSURE"
+        ? "primary: the company's own claim"
+        : "primary: official"
+      : fact.tier === "SECONDARY"
+        ? "secondary"
+        : "other source";
+  const evidence =
+    fact.evidenceStatus === "MULTI_SOURCE_SUPPORTED"
+      ? `several independent sources (with ${(fact.corroboratedBy ?? []).join(", ")})`
+      : fact.evidenceStatus === "SELF_REPORTED"
+        ? "the company's own claim"
+        : "one source";
+  const status =
+    fact.lifecycleStatus === "CONTRADICTORY"
+      ? `CONTRADICTORY: disagrees with ${(fact.contradicts ?? []).join(", ")}`
+      : fact.lifecycleStatus === "STALE"
+        ? "STALE: out of date for this line of enquiry"
+        : "current";
+  return `${tier}; ${evidence}; ${status}`;
+}
+
+/** Capital Q's own records, as the writer reads them: never web facts. */
+export function recordsText(records: readonly CapitalQRecord[]): string {
+  if (records.length === 0) return "";
+  return [
+    "CAPITAL Q RECORDS (companies on Capital Q the person may see; each is the company's own declared profile, not verified and not a recommendation; never cite them as [S n]):",
+    ...records.map(
+      (record) =>
+        `- ${record.name}${record.stage === null ? "" : ` (${record.stage})`}${record.country === null ? "" : `, ${record.country}`}${record.description === null ? "" : `: ${record.description.slice(0, 300)}`}`,
+    ),
+  ].join("\n");
 }
 
 export function researchText(
@@ -95,20 +176,41 @@ export function researchText(
     return "NO PUBLIC SOURCES FOUND: the searches found nothing public for this. Write from Capital Q's records and the person's own documents only; what only public sources could tell is not known -- say so, never invent it.";
   if (facts.length === 0)
     return "No public research was available for this document.";
-  return facts
-    .map(
-      (fact) =>
-        `${fact.id} [S${String(fact.source)}] (${fact.lane}, ${fact.kind}${fact.asOf === null ? "" : `, as of ${fact.asOf}`}) ${fact.statement}`,
-    )
+  const lines = facts.map((fact) => {
+    const standing = factStanding(fact);
+    return `${fact.id} [S${String(fact.source)}] (${fact.lane}, ${fact.kind}${fact.asOf === null ? "" : `, as of ${fact.asOf}`}${standing === null ? "" : `; ${standing}`}) ${fact.statement}`;
+  });
+  // Investigation (2026-10-29): code cross-checked these facts.
+  const investigated = facts.some((fact) => fact.evidenceStatus !== undefined);
+  return (
+    investigated
+      ? [
+          "INVESTIGATION: facts from public pages, admitted only when their numbers are on their page, then cross-checked by code (independent publishers, disagreeing figures, dates).",
+          ...lines,
+        ]
+      : lines
+  )
     .join("\n")
     .slice(0, 24_000);
+}
+
+/** A source's tier, as a report states it. */
+export function tierText(source: AnalysisSource): string | null {
+  if (source.tier === undefined) return null;
+  return source.tier === "PRIMARY"
+    ? source.tierKind === "COMPANY_DISCLOSURE"
+      ? "primary: the company's own disclosure, its claim"
+      : "primary: official source"
+    : source.tier === "SECONDARY"
+      ? "secondary"
+      : "other";
 }
 
 export function sourcesText(sources: readonly AnalysisSource[]): string {
   return sources
     .map(
       (source) =>
-        `S${String(source.index)} ${source.title ?? "(untitled)"} | ${source.domain}${source.publishedAt === null ? "" : ` | ${source.publishedAt.slice(0, 10)}`}`,
+        `S${String(source.index)} ${source.title ?? "(untitled)"} | ${source.domain}${source.publishedAt === null ? "" : ` | ${source.publishedAt.slice(0, 10)}`}${tierText(source) === null ? "" : ` | ${tierText(source) ?? ""}`}`,
     )
     .join("\n")
     .slice(0, 10_000);
@@ -352,12 +454,19 @@ function findingsFor(
           0,
           2_000,
         ),
-      // What a public page says: supported by that document, not verified
-      // by Capital Q.
+      // What a public page says: supported by that document (or several
+      // independent ones, or only the company's own), never verified by
+      // Capital Q. Code's cross-check decided the evidence and status.
       truthClass: "UNKNOWN" as const,
-      evidenceStatus: "DOCUMENT_SUPPORTED" as const,
-      lifecycleStatus: "CURRENT" as const,
-      confidence: "MODERATE" as const,
+      evidenceStatus: fact.evidenceStatus ?? ("DOCUMENT_SUPPORTED" as const),
+      lifecycleStatus: fact.lifecycleStatus ?? ("CURRENT" as const),
+      confidence:
+        fact.lifecycleStatus === "CONTRADICTORY"
+          ? ("CONFLICTING_EVIDENCE" as const)
+          : fact.lifecycleStatus === "STALE" ||
+              fact.evidenceStatus === "SELF_REPORTED"
+            ? ("LOW" as const)
+            : ("MODERATE" as const),
       evidenceRefs: [],
       subjects: [],
     }));
@@ -410,6 +519,12 @@ export function analysisContent(input: {
   readonly codeGaps?: readonly string[] | undefined;
   /** A Sources section even when nothing is cited (a diligence memo's fixed shape). */
   readonly sourcesAlways?: boolean | undefined;
+  /**
+   * Investigation (2026-10-29): sections code writes from its cross-check
+   * (Contradictions, What public sources cannot establish), before Sources.
+   */
+  readonly codeSections?:
+    readonly { readonly heading: string; readonly body: string }[] | undefined;
 }): QArtifactContent {
   const { draft, review } = input;
   const sections = draft.sections.map((section, index) => ({
@@ -428,6 +543,7 @@ export function analysisContent(input: {
       draft.summary,
       ...draft.sections.map((section) => section.body),
       ...(input.alsoCites ?? []),
+      ...(input.codeSections ?? []).map((section) => section.body),
     ].flatMap((body) =>
       [...body.matchAll(CITED)].map((match) => Number(match[1])),
     ),
@@ -435,7 +551,7 @@ export function analysisContent(input: {
   const listed = input.sources.filter((source) => cited.has(source.index));
   const sourceLines = listed.map(
     (source) =>
-      `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}. ${source.url}`,
+      `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${tierText(source) === null ? "" : ` (${tierText(source) ?? ""})`}. ${source.url}`,
   );
   const sourceSections =
     sourceLines.length === 0
@@ -477,6 +593,13 @@ export function analysisContent(input: {
           findings: index === 0 ? section.findings : [],
         })),
       ),
+      ...(input.codeSections ?? []).flatMap((section) =>
+        splitSection(section.heading, section.body).map((part) => ({
+          heading: part.heading.slice(0, 160),
+          body: part.body,
+          findings: [],
+        })),
+      ),
       ...sourceSections.map((part) => ({
         heading: part.heading,
         body: part.body,
@@ -485,4 +608,82 @@ export function analysisContent(input: {
     ].slice(0, 24),
     gaps,
   };
+}
+
+/**
+ * Investigation (2026-10-29): the sections code writes from its own
+ * cross-check, never a model -- every contradiction with both sides and
+ * their sources, and what public search cannot establish, with the lines
+ * of enquiry no search could run named.
+ */
+export function investigationSections(input: {
+  readonly facts: readonly AnalysisFact[];
+  readonly investigations: readonly InvestigationSummary[];
+}): readonly { readonly heading: string; readonly body: string }[] {
+  if (input.investigations.length === 0) return [];
+  const byId = new Map(input.facts.map((fact) => [fact.id, fact]));
+  const side = (fact: AnalysisFact) =>
+    `[S${String(fact.source)}] ${fact.domain}${fact.asOf === null ? "" : ` (${fact.asOf})`}: "${fact.statement}"`;
+  const pairs: string[] = [];
+  const seen = new Set<string>();
+  for (const fact of input.facts) {
+    for (const other of fact.contradicts ?? []) {
+      const partner = byId.get(other);
+      if (partner === undefined) continue;
+      const key = [fact.id, partner.id].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const about =
+        fact.measure != null && fact.entity != null
+          ? `${fact.entity}, ${fact.measure}`
+          : fact.lane;
+      pairs.push(
+        `- ${about}: ${side(fact)} -- against ${side(partner)}. Not reconciled: both stand until a primary source settles it.`,
+      );
+    }
+  }
+  const contradictions =
+    pairs.length === 0
+      ? "Code compared every pair of figures about the same measure and period across the sources; none disagreed. Figures for different periods or in different units are not compared."
+      : [
+          "Sources that disagree, as code found them when it compared figures about the same measure and period. Neither side is chosen.",
+          ...pairs,
+        ].join("\n");
+  const couldNotRun = [
+    ...new Set(input.investigations.flatMap((one) => one.couldNotRun)),
+  ];
+  const stale = input.facts.filter(
+    (fact) => fact.lifecycleStatus === "STALE",
+  ).length;
+  const limits = [
+    "Public search reaches what is published. It cannot establish:",
+    ...PUBLIC_SEARCH_LIMITS.map((line) => `- ${line}`),
+    ...(couldNotRun.length === 0
+      ? []
+      : [
+          `- Lines of enquiry no search could run (the search providers did not answer): ${couldNotRun.join(", ")}. Nothing is said about them.`,
+        ]),
+    ...(stale === 0
+      ? []
+      : [
+          `- ${String(stale)} fact${stale === 1 ? " is" : "s are"} older than their line of enquiry's horizon (marked out of date); newer figures may exist that were not found.`,
+        ]),
+  ].join("\n");
+  return [
+    { heading: "Contradictions", body: contradictions },
+    { heading: "What public sources cannot establish", body: limits },
+  ];
+}
+
+/** What stayed open when the investigation stopped, for "not known". */
+export function investigationGaps(
+  investigations: readonly InvestigationSummary[],
+): readonly string[] {
+  return [
+    ...new Set(
+      investigations.flatMap((one) =>
+        one.open.map((gap) => `Still open after research: ${gap}.`),
+      ),
+    ),
+  ].slice(0, 8);
 }

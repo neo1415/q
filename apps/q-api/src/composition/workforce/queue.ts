@@ -55,6 +55,15 @@ export type WorkRow = {
 /** No step key starts with "_" (planKey; step_key's check). */
 export const LIVE_RESULT_KEY = "_live";
 
+/**
+ * Investigation (2026-10-29): a running step's checkpoint, beside the step
+ * results under a key no step can have; its status is never a finished
+ * one, so no reader of results takes it for a step's result.
+ */
+export function checkpointKey(stepKey: string): string {
+  return `_checkpoint:${stepKey}`;
+}
+
 const LiveEntrySchema = z.object({
   status: z.literal("LIVE"),
   live: WorkforceLiveStageSchema,
@@ -123,6 +132,17 @@ export type AgentWorkQueue = {
     jobId: string,
     workerId: string,
     live: WorkforceLiveStage,
+  ) => Promise<void>;
+  /**
+   * Investigation (2026-10-29): a running step's checkpoint, kept under
+   * checkpointKey(stepKey) on the row this worker holds (replaced each
+   * time), so a worker that restarts resumes the step where it was.
+   */
+  readonly recordCheckpoint?: (
+    jobId: string,
+    workerId: string,
+    stepKey: string,
+    value: unknown,
   ) => Promise<void>;
   /** Ends the row this worker holds. False: it was not this worker's. */
   readonly finish: (
@@ -239,6 +259,15 @@ export function createPostgresAgentWorkQueue(
         update q_runtime.agent_work_queue
            set results = results || jsonb_build_object(${LIVE_RESULT_KEY}::text, ${sql.json(
              asJson({ status: "LIVE", live }),
+           )}::jsonb)
+         where job_id = ${jobId} and locked_by = ${workerId} and state = 'RUNNING'`;
+    },
+
+    recordCheckpoint: async (jobId, workerId, stepKey, value) => {
+      await sql`
+        update q_runtime.agent_work_queue
+           set results = results || jsonb_build_object(${checkpointKey(stepKey)}::text, ${sql.json(
+             asJson(value),
            )}::jsonb)
          where job_id = ${jobId} and locked_by = ${workerId} and state = 'RUNNING'`;
     },
@@ -397,6 +426,19 @@ export function createInMemoryAgentWorkQueue(
         row.results = {
           ...row.results,
           [LIVE_RESULT_KEY]: { status: "LIVE", live },
+        };
+      }
+      return Promise.resolve();
+    },
+    recordCheckpoint: (jobId, workerId, stepKey, value) => {
+      const row = rows.find((one) => one.job_id === jobId);
+      if (row !== undefined && held(row, workerId)) {
+        row.results = {
+          ...row.results,
+          // Stored as jsonb stores it: a copy, never the live object.
+          [checkpointKey(stepKey)]: JSON.parse(
+            JSON.stringify(value),
+          ) as unknown,
         };
       }
       return Promise.resolve();

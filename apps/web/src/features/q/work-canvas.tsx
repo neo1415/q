@@ -106,13 +106,27 @@ export const PLAN_STEPS: readonly Step[] = [
   { stage: "FILING", label: "Ready", Icon: Folder },
 ];
 
+/**
+ * Investigation-grade research (2026-10-29): stages shown on a step they
+ * belong to -- planning the questions is research, the cross-check is
+ * part of reading the sources -- so the step bar keeps its shape.
+ */
+const SHOWN_ON: Partial<
+  Readonly<Record<WorkforceLiveStageName, WorkforceLiveStageName>>
+> = {
+  PLANNING_RESEARCH: "SEARCHING",
+  CROSS_CHECKING: "READING",
+};
+
 if (
   STEPS.map((step) => step.stage).join() !==
     WORKFORCE_DOCUMENT_LIVE_STEPS.join() ||
   PLAN_STEPS.map((step) => step.stage).join() !==
     WORKFORCE_PLAN_LIVE_STEPS.join() ||
   !WORKFORCE_LIVE_STAGES.every((stage) =>
-    [...STEPS, ...PLAN_STEPS].some((step) => step.stage === stage),
+    [...STEPS, ...PLAN_STEPS].some(
+      (step) => step.stage === (SHOWN_ON[stage] ?? stage),
+    ),
   )
 ) {
   throw new Error("the work canvas names every live stage");
@@ -142,7 +156,9 @@ export function targetStep(
 ): number {
   if (live === null) return 0;
   if (live.state === "DONE") return steps.length;
-  const stage = live.stage?.stage;
+  const recorded = live.stage?.stage;
+  const stage =
+    recorded === undefined ? undefined : (SHOWN_ON[recorded] ?? recorded);
   return stage === undefined
     ? 0
     : Math.max(

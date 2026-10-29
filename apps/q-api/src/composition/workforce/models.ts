@@ -19,8 +19,8 @@ import {
   normalisePlanV10,
   AnalysisCritiqueResultV3Schema,
   AnalysisDocumentResultV3Schema,
-  ResearchFactsResultV2Schema,
-  ResearchPlanResultV2Schema,
+  ResearchFactsResultV3Schema,
+  ResearchPlanResultV4Schema,
   renderPrompt,
   type AnalysisCritiqueResult,
   type AnalysisCritiqueVariables,
@@ -29,11 +29,11 @@ import {
   type ResearchFactsResult,
   type ResearchFactsVariables,
   type ResearchPlanResult,
-  type ResearchPlanVariables,
+  type ResearchPlanVariablesV4,
   type AnalysisCritiqueResultV3,
   type AnalysisDocumentResultV3,
-  type ResearchFactsResultV2,
-  type ResearchPlanResultV2,
+  type ResearchFactsResultV3,
+  type ResearchPlanResultV4,
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
   type SubstanceCritiqueVariables,
@@ -90,7 +90,28 @@ export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariablesV15Input, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
-export type ResearchPlanInput = Omit<ResearchPlanVariables, Frame>;
+/**
+ * RESEARCH_PLAN v4 (investigation, 2026-10-29): the open questions code
+ * found after a round and the queries already sent (both empty on the
+ * first round).
+ */
+export type ResearchPlanInput = Omit<ResearchPlanVariablesV4, Frame>;
+/** A planned question as code reads it; `primary` absent: not marked. */
+export type ResearchPlanOutput = {
+  readonly questions: readonly (ResearchPlanResult["questions"][number] & {
+    readonly primary?: boolean | undefined;
+  })[];
+  /** Words for Capital Q's own company search; never sent outside. */
+  readonly internalQuery?: string | null | undefined;
+};
+/** Facts as code reads them; measure and entity are the reader's labels. */
+export type ResearchFactsOutput = {
+  readonly facts: readonly (ResearchFactsResult["facts"][number] & {
+    readonly measure?: string | null | undefined;
+    readonly entity?: string | null | undefined;
+  })[];
+  readonly followUps: ResearchFactsResult["followUps"];
+};
 export type ResearchFactsInput = Omit<ResearchFactsVariables, Frame>;
 export type AnalysisWriteInput = Omit<AnalysisWriteVariables, Frame>;
 export type AnalysisCritiqueInput = Omit<AnalysisCritiqueVariables, Frame>;
@@ -258,13 +279,13 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     input: ResearchPlanInput,
-  ) => Promise<Priced<ResearchPlanResult> | null>;
+  ) => Promise<Priced<ResearchPlanOutput> | null>;
   /** The dated, sourced facts in one question's public pages. */
   readonly researchFacts: (
     who: Who,
     trace: Trace,
     input: ResearchFactsInput,
-  ) => Promise<Priced<ResearchFactsResult> | null>;
+  ) => Promise<Priced<ResearchFactsOutput> | null>;
   /** An analysis document, or its revision from the review. */
   readonly writeAnalysis: (
     who: Who,
@@ -550,13 +571,13 @@ export function createWorkforceModels(dependencies: {
     // Live 2026-10-24 (batch 5): tolerant results, clipped here to the
     // shapes code reads; a malformed list element costs that element.
     planResearch: async (who, trace, variables) => {
-      const result = await priced<ResearchPlanInput, ResearchPlanResultV2>({
+      const result = await priced<ResearchPlanInput, ResearchPlanResultV4>({
         task: "RESEARCH_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: ResearchPlanResultV2Schema,
+        schema: ResearchPlanResultV4Schema,
         budget: RESEARCH_PLAN_BUDGET,
         environmentNotes:
           "You are planning searches, not running them. Code composes every query before anything leaves Capital Q.",
@@ -573,18 +594,24 @@ export function createWorkforceModels(dependencies: {
             alsoQuery:
               one.alsoQuery === null ? null : one.alsoQuery.slice(0, 160),
             recent: one.recent,
+            primary: one.primary,
           })),
+          internalQuery:
+            result.output.internalQuery === null ||
+            result.output.internalQuery.length === 0
+              ? null
+              : result.output.internalQuery.slice(0, 120),
         },
       };
     },
     researchFacts: async (who, trace, variables) => {
-      const result = await priced<ResearchFactsInput, ResearchFactsResultV2>({
+      const result = await priced<ResearchFactsInput, ResearchFactsResultV3>({
         task: "RESEARCH_FACTS",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: ResearchFactsResultV2Schema,
+        schema: ResearchFactsResultV3Schema,
         budget: RESEARCH_FACTS_BUDGET,
         environmentNotes:
           "You are reading public pages, not answering anyone. Code keeps a fact only when its numbers are on its page.",
@@ -601,6 +628,8 @@ export function createWorkforceModels(dependencies: {
             asOf: fact.asOf === null ? null : fact.asOf.slice(0, 40),
             source: fact.source,
             kind: fact.kind,
+            measure: fact.measure === null ? null : fact.measure.slice(0, 60),
+            entity: fact.entity === null ? null : fact.entity.slice(0, 60),
           })),
           followUps: result.output.followUps.slice(0, 3).map((one) => ({
             lane: one.lane.slice(0, 40),

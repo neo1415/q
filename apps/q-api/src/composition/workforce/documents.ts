@@ -30,7 +30,10 @@ import type {
 import {
   REVIEWER_OPEN_POINT,
   analysisContent,
+  investigationGaps,
+  investigationSections,
   mergeDossiers,
+  recordsText,
   researchText,
   sourcesText,
   writeAnalysisWithReview,
@@ -357,6 +360,11 @@ export function createWorkforceDocuments(dependencies: {
     }
     const merged = mergeDossiers(input.research ?? []);
     if (merged.budgetLimited) codeGaps.unshift(BUDGET_LIMITED_GAP);
+    // Investigation (2026-10-29): Capital Q's own records the person may
+    // see, labelled apart from web facts, and what stayed open.
+    const records = recordsText(merged.records);
+    if (records.length > 0) company = `${company}\n\n${records}`;
+    codeGaps.push(...investigationGaps(merged.investigations));
     if (
       diligence &&
       (input.research ?? []).length === 0 &&
@@ -438,6 +446,10 @@ export function createWorkforceDocuments(dependencies: {
         seed,
         publicSources: input.publicSources ?? null,
         codeGaps,
+        codeSections: investigationSections({
+          facts: merged.facts,
+          investigations: merged.investigations,
+        }),
       });
     }
     // Filed under a fresh decision, as the person now.

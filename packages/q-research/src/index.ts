@@ -83,6 +83,7 @@ export {
 } from "./domain/egress.js";
 export {
   ENTITY_RESOLUTIONS,
+  looksLikeOwnDomain,
   RANKING_VERSION,
   SUBJECT_MATCHES,
   type EntityResolution,

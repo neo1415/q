@@ -179,6 +179,10 @@ export const WORKFORCE_LIVE_STAGES = [
   "READING_DOCUMENTS",
   "PLANNING",
   "REVIEWING_PLAN",
+  // Investigation-grade research (2026-10-29): planning the questions (and
+  // a later round's open ones), and code's cross-check after each round.
+  "PLANNING_RESEARCH",
+  "CROSS_CHECKING",
 ] as const;
 export type WorkforceLiveStageName = (typeof WORKFORCE_LIVE_STAGES)[number];
 
@@ -237,6 +241,11 @@ export const WorkforceLiveStageSchema = z
       .optional(),
     /** The reviewer's points still open on the latest draft. Additive. */
     openPoints: z.number().int().min(0).max(50).nullable().optional(),
+    /**
+     * Investigation (2026-10-29): which research round the work is in; a
+     * later round's SEARCHING counts the open questions it checks. Additive.
+     */
+    round: z.number().int().min(1).max(10).nullable().optional(),
     at: UtcTimestampSchema,
   })
   .strict();
