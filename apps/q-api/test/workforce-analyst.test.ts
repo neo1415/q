@@ -1363,7 +1363,7 @@ describe("the analysis is critiqued and really revised", () => {
       (section) => section.heading === "Market and sizing",
     );
     expect(market?.findings[0]).toMatchObject({
-      truthClass: "UNKNOWN",
+      truthClass: "USER_CLAIM",
       evidenceStatus: "DOCUMENT_SUPPORTED",
     });
     expect(filed?.content.gaps).toEqual(MAJI_DRAFT_TWO.gaps);

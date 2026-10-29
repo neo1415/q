@@ -131,6 +131,29 @@ const EVIDENCE_STATUSES = new Set<string>([
   "PLATFORM_VERIFIED",
 ]);
 
+/** Evidence only a verification (by Capital Q or a named third party) gives. */
+const VERIFIED_EVIDENCE = new Set<string>([
+  "EXTERNALLY_VERIFIED",
+  "PLATFORM_VERIFIED",
+]);
+
+/**
+ * ADR-001's axes kept coherent (live 2026-10-29, run B: a RISK labelled
+ * Q_INFERENCE came back PLATFORM_VERIFIED). An inference, an estimate or
+ * an unknown is never verified evidence: what supports it is at most the
+ * documents it rests on. The truth class, the claim's own kind, is kept.
+ */
+export function coherentEvidence(
+  truthClass: TruthClass,
+  evidenceStatus: EvidenceStatus,
+): EvidenceStatus {
+  return truthClass !== "VERIFIED" &&
+    truthClass !== "USER_CLAIM" &&
+    VERIFIED_EVIDENCE.has(evidenceStatus)
+    ? "DOCUMENT_SUPPORTED"
+    : evidenceStatus;
+}
+
 const CONFIDENCE_LEVELS = new Set<string>([
   "HIGH",
   "MODERATE",
@@ -385,6 +408,21 @@ export function findingBlockOf(
 ): Extract<QResultBlock, { kind: "FINDING" }> | null {
   const statement = finding.statement.trim();
   if (statement.length === 0) return null;
+  // The model's own reading of what kind of claim this is, passed through
+  // rather than re-decided here. An unrecognised value becomes the
+  // weakest honest one: a claim whose standing we cannot read is a user
+  // claim with no evidence, never a fact.
+  const truthClass = (
+    TRUTH_CLASSES.has(finding.truthClass ?? "")
+      ? finding.truthClass
+      : "USER_CLAIM"
+  ) as TruthClass;
+  const evidenceStatus = coherentEvidence(
+    truthClass,
+    (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
+      ? finding.evidenceStatus
+      : "SELF_REPORTED") as EvidenceStatus,
+  );
   return {
     kind: "FINDING",
     finding: {
@@ -399,16 +437,8 @@ export function findingBlockOf(
       confidence: (CONFIDENCE_LEVELS.has(finding.confidence ?? "")
         ? finding.confidence
         : "MODERATE") as QConfidenceLevel,
-      // The model's own reading of what kind of claim this is, passed
-      // through rather than re-decided here. An unrecognised value
-      // becomes the weakest honest one: a claim whose standing we
-      // cannot read is a user claim with no evidence, never a fact.
-      truthClass: (TRUTH_CLASSES.has(finding.truthClass ?? "")
-        ? finding.truthClass
-        : "USER_CLAIM") as TruthClass,
-      evidenceStatus: (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
-        ? finding.evidenceStatus
-        : "SELF_REPORTED") as EvidenceStatus,
+      truthClass,
+      evidenceStatus,
       // Deliberately empty. The finding's supporting evidence is real
       // and its identifiers are not the browser's to hold.
       evidenceRefs: [],
@@ -647,7 +677,10 @@ export function summaryBlock(input: {
             {
               text: point.text,
               truthClass: point.truthClass.data,
-              evidenceStatus: point.evidenceStatus.data,
+              evidenceStatus: coherentEvidence(
+                point.truthClass.data,
+                point.evidenceStatus.data,
+              ),
             },
           ]
         : [],

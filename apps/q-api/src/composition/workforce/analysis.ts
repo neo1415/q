@@ -463,10 +463,13 @@ function findingsFor(
           0,
           2_000,
         ),
-      // What a public page says: supported by that document (or several
-      // independent ones, or only the company's own), never verified by
+      // What a public page says is its publisher's claim (ADR-001
+      // USER_CLAIM: a party's own statement, as the platform's other
+      // public findings label it -- live 2026-10-29, run A filed them
+      // UNKNOWN), supported by that document, by several independent
+      // ones, or only by the company's own word; never verified by
       // Capital Q. Code's cross-check decided the evidence and status.
-      truthClass: "UNKNOWN" as const,
+      truthClass: "USER_CLAIM" as const,
       evidenceStatus: fact.evidenceStatus ?? ("DOCUMENT_SUPPORTED" as const),
       lifecycleStatus: fact.lifecycleStatus ?? ("CURRENT" as const),
       confidence:
