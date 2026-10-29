@@ -60,7 +60,12 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-type Kept = { role: "PERSON" | "Q"; text: string; channel: string };
+type Kept = {
+  role: "PERSON" | "Q";
+  text: string;
+  channel: string;
+  createdAt?: string;
+};
 
 /** The world's onboarding service, plus the interview thread it keeps. */
 function withThread(world: InvestorWorld) {
@@ -76,15 +81,15 @@ function withThread(world: InvestorWorld) {
         ) as {
           turns: { role: "PERSON" | "Q"; text: string; channel: string }[];
         };
-        thread.push(...body.turns);
+        // Stamped when written, as the API does: a turn said after an
+        // answer was saved is newer than it.
+        const at = new Date().toISOString();
+        thread.push(...body.turns.map((turn) => ({ ...turn, createdAt: at })));
         return Response.json({ written: true }, { status: 201 });
       }
       const limit = Number(url.searchParams.get("limit") ?? "100");
       return Response.json({
-        items: thread.slice(-limit).map((turn) => ({
-          ...turn,
-          createdAt: "2026-10-27T20:21:00.000Z",
-        })),
+        items: thread.slice(-limit),
       });
     }
     return world.fetch(input, init);

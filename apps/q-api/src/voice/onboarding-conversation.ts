@@ -321,10 +321,27 @@ export function createOnboardingConversation(dependencies: {
             : null;
       return value !== null && sameValue(current.value, value);
     };
+    // A settled answer changes only on something they said after it was
+    // saved (live 2026-10-29: "mostly follow" saved as follow, then the
+    // finishing reading re-read the same words and wrote "follow, lead").
+    // The reader is a model; re-reading old words is not new information.
+    const personSaid = thread.items
+      .filter((turn) => turn.role === "PERSON")
+      .map((turn) => ({ at: Date.parse(turn.createdAt), text: turn.text }));
+    const saidSince = (stepKey: string, quote: string): boolean => {
+      const current = onRecord.find((r) => r.stepKey === stepKey);
+      if (current === undefined) return true;
+      const savedAt = Date.parse(current.createdAt);
+      return quotedFrom(
+        quote,
+        personSaid.filter((turn) => turn.at >= savedAt).map((t) => t.text),
+      );
+    };
     const answers = reading.answers.filter(
       (answer) =>
         isAnswerable(state, answer.stepKey) &&
-        !unchanged(answer.stepKey, answer.value),
+        !unchanged(answer.stepKey, answer.value) &&
+        saidSince(answer.stepKey, answer.quote),
     );
     const declined = reading.declined.filter(
       (item) => stepOf(state, item.stepKey)?.status === "OPEN",
@@ -632,6 +649,31 @@ export function createOnboardingConversation(dependencies: {
       return { commentary: readBack(state) };
     },
   };
+}
+
+const plain = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .normalize("NFKC")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length > 0);
+
+/**
+ * Whether the reader's quote comes from one of these turns: verbatim, or
+ * (the reader trims and joins) most of its words in one turn. Any
+ * language: words are letters and digits, not an English list.
+ */
+export function quotedFrom(quote: string, turns: readonly string[]): boolean {
+  const words = plain(quote);
+  if (words.length === 0) return false;
+  const joined = words.join(" ");
+  return turns.some((turn) => {
+    const said = plain(turn);
+    if (said.join(" ").includes(joined)) return true;
+    const bag = new Set(said);
+    const shared = words.filter((word) => bag.has(word)).length;
+    return shared / words.length >= 0.6;
+  });
 }
 
 function isWords(value: unknown): value is readonly string[] {

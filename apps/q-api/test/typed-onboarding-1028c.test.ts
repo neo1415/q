@@ -272,14 +272,16 @@ describe("defect 1: the investor's sectors are never lost to free text", () => {
     expect(sectorsOf(world)).toEqual([FINTECH]);
     expect(world.recordedNote("I3.sectors")).toBe("health");
     await say("hold on, my dog is barking");
-    await settled(() => (world.recordedNote("I3.sectors") ?? "") !== "health");
-    // Still the categories, never the text; their words beside them.
+    // The second reading re-read "fintech and health", said before the
+    // sectors were saved: old words are not new information (re-test 4,
+    // 2026-10-29), so nothing is written -- the categories stand.
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(world.recordedValue("I3.sectors")).toEqual({
       type: "RESOURCE_REFERENCE",
       resourceType: "TAXONOMY_NODE",
       resourceIds: [FINTECH],
     });
-    expect(world.recordedNote("I3.sectors")).toContain("fintech and health");
+    expect(world.recordedNote("I3.sectors")).toBe("health");
     expect(
       world.history("I3.sectors").every((v) => v.type === "RESOURCE_REFERENCE"),
     ).toBe(true);
