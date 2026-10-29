@@ -7,7 +7,11 @@ import { Button } from "@capital-q/ui/button";
 import { linkClassName } from "@capital-q/ui/link";
 import type { NoticeTone } from "@capital-q/ui/states";
 
-import { sendSignInLinkAction, signInWithPasswordAction } from "@/auth/actions";
+import {
+  resendConfirmationAction,
+  sendSignInLinkAction,
+  signInWithPasswordAction,
+} from "@/auth/actions";
 import { INITIAL_AUTH_FORM_STATE } from "@/auth/form-state";
 
 import { AuthHeading } from "./auth-heading";
@@ -52,6 +56,10 @@ export function SignInForm({
     sendSignInLinkAction,
     INITIAL_AUTH_FORM_STATE,
   );
+  const [resendState, resendAction] = useActionState(
+    resendConfirmationAction,
+    INITIAL_AUTH_FORM_STATE,
+  );
 
   const signUpHref =
     next === "/home"
@@ -85,9 +93,28 @@ export function SignInForm({
           {passwordState.status === "error" ? (
             <FormNotice tone="danger">{passwordState.message}</FormNotice>
           ) : null}
+          {passwordState.status === "unconfirmed" ? (
+            <FormNotice tone="warning">{t(passwordState.message)}</FormNotice>
+          ) : null}
           <SubmitButton pendingLabel="Signing in…">{t("Sign in")}</SubmitButton>
         </form>
-      ) : (
+      ) : null}
+
+      {mode === "password" && passwordState.status === "unconfirmed" ? (
+        // A separate form: resending must not resubmit the password.
+        <form action={resendAction} className="flex flex-col gap-3">
+          <input type="hidden" name="next" value={next} />
+          <input type="hidden" name="email" value={passwordState.email} />
+          {resendState.status === "error" ? (
+            <FormNotice tone="danger">{t(resendState.message)}</FormNotice>
+          ) : null}
+          <SubmitButton variant="secondary" pendingLabel={t("Sending…")}>
+            {t("Send the confirmation link again")}
+          </SubmitButton>
+        </form>
+      ) : null}
+
+      {mode === "password" ? null : (
         <form action={linkAction} className="flex flex-col gap-5">
           <input type="hidden" name="next" value={next} />
           <EmailField />

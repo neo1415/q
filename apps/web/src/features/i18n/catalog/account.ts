@@ -154,4 +154,57 @@ export const ACCOUNT_AR: Readonly<Record<string, string>> = {
     "تم الإرسال. سيرد شخص من Capital Q خلال 3 أيام.",
   "Your earlier requests couldn't load. Nothing is lost.":
     "تعذّر تحميل طلباتك السابقة. لم يضِع شيء.",
+
+  // Security: two-step verification and confirming an email
+  Security: "الأمان",
+  "Two-step verification": "التحقق بخطوتين",
+  "Two-step verification keeps your account safe if your password is ever known to someone else.":
+    "يحمي التحقق بخطوتين حسابك إذا عرف أحد كلمة مرورك يومًا.",
+  "Two-step verification is on.": "التحقق بخطوتين مفعّل.",
+  "Two-step verification is off.": "التحقق بخطوتين غير مفعّل.",
+  "Two-step verification is on. You'll be asked for a code next time you sign in.":
+    "التحقق بخطوتين مفعّل. سيُطلب منك رمز في المرة القادمة التي تسجّل فيها الدخول.",
+  "Each time you sign in, you will also enter a code from an authenticator app on your phone, such as Google Authenticator, 1Password or Microsoft Authenticator.":
+    "في كل مرة تسجّل فيها الدخول، ستُدخل أيضًا رمزًا من تطبيق مصادقة على هاتفك، مثل Google Authenticator أو 1Password أو Microsoft Authenticator.",
+  "Signing in asks for a code from your authenticator app as well as your password, email link or Google.":
+    "يطلب تسجيل الدخول رمزًا من تطبيق المصادقة إضافةً إلى كلمة المرور أو رابط البريد أو Google.",
+  "Turn on two-step verification": "فعّل التحقق بخطوتين",
+  "Turn off two-step verification": "أوقف التحقق بخطوتين",
+  "Preparing…": "جارٍ التحضير…",
+  "Turning off…": "جارٍ الإيقاف…",
+  "Scan this code with your authenticator app.":
+    "امسح هذا الرمز بتطبيق المصادقة.",
+  "QR code to add Capital Q to your authenticator app":
+    "رمز QR لإضافة Capital Q إلى تطبيق المصادقة",
+  "Can't scan it? Enter this key in the app instead:":
+    "لا يمكنك مسحه؟ أدخل هذا المفتاح في التطبيق بدلًا من ذلك:",
+  "Enter the 6-digit code the app shows.":
+    "أدخل الرمز المكوّن من 6 أرقام الذي يعرضه التطبيق.",
+  "To turn it off, enter a code from your authenticator app.":
+    "لإيقافه، أدخل رمزًا من تطبيق المصادقة.",
+  "On. Signing in also asks for a code from your authenticator app.":
+    "مفعّل. يطلب تسجيل الدخول أيضًا رمزًا من تطبيق المصادقة.",
+  "Off. Add a code from an authenticator app to every sign-in.":
+    "غير مفعّل. أضف رمزًا من تطبيق مصادقة إلى كل تسجيل دخول.",
+  "Add a code from an authenticator app to every sign-in.":
+    "أضف رمزًا من تطبيق مصادقة إلى كل تسجيل دخول.",
+  Manage: "إدارة",
+  "Enter the 6-digit code from your authenticator app to finish signing in.":
+    "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة لإكمال تسجيل الدخول.",
+  "Enter the 6-digit code from your authenticator app.":
+    "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة.",
+  "That code didn't work. Enter the 6-digit code your authenticator app shows now.":
+    "لم ينجح هذا الرمز. أدخل الرمز المكوّن من 6 أرقام الذي يعرضه تطبيق المصادقة الآن.",
+  "Lost access to your authenticator app? Contact Capital Q support from the email on your account and we will help you back in.":
+    "فقدت الوصول إلى تطبيق المصادقة؟ تواصل مع دعم Capital Q من البريد المسجّل في حسابك وسنساعدك على العودة.",
+  "Sign in as someone else": "سجّل الدخول بحساب آخر",
+  "Signing out…": "جارٍ تسجيل الخروج…",
+  "That didn't work. Try again in a moment.":
+    "لم ينجح ذلك. حاول مرة أخرى بعد قليل.",
+  "Too many attempts. Wait a few minutes and try again.":
+    "محاولات كثيرة. انتظر بضع دقائق ثم حاول مرة أخرى.",
+  "Confirm your email to finish signing in. We can send the link again.":
+    "أكّد بريدك الإلكتروني لإكمال تسجيل الدخول. يمكننا إرسال الرابط مجددًا.",
+  "Send the confirmation link again": "أرسل رابط التأكيد مجددًا",
+  "Enter your email.": "أدخل بريدك الإلكتروني.",
 };

@@ -7,6 +7,7 @@ import { sessionCookieOptions } from "./cookie-options";
 import { landingRedirect } from "./landing-route";
 import { resolveSafeReturnPath, signInPath } from "./redirect-safety";
 import { classifyRoute } from "./route-policy";
+import { secondStepPath, secondStepRequired } from "./second-step";
 
 /**
  * The request-level session boundary, run by `proxy.ts` before protected and
@@ -21,6 +22,11 @@ import { classifyRoute } from "./route-policy";
  *   2. protect -- a signed-out visitor to a protected route is sent to
  *      sign-in with a safe return path, and a signed-in visitor to a
  *      signed-out-only route is sent on to the application.
+ *
+ * Two-step verification: a session that has passed its first step but owes
+ * its authenticator code (second-step.ts) is not signed in for protected
+ * routes -- it is sent to the code page with the same safe return path --
+ * and may still open the sign-in pages, to sign in as somebody else.
  *
  * The proxy decides nothing about authorization: it knows "session or no
  * session", never tenant, organisation or role.
@@ -60,7 +66,14 @@ export async function handleSessionProxy(
   // (founder live 2026-09-29: clicks waited seconds). getClaims falls back
   // to the server itself where keys cannot be verified locally.
   const { data } = await supabase.auth.getClaims();
-  const user = typeof data?.claims.sub === "string" ? data.claims.sub : null;
+  const claims = data?.claims;
+  const user = typeof claims?.sub === "string" ? claims.sub : null;
+  // Asked only where it changes the answer (an Auth-server lookup, cached
+  // per user for a minute, and only for aal1 sessions).
+  const owesSecondStep = (): Promise<boolean> =>
+    user === null
+      ? Promise.resolve(false)
+      : secondStepRequired(supabase, { sub: user, aal: claims?.aal });
 
   const { pathname, search, searchParams } = request.nextUrl;
 
@@ -83,7 +96,19 @@ export async function handleSessionProxy(
     );
   }
 
-  if (access === "signed-out-only" && user !== null) {
+  if (access === "protected" && (await owesSecondStep())) {
+    return redirectWithSession(
+      request,
+      secondStepPath(`${pathname}${search}`),
+      response,
+    );
+  }
+
+  if (
+    access === "signed-out-only" &&
+    user !== null &&
+    !(await owesSecondStep())
+  ) {
     return redirectWithSession(
       request,
       resolveSafeReturnPath(searchParams.get("next")),

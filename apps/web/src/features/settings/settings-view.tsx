@@ -43,6 +43,7 @@ import { SettingsJumpIndex } from "./settings-index";
 const SECTIONS = [
   { id: "profile", label: "Your profile" },
   { id: "account", label: "Account" },
+  { id: "security", label: "Security" },
   { id: "team", label: "Team" },
   { id: "appearance", label: "Appearance" },
   { id: "q", label: "Q" },
@@ -101,6 +102,8 @@ export type SettingsViewProps = {
   readonly speaking: MyEtiquetteGuideDto | null;
   readonly acting: MyOrganisationDto | null;
   readonly learning: QPreferenceLearningDto | null;
+  /** Two-step verification, from the Auth server; null when unknown. */
+  readonly twoStep?: boolean | null | undefined;
   /** The Google connect round trip's outcome, from the query string. */
   readonly google?: string | undefined;
   readonly reconnect?: boolean | undefined;
@@ -122,6 +125,7 @@ export function SettingsView({
   speaking,
   acting,
   learning,
+  twoStep = null,
   google,
   reconnect,
   review,
@@ -261,6 +265,35 @@ export function SettingsView({
                     <SignOutButton />
                   </SRow>
                 </>,
+              )}
+
+              {group(
+                "security",
+                t("Security"),
+                <SRow
+                  title={t("Two-step verification")}
+                  description={
+                    twoStep === true
+                      ? t(
+                          "On. Signing in also asks for a code from your authenticator app.",
+                        )
+                      : twoStep === false
+                        ? t(
+                            "Off. Add a code from an authenticator app to every sign-in.",
+                          )
+                        : t(
+                            "Add a code from an authenticator app to every sign-in.",
+                          )
+                  }
+                >
+                  <Link
+                    href="/settings/security"
+                    className={accountButton("secondary", "sm")}
+                    data-settings-two-step
+                  >
+                    {twoStep === true ? t("Manage") : t("Turn on")}
+                  </Link>
+                </SRow>,
               )}
 
               {group(

@@ -8,7 +8,7 @@ import {
 } from "@capital-q/api-client";
 import { languageInfo } from "@capital-q/q-core/language";
 
-import { getSessionUser } from "@/auth/session";
+import { getSessionUser, twoStepEnabled } from "@/auth/session";
 import { adminContext } from "@/features/admin/admin-context";
 import { machineUiText } from "@/features/i18n/machine";
 import { translate, uiLanguageOf } from "@/features/i18n/messages";
@@ -63,6 +63,7 @@ export default async function SettingsPage({
     mine,
     learning,
     profile,
+    twoStep,
   ] = await Promise.all([
     resolveQStanding(),
     session === null
@@ -81,6 +82,7 @@ export default async function SettingsPage({
       ? Promise.resolve(null)
       : getQPreferenceLearning(session).catch(() => null),
     loadProfilePage(billingSession, context).catch(() => null),
+    twoStepEnabled().catch(() => null),
   ]);
   const person = profile?.person ?? null;
   const images =
@@ -116,6 +118,7 @@ export default async function SettingsPage({
       speaking={speaking}
       acting={acting}
       learning={learning}
+      twoStep={twoStep}
       google={typeof google === "string" ? google : undefined}
       reconnect={params["reconnect"] === "google"}
     />

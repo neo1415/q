@@ -991,6 +991,12 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/auth/update-password": exempt(
     "password entry in the auth provider's own flow; a password never passes through Q",
   ),
+  "/auth/two-step": exempt(
+    "the authenticator code at sign-in; a session owing it reaches no Q surface",
+  ),
+  "/settings/security": exempt(
+    "two-step verification setup: a secret and codes Q must never see or operate",
+  ),
   "/dev/q-presence": exempt("development-only page"),
   "/dev/ui": exempt("development-only page"),
   "/dev/daily": exempt("development-only page"),

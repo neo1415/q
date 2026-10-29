@@ -27,6 +27,27 @@ export const GOOGLE_SIGN_IN_FAILURE =
 export const RATE_LIMITED =
   "Too many attempts. Wait a few minutes and try again.";
 export const SAME_PASSWORD = "Choose a password you haven't used before.";
+/**
+ * The address is not confirmed. Only reachable with the right password:
+ * the Auth server checks the password before confirmation, so this
+ * reveals nothing to somebody guessing which addresses hold accounts.
+ */
+export const EMAIL_NOT_CONFIRMED =
+  "Confirm your email to finish signing in. We can send the link again.";
+export const SECOND_STEP_FAILURE =
+  "That code didn't work. Enter the 6-digit code your authenticator app shows now.";
+
+/** The Auth server's "right password, unconfirmed address". */
+export function isEmailNotConfirmed(error: unknown): boolean {
+  return isAuthApiError(error) && error.code === "email_not_confirmed";
+}
+
+/** A wrong, expired or reused one-time code, or anything else: one sentence. */
+export function describeSecondStepFailure(error: unknown): string {
+  return isAuthApiError(error) && error.code === "over_request_rate_limit"
+    ? RATE_LIMITED
+    : SECOND_STEP_FAILURE;
+}
 
 export function describeAuthFailure(error: unknown, fallback: string): string {
   if (!isAuthApiError(error)) {

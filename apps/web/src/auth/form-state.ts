@@ -5,6 +5,16 @@
  */
 export type AuthFormState =
   | { readonly status: "idle" }
-  | { readonly status: "error"; readonly message: string };
+  | { readonly status: "error"; readonly message: string }
+  /**
+   * The password was right but the address is not confirmed yet. Carries
+   * the address they typed, back to their own browser, so the resend
+   * control needs nothing typed twice.
+   */
+  | {
+      readonly status: "unconfirmed";
+      readonly message: string;
+      readonly email: string;
+    };
 
 export const INITIAL_AUTH_FORM_STATE: AuthFormState = { status: "idle" };

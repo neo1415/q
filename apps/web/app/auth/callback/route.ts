@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { resolveSafeReturnPath } from "@/auth/redirect-safety";
+import { secondStepPath, secondStepRequired } from "@/auth/second-step";
 import { createServerSupabaseClient } from "@/auth/supabase-server";
 
 /**
@@ -26,6 +27,10 @@ import { createServerSupabaseClient } from "@/auth/supabase-server";
  * origin, not the request's Host header — and `next` is resolved through the
  * same allow-list as every other return path, so no `?next=https://evil` can
  * survive a round trip through Google.
+ *
+ * Every one of these is a first step only. Somebody with an authenticator
+ * app turned on is sent on to the two-step page, carrying where they were
+ * going (for recovery: choosing a new password).
  */
 
 const EMAIL_OTP_TYPES = new Set([
@@ -87,11 +92,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     established = error === null;
   }
 
-  const destination = established
-    ? isRecovery
-      ? "/auth/update-password"
-      : next
-    : "/auth/sign-in?notice=link-invalid";
+  let destination = "/auth/sign-in?notice=link-invalid";
+  if (established) {
+    const onward = isRecovery ? "/auth/update-password" : next;
+    const { data } = await supabase.auth.getClaims();
+    const sub = data?.claims.sub;
+    destination =
+      typeof sub === "string" &&
+      (await secondStepRequired(supabase, { sub, aal: data?.claims.aal }))
+        ? secondStepPath(onward)
+        : onward;
+  }
 
   const response = NextResponse.redirect(new URL(destination, auth.appOrigin));
   response.headers.set("Cache-Control", "no-store");

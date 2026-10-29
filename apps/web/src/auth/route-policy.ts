@@ -68,7 +68,15 @@ export const SIGNED_OUT_ONLY_PATHS = [
   "/auth/forgot-password",
 ] as const;
 
-export type RouteAccess = "protected" | "signed-out-only" | "public";
+/**
+ * The two-step verification page: for a session that has passed its first
+ * step and owes its second. Neither protected (that would send it back to
+ * itself) nor signed-out-only; the page decides who it serves.
+ */
+export const SECOND_STEP_PATHS = ["/auth/two-step"] as const;
+
+export type RouteAccess =
+  "protected" | "signed-out-only" | "second-step" | "public";
 
 function matches(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -80,6 +88,9 @@ export function classifyRoute(pathname: string): RouteAccess {
   }
   if (SIGNED_OUT_ONLY_PATHS.some((path) => matches(pathname, path))) {
     return "signed-out-only";
+  }
+  if (SECOND_STEP_PATHS.some((path) => matches(pathname, path))) {
+    return "second-step";
   }
   return "public";
 }

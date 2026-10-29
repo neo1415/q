@@ -6,6 +6,7 @@ import { config as proxyConfig } from "../proxy";
 import {
   classifyRoute,
   PROTECTED_PATH_PREFIXES,
+  SECOND_STEP_PATHS,
   SIGNED_OUT_ONLY_PATHS,
 } from "../src/auth/route-policy";
 
@@ -46,12 +47,13 @@ describe("the proxy covers the route policy", () => {
     },
   );
 
-  it.each([...PROTECTED_PATH_PREFIXES, ...SIGNED_OUT_ONLY_PATHS])(
-    "the proxy runs on %s",
-    (path) => {
-      expect(proxyRunsOn(path)).toBe(true);
-    },
-  );
+  it.each([
+    ...PROTECTED_PATH_PREFIXES,
+    ...SIGNED_OUT_ONLY_PATHS,
+    ...SECOND_STEP_PATHS,
+  ])("the proxy runs on %s", (path) => {
+    expect(proxyRunsOn(path)).toBe(true);
+  });
 });
 
 describe("classifyRoute", () => {
@@ -100,4 +102,10 @@ describe("classifyRoute", () => {
       expect(classifyRoute(path)).toBe("public");
     },
   );
+});
+
+describe("the two-step page", () => {
+  it("is neither protected (it would send itself to itself) nor signed-out-only", () => {
+    expect(classifyRoute("/auth/two-step")).toBe("second-step");
+  });
 });

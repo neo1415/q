@@ -8,10 +8,13 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 
 import {
   describeAuthFailure,
+  describeSecondStepFailure,
   describeSignUpFailure,
+  EMAIL_NOT_CONFIRMED,
   GENERIC_FAILURE,
   GENERIC_SIGN_IN_FAILURE,
   GOOGLE_SIGN_IN_FAILURE,
+  isEmailNotConfirmed,
 } from "./auth-errors";
 import type { AuthFormState } from "./form-state";
 import { DEFAULT_RETURN_PATH, resolveSafeReturnPath } from "./redirect-safety";
@@ -21,6 +24,11 @@ import {
   RegistrationJourneySchema,
   WORKSPACE_CHOSEN_COOKIE,
 } from "./registration";
+import {
+  forgetFactorLookup,
+  resolveSecondStepReturn,
+  secondStepPath,
+} from "./second-step";
 import { getSessionUser } from "./session";
 import { createServerSupabaseClient } from "./supabase-server";
 
@@ -38,6 +46,11 @@ import { createServerSupabaseClient } from "./supabase-server";
 const EmailSchema = z.string().trim().min(3).max(254).email();
 const PasswordSchema = z.string().min(8).max(72);
 const SignInPasswordSchema = z.string().min(1).max(72);
+/** An authenticator app's code: six digits, spaces tolerated. */
+const OneTimeCodeSchema = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, ""))
+  .pipe(z.string().regex(/^\d{6}$/));
 
 function field(formData: FormData, name: string): string | undefined {
   const value = formData.get(name);
@@ -115,13 +128,108 @@ export async function signInWithPasswordAction(
   }
 
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.auth.signInWithPassword(input.data);
+  const { data, error } = await supabase.auth.signInWithPassword(input.data);
 
   if (error !== null) {
+    if (isEmailNotConfirmed(error)) {
+      return {
+        status: "unconfirmed",
+        message: EMAIL_NOT_CONFIRMED,
+        email: input.data.email,
+      };
+    }
     return {
       status: "error",
       message: describeAuthFailure(error, GENERIC_SIGN_IN_FAILURE),
     };
+  }
+
+  // The user comes from the Auth server's own answer to this sign-in. With
+  // an authenticator app on, the password was only the first step.
+  const verifiedFactor = (data.user.factors ?? []).some(
+    (factor) => factor.status === "verified",
+  );
+  redirect(verifiedFactor ? secondStepPath(next) : next);
+}
+
+/**
+ * Send the confirmation link again (sign-in's "confirm your email" state).
+ * Every outcome but a rate limit looks the same, so the form says nothing
+ * about which addresses hold accounts.
+ */
+export async function resendConfirmationAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const next = resolveSafeReturnPath(field(formData, "next"));
+  const email = EmailSchema.safeParse(field(formData, "email"));
+
+  if (!email.success) {
+    return { status: "error", message: "Enter your email." };
+  }
+
+  const { auth } = loadWebServerConfig();
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.data,
+    options: { emailRedirectTo: callbackUrl(auth.appOrigin, next) },
+  });
+
+  if (error !== null) {
+    const message = describeAuthFailure(error, GENERIC_FAILURE);
+    if (message !== GENERIC_FAILURE) {
+      return { status: "error", message };
+    }
+  }
+
+  redirect("/auth/check-email?purpose=confirm");
+}
+
+/**
+ * The second step: the code from the person's authenticator app, checked
+ * by the Auth server, which raises this session to aal2 and rotates its
+ * cookies. The factor is the session's own, listed by the Auth server; no
+ * factor id is taken from the form.
+ */
+export async function verifySecondStepAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const next = resolveSecondStepReturn(field(formData, "next"));
+  const supabase = await createServerSupabaseClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const sub = claims?.claims.sub;
+  if (typeof sub !== "string") {
+    redirect("/auth/sign-in");
+  }
+
+  const code = OneTimeCodeSchema.safeParse(field(formData, "code"));
+  if (!code.success) {
+    return {
+      status: "error",
+      message: "Enter the 6-digit code from your authenticator app.",
+    };
+  }
+
+  const { data: factors, error: listError } =
+    await supabase.auth.mfa.listFactors();
+  if (listError !== null) {
+    return { status: "error", message: GENERIC_FAILURE };
+  }
+  const factor = factors.totp[0];
+  if (factor === undefined) {
+    // Nothing to verify: two-step verification is not on for them.
+    forgetFactorLookup(sub);
+    redirect(next);
+  }
+
+  const { error } = await supabase.auth.mfa.challengeAndVerify({
+    factorId: factor.id,
+    code: code.data,
+  });
+  if (error !== null) {
+    return { status: "error", message: describeSecondStepFailure(error) };
   }
 
   redirect(next);
