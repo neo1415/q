@@ -114,3 +114,42 @@ describe("composeEgressQuery", () => {
     ]);
   });
 });
+
+describe("deep research keeps the country they named (live 2026-10-29, run A)", () => {
+  const userText =
+    "Q, investigate the Nigerian B2B payments sector and how it affects my fintech thesis";
+
+  it("'Nigerian' allows Nigeria and regulator words; private markers still never leave", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: `Nigeria central bank payments regulation circular ${PRIVATE_MARKER} 250k`,
+      userText,
+      publicIdentity: [],
+      researchVocabulary: true,
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.query).toBe(
+      "nigeria central bank payments regulation circular",
+    );
+    expect(containsAny(outcome.query, [PRIVATE_MARKER, "250k"])).toBe(false);
+  });
+
+  it("a country they never named does not leave", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: "Kenya payments regulation",
+      userText,
+      publicIdentity: [],
+      researchVocabulary: true,
+    });
+    expect(outcome.ok && outcome.query.includes("kenya")).toBe(false);
+  });
+
+  it("everyday research is unchanged: exact words only", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: "Nigeria payments",
+      userText,
+      publicIdentity: [],
+    });
+    expect(outcome.ok && outcome.query.includes("nigeria")).toBe(false);
+  });
+});

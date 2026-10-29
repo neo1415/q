@@ -1,4 +1,5 @@
 import { RESEARCH_BOUNDS } from "../contracts.js";
+import { COUNTRIES, mentionedCountries } from "./geography.js";
 
 /**
  * The outbound Context Firewall for research (CQ-Q-RESEARCH-001 §9-§10).
@@ -259,6 +260,29 @@ export const RESEARCH_VOCABULARY: ReadonlySet<string> = new Set([
   "average",
   "estimate",
   "estimates",
+  // Live 2026-10-29: a regulatory lane needs the words for who regulates
+  // and how -- generic, public, and true of every market.
+  "central",
+  "bank",
+  "banks",
+  "circular",
+  "circulars",
+  "guidelines",
+  "framework",
+  "gazette",
+  "act",
+  "law",
+  "laws",
+  "compliance",
+  "fintech",
+  "fintechs",
+  "payments",
+  "payment",
+  "funding",
+  "news",
+  "official",
+  "registry",
+  "filings",
 ]);
 
 /** A figure or money-like token: "2.4m", "$700k", "3,000,000", "USD". */
@@ -320,6 +344,19 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
   }
   if (input.researchVocabulary === true) {
     for (const token of RESEARCH_VOCABULARY) allowed.add(token);
+    // Live 2026-10-29 (run A): they asked about the "Nigerian" sector and
+    // every planned query lost its country ("Nigeria", not their word), so
+    // the investigation read irs.gov and ssa.gov. A country they named, in
+    // any listed form, allows its other public forms (name, demonym, main
+    // cities) -- the same fact, no new information leaves.
+    const said = [input.userText, ...(input.earlierUserText ?? [])].join(" ");
+    const named = new Set(mentionedCountries(said));
+    for (const entry of COUNTRIES) {
+      if (!named.has(entry.code)) continue;
+      for (const term of [entry.name, ...entry.aliases]) {
+        for (const token of tokenise(term)) allowed.add(token);
+      }
+    }
   }
   return allowed;
 }
