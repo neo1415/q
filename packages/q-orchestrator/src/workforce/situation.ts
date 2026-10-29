@@ -37,6 +37,7 @@ export const EMPTY_SITUATION: JobSituation = { facts: [], moves: [] };
 
 const OPEN_REQUESTS_MAX = 3;
 const WAITING_MAX = 3;
+const MANDATE_MAX = 3;
 
 function day(at: string): string {
   return at.slice(0, 10);
@@ -86,6 +87,12 @@ export function situationFrom(input: {
   /** Briefs that were asked for and could not be read: names, or null. */
   readonly unreadable?: readonly (string | null)[] | undefined;
   readonly waiting?: readonly { readonly summary: string }[] | undefined;
+  /**
+   * Their declared mandate and thesis lines, read as them (an investor's
+   * situation dossier, MANDATE section). Null: could not be read
+   * (UNKNOWN); absent or empty: none on record or not theirs to have.
+   */
+  readonly mandate?: readonly string[] | null | undefined;
 }): JobSituation {
   const facts: WorkforceSituationFact[] = [];
   const moves: {
@@ -104,6 +111,15 @@ export function situationFrom(input: {
     facts.push({ ref, kind, text: text.slice(0, 300), at });
     return ref;
   };
+
+  // First: what every investment question is weighed against.
+  if (input.mandate === null) {
+    add("UNKNOWN", "Your declared mandate and thesis: not known right now.");
+  } else {
+    for (const line of (input.mandate ?? []).slice(0, MANDATE_MAX)) {
+      add("MANDATE", line);
+    }
+  }
 
   for (const brief of input.briefs) {
     const name = brief.counterparty.name ?? "the other side";

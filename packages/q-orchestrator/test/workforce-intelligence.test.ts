@@ -12,6 +12,7 @@ import {
   registeredExecutors,
   runJob,
   situationFrom,
+  situationText,
   type AgentExecutor,
   type BoundStep,
   type JobRecorder,
@@ -665,5 +666,34 @@ describe("MET needs a fact that shows it in place (live 2026-10-16)", () => {
       "UNKNOWN",
       "MET",
     ]);
+  });
+});
+
+describe("the lead reads their declared mandate (live case A, 2026-10-29)", () => {
+  it("puts the mandate first, as MANDATE facts", () => {
+    const situation = situationFrom({
+      briefs: [brief()],
+      mandate: [
+        "Mandate 'Aster Seed Fintech': seed to Series A; Nigeria, Ghana, Kenya; B2B payments.",
+        "Thesis note: back infrastructure that owns a recurring business workflow.",
+      ],
+    });
+    expect(situation.facts.slice(0, 2)).toEqual([
+      expect.objectContaining({ ref: "F1", kind: "MANDATE" }),
+      expect.objectContaining({ ref: "F2", kind: "MANDATE" }),
+    ]);
+    expect(situationText(situation)).toContain(
+      "F2 [MANDATE] Thesis note: back infrastructure",
+    );
+  });
+
+  it("an unreadable mandate is unknown; none on record adds nothing", () => {
+    expect(situationFrom({ briefs: [], mandate: null }).facts).toEqual([
+      expect.objectContaining({
+        kind: "UNKNOWN",
+        text: "Your declared mandate and thesis: not known right now.",
+      }),
+    ]);
+    expect(situationFrom({ briefs: [], mandate: [] }).facts).toEqual([]);
   });
 });
