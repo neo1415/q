@@ -630,6 +630,7 @@ import {
   createRelationshipMailPort,
 } from "./composition/own-records.js";
 import { createLocalFigureStatus } from "./composition/local-figures.js";
+import { createPlanFiguresRead } from "./composition/workforce/plan-figures.js";
 import {
   createRecordChangeActions,
   createRecordChangeBoard,
@@ -4009,6 +4010,18 @@ const plans = createPlans({
     },
     models: workforceModels,
     documents: createDeckRead(qTools.port),
+    // Their own figures, held-back documents and confirmed-figure
+    // contradictions (own company only; live 2026-10-29).
+    figures: (() => {
+      const read = createPlanFiguresRead({
+        sql: database.sql,
+        documentFigures: createLocalFigureStatus(database.sql),
+      });
+      return (context, subject) =>
+        subject.side === "FOUNDER"
+          ? read(context.actor, subject.companyId)
+          : Promise.resolve([]);
+    })(),
     // Public reading from public-safe topics only (never their records),
     // under the job's own search budget.
     research: ({ actor, jobId, runId, progress }) => {
@@ -5111,6 +5124,7 @@ const orchestrator = withLearning(
 const continueApproved = createApprovedContinuation({
   orchestrator: () => orchestrator,
   actions: qActionPort,
+  complete: (ref) => orchestrationRuntime.complete(ref),
   logger,
 });
 

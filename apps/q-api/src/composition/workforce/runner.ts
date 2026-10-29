@@ -388,6 +388,14 @@ export function createAgentWorkRunner(dependencies: {
         await store
           .setJobStatus(owner, row.job_id, "DONE")
           .catch(() => undefined);
+      } else if (ended.state === "FAILED" && ended.outputs !== undefined) {
+        // No plan was made: the step failed, and what Q could say from
+        // what it holds is kept beside it for the delivery.
+        await queue.recordStep(row.job_id, workerId, "plan", {
+          status: "FAILED",
+          summary: ended.reason ?? "The plan couldn't be finished.",
+          outputs: ended.outputs,
+        });
       }
       await finish(ended.state, ended.reason);
       await deliverAfter(owner, row.job_id);

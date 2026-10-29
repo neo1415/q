@@ -419,7 +419,10 @@ export function createSituationAssembler(
       reason: null,
       facts: lines
         .map((line) => line.trim())
-        .filter((line) => line.length > 0)
+        // A heading of the recall ("About their company, in their words:")
+        // is not something remembered (live 2026-10-29: two of them were
+        // cited as facts).
+        .filter((line) => line.length > 0 && !/:\s*$/u.test(line))
         .map((line) => ({
           statement: `Remembered: ${line.slice(0, 980)}`,
           truthClass: "USER_CLAIM",
@@ -445,10 +448,11 @@ export function createSituationAssembler(
     return {
       status: "READ",
       reason: null,
-      facts: [...items]
-        .sort((a, b) => b.at.localeCompare(a.at))
-        .map((item) => ({
-          statement: `You ${item.what.trim().slice(0, 960)}`,
+      facts: activityOnce(items).map(({ item, times }) => ({
+          // Live 2026-10-29: "You approved an action" four times over, and
+          // "You skipped a step" four more, filled the section. Each act
+          // once, with how many times and the newest.
+          statement: `You ${item.what.trim().slice(0, 900)}${times > 1 ? ` (${String(times)} times; latest ${item.at.slice(0, 10)})` : ""}`,
           truthClass: "VERIFIED",
           evidenceStatus: "PLATFORM_VERIFIED",
           label: "personal_private",
@@ -459,6 +463,23 @@ export function createSituationAssembler(
           provenance: { tool: "my_activity", record: item.record, url: null },
         })),
     };
+  }
+
+  /** Each kind of act once, newest first, with how many times it happened. */
+  function activityOnce(
+    items: readonly SituationActivityItem[],
+  ): readonly { readonly item: SituationActivityItem; readonly times: number }[] {
+    const out = new Map<
+      string,
+      { item: SituationActivityItem; times: number }
+    >();
+    for (const item of [...items].sort((a, b) => b.at.localeCompare(a.at))) {
+      const key = item.what.trim().toLowerCase();
+      const held = out.get(key);
+      if (held === undefined) out.set(key, { item, times: 1 });
+      else held.times += 1;
+    }
+    return [...out.values()];
   }
 
   async function research(

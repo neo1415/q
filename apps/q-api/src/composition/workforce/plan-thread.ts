@@ -89,8 +89,17 @@ export function runtimeOf(
   return runtimes.get(key) ?? EMPTY;
 }
 
-/** The status line the person sees for a step moving to `status` (code's words). */
-export function statusLine(step: QPlanStep, status: QPlanStepStatus): string {
+/**
+ * The status line the person sees for a step moving to `status` (code's
+ * words). PROPOSED says "ready for your approval" only when an approval
+ * card exists for it (`prepared`); otherwise Q has yet to prepare it (live
+ * 2026-10-29: "Ready for your approval" with no approval behind it).
+ */
+export function statusLine(
+  step: QPlanStep,
+  status: QPlanStepStatus,
+  prepared = true,
+): string {
   const title = step.title.replace(/[.\s]+$/u, "");
   switch (status) {
     case "DOING":
@@ -98,7 +107,9 @@ export function statusLine(step: QPlanStep, status: QPlanStepStatus): string {
     case "DONE":
       return `Done: ${title}`;
     case "PROPOSED":
-      return `Ready for your approval: ${title}`;
+      return prepared
+        ? `Ready for your approval: ${title}`
+        : `Q will prepare it for your approval: ${title}`;
     case "WAITING_YOU":
       return `Your part: ${title}`;
     case "SKIPPED":
@@ -140,7 +151,9 @@ export function createPlanThread(
       plan: Pick<QPlan, "planId" | "version">,
       step: QPlanStep,
       status: QPlanStepStatus,
+      options: { readonly prepared?: boolean } = {},
     ): Promise<void> => {
+      const prepared = options.prepared ?? true;
       await note(owner, plan, step.key, `state ${status}`);
       await store.appendThread(owner, {
         planId: plan.planId,
@@ -149,8 +162,25 @@ export function createPlanThread(
         author: "WORKER",
         stepKey: step.key,
         factRef: null,
-        text: statusLine(step, status),
-        idempotencyKey: `plan-status:${plan.planId}:${String(plan.version)}:${step.key}:${status}`,
+        text: statusLine(step, status, prepared),
+        idempotencyKey: `plan-status:${plan.planId}:${String(plan.version)}:${step.key}:${status}${prepared || status !== "PROPOSED" ? "" : ":unprepared"}`,
+      });
+    },
+    /** A step of theirs that could not be put on their board: said plainly. */
+    notPlaced: async (
+      owner: Owner,
+      plan: Pick<QPlan, "planId" | "version">,
+      step: QPlanStep,
+    ): Promise<void> => {
+      await store.appendThread(owner, {
+        planId: plan.planId,
+        jobId: null,
+        kind: "STATUS",
+        author: "WORKER",
+        stepKey: step.key,
+        factRef: null,
+        text: `Couldn't put it on your board yet: ${step.title.replace(/[.\s]+$/u, "")}`,
+        idempotencyKey: `plan-status:${plan.planId}:${String(plan.version)}:${step.key}:NOT_PLACED`,
       });
     },
     link: async (

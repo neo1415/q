@@ -45,7 +45,7 @@ import {
   type DiligenceQuestionsShortenVariables,
   ReplyReaderResultSchema,
   PlanReviewResultSchema,
-  PlanWriteResultSchema,
+  PlanWriteResultV2Schema,
   type PlanReviewResult,
   type PlanReviewVariables,
   type PlanWriteResult,
@@ -186,17 +186,30 @@ const PLAN = PLAN_BUDGET;
  * bounded on its own; the plan job makes at most six such calls.
  */
 export const PLAN_WRITE_BUDGET = {
-  maxAttempts: 2,
-  maxEstimatedCostUsd: 0.12,
-  maxOutputTokens: 5_000,
-  attemptTimeoutMs: 60_000,
+  // One attempt: a refused plan is asked again by the job WITH the
+  // refused fields (live 2026-10-29: the gateway's identical second attempt
+  // failed exactly as the first, 7 times).
+  maxAttempts: 1,
+  maxEstimatedCostUsd: 0.2,
+  // Room for the reasoning beside a 12-step plan.
+  maxOutputTokens: 9_000,
+  attemptTimeoutMs: 90_000,
 } as const;
 export const PLAN_REVIEW_BUDGET = {
   maxAttempts: 2,
-  maxEstimatedCostUsd: 0.06,
-  maxOutputTokens: 2_400,
-  attemptTimeoutMs: 45_000,
+  maxEstimatedCostUsd: 0.1,
+  maxOutputTokens: 5_000,
+  attemptTimeoutMs: 75_000,
 } as const;
+/**
+ * Plan writing and reviewing are reasoning, not extraction (live
+ * 2026-10-29: routed as STRUCTURED_EXTRACTION -- BASIC floor, 15 s target,
+ * no reasoning -- the drafts were generic and scored 65-91). Evidence
+ * synthesis, with the model's reasoning on.
+ */
+export const PLAN_TASK_CLASS = "EVIDENCE_SYNTHESIS" as const;
+export const PLAN_WRITE_REASONING = "MEDIUM" as const;
+export const PLAN_REVIEW_REASONING = "MEDIUM" as const;
 
 export type WorkforceModels = {
   readonly review: (
@@ -269,6 +282,12 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     input: PlanWriteInput,
+    /**
+     * Called when the schema refused the whole plan: the refused fields
+     * (paths and Zod codes, never a value), so the job can ask once more
+     * with them.
+     */
+    onRefused?: (refusals: readonly string[]) => void,
   ) => Promise<PlanWriteResult | null>;
   /** One independent review of it, against plan-rubric/v1. */
   readonly reviewPlan?: (
@@ -320,6 +339,10 @@ export function createWorkforceModels(dependencies: {
     readonly etiquette: EtiquettePurpose | null;
     /** A malformed element of a list costs that element alone (gateway DROP). */
     readonly dropListItems?: boolean | undefined;
+    /** The model's own reasoning effort; none when not said. */
+    readonly reasoning?: "LOW" | "MEDIUM" | "HIGH" | undefined;
+    /** The schema refused the whole object: its refused fields (paths). */
+    readonly onRefused?: ((refusals: readonly string[]) => void) | undefined;
   };
 
   async function call<V, O>(input: CallInput<V, O>): Promise<O | null> {
@@ -354,6 +377,9 @@ export function createWorkforceModels(dependencies: {
             ? {}
             : { dataPosture: dependencies.dataPosture }),
           budget: input.budget,
+          ...(input.reasoning === undefined
+            ? {}
+            : { reasoning: input.reasoning }),
           messages: [...rendered.messages],
           output: rendered.output,
           attribution: {
@@ -396,10 +422,21 @@ export function createWorkforceModels(dependencies: {
           : {}),
       };
     } catch (error: unknown) {
+      const refusals = (error as { readonly refusals?: unknown } | null)
+        ?.refusals;
+      const refused = Array.isArray(refusals)
+        ? refusals.filter((one): one is string => typeof one === "string")
+        : [];
+      // Paths and codes only, never a value the model wrote.
       dependencies.logger?.warn(
-        { err: error, task: input.task },
+        {
+          err: error,
+          task: input.task,
+          ...(refused.length > 0 ? { refusals: refused } : {}),
+        },
         "workforce model call not made",
       );
+      if (refused.length > 0) input.onRefused?.(refused);
       return null;
     }
   }
@@ -646,15 +683,20 @@ export function createWorkforceModels(dependencies: {
         },
       };
     },
-    writePlan: (who, trace, input) =>
+    writePlan: (who, trace, input, onRefused) =>
       call<PlanWriteInput, PlanWriteResult>({
         task: "PLAN_WRITE",
-        taskClass: "STRUCTURED_EXTRACTION",
+        taskClass: PLAN_TASK_CLASS,
         who,
         trace,
         variables: input,
-        schema: PlanWriteResultSchema,
+        schema: PlanWriteResultV2Schema,
         budget: PLAN_WRITE_BUDGET,
+        reasoning: PLAN_WRITE_REASONING,
+        // A list over its bound keeps its first items (reported, never
+        // repaired); one stray element never refuses the whole plan.
+        dropListItems: true,
+        onRefused,
         environmentNotes:
           "You plan; nothing runs from your plan until the person accepts it, and every outward or consequential step is approved by them first.",
         etiquette: null,
@@ -662,12 +704,14 @@ export function createWorkforceModels(dependencies: {
     reviewPlan: (who, trace, input) =>
       call<PlanReviewInput, PlanReviewResult>({
         task: "PLAN_REVIEW",
-        taskClass: "STRUCTURED_EXTRACTION",
+        taskClass: PLAN_TASK_CLASS,
         who,
         trace,
         variables: input,
         schema: PlanReviewResultSchema,
         budget: PLAN_REVIEW_BUDGET,
+        reasoning: PLAN_REVIEW_REASONING,
+        dropListItems: true,
         environmentNotes:
           "You are reviewing, not writing. Code recomputes your score and decides whether the plan is redrafted.",
         etiquette: null,

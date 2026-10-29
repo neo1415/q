@@ -126,8 +126,12 @@ export const QPlanStepSchema = z
   .object({
     key: QPlanStepKeySchema,
     title: z.string().trim().min(1).max(160),
-    /** Why this step, for this person, in plain words. */
-    why: z.string().trim().min(1).max(300),
+    /**
+     * Why this step, for this person, in plain words. Room for two full
+     * sentences (live 2026-10-29: at 300 nearly every why was cut
+     * mid-sentence, "payback,…"). Additive: older versions still parse.
+     */
+    why: z.string().trim().min(1).max(600),
     /** The situation facts the why rests on. At least one. */
     cites: z.array(QSituationFactRefSchema).min(1).max(8),
     owner: QPlanStepOwnerSchema,
@@ -606,6 +610,24 @@ export const QPlanViewSchema = z
           .strict(),
       )
       .max(20),
+    /**
+     * The facts the plan cites, as the person's own situation stated them
+     * when the plan was written: what a step's "why" link opens. Refs stay
+     * data and never appear in the plan's words (live 2026-10-29: "(F23)"
+     * on every step). Additive.
+     */
+    facts: z
+      .array(
+        z
+          .object({
+            ref: QSituationFactRefSchema,
+            statement: z.string().trim().min(1).max(1_000),
+            truthClass: z.string().trim().min(1).max(32),
+          })
+          .strict(),
+      )
+      .max(120)
+      .optional(),
   })
   .strict();
 export type QPlanView = z.infer<typeof QPlanViewSchema>;

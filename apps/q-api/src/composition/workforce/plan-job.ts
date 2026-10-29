@@ -536,9 +536,47 @@ function stepKeyOf(raw: string, taken: Set<string>): string {
   return unique;
 }
 
+/**
+ * A fact ref written into the words ("(F23)", "(F29, F31)", "F12") rather
+ * than into cites. Live 2026-10-29: "(F23)" reached the person on every
+ * step. The refs stay data (cites); the card shows them as a "why" link.
+ */
+const REF_IN_WORDS =
+  /\s*[([]\s*(?:[FP][1-9]\d{0,3}\s*(?:[,;/]|and)?\s*)+[)\]]|\b[FP][1-9]\d{0,3}\b/gu;
+
+/** The words without fact refs; the spacing and punctuation left tidy. */
+export function withoutRefs(text: string): string {
+  return text
+    .replace(REF_IN_WORDS, "")
+    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/\(\s*\)/gu, "")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
+/**
+ * Cut to `max` at the last sentence end that fits, never mid-word or
+ * mid-sentence with a dangling ellipsis (live 2026-10-29: "payback,…").
+ * With no sentence end in reach, the last whole clause or word, closed with
+ * a full stop.
+ */
+export function sentenceClip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const room = text.slice(0, max);
+  let end = -1;
+  for (const match of room.matchAll(/[.!?](?=\s|$)/gu)) {
+    end = match.index + 1;
+  }
+  if (end >= Math.floor(max / 3)) return room.slice(0, end).trim();
+  const clause = Math.max(room.lastIndexOf(";"), room.lastIndexOf(","));
+  const space = room.lastIndexOf(" ");
+  const cut = clause > max / 2 ? clause : space > 0 ? space : max - 1;
+  return `${room.slice(0, cut).replace(/[\s,;:]+$/u, "")}.`;
+}
+
 /** The person's words: no internal names reach them (addendum 3 rule 4). */
 function plainWords(text: string, max: number): string {
-  const clean = text.replace(/\s+/gu, " ").trim();
+  const clean = withoutRefs(text.replace(/\s+/gu, " ").trim());
   // The writer is told never to use these; a slip is softened, not passed.
   const softened = clean.replace(ROLE_WORDS_ROLE_FREE, (word) =>
     /^job$/iu.test(word)
@@ -547,9 +585,7 @@ function plainWords(text: string, max: number): string {
         ? "situation"
         : "Q",
   );
-  return softened.length <= max
-    ? softened
-    : `${softened.slice(0, max - 1).trimEnd()}…`;
+  return sentenceClip(softened, max);
 }
 
 export type GroundedPlan = {
@@ -609,7 +645,7 @@ export function groundPlan(input: {
     steps.push({
       key,
       title: plainWords(step.title, 160),
-      why: plainWords(step.why, 300),
+      why: plainWords(step.why, 600),
       cites,
       owner: classified.owner,
       action: classified.action,
@@ -715,9 +751,36 @@ export function codeChecks(
       "Some cites named refs the situation does not hold: cite only refs listed in THE SITUATION.",
     );
   }
+  // A step that waits for another is due after it (code, not a reviewer).
+  const due = new Map(plan.steps.map((step) => [step.key, step.due]));
+  for (const step of plan.steps) {
+    for (const wait of step.waitsFor) {
+      if (wait.kind !== "STEP_DONE") continue;
+      const before = due.get(wait.stepKey) ?? null;
+      if (step.due !== null && before !== null && step.due < before) {
+        fixes.push(
+          `[${step.key}] It needs ${wait.stepKey} done first but is due before it (${step.due} < ${before}): move its date after ${before}.`,
+        );
+      }
+    }
+  }
+  // Sharing a document is the person's decision, approved on its own.
+  for (const step of plan.steps) {
+    if (
+      step.action.kind === "APP_ACTION" &&
+      step.action.name === "document.access.share" &&
+      !step.needsApproval
+    ) {
+      fixes.push(
+        `[${step.key}] It shares a document without the person's own approval of that share: make it a step they approve.`,
+      );
+    }
+  }
   for (const section of dossier.sections) {
     if (section.status !== "READ" || section.facts.length === 0) continue;
     if (section.source === "MEMORY" || section.source === "Q_DAILY") continue;
+    // Their own recent acts are context, not a gap the plan must close.
+    if (section.source === "ACTIVITY") continue;
     if (section.facts.some((fact) => used.has(fact.ref))) continue;
     fixes.push(
       `Nothing in the plan uses ${SOURCE_WORDS[section.source]} (${section.facts
@@ -854,6 +917,18 @@ export type PlanJobDependencies = {
   readonly store: PlanStore;
   /** READING_DOCUMENTS: their own deck as Q read it (own-company asks). */
   readonly documents?: PlanDocumentRead | undefined;
+  /**
+   * Their own figures (what they told Q, what they confirmed from their
+   * financial documents, set against their deck) and which documents are
+   * held back from Q, as CAPITAL facts. Live 2026-10-29: the founder's
+   * recorded cash and burn were called "not established".
+   */
+  readonly figures?:
+    | ((
+        context: QToolExecutionContext,
+        subject: SituationSubject,
+      ) => Promise<readonly RawFact[]>)
+    | undefined;
   /** SEARCHING: deep research for this job, under its search budget. */
   readonly research?:
     | ((input: {
@@ -1035,8 +1110,20 @@ export async function runPlanJob(
       : dependencies.assembler
           .research(dossier, { hook, ask: payload.ask })
           .catch(() => dossier);
-  const [deckFacts, withPublic] = await Promise.all([documents, researched]);
-  dossier = withFacts(withPublic, "DECK", deckFacts);
+  const figures =
+    ownCompany && dependencies.figures !== undefined
+      ? dependencies.figures(context, subject).catch(() => [])
+      : Promise.resolve([]);
+  const [deckFacts, figureFacts, withPublic] = await Promise.all([
+    documents,
+    figures,
+    researched,
+  ]);
+  dossier = withFacts(
+    withFacts(withPublic, "DECK", deckFacts),
+    "CAPITAL",
+    figureFacts,
+  );
   if (hook !== undefined) {
     const publicSection = dossier.sections.find(
       (section) => section.source === "PUBLIC",
@@ -1095,8 +1182,7 @@ export async function runPlanJob(
     publicFindings,
     allowedActions,
   };
-  modelCalls += 1;
-  const first = await writePlan(who, trace, {
+  const firstInput: PlanWriteInput = {
     ...base,
     mode: prior === null ? "NEW" : "REDRAFT",
     priorPlan:
@@ -1107,7 +1193,32 @@ export async function runPlanJob(
       direction === null
         ? ""
         : `1. The person asked for this change: ${direction}`.slice(0, 6_000),
+  };
+  modelCalls += 1;
+  let refused: readonly string[] = [];
+  let first = await writePlan(who, trace, firstInput, (paths) => {
+    refused = paths;
   });
+  if (first === null && refused.length > 0) {
+    // Once more, told exactly which fields were refused (paths and codes,
+    // never a value). Live 2026-10-29: the identical second attempt failed
+    // as the first did, and the person got no plan.
+    dependencies.logger?.warn(
+      { jobId: input.jobId, refusals: refused },
+      "plan write refused; asked once more with the refused fields",
+    );
+    modelCalls += 1;
+    first = await writePlan(who, trace, {
+      ...firstInput,
+      fixes: [
+        firstInput.fixes,
+        `${firstInput.fixes === "" ? "1" : "2"}. Your last answer was refused for these fields (path: reason): ${refused.join("; ")}. Keep every list and text within the limits stated in THE SHAPE, and use only the fields listed there.`,
+      ]
+        .filter((part) => part !== "")
+        .join("\n")
+        .slice(0, 6_000),
+    });
+  }
   if (first === null || first.steps.length === 0) {
     return {
       status: "ANSWERED",
@@ -1116,8 +1227,9 @@ export async function runPlanJob(
     };
   }
   const clarification = first.clarification;
+  const written = first;
   let grounded = groundPlan({
-    written: first,
+    written,
     dossier,
     roster,
     ...(prior === null ? {} : { priorKeys: keysOf(prior.plan) }),
@@ -1235,8 +1347,13 @@ export async function runPlanJob(
     ...reviews.flatMap((review) => (review.passed ? [] : review.fixes)),
     ...remainingCode,
   ];
-  const points = [...new Set(openPoints)]
-    .map((point) => point.slice(0, 300))
+  // What the reviewers still want, in the person's words: "Step 2: …",
+  // the change asked for, no fact codes (live 2026-10-29: the card said
+  // only "draft", and the line quoted "[s2] … cites F26 …").
+  const points = [
+    ...new Set(openPoints.map((point) => personPoint(point, grounded.steps))),
+  ]
+    .filter((point) => point.length > 0)
     .slice(0, 12);
   const review: QPlanReviewSummary = {
     rubricVersion: Q_PLAN_RUBRIC_VERSION,
@@ -1444,6 +1561,29 @@ function keysOfGrounded(plan: GroundedPlan): ReadonlyMap<string, string> {
   return new Map(plan.steps.map((step) => [step.key, step.key]));
 }
 
+/**
+ * A reviewer's point ("[s2] problem Fix: change") as the person reads it:
+ * the step by its number and what is still wanted, without fact codes.
+ */
+export function personPoint(
+  point: string,
+  steps: readonly Pick<QPlanStep, "key">[],
+): string {
+  const match = /^\[([^\]]+)\]\s*(.*)$/su.exec(point.trim());
+  const key = match?.[1] ?? null;
+  const body = match?.[2] ?? point.trim();
+  const [problem = "", fix] = body.split(/\s*Fix:\s*/u);
+  const wanted = withoutRefs((fix ?? problem).trim()).replace(
+    /^./u,
+    (letter) => letter.toUpperCase(),
+  );
+  const index = key === null ? -1 : steps.findIndex((one) => one.key === key);
+  return sentenceClip(
+    index === -1 ? wanted : `Step ${String(index + 1)}: ${wanted}`,
+    300,
+  );
+}
+
 /** The plan card: a reference the client reads under the person's authority. */
 export function planBlockOf(plan: QPlan): QPlanBlock {
   return {
@@ -1475,9 +1615,14 @@ export function planReadyLine(
   ];
   if (first !== undefined) lines.push(`First: ${first.title}`);
   if (plan.review?.fullyReviewed !== true) {
-    const open = plan.review?.openPoints[0];
+    const open = plan.review?.openPoints ?? [];
     lines.push(
-      `It's a draft I haven't been able to fully review yet${open === undefined ? "." : ` — still open: ${open.replace(/\s*Fix:.*$/u, "")}`}`,
+      open.length === 0
+        ? "It's a draft: the two reviews didn't pass it yet."
+        : `It's a draft: the two reviews didn't pass it yet. What they still want: ${open
+            .slice(0, 2)
+            .map((point) => point.replace(/[.\s]+$/u, ""))
+            .join("; ")}${open.length > 2 ? `; and ${String(open.length - 2)} more on the card` : ""}.`,
     );
   }
   if (clarification !== null) {

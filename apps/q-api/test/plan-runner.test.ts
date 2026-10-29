@@ -4,7 +4,10 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import { PLAN_F03_ASK } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
-import { deliveredPlan } from "../src/composition/workforce/delivery.js";
+import {
+  deliveredPlan,
+  failedPlanAnswer,
+} from "../src/composition/workforce/delivery.js";
 import { createWorkforceJobs } from "../src/composition/workforce/jobs.js";
 import { expectedOf } from "../src/composition/workforce/progress.js";
 import { createInMemoryAgentWorkQueue } from "../src/composition/workforce/queue.js";
@@ -65,15 +68,23 @@ function fakeSql(input: { readonly conversationId?: string } = {}) {
   return { sql, queries };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
 function world(
-  options: { readonly reviews?: ReturnType<typeof review>[] } = {},
+  options: {
+    readonly reviews?: ReturnType<typeof review>[];
+    readonly writes?: Parameters<typeof fakePlanModels>[0]["writes"];
+    /** The board refuses every add (as Postgres did, live 2026-10-29). */
+    readonly boardDown?: boolean;
+  } = {},
 ) {
+  const options_ = options;
   const queue = createInMemoryAgentWorkQueue();
   const workforce = createInMemoryWorkforceStore();
   const plansStore = memoryPlanStore();
   const { assembler } = fakeAssembler(FOUNDER_DOSSIER);
   const { models, calls } = fakePlanModels({
-    writes: [FOUNDER_PLAN],
+    writes: options.writes ?? [FOUNDER_PLAN],
     reviews: options.reviews ?? [review(0)],
   });
   const jobsFor = () =>
@@ -120,6 +131,16 @@ function world(
     },
     board: {
       add: (_actor, request, options) => {
+        // As workspace.board_items does: the key is a uuid column, and a
+        // key that is not one fails the insert (live 2026-10-29).
+        if (options.idempotencyKey.match(UUID) === null) {
+          return Promise.reject(
+            new Error('invalid input syntax for type uuid: "plan:…"'),
+          );
+        }
+        if (options_.boardDown === true) {
+          return Promise.reject(new Error("connection reset"));
+        }
         const existing = board.find(
           (one) => one.key === options.idempotencyKey,
         );
@@ -132,6 +153,7 @@ function world(
         }
         return Promise.resolve({
           outcome: "OK",
+          replayed: existing !== undefined,
           value: {
             id: `0000000${String(board.length)}-0000-4000-8000-000000000000`,
           },
@@ -320,8 +342,13 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     const status = (await w.plans.view(owner, block.planId))?.lines.map(
       (one) => one.text,
     );
+    // No card is prepared for it yet, so it is never "ready for your
+    // approval" (live 2026-10-29: said with no approval behind it).
     expect(status).toContain(
-      "Ready for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
+      "Q will prepare it for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
+    );
+    expect(status?.some((line) => line.startsWith("Ready for your approval"))).toBe(
+      false,
     );
     expect(status).toContain(
       "Your part: Add a Business model slide showing revenue per clinic",
@@ -398,5 +425,72 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     expect(w.reminders).toHaveLength(3);
     expect(w.cards).toHaveLength(0);
     expect(w.plansStore.plans.get(block.planId)?.status).toBe("ON_BOARD");
+    // Every board key is a UUID, stable per step and version.
+    expect(w.board.every((one) => UUID.test(one.key))).toBe(true);
+    // Again: nothing new, and it says so truthfully.
+    const again = await w.plans.decide(founder, block.planId, {
+      affordance: "PUT_ON_BOARD",
+      version: 1,
+    });
+    expect(again.message).toContain("already on your board");
+    expect(w.board).toHaveLength(3);
+  });
+
+  it("a board that refuses is said as a failure, never 'already there'", async () => {
+    const w = world({ boardDown: true });
+    const { block } = await offered(w);
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "PUT_ON_BOARD",
+      version: 1,
+    });
+    expect(decided.outcome).toBe("FAILED");
+    expect(decided.message).toMatch(/couldn't put your 3 steps on your board/u);
+    expect(decided.message).not.toMatch(/already/u);
+    expect(w.board).toHaveLength(0);
+    expect(w.plansStore.plans.get(block.planId)?.status).not.toBe("ON_BOARD");
+  });
+
+  it("Execute with a board that refuses says so on the step, never 'your part'", async () => {
+    const w = world({ boardDown: true });
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    await w.plans.execute(
+      founder,
+      executePayloadOf(founder.userId, view.plan, view.bodySha256),
+    );
+    const lines = (await w.plans.view(owner, block.planId))?.lines.map(
+      (one) => one.text,
+    );
+    expect(lines).toContain(
+      "Couldn't put it on your board yet: Add a Business model slide showing revenue per clinic",
+    );
+    expect(
+      lines?.some((line) => line.startsWith("Your part: Add a Business")),
+    ).toBe(false);
+  });
+});
+
+describe("a plan that could not be written", () => {
+  it("ends FAILED (never 'Two reviews · Ready · Filed') and still answers from what Q holds", async () => {
+    const w = world({ writes: [null] });
+    const started = await w.plans.start(founder, RUN, {
+      ask: ASK,
+      planAsk: {
+        kind: "IMPROVE",
+        research: "NONE",
+        side: "FOUNDER",
+        subject: "OWN",
+        deliverable: "PLAN",
+      },
+    });
+    if (started.status !== "STARTED") throw new Error("not started");
+    await w.runner.pass();
+    const [row] = await w.queue.forOwner(owner, [started.jobId]);
+    expect(row?.state).toBe("FAILED");
+    const answer = row === undefined ? null : failedPlanAnswer(row);
+    expect(answer !== null && "answer" in answer).toBe(true);
+    if (answer === null || !("answer" in answer)) return;
+    expect(answer.answer.line).toContain("here is where things stand");
   });
 });

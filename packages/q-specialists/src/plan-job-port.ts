@@ -48,14 +48,14 @@ export type QPlanJobPort = {
 };
 
 /**
- * Whether the reading asks for a plan of their OWN whose deliverable is a
- * plan or a review of their own documents (F03). A company they named, or
- * a written analysis or document, stays with the team job that writes
- * documents.
+ * Whether the reading asks for a plan of their OWN: the deliverable is
+ * steps to take. An analysis, a review of their documents (F03) or a
+ * document is that work, done by the team job that writes documents --
+ * never a plan whose first step is the thing asked (live 2026-10-29). Work
+ * for someone they named stays with the team job too.
  */
 export function planAskRoutes(planAsk: QPlanAskReading | null): boolean {
   if (planAsk === null) return false;
   if (planAsk.subject === "NAMED") return false;
-  if (planAsk.deliverable === "DOCUMENT_REVIEW") return true;
   return planAsk.kind !== "NONE" && planAsk.deliverable === "PLAN";
 }

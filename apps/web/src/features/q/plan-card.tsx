@@ -9,6 +9,8 @@ import { ICON_SIZE, ICON_STROKE, ListChecks } from "@capital-q/ui/icons";
 import { useT } from "@/features/i18n/language";
 
 import { decidePlanAction, readPlanAction } from "./plan-actions";
+import { WorkInProgressCard } from "./work-canvas";
+import { useWorkLive } from "./work-live";
 
 /**
  * Situation-first planning (S5): the plan Q wrote for the person, as a
@@ -53,6 +55,69 @@ export function stepNote(
   return null;
 }
 
+/**
+ * Words written before plans kept their fact refs out of the text: a ref
+ * such as "(F23)" is data, never something the person reads (live
+ * 2026-10-29). The card shows the cited facts behind a "Why" instead.
+ */
+export function withoutFactRefs(text: string): string {
+  return text
+    .replace(
+      /\s*[([]\s*(?:[FP][1-9]\d{0,3}\s*(?:[,;/]|and)?\s*)+[)\]]|\b[FP][1-9]\d{0,3}\b/gu,
+      "",
+    )
+    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
+type CitedFact = NonNullable<QPlanView["facts"]>[number];
+
+/** A cited fact as the person reads it: theirs, a reading, or on record. */
+export function factNote(fact: Pick<CitedFact, "truthClass">): string | null {
+  switch (fact.truthClass) {
+    case "USER_CLAIM":
+      return "Your own figure or words";
+    case "Q_INFERENCE":
+      return "Q's reading";
+    case "ESTIMATE":
+      return "An estimate";
+    case "UNKNOWN":
+      return "Not known";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The work making the next version, followed in place (live 2026-10-29:
+ * "Change it" showed v2 only after a reload). When it ends, the card reads
+ * its own version again, so it says a newer one exists; the new version
+ * arrives in the conversation as its own card.
+ */
+function ChangeFollow({
+  jobId,
+  onSettled,
+}: {
+  readonly jobId: string;
+  readonly onSettled: () => void;
+}) {
+  const { live } = useWorkLive(jobId);
+  const state = live?.state ?? null;
+  useEffect(() => {
+    if (state === "DONE" || state === "FAILED" || state === "STOPPED") {
+      onSettled();
+    }
+    // onSettled reads the card's own state; only the job's end matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+  return (
+    <WorkInProgressCard
+      block={{ kind: "WORK_IN_PROGRESS", jobId, title: "Changing your plan" }}
+    />
+  );
+}
+
 export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const t = useT();
   const noteId = useId();
@@ -63,6 +128,8 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
   const [version, setVersion] = useState(block.version);
+  const [changeJob, setChangeJob] = useState<string | null>(null);
+  const [reads, setReads] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -74,7 +141,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
     return () => {
       live = false;
     };
-  }, [block.planId, version]);
+  }, [block.planId, version, reads]);
 
   if (missing) return null;
 
@@ -92,6 +159,13 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
       if (decided.outcome === "CHANGING") {
         setChanging(false);
         setNote("");
+        if ("jobId" in decided && decided.jobId !== null) {
+          setChangeJob(decided.jobId);
+        }
+      }
+      // Board and approval change what the card's lines say: read again.
+      if (decided.outcome === "ON_BOARD" || decided.outcome === "FAILED") {
+        setReads((count) => count + 1);
       }
     });
   };
@@ -99,6 +173,8 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const plan = view?.plan ?? null;
   const reviewed = plan?.review?.fullyReviewed ?? block.reviewed;
   const current = view?.current ?? true;
+  const facts = new Map((view?.facts ?? []).map((fact) => [fact.ref, fact]));
+  const stillWanted = reviewed ? [] : (plan?.review?.openPoints ?? []);
 
   return (
     <section
@@ -146,8 +222,25 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
       ) : (
         <>
           <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
-            {plan.situationSummary}
+            {withoutFactRefs(plan.situationSummary)}
           </p>
+          {stillWanted.length === 0 ? null : (
+            <section className="flex flex-col gap-1" data-q-plan-wanted>
+              <h4 className="cq-caption m-0 text-(--cq-text-tertiary)">
+                {t("What the reviews still want")}
+              </h4>
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {stillWanted.slice(0, 5).map((point) => (
+                  <li
+                    key={point}
+                    className="cq-body-sm text-(--cq-text-secondary)"
+                  >
+                    {withoutFactRefs(point)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <ol
             className="m-0 flex list-none flex-col gap-2 p-0"
             aria-label={t("Steps")}
@@ -155,6 +248,10 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           >
             {plan.steps.map((step, index) => {
               const noteText = stepNote(step);
+              const cited = step.cites.flatMap((ref) => {
+                const fact = facts.get(ref);
+                return fact === undefined ? [] : [fact];
+              });
               return (
                 <li
                   key={step.key}
@@ -167,11 +264,29 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="cq-body-sm text-(--cq-text-primary)">
-                      {step.title}
+                      {withoutFactRefs(step.title)}
                     </span>
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      {step.why}
+                      {withoutFactRefs(step.why)}
                     </span>
+                    {cited.length === 0 ? null : (
+                      <details className="cq-caption" data-q-plan-why>
+                        <summary className="cursor-pointer text-(--cq-text-tertiary) underline-offset-2 hover:underline">
+                          {t("Why")}
+                        </summary>
+                        <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0 text-(--cq-text-secondary)">
+                          {cited.map((fact) => {
+                            const kind = factNote(fact);
+                            return (
+                              <li key={fact.ref}>
+                                {fact.statement}
+                                {kind === null ? null : ` · ${t(kind)}`}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </details>
+                    )}
                     <span className="cq-caption text-(--cq-text-tertiary)">
                       {t(ownerWords(step))}
                       {step.due === null ? null : ` · ${t("By")} ${step.due}`}
@@ -193,7 +308,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                     key={question}
                     className="cq-body-sm text-(--cq-text-secondary)"
                   >
-                    {question}
+                    {withoutFactRefs(question)}
                   </li>
                 ))}
               </ul>
@@ -312,6 +427,13 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           </div>
         </form>
       ) : null}
+
+      {changeJob === null ? null : (
+        <ChangeFollow
+          jobId={changeJob}
+          onSettled={() => setReads((count) => count + 1)}
+        />
+      )}
 
       {message === null ? null : (
         <p

@@ -10,6 +10,7 @@ import {
   QRunNotResumableError,
   type QActionPort,
   type QOrchestrator,
+  type QRunRef,
 } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
@@ -38,11 +39,22 @@ export function createApprovedContinuation(dependencies: {
   /** Resolved at call time: composed after the routes and tools that call this. */
   readonly orchestrator: () => QOrchestrator | undefined;
   readonly actions: Pick<QActionPort, "executeApproved">;
+  /**
+   * Ends a run that the gate executed for (its card's run, which no engine
+   * will continue), so the screen watching it settles. Live 2026-10-29: a
+   * plan's Execute card stayed on Approve after it was approved and run.
+   */
+  readonly complete?:
+    | ((ref: QRunRef) => Promise<unknown>)
+    | undefined;
   readonly logger?: Logger | undefined;
 }): ApprovedContinuation {
   const { actions, logger } = dependencies;
   return async ({ actor, runId, actionId, correlationId }) => {
     const orchestrator = dependencies.orchestrator();
+    // A run whose own engine will not continue it (its card's run) is
+    // ended here once the gate has executed its action.
+    let unresumable = false;
     if (orchestrator !== undefined) {
       try {
         const handle = await orchestrator.resume({
@@ -70,6 +82,7 @@ export function createApprovedContinuation(dependencies: {
         ) {
           throw error;
         }
+        unresumable = !(error instanceof QRunAlreadyTerminalError);
         logger?.warn(
           { qRunId: runId, actionId, correlationId, reason: error.name },
           "approved action's run is not resumable; executing through the gate",
@@ -87,5 +100,19 @@ export function createApprovedContinuation(dependencies: {
       { qRunId: runId, actionId, correlationId, outcome: outcome.kind },
       "approved action executed without its run",
     );
+    if (unresumable && dependencies.complete !== undefined) {
+      await dependencies
+        .complete({
+          runId,
+          tenantId: actor.tenantId,
+          actorUserId: actor.userId,
+        })
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, qRunId: runId, actionId },
+            "approved card's run not ended",
+          );
+        });
+    }
   };
 }

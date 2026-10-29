@@ -77,7 +77,7 @@ export function QNow({
         <div className="cq-q-now-item" data-q-now-task>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-              {t("Q is working")}
+              {t(session.presence.detail ?? "Q is working")}
             </span>
             {/* §7.1 Now, as its own column only: a durable task's name,
                 real step count and bar. Elsewhere the thread shows it. */}
