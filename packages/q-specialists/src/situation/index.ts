@@ -18,6 +18,7 @@ export {
 } from "./assemble.js";
 export {
   SITUATION_SOURCE_SPECS,
+  mandateTopics,
   SITUATION_TOOLS,
   type SituationRawFact,
   type SituationRead,

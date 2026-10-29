@@ -1,5 +1,5 @@
 import { RESEARCH_BOUNDS } from "../contracts.js";
-import { COUNTRIES, mentionedCountries } from "./geography.js";
+import { COUNTRIES, placeCountries } from "./geography.js";
 
 /**
  * The outbound Context Firewall for research (CQ-Q-RESEARCH-001 §9-§10).
@@ -348,9 +348,12 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
     // every planned query lost its country ("Nigeria", not their word), so
     // the investigation read irs.gov and ssa.gov. A country they named, in
     // any listed form, allows its other public forms (name, demonym, main
-    // cities) -- the same fact, no new information leaves.
+    // cities) -- the same fact, no new information leaves. Owner
+    // 2026-10-29: a state, county, region or province they name places the
+    // question in its country too ("Kano" means Nigeria), from reference
+    // data (geography.ts SUBNATIONAL).
     const said = [input.userText, ...(input.earlierUserText ?? [])].join(" ");
-    const named = new Set(mentionedCountries(said));
+    const named = new Set(placeCountries(said));
     for (const entry of COUNTRIES) {
       if (!named.has(entry.code)) continue;
       for (const term of [entry.name, ...entry.aliases]) {

@@ -153,3 +153,36 @@ describe("deep research keeps the country they named (live 2026-10-29, run A)", 
     expect(outcome.ok && outcome.query.includes("nigeria")).toBe(false);
   });
 });
+
+describe("a subnational place counts as its country (owner 2026-10-29)", () => {
+  it("'Lagos State' and 'Kano' allow Nigeria; 'Western Cape' South Africa", () => {
+    for (const [userText, query, country] of [
+      [
+        "Lagos State fintech regulation",
+        "Nigeria fintech regulation",
+        "nigeria",
+      ],
+      ["fintech regulation in Kano", "Nigeria fintech regulation", "nigeria"],
+      ["Western Cape payments", "South Africa payments regulation", "south"],
+      ["Kisumu county payments", "Kenya payments", "kenya"],
+    ] as const) {
+      const outcome = composeEgressQuery({
+        requestedQuery: query,
+        userText,
+        publicIdentity: [],
+        researchVocabulary: true,
+      });
+      expect(outcome.ok && outcome.query.includes(country)).toBe(true);
+    }
+  });
+
+  it("an everyday word that names a state alone ('delta') places nothing", () => {
+    const outcome = composeEgressQuery({
+      requestedQuery: "Nigeria payments delta",
+      userText: "payments delta between providers",
+      publicIdentity: [],
+      researchVocabulary: true,
+    });
+    expect(outcome.ok && outcome.query.includes("nigeria")).toBe(false);
+  });
+});

@@ -1967,6 +1967,48 @@ const workforcePortsFor = createWorkforcePorts(
       capitalQRecords: (actor, query) =>
         createCapitalQRecords({ firewall, tools: qTools.port })(actor, query),
       jobSearchBudget: workforceJobSearchBudget(process.env),
+      // Owner 2026-10-29: research starts from everything Q knows about
+      // the account. Their own earlier messages in the conversation the job
+      // came from (read as them), and their situation dossier -- the
+      // assembler planning uses, as them, cached per person -- from which
+      // the research brief decides what the question needs.
+      earlierUserText: async (actor, runId) => {
+        const parsed = QRunIdSchema.safeParse(runId);
+        if (!parsed.success) return [];
+        const { run } = await qRuntime.getRun({ actor, runId: parsed.data });
+        if (run.conversationId === null) return [];
+        const { detail } = await qRuntime.getConversation({
+          actor,
+          conversationId: QConversationIdSchema.parse(run.conversationId),
+        });
+        return detail.messages
+          .flatMap((message) => (message.role === "USER" ? [message.text] : []))
+          .slice(-4);
+      },
+      situation: async (actor, runId, ask) => {
+        const context = await situationToolContext(actor, runId);
+        if (context === null) return null;
+        const companyId = await runtimeDependencies.ownCompany(actor);
+        const investorOrganisationId =
+          companyId === null
+            ? await runtimeDependencies.ownInvestorOrganisation(actor)
+            : null;
+        if (companyId === null && investorOrganisationId === null) return null;
+        const publicProfile =
+          companyId === null ? null : await situationPublicProfile(actor);
+        return situationAssembler.assemble({
+          context,
+          subject:
+            companyId !== null
+              ? { side: "FOUNDER", companyId }
+              : {
+                  side: "INVESTOR",
+                  investorOrganisationId: investorOrganisationId ?? "",
+                },
+          ask,
+          ...(publicProfile === null ? {} : { publicProfile }),
+        });
+      },
       logger,
     }),
     writeReply: async (input) =>
@@ -3948,6 +3990,39 @@ const situationAssembler = createSituationAssembler({
   // Addendum 2: what they did recently, from their own domain events.
   activity: createActivityRead(database.sql),
 });
+/** The asker's own run context for their situation, as planning reads it. */
+const situationToolContext = async (actor: ActorContext, runId: string) => {
+  const run = QRunIdSchema.safeParse(runId);
+  if (!run.success) return null;
+  const correlationId = CorrelationIdSchema.parse(createCorrelationId());
+  const decision = await firewall.plan({
+    actor,
+    runId: run.data,
+    correlationId,
+    capability: "ANSWER",
+    subjects: [],
+  });
+  return decision.outcome === "DENIED"
+    ? null
+    : {
+        actor,
+        runId: run.data,
+        correlationId,
+        capability: "ANSWER" as const,
+        plan: decision.plan,
+      };
+};
+/** A founder's own company's public-safe profile (topics for research). */
+const situationPublicProfile = async (actor: ActorContext) => {
+  const own = await createOwnResearchSubject(database.sql)(actor);
+  return own === null
+    ? null
+    : {
+        name: own.name,
+        country: own.country ?? undefined,
+        sectors: own.sectors,
+      };
+};
 const planStore = createPostgresPlanStore({
   sql: database.sql,
   transactions: database.transactions,
@@ -3994,27 +4069,7 @@ const plans = createPlans({
   planJob: {
     assembler: situationAssembler,
     // As the asker, now: their own firewall plan for the run they asked in.
-    toolContext: async (actor, runId) => {
-      const run = QRunIdSchema.safeParse(runId);
-      if (!run.success) return null;
-      const correlationId = CorrelationIdSchema.parse(createCorrelationId());
-      const decision = await firewall.plan({
-        actor,
-        runId: run.data,
-        correlationId,
-        capability: "ANSWER",
-        subjects: [],
-      });
-      return decision.outcome === "DENIED"
-        ? null
-        : {
-            actor,
-            runId: run.data,
-            correlationId,
-            capability: "ANSWER",
-            plan: decision.plan,
-          };
-    },
+    toolContext: situationToolContext,
     models: workforceModels,
     documents: createDeckRead(qTools.port),
     // Their own figures, held-back documents and confirmed-figure
@@ -4057,16 +4112,7 @@ const plans = createPlans({
         }));
       };
     },
-    publicProfile: async (actor) => {
-      const own = await createOwnResearchSubject(database.sql)(actor);
-      return own === null
-        ? null
-        : {
-            name: own.name,
-            country: own.country ?? undefined,
-            sectors: own.sectors,
-          };
-    },
+    publicProfile: situationPublicProfile,
     tools: qTools.port,
     logger,
   },

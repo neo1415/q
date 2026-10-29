@@ -348,17 +348,28 @@ export function createWorkforceDocuments(dependencies: {
           );
       }
     }
-    // Whoever it is for: their own context, read as them.
+    const merged = mergeDossiers(input.research ?? []);
+    // Owner 2026-10-29: research starts from everything Q knows about the
+    // person. When a research step wrote a brief from their situation, the
+    // writer reads it (the facts it selected and the sections it drew on:
+    // a thesis from their declared mandate, exposure from their own
+    // record) instead of a second, thinner read of the same records.
+    const briefed = merged.briefs.length > 0;
+    if (briefed) {
+      company = `${company}\n\nWHAT THIS QUESTION NEEDS, as Q briefed it from everything it holds about ${input.principalName ?? "the person"} (their own records, read as them; private):\n${merged.briefs.join("\n\n").slice(0, 16_000)}`;
+    }
+    // Whoever it is for: their own context, read as them (with a brief,
+    // only what it cannot hold: the history of a relationship in focus).
     const theirs = await dependencies
       .ownContext?.(actor, {
         companyId,
         goal: `${input.personRequest ?? ""} ${input.goal}`,
+        briefed,
       })
       .catch(() => null);
     if (theirs != null && theirs.length > 0) {
       company = `${company}\n\nWHO THIS IS FOR (${input.principalName ?? "the person"}), from their own records:\n${theirs}`;
     }
-    const merged = mergeDossiers(input.research ?? []);
     if (merged.budgetLimited) codeGaps.unshift(BUDGET_LIMITED_GAP);
     // Investigation (2026-10-29): Capital Q's own records the person may
     // see, labelled apart from web facts, and what stayed open.

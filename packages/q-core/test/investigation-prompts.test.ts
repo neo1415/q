@@ -8,7 +8,10 @@ import {
   renderPrompt,
   DEFAULT_COMMUNICATION_PROFILE,
   RESEARCH_FACTS_V3,
+  RESEARCH_BRIEF_V1,
   RESEARCH_PLAN_V4,
+  RESEARCH_PLAN_V5,
+  ResearchBriefResultSchema,
   ResearchFactsResultV3Schema,
   ResearchPlanResultV4Schema,
 } from "../src/index.js";
@@ -17,7 +20,11 @@ import {
 describe("investigation prompts", () => {
   it("are the active versions", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(4);
+    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(5);
+    expect(registry.getActive("RESEARCH_BRIEF").definition.version).toBe(1);
+    expect(registry.get("RESEARCH_PLAN", 4)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(3);
     expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(5);
     expect(registry.get("RESEARCH_FACTS", 2)?.definition.status).toBe(
@@ -39,8 +46,14 @@ describe("investigation prompts", () => {
         today: "2026-10-29",
         gaps: "REGULATION: no primary source yet",
         asked: "zedland widget payments market size",
+        brief:
+          "QUESTION: the Zedland widget payments sector\nSELECTED FACTS\n(none)",
       },
     });
+    expect(rendered.messages.map((one) => one.content).join("\n")).toContain(
+      "THE RESEARCH BRIEF (private",
+    );
+    expect(RESEARCH_PLAN_V5.template).toContain("never assume a country");
     const text = rendered.messages.map((one) => one.content).join("\n");
     expect(text).toContain("REGULATION: no primary source yet");
     expect(text).toContain("zedland widget payments market size");
@@ -93,5 +106,28 @@ describe("investigation prompts", () => {
     expect(ANALYSIS_WRITE_INVESTIGATION_RULE).toMatch(
       /No confidence percentages/u,
     );
+  });
+});
+
+describe("research brief prompt (owner 2026-10-29)", () => {
+  it("reads the situation and answers with refs; a slip costs the field, not the brief", () => {
+    expect(RESEARCH_BRIEF_V1.template).toContain("{{situation}}");
+    expect(RESEARCH_BRIEF_V1.template).toContain("never repeat a figure");
+    const parsed = ResearchBriefResultSchema.parse({
+      question: "q",
+      market: "not an object",
+      relevant: [{ ref: "F1", why: "w" }],
+      unknowns: [{ what: "x", establish: "MAYBE" }],
+      angles: [],
+      irrelevant: [],
+      summary: "s",
+    });
+    expect(parsed.market).toEqual({
+      places: [],
+      sectors: [],
+      stage: null,
+      subjects: [],
+    });
+    expect(parsed.unknowns[0]?.establish).toBe("PERSON");
   });
 });

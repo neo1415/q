@@ -25,6 +25,12 @@ const HISTORY_MAX = 2;
 export type OwnContextFocus = {
   readonly companyId: string | null;
   readonly goal: string;
+  /**
+   * Owner 2026-10-29: a research brief written from their whole situation
+   * already holds their organisation, mandate and pipeline; only the
+   * history of a relationship in focus is read here then.
+   */
+  readonly briefed?: boolean | undefined;
 };
 
 /**
@@ -90,9 +96,10 @@ export function createOwnContextReader(dependencies: {
     focus?: OwnContextFocus,
   ): Promise<string | null> => {
     const lines: string[] = [];
-    const investorId = await dependencies
-      .ownInvestorOrganisation(actor)
-      .catch(() => null);
+    const briefed = focus?.briefed === true;
+    const investorId = briefed
+      ? null
+      : await dependencies.ownInvestorOrganisation(actor).catch(() => null);
     if (investorId !== null) {
       const read = (record: "INVESTOR_ORGANISATION" | "INVESTOR_MANDATES") =>
         dependencies.records
@@ -122,23 +129,25 @@ export function createOwnContextReader(dependencies: {
         ? undefined
         : await dependencies.relationships(actor).catch(() => undefined);
     if (own === undefined) {
-      lines.push("Their pipeline: not readable just now (unknown).");
+      if (!briefed)
+        lines.push("Their pipeline: not readable just now (unknown).");
     } else if (own !== null) {
       const items = own.items.slice(0, PIPELINE_MAX);
-      lines.push(
-        items.length === 0
-          ? "Their pipeline: no relationships yet."
-          : [
-              `Their pipeline (${own.side === "INVESTOR" ? "companies they are talking to" : "investors their company is talking to"}, as their relationships screen lists them):`,
-              ...items.map(
-                (item) =>
-                  `- ${item.counterpart.name} (${item.counterpart.kind}): ${item.state} since ${item.stateSince.slice(0, 10)}; next step: ${item.nextStep}`,
-              ),
-              ...(own.items.length > items.length
-                ? [`(and ${String(own.items.length - items.length)} more)`]
-                : []),
-            ].join("\n"),
-      );
+      if (!briefed)
+        lines.push(
+          items.length === 0
+            ? "Their pipeline: no relationships yet."
+            : [
+                `Their pipeline (${own.side === "INVESTOR" ? "companies they are talking to" : "investors their company is talking to"}, as their relationships screen lists them):`,
+                ...items.map(
+                  (item) =>
+                    `- ${item.counterpart.name} (${item.counterpart.kind}): ${item.state} since ${item.stateSince.slice(0, 10)}; next step: ${item.nextStep}`,
+                ),
+                ...(own.items.length > items.length
+                  ? [`(and ${String(own.items.length - items.length)} more)`]
+                  : []),
+              ].join("\n"),
+        );
       const brief = dependencies.brief;
       if (brief !== undefined) {
         for (const item of relationshipsInFocus(own, focus)) {

@@ -1532,6 +1532,9 @@ export {
   RESEARCH_FACTS_V3,
   RESEARCH_PLAN_INVESTIGATION_RULES,
   RESEARCH_PLAN_V4,
+  RESEARCH_PLAN_SITUATION_RULE,
+  RESEARCH_PLAN_V5,
+  RESEARCH_BRIEF_V1,
 } from "./prompts/tasks/analyst-investigation.v1.js";
 export * from "./prompts/schemas/analyst.js";
 export {

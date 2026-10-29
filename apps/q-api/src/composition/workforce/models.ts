@@ -21,6 +21,7 @@ import {
   AnalysisDocumentResultV3Schema,
   ResearchFactsResultV3Schema,
   ResearchPlanResultV4Schema,
+  ResearchBriefResultSchema,
   renderPrompt,
   type AnalysisCritiqueResult,
   type AnalysisCritiqueVariables,
@@ -29,7 +30,9 @@ import {
   type ResearchFactsResult,
   type ResearchFactsVariables,
   type ResearchPlanResult,
-  type ResearchPlanVariablesV4,
+  type ResearchPlanVariablesV5,
+  type ResearchBriefResult,
+  type ResearchBriefVariables,
   type AnalysisCritiqueResultV3,
   type AnalysisDocumentResultV3,
   type ResearchFactsResultV3,
@@ -91,11 +94,14 @@ export type PlanVariables = Omit<JobPlanVariablesV15Input, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
 /**
- * RESEARCH_PLAN v4 (investigation, 2026-10-29): the open questions code
- * found after a round and the queries already sent (both empty on the
- * first round).
+ * RESEARCH_PLAN v5 (2026-10-29): the open questions code found after a
+ * round and the queries already sent (both empty on the first round), and
+ * the research brief code grounded (the selected facts only).
  */
-export type ResearchPlanInput = Omit<ResearchPlanVariablesV4, Frame>;
+export type ResearchPlanInput = Omit<ResearchPlanVariablesV5, Frame>;
+/** RESEARCH_BRIEF v1: the request, their earlier words and the situation. */
+export type ResearchBriefInput = Omit<ResearchBriefVariables, Frame>;
+export type ResearchBriefOutput = ResearchBriefResult;
 /** A planned question as code reads it; `primary` absent: not marked. */
 export type ResearchPlanOutput = {
   readonly questions: readonly (ResearchPlanResult["questions"][number] & {
@@ -177,7 +183,16 @@ export const ANALYSIS_CRITIQUE_BUDGET = {
   maxOutputTokens: 2_400,
   attemptTimeoutMs: 90_000,
 } as const;
+/** One brief per job: a whole situation in, a short judgement out. */
+export const RESEARCH_BRIEF_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.05,
+  maxOutputTokens: 1_800,
+  attemptTimeoutMs: 45_000,
+} as const;
+
 type DeepBudget =
+  | typeof RESEARCH_BRIEF_BUDGET
   | typeof RESEARCH_PLAN_BUDGET
   | typeof RESEARCH_FACTS_BUDGET
   | typeof ANALYSIS_WRITE_BUDGET
@@ -274,6 +289,15 @@ export type WorkforceModels = {
     trace: Trace,
     input: ShortenQuestionsInput,
   ) => Promise<readonly string[] | null>;
+  /**
+   * Owner 2026-10-29: what a research question needs, decided from the
+   * person's situation before anything is planned.
+   */
+  readonly researchBrief?: (
+    who: Who,
+    trace: Trace,
+    input: ResearchBriefInput,
+  ) => Promise<Priced<ResearchBriefOutput> | null>;
   /** Owner 2026-10-23: the focused searches deep research runs. */
   readonly planResearch: (
     who: Who,
@@ -338,6 +362,7 @@ export function createWorkforceModels(dependencies: {
       | "DILIGENCE_QUESTIONS"
       | "DILIGENCE_QUESTIONS_SHORTEN"
       | "RESEARCH_PLAN"
+      | "RESEARCH_BRIEF"
       | "RESEARCH_FACTS"
       | "ANALYSIS_WRITE"
       | "ANALYSIS_CRITIQUE"
@@ -604,6 +629,20 @@ export function createWorkforceModels(dependencies: {
         },
       };
     },
+    researchBrief: (who, trace, variables) =>
+      priced<ResearchBriefInput, ResearchBriefResult>({
+        task: "RESEARCH_BRIEF",
+        taskClass: "EVIDENCE_SYNTHESIS",
+        who,
+        trace,
+        variables,
+        schema: ResearchBriefResultSchema,
+        budget: RESEARCH_BRIEF_BUDGET,
+        environmentNotes:
+          "You are briefing research, not running it. Code checks every reference and composes every query before anything leaves Capital Q.",
+        etiquette: null,
+        dropListItems: true,
+      }),
     researchFacts: async (who, trace, variables) => {
       const result = await priced<ResearchFactsInput, ResearchFactsResultV3>({
         task: "RESEARCH_FACTS",

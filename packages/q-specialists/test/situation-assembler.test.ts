@@ -26,6 +26,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import {
   createSituationAssembler,
+  mandateTopics,
   type SituationAssemblerOptions,
   type SituationAssemblerPorts,
   type SituationSubject,
@@ -752,6 +753,11 @@ describe("situation assembler", () => {
     }
     // Their own side is read: mandate, inbox, feed, saves.
     expect(sectionOf(dossier, "MANDATE").status).toBe("READ");
+    // Owner 2026-10-29: their declared sectors are public vocabulary for
+    // research topics; the cheque and their organisation's name never are.
+    expect(dossier.publicTopics).toEqual(["fintech"]);
+    expect(dossier.publicTopics.join(" ")).not.toContain(MANDATE_SECRET);
+    expect(dossier.publicTopics.join(" ")).not.toContain("Harbour");
     expect(sectionOf(dossier, "GATEQ").status).toBe("READ");
     expect(sectionOf(dossier, "FEED_DECISIONS").facts[0]?.statement).toContain(
       "You saved Tallyloom",
@@ -844,5 +850,52 @@ describe("situation assembler", () => {
       status: "UNAVAILABLE",
       reason: "TIMED_OUT",
     });
+  });
+});
+
+describe("mandate topics (owner 2026-10-29)", () => {
+  it("are their declared sectors in each declared geography; exclusions, cheques and names never", () => {
+    const topics = mandateTopics([
+      {
+        investorOrganisationId: INVESTOR_ORG,
+        displayName: "Harbour Capital",
+        investorType: null,
+        deploymentState: null,
+        mandates: [
+          {
+            mandateId: randomUUID(),
+            status: "ACTIVE",
+            version: 1,
+            discoveryMode: null,
+            cheque: { currency: "USD", min: "250000", max: "1000000" },
+            stage: { minStageCode: "seed", maxStageCode: "seed" },
+            constraints: [],
+            taxonomyPreferences: (
+              [
+                ["industry", "fintech", false],
+                ["business_model", "b2b_saas", false],
+                ["industry", "digital_lending", true],
+                ["geography", "nigeria", false],
+                ["geography", "kenya", false],
+              ] as const
+            ).map(([vocabularyCode, canonicalCode, isExclusion]) => ({
+              vocabularyCode,
+              canonicalCode,
+              preferenceStrength: isExclusion ? "HARD_EXCLUSION" : "MUST",
+              isExclusion,
+            })),
+            truthClass: "USER_CLAIM",
+          },
+        ],
+        truncated: false,
+      },
+    ]);
+    expect(topics).toEqual([
+      "fintech b2b saas nigeria",
+      "fintech b2b saas kenya",
+    ]);
+    const all = topics.join(" ");
+    for (const never of ["250000", "1000000", "lending", "Harbour", "seed"])
+      expect(all).not.toContain(never);
   });
 });

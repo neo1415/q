@@ -120,6 +120,12 @@ export type DeepResearchCommand = {
   readonly questions: readonly DeepResearchQuestion[];
   /** Words from public pages an earlier round read (egress.ts). */
   readonly publicTerms?: readonly string[] | undefined;
+  /**
+   * The person's own earlier messages in the conversation that asked
+   * (owner 2026-10-29: "Lagos" said a turn before places the question in
+   * Nigeria). Their words, never Q's.
+   */
+  readonly earlierUserText?: readonly string[] | undefined;
   /** Epoch ms after which no new question starts. */
   readonly deadlineAt: number;
   readonly signal?: AbortSignal | undefined;
@@ -233,6 +239,9 @@ export function createDeepResearch(dependencies: {
                 : { alsoQueries: [question.alsoQuery] }),
               ...(budget === undefined ? {} : { maxSearches: granted }),
               userText: command.request,
+              ...(command.earlierUserText === undefined
+                ? {}
+                : { earlierUserText: command.earlierUserText }),
               subject: null,
               freshness,
               extractCount: pages,

@@ -442,3 +442,103 @@ export const AnalysisCritiqueResultV3Schema = z.object({
 export type AnalysisCritiqueResultV3 = z.infer<
   typeof AnalysisCritiqueResultV3Schema
 >;
+
+// ---------------------------------------------------------------------------
+// Situation-first research (owner 2026-10-29): every Q capability starts
+// from everything Q knows about the account. A research BRIEF first decides,
+// from the person's situation dossier (the one planning reads, with F<n>
+// refs), what this question needs; the planner reads the brief and the facts
+// it selected, never the whole dossier; code still composes every query.
+// ---------------------------------------------------------------------------
+
+export const ResearchPlanVariablesV5Schema =
+  ResearchPlanVariablesV4Schema.extend({
+    /**
+     * The research brief as code grounded it: the question, the market in
+     * question, the angles, what is unknown, what must not drive the
+     * research, and the selected facts (F<n>). Private context for planning
+     * only; nothing in it may be written into a query. UNTRUSTED.
+     */
+    brief: z.string().max(8_000),
+  }).strict();
+export type ResearchPlanVariablesV5 = z.infer<
+  typeof ResearchPlanVariablesV5Schema
+>;
+export const RESEARCH_PLAN_V5_UNTRUSTED = [
+  ...RESEARCH_PLAN_V4_UNTRUSTED,
+  "brief",
+] as const;
+
+export const RESEARCH_BRIEF_SCHEMA_NAME = "ResearchBriefResult";
+export const RESEARCH_BRIEF_SCHEMA_VERSION = 1;
+
+export const ResearchBriefVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    /** The person's request, in their words. UNTRUSTED. */
+    request: z.string().min(1).max(4_000),
+    /** Their own earlier messages in the conversation. UNTRUSTED. */
+    earlier: z.string().max(4_000),
+    today: z.string().min(1).max(40),
+    /** The situation dossier, sections of F<n> facts. UNTRUSTED. */
+    situation: z.string().max(24_000),
+  })
+  .strict();
+export type ResearchBriefVariables = z.infer<
+  typeof ResearchBriefVariablesSchema
+>;
+export const RESEARCH_BRIEF_UNTRUSTED = [
+  "request",
+  "earlier",
+  "situation",
+] as const;
+
+const BriefFrom = z.string().trim().min(1).max(200);
+const BriefTerm = z.object({
+  name: z.string().trim().min(1).max(80),
+  /** The F<n> ref or the person's quoted words it came from. */
+  from: BriefFrom,
+});
+
+export const ResearchBriefResultSchema = z.object({
+  /** The question restated in their terms. */
+  question: z.string().trim().min(1).max(600),
+  market: z
+    .object({
+      places: z.array(BriefTerm).max(8).catch([]),
+      sectors: z.array(BriefTerm).max(6).catch([]),
+      stage: BriefTerm.nullable().catch(null),
+      /** Companies, products or bodies the research is about. */
+      subjects: z.array(BriefTerm).max(6).catch([]),
+    })
+    .catch({ places: [], sectors: [], stage: null, subjects: [] }),
+  /** The facts that matter for this question, and why. */
+  relevant: z
+    .array(
+      z.object({
+        ref: z
+          .string()
+          .trim()
+          .regex(/^F\d{1,3}$/u),
+        why: z.string().trim().min(1).max(200),
+      }),
+    )
+    .max(12)
+    .catch([]),
+  /** What Q needs and does not know; who can establish it. */
+  unknowns: z
+    .array(
+      z.object({
+        what: z.string().trim().min(1).max(200),
+        establish: z.enum(["RESEARCH", "PERSON"]).catch("PERSON"),
+      }),
+    )
+    .max(8)
+    .catch([]),
+  angles: z.array(z.string().trim().min(1).max(200)).max(8).catch([]),
+  /** What is irrelevant and must not drive the research. */
+  irrelevant: z.array(z.string().trim().min(1).max(200)).max(8).catch([]),
+  /** For the person: what Q is looking into, plain words, no refs. */
+  summary: z.string().trim().min(1).max(600),
+});
+export type ResearchBriefResult = z.infer<typeof ResearchBriefResultSchema>;
