@@ -137,8 +137,11 @@ describe("the loop never offers a covered step as its question", () => {
     }).turn({ ...turn(world, "Seed stage only."), actor });
 
     expect(seen[0]).toContain('"coveredBy":"I7.hard_exclusions"');
-    expect(outcome.asking).toBeNull();
-    expect(outcome.askingAbout).toEqual([]);
+    // Never the covered step; since 2026-10-29 the turn asks what is
+    // really open instead of ending with no question.
+    expect(outcome.asking?.stepKey).not.toBe("I7.sector_exclusions");
+    expect(outcome.askingAbout).not.toContain("I7.sector_exclusions");
+    expect(outcome.reply).not.toContain("Any sectors to exclude");
   });
 
   it("the write that settles a concept leaves the rest of its family out of what is still open", async () => {
