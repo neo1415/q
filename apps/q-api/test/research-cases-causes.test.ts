@@ -192,28 +192,27 @@ describe("cases B and G: a founder's own country is public and travels", () => {
         "payments adoption 2026",
       ],
     } as const;
-    for (const [prefix, place, raw] of [
-      ["B", "nigeria", briefB()],
+    const briefG: ResearchBriefOutput = {
+      ...briefB(),
+      question: "What changed in ShambaPay's Kenyan market this year.",
+      market: {
+        places: [{ name: "Kenya", from: "F2" }],
+        sectors: [
+          { name: "Agri-fintech", from: "F2" },
+          { name: "Payments", from: "F2" },
+        ],
+        stage: null,
+        subjects: [{ name: "Pula", from: "F1" }],
+      },
+      relevant: [{ ref: "F2", why: "The company and its country." }],
+      angles: [],
+    };
+    const runs: readonly (readonly ["B" | "G", string, ResearchBriefOutput])[] =
       [
-        "G",
-        "kenya",
-        {
-          ...briefB(),
-          question: "What changed in ShambaPay's Kenyan market this year.",
-          market: {
-            places: [{ name: "Kenya", from: "F2" }],
-            sectors: [
-              { name: "Agri-fintech", from: "F2" },
-              { name: "Payments", from: "F2" },
-            ],
-            stage: null,
-            subjects: [{ name: "Pula", from: "F1" }],
-          },
-          relevant: [{ ref: "F2", why: "The company and its country." }],
-          angles: [],
-        },
-      ],
-    ] as const) {
+        ["B", "nigeria", briefB()],
+        ["G", "kenya", briefG],
+      ];
+    for (const [prefix, place, raw] of runs) {
       const one = caseOf(prefix);
       const sent: string[] = [];
       const found = await research({

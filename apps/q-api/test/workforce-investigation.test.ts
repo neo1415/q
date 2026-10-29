@@ -31,7 +31,10 @@ import type {
   ResearchPlanOutput,
   WorkforceModels,
 } from "../src/composition/workforce/models.js";
-import { FIRST_ROUND_GAPS } from "../src/composition/workforce/deep-research.js";
+import {
+  FIRST_ROUND_GAPS,
+  FIRST_ROUND_RETRY_GAPS,
+} from "../src/composition/workforce/deep-research.js";
 import { progressOf } from "../src/composition/workforce/progress.js";
 import {
   checkpointKey,
@@ -926,7 +929,9 @@ describe("a research plan that fails (live 2026-10-29)", () => {
     expect(found.status).toBe("OK");
     expect(inputs[0]?.gaps).toBe(FIRST_ROUND_GAPS);
     expect(inputs[0]?.asked).toBe("Nothing yet.");
-    expect(inputs[1]).toEqual(inputs[0]);
+    // Asked again saying what went wrong (live case E: an identical
+    // retry was refused by the provider), the rest unchanged.
+    expect(inputs[1]).toEqual({ ...inputs[0], gaps: FIRST_ROUND_RETRY_GAPS });
     expect(sent).toEqual(
       expect.arrayContaining(["zedland widget payments market size"]),
     );
