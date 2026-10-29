@@ -572,6 +572,7 @@ import {
   proposalStatusLine,
   Q_WORK_LINE,
   type QReceiptPort,
+  waitingCardLine,
 } from "./conversation-receipts.js";
 export {
   createWordsReaders,
@@ -9888,6 +9889,39 @@ export function createModelGatewayQAnswer(
           dependencies.receipts !== undefined
             ? proposalStatusLine(receipts)
             : null;
+        // Live 2026-10-29: a reply to Q's other offer ("yes" to opening
+        // Settings) acted elsewhere while a card still waited, and nothing
+        // said so. The engine's waiting line follows such a turn; never
+        // beside a status line, a decided approval or a new proposal.
+        const proposedNow =
+          proposed ||
+          proposedName ||
+          toolCalls.some(
+            (call) =>
+              call.status === "SUCCEEDED" &&
+              call.providerName.startsWith("propose_"),
+          );
+        const actedElsewhere =
+          clientActionBlocks.length > 0 ||
+          toolCalls.some((call) => {
+            const kind = offeredByName.get(call.providerName)?.classification;
+            return (
+              call.status === "SUCCEEDED" &&
+              kind !== undefined &&
+              kind !== "READ_ONLY" &&
+              kind !== "ANALYTICAL"
+            );
+          });
+        const waitingLine =
+          statusLine === null &&
+          approvalLine === null &&
+          !proposedNow &&
+          actedElsewhere &&
+          (request.turnKind === "ANSWER" ||
+            request.turnKind === "TOOL_REQUEST") &&
+          dependencies.receipts !== undefined
+            ? waitingCardLine(receipts)
+            : null;
         // The engine's status replaces the model's: its status sentences
         // go, and its one offer follows the status line, so the answer
         // never says both "nothing is waiting" and "it needs your
@@ -10016,6 +10050,9 @@ export function createModelGatewayQAnswer(
                 ...(statusLine === null || couldNot !== null
                   ? []
                   : [statusLine]),
+                ...(waitingLine === null || couldNot !== null
+                  ? []
+                  : [waitingLine]),
                 // The card the engine shows is the offer when one was
                 // prepared; otherwise the model's one offer follows.
                 ...(statusTalk?.offer == null ||

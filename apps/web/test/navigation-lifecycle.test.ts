@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -548,6 +548,15 @@ describe("the typed route table", () => {
         const full = join(dir, name);
         if (!statSync(full).isDirectory()) {
           if (name === "page.tsx" && route.length > 0) found.push(route);
+          // A page address answered by a redirect before any HTML (React
+          // #419, live 2026-10-29) is still a page address.
+          if (
+            name === "route.ts" &&
+            route.length > 0 &&
+            readFileSync(full, "utf8").includes("redirectBeforeStreaming(")
+          ) {
+            found.push(route);
+          }
           continue;
         }
         walk(full, /^\(.+\)$/u.test(name) ? route : `${route}/${name}`);

@@ -305,7 +305,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
       authority: reading({ finishing: true }),
     });
     const first = await say("that's all");
-    expect(first.reply).toMatch(/^Here's what I have saved: /u);
+    expect(first.reply).toMatch(/^Here's what I have saved:\n/u);
     expect(first.asking?.stepKey).toBe("I11.review");
     expect(world.recordedValue("I11.review")).toBeUndefined();
     expect(first.view.session.status).toBe("ACTIVE");

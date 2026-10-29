@@ -790,6 +790,19 @@ const EDGES: readonly EdgeSpec[] = [
     type: "commonly_co_occurs",
     to: ["customer_type", "small_business"],
   },
+  // Live 2026-10-29: a founder's Telehealth (a product category) never met
+  // an investor's Healthcare (an industry). Healthcare is broader than both
+  // of its product categories; matching follows `broader_than` edges.
+  {
+    from: ["industry", "healthcare"],
+    type: "broader_than",
+    to: ["product_category", "telehealth"],
+  },
+  {
+    from: ["industry", "healthcare"],
+    type: "broader_than",
+    to: ["product_category", "health_records"],
+  },
 ];
 
 function build(): ReferenceTaxonomy {

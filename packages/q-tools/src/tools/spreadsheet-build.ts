@@ -78,8 +78,31 @@ export type UnfilledColumn = {
   /** NOT_KNOWN: how many rows are blank, of `of`. */
   readonly rows?: number | undefined;
   readonly of?: number | undefined;
+  /**
+   * NOT_KNOWN on a side-by-side sheet (one row per measure, one column per
+   * company): the names whose cell in this row is blank.
+   */
+  readonly for?: readonly string[] | undefined;
   readonly detail?: string | undefined;
 };
+
+/**
+ * Live 2026-10-29 ("put that side-by-side thing into a file"): a measure
+ * row's blank cells, named by the column they sit under, so the receipt
+ * says which cells were not filled as the pipeline sheet's does.
+ */
+function unfilledByRow(main: QSheet | undefined): UnfilledColumn[] {
+  if (main === undefined) return [];
+  return main.rows.flatMap((row) => {
+    const names = main.columns.flatMap((column, at) =>
+      at > 0 && row[at] === null ? [column.label] : [],
+    );
+    const label = row[0];
+    return names.length === 0 || typeof label !== "string"
+      ? []
+      : [{ column: label, why: "NOT_KNOWN" as const, for: names }];
+  });
+}
 
 export type BuiltSpreadsheet = {
   readonly title: string;
@@ -355,6 +378,24 @@ const money = (value: Money | null | undefined): QSheetCell =>
     ? null
     : { amount: value.amount, currency: value.currency };
 
+function unscoredOf(
+  input: PipelineInput,
+  joined: Extract<PipelineFitJoin, { kind: "JOINED" }> | null,
+): string[] {
+  if (joined === null) return [];
+  const names = input.relationships
+    .filter(
+      (item) =>
+        item.counterpart.kind === "COMPANY" &&
+        !joined.byCompany.has(item.counterpart.id),
+    )
+    .map((item) => item.counterpart.name);
+  if (names.length === 0) return [];
+  return [
+    `${andList(names)} ${names.length === 1 ? "has" : "have"} no fit score yet: Capital Q scores fit for companies eligible for Discover (for example once verification is complete), so ${names.length === 1 ? "its" : "their"} fit cells are blank.`,
+  ];
+}
+
 export function buildPipelineSheet(
   input: PipelineInput,
   choice: SheetChoice,
@@ -555,6 +596,10 @@ export function buildPipelineSheet(
       ...(input.fit?.kind === "NOT_AVAILABLE"
         ? [`Fit with your mandate is not in this sheet: ${input.fit.detail}.`]
         : []),
+      // Live 2026-10-29 (LedgerBridge): the fit service scores only the
+      // companies eligible for Discover, so one awaiting that has blank fit
+      // cells; the reason is said, not left to read as a verdict.
+      ...unscoredOf(input, joined),
     ],
     unfilled: [
       ...unfilledOf(
@@ -639,6 +684,7 @@ export function buildComparisonSheet(
     gaps: rows.some((row) => row.some((cell) => cell === null))
       ? ["Blank cells were not known when Q compared them."]
       : [],
+    unfilled: unfilledByRow(main),
   });
 }
 
@@ -774,6 +820,7 @@ export function buildTableSheet(
     gaps: rows.some((row) => row.some((cell) => cell === null))
       ? ["Blank cells were not known in Q's table."]
       : [],
+    unfilled: unfilledByRow(main),
   });
 }
 
@@ -885,6 +932,11 @@ export function buildShownSheet(
  * was made -- sheets, rows, columns -- and which asked-for columns could
  * not be filled and why. The model adds at most one offer after it.
  */
+const andList = (names: readonly string[]): string =>
+  names.length <= 1
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+
 export function spreadsheetReceipt(built: BuiltSpreadsheet): string {
   const list = (labels: readonly string[], max: number) =>
     labels.length <= max
@@ -905,9 +957,11 @@ export function spreadsheetReceipt(built: BuiltSpreadsheet): string {
     .map((gap) =>
       gap.why === "NOT_AVAILABLE"
         ? `${gap.column}: not available${gap.detail === undefined || gap.detail.length === 0 ? "" : ` (${gap.detail})`}`
-        : gap.rows !== undefined && gap.of !== undefined && gap.rows < gap.of
-          ? `${gap.column}: not known for ${String(gap.rows)} of ${String(gap.of)} rows, left blank`
-          : `${gap.column}: not known for any row, left blank`,
+        : gap.for !== undefined && gap.for.length > 0
+          ? `${gap.column}: not known for ${andList(gap.for)}, left blank`
+          : gap.rows !== undefined && gap.of !== undefined && gap.rows < gap.of
+            ? `${gap.column}: not known for ${String(gap.rows)} of ${String(gap.of)} rows, left blank`
+            : `${gap.column}: not known for any row, left blank`,
     );
   return (
     missing.length === 0 ? made : `${made} Not filled: ${missing.join("; ")}.`

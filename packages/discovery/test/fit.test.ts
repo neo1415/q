@@ -50,7 +50,10 @@ import {
   stageLabel,
 } from "../src/infrastructure/fit-inputs.js";
 import { ELIGIBILITY_BATCH_MAX } from "../src/eligibility/contracts.js";
-import type { MandateHardConstraint } from "../src/eligibility/ports.js";
+import type {
+  MandateHardConstraint,
+  MandateTaxonomyRule,
+} from "../src/eligibility/ports.js";
 import {
   FIT_REASON_TEMPLATES,
   renderFitReason,
@@ -477,6 +480,38 @@ describe("comparators", () => {
     );
     expect(profile.band).toBe("OUTSIDE_MANDATE");
     expect(profile.hardRule?.label).toMatch(/rule you set/);
+  });
+
+  it("a 'Must match' the company positively misses is outside the mandate, never a Good fit (live 2026-10-29, Mizan)", () => {
+    const geo = (value: string | null) =>
+      value === null
+        ? snapshotWith(
+            {},
+            { "declared_fit.geography": "COMPANY_GEOGRAPHY_UNKNOWN" },
+          )
+        : snapshotWith({ "declared_fit.geography": value });
+    const must = { mustMatch: { geography: true } };
+    const cairo = observe(must, [], geo("NO_MATCH"));
+    expect(cairo.hardRule?.code).toBe("EXCLUDED_GEOGRAPHY");
+    expect(cairo.hardRule?.label).toMatch(/said must match/);
+    const { profile } = assessFit(
+      { ...row("SSMSSSSSS"), hardRule: cairo.hardRule },
+      FIT_CONFIG_V4,
+      AT,
+    );
+    expect(profile.band).toBe("OUTSIDE_MANDATE");
+    expect(fitScoreOutOf10(profile)).toBeNull();
+    // Unknown never excludes; a region match meets it; a preference only
+    // (not "Must match") stays a weighted miss.
+    expect(observe(must, [], geo(null)).hardRule).toBeNull();
+    expect(observe(must, [], geo("REGION_MATCH")).hardRule).toBeNull();
+    expect(observe({}, [], geo("NO_MATCH")).hardRule).toBeNull();
+    const stage = observe(
+      { mustMatch: { stage: true } },
+      [],
+      snapshotWith({ "declared_fit.stage": "NO_MATCH" }),
+    );
+    expect(stage.hardRule?.code).toBe("STAGE_OUTSIDE_STRICT_RANGE");
   });
 
   it("formats money short and deterministically", () => {
@@ -1029,7 +1064,11 @@ describe("fit inputs from the investor's own mandate and what the reader may see
       automatedUse: "ELIGIBLE",
     }) as unknown as MandateHardConstraint;
 
-  function source(roles: readonly string[], raise: boolean) {
+  function source(
+    roles: readonly string[],
+    raise: boolean,
+    taxonomyPreferences: readonly MandateTaxonomyRule[] = [],
+  ) {
     // No snapshot row exists: every read returns nothing.
     const sql = (() => Promise.resolve([])) as never;
     return createFitInputSource({
@@ -1044,7 +1083,7 @@ describe("fit inputs from the investor's own mandate and what the reader may see
                 investorOrganisationId: ID(300),
                 version: 3,
                 status: "ACTIVE" as const,
-                taxonomyPreferences: [],
+                taxonomyPreferences,
                 stage: { minStageCode: "pre_seed", maxStageCode: "seed" },
                 constraints: [
                   constraint("investment_role", {
@@ -1166,6 +1205,31 @@ describe("fit inputs from the investor's own mandate and what the reader may see
       now: NOW,
     });
     expect(observed.observations.CHEQUE_SIZE.outcome).toBe("UNKNOWN");
+  });
+
+  it("reads 'Must match' geography only from the investor's own selection", async () => {
+    const pref = (
+      preferenceStrength: MandateTaxonomyRule["preferenceStrength"],
+      from = "user_selected",
+    ): MandateTaxonomyRule => ({
+      nodeId: ID(400),
+      vocabularyCode: "geography",
+      preferenceStrength,
+      isExclusion: false,
+      source: from,
+    });
+    const must = async (prefs: readonly MandateTaxonomyRule[]) =>
+      (
+        await source([], false, prefs).read({
+          actor,
+          investorOrganisationId: ID(300),
+          mandateId: ID(200),
+          companyIds: [ID(1)],
+        })
+      ).get(ID(1))?.declared.mustMatch?.geography ?? false;
+    expect(await must([pref("MUST")])).toBe(true);
+    expect(await must([pref("STRONG")])).toBe(false);
+    expect(await must([pref("MUST", "q_inferred")])).toBe(false);
   });
 
   it("labels stages plainly", () => {

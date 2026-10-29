@@ -173,6 +173,30 @@ describe("reference taxonomy (§110-120)", () => {
     expect(pi).toBeGreaterThan(fs);
     expect(sql).not.toMatch(/weight|score|rank/i);
   });
+
+  it("Healthcare is broader than Telehealth and Health Records, as the 2026-10-29 migration applies (live re-test)", async () => {
+    const healthcare = referenceNode("industry", "healthcare").id;
+    const under = REFERENCE_TAXONOMY.edges
+      .filter(
+        (e) => e.fromNodeId === healthcare && e.edgeType === "broader_than",
+      )
+      .map((e) => e.toNodeId)
+      .sort();
+    const expected = [
+      referenceNode("product_category", "telehealth").id,
+      referenceNode("product_category", "health_records").id,
+    ].sort();
+    expect(under).toEqual(expected);
+    const { readFile } = await import("node:fs/promises");
+    const migration = await readFile(
+      new URL(
+        "../../../supabase/migrations/20261231160000_taxonomy_healthcare_broader_than.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    for (const id of [healthcare, ...expected]) expect(migration).toContain(id);
+  });
 });
 
 describe("hierarchy validation (§27-30, §171-172)", () => {

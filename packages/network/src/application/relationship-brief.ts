@@ -582,28 +582,10 @@ export function createRelationshipBrief(
     // The interests this side's history names, for their notes: the party
     // check above already passed, and an interest's note is written to the
     // other side. A failed read leaves the note unknown, never invented.
-    const interestIds = [
-      ...new Set(
-        visible.flatMap((event) =>
-          event.eventType === RELATIONSHIP_EVENT_INTEREST_EXPRESSED
-            ? [text(event.payload?.["interestId"])]
-            : [],
-        ),
-      ),
-    ].filter((interestId): interestId is string => interestId !== null);
-    const interests = new Map<string, BriefInterestRead>();
-    for (const interestId of interestIds.slice(0, 5)) {
-      const parsed = InterestIdSchema.safeParse(interestId);
-      if (!parsed.success) continue;
-      const found = await dependencies.interests
-        .findById(dependencies.sql, parsed.data)
-        .catch(() => null);
-      if (found === null || found.relationshipId !== relationshipId) continue;
-      interests.set(interestId, {
-        note: found.note ?? null,
-        expressedBy: found.expressedByParty,
-      });
-    }
+    const interests = await readInterests(
+      dependencies,
+      interestsNamed(visible, relationshipId).slice(0, 5),
+    );
     return assembleBrief({
       interests,
       view: {
@@ -619,6 +601,55 @@ export function createRelationshipBrief(
       now,
     });
   };
+}
+
+/** The interests a history names, each with the relationship it is on. */
+function interestsNamed(
+  visible: readonly ProjectableEvent[],
+  relationshipId: string,
+): { readonly interestId: string; readonly relationshipId: string }[] {
+  return [
+    ...new Set(
+      visible.flatMap((event) =>
+        event.eventType === RELATIONSHIP_EVENT_INTEREST_EXPRESSED
+          ? [text(event.payload?.["interestId"])]
+          : [],
+      ),
+    ),
+  ]
+    .filter((interestId): interestId is string => interestId !== null)
+    .map((interestId) => ({ interestId, relationshipId }));
+}
+
+/**
+ * The notes of the interests a history names: the party check already
+ * passed, and an interest's note is written to the other side. One read
+ * an interest, side by side; a failed read or an interest on another
+ * relationship is left out (its note unknown, never invented).
+ */
+async function readInterests(
+  dependencies: Pick<ExpressInterestDependencies, "interests" | "sql">,
+  wanted: readonly {
+    readonly interestId: string;
+    readonly relationshipId: string;
+  }[],
+): Promise<Map<string, BriefInterestRead>> {
+  const interests = new Map<string, BriefInterestRead>();
+  await Promise.all(
+    wanted.map(async ({ interestId, relationshipId }) => {
+      const parsed = InterestIdSchema.safeParse(interestId);
+      if (!parsed.success) return;
+      const found = await dependencies.interests
+        .findById(dependencies.sql, parsed.data)
+        .catch(() => null);
+      if (found === null || found.relationshipId !== relationshipId) return;
+      interests.set(interestId, {
+        note: found.note ?? null,
+        expressedBy: found.expressedByParty,
+      });
+    }),
+  );
+  return interests;
 }
 
 /** Reads one batch reader; a failure or a missing entry is UNAVAILABLE. */
@@ -718,37 +749,52 @@ export function createRelationshipBriefs(
       readBatch(sources.meetings, actor, ids),
       readBatch(sources.diligence, actor, [...inDiligence]),
     ]);
-    return Promise.all(
-      page.map(async (listing) => {
-        const id = listing.relationship.id;
-        const visible =
+    const histories = await Promise.all(
+      page.map(
+        async (listing) =>
           listing.visibleHistory ??
           visibleToParty(
             await readHistory(dependencies, listing.relationship.id),
             side,
-          );
-        return assembleBrief({
-          view: {
-            side,
-            counterpart:
-              side === "INVESTOR"
-                ? { kind: "COMPANY", id: listing.relationship.companyId }
-                : {
-                    kind: "INVESTOR_ORGANISATION",
-                    id: listing.relationship.investorOrganisationId,
-                  },
-            status: listing,
-          },
-          visible,
-          name: listing.counterpartName,
-          latest: entry(threads, id, threadRead),
-          meetings: entry(meetings, id, (list) => ({ list })),
-          diligence: inDiligence.has(id)
-            ? entry(diligence, id, (area) => ({ area }))
-            : { status: "OK", area: null },
-          now,
-        });
-      }),
+          ),
+      ),
     );
+    // Live 2026-10-29 (J7-I): the list's briefs read no interests, so every
+    // history entry's note was empty ("with no note") over a real note.
+    const interests = await readInterests(
+      dependencies,
+      page.flatMap((listing, at) =>
+        interestsNamed(histories[at] ?? [], listing.relationship.id).slice(
+          0,
+          2,
+        ),
+      ),
+    );
+    return page.map((listing, at) => {
+      const id = listing.relationship.id;
+      const visible = histories[at] ?? [];
+      return assembleBrief({
+        interests,
+        view: {
+          side,
+          counterpart:
+            side === "INVESTOR"
+              ? { kind: "COMPANY", id: listing.relationship.companyId }
+              : {
+                  kind: "INVESTOR_ORGANISATION",
+                  id: listing.relationship.investorOrganisationId,
+                },
+          status: listing,
+        },
+        visible,
+        name: listing.counterpartName,
+        latest: entry(threads, id, threadRead),
+        meetings: entry(meetings, id, (list) => ({ list })),
+        diligence: inDiligence.has(id)
+          ? entry(diligence, id, (area) => ({ area }))
+          : { status: "OK", area: null },
+        now,
+      });
+    });
   };
 }

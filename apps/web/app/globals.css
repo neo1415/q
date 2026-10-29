@@ -2327,7 +2327,9 @@
     position: absolute;
     top: 50%;
     inset-inline-end: 12px;
-    z-index: 2;
+    /* Above everything painted on the stage (the pitch, its scrim and the
+       caption overlay), from the token scale. */
+    z-index: var(--cq-z-sticky);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2348,15 +2350,11 @@
       inset-inline-start: 44px;
     }
   }
-  /* On a phone the swipe is the move; the explicit Previous and Next stay
-     reachable by keyboard and switch access, shown when focused. */
+  /* On a phone the swipe is the quick move, and Previous and Next are its
+     single-tap equivalent (WCAG 2.2 SC 2.5.7): shown and tappable, top
+     right under the filter (live 2026-10-29: clipped to nothing, so a tap
+     at their centre reached the video). */
   @media (max-width: 1023px) {
-    /* Clipped, never squashed: re-test #3 measured the buttons at 44x22
-       and past the right edge inside a 1px box. Their own size and place
-       stay (44px, inside the viewport); only the paint is clipped. */
-    .cq-feed-nav:not(:focus-within) {
-      clip-path: inset(50%);
-    }
     .cq-feed-nav {
       top: calc(56px + var(--cq-safe-top));
       transform: none;

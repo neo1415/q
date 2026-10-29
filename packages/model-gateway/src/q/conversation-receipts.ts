@@ -615,6 +615,20 @@ function named(summary: string): string {
  * because those are what the person can act on; otherwise the latest
  * change; and with none, that nothing is waiting or saved here.
  */
+/**
+ * The waiting card, said after a turn that went somewhere else (live
+ * 2026-10-29: a bare "yes" answered Q's other offer, opened Settings, and
+ * the card still waiting went unmentioned). The engine's own status line,
+ * only when something is PENDING; null otherwise, so nothing is said when
+ * nothing waits.
+ */
+export function waitingCardLine(receipts: readonly QReceipt[]): string | null {
+  const waiting = receipts.some(
+    (receipt) => receipt.kind === "ACTION" && receipt.status === "PENDING",
+  );
+  return waiting ? proposalStatusLine(receipts) : null;
+}
+
 export function proposalStatusLine(receipts: readonly QReceipt[]): string {
   const actions = receipts.filter(
     (receipt): receipt is Extract<QReceipt, { kind: "ACTION" }> =>

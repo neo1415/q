@@ -18,6 +18,7 @@ import {
   UNRESTRICTED_GEOGRAPHY_CODE,
 } from "../candidates/structured.js";
 import { DECLARED_TAXONOMY_SOURCES } from "../eligibility/policy.js";
+import { nodesUnder } from "./taxonomy-expansion.js";
 
 /**
  * Structured retrieval, assembled from the owning contexts' public ports.
@@ -148,7 +149,7 @@ export function createDomainCandidatePorts(
           node.canonicalCode === UNRESTRICTED_GEOGRAPHY_CODE;
         const descendants = unrestricted
           ? []
-          : await taxonomy.listDescendants(node.id);
+          : await nodesUnder(taxonomy, node);
         return {
           preferredNodeId: node.id,
           vocabularyCode: node.vocabularyCode,

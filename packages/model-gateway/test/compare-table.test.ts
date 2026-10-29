@@ -455,7 +455,7 @@ describe("namesToCompare (no reader comparison)", () => {
 // sets no preference" for both companies. A fact row says the company's
 // own facts or "Not stated"; how the mandate weighs them is the fit's.
 describe("fact rows are the company's facts (F-126)", () => {
-  it("says each company's own traction and team, or Not stated, never the mandate's weighting", () => {
+  it("says each company's own traction and team, or nothing (not known), never the mandate's weighting", () => {
     const { read, fits } = run();
     read.companyFacts.set(MIZAN, {
       ...(read.companyFacts.get(MIZAN) ?? {
@@ -501,11 +501,13 @@ describe("fact rows are the company's facts (F-126)", () => {
     const cells = (label: string) =>
       block.rows.find((row) => row.label === label)?.cells ?? [];
     expect(cells("Traction")[0]).toContain("$42,000");
-    expect(cells("Traction")[1]).toBe("Not stated");
+    // Unknown is the contract's empty cell (live 2026-10-29: "Not stated"
+    // went into the spreadsheet as words).
+    expect(cells("Traction")[1]).toBe("");
     expect(cells("Team")[0]).toBe(
       "Amira Saleh (founder, CEO); Omar Fathy (company-stated)",
     );
-    expect(cells("Team")[1]).toBe("Not stated");
+    expect(cells("Team")[1]).toBe("");
     for (const label of ["Traction", "Team"]) {
       for (const cell of cells(label)) {
         expect(cell).not.toMatch(/mandate/iu);
@@ -575,7 +577,7 @@ describe("the table never holds strangers", () => {
     const traction = block.rows.find((row) => row.label === "Traction");
     expect(traction?.cells[0]).toContain("₦38m in monthly recurring revenue");
     expect(traction?.cells[0]).toContain("(company-stated, profile)");
-    expect(traction?.cells[1]).toBe("Not stated");
+    expect(traction?.cells[1]).toBe("");
   });
 
   it("with a ranked set shown: only those, never Capital Q", () => {

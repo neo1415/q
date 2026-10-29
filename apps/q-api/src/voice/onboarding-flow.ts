@@ -270,6 +270,39 @@ export function withoutAnsweredQuestions(
     .trim();
 }
 
+/**
+ * The model's own `asking` names a step the record answered before this
+ * turn (live 2026-10-29: the deck's team size of 3 was kept, and Q still
+ * asked "how many people work at Ajali Health today, including the three
+ * founders?" -- a paraphrase no wording check matches). Decided by the
+ * step the reply declares, not by its words: its questions are taken out,
+ * and the backstop then asks what is really open. A step answered in this
+ * very turn may still be confirmed, so it is left alone.
+ */
+export function withoutAskOfAnswered(
+  reply: string,
+  asking: string | null | undefined,
+  state: OnboardingState,
+  recordedThisTurn: readonly string[],
+): string {
+  if (asking === null || asking === undefined) return reply;
+  if (recordedThisTurn.includes(asking)) return reply;
+  const step = state.steps.find((one) => one.stepKey === asking);
+  const answered =
+    step !== undefined &&
+    (step.status === "ANSWERED" ||
+      step.savePending === true ||
+      step.coveredBy !== undefined);
+  if (!answered) return reply;
+  const sentences = reply.match(/[^.?!؟]+[.?!؟]*/gu) ?? [reply];
+  return sentences
+    .filter((sentence) => !/[?؟]/u.test(sentence))
+    .filter((sentence) => sentence.trim() !== OPTIONAL_TAIL)
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Lower-case words only, single-spaced. */
 function normalWords(text: string): string {
   return text
@@ -585,11 +618,22 @@ export function finishingLine(
     // by reviewOf), never a prefix cut at a count (production re-test
     // 2026-10-28: the founder's read-back stopped at paying customers and
     // left out revenue, its currency, the raise and the instrument).
+    // One block a group, a blank line between (live 2026-10-29: one run-on
+    // paragraph two screens tall at 390); the screen lists each block.
     const saved = copy.review.saved
-      .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
-      .filter((line) => line.length > 0);
+      .map((block) =>
+        block
+          .split("\n")
+          .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
+          .filter((line) => line.length > 0)
+          .join("\n"),
+      )
+      .filter((block) => block.length > 0);
     return {
-      reply: `Here's what I have saved: ${saved.length === 0 ? "nothing yet" : saved.join(". ")}. Is that all right? Say yes and I'll finish, or tell me what to change.`,
+      reply:
+        saved.length === 0
+          ? "Here's what I have saved: nothing yet. Is that all right? Say yes and I'll finish, or tell me what to change."
+          : `Here's what I have saved:\n\n${saved.join("\n\n")}\n\nIs that all right? Say yes and I'll finish, or tell me what to change.`,
       asking: copy.review.stepKey,
     };
   }

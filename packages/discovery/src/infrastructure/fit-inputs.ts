@@ -6,7 +6,9 @@ import type { ActorContext } from "@capital-q/security";
 import type {
   EligibilityPorts,
   MandateHardConstraint,
+  MandateTaxonomyRule,
 } from "../eligibility/ports.js";
+import { DECLARED_TAXONOMY_SOURCES } from "../eligibility/policy.js";
 import type { DeclaredFitFacts } from "../fit/observe.js";
 import type { FitCompanyInputs, FitInputSource } from "../fit/service.js";
 import type { FitStatedEvidence } from "../fit/stated.js";
@@ -211,6 +213,7 @@ export function createFitInputSource(
 
 function mandateFacts(mandate: {
   readonly constraints: readonly MandateHardConstraint[];
+  readonly taxonomyPreferences?: readonly MandateTaxonomyRule[] | undefined;
   readonly stage?:
     | {
         readonly minStageCode: string | null;
@@ -294,7 +297,31 @@ function mandateFacts(mandate: {
         : `${min} to ${max}`
       : (min ?? max);
 
+  // "Must match" as the investor declared it, on their own selection
+  // only: a positive geography preference, or a stage rule at MUST.
+  const mustGeography =
+    (mandate.taxonomyPreferences ?? []).some(
+      (p) =>
+        p.vocabularyCode === "geography" &&
+        p.preferenceStrength === "MUST" &&
+        !p.isExclusion &&
+        (DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(p.source),
+    ) ||
+    mandate.constraints.some(
+      (c) =>
+        c.dimension === "geography.country" &&
+        c.importance === "MUST" &&
+        !c.isHardExclusion,
+    );
+  const mustStage = mandate.constraints.some(
+    (c) =>
+      c.dimension === "stage" && c.importance === "MUST" && !c.isHardExclusion,
+  );
+
   return {
+    ...(mustGeography || mustStage
+      ? { mustMatch: { geography: mustGeography, stage: mustStage } }
+      : {}),
     cheque,
     leadPolicy,
     businessModelPreferences:

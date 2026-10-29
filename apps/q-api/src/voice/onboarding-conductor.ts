@@ -18,6 +18,7 @@ import {
 } from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import type { Logger } from "@capital-q/observability";
+import type { OnboardingState } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -725,6 +726,12 @@ export type ConductorPortFactory = (input: {
   readonly journeyType: "founder" | "investor";
 }) => KnownAnswerPort & {
   readonly view: () => OnboardingSessionView | null;
+  /**
+   * Coverage's picture (the same `next` the conversation follows): a
+   * reopening asks what the conversation would ask, not the journey's
+   * order. Absent: the journey's order.
+   */
+  readonly state?: (() => Promise<OnboardingState>) | undefined;
   readonly recommendFound?:
     | ((
         items: readonly FoundRecommendation[],
@@ -928,6 +935,7 @@ export function createOnboardingConductor(
     if (!underway) return null;
     const actor = input.actor;
     let view: OnboardingSessionView | null = null;
+    let coverageNext: string | undefined = undefined;
     if (actor !== undefined) {
       const port = dependencies.portFor({
         actor,
@@ -937,6 +945,17 @@ export function createOnboardingConductor(
       });
       await settleKnownAnswers(port, input.journeyType);
       view = port.view();
+      // Live 2026-10-29: after "continue later" (a line that asks nothing),
+      // the reopening took the journey's order and read back the company
+      // details (F3.review) instead of the founders' full-time question
+      // the conversation had open. Coverage's own next is that question.
+      // Only a question: a confirmation is still reached by order below.
+      coverageNext = (await port.state?.().catch(() => null))?.next?.find(
+        (one) =>
+          one.reason === "CONTRADICTION" ||
+          one.reason === "ESSENTIAL_MISSING" ||
+          one.reason === "IMPORTANT_MISSING",
+      )?.stepKey;
     }
     view ??= await getOnboardingSession(
       input.session,
@@ -971,7 +990,10 @@ export function createOnboardingConductor(
       input.recentTurns.some((t) => t.role === "person");
     const pending =
       focused === null && view.session.status !== "COMPLETED"
-        ? stepStillAsked(view, input.journeyType, lastQ)
+        ? (stepStillAsked(view, input.journeyType, lastQ) ??
+          (coverageNext === undefined
+            ? null
+            : nextUnansweredStep(view, input.journeyType, [coverageNext])))
         : null;
     const asked = focused ?? pending;
     const ask =

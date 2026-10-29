@@ -235,6 +235,31 @@ describe("the builders", () => {
     });
   });
 
+  it("side by side: the receipt names each blank cell by its measure and company (live 2026-10-29)", () => {
+    const built = buildTableSheet(
+      {
+        kind: "TABLE",
+        title: "Side by side",
+        columns: [
+          { label: "MedTrail", subject: null },
+          { label: "Mizan", subject: null },
+        ],
+        rows: [
+          { label: "Stage", cells: ["Seed", "Seed"] },
+          { label: "Traction", cells: ["", ""] },
+          { label: "Team", cells: ["Vikram (founder)", ""] },
+        ],
+      },
+      { messageId: MESSAGE, today: TODAY },
+      {},
+    );
+    expect(built.workbook.sheets[0]?.rows[1]).toEqual(["Traction", null, null]);
+    const said = spreadsheetReceipt(built);
+    expect(said).toContain(
+      "Not filled: Traction: not known for MedTrail and Mizan, left blank; Team: not known for Mizan, left blank.",
+    );
+  });
+
   it("comparison: subjects become columns under the names the reader may see", () => {
     const block: Extract<QResultBlock, { kind: "COMPARISON" }> = {
       kind: "COMPARISON",
@@ -603,6 +628,26 @@ describe("XLSX-002 · the pipeline joins fit when it is asked for", () => {
     const said = spreadsheetReceipt(built);
     expect(said).toMatch(/Pipeline \(2 rows; columns Counterparty, Stage/);
     expect(said).toMatch(/Cheque fit: not known for 1 of 2 rows/);
+  });
+
+  it("says why a company in the pipeline has no fit, never leaving blank cells to read as a verdict (LedgerBridge)", () => {
+    const built = buildPipelineSheet(
+      {
+        side: "INVESTOR",
+        relationships: pipeline,
+        decisions: [],
+        today: TODAY,
+        fit: {
+          kind: "JOINED",
+          byCompany: new Map([[CO_1, fitOf()]]),
+          cheque: null,
+        },
+      },
+      {},
+    );
+    expect(built?.gaps.join(" ")).toContain(
+      "Mizan has no fit score yet: Capital Q scores fit for companies eligible for Discover",
+    );
   });
 
   it("says fit is not available, and why, when it cannot be joined; never a column of zeros", () => {

@@ -276,7 +276,7 @@ export function QComposer({
               }
             }}
             onKeyDown={handleKeyDown}
-            className="cq-body max-h-40 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) [field-sizing:content] disabled:opacity-50"
+            className="cq-body max-h-40 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-(--cq-text-primary) outline-none placeholder:truncate placeholder:text-(--cq-text-tertiary) [field-sizing:content] disabled:opacity-50"
             data-q-composer-input
           />
         </div>

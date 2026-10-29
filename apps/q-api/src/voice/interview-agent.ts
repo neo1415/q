@@ -116,6 +116,7 @@ import {
   withoutRepeatedReceipt,
   withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
+  withoutAskOfAnswered,
 } from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
@@ -3133,6 +3134,32 @@ export function createInterviewAgent(
           e.status !== "COMPLETED" &&
           e.status !== "SKIPPED",
       );
+
+    // The reply's own declared question is one the record already answered
+    // (live 2026-10-29, team size): its questions go, and the backstop below
+    // asks what is really open.
+    if (
+      result !== undefined &&
+      !handingOver &&
+      !pausing &&
+      stateAfter !== null
+    ) {
+      const cut = withoutAskOfAnswered(
+        reply,
+        result.asking,
+        stateAfter,
+        recorded,
+      );
+      if (cut !== reply) {
+        logger.info(
+          { asking: result.asking },
+          "the reply asked a step already answered; its question was taken out",
+        );
+        reply = cut;
+        askedOpen = null;
+        stillOpen = false;
+      }
+    }
 
     // Proactive (owner 2026-10-16): a turn that is not the last never ends
     // without the next most valuable question, from coverage. Not while a

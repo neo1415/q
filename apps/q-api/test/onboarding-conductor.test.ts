@@ -627,6 +627,48 @@ describe("Q leads", () => {
     expect(appended).toEqual([outcome.reply]);
   });
 
+  it("reopens on the question the conversation had open, not the journey's order (live 2026-10-29: a read-back instead of the full-time question)", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
+    const open = FOUNDER_KEYS.slice(0, 6).find(
+      (key, at) => at > 1 && key !== "F1.website",
+    );
+    if (open === undefined) throw new Error("no open step");
+    const base = fakePorts();
+    const portFor: ConductorPortFactory = (context) => ({
+      ...base.portFor(context),
+      state: () =>
+        Promise.resolve({
+          journey: "founder",
+          currentStepKey: null,
+          canComplete: false,
+          completed: false,
+          steps: [],
+          checks: [],
+          next: [{ stepKey: open, reason: "ESSENTIAL_MISSING" }],
+        }),
+    });
+    const { fetch: f } = api({
+      kept: [
+        { role: "Q", text: "Are the founders all full-time on it?" },
+        { role: "PERSON", text: "I'll continue this later" },
+        {
+          role: "Q",
+          text: "Of course. Pick this up whenever you like; your home page is ready.",
+        },
+      ],
+    });
+    const outcome = await createOnboardingConductor({
+      agent,
+      portFor,
+      logger,
+    }).turn(input(f, ""));
+    expect(agent.calls).toEqual([]);
+    expect(outcome.resumed).toBe(true);
+    expect(outcome.askingAbout).toEqual([open]);
+    expect(outcome.reply).toMatch(/^Picking up where we left off\./u);
+    await tick();
+  });
+
   it("opens a first conversation with the loop's own greeting", async () => {
     const agent = fakeAgent(() =>
       Promise.resolve(outcomeOf("Hi Aria. Is Mai Soli your company's name?")),

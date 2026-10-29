@@ -60,10 +60,6 @@ const EXEMPT: Readonly<Record<string, string>> = {
   "settings/reconnect/google/page.tsx": CALLBACK,
   "settings/billing/page.tsx":
     "an old address: it redirects to Plan and billing, which registers its own section",
-  "company/page.tsx":
-    "the bare company address: it redirects to the founder's own company page, which registers its own sections",
-  "mandate/page.tsx":
-    "the bare mandate address: it redirects to the investor's profile, which registers its own section",
   "g/[publicId]/page.tsx": PUBLIC,
   "g/[publicId]/embed/page.tsx": PUBLIC,
   "u/[handle]/page.tsx": PUBLIC,

@@ -1163,15 +1163,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/discover/saved/compare": cap("tool.fit_compare"),
   // Founder design 2026-09-28: a Q Card by its whole @handle.
   "/find": exempt("the old address of Search; it only redirects"),
-  // D6 (live typed run 2026-10-28): short addresses people type; each only
-  // redirects to the person's own company page or mandate, or to the setup
-  // that creates it. Q already opens those destinations.
-  "/company": exempt(
-    "redirects to the person's own company page, or to founder setup",
-  ),
-  "/mandate": exempt(
-    "redirects to the investor's mandate on their profile, or to investor setup",
-  ),
+  // D6: /company and /mandate are route handlers now (a 307 before any
+  // HTML; React #419, live 2026-10-29), not pages.
   "/search": exempt(
     "search by @handle and founders' videos; the People tab opens public Q Cards and Q links them directly",
   ),
