@@ -332,3 +332,118 @@ export const ANALYSIS_WRITE_V6: PromptDefinition<
 if (!ANALYSIS_WRITE_V6.template.includes("ANSWER THE QUESTION ASKED")) {
   throw new Error("ANALYSIS_WRITE v6 extends v5's rules, which changed");
 }
+
+/**
+ * Live case E (2026-10-29): the first plan for a global question came
+ * back with no questions. v5's rules key the first round off OPEN
+ * QUESTIONS being empty, but code always fills it (an empty field reads
+ * "(not provided)", which the planner took for a later round with nothing
+ * open): read literally, every first round was "a later round" where "when
+ * nothing new is worth searching, return no questions". v6 names the first
+ * round by what code says in it and never allows it to be empty.
+ */
+export const RESEARCH_PLAN_V6: PromptDefinition<
+  ResearchPlanVariablesV5,
+  ResearchPlanResultV4
+> = {
+  ...RESEARCH_PLAN_V5,
+  version: 6,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-29",
+  changeDescription:
+    "Live case E 2026-10-29: v5 keyed the first round off OPEN QUESTIONS being empty, which code never sends; read literally, a first round was a later round with nothing open, and the plan came back empty. v6: the first round is the one OPEN QUESTIONS says is the first round, and it always plans 6 to 12 questions; only a later round may return none.",
+  template: RESEARCH_PLAN_V5.template
+    .replace(
+      "OPEN QUESTIONS (code's findings after the last round; empty on the first round)",
+      "OPEN QUESTIONS (code's findings after the last round; on the first round it says it is the first round)",
+    )
+    .replace(
+      "- On the first round (OPEN QUESTIONS empty): between 6 and 12 questions, each a different line of enquiry.",
+      "- On the first round (OPEN QUESTIONS says it is the first round): always between 6 and 12 questions, each a different line of enquiry, never none -- the request asks for research. This holds for a global question too: with no place, plan the same lines worldwide.",
+    )
+    .replace(
+      "- INVESTIGATION ROUNDS: when OPEN QUESTIONS is not empty this is a later round.",
+      "- INVESTIGATION ROUNDS: when OPEN QUESTIONS lists code's open questions, this is a later round.",
+    )
+    .replace(
+      "When nothing new is worth searching, return no questions.",
+      "In a later round, when nothing new is worth searching, return no questions.",
+    ),
+};
+
+for (const piece of [
+  "on the first round it says it is the first round",
+  "never none",
+  "lists code's open questions",
+  "In a later round, when nothing new",
+]) {
+  if (!RESEARCH_PLAN_V6.template.includes(piece)) {
+    throw new Error("RESEARCH_PLAN v6 extends v5's template, which changed");
+  }
+}
+
+/**
+ * Live cases C and F (2026-10-29): the brief left out a pipeline company
+ * in the market in question because the investor tracks it as a
+ * later-stage secondary (C: Moniepoint, a Nigerian business-payments
+ * company, for a B2B payments question), and left out a pipeline company
+ * outside the market when the question was about the pipeline itself (F:
+ * Apollo Agriculture, for "how does the sector news affect my pipeline?").
+ */
+export const RESEARCH_BRIEF_RELEVANCE_RULE_V3 = `- relevant: the facts that shape the research the person asked for, and why, by F ref only -- a short list (at most 12), never everything. Ask of each fact: would the researcher plan different searches, or the writer reach a different conclusion about THIS question, without it?
+  - A question about a sector, market or topic is shaped by their declared mandate or thesis (geographies, sectors, stage, what it prefers and excludes), their stated preferences about sources, and companies in their pipeline that operate in that market (as market participants: competitors, benchmarks).
+  - A company in their pipeline (prospects, companies they watch or track) that operates in the market in question is selected as a market participant whatever its stage and whatever they track it for: a later-stage company, a benchmark or a secondary is still a competitor or comparable in that market.
+  - When the request is about their pipeline or portfolio itself ("my pipeline", "my portfolio", "the companies I track"), every company in it is selected, in the market in question or not: the answer covers each one, if only to say the news does not touch it.
+  - Records about one deal or company -- a board card, a deal code name, an IC or ticket note, a meeting, a message thread, a memo, a relationship state -- are selected only when the request or their earlier messages are about that company or deal (by name, or "this company", "the deal"). A sector question that mentions their thesis is not about any one company.
+  - A mandate exclusion matters only when the question touches the excluded sector; a pipeline company outside the market in question does not matter unless the request is about their pipeline itself; private figures never matter for planning.
+- subjects (in market): the companies, products or official bodies the research is about -- the request's own subjects and the market's participants and regulators -- never a company only because Q holds a deal record about it.
+`;
+
+export const RESEARCH_BRIEF_V3: PromptDefinition<
+  ResearchBriefVariables,
+  ResearchBriefResult
+> = {
+  ...RESEARCH_BRIEF_V2,
+  version: 3,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-29",
+  changeDescription:
+    "Live cases C and F 2026-10-29: v2 left out a pipeline company in the market because it was tracked as a later-stage secondary, and a pipeline company outside the market when the question was about the pipeline itself. v3: a pipeline company in the market is a participant whatever its stage or purpose; a question about their pipeline selects every company in it.",
+  template: RESEARCH_BRIEF_V2.template.replace(
+    RESEARCH_BRIEF_RELEVANCE_RULE,
+    RESEARCH_BRIEF_RELEVANCE_RULE_V3,
+  ),
+};
+
+if (!RESEARCH_BRIEF_V3.template.includes("whatever its stage")) {
+  throw new Error("RESEARCH_BRIEF v3 extends v2's template, which changed");
+}
+
+/**
+ * Live case F (2026-10-29): asked "how does the sector news affect my
+ * pipeline?", the investigation report had no section on the pipeline:
+ * v6's fixed section list had none, and its question rule kept a company
+ * they look at to one closing paragraph.
+ */
+export const ANALYSIS_WRITE_PIPELINE_RULE = `- THEIR PIPELINE: when the request asks how something affects their pipeline, portfolio or the companies they track, the request is about those companies. Add a section headed "Your pipeline" right after Implications for your thesis: one short paragraph per company in their pipeline that WHAT THIS QUESTION NEEDS names, each saying what the evidence means for it (labelled (Q's inference)) or that it does not touch it, and why.
+`;
+
+export const ANALYSIS_WRITE_V7: PromptDefinition<
+  AnalysisWriteVariables,
+  AnalysisDocumentResultV3
+> = {
+  ...ANALYSIS_WRITE_V6,
+  version: 7,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-29",
+  changeDescription:
+    "Live case F 2026-10-29: asked how sector news affects their pipeline, the report had no pipeline section. v7: a question about their pipeline, portfolio or tracked companies gets a 'Your pipeline' section after Implications for your thesis, one paragraph per pipeline company the brief names.",
+  template: ANALYSIS_WRITE_V6.template.replace(
+    "- Unknown stays unknown:",
+    `${ANALYSIS_WRITE_PIPELINE_RULE}- Unknown stays unknown:`,
+  ),
+};
+
+if (!ANALYSIS_WRITE_V7.template.includes('headed "Your pipeline"')) {
+  throw new Error("ANALYSIS_WRITE v7 extends v6's template, which changed");
+}

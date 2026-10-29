@@ -1542,6 +1542,11 @@ export {
   RESEARCH_BRIEF_RELEVANCE_RULE,
   RESEARCH_FACTS_UNREAD_RULE,
   ANALYSIS_WRITE_QUESTION_RULE,
+  RESEARCH_PLAN_V6,
+  RESEARCH_BRIEF_V3,
+  RESEARCH_BRIEF_RELEVANCE_RULE_V3,
+  ANALYSIS_WRITE_V7,
+  ANALYSIS_WRITE_PIPELINE_RULE,
 } from "./prompts/tasks/analyst-investigation.v1.js";
 export * from "./prompts/schemas/analyst.js";
 export {

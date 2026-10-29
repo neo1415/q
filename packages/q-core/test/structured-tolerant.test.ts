@@ -25,9 +25,9 @@ describe("tolerant deep-work results", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("JOB_PLAN").definition.version).toBe(15);
     // Investigation-grade research (2026-10-29) superseded these.
-    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(5);
+    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(6);
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(4);
-    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(6);
+    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(7);
     expect(registry.getActive("ANALYSIS_CRITIQUE").definition.version).toBe(3);
   });
 

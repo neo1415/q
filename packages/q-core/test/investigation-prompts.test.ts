@@ -16,6 +16,9 @@ import {
   ANALYSIS_WRITE_QUESTION_RULE,
   RESEARCH_PLAN_V4,
   RESEARCH_PLAN_V5,
+  RESEARCH_PLAN_V6,
+  RESEARCH_BRIEF_V3,
+  ANALYSIS_WRITE_V7,
   ResearchBriefResultSchema,
   ResearchFactsResultV3Schema,
   ResearchPlanResultV4Schema,
@@ -23,15 +26,44 @@ import {
 
 /** Investigation-grade research prompts (owner 2026-10-29). */
 describe("investigation prompts", () => {
+  it("never make a first round a later round (live case E, 2026-10-29)", () => {
+    // v5 said OPEN QUESTIONS is empty on the first round, which code never
+    // sends; read literally, a first round was a later round with nothing
+    // open, where returning no questions is allowed.
+    expect(RESEARCH_PLAN_V5.template).toContain(
+      "when OPEN QUESTIONS is not empty this is a later round",
+    );
+    expect(RESEARCH_PLAN_V6.template).not.toContain("OPEN QUESTIONS empty");
+    expect(RESEARCH_PLAN_V6.template).not.toContain("is not empty this is");
+    expect(RESEARCH_PLAN_V6.template).toContain(
+      "on the first round it says it is the first round",
+    );
+    expect(RESEARCH_PLAN_V6.template).toContain("never none");
+    expect(RESEARCH_PLAN_V6.template).toContain(
+      "In a later round, when nothing new is worth searching, return no questions.",
+    );
+  });
+
+  it("select pipeline companies in the market whatever their stage, and the whole pipeline when asked about it (cases C, F)", () => {
+    expect(RESEARCH_BRIEF_V3.template).toContain("whatever its stage");
+    expect(RESEARCH_BRIEF_V3.template).toContain(
+      "every company in it is selected",
+    );
+    expect(RESEARCH_BRIEF_V3.template).not.toContain(
+      "a pipeline company outside the market in question does not matter;",
+    );
+    expect(ANALYSIS_WRITE_V7.template).toContain('headed "Your pipeline"');
+  });
+
   it("are the active versions", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(5);
-    expect(registry.getActive("RESEARCH_BRIEF").definition.version).toBe(2);
+    expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(6);
+    expect(registry.getActive("RESEARCH_BRIEF").definition.version).toBe(3);
     expect(registry.get("RESEARCH_PLAN", 4)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(4);
-    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(6);
+    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(7);
     expect(registry.get("RESEARCH_FACTS", 2)?.definition.status).toBe(
       "DEPRECATED",
     );
