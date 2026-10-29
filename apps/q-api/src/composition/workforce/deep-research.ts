@@ -516,10 +516,14 @@ function checkedFacts(
 export function dossierFacts(
   checked: readonly CrossChecked<TieredFact & { readonly id: string }>[],
 ): ResearchDossier["facts"] {
-  const ranked = rankFacts(checked, DOSSIER_MAX_FACTS, (fact) =>
-    tierRank(fact.tier),
+  // Ranking gives final ids; the cross-check's references use the
+  // provisional ones, kept beside them.
+  const ranked = rankFacts(
+    checked.map((fact) => ({ ...fact, provisional: fact.id })),
+    DOSSIER_MAX_FACTS,
+    (fact) => tierRank(fact.tier),
   );
-  const kept = ranked.map((fact) => ({ ...fact, provisional: fact.id }));
+  const kept = [...ranked];
   const byProvisional = new Map(checked.map((fact) => [fact.id, fact]));
   const have = new Set(kept.map((fact) => fact.provisional));
   for (const fact of [...kept]) {
