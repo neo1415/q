@@ -1304,7 +1304,6 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 5. **Re-record only on purpose.** A miss in CI means code changed a query, a page read or a prompt. Re-record with `--force` only when the change is intended.
 6. **Evaluate a prompt or model change cheaply:** `NODE_USE_ENV_PROXY=1 node scripts/research-acceptance/eval.mjs`. It replays the recorded web pages, runs the models live, and scores with code checks plus a rubric. It spends no search credits.
 
-
 ## 2026-10-29 evening — two-step, email verification, deep research case A (Claude coordinator)
 
 - Deployed `ee1f98792` (see STATE). Live-verified two-step (TOTP) end to end incl. API refusal of aal1; email verification switched ON after a live sign-up/confirm run; resume fix verified.
