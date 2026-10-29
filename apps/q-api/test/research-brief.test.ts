@@ -173,14 +173,78 @@ describe("research brief grounding", () => {
       expect(terms).not.toContain(never.toLowerCase());
     // "seed" is not public vocabulary here (not in topics or their words).
     expect(brief.terms).not.toContain("seed");
-    // The planner reads the selected facts only.
-    expect(brief.planner).toContain(NG_PIPELINE);
+    // The query planner reads only what could leave: a private selected
+    // fact (the pipeline company) goes to the writer alone.
+    expect(brief.planner).toContain("Nigeria");
+    expect(brief.planner).not.toContain(NG_PIPELINE);
+    expect(brief.planner).not.toContain(CHEQUE);
+    expect(brief.writer).toContain(NG_PIPELINE);
     expect(brief.planner).not.toContain(OTHER_PIPELINE);
     expect(brief.planner).not.toContain(THIRD_PIPELINE);
     expect(brief.planner).not.toContain("F99");
     // For the person: no refs.
     expect(brief.summary).not.toMatch(/\bF\d/u);
     expect(brief.scope).toContain("Nigeria, Ghana, Kenya");
+  });
+
+  it("the planner never sees a private selected fact, nor model words about one (case A, Project Kola)", () => {
+    const CODE_NAME = "Project Kolax";
+    const dossier: QSituationDossier = {
+      ...DOSSIER,
+      sections: [
+        ...DOSSIER.sections,
+        {
+          source: "BOARD",
+          status: "READ",
+          reason: null,
+          truncated: false,
+          facts: [
+            fact(
+              "F5",
+              `Board card '${CODE_NAME}': internal code name; status first look.`,
+              "investor_private",
+            ),
+          ],
+        },
+        {
+          source: "PUBLIC",
+          status: "READ",
+          reason: null,
+          truncated: false,
+          facts: [
+            fact(
+              "F6",
+              "The central bank published new payment service bank guidelines.",
+              "public_external",
+            ),
+          ],
+        },
+      ],
+    };
+    const brief = groundBrief({
+      raw: {
+        ...RAW_BRIEF,
+        market: {
+          ...RAW_BRIEF.market,
+          subjects: [{ name: CODE_NAME, from: "F5" }],
+        },
+        relevant: [
+          { ref: "F5", why: `${CODE_NAME} is the deal in view.` },
+          { ref: "F6", why: "Public regulatory news." },
+        ],
+        angles: [`how it affects ${CODE_NAME}`, "payments regulation"],
+        unknowns: [{ what: `${CODE_NAME} licence`, establish: "RESEARCH" }],
+      },
+      dossier,
+      words: [REQUEST],
+    });
+    expect(brief.selected).toEqual(["F5", "F6"]);
+    expect(brief.planner).not.toContain(CODE_NAME);
+    expect(brief.planner).not.toContain("Kolax");
+    expect(brief.planner).toContain("payments regulation");
+    expect(brief.planner).toContain("payment service bank guidelines");
+    // The writer still reads the whole brief.
+    expect(brief.writer).toContain(CODE_NAME);
   });
 
   it("with no place in words or context the scope is global", () => {
@@ -308,10 +372,10 @@ describe("deep research from the person's situation", () => {
     // One brief call, from the whole situation.
     expect(briefs).toHaveLength(1);
     expect(briefs[0]?.situation).toContain(OTHER_PIPELINE);
-    // The planner reads the brief and the selected facts only.
+    // The planner reads the public-safe part of the brief only.
     const planned = plans[0];
     expect(planned?.brief).toContain("Nigeria");
-    expect(planned?.brief).toContain(NG_PIPELINE);
+    expect(planned?.brief).not.toContain(NG_PIPELINE);
     expect(planned?.brief).not.toContain(OTHER_PIPELINE);
     expect(planned?.brief).not.toContain(THIRD_PIPELINE);
     // The queries carry their markets, and nothing private.

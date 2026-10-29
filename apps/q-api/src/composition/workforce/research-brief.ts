@@ -19,8 +19,9 @@ import { situationText } from "./plan-job.js";
  * proposes the brief; code grounds it here:
  *
  *   - a fact is selected only by a ref the dossier holds;
- *   - the planner reads the brief and the selected facts, never the whole
- *     dossier;
+ *   - the query planner reads only the public-safe part of the brief (the
+ *     market, angles and selected facts labelled public_external); the
+ *     writer reads the whole brief, private selected facts included;
  *   - what may LEAVE in a query is exactly what was judged relevant and is
  *     public: the brief's places, sectors, stage and subjects whose every
  *     word is public-safe vocabulary (the dossier's own public topics -- a
@@ -67,7 +68,7 @@ export const GroundedBriefSchema = z
     selected: z.array(z.string().regex(/^F\d{1,3}$/u)).max(12),
     /** What may leave beside their words and the pages read. */
     terms: z.array(z.string().max(120)).max(40),
-    /** What the planner reads. */
+    /** What the query planner reads: the public-safe part only. */
     planner: z.string().max(8_000),
     /** What the writer reads. */
     writer: z.string().max(12_000),
@@ -235,10 +236,52 @@ export function groundBrief(input: {
       `${factLine(fact)}${reason === undefined ? "" : ` -- why: ${reason}`}`,
     ];
   });
-  const planner = [
+  const full = [
     ...head,
     "SELECTED FACTS",
     ...(selectedLines.length === 0 ? ["(none)"] : selectedLines),
+  ].join("\n");
+  // Live 2026-10-29 (case A): the planner was shown a private board card's
+  // code name. Defense in depth: the query planner reads only what could
+  // leave anyway -- the market in public-safe words, the brief's lines
+  // whose every word is public-safe, and the selected facts labelled
+  // public_external (the person's own words reach it as the request). A
+  // private selected fact, and anything the model wrote from one, goes to
+  // the writer only.
+  const plannerMarket = [
+    places.length === 0
+      ? "MARKET: no place in the request or their situation: research globally, never an assumed country."
+      : (() => {
+          const shown = places.filter(isPublic);
+          return shown.length === 0
+            ? "MARKET: the place in question is private context: do not name a country unless the request does."
+            : `MARKET: places: ${shown.join("; ")}${countries.length > 0 ? ` [countries: ${countries.map((code) => countryName(code) ?? code).join(", ")}]` : ""}`;
+        })(),
+    ...(() => {
+      const shown = sectors.filter(isPublic);
+      return shown.length === 0 ? [] : [`sectors: ${shown.join("; ")}`];
+    })(),
+    ...(stage === null || !isPublic(stage) ? [] : [`stage: ${stage}`]),
+    ...(() => {
+      const shown = subjects.filter(isPublic);
+      return shown.length === 0 ? [] : [`about: ${shown.join("; ")}`];
+    })(),
+  ];
+  const publicLines = publicFacts.map(factLine);
+  const planner = [
+    ...plannerMarket,
+    ...list("ANGLES", raw.angles.filter(isPublic)),
+    ...list(
+      "NOT KNOWN (research can establish it)",
+      unknowns
+        .filter((one) => one.establish === "RESEARCH")
+        .map((one) => one.what)
+        .filter(isPublic),
+    ),
+    ...list("MUST NOT DRIVE THE RESEARCH", raw.irrelevant.filter(isPublic)),
+    "SELECTED PUBLIC FACTS",
+    ...(publicLines.length === 0 ? ["(none)"] : publicLines),
+    "Their private context is not shown here: plan for the request, this market and these angles only.",
   ]
     .join("\n")
     .slice(0, 8_000);
@@ -252,7 +295,7 @@ export function groundBrief(input: {
     ),
   ];
   const writer = [
-    planner,
+    full,
     ...(drawnOn.length === 0
       ? []
       : [
