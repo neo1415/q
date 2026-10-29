@@ -269,6 +269,13 @@ export const QDocumentToolResultSchema = z
      */
     slide: z.number().int().min(1).max(24).optional(),
     replayed: z.boolean().optional(),
+    /**
+     * XLSX-002 (live 2026-10-28): the tool's own receipt for the reply --
+     * what was made and what could not be filled -- written by code. The
+     * answer path says it ahead of the model's words, which may add at
+     * most one offer; the model cannot leave it out.
+     */
+    says: z.string().trim().min(1).max(900).optional(),
   })
   .strict();
 export type QDocumentToolResult = z.infer<typeof QDocumentToolResultSchema>;

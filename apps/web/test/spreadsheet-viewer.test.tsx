@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +25,9 @@ vi.mock("../src/features/q/actions", () => ({
 }));
 
 const { ArtifactViewer } = await import("../src/features/q/artifact-viewer");
+const { ArtifactCard } = await import("../src/features/q/artifact-card");
+const { QBoardTimeline } = await import("../src/features/q/q-board-timeline");
+const { boardFiles } = await import("../src/features/q/saved-files");
 const { previewCell } = await import("../src/features/q/spreadsheet-preview");
 const { qArtifactExportFormats } =
   await import("../src/features/q/wire-constants");
@@ -185,5 +194,161 @@ describe("the spreadsheet's wire values", () => {
     expect(
       previewCell({ key: "a", label: "A", type: "date" }, "2026-03-31"),
     ).toBe("2026-03-31");
+  });
+});
+
+/** A sheet wider and longer than the card's glance. */
+function wide(): QArtifactDetail {
+  const base = spreadsheet();
+  const columns = Array.from({ length: 8 }, (_unused, at) => ({
+    key: `c${String(at + 1)}`,
+    label: `Column ${String(at + 1)}`,
+    type: "text" as const,
+  }));
+  const rows = Array.from({ length: 9 }, (_unused, row) =>
+    columns.map((_column, at) => `r${String(row + 1)}c${String(at + 1)}`),
+  );
+  const current = base.current;
+  if (current === null || current === undefined) return base;
+  const workbook = current.content.workbook;
+  if (workbook === undefined) return base;
+  return {
+    ...base,
+    current: {
+      ...current,
+      content: {
+        ...current.content,
+        workbook: {
+          ...workbook,
+          sheets: [{ name: "Pipeline", columns, rows, totals: [] }],
+          sources: workbook.sources
+            .slice(0, 1)
+            .map((source) => ({ ...source, sheet: "Pipeline" })),
+        },
+      },
+    },
+  };
+}
+
+describe("XLSX-002 · a spreadsheet's card shows a first look", () => {
+  it("the card in the thread shows the first 5 rows and 6 columns in a scroll wrapper", async () => {
+    readQArtifactAction.mockResolvedValue({ ok: true, value: wide() });
+    render(
+      <ArtifactCard
+        block={{
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: ARTIFACT,
+          type: "SPREADSHEET",
+          status: "READY",
+          title: "Pipeline",
+        }}
+        onOpen={vi.fn()}
+      />,
+    );
+    const glance = await waitFor(() => {
+      const found = document.querySelector("[data-q-spreadsheet-glance]");
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    expect(
+      glance.querySelectorAll("[data-q-spreadsheet-glance-head]"),
+    ).toHaveLength(6);
+    expect(
+      glance.querySelectorAll("[data-q-spreadsheet-glance-row]"),
+    ).toHaveLength(5);
+    // Wider than a phone: it scrolls inside its own wrapper.
+    expect(glance.querySelector(".overflow-x-auto")).not.toBeNull();
+    expect(within(glance).getByText("r1c1")).toBeTruthy();
+    expect(within(glance).queryByText("r6c1")).toBeNull();
+    expect(within(glance).queryByText("r1c7")).toBeNull();
+    expect(
+      within(glance).getByText(
+        "A first look. Open it for every row and column.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("a card for any other document reads nothing more", async () => {
+    render(
+      <ArtifactCard
+        block={{
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: ARTIFACT,
+          type: "Q_REPORT",
+          status: "READY",
+          title: "Comparison",
+        }}
+      />,
+    );
+    await screen.findByText("Comparison");
+    expect(readQArtifactAction).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-q-spreadsheet-glance]")).toBeNull();
+  });
+});
+
+describe("XLSX-002 · the Board's Files come from the server", () => {
+  it("after a reload (no turns in memory) Files lists the saved spreadsheet", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        fetched.push(url);
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              items: [
+                {
+                  artifactId: ARTIFACT,
+                  type: "SPREADSHEET",
+                  status: "READY",
+                  title: "Pipeline",
+                  currentVersion: 1,
+                  updatedAt: NOW,
+                },
+                {
+                  artifactId: "a0000000-0000-4000-8000-000000000010",
+                  type: "Q_REPORT",
+                  status: "PREPARING",
+                  title: "Still being written",
+                  currentVersion: 0,
+                  updatedAt: NOW,
+                },
+              ],
+            }),
+        } as Response);
+      }),
+    );
+    const opened = vi.fn();
+    render(
+      <QBoardTimeline
+        conversationId={null}
+        turns={[]}
+        onOpenArtifact={opened}
+      />,
+    );
+    const file = await screen.findByRole("button", { name: /Pipeline/u });
+    expect(fetched).toContain("/api/q-artifact/recent");
+    expect(screen.queryByText("Nothing on the Board yet")).toBeNull();
+    expect(screen.queryByText("Still being written")).toBeNull();
+    await userEvent.click(file);
+    expect(opened).toHaveBeenCalledWith(ARTIFACT);
+  });
+
+  it("merges what this tab made with what is saved, each once", () => {
+    expect(
+      boardFiles(
+        [
+          {
+            artifactId: "a",
+            title: "A",
+            detail: "Made by Q because you asked",
+          },
+        ],
+        [
+          { artifactId: "a", title: "A", detail: "Spreadsheet, saved" },
+          { artifactId: "b", title: "B", detail: "Report, saved" },
+        ],
+      ).map((file) => `${file.artifactId}:${file.detail}`),
+    ).toEqual(["a:Made by Q because you asked", "b:Report, saved"]);
   });
 });

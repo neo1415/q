@@ -549,6 +549,8 @@ export {
   MakeSpreadsheetInputSchema,
   MakeSpreadsheetOutputSchema,
   SPREADSHEET_ARTIFACT_TYPE,
+  SPREADSHEET_FAILED_LINE,
+  SPREADSHEET_NOTHING_LINE,
   SPREADSHEET_SOURCES,
   type MakeSpreadsheetInput,
   type MakeSpreadsheetOutput,
@@ -556,14 +558,24 @@ export {
   type SpreadsheetPort,
 } from "./tools/spreadsheet.js";
 export {
+  buildComparisonCardsSheet,
   buildComparisonSheet,
   buildFiguresSheet,
   buildPipelineSheet,
   buildRankedSheet,
+  buildShownSheet,
   buildTableSheet,
+  PIPELINE_FIT_COLUMNS,
+  spreadsheetReceipt,
   spreadsheetSections,
+  TABULAR_BLOCK_KINDS,
+  tabularBlocks,
   type BuiltSpreadsheet,
+  type PipelineFit,
+  type PipelineFitJoin,
   type SheetChoice,
+  type TabularBlock,
+  type UnfilledColumn,
 } from "./tools/spreadsheet-build.js";
 
 // DAILY block: The Q Daily tools.

@@ -4,6 +4,7 @@ import {
   Q_SHEET_NAME_MAX,
   Q_SHEET_ROWS_MAX,
   Q_SHEET_TEXT_MAX,
+  type Money,
   type QAnswerCardsBlock,
   type QResultBlock,
   type QSheet,
@@ -64,12 +65,30 @@ export type SheetChoice = {
   readonly columns?: readonly string[] | undefined;
 };
 
+/**
+ * A column the person asked for that the sheet could not fill (live
+ * 2026-10-28: "cheque fit" was asked for and silently left out).
+ * NOT_KNOWN: the column is there, and these rows are blank because the
+ * value is not known. NOT_AVAILABLE: the column is not in the sheet at
+ * all, for the reason in `detail`.
+ */
+export type UnfilledColumn = {
+  readonly column: string;
+  readonly why: "NOT_KNOWN" | "NOT_AVAILABLE";
+  /** NOT_KNOWN: how many rows are blank, of `of`. */
+  readonly rows?: number | undefined;
+  readonly of?: number | undefined;
+  readonly detail?: string | undefined;
+};
+
 export type BuiltSpreadsheet = {
   readonly title: string;
   readonly summary: string;
   readonly workbook: QWorkbook;
   /** What the sheet could not establish, for the artifact's "not known". */
   readonly gaps: readonly string[];
+  /** Asked-for columns it could not fill, and why; for the reply's receipt. */
+  readonly unfilled: readonly UnfilledColumn[];
 };
 
 /** "INTEREST_EXPRESSED" -> "Interest expressed". */
@@ -171,6 +190,45 @@ function provenanceLine(today: string): string {
   return `Prepared by Q from your Capital Q records on ${today}. Every value is copied from the record named on this sheet; a blank cell is not known, never zero.`;
 }
 
+/**
+ * The asked-for columns of the first sheet that came out blank, by code:
+ * a column the choice named (or `also`, columns the ask is known to want)
+ * with blank cells is NOT_KNOWN for those rows; a named key the builder
+ * has no column for is NOT_AVAILABLE. With no choice, only a column blank
+ * on every row is reported.
+ */
+function unfilledOf(
+  main: QSheet | undefined,
+  builderKeys: readonly string[],
+  choice: SheetChoice,
+  also: readonly string[] = [],
+): UnfilledColumn[] {
+  if (main === undefined) return [];
+  const named = new Set([...(choice.columns ?? []), ...also]);
+  const out: UnfilledColumn[] = [];
+  main.columns.forEach((column, at) => {
+    const blank = main.rows.filter((row) => row[at] === null).length;
+    if (blank === 0) return;
+    const asked = named.has(column.key);
+    if (!asked && blank < main.rows.length) return;
+    out.push({
+      column: column.label,
+      why: "NOT_KNOWN",
+      rows: blank,
+      of: main.rows.length,
+    });
+  });
+  for (const key of choice.columns ?? []) {
+    if (builderKeys.includes(key)) continue;
+    out.push({
+      column: key,
+      why: "NOT_AVAILABLE",
+      detail: "Capital Q holds no such column for this sheet",
+    });
+  }
+  return out;
+}
+
 function finish(input: {
   readonly title: string;
   readonly summary: string;
@@ -178,6 +236,7 @@ function finish(input: {
   readonly sources: readonly QSheetSource[];
   readonly today: string;
   readonly gaps?: readonly string[] | undefined;
+  readonly unfilled?: readonly UnfilledColumn[] | undefined;
 }): BuiltSpreadsheet {
   return {
     title: input.title.slice(0, 160),
@@ -188,6 +247,7 @@ function finish(input: {
       provenance: provenanceLine(input.today),
     }),
     gaps: [...(input.gaps ?? [])],
+    unfilled: [...(input.unfilled ?? [])],
   };
 }
 
@@ -224,17 +284,76 @@ export type PipelineInput = {
     readonly decision: "SAVED" | "PASSED";
   }[];
   readonly today: string;
+  /**
+   * Fit with their own mandate, joined on the company id, when the ask
+   * names it or the run read it. Absent: not asked, no fit columns.
+   */
+  readonly fit?: PipelineFitJoin | undefined;
 };
+
+/** One company's fit, as the fit service computed it for this reader. */
+export type PipelineFit = {
+  /** Out of 10 as an exact decimal; null when too little is known. */
+  readonly score: string | null;
+  /** The band in words ("Good fit"). */
+  readonly band: string;
+  /** Each outcome in words; null when UNKNOWN (never a negative). */
+  readonly cheque: {
+    readonly outcome: string | null;
+    readonly reason: string;
+  } | null;
+  readonly stage: {
+    readonly outcome: string | null;
+    readonly reason: string;
+  } | null;
+  readonly reasons: readonly string[];
+  /** The round as disclosed to this reader, or null. */
+  readonly round: Money | null;
+};
+
+export type PipelineFitJoin =
+  | {
+      readonly kind: "JOINED";
+      readonly byCompany: ReadonlyMap<string, PipelineFit>;
+      /** Their declared cheque range; null when not declared or not read. */
+      readonly cheque: {
+        readonly from: Money | null;
+        readonly to: Money | null;
+      } | null;
+    }
+  | {
+      readonly kind: "NOT_AVAILABLE";
+      /** Why, in plain words ("there is no active mandate yet"). */
+      readonly detail: string;
+    };
 
 const PIPELINE_COLUMNS: readonly QSheetColumn[] = [
   { key: "counterparty", label: "Counterparty", type: "text" },
-  { key: "kind", label: "Kind", type: "text" },
+  { key: "kind", label: "Company or investor", type: "text" },
   { key: "stage", label: "Stage", type: "text" },
   { key: "since", label: "Since", type: "date" },
   { key: "nextStep", label: "Next step", type: "text" },
   { key: "lastMessageFrom", label: "Last message from", type: "text" },
   { key: "lastMessageOn", label: "Last message on", type: "date" },
 ];
+
+/** Joined on the company id when fit is asked for (XLSX-002). */
+export const PIPELINE_FIT_COLUMNS: readonly QSheetColumn[] = [
+  { key: "fitScore", label: "Mandate fit (out of 10)", type: "number" },
+  { key: "fitBand", label: "Fit", type: "text" },
+  { key: "chequeFit", label: "Cheque fit", type: "text" },
+  { key: "chequeFitWhy", label: "Cheque fit, why", type: "text" },
+  { key: "stageFit", label: "Stage fit", type: "text" },
+  { key: "round", label: "Round", type: "money" },
+  { key: "chequeFrom", label: "Your cheque from", type: "money" },
+  { key: "chequeTo", label: "Your cheque to", type: "money" },
+  { key: "fitReasons", label: "Why it fits", type: "text" },
+];
+
+const money = (value: Money | null | undefined): QSheetCell =>
+  value === null || value === undefined
+    ? null
+    : { amount: value.amount, currency: value.currency };
 
 export function buildPipelineSheet(
   input: PipelineInput,
@@ -243,13 +362,24 @@ export function buildPipelineSheet(
   if (input.relationships.length === 0 && input.decisions.length === 0) {
     return null;
   }
+  const joined = input.fit?.kind === "JOINED" ? input.fit : null;
+  // "Company or investor" says something only when the pipeline holds
+  // both; every row the same is a column of one repeated word.
+  const mixed =
+    new Set(input.relationships.map((item) => item.counterpart.kind)).size > 1;
+  const base = PIPELINE_COLUMNS.filter(
+    (column) => column.key !== "kind" || mixed,
+  );
+  const columns = joined === null ? base : [...base, ...PIPELINE_FIT_COLUMNS];
   const rows = input.relationships.map((item): QSheetCell[] => {
     // A chat that could not be read is unknown, never "no messages".
     const read = item.lastMessageRead === "OK";
     const message = item.lastMessage ?? null;
-    return [
+    const own: QSheetCell[] = [
       text(item.counterpart.name),
-      item.counterpart.kind === "COMPANY" ? "Company" : "Investor",
+      ...(mixed
+        ? [item.counterpart.kind === "COMPANY" ? "Company" : "Investor"]
+        : []),
       words(item.state),
       dateOf(item.stateSince),
       item.nextStep === "NONE" ? null : words(item.nextStep),
@@ -262,21 +392,58 @@ export function buildPipelineSheet(
           : "You",
       read && message !== null ? dateOf(message.at) : null,
     ];
+    if (joined === null) return own;
+    // Typed join on the company id; an investor counterpart, or a company
+    // the fit could not be read for, is blank (not known), never zero.
+    const fit =
+      item.counterpart.kind === "COMPANY"
+        ? joined.byCompany.get(item.counterpart.id)
+        : undefined;
+    return [
+      ...own,
+      fit === undefined ? null : decimalOf(fit.score),
+      fit === undefined ? null : text(fit.band),
+      text(fit?.cheque?.outcome),
+      text(fit?.cheque?.reason),
+      text(fit?.stage?.outcome),
+      money(fit?.round),
+      money(joined.cheque?.from),
+      money(joined.cheque?.to),
+      fit === undefined ? null : text(fit.reasons.join("\n")),
+    ];
   });
+  // Fit asked for and joined: its columns stay even where the model's
+  // choice of columns did not name them.
+  const fitKeys = PIPELINE_FIT_COLUMNS.map((column) => column.key);
+  const kept: SheetChoice =
+    joined !== null && (choice.columns?.length ?? 0) > 0
+      ? {
+          ...choice,
+          columns: [
+            ...(choice.columns ?? []),
+            ...fitKeys.filter((key) => !(choice.columns ?? []).includes(key)),
+          ],
+        }
+      : choice;
   const sheets: QSheet[] = [];
   const sources: QSheetSource[] = [];
+  let main: QSheet | undefined;
   if (rows.length > 0) {
-    const main = sheet(
+    main = sheet(
       sheetName(choice.sheetName, "Pipeline"),
-      PIPELINE_COLUMNS,
+      columns,
       rows,
       [],
-      choice,
+      kept,
     );
     sheets.push(main);
+    const ownLabels = labelsOf(
+      main,
+      base.map((column) => column.key),
+    );
     sources.push({
       sheet: main.name,
-      columns: main.columns.map((column) => column.label),
+      columns: ownLabels,
       from: "Your Capital Q relationship history, as your side sees it",
       truthClass: "VERIFIED",
       refs: input.relationships.slice(0, 50).map((item) => ({
@@ -285,6 +452,53 @@ export function buildPipelineSheet(
         label: item.counterpart.name.slice(0, 200),
       })),
     });
+    if (joined !== null) {
+      const companyRefs = input.relationships
+        .filter((item) => item.counterpart.kind === "COMPANY")
+        .slice(0, 50)
+        .map((item): Ref => ({
+          kind: "COMPANY",
+          id: item.counterpart.id,
+          label: item.counterpart.name.slice(0, 200),
+        }));
+      const covered = (keys: readonly string[]) =>
+        main?.columns.some((column) => keys.includes(column.key)) === true;
+      const fitColumns = [
+        "fitScore",
+        "fitBand",
+        "chequeFit",
+        "chequeFitWhy",
+        "stageFit",
+        "fitReasons",
+      ];
+      if (covered(fitColumns)) {
+        sources.push({
+          sheet: main.name,
+          columns: labelsOf(main, fitColumns),
+          from: "Fit with your mandate, computed by code from Capital Q's fit rules; not a verified fact",
+          truthClass: "Q_INFERENCE",
+          refs: companyRefs,
+        });
+      }
+      if (covered(["round"])) {
+        sources.push({
+          sheet: main.name,
+          columns: labelsOf(main, ["round"]),
+          from: "Each company's round, as it is disclosed to you on Capital Q",
+          truthClass: "USER_CLAIM",
+          refs: companyRefs,
+        });
+      }
+      if (covered(["chequeFrom", "chequeTo"])) {
+        sources.push({
+          sheet: main.name,
+          columns: labelsOf(main, ["chequeFrom", "chequeTo"]),
+          from: "Your own declared mandate",
+          truthClass: "USER_CLAIM",
+          refs: [],
+        });
+      }
+    }
   }
   if (input.decisions.length > 0) {
     const triage = sheet(
@@ -318,15 +532,39 @@ export function buildPipelineSheet(
     });
   }
   const count = input.relationships.length;
+  const unavailable =
+    input.fit?.kind === "NOT_AVAILABLE"
+      ? (["Mandate fit", "Cheque fit", "Stage fit"] as const).map(
+          (column): UnfilledColumn => ({
+            column,
+            why: "NOT_AVAILABLE",
+            detail: input.fit?.kind === "NOT_AVAILABLE" ? input.fit.detail : "",
+          }),
+        )
+      : [];
   return finish({
     title: "Pipeline",
-    summary: `Your pipeline as of ${input.today}: ${String(count)} relationship${count === 1 ? "" : "s"}${input.decisions.length > 0 ? ` and ${String(input.decisions.length)} saved or passed compan${input.decisions.length === 1 ? "y" : "ies"}` : ""}, from your Capital Q relationship history.`,
+    summary: `Your pipeline as of ${input.today}: ${String(count)} relationship${count === 1 ? "" : "s"}${input.decisions.length > 0 ? ` and ${String(input.decisions.length)} saved or passed compan${input.decisions.length === 1 ? "y" : "ies"}` : ""}, from your Capital Q relationship history${joined === null ? "" : ", with each company's fit with your mandate"}.`,
     sheets,
     sources,
     today: input.today,
-    gaps: input.relationships.some((item) => item.lastMessageRead !== "OK")
-      ? ["Some chats could not be read; their last-message cells are blank."]
-      : [],
+    gaps: [
+      ...(input.relationships.some((item) => item.lastMessageRead !== "OK")
+        ? ["Some chats could not be read; their last-message cells are blank."]
+        : []),
+      ...(input.fit?.kind === "NOT_AVAILABLE"
+        ? [`Fit with your mandate is not in this sheet: ${input.fit.detail}.`]
+        : []),
+    ],
+    unfilled: [
+      ...unfilledOf(
+        main,
+        [...PIPELINE_COLUMNS, ...PIPELINE_FIT_COLUMNS].map((c) => c.key),
+        choice,
+        joined === null ? [] : fitKeys,
+      ),
+      ...unavailable,
+    ],
   });
 }
 
@@ -537,6 +775,143 @@ export function buildTableSheet(
       ? ["Blank cells were not known in Q's table."]
       : [],
   });
+}
+
+// --- named things side by side as cards Q showed ------------------------------
+
+type ComparisonCards = Extract<QResultBlock, { kind: "COMPARISON_CARDS" }>;
+
+export function buildComparisonCardsSheet(
+  block: ComparisonCards,
+  input: { readonly messageId: string; readonly today: string },
+  choice: SheetChoice,
+): BuiltSpreadsheet {
+  const points = Math.max(...block.items.map((item) => item.points.length));
+  const columns: QSheetColumn[] = [
+    { key: "name", label: "Name", type: "text" },
+    { key: "subtitle", label: "About", type: "text" },
+    ...Array.from({ length: points }, (_unused, at) => ({
+      key: `point${String(at + 1)}`,
+      label: `Point ${String(at + 1)}`,
+      type: "text" as const,
+    })),
+  ];
+  const rows = block.items.map((item): QSheetCell[] => [
+    text(item.name),
+    text(item.subtitle),
+    ...Array.from({ length: points }, (_unused, at) => text(item.points[at])),
+  ]);
+  const title = block.title ?? "Side by side";
+  const main = sheet(
+    sheetName(choice.sheetName, "Side by side"),
+    columns,
+    rows,
+    [],
+    choice,
+  );
+  return finish({
+    title,
+    summary: `${title}: the ${String(block.items.length)} Q set side by side in this conversation, as a spreadsheet.`,
+    sheets: [main],
+    sources: [
+      {
+        sheet: main.name,
+        columns: main.columns.map((column) => column.label),
+        from: "Q's answer in this conversation, from the records it read",
+        truthClass: null,
+        refs: [answerRef(input.messageId)],
+      },
+    ],
+    today: input.today,
+  });
+}
+
+/**
+ * The tabular blocks of one answer, best first: a side-by-side comparison
+ * or table before cards, so "put that in a file" after a comparison is the
+ * comparison (live 2026-10-28), never the list beside it.
+ */
+export const TABULAR_BLOCK_KINDS = [
+  "COMPARISON",
+  "TABLE",
+  "COMPARISON_CARDS",
+  "ANSWER_CARDS",
+] as const;
+export type TabularBlock = Extract<
+  QResultBlock,
+  { kind: (typeof TABULAR_BLOCK_KINDS)[number] }
+>;
+
+export function tabularBlocks(
+  blocks: readonly QResultBlock[],
+): readonly TabularBlock[] {
+  return TABULAR_BLOCK_KINDS.flatMap((kind) =>
+    blocks.filter((block): block is TabularBlock => block.kind === kind),
+  );
+}
+
+/** The best tabular block of an answer as a spreadsheet, or null. */
+export function buildShownSheet(
+  blocks: readonly QResultBlock[],
+  input: {
+    readonly messageId: string;
+    readonly today: string;
+    readonly names?: ReadonlyMap<string, string> | undefined;
+  },
+  choice: SheetChoice,
+): BuiltSpreadsheet | null {
+  const block = tabularBlocks(blocks)[0];
+  if (block === undefined) return null;
+  const at = { messageId: input.messageId, today: input.today };
+  switch (block.kind) {
+    case "COMPARISON":
+      return buildComparisonSheet(
+        block,
+        { ...at, names: input.names ?? new Map<string, string>() },
+        choice,
+      );
+    case "TABLE":
+      return buildTableSheet(block, at, choice);
+    case "COMPARISON_CARDS":
+      return buildComparisonCardsSheet(block, at, choice);
+    case "ANSWER_CARDS":
+      return buildRankedSheet(block, at, choice);
+  }
+}
+
+/**
+ * What the reply says after a spreadsheet is made, written by code from
+ * the built workbook (live 2026-10-28: the whole reply was an offer): what
+ * was made -- sheets, rows, columns -- and which asked-for columns could
+ * not be filled and why. The model adds at most one offer after it.
+ */
+export function spreadsheetReceipt(built: BuiltSpreadsheet): string {
+  const list = (labels: readonly string[], max: number) =>
+    labels.length <= max
+      ? labels.join(", ")
+      : `${labels.slice(0, max).join(", ")} and ${String(labels.length - max)} more`;
+  const sheets = built.workbook.sheets.map((one, at) => {
+    const rows = `${String(one.rows.length)} row${one.rows.length === 1 ? "" : "s"}`;
+    return at === 0
+      ? `${one.name} (${rows}; columns ${list(
+          one.columns.map((column) => column.label),
+          10,
+        )})`
+      : `${one.name} (${rows})`;
+  });
+  const made = `I've made “${built.title}” as an Excel spreadsheet, with a CSV: ${sheets.join("; ")}, plus a Sources sheet saying where each column came from.`;
+  const missing = built.unfilled
+    .slice(0, 6)
+    .map((gap) =>
+      gap.why === "NOT_AVAILABLE"
+        ? `${gap.column}: not available${gap.detail === undefined || gap.detail.length === 0 ? "" : ` (${gap.detail})`}`
+        : gap.rows !== undefined && gap.of !== undefined && gap.rows < gap.of
+          ? `${gap.column}: not known for ${String(gap.rows)} of ${String(gap.of)} rows, left blank`
+          : `${gap.column}: not known for any row, left blank`,
+    );
+  return (
+    missing.length === 0 ? made : `${made} Not filled: ${missing.join("; ")}.`
+  ).slice(0, 900);
 }
 
 // --- a company's stated figures ---------------------------------------------

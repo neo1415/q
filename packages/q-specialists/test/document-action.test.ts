@@ -6,6 +6,7 @@ import {
   PermittedContextPlanSchema,
   QArtifactIdSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
+  type QArtifactContent,
   type QResultBlock,
 } from "@capital-q/contracts";
 import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
@@ -913,6 +914,100 @@ describe("an answer as a document, deterministically", () => {
   it("is nothing when the answer holds no words", () => {
     expect(composeAnswerDocument({ answer: "  \n# \n" })).toBeNull();
     expect(composeAnswerDocument({ answer: "# Title only" })).toBeNull();
+  });
+});
+
+/**
+ * XLSX-002 (live 2026-10-28): "put that side-by-side thing you showed me
+ * earlier into a file I can send to the committee" made a PDF that said
+ * "The full comparison is on screen". An answer that showed a table is
+ * filed as a spreadsheet first and a PDF holding the same table beside it.
+ */
+const SIDE_BY_SIDE: QResultBlock = {
+  kind: "TABLE",
+  title: "Side by side",
+  columns: [
+    { label: "MedTrail", subject: null },
+    { label: "Mizan", subject: null },
+  ],
+  rows: [
+    { label: "Stage", cells: ["Seed", "Seed"] },
+    { label: "Raise", cells: ["$1.5 million", ""] },
+  ],
+};
+const COMPARED =
+  "MedTrail and Mizan are level on fit, at 9 each. The full comparison is on screen.";
+
+describe("XLSX-002 · a tabular answer as a file", () => {
+  it("files the table as a spreadsheet first and a PDF with the same table beside it", async () => {
+    const s = seam({
+      history: [
+        message("USER", "compare MedTrail and Mizan for my mandate"),
+        message("Q", COMPARED, [SIDE_BY_SIDE]),
+        message(
+          "USER",
+          "put that side-by-side thing you showed me earlier into a file I can send to the committee",
+        ),
+      ],
+      reading: answerDocumentReading("ANSWER_EXPORT"),
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    // The PDF is prepared first (it holds the table), then the sheet; the
+    // reply leads with the spreadsheet's card.
+    expect(s.prepared.map((p) => p["artifactType"]).sort()).toEqual([
+      "Q_REPORT",
+      "SPREADSHEET",
+    ]);
+    const sheet = s.prepared.find((p) => p["artifactType"] === "SPREADSHEET")?.[
+      "content"
+    ] as { content: QArtifactContent };
+    expect(sheet.content.workbook?.sheets[0]?.rows).toEqual([
+      ["Stage", "Seed", "Seed"],
+      ["Raise", "$1.5 million", null],
+    ]);
+    const pdf = s.prepared.find((p) => p["artifactType"] === "Q_REPORT")?.[
+      "content"
+    ] as { content: QArtifactContent };
+    expect(pdf.content.sections[0]).toMatchObject({
+      heading: "Side by side",
+      body: "Stage — MedTrail: Seed; Mizan: Seed\nRaise — MedTrail: $1.5 million; Mizan: not known",
+    });
+    // Nothing in the document points at a screen.
+    const words = pdf.content.sections.map((x) => x.body).join("\n");
+    expect(words).not.toMatch(/on screen/i);
+    expect(words).toContain("level on fit");
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.blocks).toHaveLength(2);
+    expect(s.stored[0]?.content).toMatch(/Excel spreadsheet/);
+    expect(s.stored[0]?.content).toMatch(/PDF with the same table/);
+  });
+
+  it("an answer that showed no table is still the PDF alone", async () => {
+    const s = seam({
+      history: [
+        message("USER", "How do I come across to investors?"),
+        message("Q", WRITTEN),
+        message("USER", "put that in a file"),
+      ],
+      reading: answerDocumentReading("ANSWER_EXPORT"),
+    });
+    await s.run();
+    expect(s.prepared.map((p) => p["artifactType"])).toEqual(["Q_REPORT"]);
+  });
+
+  it("a PDF of a comparison writes the table in, row by row, unknown as not known", () => {
+    const document = composeAnswerDocument({
+      answer: COMPARED,
+      table: SIDE_BY_SIDE,
+    });
+    expect(document?.content.sections.map((x) => x.heading)).toEqual([
+      "Side by side",
+      "Answer",
+    ]);
+    expect(document?.content.sections[1]?.body).toBe(
+      "MedTrail and Mizan are level on fit, at 9 each.",
+    );
   });
 });
 

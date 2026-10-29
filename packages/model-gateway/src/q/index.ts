@@ -112,6 +112,7 @@ import {
   dailyFollowUpKind,
   ModelFindingSchema,
   inTurnLanguage,
+  splitSentences,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -258,6 +259,8 @@ export { outputSplitOf, type OutputSplit } from "./output-split.js";
 // The seam's read cache, for the composition that must forget a person's
 // reads when an approved action of theirs executes outside any run.
 export { createReadCache, type ReadCache } from "./read-cache.js";
+// XLSX-002: a filed answer drops what only made sense on screen.
+export { claimsOnScreen } from "./screen-claims.js";
 export { boundedCompletedMessage } from "./completed-event.js";
 import {
   findKnownInvestor,
@@ -4119,6 +4122,9 @@ export function createModelGatewayQAnswer(
           request.compare !== undefined || asksToCompare(latest.content)
             ? 4
             : 2,
+          // A word opening a sentence is a name only when the reader heard
+          // it as one (live 2026-10-28: "My" was searched).
+          heardNames(request),
         ),
         ...lowercaseNameCandidates(latest.content),
       ].filter(
@@ -4798,7 +4804,11 @@ export function createModelGatewayQAnswer(
         .then((prepared) => {
           if (prepared === null) return undefined;
           const names =
-            companyNameCandidates(prepared.latest.content).length > 0 ||
+            companyNameCandidates(
+              prepared.latest.content,
+              2,
+              heardNames(request),
+            ).length > 0 ||
             lowercaseNameCandidates(prepared.latest.content).length > 0;
           if (!names && request.plan.screen?.manifest?.focus === undefined) {
             return undefined;
@@ -7891,6 +7901,8 @@ export function createModelGatewayQAnswer(
        */
       /** ADR 0040: what each app action that ran said, in its own words. */
       const actedLines: string[] = [];
+      /** XLSX-002: what a document tool made, in its own words; said first. */
+      const madeLines: string[] = [];
       /**
        * An app action prepared a card this turn: the engine says its status
        * after the turn, so the model's own approval talk goes (lead
@@ -9025,6 +9037,15 @@ export function createModelGatewayQAnswer(
               const acted = outcome.result.ok
                 ? appActionLineOf(outcome.result.data)
                 : null;
+              // XLSX-002: a document tool's own receipt (what it made, what
+              // it could not fill) is said ahead of the model's words.
+              const made = outcome.result.ok
+                ? documentReceiptOf(call.name, outcome.result.data)
+                : null;
+              if (made !== null) {
+                // The newest receipt of a tool replaces its earlier one.
+                madeLines.splice(0, madeLines.length, made);
+              }
               if (
                 outcome.result.ok &&
                 (outcome.result.data as { readonly status?: unknown } | null)
@@ -9839,6 +9860,7 @@ export function createModelGatewayQAnswer(
         const couldNot =
           parityGap !== null &&
           actedLines.length === 0 &&
+          madeLines.length === 0 &&
           gapsSaid === null &&
           !preparedByTool &&
           // The answer already says why nothing was done ("you're already
@@ -9897,6 +9919,9 @@ export function createModelGatewayQAnswer(
                 ...(rememberLine === null ? [] : [rememberLine.line]),
                 // Code's opening lines for this answer, before the model's.
                 ...(leadLines === undefined ? [] : [leadLines]),
+                // XLSX-002: what a document tool made and could not fill,
+                // in its own words, before the model's (one offer at most).
+                ...madeLines,
                 // Nothing was done: a model line that says it was is
                 // false, and is not said beside the could-not line
                 // (follow-55, Zino run 50159909: "Your investment stages
@@ -9905,14 +9930,17 @@ export function createModelGatewayQAnswer(
                 claimsDone(statusTalk?.text ?? guarded.text)
                   ? []
                   : [
-                      withoutRememberTalk(
-                        leadLines === undefined
-                          ? (statusTalk?.text ?? guarded.text)
-                          : afterLeadLines(
-                              statusTalk?.text ?? guarded.text,
-                              leadLines,
-                            ),
-                        rememberLine,
+                      ((said: string) =>
+                        madeLines.length === 0 ? said : atMostOneOffer(said))(
+                        withoutRememberTalk(
+                          leadLines === undefined
+                            ? (statusTalk?.text ?? guarded.text)
+                            : afterLeadLines(
+                                statusTalk?.text ?? guarded.text,
+                                leadLines,
+                              ),
+                          rememberLine,
+                        ),
                       ),
                     ]),
                 ...(couldNot === null ? [] : [couldNot]),
@@ -10685,6 +10713,67 @@ export function claimsDone(text: string): boolean {
 /** A reply that puts a question to the person: any sentence ending "?". */
 export function asksThePerson(text: string): boolean {
   return /\?["'’”)]*(?:\s|$)/u.test(text);
+}
+
+/**
+ * The names the turn's reader heard: whom the turn is about (v58
+ * namedOther) and the names of a comparison (v62). Empty before the
+ * reading is in, so a warmed read never binds a sentence's first word.
+ */
+export function heardNames(request: {
+  readonly namedOther?: { readonly name: string } | null | undefined;
+  readonly compare?: { readonly names: readonly string[] } | null | undefined;
+}): readonly string[] {
+  return [
+    ...(request.namedOther?.name === undefined
+      ? []
+      : [request.namedOther.name]),
+    ...(request.compare?.names ?? []),
+  ];
+}
+
+/**
+ * XLSX-002 (live 2026-10-28, the pipeline spreadsheet answered with only
+ * "Want me to add a separate tab…?"): a document tool's own receipt, read
+ * from its authorised result by its closed schema -- a document filed with
+ * `says`, or make_spreadsheet's nothing-to-put-in-it / failed line. Null
+ * when the result carries none.
+ */
+export function documentReceiptOf(
+  toolName: string,
+  data: unknown,
+): string | null {
+  const filed = QDocumentToolResultSchema.safeParse(data);
+  if (filed.success) return filed.data.says ?? null;
+  if (toolName !== "make_spreadsheet") return null;
+  const record = (typeof data === "object" && data !== null ? data : {}) as {
+    readonly status?: unknown;
+    readonly says?: unknown;
+  };
+  return (record.status === "NOTHING_TO_PUT_IN_IT" ||
+    record.status === "FAILED") &&
+    typeof record.says === "string" &&
+    record.says.trim().length > 0
+    ? record.says.trim()
+    : null;
+}
+
+/**
+ * After a receipt, the model's words carry at most one offer: of its
+ * questions, only the last stays (each sentence that ends in a question
+ * mark is one; the rest of what it said is kept as written).
+ */
+export function atMostOneOffer(text: string): string {
+  const sentences = splitSentences(text);
+  const asks = sentences
+    .map((sentence, at) => ({ at, ask: /[?？؟]\s*$/u.test(sentence) }))
+    .filter((one) => one.ask);
+  if (asks.length <= 1) return text;
+  const last = asks.at(-1)?.at;
+  return sentences
+    .filter((sentence, at) => !/[?？؟]\s*$/u.test(sentence) || at === last)
+    .join("")
+    .trim();
 }
 
 export function appActionLineOf(data: unknown): string | null {

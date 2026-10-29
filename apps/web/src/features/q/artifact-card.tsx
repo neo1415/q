@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
+import type { QWorkbook } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
   CircleAlert,
@@ -14,9 +15,11 @@ import {
 import { expectDocument } from "@/features/documents/document-ready";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
+import { readQArtifactAction } from "./actions";
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactDownloads } from "./artifact-download";
 import type { QTurnObjectBlock } from "./conversation";
+import { SpreadsheetGlance } from "./spreadsheet-preview";
 import { qArtifactExportFormats } from "./wire-constants";
 import { useT } from "@/features/i18n/language";
 
@@ -106,6 +109,40 @@ function useSettledStatus(
   return status;
 }
 
+/**
+ * XLSX-002: a ready spreadsheet's workbook, read once through the same
+ * narrow action the viewer uses, for the card's glance. Null until it
+ * arrives, and when it cannot be read (the card stands without it).
+ */
+function useCardWorkbook(
+  artifactId: string,
+  wanted: boolean,
+): QWorkbook | null {
+  const [read, setRead] = useState<{
+    readonly id: string;
+    readonly workbook: QWorkbook | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!wanted) return;
+    let alive = true;
+    void readQArtifactAction(artifactId)
+      .then((result) => {
+        if (!alive) return;
+        setRead({
+          id: artifactId,
+          workbook: result.ok
+            ? (result.value.current?.content.workbook ?? null)
+            : null,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [artifactId, wanted]);
+  return wanted && read?.id === artifactId ? read.workbook : null;
+}
+
 export function ArtifactCard({
   block: given,
   onOpen,
@@ -128,6 +165,10 @@ export function ArtifactCard({
   const ready = block.status === "READY";
   const deck = block.type === "PITCH_DECK";
   const TypeIcon = deck ? Presentation : FileText;
+  const workbook = useCardWorkbook(
+    given.artifactId,
+    ready && block.type === "SPREADSHEET",
+  );
 
   return (
     <section
@@ -161,6 +202,12 @@ export function ArtifactCard({
           </p>
         </div>
       </div>
+
+      {ready && workbook !== null ? (
+        <div className="min-w-0">
+          <SpreadsheetGlance workbook={workbook} />
+        </div>
+      ) : null}
 
       {ready ? (
         <div className="flex flex-wrap items-center gap-2">

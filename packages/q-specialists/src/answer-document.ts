@@ -5,6 +5,9 @@ import {
   Q_ARTIFACT_TITLE_MAX,
   type QArtifactContent,
 } from "@capital-q/contracts";
+import { claimsOnScreen } from "@capital-q/model-gateway/q";
+import { splitSentences } from "@capital-q/q-core";
+import type { TabularBlock } from "@capital-q/q-tools";
 
 /**
  * One of Q's answers as a document (founder live 2026-09-28 #1: "a PDF of
@@ -156,6 +159,96 @@ export function workTitle(input: {
   return `${ask.charAt(0).toUpperCase()}${ask.slice(1)}`;
 }
 
+const NOT_KNOWN = "not known";
+const cell = (value: string | undefined) => {
+  const said = plain(value?.trim() ?? "");
+  return said.length === 0 ? NOT_KNOWN : said;
+};
+
+/**
+ * XLSX-002 (live 2026-10-28: the committee PDF of a comparison said "The
+ * full comparison is on screen"): the table the answer showed, written
+ * into the document as text, row by row, every value as shown and an
+ * empty one as "not known". Code writes it from the block; nothing is
+ * summarised or reordered.
+ */
+export function tableSection(
+  block: TabularBlock,
+  names: ReadonlyMap<string, string> = new Map(),
+): { readonly heading: string; readonly body: string } {
+  switch (block.kind) {
+    case "TABLE":
+      return {
+        heading: block.title,
+        body: block.rows
+          .map(
+            (row) =>
+              `${plain(row.label)} — ${block.columns
+                .map(
+                  (column, at) =>
+                    `${plain(column.label)}: ${cell(row.cells[at])}`,
+                )
+                .join("; ")}`,
+          )
+          .join("\n"),
+      };
+    case "COMPARISON": {
+      const label = (at: number) => {
+        const one = block.subjects[at];
+        const id =
+          one === undefined
+            ? null
+            : "companyId" in one
+              ? one.companyId
+              : "investorOrganisationId" in one
+                ? one.investorOrganisationId
+                : null;
+        return (
+          (id === null ? undefined : names.get(id)) ??
+          `Subject ${String(at + 1)}`
+        );
+      };
+      return {
+        heading: "Side by side",
+        body: block.rows
+          .map(
+            (row) =>
+              `${plain(row.label)} — ${row.values
+                .map((value, at) => `${label(at)}: ${cell(value)}`)
+                .join("; ")}`,
+          )
+          .join("\n"),
+      };
+    }
+    case "COMPARISON_CARDS":
+      return {
+        heading: block.title ?? "Side by side",
+        body: block.items
+          .map((item) =>
+            [
+              item.subtitle === null
+                ? plain(item.name)
+                : `${plain(item.name)} — ${plain(item.subtitle)}`,
+              ...item.points.map((point) => `• ${plain(point)}`),
+            ].join("\n"),
+          )
+          .join("\n\n"),
+      };
+    case "ANSWER_CARDS":
+      return {
+        heading: block.title,
+        body: block.cards
+          .map((card, at) =>
+            [
+              `${block.shape === "RANKED" ? `${String(at + 1)}. ` : ""}${plain(card.name)}${card.fit === null ? "" : ` — fit ${String(card.fit.score)} out of 10`}${card.raise === undefined || card.raise === null ? "" : ` — raising ${plain(card.raise)}`}`,
+              ...card.reasons.map((reason) => `• ${plain(reason)}`),
+            ].join("\n"),
+          )
+          .join("\n\n"),
+      };
+  }
+}
+
 export function composeAnswerDocument(input: {
   /** The answer, as Q wrote it (markdown). */
   readonly answer: string;
@@ -163,8 +256,21 @@ export function composeAnswerDocument(input: {
   readonly question?: string | undefined;
   /** Who or what the work is about, when the turn resolved it (F-73). */
   readonly subject?: string | null | undefined;
+  /**
+   * XLSX-002: the table the answer showed. It is written in first, and a
+   * sentence that only pointed at the screen ("The full comparison is on
+   * screen") is not, because in a document the table is right there.
+   */
+  readonly table?: TabularBlock | undefined;
+  readonly names?: ReadonlyMap<string, string> | undefined;
 }): AnswerDocument | null {
-  const lines = input.answer.replace(/\r\n?/g, "\n").split("\n");
+  const prose =
+    input.table === undefined
+      ? input.answer
+      : splitSentences(input.answer)
+          .filter((sentence) => !claimsOnScreen(sentence))
+          .join("");
+  const lines = prose.replace(/\r\n?/g, "\n").split("\n");
   const sections: { heading: string; lines: string[] }[] = [];
   let current: { heading: string; lines: string[] } = {
     heading: "",
@@ -181,17 +287,30 @@ export function composeAnswerDocument(input: {
   }
   sections.push(current);
 
-  const filed = sections.flatMap((section) => {
-    const text = body(section.lines);
-    if (text.length === 0) return [];
-    return [
-      {
-        heading: clip(section.heading || "Answer", Q_ARTIFACT_TITLE_MAX),
-        body: clip(text, Q_ARTIFACT_SECTION_BODY_MAX),
-        findings: [],
-      },
-    ];
-  });
+  const table =
+    input.table === undefined ? null : tableSection(input.table, input.names);
+  const filed = [
+    ...(table === null || table.body.trim().length === 0
+      ? []
+      : [
+          {
+            heading: clip(table.heading, Q_ARTIFACT_TITLE_MAX),
+            body: clip(table.body, Q_ARTIFACT_SECTION_BODY_MAX),
+            findings: [],
+          },
+        ]),
+    ...sections.flatMap((section) => {
+      const text = body(section.lines);
+      if (text.length === 0) return [];
+      return [
+        {
+          heading: clip(section.heading || "Answer", Q_ARTIFACT_TITLE_MAX),
+          body: clip(text, Q_ARTIFACT_SECTION_BODY_MAX),
+          findings: [],
+        },
+      ];
+    }),
+  ];
   if (filed.length === 0) return null;
 
   const question = input.question?.trim().replace(/\s+/g, " ") ?? "";

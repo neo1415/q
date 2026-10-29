@@ -23,6 +23,7 @@ import {
 } from "./board-timeline";
 import type { QTurn } from "./conversation";
 import { useBoardMarks } from "./q-board";
+import { boardFiles, useSavedFiles } from "./saved-files";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -236,13 +237,21 @@ export function QBoardTimeline({
 }) {
   const t = useT();
   const marks = useBoardMarks(conversationId);
-  const [tab, setTab] = useState<Tab>("timeline");
+  const [chosen, setTab] = useState<Tab | null>(null);
   const entries = boardTimeline(turns, decisions).filter(
     (entry) => !marks.dismissed.includes(entry.id),
   );
   const pinned = entries.filter((entry) => marks.pinned.includes(entry.id));
-  const files = entries.flatMap((entry) => entry.files);
+  const made = entries.flatMap((entry) => entry.files);
+  // XLSX-002: Files lists their saved documents from the server, so a
+  // reload never empties it; what this tab made comes first.
+  const saved = useSavedFiles(made.length);
+  const files = boardFiles(made, saved);
   const empty = entries.length === 0;
+  // Nothing at all: the welcome. Saved files but no timeline yet: the
+  // Board still opens on its Files.
+  const nothing = empty && files.length === 0;
+  const tab: Tab = chosen ?? (empty && files.length > 0 ? "files" : "timeline");
   const groups = groupByDay(entries, now);
 
   return (
@@ -266,7 +275,7 @@ export function QBoardTimeline({
           )}
         </div>
       ) : null}
-      {empty ? null : (
+      {nothing ? null : (
         <div className="cq-board-tabs" role="tablist" aria-label={t("Board")}>
           {(
             [
@@ -291,11 +300,19 @@ export function QBoardTimeline({
         <div className="cq-board-timeline">
           {empty ? (
             <div className="cq-board-empty">
-              <h2>{t("Nothing on the Board yet")}</h2>
+              <h2>
+                {nothing
+                  ? t("Nothing on the Board yet")
+                  : t("Nothing from this conversation yet")}
+              </h2>
               <p>
-                {t(
-                  "What Q shows you lands here, so you can find it again. Pin what matters; files Q makes for you sit alongside.",
-                )}
+                {nothing
+                  ? t(
+                      "What Q shows you lands here, so you can find it again. Pin what matters; files Q makes for you sit alongside.",
+                    )
+                  : t(
+                      "What Q shows you here lands on this timeline. Your saved files are under Files.",
+                    )}
               </p>
               {onAsk === undefined || suggestions.length === 0 ? null : (
                 <div className="flex flex-wrap justify-center gap-2">
@@ -337,7 +354,7 @@ export function QBoardTimeline({
             ))
           )}
         </div>
-        {empty ? null : (
+        {nothing ? null : (
           <aside className="cq-board-rail">
             <section className="pins" aria-label={t("Pinned")}>
               <h2>

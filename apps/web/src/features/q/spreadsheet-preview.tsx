@@ -16,6 +16,13 @@ import { useT } from "@/features/i18n/language";
  */
 
 export const SPREADSHEET_PREVIEW_ROWS = 50;
+/**
+ * XLSX-002: the card in the thread and on the Board shows a glance --
+ * the first rows and columns -- so the person sees what they got before
+ * opening it; the viewer and the file have the rest.
+ */
+export const SPREADSHEET_CARD_ROWS = 5;
+export const SPREADSHEET_CARD_COLUMNS = 6;
 
 const formatter = (options: Intl.NumberFormatOptions) =>
   new Intl.NumberFormat(undefined, options);
@@ -43,6 +50,83 @@ export function previewCell(
   }
   if (column.type === "percent") return `${cell}%`;
   return cell;
+}
+
+/**
+ * The card's glance at a spreadsheet: the first rows and columns of its
+ * first sheet, in the same scroll wrapper as the viewer's table so a
+ * phone scrolls it sideways rather than the page.
+ */
+export function SpreadsheetGlance({
+  workbook,
+}: {
+  readonly workbook: QWorkbook;
+}) {
+  const t = useT();
+  const sheet = workbook.sheets[0];
+  if (sheet === undefined) return null;
+  const columns = sheet.columns.slice(0, SPREADSHEET_CARD_COLUMNS);
+  const rows = sheet.rows.slice(0, SPREADSHEET_CARD_ROWS);
+  const clipped =
+    sheet.rows.length > rows.length || sheet.columns.length > columns.length;
+  return (
+    <figure className="flex flex-col gap-1" data-q-spreadsheet-glance>
+      <div className="cq-q-table-scroll overflow-x-auto rounded-md border border-(--cq-border-subtle)">
+        <table className="w-full border-collapse text-start">
+          <thead className="bg-(--cq-surface-subtle)">
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={`cq-caption px-2 py-1.5 whitespace-nowrap text-(--cq-text-primary) ${column.type === "number" || column.type === "money" || column.type === "percent" ? "text-end" : "text-start"}`}
+                  data-q-spreadsheet-glance-head={column.key}
+                >
+                  {column.type === "money" && column.currency !== undefined
+                    ? `${column.label} (${column.currency})`
+                    : column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((cells, at) => (
+              <tr
+                key={String(at)}
+                className="border-t border-(--cq-border-subtle)"
+                data-q-spreadsheet-glance-row
+              >
+                {columns.map((column, index) => {
+                  const shown = previewCell(column, cells[index] ?? null);
+                  return (
+                    <td
+                      key={column.key}
+                      className={`cq-caption max-w-48 truncate px-2 py-1.5 align-top whitespace-nowrap text-(--cq-text-primary) ${column.type === "number" || column.type === "money" || column.type === "percent" ? "text-end tabular-nums" : "text-start"}`}
+                    >
+                      {shown === null ? (
+                        <span className="text-(--cq-text-tertiary)">
+                          {t("Not known")}
+                        </span>
+                      ) : column.type === "boolean" ? (
+                        t(shown)
+                      ) : (
+                        shown
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {clipped ? (
+        <figcaption className="cq-caption text-(--cq-text-tertiary)">
+          {t("A first look. Open it for every row and column.")}
+        </figcaption>
+      ) : null}
+    </figure>
+  );
 }
 
 export function SpreadsheetPreview({
