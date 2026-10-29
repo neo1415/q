@@ -181,3 +181,44 @@ describe("a comparison as cards (v12)", () => {
     expect(blocks?.some((b) => b.kind === "COMPARISON_CARDS")).toBe(false);
   });
 });
+
+describe("a finding's standing (live 2026-10-29, F06)", () => {
+  const standing = (over: Record<string, unknown>) => {
+    const blocks = analystResultBlocks({
+      result: { findings: [finding(over)] },
+      subjects: [companySubject],
+    });
+    const block = blocks?.find((one) => one.kind === "FINDING");
+    return block?.kind === "FINDING"
+      ? [block.finding.truthClass, block.finding.evidenceStatus]
+      : null;
+  };
+
+  it("never shows a model's VERIFIED that names nothing it rests on", () => {
+    expect(
+      standing({
+        statement:
+          "The spreadsheet request could not be fulfilled because the available company figures did not provide suitable data.",
+        truthClass: "VERIFIED",
+        evidenceStatus: "PLATFORM_VERIFIED",
+        basis: [],
+      }),
+    ).toEqual(["Q_INFERENCE", "NO_EVIDENCE"]);
+  });
+
+  it("keeps a VERIFIED carried over from a supplied fact", () => {
+    expect(
+      standing({
+        truthClass: "VERIFIED",
+        evidenceStatus: "PLATFORM_VERIFIED",
+        basis: ["F2"],
+      }),
+    ).toEqual(["VERIFIED", "PLATFORM_VERIFIED"]);
+  });
+
+  it("leaves code's own findings, which carry no basis, as they are", () => {
+    expect(
+      standing({ truthClass: "VERIFIED", evidenceStatus: "PLATFORM_VERIFIED" }),
+    ).toEqual(["VERIFIED", "PLATFORM_VERIFIED"]);
+  });
+});
