@@ -5168,6 +5168,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "What Capital Q knows about your company, and what investors would see.",
   "What I did",
   "What I read from your description",
+  "What I'm looking into",
   "What Q did",
   "What Q did couldn’t load.",
   "What Q did couldn’t load. Try again in a moment.",

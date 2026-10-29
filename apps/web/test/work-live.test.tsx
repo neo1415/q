@@ -20,6 +20,7 @@ import {
 } from "../src/features/q/conversation";
 import {
   nextStep,
+  stepInViewLine,
   stepLine,
   stepStates,
   WorkInProgressCard,
@@ -238,6 +239,33 @@ describe("the work canvas's step bar", () => {
     );
     expect(stepLine("REVISING", "SKIPPED", null)).toBe("Not needed");
     expect(stepLine("FILING", "LATER", null)).toBe("");
+  });
+
+  it("the step in view says the investigation's own stage, live (run A, 2026-10-29)", () => {
+    // Planning shows on the research step: its own line, never the step's.
+    expect(
+      stepInViewLine(
+        "SEARCHING",
+        stage({ stage: "PLANNING_RESEARCH", round: 1 }),
+      ),
+    ).toBe("Planning the investigation");
+    // Round 2 while the view holds Reading (it never steps back).
+    expect(
+      stepInViewLine(
+        "READING",
+        stage({ stage: "SEARCHING", round: 2, questions: 3, sources: 33 }),
+      ),
+    ).toBe("Round 2: checking 3 open questions");
+    expect(
+      stepInViewLine(
+        "READING",
+        stage({ stage: "CROSS_CHECKING", sources: 33, facts: 35 }),
+      ),
+    ).toBe("Cross-checking sources");
+    // Outside research, the step's own line as before.
+    expect(
+      stepInViewLine("DRAFTING", stage({ stage: "READING", sources: 3 })),
+    ).toBe("Writing the first draft");
   });
 });
 

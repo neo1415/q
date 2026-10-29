@@ -604,6 +604,7 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "Round {n}: checking {n2} open questions":
     "الجولة {n}: التحقق من {n2} أسئلة مفتوحة",
   "Cross-checking sources": "مطابقة المصادر",
+  "What I'm looking into": "ما أبحث فيه",
   "Reading public sources": "قراءة المصادر العامة",
   "Reading 1 public source": "قراءة مصدر عام واحد",
   "Reading {n} public sources": "قراءة {n} مصادر عامة",

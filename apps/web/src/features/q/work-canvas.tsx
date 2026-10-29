@@ -132,6 +132,34 @@ if (
   throw new Error("the work canvas names every live stage");
 }
 
+/** The research steps: where an investigation's rounds are shown. */
+const RESEARCH_VIEW: ReadonlySet<WorkforceLiveStageName> = new Set([
+  "SEARCHING",
+  "READING",
+]);
+
+/**
+ * The line under the step in view. Live 2026-10-29 (run A): the step's
+ * own name replaced the work's stage, so "Planning the investigation"
+ * read as "Researching the question", the cross-check as "Read 33
+ * sources", and round 2 (the view never steps back) as round 1's
+ * reading. While research is in view, the line is the work's own stage:
+ * planning, a later round's open questions, the cross-check.
+ */
+export function stepInViewLine(
+  step: WorkforceLiveStageName,
+  stage: WorkforceLiveStage | null,
+): string {
+  if (stage === null) return liveLine(null);
+  const shownOn = SHOWN_ON[stage.stage] ?? stage.stage;
+  if (
+    shownOn === step ||
+    (RESEARCH_VIEW.has(step) && RESEARCH_VIEW.has(shownOn))
+  )
+    return liveLine(stage);
+  return liveLine({ ...stage, stage: step });
+}
+
 /** The step bar for this job: a plan's, or a document's. */
 export function stepsFor(live: WorkforceLive | null): readonly Step[] {
   return live?.expected?.kind === "PLAN" ||
@@ -574,7 +602,12 @@ function StepInView({
   const t = useT();
   const read = stage?.read ?? [];
   const sections = stage?.sections ?? [];
-  const line = t(liveLine(stage === null ? null : { ...stage, stage: step }));
+  const line = t(stepInViewLine(step, stage));
+  // Owner 2026-10-29: what Q decided to look into, from its research brief.
+  const brief =
+    RESEARCH_VIEW.has(step) && stage?.brief != null && stage.brief.length > 0
+      ? stage.brief
+      : null;
   const skeleton = (
     <div
       className="flex flex-col gap-2"
@@ -689,6 +722,15 @@ function StepInView({
           </span>
         ) : null}
       </p>
+      {brief === null ? null : (
+        <p className="cq-body-sm text-(--cq-text-secondary)" data-q-work-brief>
+          <span className="font-medium text-(--cq-text-primary)">
+            {t("What I'm looking into")}
+          </span>
+          {" · "}
+          {brief}
+        </p>
+      )}
       {body}
     </div>
   );
