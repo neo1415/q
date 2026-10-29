@@ -303,15 +303,159 @@ export function pagesText(sources: readonly DeepResearchSource[]): string {
     .slice(0, 19_000);
 }
 
-/** A lane's unread pages: those it found this round, read in full first. */
-function pagesFor(
+/**
+ * A lane's pages found this round that were READ in full: the only pages
+ * a fact may come from (live 2026-10-29, case A: three facts were taken
+ * from the search snippets of regulator pages whose reads timed out).
+ */
+export function pagesFor<
+  S extends Pick<DeepResearchSource, "lanes" | "excerpt" | "extracted">,
+>(lane: string, sources: readonly S[]): readonly S[] {
+  return sources
+    .filter(
+      (source) =>
+        source.lanes.includes(lane) &&
+        source.excerpt !== "" &&
+        source.extracted,
+    )
+    .slice(0, PAGES_PER_LANE);
+}
+
+/**
+ * A lane's pages known only from a search snippet (their read failed),
+ * shown to the fact reader without a source number: a lead to follow up,
+ * never a fact. Code admits facts against read pages only.
+ */
+export function leadsText(
   lane: string,
   sources: readonly DeepResearchSource[],
-): readonly DeepResearchSource[] {
-  return sources
-    .filter((source) => source.lanes.includes(lane) && source.excerpt !== "")
-    .sort((a, b) => Number(b.extracted) - Number(a.extracted))
+): string {
+  const unread = sources
+    .filter(
+      (source) =>
+        source.lanes.includes(lane) &&
+        source.excerpt !== "" &&
+        !source.extracted,
+    )
     .slice(0, PAGES_PER_LANE);
+  if (unread.length === 0) return "";
+  return [
+    "NOT READ (search-result snippets of pages that could not be read; no source number: never the source of a fact, at most a follow-up lead)",
+    ...unread.map(
+      (source) =>
+        `- ${source.title ?? "(untitled)"} | ${source.domain}: ${source.excerpt.replace(/\s+/gu, " ").slice(0, 400)}`,
+    ),
+  ]
+    .join("\n")
+    .slice(0, 2_400);
+}
+
+/**
+ * Live 2026-10-29 (case A): the planner dropped the place from queries
+ * that name an official body by its initials ("cbn licensed payment
+ * operators 2025"). When the market in question has a place, every
+ * outgoing query carries one: a query naming none of the market's
+ * countries (or a place within them) gets the first country's name. A
+ * deterministic boundary; egress still decides what may leave.
+ */
+export function withMarketPlace(
+  query: string,
+  countries: readonly string[],
+): string {
+  const first = countries[0];
+  if (first === undefined) return query;
+  if (placeCountries(query).some((code) => countries.includes(code)))
+    return query;
+  const name = countryName(first);
+  if (name === null) return query;
+  return `${query.slice(0, 239 - name.length).trimEnd()} ${name}`;
+}
+
+/**
+ * Pages from the market's own official bodies (the regulator, central
+ * bank, statistics office) whose read failed get one longer read before
+ * they are given up (live 2026-10-29: cbn.gov.ng timed out in a shared
+ * 8 s batch). Bounded by the job's deadline.
+ */
+export const PRIMARY_REREAD_MS = 20_000;
+const PRIMARY_REREADS_MAX = 3;
+const REREAD_MIN_MS = 2_000;
+
+const urlKey = (url: string) => url.toLowerCase().replace(/\/+$/u, "");
+
+/**
+ * The re-read itself: the market's official pages among `sources` that
+ * were not read, read once more on their own, within `budgetMs`. What is
+ * read comes back by address; anything else (a failure, a timeout, a
+ * refusal) leaves the page unread, never an error.
+ */
+export async function rereadPrimary(input: {
+  readonly service: Pick<PublicWebResearchService, "extract">;
+  readonly actor: ActorContext;
+  readonly runId: string;
+  readonly correlationId: z.infer<typeof CorrelationIdSchema>;
+  readonly sources: readonly DeepResearchSource[];
+  readonly countries: ReadonlySet<string>;
+  readonly budgetMs: number;
+}): Promise<
+  ReadonlyMap<
+    string,
+    {
+      readonly excerpt: string;
+      readonly title: string | null;
+      readonly instructionRisk: boolean;
+    }
+  >
+> {
+  const none = new Map<
+    string,
+    { excerpt: string; title: string | null; instructionRisk: boolean }
+  >();
+  if (input.budgetMs < REREAD_MIN_MS) return none;
+  const urls = input.sources
+    .filter((source) => {
+      if (source.extracted) return false;
+      const tier = sourceTier({
+        url: source.url,
+        domain: source.domain,
+        title: source.title,
+        countries: input.countries,
+      });
+      return tier.tier === "PRIMARY" && tier.kind !== "COMPANY_DISCLOSURE";
+    })
+    .slice(0, PRIMARY_REREADS_MAX)
+    .map((source) => source.url);
+  if (urls.length === 0) return none;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const outcome = await Promise.race([
+      input.service.extract({
+        actor: input.actor,
+        runId: input.runId,
+        correlationId: input.correlationId,
+        urls,
+        signal: AbortSignal.timeout(input.budgetMs),
+      }),
+      // Raced too, for a provider that does not heed its signal.
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), input.budgetMs);
+      }),
+    ]);
+    if (outcome === null || outcome.status !== "OK") return none;
+    for (const source of outcome.sources) {
+      if (source.excerpt.trim().length === 0) continue;
+      none.set(urlKey(source.url), {
+        excerpt: source.excerpt,
+        title: source.title,
+        instructionRisk: source.instructionRisk.length > 0,
+      });
+    }
+    return none;
+  } catch {
+    return none;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 /**
@@ -891,6 +1035,14 @@ export function workforceDeepResearch(dependencies: {
       ),
     );
 
+    // The brief's market countries, in its order: every outgoing query
+    // carries one of them (withMarketPlace).
+    const queryCountries =
+      brief === null
+        ? []
+        : [...new Set(brief.places.flatMap((place) => placeCountries(place)))];
+    const placed = (query: string) => withMarketPlace(query, queryCountries);
+
     const plannedLane = (one: {
       readonly lane: string;
       readonly query: string;
@@ -1076,8 +1228,10 @@ export function workforceDeepResearch(dependencies: {
         });
         const questions: DeepResearchQuestion[] = state.current.map((one) => ({
           lane: one.lane,
-          query: one.query,
-          ...(one.alsoQuery === null ? {} : { alsoQuery: one.alsoQuery }),
+          query: placed(one.query),
+          ...(one.alsoQuery === null
+            ? {}
+            : { alsoQuery: placed(one.alsoQuery) }),
           recent: one.recent,
         }));
         const result = await deep.run({
@@ -1103,23 +1257,53 @@ export function workforceDeepResearch(dependencies: {
           searchBudget: budget,
         });
         const knownIndex = new Set(state.sources.map((one) => one.index));
-        const fresh = result.sources.filter(
+        const found = result.sources.filter(
           (one) => !knownIndex.has(one.index),
         );
-        state.sources = result.sources.slice(0, 60).map((one) => ({
-          index: one.index,
-          url: one.url,
-          domain: one.domain,
-          title: one.title?.slice(0, 400) ?? null,
-          publishedAt: one.publishedAt,
-          retrievedAt: one.retrievedAt,
-          excerpt: knownIndex.has(one.index)
-            ? ""
-            : one.excerpt.slice(0, PAGE_CHARS),
-          extracted: one.extracted,
-          instructionRisk: one.instructionRisk,
-          lanes: [...one.lanes],
-        }));
+        // The market's own official pages whose read failed: one longer
+        // read each, inside the job's deadline.
+        const reread = await rereadPrimary({
+          service,
+          actor: input.actor,
+          runId: input.runId,
+          correlationId,
+          sources: found,
+          countries: marketCountries,
+          budgetMs: Math.min(
+            PRIMARY_REREAD_MS,
+            started + deadlineMs * 0.8 - now(),
+          ),
+        });
+        const withRead = (one: DeepResearchSource): DeepResearchSource => {
+          const page = one.extracted ? undefined : reread.get(urlKey(one.url));
+          return page === undefined
+            ? one
+            : {
+                ...one,
+                title: one.title ?? page.title,
+                excerpt: page.excerpt,
+                extracted: true,
+                instructionRisk: one.instructionRisk || page.instructionRisk,
+              };
+        };
+        const fresh = found.map(withRead);
+        state.sources = result.sources
+          .slice(0, 60)
+          .map(withRead)
+          .map((one) => ({
+            index: one.index,
+            url: one.url,
+            domain: one.domain,
+            title: one.title?.slice(0, 400) ?? null,
+            publishedAt: one.publishedAt,
+            retrievedAt: one.retrievedAt,
+            excerpt: knownIndex.has(one.index)
+              ? ""
+              : one.excerpt.slice(0, PAGE_CHARS),
+            extracted: one.extracted,
+            instructionRisk: one.instructionRisk,
+            lanes: [...one.lanes],
+          }));
         state.lanes = [...state.lanes, ...result.lanes].slice(0, 40);
         for (const question of state.current) {
           state.asked.push(question.query.toLowerCase());
@@ -1164,7 +1348,12 @@ export function workforceDeepResearch(dependencies: {
             lane: question.lane.slice(0, 40),
             question: question.query.slice(0, 200),
             today,
-            pages: pagesText(pages),
+            pages: [
+              pagesText(pages).slice(0, 17_500),
+              leadsText(question.lane, state.sources),
+            ]
+              .filter((part) => part.length > 0)
+              .join("\n\n"),
           });
           spend.charge(read?.costUsd ?? null, FACTS_CEILING_USD);
           if (read === null) return;
@@ -1178,16 +1367,20 @@ export function workforceDeepResearch(dependencies: {
         const seen = new Set(
           state.facts.map((fact) => factKey(fact.statement)),
         );
+        // Only pages actually read can stand behind a fact: a snippet of a
+        // page that could not be read is a lead, never evidence.
         const { verified } = verifyFacts(
           proposed,
-          state.sources.map((one) => ({
-            index: one.index,
-            url: one.url,
-            domain: one.domain,
-            title: one.title,
-            publishedAt: one.publishedAt,
-            excerpt: one.excerpt,
-          })),
+          state.sources
+            .filter((one) => one.extracted)
+            .map((one) => ({
+              index: one.index,
+              url: one.url,
+              domain: one.domain,
+              title: one.title,
+              publishedAt: one.publishedAt,
+              excerpt: one.excerpt,
+            })),
           seen,
         );
         state.facts = [
