@@ -75,6 +75,9 @@ const KEPT: ReadonlySet<QTurnObjectBlock["kind"]> = new Set([
   "COMPARISON_CARDS",
   "ARTIFACT_REFERENCE",
   "ACTION_PROPOSAL",
+  // Live e11: the plan card is on the Board (S5), but it was never kept
+  // here, so the header read "Board 0" beside a plan with 19 tasks.
+  "PLAN",
 ]);
 
 function count(n: number, one: string, many: string): string {
@@ -183,6 +186,7 @@ function titleOf(
     if (block.kind === "COMPARISON_CARDS" && block.title !== null)
       return block.title;
     if (block.kind === "ARTIFACT_REFERENCE") return block.title;
+    if (block.kind === "PLAN") return cutAtWord(block.title, 120);
   }
   return cutAtWord(question?.trim() ?? "", 120) || "Shown by Q";
 }

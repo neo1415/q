@@ -355,6 +355,32 @@ describe("S5: Execute is one approval bound to the exact version", () => {
       "Your part: Add a Business model slide showing revenue per clinic",
     );
     expect(w.plansStore.plans.get(block.planId)?.status).toBe("EXECUTING");
+    // Live e11: each step reads where it stands (the thread's projection),
+    // while the body hash the approval bound to stays the stored one.
+    const running = await w.plans.view(owner, block.planId);
+    expect(running?.bodySha256).toBe(view.bodySha256);
+    const byTitle = new Map(
+      (running?.plan.steps ?? []).map((step) => [step.title, step] as const),
+    );
+    const theirs = byTitle.get(
+      "Add a Business model slide showing revenue per clinic",
+    );
+    expect(theirs?.status).toBe("WAITING_YOU");
+    expect(theirs?.boardItemId).toMatch(UUID);
+    expect(
+      byTitle.get(
+        "Reply to Kestrel Ventures with revenue per clinic, as their note asked",
+      )?.status,
+    ).toBe("PROPOSED");
+    // Live e11: Execute on a running plan prepares no second approval.
+    const cardsBefore = w.cards.length;
+    const again = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: view.plan.version,
+      bodySha256: view.bodySha256,
+    });
+    expect(again.outcome).toBe("EXECUTING");
+    expect(w.cards).toHaveLength(cardsBefore);
     // Executing again is idempotent: no second board item or reminder.
     await w.plans.execute(
       founder,

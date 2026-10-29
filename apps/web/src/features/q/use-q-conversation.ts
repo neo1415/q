@@ -38,6 +38,7 @@ import {
   documentAsked,
   navigationHeard,
 } from "./control/fast-navigation";
+import { announceApprovalDecided } from "./approval-decided";
 import { askQ } from "./ask-route";
 import { noteLiveRun, noteTypedRun } from "./follow-navigation";
 import { loadWire } from "./wire";
@@ -256,6 +257,7 @@ export function useQConversation(
   const [decisions, setDecisions] = useState<readonly BoardDecision[]>([]);
   const recordDecision = useCallback(
     (approvalId: string, decision: "APPROVE" | "REJECT") => {
+      if (decision === "APPROVE") announceApprovalDecided();
       setDecisions((current) => [
         ...current,
         {

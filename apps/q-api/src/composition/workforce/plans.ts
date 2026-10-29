@@ -347,15 +347,18 @@ export function createPlans(dependencies: PlansDependencies) {
     planId: string,
     version?: number,
   ): Promise<QPlanView | null> => {
-    const [stored, lines] = await Promise.all([
+    const [stored, lines, runtimes] = await Promise.all([
       store.read(owner, planId, version),
       store
         .readThread(owner, { planId }, { kinds: ["STATUS"] })
         .catch(() => []),
+      thread
+        .runtimes(owner, planId)
+        .catch(() => new Map<string, StepRuntime>()),
     ]);
     if (stored === null) return null;
     return {
-      plan: stored.plan,
+      plan: withRuntimes(stored.plan, runtimes),
       bodySha256: stored.bodySha256,
       current: stored.plan.version === stored.headVersion,
       headVersion: stored.headVersion,
@@ -403,6 +406,15 @@ export function createPlans(dependencies: PlansDependencies) {
     const trace = await traceOf(owner, head.jobId);
     switch (request.affordance) {
       case "EXECUTE": {
+        // Live e11: Execute stayed live on a plan already running. It runs
+        // once; a second approval card would only repeat it.
+        if (stored.status === "EXECUTING" || stored.status === "DONE") {
+          return result(
+            "EXECUTING",
+            "This plan is already running; the card shows each step as it lands.",
+            head.currentVersion,
+          );
+        }
         // The approval binds to the body the card showed: a different body
         // is a different plan.
         if (request.bodySha256 !== stored.bodySha256) {
@@ -1111,6 +1123,41 @@ export function awaitsGo(step: QPlanStep, runtime: StepRuntime): boolean {
   if (step.owner === "YOU") return runtime.boardItemId === null;
   return true;
 }
+
+/**
+ * Live e11 (2026-10-29): the card showed the thread's last four lines, so a
+ * finished step still read "Started" and nothing said which step stood
+ * where. A version's body is immutable; where its steps stand is the
+ * thread's projection, laid over the body's own additive step fields
+ * (status, job, board item, approval, reminder) for the reader only. The
+ * body hash the approval binds to is the stored one, untouched.
+ */
+export function withRuntimes(
+  plan: QPlan,
+  runtimes: ReadonlyMap<string, StepRuntime>,
+): QPlan {
+  if (runtimes.size === 0) return plan;
+  const uuid = (id: string | null) =>
+    id !== null && UUID_TEXT.test(id) ? id : null;
+  return {
+    ...plan,
+    steps: plan.steps.map((step) => {
+      const runtime = runtimes.get(step.key);
+      if (runtime === undefined) return step;
+      return {
+        ...step,
+        status: runtime.status,
+        jobId: uuid(runtime.jobId) ?? step.jobId,
+        boardItemId: uuid(runtime.boardItemId) ?? step.boardItemId,
+        proposalId: uuid(runtime.actionId) ?? step.proposalId,
+        reminderId: runtime.reminderId ?? step.reminderId,
+      };
+    }),
+  };
+}
+
+const UUID_TEXT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 /** A step's own record says it is done: what was verified, in plain words. */
 export function verifiedDone(

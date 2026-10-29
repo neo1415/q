@@ -7,7 +7,9 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, ICON_STROKE, ListChecks } from "@capital-q/ui/icons";
 
 import { useT } from "@/features/i18n/language";
+import { startPacedPoll } from "@/features/polling/paced-poll";
 
+import { Q_APPROVAL_DECIDED_EVENT } from "./approval-decided";
 import { decidePlanAction, readPlanAction } from "./plan-actions";
 import { WorkInProgressCard } from "./work-canvas";
 import { useWorkLive } from "./work-live";
@@ -90,6 +92,96 @@ export function factNote(fact: Pick<CitedFact, "truthClass">): string | null {
 }
 
 /**
+ * Where a step stands, in code's words (the thread's own projection, laid
+ * over the step by the Q API); null while nothing has moved for it. Live
+ * e11: the card showed only the thread's last lines, so a finished step
+ * still read "Started" and none said which step stood where.
+ */
+export function stepStatusWords(
+  step: Pick<QPlanStep, "status" | "proposalId" | "boardItemId">,
+): string | null {
+  switch (step.status) {
+    case "DOING":
+      return "Started";
+    case "DONE":
+      return "Done";
+    case "PROPOSED":
+      return step.proposalId !== null
+        ? "Ready for your approval"
+        : "Q prepares it for your approval";
+    case "WAITING_YOU":
+      return step.boardItemId !== null
+        ? "Your part, on your board"
+        : "Your part";
+    case "SKIPPED":
+      return "Skipped";
+    case "TODO":
+      return null;
+  }
+}
+
+/** A plan already running (or run) is not offered Execute again (live e11). */
+export function planRunning(status: QPlanView["status"]): boolean {
+  return status === "EXECUTING" || status === "DONE";
+}
+
+/** What the card shows that can move: a changed key is a changed card. */
+export function planViewKey(view: QPlanView): string {
+  return [
+    view.status,
+    String(view.headVersion),
+    view.plan.steps.map((step) => `${step.key}:${step.status}`).join(","),
+    String(view.lines.length),
+  ].join("|");
+}
+
+/**
+ * Whether the card keeps reading its plan: while steps of the newest
+ * version are under way, or for a short while after the person approved
+ * something here (the plan's approval starts its steps within a second).
+ */
+export function planFollowed(
+  view: QPlanView | null,
+  approvedUntil: number,
+  now: number,
+): boolean {
+  if (view === null || !view.current) return false;
+  if (view.status === "EXECUTING") {
+    return view.plan.steps.some((step) => step.status === "DOING");
+  }
+  return !planRunning(view.status) && now < approvedUntil;
+}
+
+/** How long after an approval the card watches for its plan to start. */
+export const PLAN_APPROVAL_WATCH_MS = 60_000;
+/** The longest one card follows a running plan without a change. */
+export const PLAN_FOLLOW_MAX_MS = 15 * 60_000;
+const PLAN_FOLLOW_PACE = { firstMs: 2_000, maxMs: 15_000 } as const;
+
+/**
+ * One running step's job, followed on the same live read the change and
+ * the work cards use; its end reads the plan again.
+ */
+function StepFollow({
+  jobId,
+  onSettled,
+}: {
+  readonly jobId: string;
+  readonly onSettled: () => void;
+}) {
+  const { live } = useWorkLive(jobId);
+  const state = live?.state ?? null;
+  useEffect(() => {
+    if (state === "DONE" || state === "FAILED" || state === "STOPPED") {
+      onSettled();
+    }
+    // Only the job's end matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+  return null;
+}
+
+/**
  * The work making the next version, followed in place (live 2026-10-29:
  * "Change it" showed v2 only after a reload). When it ends, the card reads
  * its own version again, so it says a newer one exists; the new version
@@ -130,6 +222,9 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const [version, setVersion] = useState(block.version);
   const [changeJob, setChangeJob] = useState<string | null>(null);
   const [reads, setReads] = useState(0);
+  // Until when the card watches for its plan to start after an approval.
+  const [approvedUntil, setApprovedUntil] = useState(0);
+  const [clock, setClock] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -142,6 +237,52 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
       live = false;
     };
   }, [block.planId, version, reads]);
+
+  // Live e11: an approval given in the conversation starts this plan's
+  // steps; the card watches for them instead of waiting for a reload.
+  useEffect(() => {
+    const onApproved = () => {
+      const now = Date.now();
+      setApprovedUntil(now + PLAN_APPROVAL_WATCH_MS);
+      setClock(now);
+    };
+    window.addEventListener(Q_APPROVAL_DECIDED_EVENT, onApproved);
+    return () =>
+      window.removeEventListener(Q_APPROVAL_DECIDED_EVENT, onApproved);
+  }, []);
+
+  const followed = planFollowed(view, approvedUntil, clock);
+  // While the plan moves, the card reads it on the paced poll every live
+  // card uses (nothing while the tab is hidden, slower while unchanged).
+  useEffect(() => {
+    if (!followed) return;
+    const started = Date.now();
+    let shown = view === null ? "" : planViewKey(view);
+    const poll = startPacedPoll(
+      async () => {
+        const read = await readPlanAction(block.planId, version);
+        if (!read.ok) return "same";
+        const key = planViewKey(read.view);
+        const now = Date.now();
+        setView(read.view);
+        setClock(now);
+        if (
+          !planFollowed(read.view, approvedUntil, now) ||
+          now - started > PLAN_FOLLOW_MAX_MS
+        ) {
+          return "done";
+        }
+        const outcome = key === shown ? "same" : "changed";
+        shown = key;
+        return outcome;
+      },
+      PLAN_FOLLOW_PACE,
+      { immediate: true },
+    );
+    return () => poll.stop();
+    // Restarted only when following starts or stops, never per read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followed, block.planId, version, approvedUntil]);
 
   if (missing) return null;
 
@@ -164,7 +305,11 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
         }
       }
       // Board and approval change what the card's lines say: read again.
-      if (decided.outcome === "ON_BOARD" || decided.outcome === "FAILED") {
+      if (
+        decided.outcome === "ON_BOARD" ||
+        decided.outcome === "FAILED" ||
+        decided.outcome === "EXECUTING"
+      ) {
         setReads((count) => count + 1);
       }
     });
@@ -175,6 +320,12 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const current = view?.current ?? true;
   const facts = new Map((view?.facts ?? []).map((fact) => [fact.ref, fact]));
   const stillWanted = reviewed ? [] : (plan?.review?.openPoints ?? []);
+  const running = view !== null && planRunning(view.status);
+  const runningJobs = current
+    ? (plan?.steps ?? []).flatMap((step) =>
+        step.status === "DOING" && step.jobId !== null ? [step.jobId] : [],
+      )
+    : [];
 
   return (
     <section
@@ -248,6 +399,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           >
             {plan.steps.map((step, index) => {
               const noteText = stepNote(step);
+              const standing = stepStatusWords(step);
               const cited = step.cites.flatMap((ref) => {
                 const fact = facts.get(ref);
                 return fact === undefined ? [] : [fact];
@@ -258,6 +410,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                   className="flex gap-3 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2"
                   data-q-plan-step={step.key}
                   data-q-plan-owner={step.owner}
+                  data-q-plan-step-status={step.status}
                 >
                   <span className="cq-caption cq-numeric w-5 shrink-0 pt-0.5 text-(--cq-text-tertiary)">
                     {index + 1}
@@ -266,6 +419,14 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                     <span className="cq-body-sm text-(--cq-text-primary)">
                       {withoutFactRefs(step.title)}
                     </span>
+                    {standing === null ? null : (
+                      <span
+                        className="cq-caption font-medium text-(--cq-text-primary)"
+                        data-q-plan-step-standing
+                      >
+                        {t(standing)}
+                      </span>
+                    )}
                     <span className="cq-caption text-(--cq-text-secondary)">
                       {withoutFactRefs(step.why)}
                     </span>
@@ -341,38 +502,52 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           {t("There is a newer version of this plan.")}
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2" data-q-plan-actions>
-          <button
-            type="button"
-            className={buttonClassName("primary", "regular")}
-            disabled={pending || view === null}
-            onClick={() => {
-              if (view === null) return;
-              decide({
-                affordance: "EXECUTE",
-                version: view.plan.version,
-                bodySha256: view.bodySha256,
-              });
-            }}
-            data-q-plan-execute
-          >
-            {t("Execute")}
-          </button>
-          <button
-            type="button"
-            className={buttonClassName("secondary", "regular")}
-            disabled={pending || view === null}
-            onClick={() => {
-              if (view === null) return;
-              decide({
-                affordance: "PUT_ON_BOARD",
-                version: view.plan.version,
-              });
-            }}
-            data-q-plan-board
-          >
-            {t("Put on my board")}
-          </button>
+        <div className="flex flex-wrap items-center gap-2" data-q-plan-actions>
+          {running ? (
+            // Live e11: Execute stayed live on a plan already running.
+            <p
+              className="cq-body-sm m-0 text-(--cq-text-secondary)"
+              data-q-plan-running
+            >
+              {view?.status === "DONE"
+                ? t("This plan has run.")
+                : t("Running: each step shows here as it lands.")}
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={buttonClassName("primary", "regular")}
+                disabled={pending || view === null}
+                onClick={() => {
+                  if (view === null) return;
+                  decide({
+                    affordance: "EXECUTE",
+                    version: view.plan.version,
+                    bodySha256: view.bodySha256,
+                  });
+                }}
+                data-q-plan-execute
+              >
+                {t("Execute")}
+              </button>
+              <button
+                type="button"
+                className={buttonClassName("secondary", "regular")}
+                disabled={pending || view === null}
+                onClick={() => {
+                  if (view === null) return;
+                  decide({
+                    affordance: "PUT_ON_BOARD",
+                    version: view.plan.version,
+                  });
+                }}
+                data-q-plan-board
+              >
+                {t("Put on my board")}
+              </button>
+            </>
+          )}
           <button
             type="button"
             className={buttonClassName("secondary", "regular")}
@@ -427,6 +602,14 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           </div>
         </form>
       ) : null}
+
+      {runningJobs.map((jobId) => (
+        <StepFollow
+          key={jobId}
+          jobId={jobId}
+          onSettled={() => setReads((count) => count + 1)}
+        />
+      ))}
 
       {changeJob === null ? null : (
         <ChangeFollow

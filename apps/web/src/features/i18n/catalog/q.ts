@@ -228,4 +228,13 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "What should change?": "ما الذي يجب تغييره؟",
   "Send the change": "أرسل التغيير",
   "A plan Q wrote for you": "خطة كتبها Q لك",
+  // Live e11: where each step of a running plan stands.
+  Skipped: "تم تخطيها",
+  "Ready for your approval": "جاهزة لموافقتك",
+  "Q prepares it for your approval": "Q يُعِدّها لموافقتك",
+  "Your part": "دورك",
+  "Your part, on your board": "دورك، على لوحتك",
+  "This plan has run.": "نُفّذت هذه الخطة.",
+  "Running: each step shows here as it lands.":
+    "قيد التنفيذ: تظهر كل خطوة هنا عند اكتمالها.",
 };

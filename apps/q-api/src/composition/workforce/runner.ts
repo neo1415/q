@@ -100,6 +100,15 @@ export function createAgentWorkRunner(dependencies: {
   readonly directions?:
     | ((owner: Owner, planId: string, since: Date) => Promise<string | null>)
     | undefined;
+  /**
+   * Live e11 (2026-10-29): a plan's step job ended at 10:13 and its step
+   * read "Started" until the ten-minute sweep at 10:16, because a job's
+   * end is not a domain event that wakes plans. The plan the job belongs
+   * to is re-evaluated as soon as the job's row has ended (verifiedDone
+   * reads that row). Absent: the sweep alone.
+   */
+  readonly planStepEnded?:
+    ((owner: Owner, planId: string) => Promise<unknown>) | undefined;
   readonly workerId?: string | undefined;
   readonly leaseMs?: number | undefined;
   readonly logger?: Logger | undefined;
@@ -119,10 +128,27 @@ export function createAgentWorkRunner(dependencies: {
     });
   };
 
+  /** The plan a step job belongs to, told its job ended (never fails the job). */
+  const planStepEnded = async (owner: Owner, row: WorkRow): Promise<void> => {
+    const planId = row.trace.planId;
+    if (planId === undefined || dependencies.planStepEnded === undefined) {
+      return;
+    }
+    await dependencies.planStepEnded(owner, planId).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, jobId: row.job_id, planId },
+        "plan not re-evaluated after its step ended",
+      );
+    });
+  };
+
   async function runOne(row: WorkRow): Promise<void> {
     const owner: Owner = { tenantId: row.tenant_id, userId: row.user_id };
     const finish = async (state: EndState, reason: string | null) => {
       const ended = await queue.finish(row.job_id, workerId, state, reason);
+      if (ended && !isPlanJobPayload(row.plan)) {
+        await planStepEnded(owner, row);
+      }
       if (ended && state === "FAILED") {
         await store
           .setJobStatus(owner, row.job_id, "FAILED")

@@ -5351,6 +5351,8 @@ const agentWorkRunner = createAgentWorkRunner({
   plans: (input) => plans.run(input),
   // S6: a plan's running steps re-read the person's direction.
   directions: (owner, planId, since) => plans.directions(owner, planId, since),
+  // Live e11: a step's job ended, so its plan reads it done now.
+  planStepEnded: (owner, planId) => plans.evaluatePlan(owner, planId),
   // Owner 2026-10-23: the finished document lands in the conversation.
   deliver: createWorkforceDelivery({
     // A plain (non-analysis) document's line, read as its owner.
