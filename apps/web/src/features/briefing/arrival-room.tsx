@@ -158,10 +158,16 @@ export function ArrivalRoom({
   readonly wide?: boolean | undefined;
 }) {
   const { filled } = useRoomSlots();
+  // The arrival with nothing beside Q (live 2026-10-29): the room's boxes
+  // step out of the layout, so Q's presence is the arrival's own flexible
+  // item and yields height to the welcome first (globals.css .cq-arrival).
+  // The columns stay mounted, as the stage's portal targets, but take no
+  // part until the briefing fills them.
+  const yielding = !filled && !wide;
   return (
     <div
       className={cx(
-        "flex w-full flex-col items-center",
+        yielding ? "contents" : "flex w-full flex-col items-center",
         filled &&
           (wide
             ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,40rem)_minmax(0,1fr)] xl:items-start xl:gap-8"
@@ -171,16 +177,22 @@ export function ArrivalRoom({
     >
       {/* Side columns from xl only: at lg (1024px) beside the 40rem stage
           they were ~95px wide and crushed their cards (live 2026-10-10). */}
-      <RoomSlot side="left" className="hidden xl:flex" />
+      <RoomSlot
+        side="left"
+        className={yielding ? "hidden" : "hidden xl:flex"}
+      />
       <div
         className={cx(
-          "flex flex-col items-center gap-6",
+          yielding ? "contents" : "flex flex-col items-center gap-6",
           wide && "w-full min-w-0",
         )}
       >
         {children}
       </div>
-      <RoomSlot side="right" className="hidden xl:flex" />
+      <RoomSlot
+        side="right"
+        className={yielding ? "hidden" : "hidden xl:flex"}
+      />
     </div>
   );
 }

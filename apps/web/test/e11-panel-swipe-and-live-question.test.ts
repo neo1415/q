@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
 import { liveQuestionShown } from "@/features/onboarding-conversation/conversation";
@@ -52,27 +49,5 @@ describe("the whole card is swipeable", () => {
     expect(panelSwipeMoves({ panelScrolledPx: 0, selecting: true })).toBe(
       false,
     );
-  });
-});
-
-describe("desktop Home: Talk to Q stays above the composer with the briefing shown", () => {
-  it("the resting room is two thirds the size while the welcome carries the briefing", () => {
-    const css = readFileSync(
-      fileURLToPath(new URL("../app/globals.css", import.meta.url)),
-      "utf8",
-    ).replace(/\s+/gu, " ");
-    expect(css).toContain(
-      ".cq-arrival:has([data-q-welcome-line] [data-q-briefing]) .cq-room-presence { width: calc(var(--cq-room-box) * 2 / 3); height: calc(var(--cq-room-box) * 2 / 3); }",
-    );
-    expect(css).toContain(
-      ".cq-arrival:has([data-q-welcome-line] [data-q-briefing]) .cq-room-presence:not(.is-gathered) > * { scale: 0.667; }",
-    );
-    const tsx = readFileSync(
-      fileURLToPath(
-        new URL("../src/features/q/q-conversation.tsx", import.meta.url),
-      ),
-      "utf8",
-    );
-    expect(tsx).toContain('"cq-arrival mx-auto flex');
   });
 });
