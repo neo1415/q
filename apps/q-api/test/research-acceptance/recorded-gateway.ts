@@ -1,14 +1,21 @@
 import { createHash } from "node:crypto";
 
 import {
+  ModelFailureClassSchema,
   ModelGatewayResultMetadataSchema,
   type ModelGatewayRequestInput,
   type ModelGatewayResult,
 } from "@capital-q/contracts";
-import type {
-  ModelGateway,
-  ModelGatewayExecuteOptions,
+import {
+  isModelGatewayError,
+  ModelGatewayError,
+  type ModelGateway,
+  type ModelGatewayExecuteOptions,
 } from "@capital-q/model-gateway";
+import type {
+  RecordingTime,
+  ReplayTime,
+} from "@capital-q/q-research/providers/recorded";
 import { z } from "zod";
 
 /**
@@ -23,12 +30,18 @@ import { z } from "zod";
  * plain Error, so a change to a prompt or to what reaches it is visible.
  * A recorded output the current schema no longer accepts is a miss too.
  *
+ * A call that FAILED is recorded too, with its failure class (a transient
+ * plan failure live must fail the same way in the replay, or the replay
+ * takes the path the live run did not). With the run's recorded time,
+ * each call's answer is delivered in the order it settled live
+ * (q-research providers/recorded.ts).
+ *
  * Every call made in a replay is also kept in memory (its task, schema
  * and message text, and the output served) so the gate can assert what
  * reached the planner and what the research brief selected.
  */
 
-export const MODEL_FIXTURE_VERSION = 1;
+export const MODEL_FIXTURE_VERSION = 2;
 
 /** The output kinds a research step asks for (no tool calls here). */
 const RecordedOutputSchema = z.discriminatedUnion("kind", [
@@ -47,7 +60,10 @@ const RecordedCallSchema = z
     hash: z.string().regex(/^[0-9a-f]{64}$/u),
     taskClass: z.string(),
     schemaName: z.string().nullable(),
-    result: z.record(z.string(), z.unknown()),
+    /** The gateway's result; null when the call failed. */
+    result: z.record(z.string(), z.unknown()).nullable(),
+    /** The failure, when it failed: the gateway's class, or null (other). */
+    failure: z.object({ failureClass: z.string().nullable() }).nullable(),
   })
   .strict();
 
@@ -132,10 +148,13 @@ export type RecordingModelGateway = ModelGateway & {
 export function createRecordingModelGateway(input: {
   readonly gateway: ModelGateway;
   readonly clock?: (() => Date) | undefined;
+  /** The run's recorded time, shared with the web recording. */
+  readonly time?: RecordingTime | undefined;
 }): RecordingModelGateway {
   const recordedAt = (input.clock ?? (() => new Date()))().toISOString();
   const calls: RecordedModelFixture["calls"] = [];
   const seen: SeenModelCall[] = [];
+  const { time } = input;
   return {
     seen,
     fixture: () => ({
@@ -144,26 +163,46 @@ export function createRecordingModelGateway(input: {
       calls: [...calls],
     }),
     execute: async (request, options) => {
-      const result = await input.gateway.execute(request, options);
       const hash = modelRequestHash(request);
-      // Round-tripped through JSON: the fixture holds data only.
-      const stored = z
-        .record(z.string(), z.unknown())
-        .parse(JSON.parse(JSON.stringify(result)));
-      calls.push({
+      // Its place is kept when it begins: the order calls began in.
+      const entry: RecordedModelFixture["calls"][number] = {
         hash,
         taskClass: request.taskClass,
         schemaName: schemaNameOf(request),
-        result: stored,
-      });
-      seen.push({
-        hash,
-        taskClass: request.taskClass,
-        schemaName: schemaNameOf(request),
-        text: textOf(request),
-        output: outputOf(result),
-      });
-      return result;
+        result: null,
+        failure: null,
+      };
+      calls.push(entry);
+      const work = () => input.gateway.execute(request, options);
+      try {
+        const result = await (time === undefined
+          ? work()
+          : time.track(`MODEL ${hash}`, work));
+        // Round-tripped through JSON: the fixture holds data only.
+        entry.result = z
+          .record(z.string(), z.unknown())
+          .parse(JSON.parse(JSON.stringify(result)));
+        seen.push({
+          hash,
+          taskClass: request.taskClass,
+          schemaName: schemaNameOf(request),
+          text: textOf(request),
+          output: outputOf(result),
+        });
+        return result;
+      } catch (error: unknown) {
+        entry.failure = {
+          failureClass: isModelGatewayError(error) ? error.failureClass : null,
+        };
+        seen.push({
+          hash,
+          taskClass: request.taskClass,
+          schemaName: schemaNameOf(request),
+          text: textOf(request),
+          output: null,
+        });
+        throw error;
+      }
     },
   };
 }
@@ -195,8 +234,11 @@ export type ReplayModelGateway = ModelGateway & {
 
 export function createReplayModelGateway(input: {
   readonly fixture: RecordedModelFixture;
+  /** The recorded schedule's replay: answers arrive in recorded order. */
+  readonly time?: ReplayTime | undefined;
 }): ReplayModelGateway {
   const fixture = RecordedModelFixtureSchema.parse(input.fixture);
+  const { time } = input;
   // The same question asked twice is answered in recorded order.
   const byHash = new Map<string, RecordedModelFixture["calls"][number][]>();
   for (const call of fixture.calls) {
@@ -207,6 +249,73 @@ export function createReplayModelGateway(input: {
   const served = new Map<string, number>();
   const seen: SeenModelCall[] = [];
   const misses: ModelMiss[] = [];
+
+  const answer = <T>(
+    request: ModelGatewayRequestInput,
+    options: ModelGatewayExecuteOptions<T> | undefined,
+    hash: string,
+  ): (() => Promise<ModelGatewayResult<T>>) => {
+    const base = {
+      hash,
+      taskClass: request.taskClass,
+      schemaName: schemaNameOf(request),
+    };
+    const fail = (reason: ModelMiss["reason"]) => {
+      const miss = { ...base, reason };
+      misses.push(miss);
+      seen.push({ ...base, text: textOf(request), output: null });
+      return () => Promise.reject(new RecordedModelMiss(miss));
+    };
+    const list = byHash.get(hash);
+    if (list === undefined || list.length === 0) return fail("NOT_RECORDED");
+    const at = served.get(hash) ?? 0;
+    served.set(hash, at + 1);
+    const call = list[Math.min(at, list.length - 1)];
+    if (call === undefined) return fail("NOT_RECORDED");
+    if (call.failure !== null || call.result === null) {
+      // Failed as it failed live: a gateway failure keeps its class.
+      seen.push({ ...base, text: textOf(request), output: null });
+      const failureClass = ModelFailureClassSchema.safeParse(
+        call.failure?.failureClass,
+      );
+      return () =>
+        Promise.reject(
+          failureClass.success
+            ? new ModelGatewayError("Recorded model failure.", {
+                failureClass: failureClass.data,
+                attempts: 1,
+                candidates: [],
+              })
+            : new Error("Recorded model failure."),
+        );
+    }
+    // Re-validated, never trusted: the metadata by its contract, a
+    // structured answer by the caller's schema as it stands today.
+    const { output: rawOutput, ...rawMetadata } = call.result;
+    const metadata = ModelGatewayResultMetadataSchema.safeParse(rawMetadata);
+    const output = RecordedOutputSchema.safeParse(rawOutput);
+    if (!metadata.success || !output.success) return fail("SCHEMA_REFUSED");
+    let result: ModelGatewayResult<T>;
+    if (output.data.kind === "TEXT") {
+      result = { ...metadata.data, output: output.data };
+    } else {
+      const value = options?.schema?.safeParse(output.data.value);
+      if (value?.success !== true) return fail("SCHEMA_REFUSED");
+      result = {
+        ...metadata.data,
+        output: {
+          kind: "STRUCTURED",
+          value: value.data,
+          ...(output.data.dropped === undefined
+            ? {}
+            : { dropped: output.data.dropped }),
+        },
+      };
+    }
+    seen.push({ ...base, text: textOf(request), output: outputOf(result) });
+    return () => Promise.resolve(result);
+  };
+
   return {
     seen,
     misses,
@@ -215,48 +324,10 @@ export function createReplayModelGateway(input: {
       options?: ModelGatewayExecuteOptions<T>,
     ): Promise<ModelGatewayResult<T>> => {
       const hash = modelRequestHash(request);
-      const base = {
-        hash,
-        taskClass: request.taskClass,
-        schemaName: schemaNameOf(request),
-      };
-      const list = byHash.get(hash);
-      const fail = (reason: ModelMiss["reason"]) => {
-        const miss = { ...base, reason };
-        misses.push(miss);
-        seen.push({ ...base, text: textOf(request), output: null });
-        return Promise.reject(new RecordedModelMiss(miss));
-      };
-      if (list === undefined || list.length === 0) return fail("NOT_RECORDED");
-      const at = served.get(hash) ?? 0;
-      served.set(hash, at + 1);
-      const call = list[Math.min(at, list.length - 1)];
-      if (call === undefined) return fail("NOT_RECORDED");
-      // Re-validated, never trusted: the metadata by its contract, a
-      // structured answer by the caller's schema as it stands today.
-      const { output: rawOutput, ...rawMetadata } = call.result;
-      const metadata = ModelGatewayResultMetadataSchema.safeParse(rawMetadata);
-      const output = RecordedOutputSchema.safeParse(rawOutput);
-      if (!metadata.success || !output.success) return fail("SCHEMA_REFUSED");
-      let result: ModelGatewayResult<T>;
-      if (output.data.kind === "TEXT") {
-        result = { ...metadata.data, output: output.data };
-      } else {
-        const value = options?.schema?.safeParse(output.data.value);
-        if (value?.success !== true) return fail("SCHEMA_REFUSED");
-        result = {
-          ...metadata.data,
-          output: {
-            kind: "STRUCTURED",
-            value: value.data,
-            ...(output.data.dropped === undefined
-              ? {}
-              : { dropped: output.data.dropped }),
-          },
-        };
-      }
-      seen.push({ ...base, text: textOf(request), output: outputOf(result) });
-      return Promise.resolve(result);
+      const outcome = answer(request, options, hash);
+      return time === undefined
+        ? outcome()
+        : time.track(`MODEL ${hash}`, outcome);
     },
   };
 }

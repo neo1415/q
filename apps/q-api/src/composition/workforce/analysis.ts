@@ -780,14 +780,23 @@ export function investigationSections(input: {
 }
 
 /** What stayed open when the investigation stopped, for "not known". */
+/** What the writer is told when the research under it ran reduced. */
+export function reducedResearchText(reduced: string): string {
+  return `RESEARCH RAN REDUCED (code's finding; say so plainly in the summary, and never present this as a full investigation): ${reduced}`;
+}
+
 export function investigationGaps(
   investigations: readonly InvestigationSummary[],
 ): readonly string[] {
   return [
-    ...new Set(
-      investigations.flatMap((one) =>
+    ...new Set([
+      // First: an investigation that ran reduced says so before anything.
+      ...investigations.flatMap((one) =>
+        one.reduced === undefined ? [] : [one.reduced],
+      ),
+      ...investigations.flatMap((one) =>
         one.open.map((gap) => `Still open after research: ${gap}.`),
       ),
-    ),
+    ]),
   ].slice(0, 8);
 }

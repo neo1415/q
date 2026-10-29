@@ -45,6 +45,7 @@ const DeliverySchema = z.object({
     topRecommendations: z.array(z.string().min(1).max(300)).max(3),
     passed: z.boolean(),
     openIssues: z.number().int().min(0),
+    reducedResearch: z.string().min(1).max(400).optional(),
   }),
 });
 export type DeliveredDocument = z.infer<typeof DeliverySchema>;
@@ -120,6 +121,9 @@ export function readyLine(title: string): string {
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
   const lines = [readyLine(delivery.title), delivery.summary.trim()];
+  // Said before the conclusion is read as a full investigation.
+  if (delivery.reducedResearch !== undefined)
+    lines.push(delivery.reducedResearch.trim());
   if (delivery.topRecommendations.length > 0) {
     lines.push(
       `What I'd do first:\n${delivery.topRecommendations

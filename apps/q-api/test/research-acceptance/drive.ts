@@ -15,12 +15,16 @@ import {
 } from "@capital-q/model-gateway";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import { createLogger } from "@capital-q/observability";
-import type { PublicWebResearchProvider } from "@capital-q/q-research";
+import {
+  SYSTEM_RESEARCH_TIME,
+  type PublicWebResearchProvider,
+} from "@capital-q/q-research";
 import { createBraveResearchProvider } from "@capital-q/q-research/providers/brave";
 import { createDirectPageReader } from "@capital-q/q-research/providers/direct-read";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
 import {
   createRecordingResearchProvider,
+  createRecordingTime,
   createReplayResearchProvider,
 } from "@capital-q/q-research/providers/recorded";
 import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
@@ -194,20 +198,24 @@ describe.runIf(MODE === "record")("research acceptance: RECORD", () => {
         }
         const startedAt = new Date();
         const clock = () => startedAt;
+        // The system's clock and deadlines, recorded: the replay is handed
+        // the same readings, deadlines and order of answers.
+        const time = createRecordingTime(SYSTEM_RESEARCH_TIME);
         const web = createRecordingResearchProvider({
           provider: liveWeb(),
           clock,
+          time,
         });
         const models = createRecordingModelGateway({
           gateway: liveGateway(),
           clock,
+          time,
         });
-        const begun = Date.now();
         const run = await runCase({
           case: one,
           provider: web,
           gateway: models,
-          now: () => startedAt.getTime() + (Date.now() - begun),
+          time,
         });
         mkdirSync(OUT, { recursive: true });
         const target = {
@@ -260,12 +268,13 @@ describe.runIf(MODE === "eval")(
           });
           const gateway = liveGateway();
           const models = createRecordingModelGateway({ gateway });
-          const started = Date.now();
+          // Live models answer anew: no schedule to follow, the system's
+          // clock.
           const run = await runCase({
             case: one,
             provider: web,
             gateway: models,
-            now: () => started + (Date.now() - started),
+            time: SYSTEM_RESEARCH_TIME,
           });
           const checks = checkCase({
             case: one,

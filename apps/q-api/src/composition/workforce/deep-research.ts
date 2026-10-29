@@ -33,7 +33,10 @@ import {
   type OpenGap,
   type PrimaryKind,
   type ProposedFact,
+  rejectOnAbort,
+  SYSTEM_RESEARCH_TIME,
   type PublicWebResearchService,
+  type ResearchTime,
   type SearchBudget,
   type SourceTier,
   type VerifiedFact,
@@ -123,6 +126,17 @@ const PAGE_CHARS = 2_200;
 const FOLLOW_UPS_MAX = 4;
 const REQUEST_MAX = 4_000;
 const PLAN_CEILING_USD = 0.04;
+/**
+ * A plan call's failures worth asking once more (live 2026-10-29: OpenAI
+ * TRANSIENT failures cost case A its plan, and the job searched one
+ * generic query).
+ */
+const RETRIED_PLAN_FAILURES: ReadonlySet<string> = new Set([
+  "TRANSIENT",
+  "RATE_LIMIT",
+  "PROVIDER_OUTAGE",
+  "TIMEOUT",
+]);
 const BRIEF_CEILING_USD = 0.05;
 const FACTS_CEILING_USD = 0.05;
 const RECORDS_MAX = 12;
@@ -203,6 +217,12 @@ export const InvestigationSummarySchema = z
      * it is global because no place was named. Absent: an older dossier.
      */
     scope: z.string().max(400).optional(),
+    /**
+     * The investigation ran in a reduced form, and why, in plain words
+     * (2026-10-29: a plan that failed degraded it to one generic search
+     * that read as a full investigation). Absent: it ran as planned.
+     */
+    reduced: z.string().max(400).optional(),
   })
   .strict();
 export type InvestigationSummary = z.infer<typeof InvestigationSummarySchema>;
@@ -397,6 +417,8 @@ export async function rereadPrimary(input: {
   readonly sources: readonly DeepResearchSource[];
   readonly countries: ReadonlySet<string>;
   readonly budgetMs: number;
+  /** The deadline's timer (the system's by default). */
+  readonly time?: ResearchTime | undefined;
 }): Promise<
   ReadonlyMap<
     string,
@@ -426,7 +448,7 @@ export async function rereadPrimary(input: {
     .slice(0, PRIMARY_REREADS_MAX)
     .map((source) => source.url);
   if (urls.length === 0) return none;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = (input.time ?? SYSTEM_RESEARCH_TIME).timeout(input.budgetMs);
   try {
     const outcome = await Promise.race([
       input.service.extract({
@@ -434,14 +456,12 @@ export async function rereadPrimary(input: {
         runId: input.runId,
         correlationId: input.correlationId,
         urls,
-        signal: AbortSignal.timeout(input.budgetMs),
+        signal: deadline.signal,
       }),
       // Raced too, for a provider that does not heed its signal.
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), input.budgetMs);
-      }),
+      rejectOnAbort(deadline.signal, () => new Error("re-read timed out")),
     ]);
-    if (outcome === null || outcome.status !== "OK") return none;
+    if (outcome.status !== "OK") return none;
     for (const source of outcome.sources) {
       if (source.excerpt.trim().length === 0) continue;
       none.set(urlKey(source.url), {
@@ -454,7 +474,7 @@ export async function rereadPrimary(input: {
   } catch {
     return none;
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    deadline.cancel();
   }
 }
 
@@ -593,6 +613,8 @@ export const InvestigationCheckpointSchema = z
     internalQuery: z.string().max(200).nullable(),
     records: z.array(CapitalQRecordSchema).max(RECORDS_MAX).nullable(),
     budgetLimited: z.boolean(),
+    /** Why the investigation ran reduced (see the summary); absent: it did not. */
+    reduced: z.string().max(400).optional(),
     /** The context read once for the job (owner 2026-10-29). Absent: older. */
     context: z
       .object({
@@ -790,11 +812,35 @@ export function scopeOfWords(words: readonly string[]): string {
     : `Scope: ${countries.map((code) => countryName(code) ?? code).join(", ")} (from their words).`;
 }
 
+/**
+ * Why an investigation with no plan ran reduced, in the person's terms:
+ * what failed, and what was searched instead.
+ */
+export function reducedReason(plan: {
+  readonly planned: unknown;
+  readonly transient: boolean;
+  readonly retried: boolean;
+}): string {
+  const why =
+    plan.planned !== null
+      ? "the research plan came back with no lines of enquiry"
+      : plan.transient
+        ? `the research plan could not be written because the model service failed with a temporary error${plan.retried ? ", twice" : ""}`
+        : "the research plan could not be written";
+  return `This investigation ran in a reduced form: ${why}, so it searched the request's own words as a single query instead of planned lines of enquiry. Ask again for the full investigation.`;
+}
+
 export function workforceDeepResearch(dependencies: {
   readonly service: PublicWebResearchService | undefined;
   readonly models: Pick<WorkforceModels, "planResearch" | "researchFacts"> &
     Partial<Pick<WorkforceModels, "researchBrief">>;
   readonly now?: (() => number) | undefined;
+  /**
+   * The clock and deadlines of the whole research path (q-research
+   * time.ts): the acceptance gate records and replays them. The system's
+   * by default; it is the clock too when `now` is absent.
+   */
+  readonly time?: ResearchTime | undefined;
   readonly deadlineMs?: number | undefined;
   readonly logger?: Logger | undefined;
   /**
@@ -852,7 +898,8 @@ export function workforceDeepResearch(dependencies: {
 }): WorkforcePortServices["research"] {
   const service = dependencies.service;
   if (service === undefined) return undefined;
-  const now = dependencies.now ?? Date.now;
+  const time = dependencies.time ?? SYSTEM_RESEARCH_TIME;
+  const now = dependencies.now ?? time.now;
   const deep = createDeepResearch({
     service,
     clock: now,
@@ -1056,21 +1103,60 @@ export function workforceDeepResearch(dependencies: {
       recent: one.recent,
       primary: one.primary === true,
     });
-    const planCall = async (gaps: readonly OpenGap[]) => {
+    const planOnce = async (gaps: readonly OpenGap[]) => {
       modelCalls += 1;
-      const planned = await models.planResearch(who, trace, {
-        request,
-        purpose: input.query.slice(0, 600),
-        subject: own.text.slice(0, 1_200),
-        brief:
-          brief?.planner ??
-          "No brief: Q could not read their situation for this question. Plan from the request alone; when it names no place, keep the queries global.",
-        today,
-        gaps: gaps.map(gapText).join("\n").slice(0, 4_000),
-        asked: state.asked.join("\n").slice(0, 6_000),
-      });
+      let failure: string | null | undefined;
+      const planned = await models.planResearch(
+        who,
+        trace,
+        {
+          request,
+          purpose: input.query.slice(0, 600),
+          subject: own.text.slice(0, 1_200),
+          brief:
+            brief?.planner ??
+            "No brief: Q could not read their situation for this question. Plan from the request alone; when it names no place, keep the queries global.",
+          today,
+          gaps: gaps.map(gapText).join("\n").slice(0, 4_000),
+          asked: state.asked.join("\n").slice(0, 6_000),
+        },
+        {
+          onFailed: (failureClass) => {
+            failure = failureClass;
+          },
+        },
+      );
       spend.charge(planned?.costUsd ?? null, PLAN_CEILING_USD);
-      return planned;
+      return { planned, failure };
+    };
+    // A transient failure is asked once more, inside the model-call cap,
+    // the job's spend and round one's share of its deadline.
+    const planCall = async (gaps: readonly OpenGap[]) => {
+      const first = await planOnce(gaps);
+      const transient =
+        first.planned === null &&
+        first.failure !== undefined &&
+        RETRIED_PLAN_FAILURES.has(first.failure ?? "");
+      if (
+        !transient ||
+        modelCalls >= MODEL_CALLS_MAX ||
+        !spend.canAfford(PLAN_CEILING_USD) ||
+        now() >= started + deadlineMs * 0.45
+      )
+        return { ...first, retried: false, transient };
+      logger?.warn(
+        { jobId: input.jobId, runId: input.runId, failure: first.failure },
+        "deep research plan failed transiently; asked once more",
+      );
+      const second = await planOnce(gaps);
+      return {
+        ...second,
+        retried: true,
+        transient:
+          second.planned === null &&
+          second.failure !== undefined &&
+          RETRIED_PLAN_FAILURES.has(second.failure ?? ""),
+      };
     };
 
     let stop: StopReason | null = null;
@@ -1101,13 +1187,21 @@ export function workforceDeepResearch(dependencies: {
         if (state.round === 0) {
           // 1. The plan, primary sources first.
           report({ stage: "PLANNING_RESEARCH", round: 1 });
-          const planned = await planCall([]);
+          const plan = await planCall([]);
+          const planned = plan.planned;
           let questions: PlannedQuestion[] = (planned?.output.questions ?? [])
             .slice(0, 12)
             .map(plannedLane);
           if (questions.length === 0) {
             // No plan: the person's own sentence, as one question, rather
-            // than nothing. Honest, but it is the old single search.
+            // than nothing. Honest only when it says so: the report and
+            // the card state that the investigation ran reduced, and why
+            // (2026-10-29: it read as a full investigation).
+            state.reduced = reducedReason(plan);
+            logger?.warn(
+              { jobId: input.jobId, runId: input.runId, why: state.reduced },
+              "deep research ran reduced: no research plan",
+            );
             const phrase = searchPhrase(request);
             if (phrase.length > 0)
               questions = [
@@ -1187,7 +1281,7 @@ export function workforceDeepResearch(dependencies: {
               round: state.round + 1,
               questions: open.length,
             });
-            const planned = await planCall(
+            const { planned } = await planCall(
               open.filter((gap) => gap.reason !== "COULD_NOT_RUN"),
             );
             // Only the open questions' lines: anything else is dropped.
@@ -1269,6 +1363,7 @@ export function workforceDeepResearch(dependencies: {
           correlationId,
           sources: found,
           countries: marketCountries,
+          time,
           budgetMs: Math.min(
             PRIMARY_REREAD_MS,
             started + deadlineMs * 0.8 - now(),
@@ -1539,6 +1634,7 @@ export function workforceDeepResearch(dependencies: {
         modelCalls,
         ms,
         scope: scope.slice(0, 400),
+        ...(state.reduced === undefined ? {} : { reduced: state.reduced }),
       },
       ...(state.records === null || state.records.length === 0
         ? {}

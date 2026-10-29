@@ -16,6 +16,12 @@ import type { SeenModelCall } from "./recorded-gateway.js";
  * a named verdict with the evidence that failed it, so a red run says
  * what broke ("query 'payments regulation' has no place term"), not
  * merely that something did.
+ *
+ * Every check a case expects ALWAYS reports (2026-10-29: a degraded live
+ * recording passed "17/17" because PRIMARY_FROM_PLACE and the brief and
+ * report checks dropped out of the list when their evidence was missing).
+ * Missing evidence -- no brief, no report, no dossier, no fact -- is a
+ * FAIL saying what is missing, never an omitted check.
  */
 
 export type CheckVerdict = {
@@ -134,6 +140,28 @@ function citedIndices(text: string): readonly number[] {
   );
 }
 
+/**
+ * The fewest queries an investigation sends (2026-10-29: a plan that fell
+ * back to the request's own sentence sent ONE and passed). The planner is
+ * asked for up to 12 lines of enquiry and the job's search budget (40)
+ * runs every one in round one, so a planned investigation sends 12 or
+ * more; 8 leaves room for a line egress refuses or the deadline skips,
+ * and no fallback reaches it.
+ */
+export const MIN_INVESTIGATION_QUERIES = 8;
+
+/**
+ * Report sections that need a line of enquiry of their own on the web;
+ * the rest (thesis, contradictions, limits, gaps) are written from them.
+ */
+const EVIDENCE_SECTIONS: ReadonlySet<ReportSection> = new Set([
+  "DEVELOPMENTS",
+  "REGULATORY",
+  "COMPETITIVE",
+  "OPPORTUNITIES",
+  "PIPELINE",
+]);
+
 function verdict(id: string, failures: readonly string[], passed: string) {
   return {
     id,
@@ -172,12 +200,54 @@ export function checkCase(input: GateInput): readonly CheckVerdict[] {
   const dossier = input.run.dossier;
   const text = reportText(input.run);
 
+  const missing = (id: string, why: string) => verdict(id, [why], "");
   checks.push(
     verdict(
       "QUERIES_SENT",
-      queries.length === 0 ? ["no query left Capital Q"] : [],
+      queries.length < MIN_INVESTIGATION_QUERIES
+        ? [
+            `${String(queries.length)} ${queries.length === 1 ? "query" : "queries"} left Capital Q; an investigation sends at least ${String(MIN_INVESTIGATION_QUERIES)}`,
+          ]
+        : [],
       `${String(queries.length)} queries`,
     ),
+  );
+  // The plan ran: no fallback to a single generic search.
+  checks.push(
+    dossier === null
+      ? missing(
+          "INVESTIGATION_PLANNED",
+          "no dossier: the research did not finish",
+        )
+      : verdict(
+          "INVESTIGATION_PLANNED",
+          dossier.investigation?.reduced === undefined
+            ? []
+            : [dossier.investigation.reduced],
+          "the investigation ran as planned",
+        ),
+  );
+  // A line of enquiry for every section that needs the web.
+  const evidenceSections = expect.sections.filter((section) =>
+    EVIDENCE_SECTIONS.has(section),
+  );
+  const linesRun = new Set(
+    (dossier?.lanes ?? [])
+      .filter((lane) => lane.status === "OK")
+      .map((lane) => lane.lane),
+  );
+  checks.push(
+    dossier === null
+      ? missing("LINES_OF_ENQUIRY", "no dossier: the research did not finish")
+      : verdict(
+          "LINES_OF_ENQUIRY",
+          linesRun.size < Math.max(1, evidenceSections.length)
+            ? [
+                `${String(linesRun.size)} lines of enquiry ran (${[...linesRun].join(", ") || "none"}); the report's ${evidenceSections.join(", ")} sections need at least ${String(Math.max(1, evidenceSections.length))}`,
+              ]
+            : [],
+          `${String(linesRun.size)} lines of enquiry ran`,
+        ),
   );
 
   // 1. The place: every query carries it, or none names one.
@@ -304,9 +374,13 @@ export function checkCase(input: GateInput): readonly CheckVerdict[] {
     );
     const brief = briefs.at(-1);
     if (brief === undefined || brief.output === null) {
-      checks.push(
-        verdict("BRIEF_WRITTEN", ["no research brief was written"], ""),
-      );
+      for (const id of [
+        "BRIEF_WRITTEN",
+        "BRIEF_MARKET",
+        "BRIEF_SELECTS",
+        "PLANNER_SEES_SELECTED_ONLY",
+      ])
+        checks.push(missing(id, "no research brief was written"));
     } else {
       const said = JSON.stringify(brief.output);
       const selected = refsIn(brief.output);
@@ -370,22 +444,23 @@ export function checkCase(input: GateInput): readonly CheckVerdict[] {
       ),
       ...input.web.pages.map((page) => page.url),
     ].some((url) => matchesDomain(domainOf(url), expect.primaryDomains));
-    if (recorded)
-      checks.push(
-        verdict(
-          "PRIMARY_FROM_PLACE",
-          sources.some(
-            (source) =>
-              source.tier === "PRIMARY" &&
-              matchesDomain(source.domain, expect.primaryDomains),
-          )
-            ? []
-            : [
-                "the recording holds the place's primary publisher, but no source from it is PRIMARY",
-              ],
-          "a primary source from the named place",
-        ),
-      );
+    checks.push(
+      verdict(
+        "PRIMARY_FROM_PLACE",
+        sources.some(
+          (source) =>
+            source.tier === "PRIMARY" &&
+            matchesDomain(source.domain, expect.primaryDomains),
+        )
+          ? []
+          : [
+              recorded
+                ? "the recording holds the place's primary publisher, but no source from it is PRIMARY"
+                : "no source from the place's primary publishers: the searches never reached one",
+            ],
+        "a primary source from the named place",
+      ),
+    );
   }
   if (expect.places.length > 0)
     checks.push(
@@ -490,6 +565,15 @@ export function checkCase(input: GateInput): readonly CheckVerdict[] {
           "every pipeline company considered",
         ),
       );
+  } else {
+    for (const id of [
+      "REPORT_SECTIONS",
+      "CITATIONS_RESOLVE",
+      "CAPITAL_Q_RECORDS_APART",
+      ...(expect.mandateTerms.length > 0 ? ["THESIS_QUOTES_MANDATE"] : []),
+      ...(expect.pipelineCompanies.length > 0 ? ["PIPELINE_CONSIDERED"] : []),
+    ])
+      checks.push(missing(id, "no report was written"));
   }
 
   // 7. Facts: every number on its page, labels per ADR-001.
@@ -499,6 +583,18 @@ export function checkCase(input: GateInput): readonly CheckVerdict[] {
     ),
   );
   const facts = dossier?.facts ?? [];
+  if (facts.length === 0) {
+    for (const id of ["FACT_NUMBERS_ON_PAGE", "EVIDENCE_LABELS_ADR001"])
+      checks.push(
+        missing(
+          id,
+          dossier === null
+            ? "no dossier: the research did not finish"
+            : "no sourced fact was admitted",
+        ),
+      );
+    return checks;
+  }
   checks.push(
     verdict(
       "FACT_NUMBERS_ON_PAGE",

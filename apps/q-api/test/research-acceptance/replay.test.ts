@@ -143,7 +143,7 @@ describe("research acceptance: the checks bite on the live failure", () => {
         "nigeria cbn payments regulation circular",
       ],
       web: {
-        version: 1,
+        version: 2,
         providerCode: "brave",
         recordedAt: "2026-10-29T12:00:00.000Z",
         searches: [
@@ -172,6 +172,8 @@ describe("research acceptance: the checks bite on the live failure", () => {
         ],
         failedUrls: [],
         extractFailures: [],
+        extracts: [],
+        schedule: null,
       },
       modelCalls: [],
     })
@@ -200,6 +202,146 @@ describe("research acceptance: the checks bite on the live failure", () => {
     expect(governmentCountry("www.centralbank.go.ke")).toBe("KE");
     expect(governmentCountry("www.gov.uk")).toBe("GB");
     expect(governmentCountry("techcabal.com")).toBeNull();
+  });
+});
+
+/** A web recording holding only what is given (no primary publisher). */
+function webOf(
+  queries: readonly string[],
+  urls: readonly string[],
+): Parameters<typeof checkCase>[0]["web"] {
+  return {
+    version: 2,
+    providerCode: "brave",
+    recordedAt: "2026-10-29T12:00:00.000Z",
+    searches: queries.map((query) => ({
+      key: query.toLowerCase(),
+      query,
+      includeDomains: [],
+      hits: urls.map((url) => ({
+        url,
+        title: null,
+        snippet: "Payments",
+        publishedAt: null,
+        relevance: null,
+      })),
+      failure: null,
+    })),
+    pages: urls.map((url) => ({ url, title: null, text: "Payments." })),
+    failedUrls: [],
+    extractFailures: [],
+    extracts: [],
+    schedule: null,
+  };
+}
+
+describe("research acceptance: every expected check always reports", () => {
+  const caseA = cases.find((one) => one.id.startsWith("A-"));
+  if (caseA === undefined) throw new Error("case A is missing");
+  const nothing: CaseRun = {
+    found: { status: "UNAVAILABLE", message: "x" },
+    dossier: null,
+    sources: [],
+    draft: null,
+    content: null,
+  };
+
+  it("reports the same checks whatever evidence is missing, and missing evidence fails", () => {
+    const full = checkCase({
+      case: caseA,
+      run: liveRunA(),
+      queries: ["nigeria payments"],
+      web: webOf(["nigeria payments"], []),
+      modelCalls: [],
+    });
+    const empty = checkCase({
+      case: caseA,
+      run: nothing,
+      queries: [],
+      web: webOf([], []),
+      modelCalls: [],
+    });
+    expect(empty.map((check) => check.id)).toEqual(
+      full.map((check) => check.id),
+    );
+    expect(empty.map((check) => check.id)).toEqual(
+      expect.arrayContaining([
+        "PRIMARY_FROM_PLACE",
+        "BRIEF_MARKET",
+        "REPORT_SECTIONS",
+        "FACT_NUMBERS_ON_PAGE",
+        "INVESTIGATION_PLANNED",
+        "LINES_OF_ENQUIRY",
+      ]),
+    );
+    const passed = empty.filter((check) => check.ok).map((check) => check.id);
+    // Only the checks that nothing sent can satisfy pass on nothing.
+    expect(passed.sort()).toEqual(
+      [
+        "CAPITAL_Q_RECORDS_NOT_SENT",
+        "FOREIGN_GOVERNMENT_NOT_PRIMARY",
+        "NO_PRIVATE_IN_QUERIES",
+        "PLACE_IN_EVERY_QUERY",
+        "QUERY_TERMS_TRACE",
+      ].sort(),
+    );
+  });
+
+  // The degraded live recording (2026-10-29): OpenAI TRANSIENT failures,
+  // the plan fell back to ONE query (the request), 4 pages, no primary
+  // source -- and it passed 17/17.
+  it("fails a degraded investigation that fell back to one generic search", () => {
+    const urls = [
+      "https://straitsresearch.com/b2b",
+      "https://techcabal.com/b2b",
+      "https://www.irs.gov/payments",
+      "https://example-news.com/b2b",
+    ];
+    const run = liveRunA();
+    const dossier = run.dossier;
+    if (dossier === null) throw new Error("run A has a dossier");
+    const degraded: CaseRun = {
+      ...run,
+      dossier: {
+        ...dossier,
+        lanes: [
+          {
+            lane: "GENERAL",
+            query: caseA.request.slice(0, 160),
+            status: "OK",
+            sources: 4,
+          },
+        ],
+        investigation: {
+          rounds: 1,
+          stop: "NO_NEW_QUERIES",
+          open: [],
+          couldNotRun: [],
+          searches: 1,
+          modelCalls: 6,
+          ms: 40_000,
+          reduced:
+            "This investigation ran in a reduced form: the research plan could not be written because the model service failed with a temporary error, twice, so it searched the request's own words as a single query instead of planned lines of enquiry. Ask again for the full investigation.",
+        },
+      },
+    };
+    const failed = checkCase({
+      case: caseA,
+      run: degraded,
+      queries: [caseA.request.slice(0, 160)],
+      web: webOf([caseA.request.slice(0, 160)], urls),
+      modelCalls: [],
+    })
+      .filter((check) => !check.ok)
+      .map((check) => check.id);
+    expect(failed).toEqual(
+      expect.arrayContaining([
+        "QUERIES_SENT",
+        "INVESTIGATION_PLANNED",
+        "LINES_OF_ENQUIRY",
+        "PRIMARY_FROM_PLACE",
+      ]),
+    );
   });
 });
 

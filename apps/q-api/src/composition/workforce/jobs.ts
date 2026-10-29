@@ -132,6 +132,11 @@ export type WorkforceDocumentDelivery = {
   readonly passed: boolean;
   /** Reviewer findings still open when it was filed (none when passed). */
   readonly openIssues: number;
+  /**
+   * The research under it ran in a reduced form, and why (deep-research
+   * InvestigationSummary.reduced). Absent: it ran as planned.
+   */
+  readonly reducedResearch?: string | undefined;
 };
 
 export type WorkforceDocumentReview = {
@@ -748,12 +753,7 @@ export function createWorkforceExecutors(dependencies: {
           }
           return {
             status: "DONE",
-            summary:
-              found.dossier !== undefined
-                ? `Read ${plural(found.dossier.sources.length, "public source", "public sources")} across ${plural(found.dossier.lanes.filter((lane) => lane.status === "OK").length, "line of enquiry", "lines of enquiry")}; kept ${plural(found.dossier.facts.length, "sourced fact", "sourced facts")}.`
-                : found.sources.length === 0
-                  ? "Found no public sources for this."
-                  : `Found ${plural(found.sources.length, "public source", "public sources")}.`,
+            summary: researchStepSummary(found),
             outputs: {
               note: {
                 query: found.query,
@@ -1014,6 +1014,26 @@ export function diligenceSubjectFor(
     }
   }
   return null;
+}
+
+/**
+ * The timeline's line for a RESEARCH step that found sources. Research
+ * that ran reduced says so first (2026-10-29: one generic search read as
+ * a full investigation).
+ */
+export function researchStepSummary(
+  found: Extract<ResearchFound, { readonly status: "OK" }>,
+): string {
+  if (found.dossier === undefined)
+    return found.sources.length === 0
+      ? "Found no public sources for this."
+      : `Found ${plural(found.sources.length, "public source", "public sources")}.`;
+  const dossier = found.dossier;
+  const reduced =
+    dossier.investigation?.reduced === undefined
+      ? ""
+      : "Ran in a reduced form: no research plan could be made, so it searched the request as one query. ";
+  return `${reduced}Read ${plural(dossier.sources.length, "public source", "public sources")} across ${plural(dossier.lanes.filter((lane) => lane.status === "OK").length, "line of enquiry", "lines of enquiry")}; kept ${plural(dossier.facts.length, "sourced fact", "sourced facts")}.`;
 }
 
 /** The timeline's line for an ANALYSIS step, in plain words. */

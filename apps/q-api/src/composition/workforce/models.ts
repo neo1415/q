@@ -8,7 +8,10 @@ import {
   type ModelTextTaskClass,
   type ModelUsagePurpose,
 } from "@capital-q/contracts";
-import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  isModelGatewayError,
+  type ModelGateway,
+} from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -298,11 +301,17 @@ export type WorkforceModels = {
     trace: Trace,
     input: ResearchBriefInput,
   ) => Promise<Priced<ResearchBriefOutput> | null>;
-  /** Owner 2026-10-23: the focused searches deep research runs. */
+  /**
+   * Owner 2026-10-23: the focused searches deep research runs. Null when
+   * no plan came back; `onFailed` says why when the call failed (the
+   * gateway's failure class, or null for anything else), so a transient
+   * failure can be asked again.
+   */
   readonly planResearch: (
     who: Who,
     trace: Trace,
     input: ResearchPlanInput,
+    options?: { readonly onFailed?: (failureClass: string | null) => void },
   ) => Promise<Priced<ResearchPlanOutput> | null>;
   /** The dated, sourced facts in one question's public pages. */
   readonly researchFacts: (
@@ -389,6 +398,8 @@ export function createWorkforceModels(dependencies: {
     readonly reasoning?: "LOW" | "MEDIUM" | "HIGH" | undefined;
     /** The schema refused the whole object: its refused fields (paths). */
     readonly onRefused?: ((refusals: readonly string[]) => void) | undefined;
+    /** The call failed: the gateway's failure class, or null (other). */
+    readonly onFailed?: ((failureClass: string | null) => void) | undefined;
   };
 
   async function call<V, O>(input: CallInput<V, O>): Promise<O | null> {
@@ -483,6 +494,7 @@ export function createWorkforceModels(dependencies: {
         "workforce model call not made",
       );
       if (refused.length > 0) input.onRefused?.(refused);
+      input.onFailed?.(isModelGatewayError(error) ? error.failureClass : null);
       return null;
     }
   }
@@ -595,8 +607,9 @@ export function createWorkforceModels(dependencies: {
       }),
     // Live 2026-10-24 (batch 5): tolerant results, clipped here to the
     // shapes code reads; a malformed list element costs that element.
-    planResearch: async (who, trace, variables) => {
+    planResearch: async (who, trace, variables, options) => {
       const result = await priced<ResearchPlanInput, ResearchPlanResultV4>({
+        onFailed: options?.onFailed,
         task: "RESEARCH_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,

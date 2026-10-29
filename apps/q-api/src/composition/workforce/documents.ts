@@ -31,6 +31,7 @@ import {
   REVIEWER_OPEN_POINT,
   analysisContent,
   investigationGaps,
+  reducedResearchText,
   investigationSections,
   mergeDossiers,
   recordsText,
@@ -376,6 +377,11 @@ export function createWorkforceDocuments(dependencies: {
     const records = recordsText(merged.records);
     if (records.length > 0) company = `${company}\n\n${records}`;
     codeGaps.push(...investigationGaps(merged.investigations));
+    const reduced = merged.investigations.find(
+      (one) => one.reduced !== undefined,
+    )?.reduced;
+    if (reduced !== undefined)
+      company = `${company}\n\n${reducedResearchText(reduced)}`;
     if (
       diligence &&
       (input.research ?? []).length === 0 &&
@@ -528,6 +534,7 @@ export function createWorkforceDocuments(dependencies: {
         topRecommendations: written.draft.topRecommendations.slice(0, 3),
         passed: written.review.passes,
         openIssues: written.review.open.length,
+        ...(reduced === undefined ? {} : { reducedResearch: reduced }),
       },
     };
   }
