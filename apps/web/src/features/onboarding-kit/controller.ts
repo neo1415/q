@@ -63,6 +63,8 @@ export type OnboardingTurn = {
   readonly conduct?: QConduct | undefined;
   /** PRESENCE: what Q's particles form for which sentence. */
   readonly gestures?: readonly QSentenceGesture[] | undefined;
+  /** The turn finished the setup: the session it returned is complete. */
+  readonly completed?: boolean | undefined;
 };
 
 export type OnboardingState<TView> = {
@@ -148,6 +150,11 @@ export type OnboardingActions<TResponse> = {
       readonly stage: string;
       readonly label: string;
     }) => void,
+    /**
+     * The review step whose confirm button they tapped (sweep D1): the
+     * turn confirms it as a typed yes does, finishing when it is the last.
+     */
+    confirmReview?: string,
   ) => Promise<OnboardingTurn | null>;
   /** Re-read the session from the runtime (Q's reading may have landed). */
   readonly refresh: () => Promise<void>;
@@ -380,7 +387,14 @@ export function useOnboardingJourney<
       }
       return run(() => submit(input), true);
     },
-    say: async (text, recentTurns, focus, onSentence, onStage) => {
+    say: async (
+      text,
+      recentTurns,
+      focus,
+      onSentence,
+      onStage,
+      confirmReview,
+    ) => {
       const say = requireClient().say;
       if (say === undefined) {
         return null;
@@ -416,6 +430,7 @@ export function useOnboardingJourney<
             askedStep: outcome.askedStep,
             conduct: outcome.conduct,
             gestures: outcome.gestures,
+            completed: outcome.view.status === "complete",
           };
         } catch {
           return null;
@@ -428,6 +443,7 @@ export function useOnboardingJourney<
           text,
           recentTurns,
           ...(focus === undefined ? {} : { focus }),
+          ...(confirmReview === undefined ? {} : { confirmReview }),
           ...(onSentence === undefined ? {} : { onSentence }),
           ...(onStage === undefined ? {} : { onStage }),
         });
@@ -440,6 +456,7 @@ export function useOnboardingJourney<
           askedStep: outcome.askedStep,
           conduct: outcome.conduct,
           gestures: outcome.gestures,
+          completed: outcome.view.status === "complete",
         };
         return outcome.view;
       }, true);

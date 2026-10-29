@@ -534,6 +534,14 @@ export const SayOnboardingRequestSchema = z
       )
       .max(16)
       .default([]),
+    /**
+     * The review step whose confirm button the person tapped under Q's
+     * read-back (sweep D1, 2026-10-29): their act, not words to be read.
+     * The interviewer confirms it as a typed yes does, finishing when the
+     * read-back was the finish's. Data, never authority: the session
+     * service still decides what may be confirmed and completed.
+     */
+    confirmReview: OnboardingStepKeySchema.optional(),
   })
   .strict();
 export type SayOnboardingRequest = z.infer<typeof SayOnboardingRequestSchema>;

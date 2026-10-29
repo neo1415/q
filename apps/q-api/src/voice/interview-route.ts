@@ -175,6 +175,9 @@ export function registerQInterviewRoute(
           utterance: input.utterance,
           recentTurns: [...input.recentTurns],
           ...(input.focus === undefined ? {} : { focus: input.focus }),
+          ...(input.confirmReview === undefined
+            ? {}
+            : { confirmReview: input.confirmReview }),
         })
         .catch((error: unknown) => {
           if (error instanceof AccountPausedError) return null;

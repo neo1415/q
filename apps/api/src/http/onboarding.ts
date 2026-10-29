@@ -250,6 +250,9 @@ export function registerOnboardingRoutes(
         channel: "text" as const,
         recentTurns: input.recentTurns,
         ...(input.focus === undefined ? {} : { focus: input.focus }),
+        ...(input.confirmReview === undefined
+          ? {}
+          : { confirmReview: input.confirmReview }),
       };
       const respond = async (
         turn: Awaited<ReturnType<QInterviewClient["turn"]>>,

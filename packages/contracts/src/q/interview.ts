@@ -68,6 +68,8 @@ export const QInterviewTurnRequestSchema = z
       )
       .max(16)
       .default([]),
+    /** The review step whose confirm button they tapped (SayOnboardingRequest). */
+    confirmReview: z.string().min(1).max(80).optional(),
   })
   .strict();
 export type QInterviewTurnRequest = z.infer<typeof QInterviewTurnRequestSchema>;

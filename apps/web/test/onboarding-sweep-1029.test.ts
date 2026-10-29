@@ -1,0 +1,90 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+/**
+ * Live onboarding sweep 2026-10-29 (production ed9be6cc4): the screen's
+ * side of D1 (the read-back's confirm button) and D4 (where finishing goes).
+ */
+
+const read = (path: string) =>
+  readFileSync(resolve(import.meta.dirname, path), "utf8");
+
+describe("D1: the confirm button under Q's read-back", () => {
+  it("goes to Q as their yes with the review it confirms, never as a bare step save", () => {
+    const source = read(
+      "../src/features/onboarding-conversation/q-onboarding-workspace.tsx",
+    );
+    const submitChip = source.slice(
+      source.indexOf("const submitChip = useCallback("),
+      source.indexOf("await tap();"),
+    );
+    const confirm = submitChip.slice(
+      submitChip.indexOf('chip.value.type === "CONFIRMATION"'),
+    );
+    expect(confirm).toContain(
+      "await sayOne(spoken ?? chip.label, true, prompt.stepKey);",
+    );
+    // The confirmation returns before the direct step save below it.
+    expect(confirm.indexOf("return;")).toBeLessThan(
+      confirm.indexOf("actions.submitValue"),
+    );
+  });
+
+  it("carries the tapped review through every hop to the interviewer", () => {
+    expect(read("../src/features/onboarding-kit/controller.ts")).toContain(
+      "...(confirmReview === undefined ? {} : { confirmReview }),",
+    );
+    expect(read("../src/features/onboarding-kit/runtime-port.ts")).toContain(
+      "confirmReview: input.confirmReview",
+    );
+    expect(read("../src/features/onboarding-kit/api-actions.ts")).toContain(
+      "confirmReview: input.confirmReview",
+    );
+    expect(read("../app/api/onboarding-say/[sessionId]/route.ts")).toContain(
+      "confirmReview: OnboardingStepKeySchema.optional()",
+    );
+  });
+});
+
+describe("D4: where finishing goes", () => {
+  it("a founder finished in the conversation goes to verification, then the profile, as the form does", () => {
+    const screen = read(
+      "../src/features/founder-onboarding/founder-onboarding-screen.tsx",
+    );
+    const finished = screen.slice(screen.indexOf("onFinished={"));
+    expect(finished.slice(0, 300)).toContain(
+      'router.push("/verification?from=setup&next=profile")',
+    );
+    const workspace = read(
+      "../src/features/onboarding-conversation/q-onboarding-workspace.tsx",
+    );
+    expect(workspace).toContain(
+      "if (turn.completed === true && onFinished !== undefined) {",
+    );
+    expect(read("../src/features/onboarding-kit/controller.ts")).toContain(
+      'completed: outcome.view.status === "complete"',
+    );
+  });
+
+  it("the investor screen passes no override, so Q's Discover destination stands", () => {
+    expect(
+      read(
+        "../src/features/investor-onboarding/investor-onboarding-screen.tsx",
+      ),
+    ).not.toContain("onFinished=");
+  });
+
+  it("the form's last button says where it goes", () => {
+    const screen = read(
+      "../src/features/founder-onboarding/founder-onboarding-screen.tsx",
+    );
+    expect(screen).toContain(
+      'label: finishing ? "Preparing your analysis…" : "Continue",',
+    );
+    expect(
+      read("../src/features/founder-onboarding/models/journey.ts"),
+    ).toContain('primaryActionLabel: "Continue",');
+  });
+});

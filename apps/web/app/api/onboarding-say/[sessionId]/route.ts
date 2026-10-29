@@ -6,6 +6,7 @@ import {
   ONBOARDING_PATH,
   ONBOARDING_SAY_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
+  OnboardingStepKeySchema,
   Q_SSE_CONTENT_TYPE,
 } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -50,6 +51,8 @@ const SayBody = z
       .string()
       .regex(/^[a-z][a-z_]{0,39}$/u)
       .optional(),
+    // The review whose confirm button they tapped (sweep D1).
+    confirmReview: OnboardingStepKeySchema.optional(),
   })
   .strict();
 

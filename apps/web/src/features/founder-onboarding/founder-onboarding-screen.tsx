@@ -77,7 +77,7 @@ export function FinishedSectionAsk({
  * one session through the adapter, and renders whichever screen the session
  * says is current. Nothing about the journey lives here.
  */
-/** F17: how long "Go to Home" waits for Q's first reading, in tries. */
+/** F17: how long the final Continue waits for Q's first reading, in tries. */
 const FINISH_TRIES = 8;
 const FINISH_WAIT_MS = 2500;
 
@@ -135,7 +135,7 @@ export function FounderOnboardingScreen({
       writeLastMode("founder", "conversation");
     }
   }, [mode]);
-  // F17: "Go to Home" waits for Q's first reading instead of failing.
+  // F17: the final Continue waits for Q's first reading instead of failing.
   const [finishing, setFinishing] = useState(false);
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
@@ -300,6 +300,11 @@ export function FounderOnboardingScreen({
             void actions.openStep(editorId);
           }}
           onFinish={() => void finishFromQ()}
+          onFinished={() =>
+            // Finished in the conversation: the same way on as the form's
+            // finish (owner 2026-10-02), verification then the profile.
+            router.push("/verification?from=setup&next=profile")
+          }
           qSubject={companyId === undefined ? undefined : { companyId }}
           contextLabel={
             session.raw.session.subject === null ? undefined : "Your company"
@@ -422,7 +427,7 @@ export function FounderOnboardingScreen({
       primaryAction={
         isFinal
           ? {
-              label: finishing ? "Preparing your analysis…" : "Go to Home",
+              label: finishing ? "Preparing your analysis…" : "Continue",
               onClick: () => {
                 if (!finishing) void finish();
               },

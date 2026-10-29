@@ -85,6 +85,8 @@ export type OnboardingClient<TView, TResponse> = {
         }[];
         /** The founder profile section they came to fill (Overview link). */
         readonly focus?: string | undefined;
+        /** The review whose confirm button they tapped (sweep D1). */
+        readonly confirmReview?: string | undefined;
         /** Turn latency L9: each finished sentence of Q's reply, as it is written. */
         readonly onSentence?: ((text: string) => void) | undefined;
         /** What Q is doing now, from real events in the turn. */

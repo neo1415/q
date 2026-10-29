@@ -78,6 +78,11 @@ export type InterviewTurnInput = {
    */
   readonly focus?: string | undefined;
   /**
+   * A review step whose confirm button the person tapped under Q's
+   * read-back (sweep D1): their act, not words. Typed turns only.
+   */
+  readonly confirmReview?: string | undefined;
+  /**
    * What they typed when they created the account (QX-004 core gate §2).
    *
    * Captured at sign-up and then, until now, never used: Q asked "what is

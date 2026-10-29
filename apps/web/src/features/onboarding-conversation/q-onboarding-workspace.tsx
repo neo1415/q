@@ -175,6 +175,8 @@ export type QOnboardingWorkspaceActions = {
       readonly stage: string;
       readonly label: string;
     }) => void,
+    /** The review step whose confirm button they tapped (sweep D1). */
+    confirmReview?: string,
   ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
@@ -209,6 +211,13 @@ export type QOnboardingWorkspaceProps = {
   readonly onEdit: (editorId: string) => void;
   /** The journey's final step is reached: the screen decides what finishing means. */
   readonly onFinish: () => void;
+  /**
+   * The conversation finished the setup (a typed yes, or the review's
+   * confirm button): the screen decides where finishing goes (founder:
+   * verification, then the profile; owner 2026-10-02). Absent: Q's own
+   * destination is followed.
+   */
+  readonly onFinished?: (() => void) | undefined;
   /** Platform subject for free Q use inside the interview (§28), when known. */
   readonly qSubject?:
     | { readonly companyId: string }
@@ -298,6 +307,7 @@ export function QOnboardingWorkspace({
   errorMessage,
   onEdit,
   onFinish,
+  onFinished,
   qSubject,
   contextLabel,
   talkOnOpen = false,
@@ -981,7 +991,7 @@ export function QOnboardingWorkspace({
   /** The Continue later leaving, declared below; a pausing typed turn uses it. */
   const leaveLaterRef = useRef<(() => void) | null>(null);
   const sayOne = useCallback(
-    async (text: string, typed = false) => {
+    async (text: string, typed = false, confirmReview?: string) => {
       const trimmed = text.trim();
       if (trimmed.length === 0) {
         return;
@@ -1040,6 +1050,7 @@ export function QOnboardingWorkspace({
           (stage) => {
             setTurnStage(stage.label);
           },
+          confirmReview,
         )
         .finally(() => {
           setReplyStream(null);
@@ -1132,6 +1143,14 @@ export function QOnboardingWorkspace({
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"
       // reached this seam and went nowhere.
+      if (turn.completed === true && onFinished !== undefined) {
+        // Sweep D4: a typed finish went straight to the profile; the form's
+        // finish goes through verification first. One destination.
+        pendingReply.drop();
+        if (turn.reply !== null) push("Q", turn.reply);
+        onFinished();
+        return;
+      }
       if (pausingDestination(turn.navigate, journeyName) !== null) {
         // A pause ("I'll continue later"; coordinator 2026-10-28): the
         // interviewer sends HOME on the typed channel for that alone, never
@@ -1186,6 +1205,7 @@ export function QOnboardingWorkspace({
       voiceSendText,
       journeyName,
       view?.session.id,
+      onFinished,
     ],
   );
 
@@ -1243,6 +1263,16 @@ export function QOnboardingWorkspace({
         await say(chip.say);
         return;
       }
+      if (chip.value.type === "CONFIRMATION" && chip.value.confirmed) {
+        // Sweep D1 (2026-10-29): "That's right" under Q's read-back saved
+        // the review on its own and Q went on to an optional question,
+        // though the read-back said "say yes and I'll finish". The tap is
+        // their yes: it goes to Q as one, with the step it confirms, and
+        // the interviewer confirms (and finishes) exactly as for a typed
+        // yes, server-side.
+        await sayOne(spoken ?? chip.label, true, prompt.stepKey);
+        return;
+      }
       if (liveQuestion !== null) {
         push("Q", liveQuestion);
       }
@@ -1280,6 +1310,7 @@ export function QOnboardingWorkspace({
       prompt,
       liveQuestion,
       say,
+      sayOne,
       push,
       markUnsent,
       settleReading,

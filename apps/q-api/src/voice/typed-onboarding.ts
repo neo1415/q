@@ -1,6 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import {
   getOnboardingSession,
   listOnboardingInterviewTurns,
+  submitOnboardingResponse,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -15,7 +18,10 @@ import {
   type OnboardingTypedReplyVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
-import type { OnboardingState } from "@capital-q/q-tools";
+import type {
+  FinishOnboardingOutput,
+  OnboardingState,
+} from "@capital-q/q-tools";
 
 import type { HeldWritesStore } from "./held-writes.js";
 import type { InterviewAgentTurnInput } from "./interview-agent.js";
@@ -147,6 +153,66 @@ export function createTypedOnboarding(dependencies: {
           // something the person saw in a typed conversation).
           reviewShown: () => readBackShown.has(input.onboardingSessionId),
         });
+      const fields = coverageProfileFor(input.journeyType).fields;
+      const labelOf = (stepKey: string) => fields[stepKey]?.label;
+      const destination = (completed: boolean) =>
+        input.journeyType === "investor"
+          ? "DISCOVER"
+          : completed
+            ? "PROFILE"
+            : "HOME";
+
+      // Sweep D1 (2026-10-29): the review's confirm button under Q's
+      // read-back. The tap is their yes, so code confirms it as a typed
+      // yes is confirmed (no model reads a button): the finish when every
+      // essential is in, that one review when the setup is not done yet.
+      const tapped = tappedReview(input.journeyType, input.confirmReview);
+      if (tapped !== null) {
+        // Anything still being read from earlier words lands first.
+        await conversation.flush?.(line);
+        // The read-back the button sits under is on their screen.
+        readBackShown.add(input.onboardingSessionId);
+        const done = await confirmTapped({
+          tapped,
+          journeyType: input.journeyType,
+          finishing: portOf(true),
+          state: () => portOf(false).state(),
+          confirmOne: async () => {
+            const view = await getOnboardingSession(
+              input.session,
+              input.onboardingSessionId,
+            );
+            await submitOnboardingResponse(
+              input.session,
+              input.onboardingSessionId,
+              {
+                stepKey: tapped,
+                response: {
+                  value: { type: "CONFIRMATION", confirmed: true },
+                  channel: "CONVERSATION",
+                },
+                expectedSessionVersion: view.session.version,
+              },
+              randomUUID(),
+            );
+          },
+          labelOf,
+        });
+        // Their words and Q's line join the thread after the write, so a
+        // background reading of "That's right" finds it already settled.
+        await conversation
+          .said(line, "PERSON", utterance)
+          .catch(() => undefined);
+        return await outcomeOf({
+          text: done.text,
+          asking: done.asking,
+          navigate: done.completed ? destination(true) : null,
+          pausing: false,
+          path: done.completed ? "FINISHED_BY_TAP" : "CONFIRMED_BY_TAP",
+          finishing: true,
+        });
+      }
+
       const port = portOf(false);
       // Their words go in the thread first, so leaving now loses nothing;
       // the background reading is scheduled from them.
@@ -174,6 +240,12 @@ export function createTypedOnboarding(dependencies: {
         correlationId: input.attribution.correlationId,
       };
 
+      // The record review Q read back, when it did: their yes to it is
+      // finishing (sweep D1: "yes" read as the review alone, and Q went on
+      // to an optional question after "Say yes and I'll finish").
+      const readBackReview = readBackShown.has(input.onboardingSessionId)
+        ? (reviewOf(state, input.journeyType, labelOf)?.stepKey ?? null)
+        : null;
       // The reply and the reading of whether they pause or finish run side
       // by side: the person waits for one model, not two in a row.
       const [authority, written] = await Promise.all([
@@ -183,6 +255,9 @@ export function createTypedOnboarding(dependencies: {
               .read({
                 utterance,
                 lastQ,
+                ...(readBackReview === null
+                  ? {}
+                  : { askedStep: readBackReview }),
                 steps: state.steps.map((step) => ({
                   stepKey: step.stepKey,
                   question: step.question,
@@ -200,14 +275,9 @@ export function createTypedOnboarding(dependencies: {
         }),
       ]);
 
-      const fields = coverageProfileFor(input.journeyType).fields;
-      const labelOf = (stepKey: string) => fields[stepKey]?.label;
-      const destination = (completed: boolean) =>
-        input.journeyType === "investor"
-          ? "DISCOVER"
-          : completed
-            ? "PROFILE"
-            : "HOME";
+      const agreedToReadBack =
+        readBackReview !== null &&
+        authority?.stated.has(readBackReview) === true;
 
       let text: string;
       let asking: string | null = null;
@@ -225,7 +295,7 @@ export function createTypedOnboarding(dependencies: {
         navigate = destination(false);
         pausing = true;
         path = "PAUSING";
-      } else if (authority?.finishing === true) {
+      } else if (authority?.finishing === true || agreedToReadBack) {
         await conversation.flush?.(line);
         const finishing = portOf(true);
         const finished = await finishing.finish();
@@ -269,51 +339,78 @@ export function createTypedOnboarding(dependencies: {
         path = "DEGRADED";
       }
 
-      // Live e11: the step this line asks is kept with it, so a reopening
-      // asks the question the conversation had open (the line asked about
-      // full-time founders; kept with no step, the resume asked team size).
-      // Only a step of this journey; whether it is still open is decided
-      // when it is read back.
-      void conversation
-        .said(line, "Q", text, keptStepOf(input.journeyType, asking))
-        .catch(() => undefined);
-      const viewPort = portOf(false);
-      await viewPort.state().catch(() => null);
-      const view =
-        viewPort.view() ??
-        (await getOnboardingSession(input.session, input.onboardingSessionId));
-      const askingStep = askingFor(view, input.journeyType, asking);
-      logger.info(
-        {
-          path,
-          asking: askingStep?.stepKey ?? null,
-          pausing,
-          finishing: authority?.finishing === true,
-          ms: Date.now() - startedAt,
-        },
-        "typed onboarding turn",
-      );
-      return {
-        reply: text,
-        intent: pausing ? "PAUSE" : "ANSWER",
-        asking: askingStep,
-        recorded: [],
-        skipped: [],
-        questionForQ: null,
-        researching: null,
+      return await outcomeOf({
+        text,
+        asking,
         navigate,
-        handoff: null,
-        pronounce: null,
-        warnings: 0,
-        view,
-        degraded: path === "DEGRADED",
-        reading: null,
-        resume: null,
-        qualitative: [],
-        trace: null,
-        askingAbout: askingStep === null ? [] : [askingStep.stepKey],
-        ...(pausing ? { pausing: true } : {}),
-      };
+        pausing,
+        path,
+        finishing: authority?.finishing === true || agreedToReadBack,
+      });
+
+      /** Q's line kept with the step it asks, and the screen's outcome. */
+      async function outcomeOf(said: {
+        readonly text: string;
+        readonly asking: string | null;
+        readonly navigate: InterviewTurnOutcome["navigate"];
+        readonly pausing: boolean;
+        readonly path: string;
+        readonly finishing: boolean;
+      }): Promise<InterviewTurnOutcome> {
+        // Live e11: the step this line asks is kept with it, so a reopening
+        // asks the question the conversation had open (the line asked about
+        // full-time founders; kept with no step, the resume asked team
+        // size). Only a step of this journey; whether it is still open is
+        // decided when it is read back.
+        void conversation
+          .said?.(
+            line,
+            "Q",
+            said.text,
+            keptStepOf(input.journeyType, said.asking),
+          )
+          .catch(() => undefined);
+        const viewPort = portOf(false);
+        await viewPort.state().catch(() => null);
+        const view =
+          viewPort.view() ??
+          (await getOnboardingSession(
+            input.session,
+            input.onboardingSessionId,
+          ));
+        const askingStep = askingFor(view, input.journeyType, said.asking);
+        logger.info(
+          {
+            path: said.path,
+            asking: askingStep?.stepKey ?? null,
+            pausing: said.pausing,
+            finishing: said.finishing,
+            ms: Date.now() - startedAt,
+          },
+          "typed onboarding turn",
+        );
+        return {
+          reply: said.text,
+          intent: said.pausing ? "PAUSE" : "ANSWER",
+          asking: askingStep,
+          recorded: [],
+          skipped: [],
+          questionForQ: null,
+          researching: null,
+          navigate: said.navigate,
+          handoff: null,
+          pronounce: null,
+          warnings: 0,
+          view,
+          degraded: said.path === "DEGRADED",
+          reading: null,
+          resume: null,
+          qualitative: [],
+          trace: null,
+          askingAbout: askingStep === null ? [] : [askingStep.stepKey],
+          ...(said.pausing ? { pausing: true } : {}),
+        };
+      }
     },
   };
 
@@ -543,4 +640,78 @@ export function savedSoFar(
   ]
     .filter((part) => part.length > 0)
     .join(" ");
+}
+
+/**
+ * The confirmation step a tapped confirm button names, when it is one of
+ * this journey's confirmation steps; null otherwise (the tap is then an
+ * ordinary typed turn).
+ */
+export function tappedReview(
+  journeyType: "founder" | "investor",
+  stepKey: string | undefined,
+): string | null {
+  if (stepKey === undefined) return null;
+  const step = definitionFor(journeyType).steps.find(
+    (s) => s.stepKey === stepKey,
+  );
+  return step?.configuration.stepType === "confirmation" ? stepKey : null;
+}
+
+/**
+ * Their tap on a review's confirm button, as a typed yes (sweep D1): every
+ * essential in, it finishes, settling the other reviews and any optional
+ * question the journey waits on (never asking one); not yet, it confirms
+ * that review alone, as the tap always did, and asks what comes next.
+ */
+export async function confirmTapped(input: {
+  readonly tapped: string;
+  readonly journeyType: "founder" | "investor";
+  readonly finishing: {
+    readonly finish: () => Promise<FinishOnboardingOutput>;
+  };
+  readonly state: () => Promise<OnboardingState>;
+  readonly confirmOne: () => Promise<void>;
+  readonly labelOf: (stepKey: string) => string | undefined;
+}): Promise<{
+  readonly text: string;
+  readonly asking: string | null;
+  readonly completed: boolean;
+}> {
+  const finished = await input.finishing.finish();
+  if (!finished.completed && finished.missing.length > 0) {
+    try {
+      await input.confirmOne();
+    } catch {
+      return {
+        text: "I couldn't save that just now. Tap it again in a moment.",
+        asking: input.tapped,
+        completed: false,
+      };
+    }
+    const now = await input.state();
+    const next = now.next?.[0]?.stepKey ?? null;
+    const question =
+      next === null
+        ? ""
+        : (SPOKEN_QUESTIONS[next] ??
+          now.steps.find((step) => step.stepKey === next)?.question ??
+          "");
+    return {
+      text: `Thank you, that's confirmed.${question.length === 0 ? "" : ` ${question}`}`,
+      asking: question.length === 0 ? null : next,
+      completed: false,
+    };
+  }
+  const said = finishingLine(input.journeyType, finished, {
+    labelOf: input.labelOf,
+    questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,
+  });
+  return {
+    text:
+      said?.reply ??
+      "Before I can finish, a few things are still open. Shall we go through them?",
+    asking: said?.asking ?? null,
+    completed: finished.completed,
+  };
 }

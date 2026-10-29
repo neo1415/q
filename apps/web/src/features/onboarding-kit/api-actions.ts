@@ -356,6 +356,8 @@ const SayInput = z.object({
     .string()
     .regex(/^[a-z][a-z_]{0,39}$/)
     .optional(),
+  // The review whose confirm button they tapped (sweep D1).
+  confirmReview: OnboardingStepKeySchema.optional(),
 });
 
 /** The conversational interview (CQ-PRE-REC-001 §16-§21): one turn to Q about the current step. */
@@ -372,6 +374,9 @@ export async function onboardingSayAction(
         expectedSessionVersion: input.expectedSessionVersion,
         recentTurns: input.recentTurns,
         ...(input.focus === undefined ? {} : { focus: input.focus }),
+        ...(input.confirmReview === undefined
+          ? {}
+          : { confirmReview: input.confirmReview }),
       },
       input.idempotencyKey,
     ),

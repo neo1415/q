@@ -965,7 +965,7 @@ function buildSnapshot(
   const readable = companyId !== undefined && companyName !== undefined;
   return {
     ...base(group, "snapshot", state),
-    primaryActionLabel: "Go to Home",
+    primaryActionLabel: "Continue",
     companyId: readable ? companyId : undefined,
     companyName: readable ? companyName : undefined,
     headline: "Here's what we have so far.",

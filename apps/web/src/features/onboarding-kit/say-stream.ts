@@ -28,6 +28,8 @@ export type SayStreamRequest = {
     readonly text: string;
   }[];
   readonly focus?: string | undefined;
+  /** The review whose confirm button they tapped (sweep D1). */
+  readonly confirmReview?: string | undefined;
 };
 
 /**

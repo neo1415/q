@@ -99,6 +99,8 @@ export type RuntimePort = {
         }[];
         /** The founder profile section they came to fill (Overview link). */
         readonly focus?: string | undefined;
+        /** The review whose confirm button they tapped (sweep D1). */
+        readonly confirmReview?: string | undefined;
         /** Turn latency L9: each finished sentence of Q's reply, as it is written. */
         readonly onSentence?: ((text: string) => void) | undefined;
         /** What Q is doing now, from real events in the turn. */
@@ -514,6 +516,7 @@ export function createRuntimeClient<
               readonly text: string;
             }[];
             readonly focus?: string | undefined;
+            readonly confirmReview?: string | undefined;
             readonly onSentence?: ((text: string) => void) | undefined;
             readonly onStage?:
               | ((stage: {
@@ -538,6 +541,9 @@ export function createRuntimeClient<
                 idempotencyKey: crypto.randomUUID(),
                 recentTurns: input.recentTurns,
                 ...(input.focus === undefined ? {} : { focus: input.focus }),
+                ...(input.confirmReview === undefined
+                  ? {}
+                  : { confirmReview: input.confirmReview }),
                 ...(input.onSentence === undefined
                   ? {}
                   : { onSentence: input.onSentence }),
