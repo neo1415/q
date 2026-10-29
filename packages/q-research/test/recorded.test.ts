@@ -95,6 +95,46 @@ describe("research record/replay (acceptance gate)", () => {
     ).toBe("cbn @a.ng,b.ng");
   });
 
+  // Re-recorded case A: a read the caller had already given up on was kept
+  // as read, so the replay read pages live never did and every later
+  // request missed.
+  it("records a read the caller gave up on as a timeout, not its late pages", async () => {
+    const late: PublicWebResearchProvider = {
+      ...live,
+      extract: (request) =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                pages: request.urls.map((url) => ({
+                  url,
+                  title: "Late",
+                  text: "arrived after the caller stopped waiting",
+                })),
+                failedUrls: [],
+                latencyMs: 30,
+              }),
+            30,
+          );
+        }),
+    };
+    const recording = createRecordingResearchProvider({
+      provider: late,
+      clock: () => new Date("2026-10-29T12:00:00.000Z"),
+    });
+    const urls = ["https://www.cbn.gov.ng/slow"];
+    await recording.extract({ urls }, { signal: AbortSignal.timeout(5) });
+    const fixture = recording.fixture();
+    expect(fixture.pages).toEqual([]);
+    expect(fixture.extractFailures).toEqual([
+      { urls, failureClass: "TIMEOUT" },
+    ]);
+    const replay = createReplayResearchProvider({ fixture });
+    await expect(replay.extract({ urls }, {})).rejects.toMatchObject({
+      failureClass: "TIMEOUT",
+    });
+  });
+
   it("records only what the provider returned, failures included", async () => {
     const fixture = await recorded();
     expect(RecordedResearchFixtureSchema.parse(fixture)).toEqual(fixture);

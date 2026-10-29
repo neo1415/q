@@ -265,6 +265,21 @@ function sentencesOf(text: string): readonly string[] {
 const ANY_CITATION = /\[S\d{1,3}/u;
 
 /**
+ * The clauses of a sentence: its ";"-joined parts and a table row's cells.
+ * Re-recorded case A: "B2B solutions include ... [S42]; LedgerBridge is
+ * recorded as ... (Capital Q record)." keeps the two apart correctly, yet
+ * a whole-sentence check sent it back twice.
+ */
+function clausesOf(sentence: string): readonly string[] {
+  return sentence
+    .split(/;\s+|\s\|\s|^\||\|$/u)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+}
+
+const RECORD_MARK = /\(Capital Q record\)/iu;
+
+/**
  * Live case A (2026-10-29): sentences about a Capital Q record carried web
  * citations ("Their reported pricing [S22] increases the burden on
  * LedgerBridge"), so the record read as web-sourced. A record's name comes
@@ -295,11 +310,16 @@ export function recordsCitedAsWeb(
       body: draft.topRecommendations.join("\n"),
     },
   ]) {
-    const mixed = sentencesOf(section.body).filter(
-      (sentence) =>
-        ANY_CITATION.test(sentence) &&
-        named.some((one) => one.pattern.test(sentence)),
-    );
+    // The record's own claim carries no web citation: a clause naming it
+    // and citing [S n], unless marked as the record.
+    const mixed = sentencesOf(section.body)
+      .flatMap((sentence) => clausesOf(sentence))
+      .filter(
+        (clause) =>
+          ANY_CITATION.test(clause) &&
+          !RECORD_MARK.test(clause) &&
+          named.some((one) => one.pattern.test(clause)),
+      );
     if (mixed.length === 0) continue;
     issues.push({
       kind: "UNSUPPORTED",

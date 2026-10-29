@@ -170,8 +170,27 @@ export function createRecordingResearchProvider(input: {
       }
     },
     extract: async (request, context) => {
+      // Recorded as the caller saw it (re-recorded case A, 2026-10-29): a
+      // read the caller gave up on (its signal fired) is a TIMEOUT for the
+      // whole request, and pages arriving after that are not kept. Keeping
+      // them made the replay read pages live never did, and every later
+      // request missed.
+      let settled = false;
+      const gaveUp = () => {
+        if (settled) return;
+        settled = true;
+        extractFailures.push({
+          urls: [...request.urls],
+          failureClass: "TIMEOUT",
+        });
+      };
+      const signal = context?.signal;
+      if (signal?.aborted === true) gaveUp();
+      signal?.addEventListener("abort", gaveUp, { once: true });
       try {
         const result = await provider.extract(request, context);
+        if (settled) return result;
+        settled = true;
         for (const page of result.pages)
           pages.set(page.url, {
             url: page.url,
@@ -181,12 +200,16 @@ export function createRecordingResearchProvider(input: {
         for (const url of result.failedUrls) failed.add(url);
         return result;
       } catch (error) {
-        if (isResearchProviderFailure(error))
+        if (!settled && isResearchProviderFailure(error)) {
+          settled = true;
           extractFailures.push({
             urls: [...request.urls],
             failureClass: error.failureClass,
           });
+        }
         throw error;
+      } finally {
+        signal?.removeEventListener("abort", gaveUp);
       }
     },
   };

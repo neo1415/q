@@ -57,6 +57,29 @@ describe("Capital Q records stay apart from web sources", () => {
     );
   });
 
+  // Re-recorded case A: correct drafts were sent back twice because the
+  // check read whole sentences, not the clause naming the record.
+  it("passes a web clause and a marked record clause in one sentence", () => {
+    const apart = draft(
+      "Evidence: solutions include approval workflows [S42] (other; one source); LedgerBridge is recorded as addressing payables (Capital Q record).",
+    );
+    expect(recordsCitedAsWeb(apart, ["LedgerBridge"])).toEqual([]);
+  });
+
+  it("reads a table row's cells apart", () => {
+    const table = draft(
+      "| Bankly | Microfinance bank | Nigeria | [S8] |\n| LedgerBridge | B2B payables | Nigeria | (Capital Q record) |",
+    );
+    expect(recordsCitedAsWeb(table, ["LedgerBridge"])).toEqual([]);
+  });
+
+  it("still flags the record's own clause citing [S n]", () => {
+    const mixed = draft(
+      "Payments grew [S1]; LedgerBridge processes 4% of B2B volume [S9].",
+    );
+    expect(recordsCitedAsWeb(mixed, ["LedgerBridge"])).toHaveLength(1);
+  });
+
   it("matches whole names only, and nothing without records", () => {
     const other = draft("LedgerBridgeway grew [S1].");
     expect(recordsCitedAsWeb(other, ["LedgerBridge"])).toEqual([]);

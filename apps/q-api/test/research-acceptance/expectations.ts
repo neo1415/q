@@ -451,9 +451,13 @@ export function checkCase(input: GateInput): readonly CheckVerdict[] {
       verdict(
         "CAPITAL_Q_RECORDS_APART",
         one.capitalQRecords.flatMap((record) =>
+          // The clause naming the record (a ";" part or a table cell)
+          // carries no [S n] unless it is marked as the record.
           sentences(text)
-            .filter((sentence) => lower(sentence).includes(lower(record.name)))
-            .filter((sentence) => citedIndices(sentence).length > 0)
+            .flatMap((sentence) => sentence.split(/;\s+|\s\|\s/u))
+            .filter((clause) => lower(clause).includes(lower(record.name)))
+            .filter((clause) => !/\(capital q record\)/u.test(lower(clause)))
+            .filter((clause) => citedIndices(clause).length > 0)
             .map(() => `${record.name} is cited as a web source`),
         ),
         "Capital Q records never cited as web sources",
