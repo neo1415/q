@@ -679,6 +679,27 @@ export function createWorkforceJobActions(dependencies: {
  * The tool's port and the run's proposer: the lead Q's plan is prepared as
  * this run's card, one per turn, and proposed by the engine after the turn.
  */
+/** How long the lead's plan waits for their mandate before planning without it. */
+export const MANDATE_READ_MS = 4_000;
+
+/** Their mandate within `ms`; null (not known) on failure or past it. */
+export async function mandateWithin(
+  read: Promise<readonly string[] | null>,
+  ms: number,
+): Promise<readonly string[] | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read.catch(() => null),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 export function createWorkforceJobBoard(dependencies: {
   readonly jobsFor: (actor: ActorContext) => WorkforceJobs;
   /** J6: whether this month's spend leaves room for a new job. */
@@ -698,6 +719,18 @@ export function createWorkforceJobBoard(dependencies: {
         runId: string,
         payload: WorkforceJobStartPayload,
       ) => Promise<OwnWorkStart | null>)
+    | undefined;
+  /**
+   * Their declared mandate and thesis lines, read as them, for the lead's
+   * plan (live case A 2026-10-29: a thesis question's plan marked the
+   * thesis UNKNOWN because the lead never read it). Null: not readable;
+   * empty: none on record.
+   */
+  readonly mandate?:
+    | ((
+        actor: ActorContext,
+        runId: string,
+      ) => Promise<readonly string[] | null>)
     | undefined;
 }): { readonly port: QJobPort; readonly proposer: QActionProposer } {
   const now = dependencies.now ?? (() => Date.now());
@@ -734,10 +767,17 @@ export function createWorkforceJobBoard(dependencies: {
             : { status: "ONE_PER_TURN", plan: planView(existing.payload) };
         }
         // R5: like a colleague, look at what is already waiting first.
-        const waitingNow =
+        const [waitingNow, mandate] = await Promise.all([
           dependencies.waiting === undefined
-            ? []
-            : await dependencies.waiting(actor).catch(() => []);
+            ? Promise.resolve([])
+            : dependencies.waiting(actor).catch(() => []),
+          dependencies.mandate === undefined
+            ? Promise.resolve(undefined)
+            : mandateWithin(
+                dependencies.mandate(actor, runId),
+                MANDATE_READ_MS,
+              ),
+        ]);
         // F-84: nothing is held before it is planned. Whether it is the same
         // work as a waiting card depends on what it would do, which only the
         // plan says (below); words naming the same people are not that.
@@ -791,6 +831,7 @@ export function createWorkforceJobBoard(dependencies: {
                         })),
                       },
               waiting: waitingNow,
+              mandate,
             }),
             // Q's own earlier answer the goal refers to: beside the goal,
             // labelled as Q's inference in the plan's prompt (v15).

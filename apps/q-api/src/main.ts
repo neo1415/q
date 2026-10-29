@@ -2111,6 +2111,28 @@ const workforceJobBoard = createWorkforceJobBoard({
     ),
   calendarConnected: async (actor) =>
     (await schedule.calendarStatus(actor.userId)) === "CONNECTED",
+  // Live case A (2026-10-29): the lead's plan reads an investor's declared
+  // mandate and thesis -- the MANDATE section of their situation dossier,
+  // as them (cached per person; the research step reuses it) -- so a
+  // thesis question's prerequisite is not marked UNKNOWN. A founder has
+  // none. (The assembler is composed further down; read only when a turn
+  // asks for a job.)
+  mandate: async (actor, runId) => {
+    if ((await runtimeDependencies.ownCompany(actor)) !== null) return [];
+    const investorOrganisationId =
+      await runtimeDependencies.ownInvestorOrganisation(actor);
+    if (investorOrganisationId === null) return [];
+    const context = await situationToolContext(actor, runId);
+    if (context === null) return null;
+    const dossier = await situationAssembler.assemble({
+      context,
+      subject: { side: "INVESTOR", investorOrganisationId },
+      ask: "",
+    });
+    const section = dossier.sections.find((one) => one.source === "MANDATE");
+    if (section === undefined || section.status !== "READ") return null;
+    return section.facts.map((fact) => fact.statement);
+  },
 });
 // Recovery D3: approved jobs as durable, leased work (the runner is
 // composed below, once the actor resolver exists).

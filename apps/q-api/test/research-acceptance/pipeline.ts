@@ -157,10 +157,15 @@ export async function runCase(input: {
   const merged = mergeDossiers([dossier]);
   const records = recordsText(merged.records);
   const who = one.actor === "founder" ? "the founder" : "the investor";
-  const company = [
-    `WHO THIS IS FOR (${who}), from their own records:\n${situationText(one.situation)}`,
-    records,
-  ]
+  // As documents.ts: with a brief, the writer reads what the brief drew
+  // from their situation (its selected facts and the sections they sit
+  // in), not a second read of the whole situation; without one, their
+  // own records.
+  const context =
+    merged.briefs.length > 0
+      ? `WHAT THIS QUESTION NEEDS, as Q briefed it from everything it holds about ${who} (their own records, read as them; private):\n${merged.briefs.join("\n\n").slice(0, 16_000)}`
+      : `WHO THIS IS FOR (${who}), from their own records:\n${situationText(one.situation)}`;
+  const company = [context, records]
     .filter((part) => part.length > 0)
     .join("\n\n");
   const today = new Date(input.now()).toISOString().slice(0, 10);
@@ -179,6 +184,7 @@ export async function runCase(input: {
       research: researchText(merged.facts),
       sources: sourcesText(merged.sources),
       sourceIndices: new Set(merged.sources.map((source) => source.index)),
+      recordNames: merged.records.map((record) => record.name),
     },
   });
   if (written === null)

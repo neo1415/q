@@ -26,6 +26,12 @@ export const WORKFORCE_FACT_KINDS = [
   "OPEN_REQUEST",
   "DOCUMENT_SHARED",
   "WAITING_APPROVAL",
+  /**
+   * Their declared mandate or thesis, as read for them (live case A,
+   * 2026-10-29: a thesis job's plan marked the thesis UNKNOWN because the
+   * lead never read the mandate).
+   */
+  "MANDATE",
   /** A source that could not be read: not known, never "none". */
   "UNKNOWN",
 ] as const;

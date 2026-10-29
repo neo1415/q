@@ -262,12 +262,68 @@ function sentencesOf(text: string): readonly string[] {
     .filter((sentence) => sentence.length > 0);
 }
 
+const ANY_CITATION = /\[S\d{1,3}/u;
+
+/**
+ * Live case A (2026-10-29): sentences about a Capital Q record carried web
+ * citations ("Their reported pricing [S22] increases the burden on
+ * LedgerBridge"), so the record read as web-sourced. A record's name comes
+ * from code's own records, never from anyone's words: a sentence naming
+ * one and citing [S n] is sent back to be split.
+ */
+export function recordsCitedAsWeb(
+  draft: AnalysisDocumentResult,
+  recordNames: readonly string[],
+): readonly AnalysisIssue[] {
+  const names = recordNames
+    .map((name) => name.trim())
+    .filter((name) => name.length >= 3);
+  if (names.length === 0) return [];
+  const named = names.map((name) => ({
+    name,
+    pattern: new RegExp(
+      `(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
+      "iu",
+    ),
+  }));
+  const issues: AnalysisIssue[] = [];
+  for (const section of [
+    { heading: "Summary", body: draft.summary },
+    ...draft.sections,
+    {
+      heading: "Top recommendations",
+      body: draft.topRecommendations.join("\n"),
+    },
+  ]) {
+    const mixed = sentencesOf(section.body).filter(
+      (sentence) =>
+        ANY_CITATION.test(sentence) &&
+        named.some((one) => one.pattern.test(sentence)),
+    );
+    if (mixed.length === 0) continue;
+    issues.push({
+      kind: "UNSUPPORTED",
+      section: section.heading.slice(0, 120),
+      problem:
+        `A Capital Q record is cited as a web source: "${(mixed[0] ?? "").slice(0, 200)}"`.slice(
+          0,
+          400,
+        ),
+      fix: "Keep Capital Q records apart from web evidence: the sentence naming the record cites no [S n] and is marked (Capital Q record); put the web evidence in its own sentence.",
+    });
+  }
+  return issues;
+}
+
 /** Code's own checks: figures without a basis, sources that do not exist. */
 export function basisProblems(
   draft: AnalysisDocumentResult,
   sourceIndices: ReadonlySet<number>,
+  /** Capital Q records' company names: never in a sentence citing [S n]. */
+  recordNames: readonly string[] = [],
 ): readonly AnalysisIssue[] {
   const issues: AnalysisIssue[] = [];
+  issues.push(...recordsCitedAsWeb(draft, recordNames));
   for (const section of [
     { heading: "Summary", body: draft.summary },
     ...draft.sections,
@@ -324,6 +380,8 @@ export type AnalysisInputs = {
   readonly research: string;
   readonly sources: string;
   readonly sourceIndices: ReadonlySet<number>;
+  /** Capital Q records' names, kept out of sentences citing [S n]. */
+  readonly recordNames?: readonly string[] | undefined;
 };
 
 const WRITE_CEILING_USD = 0.45;
@@ -394,7 +452,11 @@ export async function writeAnalysisWithReview(dependencies: {
         .map((section) => section.heading.slice(0, 120)),
     });
     // Code's checks first: they are certain, and cost nothing.
-    const coded = basisProblems(draft, inputs.sourceIndices);
+    const coded = basisProblems(
+      draft,
+      inputs.sourceIndices,
+      inputs.recordNames ?? [],
+    );
     let verdict: AnalysisCritiqueResult | null = null;
     if (
       spend.canAfford(CRITIQUE_CEILING_USD) &&

@@ -9,6 +9,11 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   RESEARCH_FACTS_V3,
   RESEARCH_BRIEF_V1,
+  RESEARCH_BRIEF_V2,
+  RESEARCH_FACTS_V4,
+  RESEARCH_FACTS_UNREAD_RULE,
+  ANALYSIS_WRITE_V6,
+  ANALYSIS_WRITE_QUESTION_RULE,
   RESEARCH_PLAN_V4,
   RESEARCH_PLAN_V5,
   ResearchBriefResultSchema,
@@ -21,12 +26,12 @@ describe("investigation prompts", () => {
   it("are the active versions", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(5);
-    expect(registry.getActive("RESEARCH_BRIEF").definition.version).toBe(1);
+    expect(registry.getActive("RESEARCH_BRIEF").definition.version).toBe(2);
     expect(registry.get("RESEARCH_PLAN", 4)?.definition.status).toBe(
       "DEPRECATED",
     );
-    expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(3);
-    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(5);
+    expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(4);
+    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(6);
     expect(registry.get("RESEARCH_FACTS", 2)?.definition.status).toBe(
       "DEPRECATED",
     );
@@ -129,5 +134,33 @@ describe("research brief prompt (owner 2026-10-29)", () => {
       subjects: [],
     });
     expect(parsed.unknowns[0]?.establish).toBe("PERSON");
+  });
+});
+
+describe("live case A prompts (2026-10-29)", () => {
+  it("the brief selects what shapes the research asked for; deal records only when asked about", () => {
+    const template = RESEARCH_BRIEF_V2.template;
+    expect(template).toContain("shape the research the person asked for");
+    expect(template).toMatch(/board card, a deal code name/u);
+    expect(template).toMatch(
+      /only when the request or their earlier messages are about that company/u,
+    );
+    // v1's relevance line is replaced, not kept beside it.
+    expect(template).not.toContain("the facts that matter for THIS question");
+    expect(template).toContain("{{situation}}");
+  });
+
+  it("the fact reader never takes a fact from a page it did not read", () => {
+    expect(RESEARCH_FACTS_V4.template).toContain(RESEARCH_FACTS_UNREAD_RULE);
+    expect(RESEARCH_FACTS_UNREAD_RULE).toMatch(/Never take a fact from it/u);
+  });
+
+  it("the writer answers the question asked and keeps Capital Q records apart", () => {
+    expect(ANALYSIS_WRITE_V6.template).toContain(ANALYSIS_WRITE_QUESTION_RULE);
+    expect(ANALYSIS_WRITE_V6.template).toContain("INVESTIGATION REPORT");
+    expect(ANALYSIS_WRITE_QUESTION_RULE).toMatch(
+      /Never turn a sector report into one company's diligence memo/u,
+    );
+    expect(ANALYSIS_WRITE_QUESTION_RULE).toMatch(/cites no \[S n\]/u);
   });
 });
