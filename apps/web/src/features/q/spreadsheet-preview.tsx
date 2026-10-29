@@ -71,7 +71,7 @@ export function SpreadsheetGlance({
     sheet.rows.length > rows.length || sheet.columns.length > columns.length;
   return (
     <figure className="flex flex-col gap-1" data-q-spreadsheet-glance>
-      <div className="cq-q-table-scroll overflow-x-auto rounded-md border border-(--cq-border-subtle)">
+      <div className="cq-q-table-scroll relative overflow-x-auto rounded-md border border-(--cq-border-subtle)">
         <table className="w-full border-collapse text-start">
           <thead className="bg-(--cq-surface-subtle)">
             <tr>
