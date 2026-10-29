@@ -53,3 +53,6 @@ docs/guide/capital-q-guide.html
 
 # Written by scripts/q-pitch/render-story.mjs (rendered narration timings).
 apps/web/public/story-media/*/beat-*.json
+
+# Recorded research acceptance fixtures: machine-written by record.mjs.
+apps/q-api/test/research-acceptance/fixtures/
