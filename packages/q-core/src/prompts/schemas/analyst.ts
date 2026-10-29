@@ -340,6 +340,89 @@ export type AnalysisDocumentResultV3 = z.infer<
   typeof AnalysisDocumentResultV3Schema
 >;
 
+// ---------------------------------------------------------------------------
+// Investigation-grade research (owner 2026-10-29): the planner is asked
+// again after each round for the open questions code found (and told what
+// was already asked), marks the lines whose answer an official body
+// publishes, and names words for Capital Q's own company search; the fact
+// reader labels what each figure measures, so code can cross-check them.
+// ---------------------------------------------------------------------------
+
+export const RESEARCH_PLAN_V4_SCHEMA_VERSION = 4;
+
+export const ResearchPlanVariablesV4Schema = z
+  .object({
+    ...TaskFrameSchema,
+    request: z.string().min(1).max(4_000),
+    purpose: z.string().max(600),
+    subject: z.string().max(1_200),
+    today: z.string().min(1).max(40),
+    /**
+     * The open questions code found after a round, one per line; empty on
+     * the first round. Lane labels and code's own wording. UNTRUSTED.
+     */
+    gaps: z.string().max(4_000),
+    /** Queries already sent, one per line (never repeated). UNTRUSTED. */
+    asked: z.string().max(6_000),
+  })
+  .strict();
+export type ResearchPlanVariablesV4 = z.infer<
+  typeof ResearchPlanVariablesV4Schema
+>;
+export const RESEARCH_PLAN_V4_UNTRUSTED = [
+  "request",
+  "purpose",
+  "subject",
+  "gaps",
+  "asked",
+] as const;
+
+export const ResearchPlanResultV4Schema = z.object({
+  questions: z
+    .array(
+      z.object({
+        lane: LooseLane,
+        query: LooseQuery,
+        alsoQuery: LooseQuery.nullable().catch(null),
+        recent: z.boolean().catch(false),
+        /** An official body publishes the answer: a primary source is expected. */
+        primary: z.boolean().catch(false),
+      }),
+    )
+    .max(16),
+  /**
+   * A few words for Capital Q's own company search (sector, place, stage),
+   * never sent outside Capital Q; null when the request is not about a
+   * sector or market.
+   */
+  internalQuery: z.string().trim().max(200).nullable().catch(null),
+});
+export type ResearchPlanResultV4 = z.infer<typeof ResearchPlanResultV4Schema>;
+
+export const RESEARCH_FACTS_V3_SCHEMA_VERSION = 3;
+export const ResearchFactsResultV3Schema = z.object({
+  facts: z
+    .array(
+      z.object({
+        statement: z.string().trim().min(1).max(800),
+        figure: z.string().trim().min(1).max(400).nullable().catch(null),
+        asOf: z.string().trim().min(1).max(120).nullable().catch(null),
+        source: z.number().int().min(1).max(500),
+        kind: z.enum(RESEARCH_FACT_KINDS).catch("FACT"),
+        /** What the figure measures, in 2-5 plain words; null for none. */
+        measure: z.string().trim().min(1).max(120).nullable().catch(null),
+        /** What it is about (the market, place or organisation); null for none. */
+        entity: z.string().trim().min(1).max(120).nullable().catch(null),
+      }),
+    )
+    .max(24),
+  followUps: z
+    .array(z.object({ lane: LooseLane, query: LooseQuery }))
+    .max(6)
+    .catch([]),
+});
+export type ResearchFactsResultV3 = z.infer<typeof ResearchFactsResultV3Schema>;
+
 export const ANALYSIS_CRITIQUE_V3_SCHEMA_VERSION = 3;
 export const AnalysisCritiqueResultV3Schema = z.object({
   passes: z.boolean(),

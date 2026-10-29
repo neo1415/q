@@ -35,19 +35,35 @@ export type ProposedFact = {
   readonly source: number;
   readonly lane: string;
   readonly kind: FactKind;
+  /**
+   * Investigation (2026-10-29): what the figure measures and what it is
+   * about, as the reader labelled them -- hints code uses to group facts
+   * for cross-checking, never a judgement of agreement. Absent: unlabelled.
+   */
+  readonly measure?: string | null | undefined;
+  readonly entity?: string | null | undefined;
 };
 
-export type AdmittedFact = ProposedFact & {
-  /** F1, F2 ... in ranked order. */
-  readonly id: string;
+/** A proposed fact whose source exists and carries every number it states. */
+export type VerifiedFact = ProposedFact & {
   readonly domain: string;
   readonly title: string | null;
   readonly url: string;
   readonly publishedAt: string | null;
 };
 
+export type AdmittedFact = VerifiedFact & {
+  /** F1, F2 ... in ranked order. */
+  readonly id: string;
+};
+
 export type FactRefusal =
   "UNKNOWN_SOURCE" | "FIGURE_NOT_IN_SOURCE" | "DUPLICATE" | "EMPTY";
+
+export type FactRefusals = readonly {
+  readonly statement: string;
+  readonly reason: FactRefusal;
+}[];
 
 export type DossierSource = {
   readonly index: number;
@@ -81,7 +97,8 @@ export function numbersSupported(
   return stated.every((value) => available.has(value));
 }
 
-function normalised(statement: string): string {
+/** One key per statement, however it is spaced or punctuated. */
+export function factKey(statement: string): string {
   return statement
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
@@ -97,9 +114,99 @@ function recency(fact: ProposedFact, publishedAt: string | null): number {
 }
 
 /**
- * Admit, deduplicate and rank proposed facts. Ranking: one fact per line of
- * enquiry in turn (coverage first), and within a line facts with a figure,
- * then the most recent, then the order they were proposed.
+ * Code's admission test, without ranking: the source exists, every number
+ * is on it, and the statement is not one already kept (`seen`: statements
+ * an earlier round kept, which this call extends).
+ */
+export function verifyFacts(
+  proposed: readonly ProposedFact[],
+  sources: readonly DossierSource[],
+  seen: Set<string> = new Set<string>(),
+): {
+  readonly verified: readonly VerifiedFact[];
+  readonly refused: FactRefusals;
+} {
+  const byIndex = new Map(sources.map((source) => [source.index, source]));
+  const refused: { statement: string; reason: FactRefusal }[] = [];
+  const verified: VerifiedFact[] = [];
+  for (const fact of proposed) {
+    const statement = fact.statement.trim();
+    if (statement.length === 0) {
+      refused.push({ statement, reason: "EMPTY" });
+      continue;
+    }
+    const source = byIndex.get(fact.source);
+    if (source === undefined) {
+      refused.push({ statement, reason: "UNKNOWN_SOURCE" });
+      continue;
+    }
+    if (!numbersSupported(fact, `${source.title ?? ""} ${source.excerpt}`)) {
+      refused.push({ statement, reason: "FIGURE_NOT_IN_SOURCE" });
+      continue;
+    }
+    const key = factKey(statement);
+    if (seen.has(key)) {
+      refused.push({ statement, reason: "DUPLICATE" });
+      continue;
+    }
+    seen.add(key);
+    verified.push({
+      ...fact,
+      statement,
+      domain: source.domain,
+      title: source.title,
+      url: source.url,
+      publishedAt: source.publishedAt,
+    });
+  }
+  return { verified, refused };
+}
+
+/**
+ * Rank verified facts: one fact per line of enquiry in turn (coverage
+ * first), and within a line the better-tiered source first (`tierOf`,
+ * higher first: an official source before the press), then facts with a
+ * figure, then the most recent, then the order they were proposed.
+ */
+export function rankFacts<F extends VerifiedFact>(
+  facts: readonly F[],
+  maxFacts: number = DOSSIER_MAX_FACTS,
+  tierOf: (fact: F) => number = () => 0,
+): readonly (F & { readonly id: string })[] {
+  const lanes = new Map<string, { fact: F; order: number }[]>();
+  facts.forEach((fact, order) => {
+    const list = lanes.get(fact.lane) ?? [];
+    list.push({ fact, order });
+    lanes.set(fact.lane, list);
+  });
+  for (const list of lanes.values()) {
+    list.sort(
+      (a, b) =>
+        tierOf(b.fact) - tierOf(a.fact) ||
+        Number(b.fact.figure !== null) - Number(a.fact.figure !== null) ||
+        recency(b.fact, b.fact.publishedAt) -
+          recency(a.fact, a.fact.publishedAt) ||
+        a.order - b.order,
+    );
+  }
+  const ranked: F[] = [];
+  const queues = [...lanes.values()];
+  while (ranked.length < maxFacts && queues.some((list) => list.length > 0)) {
+    for (const list of queues) {
+      const one = list.shift();
+      if (one !== undefined && ranked.length < maxFacts) ranked.push(one.fact);
+    }
+  }
+  return ranked.map((fact, position) => ({
+    ...fact,
+    id: `F${String(position + 1)}`,
+  }));
+}
+
+/**
+ * Admit, deduplicate and rank proposed facts: verifyFacts, then rankFacts
+ * (one fact per line of enquiry in turn; within a line facts with a
+ * figure, then the most recent, then the order they were proposed).
  */
 export function admitFacts(
   proposed: readonly ProposedFact[],
@@ -107,75 +214,8 @@ export function admitFacts(
   maxFacts: number = DOSSIER_MAX_FACTS,
 ): {
   readonly admitted: readonly AdmittedFact[];
-  readonly refused: readonly {
-    readonly statement: string;
-    readonly reason: FactRefusal;
-  }[];
+  readonly refused: FactRefusals;
 } {
-  const byIndex = new Map(sources.map((source) => [source.index, source]));
-  const refused: { statement: string; reason: FactRefusal }[] = [];
-  const seen = new Set<string>();
-  const kept: {
-    fact: ProposedFact;
-    source: DossierSource;
-    order: number;
-  }[] = [];
-  proposed.forEach((fact, order) => {
-    const statement = fact.statement.trim();
-    if (statement.length === 0) {
-      refused.push({ statement, reason: "EMPTY" });
-      return;
-    }
-    const source = byIndex.get(fact.source);
-    if (source === undefined) {
-      refused.push({ statement, reason: "UNKNOWN_SOURCE" });
-      return;
-    }
-    if (!numbersSupported(fact, `${source.title ?? ""} ${source.excerpt}`)) {
-      refused.push({ statement, reason: "FIGURE_NOT_IN_SOURCE" });
-      return;
-    }
-    const key = normalised(statement);
-    if (seen.has(key)) {
-      refused.push({ statement, reason: "DUPLICATE" });
-      return;
-    }
-    seen.add(key);
-    kept.push({ fact: { ...fact, statement }, source, order });
-  });
-
-  const lanes = new Map<string, typeof kept>();
-  for (const one of kept) {
-    const list = lanes.get(one.fact.lane) ?? [];
-    list.push(one);
-    lanes.set(one.fact.lane, list);
-  }
-  for (const list of lanes.values()) {
-    list.sort(
-      (a, b) =>
-        Number(b.fact.figure !== null) - Number(a.fact.figure !== null) ||
-        recency(b.fact, b.source.publishedAt) -
-          recency(a.fact, a.source.publishedAt) ||
-        a.order - b.order,
-    );
-  }
-  const ranked: typeof kept = [];
-  const queues = [...lanes.values()];
-  while (ranked.length < maxFacts && queues.some((list) => list.length > 0)) {
-    for (const list of queues) {
-      const one = list.shift();
-      if (one !== undefined && ranked.length < maxFacts) ranked.push(one);
-    }
-  }
-  return {
-    admitted: ranked.map(({ fact, source }, position) => ({
-      ...fact,
-      id: `F${String(position + 1)}`,
-      domain: source.domain,
-      title: source.title,
-      url: source.url,
-      publishedAt: source.publishedAt,
-    })),
-    refused,
-  };
+  const { verified, refused } = verifyFacts(proposed, sources);
+  return { admitted: rankFacts(verified, maxFacts), refused };
 }

@@ -23,6 +23,7 @@ import { webOriginFrom } from "./composition/web-origin.js";
 import { namedPictureOf } from "./http/q-approvals.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
+import { createCapitalQRecords } from "./composition/workforce/capital-q-records.js";
 import {
   createNamedResearchSubject,
   createOwnResearchSubject,
@@ -1960,6 +1961,11 @@ const workforcePortsFor = createWorkforcePorts(
           firewall,
           investigate: qIntelligence.companyIntelligence.investigate,
         })(actor, companyId),
+      // Investigation (2026-10-29): companies on Capital Q they may see,
+      // by the company search tool as them under their firewall plan
+      // (composed further down; read when a job runs). Never sent outside.
+      capitalQRecords: (actor, query) =>
+        createCapitalQRecords({ firewall, tools: qTools.port })(actor, query),
       jobSearchBudget: workforceJobSearchBudget(process.env),
       logger,
     }),

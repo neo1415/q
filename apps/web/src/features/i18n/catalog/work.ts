@@ -596,6 +596,14 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "Researching the question": "البحث في السؤال",
   "Searching 1 line of enquiry": "البحث في مسار بحث واحد",
   "Searching {n} lines of enquiry": "البحث في {n} مسارات بحث",
+  "Planning the investigation": "تخطيط التحقيق",
+  "Round {n}: planning the open questions":
+    "الجولة {n}: تخطيط الأسئلة المفتوحة",
+  "Round {n}: checking 1 open question":
+    "الجولة {n}: التحقق من سؤال مفتوح واحد",
+  "Round {n}: checking {n2} open questions":
+    "الجولة {n}: التحقق من {n2} أسئلة مفتوحة",
+  "Cross-checking sources": "مطابقة المصادر",
   "Reading public sources": "قراءة المصادر العامة",
   "Reading 1 public source": "قراءة مصدر عام واحد",
   "Reading {n} public sources": "قراءة {n} مصادر عامة",

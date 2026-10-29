@@ -3,18 +3,36 @@ import { randomUUID } from "node:crypto";
 import { CorrelationIdSchema } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
-  admitFacts,
   createDeepResearch,
   createSearchBudget,
+  crossCheck,
+  gapText,
+  looksLikeOwnDomain,
+  openGaps,
   publicTermsOf,
+  rankFacts,
+  registrableDomain,
   searchPhrase,
-  type SearchBudget,
-  type AdmittedFact,
-  type DeepResearchLaneOutcome,
+  sourceTier,
+  tierRank,
+  verifyFacts,
+  factKey,
+  CHECKED_EVIDENCE_STATUSES,
+  CHECKED_LIFECYCLE_STATUSES,
+  DOSSIER_MAX_FACTS,
+  FACT_KINDS,
+  PRIMARY_KINDS,
+  SOURCE_TIERS,
+  type CrossChecked,
   type DeepResearchQuestion,
   type DeepResearchSource,
+  type OpenGap,
+  type PrimaryKind,
   type ProposedFact,
   type PublicWebResearchService,
+  type SearchBudget,
+  type SourceTier,
+  type VerifiedFact,
 } from "@capital-q/q-research";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
@@ -31,35 +49,75 @@ import type { WorkforceModels } from "./models.js";
 import type { WorkforcePortServices } from "./ports.js";
 
 /**
- * A RESEARCH step as an analyst does it (owner 2026-10-23; production
- * 17:47 UTC ran ONE search for the keyword string "research kenya water
- * access and water kiosks market size competitors alternatives and to
- * maji growth" and found bottled-water reports and a how-to blog).
+ * A RESEARCH step as an analyst investigates (owner 2026-10-23, made
+ * investigation-grade 2026-10-29: "Q must investigate, not write a
+ * convincing answer from a handful of results").
  *
- *   1. A model plans 6-12 focused questions from the request (market size,
- *      demand, competitors by name, alternatives, regulation, unit
- *      economics, news). It sees the person's request and the step's goal
- *      only -- nothing from their records -- so no private fact can be put
- *      in a query; every query is composed again by the egress policy.
- *   2. They run side by side over the configured providers (which fail
- *      over), each reading its best pages with the vetted page reader.
- *   3. A model reads each question's pages into dated, sourced facts and
- *      names what deserves a search of its own; one follow-up round runs
- *      those, with the first round's public words allowed to travel.
- *   4. Code admits a fact only when every number in it is on its page,
- *      deduplicates and ranks them (dossier.ts).
+ *   1. PLAN. A model plans 6-12 focused questions from the request,
+ *      official (primary) sources first. It sees the person's request and
+ *      the step's goal only -- nothing from their records -- so no private
+ *      fact can be put in a query; every query is composed again by the
+ *      egress policy.
+ *   2. ROUNDS. The questions run side by side over the configured providers
+ *      (which fail over), each reading its best pages. A model reads each
+ *      line's pages into dated, sourced facts; code admits a fact only when
+ *      every number in it is on its page. Code then cross-checks them
+ *      (q-research cross-check.ts: corroboration across independent
+ *      publishers, contradictions with both sides kept, staleness) and
+ *      names the open questions: a planned line with no fact or that could
+ *      not run, facts that disagree, only stale facts, a line that wants an
+ *      official source and has none. The planner is asked for queries for
+ *      THOSE gaps only, never one already sent. A bounded loop: it stops on
+ *      no gaps, the search budget, the model-call cap, the deadline, the
+ *      round cap, or nothing new to ask.
+ *   3. DURABLE. After each phase of each round the investigation is kept on
+ *      the job's row (checkpoint): a worker that restarts resumes where it
+ *      was -- the queries already sent are never sent again.
+ *   4. CAPITAL Q RECORDS. Beside the web, companies on Capital Q the person
+ *      may see (the company search tool, as them, under their firewall
+ *      plan). They are kept apart from web facts and never reach a query.
  *
- * Bounded by a wall-clock deadline and the step's budget; a question that
- * would not fit either is not started. Page text never leaves this step:
- * the dossier keeps facts, sources' addresses, titles and dates.
+ * Page text never leaves this step: the dossier keeps facts, sources'
+ * addresses, titles, dates and tiers.
  */
 
 export const DEEP_RESEARCH_DEADLINE_MS = 150_000;
+/**
+ * Rounds at most. Round one covers the plan; round two fills what it
+ * missed; round three settles what round two found disputed or official.
+ * Each later round costs a planner call and its page reads for fewer new
+ * facts, and three rounds of four-wide searches with their reads fit the
+ * 150 s deadline (live rounds take 30-40 s).
+ */
+export const INVESTIGATION_ROUNDS_MAX = 3;
+/**
+ * Questions a later round may ask: the job's search budget (8 by default)
+ * keeps two searches back after round one, so more would only be skipped.
+ */
+export const GAP_QUESTIONS_MAX = 4;
+/**
+ * A line of enquiry is searched at most twice: what two differently
+ * phrased searches did not find, a third rarely does; the report then
+ * names it as open instead of spending on it again.
+ */
+export const LANE_TRIES_MAX = 2;
+/**
+ * Model calls one RESEARCH step may make: a planner call per round (3) and
+ * the page reads (up to 12 in round one, 4 in each later round), with room
+ * for a retry's worth. The step's dollar cap still bounds every call.
+ */
+export const MODEL_CALLS_MAX = 24;
 const FACT_CALLS_AT_ONCE = 4;
 const PAGES_PER_LANE = 4;
 const PAGE_CHARS = 2_200;
 const FOLLOW_UPS_MAX = 4;
 const REQUEST_MAX = 4_000;
+const PLAN_CEILING_USD = 0.04;
+const FACTS_CEILING_USD = 0.05;
+const RECORDS_MAX = 12;
+
+const Tier = z.enum(SOURCE_TIERS);
+const TierKind = z.enum(PRIMARY_KINDS).nullable();
 
 export const DossierSourceSchema = z
   .object({
@@ -68,6 +126,9 @@ export const DossierSourceSchema = z
     domain: z.string().max(300),
     title: z.string().max(400).nullable(),
     publishedAt: z.string().max(40).nullable(),
+    /** Investigation (2026-10-29): the publisher's tier. Absent: older dossier. */
+    tier: Tier.optional(),
+    tierKind: TierKind.optional(),
   })
   .strict();
 
@@ -84,8 +145,47 @@ export const DossierFactSchema = z
     title: z.string().max(400).nullable(),
     url: z.string().max(2_000),
     publishedAt: z.string().max(40).nullable(),
+    // Investigation (2026-10-29), all optional: an older dossier has none.
+    measure: z.string().max(60).nullable().optional(),
+    entity: z.string().max(60).nullable().optional(),
+    tier: Tier.optional(),
+    tierKind: TierKind.optional(),
+    /** ADR-001 evidence_status, decided by code's cross-check. */
+    evidenceStatus: z.enum(CHECKED_EVIDENCE_STATUSES).optional(),
+    /** ADR-001 lifecycle_status, decided by code's cross-check. */
+    lifecycleStatus: z.enum(CHECKED_LIFECYCLE_STATUSES).optional(),
+    corroboratedBy: z.array(z.string().max(8)).max(12).optional(),
+    contradicts: z.array(z.string().max(8)).max(12).optional(),
   })
   .strict();
+
+/** A company on Capital Q the person may see: its own declared profile. */
+export const CapitalQRecordSchema = z
+  .object({
+    companyId: z.string().max(64),
+    name: z.string().min(1).max(200),
+    stage: z.string().max(64).nullable(),
+    country: z.string().max(8).nullable(),
+    description: z.string().max(400).nullable(),
+  })
+  .strict();
+export type CapitalQRecord = z.infer<typeof CapitalQRecordSchema>;
+
+/** How the investigation went, as code counted it. */
+export const InvestigationSummarySchema = z
+  .object({
+    rounds: z.number().int().min(0).max(10),
+    stop: z.string().max(40),
+    /** Open questions left when it stopped (code's wording). */
+    open: z.array(z.string().max(300)).max(24),
+    /** Lines of enquiry no provider could search. */
+    couldNotRun: z.array(z.string().max(40)).max(24),
+    searches: z.number().int().min(0),
+    modelCalls: z.number().int().min(0),
+    ms: z.number().int().min(0),
+  })
+  .strict();
+export type InvestigationSummary = z.infer<typeof InvestigationSummarySchema>;
 
 /** What a RESEARCH step hands the document after it (kept with the job). */
 export const ResearchDossierSchema = z
@@ -104,12 +204,16 @@ export const ResearchDossierSchema = z
           })
           .strict(),
       )
-      .max(24),
+      .max(40),
     /**
      * The job's search budget left some lines of enquiry unsearched or
      * narrowed (2026-10-28); the document says so. Absent: an older dossier.
      */
     budgetLimited: z.boolean().optional(),
+    /** Investigation (2026-10-29): rounds, why it stopped, what stayed open. */
+    investigation: InvestigationSummarySchema.optional(),
+    /** Capital Q records the person may see, kept apart from web facts. */
+    records: z.array(CapitalQRecordSchema).max(RECORDS_MAX).optional(),
   })
   .strict();
 export type ResearchDossier = z.infer<typeof ResearchDossierSchema>;
@@ -167,13 +271,13 @@ export function pagesText(sources: readonly DeepResearchSource[]): string {
     .slice(0, 19_000);
 }
 
-/** A lane's pages: those it found, read in full first. */
+/** A lane's unread pages: those it found this round, read in full first. */
 function pagesFor(
   lane: string,
   sources: readonly DeepResearchSource[],
 ): readonly DeepResearchSource[] {
   return sources
-    .filter((source) => source.lanes.includes(lane))
+    .filter((source) => source.lanes.includes(lane) && source.excerpt !== "")
     .sort((a, b) => Number(b.extracted) - Number(a.extracted))
     .slice(0, PAGES_PER_LANE);
 }
@@ -204,6 +308,266 @@ export type DeepResearchInput = Parameters<
   NonNullable<WorkforcePortServices["research"]>
 >[0];
 
+/**
+ * Where an investigation is kept between phases, on the job's own durable
+ * row (runner.ts): what is loaded is re-validated, never trusted.
+ */
+export type ResearchCheckpoint = {
+  readonly load: () => Promise<unknown>;
+  readonly save: (value: unknown) => Promise<void>;
+};
+
+// ---------------------------------------------------------------------------
+// The investigation's durable state
+// ---------------------------------------------------------------------------
+
+const QuestionSchema = z
+  .object({
+    lane: z.string().min(1).max(40),
+    query: z.string().min(1).max(240),
+    alsoQuery: z.string().max(240).nullable(),
+    recent: z.boolean(),
+    primary: z.boolean(),
+  })
+  .strict();
+type PlannedQuestion = z.infer<typeof QuestionSchema>;
+
+const StoredSourceSchema = z
+  .object({
+    index: z.number().int().min(1),
+    url: z.string().max(2_000),
+    domain: z.string().max(300),
+    title: z.string().max(400).nullable(),
+    publishedAt: z.string().max(40).nullable(),
+    retrievedAt: z.string().max(40),
+    /** Kept only until the round's facts are read; "" after. */
+    excerpt: z.string().max(PAGE_CHARS),
+    extracted: z.boolean(),
+    instructionRisk: z.boolean(),
+    lanes: z.array(z.string().max(40)).max(40),
+  })
+  .strict();
+
+const StoredFactSchema = z
+  .object({
+    statement: z.string().min(1).max(400),
+    figure: z.string().max(80).nullable(),
+    asOf: z.string().max(40).nullable(),
+    source: z.number().int().min(1),
+    lane: z.string().max(40),
+    kind: z.enum(FACT_KINDS),
+    measure: z.string().max(60).nullable(),
+    entity: z.string().max(60).nullable(),
+    domain: z.string().max(300),
+    title: z.string().max(400).nullable(),
+    url: z.string().max(2_000),
+    publishedAt: z.string().max(40).nullable(),
+  })
+  .strict();
+
+const LaneOutcomeSchema = z
+  .object({
+    lane: z.string().max(40),
+    query: z.string().max(240).nullable(),
+    status: z.enum([
+      "OK",
+      "NOTHING_SAFE_TO_SEND",
+      "PROVIDER_UNAVAILABLE",
+      "SKIPPED_DEADLINE",
+      "SKIPPED_BUDGET",
+      "FAILED",
+    ]),
+    sources: z.number().int().min(0),
+  })
+  .strict();
+
+export const INVESTIGATION_PHASES = ["PLANNED", "SEARCHED", "READ"] as const;
+
+/** The checkpoint kept on the job's row after each phase of each round. */
+export const InvestigationCheckpointSchema = z
+  .object({
+    status: z.literal("CHECKPOINT"),
+    version: z.literal(1),
+    /** The round in hand (0: not planned yet) and how far it got. */
+    round: z.number().int().min(0).max(INVESTIGATION_ROUNDS_MAX),
+    phase: z.enum(INVESTIGATION_PHASES),
+    /** Round one's plan: the lines of enquiry gaps are measured against. */
+    plan: z.array(QuestionSchema).max(16),
+    /** This round's questions. */
+    current: z.array(QuestionSchema).max(16),
+    /** Every query sent, lower-cased: never sent again. */
+    asked: z.array(z.string().max(240)).max(80),
+    tries: z.record(z.string().max(40), z.number().int().min(0).max(10)),
+    lanes: z.array(LaneOutcomeSchema).max(40),
+    sources: z.array(StoredSourceSchema).max(60),
+    facts: z.array(StoredFactSchema).max(200),
+    followUps: z
+      .array(
+        z
+          .object({ lane: z.string().max(40), query: z.string().max(240) })
+          .strict(),
+      )
+      .max(12),
+    /** Public words earlier rounds read, allowed to travel (egress.ts). */
+    publicTerms: z.array(z.string().max(24_000)).max(200),
+    /** The job's searches spent when this was kept (restores its budget). */
+    searches: z.number().int().min(0),
+    modelCalls: z.number().int().min(0),
+    spentUsd: z.number().min(0),
+    internalQuery: z.string().max(200).nullable(),
+    records: z.array(CapitalQRecordSchema).max(RECORDS_MAX).nullable(),
+    budgetLimited: z.boolean(),
+  })
+  .strict();
+export type InvestigationCheckpoint = z.infer<
+  typeof InvestigationCheckpointSchema
+>;
+
+export const STOP_REASONS = [
+  "NO_GAPS",
+  "ROUND_CAP",
+  "SEARCH_BUDGET",
+  "MODEL_BUDGET",
+  "DEADLINE",
+  "NO_NEW_QUERIES",
+] as const;
+export type StopReason = (typeof STOP_REASONS)[number];
+
+const laneOf = (raw: string) =>
+  raw
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/gu, "_")
+    .replace(/^_+|_+$/gu, "")
+    .slice(0, 40) || "GENERAL";
+
+const PUBLIC_TERMS_MAX = 24_000;
+
+/** Public words, bounded: what travels is what was read, never more. */
+function addTerms(terms: string[], more: readonly string[]): void {
+  let used = terms.reduce((sum, term) => sum + term.length, 0);
+  for (const term of more) {
+    if (term.length === 0 || used >= PUBLIC_TERMS_MAX) continue;
+    const kept = term.slice(0, PUBLIC_TERMS_MAX - used);
+    terms.push(kept);
+    used += kept.length;
+  }
+}
+
+type TieredFact = VerifiedFact & {
+  readonly measure: string | null;
+  readonly entity: string | null;
+  readonly tier: SourceTier;
+  readonly tierKind: PrimaryKind | null;
+};
+
+/**
+ * Each fact's publisher tier. A page on the site of a company the facts
+ * name (or the subject's) is that company's own disclosure: its claim.
+ */
+function tiered(
+  facts: readonly z.infer<typeof StoredFactSchema>[],
+  subjectName: string | null,
+): readonly TieredFact[] {
+  const named = [
+    ...new Set(
+      [subjectName ?? "", ...facts.map((fact) => fact.entity ?? "")].filter(
+        (name) => name.trim().length >= 3,
+      ),
+    ),
+  ];
+  const companyDomains = new Set(
+    facts
+      .filter((fact) =>
+        named.some((name) => looksLikeOwnDomain(fact.domain, name)),
+      )
+      .map((fact) => registrableDomain(fact.domain)),
+  );
+  return facts.map((fact) => {
+    const tier = sourceTier({
+      url: fact.url,
+      domain: fact.domain,
+      title: fact.title,
+      companyDomains,
+    });
+    return { ...fact, tier: tier.tier, tierKind: tier.kind };
+  });
+}
+
+/** Cross-checked facts with provisional ids, in the order found. */
+function checkedFacts(
+  facts: readonly z.infer<typeof StoredFactSchema>[],
+  subjectName: string | null,
+  today: Date,
+): readonly CrossChecked<TieredFact & { readonly id: string }>[] {
+  return crossCheck(
+    tiered(facts, subjectName).map((fact, position) => ({
+      ...fact,
+      id: `V${String(position + 1)}`,
+    })),
+    today,
+  );
+}
+
+/**
+ * The dossier's facts: ranked (coverage first, official sources first),
+ * with every fact a kept fact disagrees with kept too -- both sides of a
+ * contradiction always reach the document -- and references renumbered.
+ */
+export function dossierFacts(
+  checked: readonly CrossChecked<TieredFact & { readonly id: string }>[],
+): ResearchDossier["facts"] {
+  // Ranking gives final ids; the cross-check's references use the
+  // provisional ones, kept beside them.
+  const ranked = rankFacts(
+    checked.map((fact) => ({ ...fact, provisional: fact.id })),
+    DOSSIER_MAX_FACTS,
+    (fact) => tierRank(fact.tier),
+  );
+  const kept = [...ranked];
+  const byProvisional = new Map(checked.map((fact) => [fact.id, fact]));
+  const have = new Set(kept.map((fact) => fact.provisional));
+  for (const fact of [...kept]) {
+    for (const other of fact.contradicts) {
+      const partner = byProvisional.get(other);
+      if (partner === undefined || have.has(other) || kept.length >= 80)
+        continue;
+      have.add(other);
+      kept.push({
+        ...partner,
+        id: `F${String(kept.length + 1)}`,
+        provisional: other,
+      });
+    }
+  }
+  const finalId = new Map(kept.map((fact) => [fact.provisional, fact.id]));
+  const rename = (ids: readonly string[]) =>
+    ids
+      .map((id) => finalId.get(id))
+      .filter((id): id is string => id !== undefined)
+      .slice(0, 12);
+  return kept.map((fact) => ({
+    id: fact.id,
+    statement: fact.statement,
+    figure: fact.figure,
+    asOf: fact.asOf,
+    source: fact.source,
+    lane: fact.lane.slice(0, 40),
+    kind: fact.kind,
+    domain: fact.domain,
+    title: fact.title?.slice(0, 400) ?? null,
+    url: fact.url,
+    publishedAt: fact.publishedAt,
+    measure: fact.measure,
+    entity: fact.entity,
+    tier: fact.tier,
+    tierKind: fact.tierKind,
+    evidenceStatus: fact.evidenceStatus,
+    lifecycleStatus: fact.lifecycleStatus,
+    corroboratedBy: rename(fact.corroboratedBy),
+    contradicts: rename(fact.contradicts),
+  }));
+}
+
 export function workforceDeepResearch(dependencies: {
   readonly service: PublicWebResearchService | undefined;
   readonly models: Pick<WorkforceModels, "planResearch" | "researchFacts">;
@@ -227,6 +591,17 @@ export function workforceDeepResearch(dependencies: {
         actor: ActorContext,
         companyId: string,
       ) => Promise<OwnResearchSubject | null>)
+    | undefined;
+  /**
+   * Investigation (2026-10-29): companies on Capital Q the person may see,
+   * found by the company search tool AS them under their firewall plan
+   * (capital-q-records.ts). Null: none readable. Never sent outside.
+   */
+  readonly capitalQRecords?:
+    | ((
+        actor: ActorContext,
+        query: { readonly text: string },
+      ) => Promise<readonly CapitalQRecord[] | null>)
     | undefined;
   /** Searches one job may send, planned ones included (default 8). */
   readonly jobSearchBudget?: number | undefined;
@@ -265,21 +640,74 @@ export function workforceDeepResearch(dependencies: {
       input.jobId === undefined
         ? null
         : { jobId: input.jobId, runId: input.runId };
-    const spend = createSpend(input.budgetUsd ?? 0.6);
     const request = input.request.slice(0, REQUEST_MAX);
-    const today = new Date(started).toISOString().slice(0, 10);
+    const todayDate = new Date(started);
+    const today = todayDate.toISOString().slice(0, 10);
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
-
+    const report = safeReport(input.progress);
     const budget = budgetFor(input.actor.tenantId, input.jobId);
-    // 1. The questions, planned by meaning from their request and, for
-    // their own company, its name, country and declared sectors only; for
-    // a company being diligenced, its name and country as they may read it.
+
+    // A resumed step carries on from its checkpoint (re-validated: the
+    // job's stored results are a trust boundary).
+    const loaded = await (input.checkpoint?.load() ?? Promise.resolve(null))
+      .then((value) => InvestigationCheckpointSchema.safeParse(value))
+      .catch(() => null);
+    const resumed = loaded?.success === true ? loaded.data : null;
+    const state: InvestigationCheckpoint = resumed ?? {
+      status: "CHECKPOINT",
+      version: 1,
+      round: 0,
+      phase: "READ",
+      plan: [],
+      current: [],
+      asked: [],
+      tries: {},
+      lanes: [],
+      sources: [],
+      facts: [],
+      followUps: [],
+      publicTerms: [],
+      searches: 0,
+      modelCalls: 0,
+      spentUsd: 0,
+      internalQuery: null,
+      records: null,
+      budgetLimited: false,
+    };
+    // What the job had spent stays spent: a restart never refills it.
+    const used = budget.limit - budget.remaining();
+    if (state.searches > used) budget.reserve(state.searches - used);
+    if (state.budgetLimited) budget.markLimited();
+    const spend = createSpend(input.budgetUsd ?? 0.6);
+    spend.charge(state.spentUsd, 0);
+    let modelCalls = state.modelCalls;
+    const save = async () => {
+      if (input.checkpoint === undefined) return;
+      const value: InvestigationCheckpoint = {
+        ...state,
+        searches: budget.limit - budget.remaining(),
+        modelCalls,
+        spentUsd: Number(spend.spent().toFixed(6)),
+        budgetLimited: budget.limited(),
+      };
+      // A checkpoint that cannot be written costs a resume, never the work.
+      await input.checkpoint.save(value).catch(() => undefined);
+    };
+
+    // The subject, as the planner reads it and egress may send it: for
+    // their own company its name, country and declared sectors; for a
+    // company being diligenced, its name and country as they may read it.
     const named =
       input.subject === undefined
         ? null
         : ((await dependencies
             .namedSubject?.(input.actor, input.subject.companyId)
             .catch(() => null)) ?? null);
+    const ownSubject =
+      input.subject === undefined
+        ? ((await dependencies.ownSubject?.(input.actor).catch(() => null)) ??
+          null)
+        : null;
     // A named company they may not read is researched from the request
     // alone -- never as their own company.
     const own =
@@ -287,78 +715,343 @@ export function workforceDeepResearch(dependencies: {
         ? named === null
           ? subjectLines(null)
           : diligenceSubjectLines(named)
-        : subjectLines(
-            (await dependencies.ownSubject?.(input.actor).catch(() => null)) ??
-              null,
-          );
-    const report = safeReport(input.progress);
-    let questions: DeepResearchQuestion[] = [];
-    const planned = await models.planResearch(who, trace, {
-      request,
-      purpose: input.query.slice(0, 600),
-      subject: own.text.slice(0, 1_200),
-      today,
+        : subjectLines(ownSubject);
+    const subjectName = named?.name ?? ownSubject?.name ?? null;
+
+    const plannedLane = (one: {
+      readonly lane: string;
+      readonly query: string;
+      readonly alsoQuery: string | null;
+      readonly recent: boolean;
+      readonly primary?: boolean | undefined;
+    }): PlannedQuestion => ({
+      lane: laneOf(one.lane),
+      query: one.query.slice(0, 240),
+      alsoQuery: one.alsoQuery === null ? null : one.alsoQuery.slice(0, 240),
+      recent: one.recent,
+      primary: one.primary === true,
     });
-    spend.charge(planned?.costUsd ?? null, 0.04);
-    if (planned !== null) {
-      questions = planned.output.questions.map((one) => ({
-        lane: one.lane.toUpperCase().replace(/[^A-Z0-9]+/gu, "_"),
-        query: one.query,
-        ...(one.alsoQuery === null ? {} : { alsoQuery: one.alsoQuery }),
-        recent: one.recent,
-      }));
-    }
-    if (questions.length === 0) {
-      // No plan: the person's own sentence, as one question, rather than
-      // nothing. Honest, but it is the old single-search behaviour.
-      const phrase = searchPhrase(request);
-      if (phrase.length > 0)
-        questions = [{ lane: "GENERAL", query: phrase.slice(0, 160) }];
-    }
-    if (questions.length === 0) {
-      return {
-        status: "UNAVAILABLE",
-        message: "There was nothing in the request to research.",
-        reason: "NOTHING_TO_RESEARCH",
-      };
+    const planCall = async (gaps: readonly OpenGap[]) => {
+      modelCalls += 1;
+      const planned = await models.planResearch(who, trace, {
+        request,
+        purpose: input.query.slice(0, 600),
+        subject: own.text.slice(0, 1_200),
+        today,
+        gaps: gaps.map(gapText).join("\n").slice(0, 4_000),
+        asked: state.asked.join("\n").slice(0, 6_000),
+      });
+      spend.charge(planned?.costUsd ?? null, PLAN_CEILING_USD);
+      return planned;
+    };
+
+    let stop: StopReason | null = null;
+    // What stayed open when it stopped (set after each round).
+    let open: readonly OpenGap[];
+    const checkedNow = () => checkedFacts(state.facts, subjectName, todayDate);
+    const gapsNow = () =>
+      openGaps({
+        lanes: state.plan.map((question) => ({
+          lane: question.lane,
+          ran: state.lanes.some(
+            (lane) =>
+              lane.lane === question.lane &&
+              (lane.status === "OK" || lane.status === "NOTHING_SAFE_TO_SEND"),
+          ),
+          primary: question.primary,
+        })),
+        facts: checkedNow(),
+        tries: new Map(Object.entries(state.tries)),
+        maxTries: LANE_TRIES_MAX,
+      });
+
+    // A round: plan (round one) or the open questions' queries, search,
+    // read, cross-check -- each phase kept before the next begins.
+    for (;;) {
+      if (state.phase === "READ") {
+        if (state.round === 0) {
+          // 1. The plan, primary sources first.
+          report({ stage: "PLANNING_RESEARCH", round: 1 });
+          const planned = await planCall([]);
+          let questions: PlannedQuestion[] = (planned?.output.questions ?? [])
+            .slice(0, 12)
+            .map(plannedLane);
+          if (questions.length === 0) {
+            // No plan: the person's own sentence, as one question, rather
+            // than nothing. Honest, but it is the old single search.
+            const phrase = searchPhrase(request);
+            if (phrase.length > 0)
+              questions = [
+                {
+                  lane: "GENERAL",
+                  query: phrase.slice(0, 160),
+                  alsoQuery: null,
+                  recent: false,
+                  primary: false,
+                },
+              ];
+          }
+          if (questions.length === 0) {
+            return {
+              status: "UNAVAILABLE",
+              message: "There was nothing in the request to research.",
+              reason: "NOTHING_TO_RESEARCH",
+            };
+          }
+          if (budget.remaining() === 0) {
+            budget.markLimited();
+            return {
+              status: "UNAVAILABLE",
+              message:
+                "This job's public search budget was already spent, so nothing more was searched.",
+              reason: "NO_SOURCES",
+            };
+          }
+          state.plan = questions;
+          state.internalQuery =
+            planned?.output.internalQuery?.trim().slice(0, 120) || null;
+          // The job's search budget (2026-10-28): the planner orders
+          // questions by importance; round one keeps searches back for
+          // later rounds when the budget allows them at all.
+          const reserve =
+            budget.remaining() >= 6
+              ? Math.min(GAP_QUESTIONS_MAX, Math.floor(budget.remaining() / 4))
+              : 0;
+          const roundOne = questions.slice(0, budget.remaining() - reserve);
+          if (roundOne.length < questions.length) budget.markLimited();
+          state.current = roundOne;
+        } else {
+          // 2. After a round: code's open questions decide whether to go on.
+          open = gapsNow();
+          if (open.length === 0) stop = "NO_GAPS";
+          else if (state.round >= INVESTIGATION_ROUNDS_MAX) stop = "ROUND_CAP";
+          else if (budget.remaining() === 0) {
+            budget.markLimited();
+            stop = "SEARCH_BUDGET";
+          } else if (now() >= started + deadlineMs * 0.65) stop = "DEADLINE";
+          else if (
+            modelCalls + 1 + Math.min(open.length, GAP_QUESTIONS_MAX) >
+              MODEL_CALLS_MAX ||
+            !spend.canAfford(PLAN_CEILING_USD + FACTS_CEILING_USD)
+          )
+            stop = "MODEL_BUDGET";
+          if (stop !== null) break;
+          const asked = new Set(state.asked);
+          const gapLanes = new Set(open.map((gap) => gap.lane));
+          const next: PlannedQuestion[] = [];
+          const take = (question: PlannedQuestion) => {
+            const key = question.query.toLowerCase();
+            if (asked.has(key) || next.length >= GAP_QUESTIONS_MAX) return;
+            asked.add(key);
+            next.push(question);
+          };
+          // A planned line the budget or a provider kept from running is
+          // asked as planned first: no model is needed to know its query.
+          for (const gap of open) {
+            if (gap.reason !== "COULD_NOT_RUN") continue;
+            const planned = state.plan.find((one) => one.lane === gap.lane);
+            if (planned !== undefined) take(planned);
+          }
+          if (open.some((gap) => gap.reason !== "COULD_NOT_RUN")) {
+            report({
+              stage: "PLANNING_RESEARCH",
+              round: state.round + 1,
+              questions: open.length,
+            });
+            const planned = await planCall(
+              open.filter((gap) => gap.reason !== "COULD_NOT_RUN"),
+            );
+            // Only the open questions' lines: anything else is dropped.
+            for (const one of planned?.output.questions ?? []) {
+              const question = plannedLane(one);
+              if (gapLanes.has(question.lane)) take(question);
+            }
+          }
+          // Round two also follows what round one's pages named.
+          if (state.round === 1) {
+            for (const lead of state.followUps.slice(0, FOLLOW_UPS_MAX)) {
+              take({
+                lane: laneOf(lead.lane),
+                query: lead.query,
+                alsoQuery: null,
+                recent: false,
+                primary: false,
+              });
+            }
+          }
+          if (next.length === 0) {
+            stop = "NO_NEW_QUERIES";
+            break;
+          }
+          state.current = next.slice(0, Math.max(1, budget.remaining()));
+        }
+        state.round += 1;
+        state.phase = "PLANNED";
+        await save();
+      }
+
+      if (state.phase === "PLANNED") {
+        // 3. The round's searches, side by side.
+        report({
+          stage: "SEARCHING",
+          questions: state.current.length,
+          round: state.round,
+        });
+        const questions: DeepResearchQuestion[] = state.current.map((one) => ({
+          lane: one.lane,
+          query: one.query,
+          ...(one.alsoQuery === null ? {} : { alsoQuery: one.alsoQuery }),
+          recent: one.recent,
+        }));
+        const result = await deep.run({
+          actor: input.actor,
+          runId: input.runId,
+          correlationId,
+          request,
+          questions,
+          // Their own company's identity may travel (their own facts), a
+          // diligenced company's name and country, and the public words
+          // earlier rounds read. Capital Q records never.
+          publicTerms: [...own.terms, ...state.publicTerms],
+          known: state.sources,
+          deadlineAt: started + deadlineMs * (state.round === 1 ? 0.45 : 0.75),
+          pagesPerQuestion: state.round === 1 ? PAGES_PER_LANE : 3,
+          searchBudget: budget,
+        });
+        const knownIndex = new Set(state.sources.map((one) => one.index));
+        const fresh = result.sources.filter(
+          (one) => !knownIndex.has(one.index),
+        );
+        state.sources = result.sources.slice(0, 60).map((one) => ({
+          index: one.index,
+          url: one.url,
+          domain: one.domain,
+          title: one.title?.slice(0, 400) ?? null,
+          publishedAt: one.publishedAt,
+          retrievedAt: one.retrievedAt,
+          excerpt: knownIndex.has(one.index)
+            ? ""
+            : one.excerpt.slice(0, PAGE_CHARS),
+          extracted: one.extracted,
+          instructionRisk: one.instructionRisk,
+          lanes: [...one.lanes],
+        }));
+        state.lanes = [...state.lanes, ...result.lanes].slice(0, 40);
+        for (const question of state.current) {
+          state.asked.push(question.query.toLowerCase());
+          state.tries[question.lane] = (state.tries[question.lane] ?? 0) + 1;
+        }
+        for (const lane of result.lanes) {
+          if (lane.query !== null) state.asked.push(lane.query.toLowerCase());
+        }
+        state.asked = [...new Set(state.asked)].slice(-80);
+        addTerms(state.publicTerms, publicTermsOf(fresh));
+        state.phase = "SEARCHED";
+        await save();
+        report({
+          stage: "READING",
+          sources: state.sources.length,
+          read: readOf(state.sources),
+        });
+      }
+
+      if (state.phase === "SEARCHED") {
+        // 4. Facts from each line's new pages; code admits them.
+        const answered = state.current.filter((question) =>
+          state.lanes.some(
+            (lane) => lane.lane === question.lane && lane.status === "OK",
+          ),
+        );
+        const proposed: ProposedFact[] = [];
+        const leads: { lane: string; query: string }[] = [];
+        await mapLimit(answered, FACT_CALLS_AT_ONCE, async (question) => {
+          const pages = pagesFor(question.lane, state.sources);
+          if (pages.length === 0) return;
+          if (
+            now() >= started + deadlineMs ||
+            modelCalls >= MODEL_CALLS_MAX ||
+            !spend.canAfford(FACTS_CEILING_USD)
+          ) {
+            return;
+          }
+          modelCalls += 1;
+          const read = await models.researchFacts(who, trace, {
+            request,
+            lane: question.lane.slice(0, 40),
+            question: question.query.slice(0, 200),
+            today,
+            pages: pagesText(pages),
+          });
+          spend.charge(read?.costUsd ?? null, FACTS_CEILING_USD);
+          if (read === null) return;
+          for (const fact of read.output.facts) {
+            proposed.push({ ...fact, lane: question.lane });
+          }
+          for (const lead of read.output.followUps) {
+            leads.push({ lane: laneOf(lead.lane), query: lead.query });
+          }
+        });
+        const seen = new Set(
+          state.facts.map((fact) => factKey(fact.statement)),
+        );
+        const { verified } = verifyFacts(
+          proposed,
+          state.sources.map((one) => ({
+            index: one.index,
+            url: one.url,
+            domain: one.domain,
+            title: one.title,
+            publishedAt: one.publishedAt,
+            excerpt: one.excerpt,
+          })),
+          seen,
+        );
+        state.facts = [
+          ...state.facts,
+          ...verified.map((fact) => ({
+            statement: fact.statement.slice(0, 400),
+            figure: fact.figure?.slice(0, 80) ?? null,
+            asOf: fact.asOf?.slice(0, 40) ?? null,
+            source: fact.source,
+            lane: fact.lane.slice(0, 40),
+            kind: fact.kind,
+            measure: fact.measure?.slice(0, 60) ?? null,
+            entity: fact.entity?.slice(0, 60) ?? null,
+            domain: fact.domain,
+            title: fact.title?.slice(0, 400) ?? null,
+            url: fact.url,
+            publishedAt: fact.publishedAt,
+          })),
+        ].slice(0, 200);
+        if (state.round === 1) state.followUps = leads.slice(0, 12);
+        // Page text is not kept once read: the facts are.
+        state.sources = state.sources.map((one) => ({ ...one, excerpt: "" }));
+        state.phase = "READ";
+        await save();
+        report({
+          stage: "CROSS_CHECKING",
+          round: state.round,
+          sources: state.sources.length,
+          facts: state.facts.length,
+        });
+      }
+
+      // Capital Q's own records, once, beside the web (never in a query).
+      if (
+        state.records === null &&
+        state.internalQuery !== null &&
+        dependencies.capitalQRecords !== undefined
+      ) {
+        const records = await dependencies
+          .capitalQRecords(input.actor, { text: state.internalQuery })
+          .catch(() => null);
+        state.records = (records ?? []).slice(0, RECORDS_MAX);
+        await save();
+      }
     }
 
-    if (budget.remaining() === 0) {
-      budget.markLimited();
-      return {
-        status: "UNAVAILABLE",
-        message:
-          "This job's public search budget was already spent, so nothing more was searched.",
-        reason: "NO_SOURCES",
-      };
-    }
-    // The job's search budget (2026-10-28): the planner orders questions
-    // by importance; round one keeps two searches back for what its pages
-    // name, when the budget allows a follow-up round at all.
-    const roundOne =
-      budget.remaining() >= 6
-        ? questions.slice(0, budget.remaining() - 2)
-        : questions;
-    if (roundOne.length < questions.length) budget.markLimited();
-    questions = roundOne;
-
-    // 2. Round one, side by side.
-    report({ stage: "SEARCHING", questions: questions.length });
-    const first = await deep.run({
-      actor: input.actor,
-      runId: input.runId,
-      correlationId,
-      request,
-      questions,
-      // Their own company's identity may travel (their own facts), and a
-      // diligenced company's name and country (what they may read of it).
-      ...(own.terms.length === 0 ? {} : { publicTerms: own.terms }),
-      deadlineAt: started + deadlineMs * 0.55,
-      pagesPerQuestion: PAGES_PER_LANE,
-      searchBudget: budget,
-    });
-    if (first.sources.length === 0) {
-      const unavailable = first.lanes.every(
+    if (state.sources.length === 0) {
+      const unavailable = state.lanes.every(
         (lane) =>
           lane.status === "PROVIDER_UNAVAILABLE" || lane.status === "FAILED",
       );
@@ -371,167 +1064,111 @@ export function workforceDeepResearch(dependencies: {
       };
     }
 
-    // 3. Facts from each question's pages; what to search next.
-    const proposed: ProposedFact[] = [];
-    const followUps: DeepResearchQuestion[] = [];
-    const readFacts = async (
-      lanes: readonly DeepResearchQuestion[],
-      sources: readonly DeepResearchSource[],
-    ) =>
-      mapLimit(lanes, FACT_CALLS_AT_ONCE, async (question) => {
-        const pages = pagesFor(question.lane, sources);
-        if (pages.length === 0) return;
-        if (now() >= started + deadlineMs || !spend.canAfford(0.05)) return;
-        const read = await models.researchFacts(who, trace, {
-          request,
-          lane: question.lane.slice(0, 40),
-          question: question.query.slice(0, 200),
-          today,
-          pages: pagesText(pages),
-        });
-        spend.charge(read?.costUsd ?? null, 0.05);
-        if (read === null) return;
-        for (const fact of read.output.facts) {
-          proposed.push({ ...fact, lane: question.lane });
-        }
-        for (const next of read.output.followUps) {
-          followUps.push({
-            lane: next.lane.toUpperCase().replace(/[^A-Z0-9]+/gu, "_"),
-            query: next.query,
-          });
-        }
-      });
-    report({
-      stage: "READING",
-      sources: first.sources.length,
-      read: readOf(first.sources),
-    });
-    const answered = questions.filter((question) =>
-      first.lanes.some(
-        (lane) => lane.lane === question.lane && lane.status === "OK",
+    // 5. The dossier: cross-checked, ranked, both sides of every
+    // contradiction kept, each source with its tier.
+    const checked = checkedNow();
+    const facts = dossierFacts(checked);
+    const tierBySource = new Map(
+      checked.map((fact) => [
+        fact.source,
+        { tier: fact.tier, tierKind: fact.tierKind },
+      ]),
+    );
+    const couldNotRun = [
+      ...new Set(
+        state.plan
+          .map((question) => question.lane)
+          .filter(
+            (lane) =>
+              !state.lanes.some(
+                (one) =>
+                  one.lane === lane &&
+                  (one.status === "OK" ||
+                    one.status === "NOTHING_SAFE_TO_SEND"),
+              ),
+          ),
       ),
-    );
-    await readFacts(answered, first.sources);
-
-    // 4. One follow-up round on what the pages named, while time allows.
-    let sources: readonly DeepResearchSource[] = first.sources;
-    let lanes: readonly DeepResearchLaneOutcome[] = first.lanes;
-    const asked = new Set(questions.map((q) => q.query.toLowerCase()));
-    const second = followUps
-      .filter((one) => {
-        const key = one.query.toLowerCase();
-        if (asked.has(key)) return false;
-        asked.add(key);
-        return true;
-      })
-      .slice(0, FOLLOW_UPS_MAX);
-    if (second.length > 0 && budget.remaining() === 0) budget.markLimited();
-    if (
-      second.length > 0 &&
-      budget.remaining() > 0 &&
-      now() < started + deadlineMs * 0.7 &&
-      spend.canAfford(0.05 * second.length)
-    ) {
-      const more = await deep.run({
-        actor: input.actor,
-        runId: input.runId,
-        correlationId,
-        request,
-        questions: second,
-        publicTerms: [...own.terms, ...publicTermsOf(first.sources)],
-        known: first.sources,
-        deadlineAt: started + deadlineMs * 0.8,
-        pagesPerQuestion: 3,
-        searchBudget: budget,
-      });
-      const fresh = more.sources.filter(
-        (source) =>
-          !first.sources.some((known) => known.index === source.index),
-      );
-      sources = more.sources;
-      lanes = [...first.lanes, ...more.lanes];
-      report({
-        stage: "READING",
-        sources: sources.length,
-        read: readOf(sources),
-      });
-      await readFacts(
-        second.filter((question) =>
-          fresh.some((source) => source.lanes.includes(question.lane)),
-        ),
-        fresh,
-      );
-    }
-
-    // 5. Code's admission: every number on its page, deduplicated, ranked.
-    const admitted = admitFacts(
-      proposed,
-      sources.map((source) => ({
-        index: source.index,
-        url: source.url,
-        domain: source.domain,
-        title: source.title,
-        publishedAt: source.publishedAt,
-        excerpt: source.excerpt,
-      })),
-    );
+    ];
+    const ms = Math.max(0, Math.round(now() - started));
+    const searches = budget.limit - budget.remaining();
     report({
-      stage: "READING",
-      sources: sources.length,
-      facts: admitted.admitted.length,
+      stage: "CROSS_CHECKING",
+      round: state.round,
+      sources: state.sources.length,
+      facts: facts.length,
     });
     logger?.info(
       {
         jobId: input.jobId,
         runId: input.runId,
-        questions: questions.length,
-        followUps: second.length,
-        sources: sources.length,
-        proposed: proposed.length,
-        admitted: admitted.admitted.length,
-        refused: admitted.refused.length,
-        searches: budget.limit - budget.remaining(),
+        resumed: resumed !== null,
+        rounds: state.round,
+        stop,
+        open: open.length,
+        couldNotRun: couldNotRun.length,
+        sources: state.sources.length,
+        facts: facts.length,
+        contradictory: facts.filter(
+          (fact) => fact.lifecycleStatus === "CONTRADICTORY",
+        ).length,
+        records: state.records?.length ?? 0,
+        searches,
         searchBudget: budget.limit,
         budgetLimited: budget.limited(),
+        modelCalls,
         spentUsd: Number(spend.spent().toFixed(4)),
-        ms: now() - started,
+        ms,
       },
       "deep research finished",
     );
     const dossier: ResearchDossier = {
       version: 1,
-      sources: sources.map((source) => ({
-        index: source.index,
-        url: source.url,
-        domain: source.domain,
-        title: source.title?.slice(0, 400) ?? null,
-        publishedAt: source.publishedAt,
-      })),
-      facts: admitted.admitted.map((fact: AdmittedFact) => ({
-        id: fact.id,
-        statement: fact.statement,
-        figure: fact.figure,
-        asOf: fact.asOf,
-        source: fact.source,
-        lane: fact.lane.slice(0, 40),
-        kind: fact.kind,
-        domain: fact.domain,
-        title: fact.title?.slice(0, 400) ?? null,
-        url: fact.url,
-        publishedAt: fact.publishedAt,
-      })),
-      lanes: lanes.slice(0, 24).map((lane) => ({
+      sources: state.sources.map((source) => {
+        const tier =
+          tierBySource.get(source.index) ??
+          (() => {
+            const own = sourceTier({
+              url: source.url,
+              domain: source.domain,
+              title: source.title,
+            });
+            return { tier: own.tier, tierKind: own.kind };
+          })();
+        return {
+          index: source.index,
+          url: source.url,
+          domain: source.domain,
+          title: source.title?.slice(0, 400) ?? null,
+          publishedAt: source.publishedAt,
+          tier: tier.tier,
+          tierKind: tier.tierKind,
+        };
+      }),
+      facts,
+      lanes: state.lanes.slice(0, 40).map((lane) => ({
         lane: lane.lane.slice(0, 40),
-        query: lane.query,
+        query: lane.query?.slice(0, 200) ?? null,
         status: lane.status,
         sources: lane.sources,
       })),
       ...(budget.limited() ? { budgetLimited: true } : {}),
+      investigation: {
+        rounds: state.round,
+        stop: stop ?? "NO_GAPS",
+        open: open.map((gap) => gapText(gap).slice(0, 300)).slice(0, 24),
+        couldNotRun: couldNotRun.slice(0, 24),
+        searches,
+        modelCalls,
+        ms,
+      },
+      ...(state.records === null || state.records.length === 0
+        ? {}
+        : { records: state.records }),
     };
     return {
       status: "OK",
-      query: lanes.find((lane) => lane.query !== null)?.query ?? "",
-      sources: sources.slice(0, 12).map((source) => ({
+      query: state.lanes.find((lane) => lane.query !== null)?.query ?? "",
+      sources: state.sources.slice(0, 12).map((source) => ({
         url: source.url,
         title: source.title,
         domain: source.domain,

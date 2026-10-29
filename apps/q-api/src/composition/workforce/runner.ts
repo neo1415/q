@@ -14,6 +14,7 @@ import type { WorkforceJobs } from "./jobs.js";
 import { mergeLive, type LiveReport } from "./live.js";
 import { isPlanJobPayload } from "./plan-job.js";
 import {
+  checkpointKey,
   liveStageOf,
   type AgentWorkQueue,
   type EndState,
@@ -227,6 +228,7 @@ export function createAgentWorkRunner(dependencies: {
       // Owner 2026-10-24: where the document work stands, kept on the row
       // (a resumed job carries on from what was shown). Writes are
       // chained so the latest lands last; a failed write is not the work's.
+      const checkpoints = new Map<string, unknown>();
       let shown = liveStageOf(row);
       let writing: Promise<void> = Promise.resolve();
       const progress: LiveReport = (patch) => {
@@ -283,6 +285,30 @@ export function createAgentWorkRunner(dependencies: {
             },
             record: (key, step, runId) =>
               queue.recordStep(row.job_id, workerId, key, step, runId),
+            // Investigation (2026-10-29): a step's checkpoint, read from
+            // the row as claimed and kept as it is saved.
+            ...(queue.recordCheckpoint === undefined
+              ? {}
+              : {
+                  checkpoint: {
+                    load: (key: string) =>
+                      Promise.resolve(
+                        checkpoints.get(key) ??
+                          row.results[checkpointKey(key)] ??
+                          null,
+                      ),
+                    save: async (key: string, value: unknown) => {
+                      if (lost) return;
+                      checkpoints.set(key, value);
+                      await queue.recordCheckpoint?.(
+                        row.job_id,
+                        workerId,
+                        key,
+                        value,
+                      );
+                    },
+                  },
+                }),
             ...(row.trace.planId === undefined ||
             dependencies.directions === undefined
               ? {}
