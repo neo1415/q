@@ -834,6 +834,8 @@ describe("Discover feed eligibility: only companies with a playable pitch (disco
     if (result.kind !== "PUBLISHED") throw new Error(result.kind);
     const items = store.rows.get(result.slate.id)?.items ?? [];
     expect(items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+    // Live e11: the build says how many it held out for want of a pitch.
+    expect(result.diagnostics.feedWithheldNoPlayablePitch).toBe(1);
   });
 
   it("fails closed: with no way to confirm a pitch, nobody enters the feed", async () => {

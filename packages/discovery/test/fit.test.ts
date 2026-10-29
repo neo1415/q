@@ -1188,6 +1188,70 @@ describe("fit inputs from the investor's own mandate and what the reader may see
     expect((await read([])).get(ID(1))?.declared.leadPolicy).toBeNull();
   });
 
+  it("a company with no persisted snapshot is read with features computed on read, never for a rank (live e11)", async () => {
+    const asked: string[][] = [];
+    const computedSnapshot = {
+      companyId: ID(1),
+      features: [
+        {
+          featureId: "declared_fit.stage",
+          status: "PRESENT",
+          value: "MATCH",
+          missingReason: null,
+        },
+        {
+          featureId: "declared_fit.geography",
+          status: "PRESENT",
+          value: "COUNTRY_MATCH",
+          missingReason: null,
+        },
+      ],
+    } as never;
+    const base = source(["lead"], false);
+    const withView = createFitInputSource({
+      sql: (() => Promise.resolve([])) as never,
+      eligibilityPorts: {
+        mandates: {
+          activeMandate: () => Promise.resolve({ kind: "NONE" as const }),
+        },
+        companies: { findMany: () => Promise.resolve([]) },
+      },
+      identities: (ids) =>
+        Promise.resolve(
+          new Map(ids.map((id) => [id, { name: id, shortDescription: null }])),
+        ),
+      viewFeatures: (input) => {
+        asked.push([...input.companyIds]);
+        return Promise.resolve(new Map([[ID(1), computedSnapshot]]));
+      },
+    });
+    const query = {
+      actor,
+      investorOrganisationId: ID(300),
+      mandateId: ID(200),
+      companyIds: [ID(1)],
+    };
+    const read = await withView.read(query);
+    expect(read.get(ID(1))?.snapshot).toBe(computedSnapshot);
+    expect(asked).toEqual([[ID(1)]]);
+    const observed = observeFit({
+      companyId: ID(1),
+      snapshot: read.get(ID(1))?.snapshot ?? null,
+      declared: {},
+      eligibilityReasons: [],
+      config: FIT_CONFIG_V4,
+      now: NOW,
+    });
+    expect(observed.observations.STAGE.outcome).toBe("STRONG");
+    expect(observed.observations.GEOGRAPHY.outcome).toBe("STRONG");
+    // A rank reads persisted snapshots only.
+    const ranked = await withView.read({ ...query, purpose: "RANK" });
+    expect(ranked.get(ID(1))?.snapshot).toBeNull();
+    expect(asked).toHaveLength(1);
+    // Without the port, as before: unknown.
+    expect((await base.read(query)).get(ID(1))?.snapshot).toBeNull();
+  });
+
   it("a raise the reader may not see stays unknown", async () => {
     const out = await source(["lead"], false).read({
       actor,

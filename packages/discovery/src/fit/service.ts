@@ -34,7 +34,6 @@ import {
 } from "../eligibility/contracts.js";
 import type { EligibilityService } from "../eligibility/service.js";
 import type { FitEvidenceLine } from "./stated.js";
-import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
 import {
@@ -44,7 +43,11 @@ import {
   type FitAssessment,
 } from "./model.js";
 import { compareFitOrder, fitOrderScore } from "./order.js";
-import { observeFit, type DeclaredFitFacts } from "./observe.js";
+import {
+  observeFit,
+  type DeclaredFitFacts,
+  type FitFeatureSource,
+} from "./observe.js";
 
 /**
  * Fit with your mandate, for one investor (B1-B3; ADR 0052).
@@ -72,7 +75,7 @@ export type FitCandidate = {
 };
 
 export type FitCompanyInputs = {
-  readonly snapshot: RecommendationFeatureSnapshot | null;
+  readonly snapshot: FitFeatureSource | null;
   readonly declared: DeclaredFitFacts;
   readonly name: string;
   /** "Seed · Clean energy · Nairobi", or null. */

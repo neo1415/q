@@ -23,6 +23,7 @@ import {
   type EligibilityService,
   type FilterMoney,
   type FitCandidate,
+  type FitInputSourceDependencies,
   type FitProfileItem,
   type FitService,
   type FitStatedEvidence,
@@ -112,6 +113,8 @@ export type FitCompositionDependencies = {
       ) => Promise<ReadonlyMap<string, CompanyDeckView | null>>)
     | undefined;
   readonly viewer: FitQViewer;
+  /** Declared-fit features on read for companies never ranked (live e11). */
+  readonly viewFeatures?: FitInputSourceDependencies["viewFeatures"];
   readonly logger?: Logger | undefined;
 };
 
@@ -252,6 +255,7 @@ export function createFitComposition(
 
   const inputs = createFitInputSource({
     fxRates,
+    viewFeatures: dependencies.viewFeatures,
     sql: dependencies.sql,
     eligibilityPorts: dependencies.eligibilityPorts,
     identities: async (companyIds, options) => {

@@ -92,10 +92,41 @@ export class CandidateNotRankableError extends Error {
   }
 }
 
+export type ComputeViewFeaturesQuery = {
+  readonly actor: ActorContext;
+  readonly mode: RecommendationMode;
+  readonly mandateId: string;
+  /** Companies the caller's own eligibility (purpose VIEW) already admitted. */
+  readonly companyIds: readonly string[];
+};
+
 export type FeatureService = {
   readonly computeForCandidates: (
     query: ComputeFeaturesQuery,
   ) => Promise<ComputeFeaturesResult>;
+  /**
+   * Live e11 (2026-10-29): a company the ranker never scored for this
+   * mandate (held out of the video feed for want of a pitch, or outside
+   * every built candidate window) has no persisted snapshot, so its
+   * profile read "0 of 6 criteria known" with stage and geography on
+   * record. The same pure computation over the same declared inputs, for
+   * reading only: the values, not a snapshot artifact. Never persisted,
+   * never a slate input, no candidate provenance (so no semantic
+   * similarity), and the feed gate is not claimed (`UNDETERMINED`).
+   * Discoverable companies only, as for the ranker.
+   */
+  readonly computeForView?: (
+    query: ComputeViewFeaturesQuery,
+  ) => Promise<ReadonlyMap<string, ViewFeatures>>;
+};
+
+/** Feature values computed on read (computeForView); not a stored snapshot. */
+export type ViewFeatures = Pick<RecommendationFeatureSnapshot, "features"> & {
+  readonly companyId: string;
+  readonly mandateId: string;
+  readonly mandateVersion: number;
+  readonly taxonomyVersion: Readonly<Record<string, number>> | null;
+  readonly computedAt: string;
 };
 
 export type FeatureServiceDependencies = {
@@ -412,6 +443,71 @@ export function createFeatureService(
         "recommendation features computed",
       );
       return { kind: "COMPUTED", snapshots, diagnostics };
+    },
+    computeForView: async (query) => {
+      const out = new Map<string, ViewFeatures>();
+      const ids = [...new Set(query.companyIds)].sort();
+      if (ids.length === 0) return out;
+      const definitions = registry.featuresFor(query.mode);
+      const subject = await ports.investorSubject.investorOrganisationFor(
+        query.actor,
+      );
+      if (subject === null) return out;
+      const investorOrganisationId = subject.investorOrganisationId;
+      const [lookup, taxonomyVersion] = await Promise.all([
+        ports.mandates.activeMandate({
+          tenantId: query.actor.tenantId,
+          investorOrganisationId,
+          mandateId: query.mandateId,
+        }),
+        ports.taxonomyVersions?.currentVersions() ?? Promise.resolve(null),
+      ]);
+      if (
+        lookup.kind !== "FOUND" ||
+        lookup.mandate.status !== "ACTIVE" ||
+        lookup.mandate.investorOrganisationId !== investorOrganisationId
+      ) {
+        return out;
+      }
+      const mandate = lookup.mandate;
+      const intent = deriveStructuredIntent(mandate);
+      const [projections, expanded] = await Promise.all([
+        companies.projectMany(ids),
+        hierarchy.expand(intent.taxonomyNodeIds),
+      ]);
+      const computedAt = clock().toISOString();
+      const provenance: CandidateProvenanceProjection = {
+        structured: null,
+        semantic: null,
+      };
+      for (const companyId of ids) {
+        const projection = projections.get(companyId);
+        if (projection === undefined) continue;
+        // No round here: the fit compares the cheque from its own
+        // disclosure-scoped read, never from a snapshot.
+        const computed = computeFeatureValues(definitions, {
+          mandate: { ...mandate, sourceClass: "DECLARED_MANDATE" },
+          company: projection.state,
+          roundTarget: null,
+          taxonomy: projection.taxonomy,
+          hierarchy: expanded,
+          candidate: provenance,
+          eligibility: {
+            sourceClass: "ELIGIBILITY_RESULT",
+            decision: "UNDETERMINED",
+            policyVersion: ELIGIBILITY_POLICY_VERSION,
+          },
+        });
+        out.set(companyId, {
+          companyId,
+          mandateId: mandate.mandateId,
+          mandateVersion: mandate.version,
+          taxonomyVersion,
+          computedAt,
+          features: [...computed.values],
+        });
+      }
+      return out;
     },
   };
 }

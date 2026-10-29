@@ -9,7 +9,7 @@ import type {
   MandateTaxonomyRule,
 } from "../eligibility/ports.js";
 import { DECLARED_TAXONOMY_SOURCES } from "../eligibility/policy.js";
-import type { DeclaredFitFacts } from "../fit/observe.js";
+import type { DeclaredFitFacts, FitFeatureSource } from "../fit/observe.js";
 import type { FitCompanyInputs, FitInputSource } from "../fit/service.js";
 import type { FitStatedEvidence } from "../fit/stated.js";
 import type { FxReferenceRates } from "../fx/ecb.js";
@@ -77,7 +77,27 @@ export type FitInputSourceDependencies = {
   readonly fxRates?:
     | (() => Promise<FxReferenceRates | readonly FxReferenceRates[] | null>)
     | undefined;
+  /**
+   * Live e11 (2026-10-29): the declared-fit features for companies the
+   * ranker never made a snapshot for (FeatureService.computeForView), so
+   * a profile reads the stage and place on record instead of "Unknown".
+   * Read-only, never persisted. Absent: such a company stays unknown.
+   */
+  readonly viewFeatures?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly mandateId: string;
+        readonly companyIds: readonly string[];
+      }) => Promise<ReadonlyMap<string, FitFeatureSource>>)
+    | undefined;
 };
+
+/**
+ * At most this many companies of one read are computed on read: a profile,
+ * a comparison or the companies a list shows, never a rank over the
+ * network (that one reads the persisted snapshots only).
+ */
+export const FIT_VIEW_FEATURES_MAX = 24;
 
 const MODE = "INVESTOR_DISCOVER";
 
@@ -92,7 +112,7 @@ export function createFitInputSource(
         facts,
         identities,
         raises,
-        snapshots,
+        persisted,
         models,
         stated,
         fx,
@@ -131,6 +151,24 @@ export function createFitInputSource(
           ? Promise.resolve(null)
           : dependencies.fxRates().catch(() => null),
       ]);
+      const unscored = ids.filter((id) => !persisted.has(id));
+      const snapshots: ReadonlyMap<string, FitFeatureSource> =
+        dependencies.viewFeatures === undefined ||
+        query.purpose === "RANK" ||
+        unscored.length === 0 ||
+        unscored.length > FIT_VIEW_FEATURES_MAX
+          ? persisted
+          : new Map([
+              ...(await dependencies
+                .viewFeatures({
+                  actor: query.actor,
+                  mandateId: query.mandateId,
+                  companyIds: unscored,
+                })
+                // A failed read is what it was before: unknown.
+                .catch(() => new Map<string, FitFeatureSource>())),
+              ...persisted,
+            ]);
       const fromMandate =
         mandate.kind === "FOUND" ? mandateFacts(mandate.mandate) : {};
       // The mandate's business-model taxonomy preferences (b2b_saas, …) are

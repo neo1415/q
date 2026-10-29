@@ -1714,3 +1714,55 @@ describe("declared_fit.cheque v2 (cheque-fit.v1)", () => {
     }
   });
 });
+
+describe("features on read for a company the ranker never scored (live e11)", () => {
+  // Live 2026-10-29: Medily Africa (seed, Kenya) was never in a slate (no
+  // pitch video), so no snapshot existed and its profile read "0 of 6
+  // criteria known" with stage and geography on record.
+  it("computes the declared fit from the same inputs, without persisting", async () => {
+    const h = harness();
+    const read = h.service.computeForView;
+    if (read === undefined) throw new Error("computeForView missing");
+    const out = await read({
+      actor: ACTOR,
+      mode: "INVESTOR_DISCOVER",
+      mandateId: ACTIVE_MANDATE,
+      companyIds: [companyId(1), companyId(2)],
+    });
+    expect([...out.keys()].sort()).toEqual([companyId(1), companyId(2)]);
+    const one = out.get(companyId(1));
+    expect(one?.mandateId).toBe(ACTIVE_MANDATE);
+    const stage = one?.features.find(
+      (f) => f.featureId === "declared_fit.stage",
+    );
+    expect(stage?.status).toBe("PRESENT");
+    // Nothing reaches the store; the feed gate is not claimed.
+    expect(h.memory.rows).toHaveLength(0);
+    expect(
+      one?.features.find((f) => f.featureId === "eligibility.hard_gate")?.value,
+    ).toBe(false);
+    // The same declared value the ranker computes for it.
+    const ranked = await computed(h, [candidate(1, null)]);
+    const rankedStage = ranked.snapshots[0]?.features.find(
+      (f) => f.featureId === "declared_fit.stage",
+    );
+    expect(stage?.value).toEqual(rankedStage?.value);
+  });
+
+  it("a company that is not discoverable gets nothing; a draft mandate gets nothing", async () => {
+    const w = world();
+    const first = w.companies[0];
+    if (first !== undefined) first.discoverable = false;
+    const read = harness(w).service.computeForView;
+    if (read === undefined) throw new Error("computeForView missing");
+    const ask = (mandateId: string, n: number) =>
+      read({
+        actor: ACTOR,
+        mode: "INVESTOR_DISCOVER",
+        mandateId,
+        companyIds: [companyId(n)],
+      });
+    expect((await ask(ACTIVE_MANDATE, 1)).size).toBe(0);
+    expect((await ask(DRAFT_MANDATE, 2)).size).toBe(0);
+  });
+});

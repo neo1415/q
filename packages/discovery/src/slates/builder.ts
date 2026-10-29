@@ -542,6 +542,7 @@ export function createSlateBuilder(
           rerankExplorationSlots: reordered.diagnostics.explorationSlots,
           candidateWindow: pool.diagnostics.structured.candidateWindow ?? 0,
           candidateWindows: pool.diagnostics.structured.candidateWindows ?? 1,
+          feedWithheldNoPlayablePitch: feed.withheld.length,
           buildDurationMs,
         };
         const publishedAt = clock();

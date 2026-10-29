@@ -2729,6 +2729,7 @@ const fitComposition = createFitComposition({
   sql: database.sql,
   eligibilityPorts: slateRead.eligibilityPorts,
   eligibility: slateRead.eligibility,
+  viewFeatures: slateRead.viewFeatures,
   companies,
   capital,
   disclosure,

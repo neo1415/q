@@ -167,10 +167,16 @@ export type DeclaredFitFacts = {
   readonly leadPolicy?: "ALWAYS" | "SOMETIMES" | "NEVER" | null | undefined;
 };
 
+/** What the fit reads of a feature snapshot: its values. */
+export type FitFeatureSource = Pick<RecommendationFeatureSnapshot, "features">;
+
 export type ObserveFitInput = {
   readonly companyId: string;
-  /** The CURRENT persisted snapshot for this pair, if the ranker made one. */
-  readonly snapshot: RecommendationFeatureSnapshot | null;
+  /**
+   * The CURRENT persisted snapshot for this pair, if the ranker made one;
+   * else the same values computed on read (live e11). Only `features` is read.
+   */
+  readonly snapshot: FitFeatureSource | null;
   readonly declared: DeclaredFitFacts;
   /** Eligibility's reason codes for this pair (purpose VIEW); hard rules come only from these. */
   readonly eligibilityReasons: readonly EligibilityReasonCode[];

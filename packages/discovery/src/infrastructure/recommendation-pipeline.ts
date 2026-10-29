@@ -13,6 +13,7 @@ import {
 } from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
 import type { DisclosureAccessService } from "@capital-q/permissions";
+import type { ActorContext } from "@capital-q/security";
 import {
   createPostgresTaxonomyAssignmentRepository,
   createPostgresTaxonomyReferenceRepository,
@@ -37,6 +38,7 @@ import type { FeatureSnapshotStore } from "../features/ports.js";
 import {
   createFeatureService,
   type FeatureService,
+  type ViewFeatures,
 } from "../features/service.js";
 import {
   createHybridCandidateService,
@@ -273,6 +275,16 @@ export type SlateReadPipeline = {
   readonly requester: RefreshRequester | undefined;
   readonly suppression: ProactiveSuppressionPort;
   readonly reader: SlateReadService;
+  /**
+   * The declared-fit features for companies with no persisted snapshot,
+   * computed on read and never persisted (FeatureService.computeForView;
+   * live e11), for the fit read's `viewFeatures`.
+   */
+  readonly viewFeatures: (input: {
+    readonly actor: ActorContext;
+    readonly mandateId: string;
+    readonly companyIds: readonly string[];
+  }) => Promise<ReadonlyMap<string, ViewFeatures>>;
 };
 
 /**
@@ -284,10 +296,27 @@ export function createSlateReadPipeline(
   dependencies: SlateReadPipelineDependencies,
 ): SlateReadPipeline {
   const { sql, disclosure, queue, policy, clock, logger } = dependencies;
-  const { eligibilityPorts, eligibility } = composeEligibility({
+  const { marketplace, assignments, taxonomy, eligibilityPorts, eligibility } =
+    composeEligibility({
+      sql,
+      disclosure,
+      materialChanges: dependencies.materialChanges,
+      clock,
+      logger,
+    });
+  const featurePorts = createDomainFeaturePorts({
     sql,
-    disclosure,
-    materialChanges: dependencies.materialChanges,
+    companies: marketplace,
+    assignments,
+    taxonomy,
+  });
+  const viewFeatureService = createFeatureService({
+    registry: createFeatureRegistry(),
+    ports: eligibilityPorts,
+    companies: featurePorts.companies,
+    hierarchy: featurePorts.hierarchy,
+    // Never written: computeForView does not persist.
+    store: createPostgresFeatureSnapshotStore({ sql }),
     clock,
     logger,
   });
@@ -345,6 +374,11 @@ export function createSlateReadPipeline(
     requester,
     suppression,
     reader,
+    viewFeatures: async (input) =>
+      (await viewFeatureService.computeForView?.({
+        ...input,
+        mode: "INVESTOR_DISCOVER",
+      })) ?? new Map(),
   };
 }
 

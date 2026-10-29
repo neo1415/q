@@ -130,6 +130,13 @@ export const SlateDiagnosticsSchema = z
      */
     candidateWindow: z.number().int().min(0).optional(),
     candidateWindows: z.number().int().min(1).optional(),
+    /**
+     * Live e11 (2026-10-29): eleven fitting companies were never in a
+     * slate and nothing said why. REC-001 admitted them; the feed's own
+     * playable-pitch gate (discover-feed-eligibility.v1) held them out
+     * because they have no pitch video. The count makes that visible.
+     */
+    feedWithheldNoPlayablePitch: z.number().int().min(0).optional(),
     buildDurationMs: z.number().int().min(0),
   })
   .strict();
