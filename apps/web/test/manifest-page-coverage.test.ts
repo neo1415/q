@@ -56,6 +56,9 @@ const EXEMPT: Readonly<Record<string, string>> = {
   "auth/sign-in/page.tsx": AUTH,
   "auth/sign-up/page.tsx": AUTH,
   "auth/update-password/page.tsx": AUTH,
+  "auth/two-step/page.tsx": AUTH,
+  "settings/security/page.tsx":
+    "two-step sign-in: Q is never told what it shows, so the secret and codes stay out of Q",
   "connected/google/page.tsx": CALLBACK,
   "settings/reconnect/google/page.tsx": CALLBACK,
   "settings/billing/page.tsx":

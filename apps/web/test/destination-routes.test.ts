@@ -78,6 +78,8 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
  */
 const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/admin": "platform operators only",
+  "/settings/security":
+    "two-step sign-in: Q never opens it, so a secret or code never passes through Q",
   // Owner 2026-10-23: a Work tab (tab.work-board); Q reads and changes it
   // with my_board. Its own destination waits for the reader's next version,
   // which carries the destination list.
