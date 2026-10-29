@@ -158,6 +158,26 @@ const RETRIED_PLAN_FAILURES: ReadonlySet<string> = new Set([
   "PROVIDER_OUTAGE",
   "TIMEOUT",
 ]);
+/**
+ * Live 2026-10-29 (case D, the IC-memo run): a truncated plan, a 45 s
+ * timeout and a retry took round one's whole share of the deadline, so no
+ * search ran and the person got no dossier at all. The plan is asked again
+ * only early enough to leave the search its time, and round one always
+ * keeps a window to search in, inside the job's deadline.
+ */
+const PLAN_RETRY_BEFORE = 0.2;
+export const ROUND_ONE_MIN_SEARCH_MS = 25_000;
+/** When round one's searches must end: its share, or its least window. */
+export function roundOneDeadline(
+  started: number,
+  deadlineMs: number,
+  at: number,
+): number {
+  return Math.min(
+    started + deadlineMs * 0.8,
+    Math.max(started + deadlineMs * 0.45, at + ROUND_ONE_MIN_SEARCH_MS),
+  );
+}
 const BRIEF_CEILING_USD = 0.05;
 const FACTS_CEILING_USD = 0.05;
 const RECORDS_MAX = 12;
@@ -1254,7 +1274,7 @@ export function workforceDeepResearch(dependencies: {
         !transient ||
         modelCalls >= MODEL_CALLS_MAX ||
         !spend.canAfford(PLAN_CEILING_USD) ||
-        now() >= started + deadlineMs * 0.45
+        now() >= started + deadlineMs * PLAN_RETRY_BEFORE
       )
         return { ...first, retried: false, transient };
       logger?.warn(
@@ -1485,7 +1505,10 @@ export function workforceDeepResearch(dependencies: {
           ],
           earlierUserText: context.earlier,
           known: state.sources,
-          deadlineAt: started + deadlineMs * (state.round === 1 ? 0.45 : 0.75),
+          deadlineAt:
+            state.round === 1
+              ? roundOneDeadline(started, deadlineMs, now())
+              : started + deadlineMs * 0.75,
           pagesPerQuestion: state.round === 1 ? PAGES_PER_LANE : 3,
           searchBudget: budget,
         });
@@ -1675,15 +1698,21 @@ export function workforceDeepResearch(dependencies: {
     }
 
     if (state.sources.length === 0) {
+      // Nothing was searched (no provider answered, or no line ran before
+      // the deadline) is not "found nothing": it is said as unchecked.
       const unavailable = state.lanes.every(
         (lane) =>
-          lane.status === "PROVIDER_UNAVAILABLE" || lane.status === "FAILED",
+          lane.status === "PROVIDER_UNAVAILABLE" ||
+          lane.status === "FAILED" ||
+          lane.status === "SKIPPED_DEADLINE",
       );
+      const said = unavailable
+        ? "Public sources couldn't be checked just now."
+        : "The searches found no public sources for this.";
       return {
         status: "UNAVAILABLE",
-        message: unavailable
-          ? "Public sources couldn't be checked just now."
-          : "The searches found no public sources for this.",
+        message:
+          state.reduced === undefined ? said : `${state.reduced} ${said}`,
         reason: unavailable ? "PUBLIC_UNAVAILABLE" : "NO_SOURCES",
       };
     }
