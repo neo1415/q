@@ -139,6 +139,12 @@ export const OWN_ACCOUNT_TOOLS: ReadonlySet<string> = new Set([
   "list_messages",
   "list_schedule",
   "find_meeting_times",
+  // Stress 2026-10-28 (J7-I vs J7-F): the investor's meeting prep waited on
+  // a card while the founder's started at once, because only the
+  // investor's plan drafted diligence questions. Drafting them sends
+  // nothing: each question is filed as its own approval card, and only
+  // that card's yes sends it. Meeting prep is their own work on both sides.
+  "diligence.questions.prepare",
 ]);
 
 /** Whether a plan is the person's own deep work (see OWN_ACCOUNT_TOOLS). */

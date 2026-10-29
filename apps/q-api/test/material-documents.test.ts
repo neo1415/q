@@ -128,3 +128,76 @@ describe("documentPages (Q room W3)", () => {
     expect([...asked, ...none.asked]).toEqual([]);
   });
 });
+
+// Stress 2026-10-28 (F03, S02-F): a highly confidential document listed in
+// the room (the founder's management accounts) is held back: no opening,
+// no text, no pages, whoever may open it on screen.
+describe("a highly confidential document is never read for Q", () => {
+  const ACCOUNTS = "00000000-0000-4000-8000-00000000c009";
+  const owner: DataRoomView = {
+    viewer: "OWNER",
+    companyId: COMPANY,
+    stageCode: "seed",
+    countryCode: "NG",
+    folders: [{ code: "finance", label: "Finance" }],
+    documents: [
+      {
+        documentId: ACCOUNTS,
+        title: "LedgerBridge financial report Sept 2026",
+        folderCode: "finance",
+        checklistItemCode: null,
+        level: "PRIVATE",
+        visibilityScope: "organisation_private",
+        kind: "PDF",
+        pageCount: 2,
+        updatedAt: "2026-10-28T00:00:00.000Z",
+        validUntil: null,
+        sharedWith: 0,
+        openedBy: 0,
+        version: 1,
+      },
+    ],
+    checklist: [],
+    requests: [],
+  };
+  function held() {
+    const asked: unknown[][] = [];
+    const fake = (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      asked.push(values);
+      return Promise.resolve([
+        {
+          id: ACCOUNTS,
+          document_type: "MANAGEMENT_ACCOUNTS",
+          sensitivity_class: "HIGHLY_CONFIDENTIAL",
+          text: "Recognised MRR $51,000",
+          page_number: 1,
+          page_count: 2,
+        },
+      ]);
+    };
+    return createMaterialDocumentReads({
+      sql: fake as unknown as DatabaseExecutor,
+      view: () => Promise.resolve(owner),
+    });
+  }
+
+  it("lists it as held back with no opening", async () => {
+    const documents = await held().documents(actor, COMPANY);
+    expect(documents).toEqual([
+      expect.objectContaining({
+        documentId: ACCOUNTS,
+        access: "OWNER",
+        opening: null,
+        heldBack: true,
+      }),
+    ]);
+  });
+
+  it("reads neither its text nor its pages", async () => {
+    const port = held();
+    expect(await port.documentText(actor, COMPANY, ACCOUNTS)).toBeNull();
+    expect(
+      await port.documentPages(actor, COMPANY, ACCOUNTS, { from: 1, to: 2 }),
+    ).toBeNull();
+  });
+});

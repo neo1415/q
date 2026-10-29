@@ -92,3 +92,140 @@ describe("whether a named company qualifies", () => {
     expect(line).toMatch(/can't be confirmed/u);
   });
 });
+
+// Stress 2026-10-28 (J3): not in Discover, so no ranked fit; the line is
+// their declared mandate against its record, by code, with what is unknown.
+describe("a named company with no ranked fit, against the declared mandate", () => {
+  const MANDATE = {
+    mandates: [
+      {
+        status: "ACTIVE",
+        stage: { minStageCode: "seed", maxStageCode: "seed" },
+        taxonomyPreferences: [
+          {
+            vocabularyCode: "geography",
+            canonicalCode: "nigeria",
+            isExclusion: false,
+          },
+          {
+            vocabularyCode: "geography",
+            canonicalCode: "kenya",
+            isExclusion: false,
+          },
+          {
+            vocabularyCode: "industry",
+            canonicalCode: "fintech",
+            isExclusion: false,
+          },
+          {
+            vocabularyCode: "industry",
+            canonicalCode: "payments",
+            isExclusion: false,
+          },
+          {
+            vocabularyCode: "industry",
+            canonicalCode: "digital_lending",
+            isExclusion: true,
+          },
+        ],
+      },
+    ],
+  };
+  const COMPANY_RECORD = {
+    companyId: LEDGERBRIDGE,
+    canonicalName: "LedgerBridge",
+    currentStageCode: "seed",
+    headquartersCountry: "NG",
+  };
+  function toolsFor(company: unknown) {
+    const calls: string[] = [];
+    return {
+      calls,
+      tools: {
+        execute: (proposal: QToolProposal): Promise<QToolCallOutcome> => {
+          calls.push(proposal.name);
+          const data =
+            proposal.name === "search_companies"
+              ? {
+                  items: [
+                    { companyId: LEDGERBRIDGE, canonicalName: "LedgerBridge" },
+                  ],
+                }
+              : proposal.name === "get_company"
+                ? company
+                : {
+                    status: "NOT_FOUND",
+                    name: null,
+                    profile: null,
+                    text: "",
+                    guidance: "",
+                  };
+          return Promise.resolve({
+            callId: proposal.callId,
+            toolName: proposal.name,
+            status: "SUCCEEDED",
+            result: { ok: true, data },
+          } as unknown as QToolCallOutcome);
+        },
+      },
+    };
+  }
+  const withCompany = new Set([
+    "search_companies",
+    "fit_profile",
+    "get_company",
+  ]);
+
+  it("checks stage and geography, and says sector is not known", async () => {
+    const { tools, calls } = toolsFor(COMPANY_RECORD);
+    const line =
+      (await namedCompanyFitLine({
+        name: "LedgerBridge",
+        tools,
+        context,
+        available: withCompany,
+        mandate: MANDATE,
+      })) ?? "";
+    expect(calls).toContain("get_company");
+    expect(line).toMatch(/not in your ranked recommendations yet/u);
+    expect(line).toMatch(
+      /it meets stage \(seed\) and geography \(based in Nigeria\)/u,
+    );
+    expect(line).toMatch(
+      /Not known: its sector against yours \(fintech, payments; your exclusion: digital lending\)/u,
+    );
+    expect(line).toMatch(/Unknown is not a mismatch/u);
+    expect(line).not.toMatch(/\/10/u);
+  });
+
+  it("says what misses, never a score", async () => {
+    const { tools } = toolsFor({
+      ...COMPANY_RECORD,
+      currentStageCode: "series_a",
+      headquartersCountry: "ZA",
+    });
+    const line =
+      (await namedCompanyFitLine({
+        name: "LedgerBridge",
+        tools,
+        context,
+        available: withCompany,
+        mandate: MANDATE,
+      })) ?? "";
+    expect(line).toMatch(
+      /It misses on stage \(series a; your mandate is seed\) and geography \(based in South Africa\)/u,
+    );
+  });
+
+  it("keeps the plain line without their mandate", async () => {
+    const { tools } = toolsFor(COMPANY_RECORD);
+    const line =
+      (await namedCompanyFitLine({
+        name: "LedgerBridge",
+        tools,
+        context,
+        available: withCompany,
+      })) ?? "";
+    expect(line).toMatch(/LedgerBridge is not in this ranking/u);
+  });
+});

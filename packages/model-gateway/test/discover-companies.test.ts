@@ -725,3 +725,14 @@ describe("raising now (F-10): only the companies stating a current raise, labell
     );
   });
 });
+
+// Stress 2026-10-28 (I03): "five companies that match my mandate" opened
+// with the platform's total ("464 companies on Capital Q"). With nothing
+// to narrow by, the head is the ranking alone.
+describe("a mandate match with no kind named", () => {
+  it("says the ranking, never the platform's total", async () => {
+    const { answer } = await discover(ask({ sectors: [] }));
+    expect(answer.text).toMatch(/^Ranked by fit with your mandate, the top /u);
+    expect(answer.text).not.toMatch(/on Capital Q/u);
+  });
+});

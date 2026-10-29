@@ -123,6 +123,12 @@ export type MaterialDocument = {
   readonly updatedAt: string;
   /** The first words of its extracted text, only where it may be opened. */
   readonly opening: string | null;
+  /**
+   * Stress 2026-10-28: classified highly confidential (management
+   * accounts, a financial model): Q never reads it and no model receives
+   * it, whoever may open it on screen. Absent: not held back.
+   */
+  readonly heldBack?: boolean | undefined;
 };
 
 const CompanyInputSchema = z

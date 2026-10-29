@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReferenceCandidates } from "@capital-q/app-actions";
 
-import { unmatchedWords } from "../src/index.js";
+import { closestDocument, unmatchedWords } from "../src/index.js";
 import { actorA } from "./support.js";
 
 /**
@@ -64,5 +64,49 @@ describe("what an action could not match, said together", () => {
       { consequential: false, aboutDocuments: true },
     );
     expect(words).toBe('Nothing on record is called "board minutes".');
+  });
+});
+
+// Stress 2026-10-28 (S05, second run): Aster CONNECTED. A share is a
+// per-document grant: the one clearly closest document goes on the card,
+// named exactly; nothing is shared until that card is approved.
+describe("the closest document for a share card", () => {
+  const candidates: ReferenceCandidates = (kind) =>
+    Promise.resolve(
+      kind === "UPLOAD"
+        ? [
+            {
+              id: "715b9d70-d70e-417e-8677-7b971a147eb4",
+              name: "LedgerBridge financial report Sept 2026",
+            },
+            {
+              id: "4cfdc5e3-cd9b-4926-9558-b1ca6c714375",
+              name: "LedgerBridge seed deck",
+            },
+          ]
+        : [],
+    );
+
+  it("finds the one clearly closest", async () => {
+    expect(
+      await closestDocument(
+        candidates,
+        "UPLOAD",
+        actorA,
+        "confidential financial model",
+      ),
+    ).toEqual({
+      id: "715b9d70-d70e-417e-8677-7b971a147eb4",
+      name: "LedgerBridge financial report Sept 2026",
+    });
+  });
+
+  it("none when nothing is close, or for a kind that is not a document", async () => {
+    expect(
+      await closestDocument(candidates, "UPLOAD", actorA, "insurance policy"),
+    ).toBeNull();
+    expect(
+      await closestDocument(candidates, "RELATIONSHIP", actorA, "Aster"),
+    ).toBeNull();
   });
 });

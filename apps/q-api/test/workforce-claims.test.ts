@@ -6,7 +6,10 @@ import {
   measureOf,
   type CompanyClaim,
 } from "../src/composition/workforce/claims.js";
-import { readDataRoom } from "../src/composition/workforce/diligence-memo.js";
+import {
+  heldBackGap,
+  readDataRoom,
+} from "../src/composition/workforce/diligence-memo.js";
 import { ActorContextSchema } from "@capital-q/security";
 
 /** Diligence audit 2026-10-28: claims vs evidence, by code. */
@@ -165,6 +168,63 @@ describe("readDataRoom", () => {
       actor,
       "company",
     );
-    expect(room).toEqual({ passages: [], notOpen: 0, available: false });
+    expect(room).toEqual({
+      passages: [],
+      notOpen: 0,
+      available: false,
+      heldBack: [],
+    });
+  });
+
+  // Stress 2026-10-28 (F03): the founder's own room: the deck is read, the
+  // highly confidential management accounts are named as held back and
+  // never read, whoever may open them.
+  it("never reads a held-back document, and names it", async () => {
+    const read: string[] = [];
+    const room = await readDataRoom(
+      {
+        documents: () =>
+          Promise.resolve([
+            {
+              documentId: "deck",
+              title: "LedgerBridge seed deck",
+              folder: "F",
+              documentType: "PITCH_DECK",
+              access: "OWNER" as const,
+              pageCount: 2,
+              updatedAt: "2026-10-01T00:00:00.000Z",
+              opening: null,
+            },
+            {
+              documentId: "accounts",
+              title: "LedgerBridge financial report Sept 2026",
+              folder: "F",
+              documentType: "MANAGEMENT_ACCOUNTS",
+              access: "OWNER" as const,
+              pageCount: 2,
+              updatedAt: "2026-10-01T00:00:00.000Z",
+              opening: null,
+              heldBack: true,
+            },
+          ]),
+        documentText: (_a, _c, id) => {
+          read.push(id);
+          return Promise.resolve({
+            text: "Monthly recurring revenue: $65,000 (September 2026).",
+            truncated: false,
+          });
+        },
+      },
+      actor,
+      "company",
+    );
+    expect(read).toEqual(["deck"]);
+    expect(room.heldBack).toEqual(["LedgerBridge financial report Sept 2026"]);
+    expect(room.passages.map((one) => one.title)).toEqual([
+      "LedgerBridge seed deck",
+    ]);
+    expect(
+      heldBackGap("LedgerBridge financial report Sept 2026", true),
+    ).toMatch(/held back from Q.*become usable once you confirm them/su);
   });
 });
