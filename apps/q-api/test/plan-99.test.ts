@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { situationFacts, type QPlanStep } from "@capital-q/contracts";
+import {
+  Q_PLAN_OPEN_POINTS_MAX,
+  situationFacts,
+  type QPlanStep,
+} from "@capital-q/contracts";
 import type { PlanReviewResult } from "@capital-q/q-core";
 
 import {
@@ -458,13 +462,19 @@ describe("4. the points the person reads (job 37655270)", () => {
     expect(merged).toHaveLength(12);
   });
 
-  it("nothing is dropped silently: past 12, the last place says how many more", () => {
-    const many = [...new Set(said), "One more.", "And another."];
+  it("nothing is dropped silently: past the cap, the last place says how many more", () => {
+    // The cap is Q_PLAN_OPEN_POINTS_MAX (20 since job ea7508c9).
+    const many = [
+      ...new Set(said),
+      ...Array.from({ length: 10 }, (_, n) => `One more, ${String(n)}.`),
+    ];
     const capped = cappedPoints(many);
-    expect(capped).toHaveLength(12);
-    expect(capped[11]).toBe(
-      `And ${String(many.length - 11)} more points the reviews raised.`,
+    expect(many.length).toBeGreaterThan(Q_PLAN_OPEN_POINTS_MAX);
+    expect(capped).toHaveLength(Q_PLAN_OPEN_POINTS_MAX);
+    expect(capped[Q_PLAN_OPEN_POINTS_MAX - 1]).toBe(
+      `And ${String(many.length - (Q_PLAN_OPEN_POINTS_MAX - 1))} more points the reviews raised.`,
     );
+    expect(cappedPoints(many, 12)).toHaveLength(12);
     expect(cappedPoints(["a", "b"])).toEqual(["a", "b"]);
   });
 

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   Q_PLAN_MAX_REDRAFTS,
   Q_PLAN_RUBRIC_VERSION,
+  Q_PLAN_OPEN_POINTS_MAX,
   Q_PLAN_REVIEW_THRESHOLD,
   Q_PLAN_STEPS_MAX,
   Q_SITUATION_FACTS_MAX,
@@ -32,6 +33,7 @@ import {
   PLAN_RUBRIC_V1,
   PLAN_REVIEW_FOCI,
   PROMPT_EMPTY_CASES,
+  createDefaultPromptRegistry,
   planReviewVerdict,
   type PlanReviewResult,
   type PlanStepAction,
@@ -448,6 +450,31 @@ const SOURCE_WORDS: Readonly<Record<QSituationSource, string>> = {
   FEED_DECISIONS: "SAVED AND PASSED",
 };
 
+/** THE SITUATION's sections as the person knows them (their own words). */
+const PERSON_SOURCE_WORDS: Readonly<Record<QSituationSource, string>> = {
+  ACTIVITY: "what you did recently",
+  RELATIONSHIPS: "your relationships",
+  MESSAGES: "your messages",
+  SCHEDULE: "your schedule",
+  BOARD: "your board",
+  Q_WORK: "Q's work and your approvals",
+  MEMORY: "what Q remembers",
+  Q_DAILY: "the Q Daily",
+  PUBLIC: "the public sources",
+  INTEREST: "the interest from investors",
+  PROSPECTS: "your prospects",
+  PROFILE: "your profile as investors see it",
+  DECK: "your deck",
+  DATA_ROOM: "your data room",
+  PITCH_VIDEO: "your pitch video",
+  READINESS: "your readiness",
+  CLAIMS: "your claims and evidence",
+  CAPITAL: "your capital figures",
+  MANDATE: "your mandate",
+  GATEQ: "your GateQ inbox",
+  FEED_DECISIONS: "what you saved and passed",
+};
+
 /** The dossier as text: sections of facts with refs and truth class. */
 export function situationText(dossier: QSituationDossier): string {
   const lines: string[] = [];
@@ -750,15 +777,34 @@ export function codeChecks(
   dossier: QSituationDossier,
   grounding: Pick<GroundedPlan, "droppedCites" | "droppedSteps">,
 ): readonly string[] {
+  return codeCheckLines(plan, dossier, grounding).map((line) => line.writer);
+}
+
+/**
+ * Code's checks in both voices: `writer` names THE SITUATION's sections as
+ * the writer's prompt reads them; `person` names them as the person knows
+ * them. Live 2026-10-30 (job ea7508c9): the card said "Nothing in the plan
+ * uses SCHEDULE", the prompt's own section name.
+ */
+export function codeCheckLines(
+  plan: Pick<GroundedPlan, "steps" | "situationRefs" | "openQuestions">,
+  dossier: QSituationDossier,
+  grounding: Pick<GroundedPlan, "droppedCites" | "droppedSteps">,
+): readonly { readonly writer: string; readonly person: string }[] {
   const used = new Set(plan.situationRefs);
-  const fixes: string[] = [];
+  const fixes: { writer: string; person: string }[] = [];
+  const same = (text: string) => ({ writer: text, person: text });
   if (grounding.droppedSteps > 0) {
     fixes.push(
-      `${String(grounding.droppedSteps)} step(s) cited no fact of the situation and were dropped: ground every step in a cited ref.`,
+      same(
+        `${String(grounding.droppedSteps)} step(s) cited no fact of the situation and were dropped: ground every step in a cited ref.`,
+      ),
     );
   } else if (grounding.droppedCites > 0) {
     fixes.push(
-      "Some cites named refs the situation does not hold: cite only refs listed in THE SITUATION.",
+      same(
+        "Some cites named refs the situation does not hold: cite only refs listed in THE SITUATION.",
+      ),
     );
   }
   // A step that waits for another is due after it (code, not a reviewer).
@@ -769,7 +815,9 @@ export function codeChecks(
       const before = due.get(wait.stepKey) ?? null;
       if (step.due !== null && before !== null && step.due < before) {
         fixes.push(
-          `[${step.key}] It needs ${wait.stepKey} done first but is due before it (${step.due} < ${before}): move its date after ${before}.`,
+          same(
+            `[${step.key}] It needs ${wait.stepKey} done first but is due before it (${step.due} < ${before}): move its date after ${before}.`,
+          ),
         );
       }
     }
@@ -782,7 +830,9 @@ export function codeChecks(
       !step.needsApproval
     ) {
       fixes.push(
-        `[${step.key}] It shares a document without the person's own approval of that share: make it a step they approve.`,
+        same(
+          `[${step.key}] It shares a document without the person's own approval of that share: make it a step they approve.`,
+        ),
       );
     }
   }
@@ -792,14 +842,14 @@ export function codeChecks(
     // Their own recent acts are context, not a gap the plan must close.
     if (section.source === "ACTIVITY") continue;
     if (section.facts.some((fact) => used.has(fact.ref))) continue;
-    fixes.push(
-      `Nothing in the plan uses ${SOURCE_WORDS[section.source]} (${section.facts
-        .slice(0, 3)
-        .map((fact) => fact.ref)
-        .join(
-          ", ",
-        )}): use it, or say in an open question why it does not matter.`,
-    );
+    const refs = section.facts
+      .slice(0, 3)
+      .map((fact) => fact.ref)
+      .join(", ");
+    fixes.push({
+      writer: `Nothing in the plan uses ${SOURCE_WORDS[section.source]} (${refs}): use it, or say in an open question why it does not matter.`,
+      person: `No step uses ${PERSON_SOURCE_WORDS[section.source]} (${refs}): a step should use it, or the plan should say why it does not matter.`,
+    });
   }
   return fixes.slice(0, 8);
 }
@@ -973,6 +1023,67 @@ export const INVENTED_UNNAMED: Pick<ReviewPoint, "problem" | "fix"> = {
   fix: "Check every name, figure, date and status against the situation, and say a pending approval or open task as pending, never as done.",
 };
 
+/**
+ * Why a reviewer's integrity verdict is fatal, as the job log keeps it:
+ * which item (firewall or invented facts), on which steps and refs, and
+ * whether the exposed words were named -- structure only, never the
+ * problem's words or the exposed words, which may carry private material.
+ * Live 2026-10-30 (job ea7508c9): R2 round 1 was flagged and nothing said
+ * why.
+ */
+export function integrityReason(result: PlanReviewResult): readonly {
+  readonly item: "firewall" | "noInventedFacts";
+  readonly score?: number;
+  readonly defects: readonly {
+    readonly stepKey: string | null;
+    readonly refs: readonly string[];
+    readonly exposedNamed?: boolean;
+  }[];
+}[] {
+  const verdict = planReviewVerdict(result);
+  if (!verdict.fatal) return [];
+  const refsOf = (defect: object): readonly string[] =>
+    "refs" in defect && Array.isArray(defect.refs)
+      ? defect.refs.filter((ref): ref is string => typeof ref === "string")
+      : [];
+  const out: {
+    item: "firewall" | "noInventedFacts";
+    score?: number;
+    defects: {
+      stepKey: string | null;
+      refs: readonly string[];
+      exposedNamed?: boolean;
+    }[];
+  }[] = [];
+  if (result.firewall.defects.length > 0) {
+    out.push({
+      item: "firewall",
+      defects: result.firewall.defects.map((defect) => ({
+        stepKey: defect.stepKey,
+        refs: refsOf(defect),
+        exposedNamed:
+          "exposed" in defect &&
+          typeof defect.exposed === "string" &&
+          defect.exposed.length > 0,
+      })),
+    });
+  }
+  if (
+    result.noInventedFacts.score < PLAN_RUBRIC_V1.noInventedFacts &&
+    result.noInventedFacts.defects.length > 0
+  ) {
+    out.push({
+      item: "noInventedFacts",
+      score: result.noInventedFacts.score,
+      defects: result.noInventedFacts.defects.map((defect) => ({
+        stepKey: defect.stepKey,
+        refs: refsOf(defect),
+      })),
+    });
+  }
+  return out;
+}
+
 /** A reviewer's defects, whole and in order: integrity first. */
 export function reviewPoints(
   result: PlanReviewResult,
@@ -1093,6 +1204,23 @@ export function redraftLine(
   return `${point.stepKey === null ? "" : `[${point.stepKey}] `}${why}${point.fix}${also}`;
 }
 
+/**
+ * A merged point as the person's open points hold it: one line per
+ * distinct fix, the step's first, then the other reviewer's (identical
+ * asks were already folded by mergedPoints). Live 2026-10-30 (job
+ * ea7508c9): R2's two step-12 fixes and its "weeks 7-8" ask were merged
+ * into R1's and only R1's words reached the card.
+ */
+export function eachFix(
+  point: Pick<ReviewPoint, "stepKey" | "problem" | "fix"> & {
+    readonly alsoFixes: readonly string[];
+  },
+): readonly string[] {
+  return [point.fix, ...point.alsoFixes].map((fix) =>
+    pointText({ ...point, fix, alsoFixes: [] }),
+  );
+}
+
 /** "[s2] problem Fix: fix" -- whole, never cut (the redraft reads it). */
 export function pointText(
   point: Pick<ReviewPoint, "stepKey" | "problem" | "fix"> & {
@@ -1162,7 +1290,23 @@ export function redraftFixes(
 
 // --- the job -----------------------------------------------------------------------
 
-export const PLAN_PROMPT_VERSION = "PLAN_WRITE@4+PLAN_REVIEW@4";
+/**
+ * The writer's and the reviewers' prompt versions, as the registry the
+ * calls render from has them active (the stored label read
+ * "PLAN_WRITE@4+PLAN_REVIEW@4" while PLAN_REVIEW v5 ran, live 2026-10-30).
+ */
+export const PLAN_PROMPT_VERSION = planPromptVersion();
+
+export function planPromptVersion(
+  registry: Pick<
+    ReturnType<typeof createDefaultPromptRegistry>,
+    "getActive"
+  > = createDefaultPromptRegistry(),
+): string {
+  return (["PLAN_WRITE", "PLAN_REVIEW"] as const)
+    .map((id) => `${id}@${String(registry.getActive(id).definition.version)}`)
+    .join("+");
+}
 /**
  * Addendum 4 allowed one redraft under a six-call budget. Plan job
  * 37655270 (2026-10-30) went 81/73 -> 92/92 in that one redraft (+11, +19)
@@ -1194,6 +1338,26 @@ export const PLAN_SECOND_REDRAFT_MAX_UNSTEPPED = 2;
  * enough to fix in one go, and this job's own measured redraft and review
  * times still fit the time budget. Otherwise it stops, as a draft.
  */
+/**
+ * How many merged points a round left, and how many of them name no step
+ * (an unnamed integrity flag not counted): logged with each decision.
+ */
+export function redraftShape(points: readonly ReviewPoint[]): {
+  readonly merged: number;
+  readonly unstepped: number;
+} {
+  const merged = mergedPoints(points);
+  return {
+    merged: merged.length,
+    unstepped: merged.filter(
+      (point) =>
+        point.stepKey === null &&
+        point.problem !== FIREWALL_UNNAMED.problem &&
+        point.problem !== INVENTED_UNNAMED.problem,
+    ).length,
+  };
+}
+
 export function anotherRedraft(input: {
   readonly redrafts: number;
   readonly scores: readonly number[];
@@ -1212,16 +1376,10 @@ export function anotherRedraft(input: {
   ) {
     return { go: false, reason: "not within reach" };
   }
-  const merged = mergedPoints(input.points);
-  const unstepped = merged.filter(
-    (point) =>
-      point.stepKey === null &&
-      point.problem !== FIREWALL_UNNAMED.problem &&
-      point.problem !== INVENTED_UNNAMED.problem,
-  ).length;
-  if (merged.length === 0) return { go: false, reason: "no points to fix" };
+  const { merged, unstepped } = redraftShape(input.points);
+  if (merged === 0) return { go: false, reason: "no points to fix" };
   if (
-    merged.length > PLAN_SECOND_REDRAFT_MAX_POINTS ||
+    merged > PLAN_SECOND_REDRAFT_MAX_POINTS ||
     unstepped > PLAN_SECOND_REDRAFT_MAX_UNSTEPPED
   ) {
     return { go: false, reason: "points not specific or too many" };
@@ -1631,6 +1789,9 @@ export async function runPlanJob(
         reviewPlan(who, trace, {
           side,
           focus,
+          // Live 2026-10-30 (job ea7508c9): with no date, a reviewer called
+          // dates from 31 Oct "already past" on 30 Oct.
+          today: base.today,
           ask: payload.ask,
           situation,
           publicFindings,
@@ -1649,6 +1810,17 @@ export async function runPlanJob(
       const reviewer = index === 0 ? "R1" : "R2";
       const mapped = reviewOf(result, reviewer, round, PLAN_PROMPT_VERSION);
       reviews.push(mapped);
+      if (mapped.integrityFailed) {
+        dependencies.logger?.warn(
+          {
+            jobId: input.jobId,
+            round,
+            reviewer,
+            integrity: integrityReason(result),
+          },
+          "plan review: integrity flagged",
+        );
+      }
       const unnamed = planReviewVerdict(result).unnamed;
       if (unnamed.length > 0) {
         // Live 2026-10-30 (job 37655270, round 2): firewall failed, 15/15
@@ -1694,8 +1866,19 @@ export async function runPlanJob(
       lastReviewMs: reviewMs,
     });
     if (redrafts > 0) {
+      // With the counts the rule read and the time it projected (live
+      // 2026-10-30, job ea7508c9: "points not specific or too many" said
+      // neither).
       dependencies.logger?.info(
-        { jobId: input.jobId, round, go: next.go, reason: next.reason },
+        {
+          jobId: input.jobId,
+          round,
+          go: next.go,
+          reason: next.reason,
+          ...redraftShape(failing),
+          elapsedMs: clock() - jobStart,
+          projectedMs: clock() - jobStart + (lastRedraftMs ?? 0) + reviewMs,
+        },
         "plan job: another redraft?",
       );
     }
@@ -1772,7 +1955,9 @@ export async function runPlanJob(
 
   const fullyReviewed =
     reviews.length === 2 && reviews.every((review) => review.passed);
-  const remainingCode = codeChecks(grounded, dossier, grounded);
+  const remainingCode = codeCheckLines(grounded, dossier, grounded).map(
+    (line) => line.person,
+  );
   const openPoints = [
     ...(redraftFailed ? [FIRST_DRAFT_ONLY] : []),
     ...(reviews.length < 2
@@ -1785,7 +1970,7 @@ export async function runPlanJob(
       ...(fullyReviewed ? [] : optional(waitingPoint(grounded.steps, dossier))),
       ...failing,
       ...unnamedPassing,
-    ]).map((point) => pointText({ ...point, alsoFixes: [] })),
+    ]).flatMap(eachFix),
     ...remainingCode,
   ];
   // What the reviewers still want, in the person's words: "Step 2: …",
@@ -2195,6 +2380,18 @@ type PlainName = {
   readonly many: (count: number) => string;
   /** No quotation: what a note says when its full names do not fit. */
   readonly brief: string;
+  /**
+   * A named kind ("your reminder"): several of one kind in a run are said
+   * once, with each title ("your reminders “A” and “B”"). Live 2026-10-30
+   * (job ea7508c9): "your reminder and your reminder “Validate…”".
+   */
+  readonly kind?: {
+    readonly key: string;
+    /** The kind for several: "your reminders". */
+    readonly plural: string;
+    readonly label: string;
+    readonly after: string;
+  };
 };
 
 const both = (count: number) => (count === 2 ? "both" : `all ${String(count)}`);
@@ -2221,10 +2418,12 @@ export function plainFactName(statement: string): PlainName {
     label: string,
     brief: string,
     after = "",
+    several = brief,
   ): PlainName => ({
     one: `${one} ${quote(label)}${after}`,
     many: (count) => `${both(count)} ${plural} ${quote(label)}${after}`,
     brief,
+    kind: { key: one, plural: several, label: quote(label), after },
   });
   const fixed = (one: string, brief = one): PlainName => ({
     one,
@@ -2239,6 +2438,7 @@ export function plainFactName(statement: string): PlainName {
       waiting[1],
       "the waiting approval",
       " waiting for you",
+      "the approvals",
     );
   }
   const reminder = /^Reminder "([^"]+)"/u.exec(text);
@@ -2248,6 +2448,8 @@ export function plainFactName(statement: string): PlainName {
       "of your reminders",
       reminder[1],
       "your reminder",
+      "",
+      "your reminders",
     );
   }
   const board = /^On your board[^"]*"([^"]+)"/u.exec(text);
@@ -2257,6 +2459,8 @@ export function plainFactName(statement: string): PlainName {
       "of your board tasks",
       board[1],
       "your board task",
+      "",
+      "your board tasks",
     );
   }
   const document = /^(?:Data room document|Your document) "([^"]+)"/u.exec(
@@ -2268,6 +2472,8 @@ export function plainFactName(statement: string): PlainName {
       "of your documents",
       document[1],
       "your document",
+      "",
+      "your documents",
     );
   }
   // Their own recent acts (ACTIVITY): "You created an evidence item (11 times; ...)".
@@ -2288,6 +2494,8 @@ export function plainFactName(statement: string): PlainName {
       "notes Q remembers of",
       memory[1],
       "what Q remembers",
+      "",
+      "what Q remembers of",
     );
   }
   if (/^Remembered:/u.test(text)) return fixed("what Q remembers");
@@ -2301,6 +2509,8 @@ export function plainFactName(statement: string): PlainName {
       "notes of interest from",
       interest[1],
       "the investor's interest",
+      "",
+      "the interest from",
     );
   }
   if (/^Current raise \(/u.test(text)) return fixed("your current raise");
@@ -2331,6 +2541,8 @@ export function plainFactName(statement: string): PlainName {
       `${kind.replace(/^the /u, "of the ")}s`,
       reading[2],
       kind,
+      "",
+      `${kind}s`,
     );
   }
   // Short: whole. Longer: a short plain name, never the fact's full text.
@@ -2373,9 +2585,42 @@ function namedFacts(
         count: (seen?.count ?? 0) + 1,
       });
     }
-    const said = [...names.values()].map(({ name, count }) =>
-      count > 1 ? name.many(count) : name.one,
-    );
+    // Several titles of one kind are said once with each title ("your
+    // reminders “A” and “B”"), or by the kind alone when a title is said
+    // briefly -- never the kind twice.
+    const kinds = new Map<string, { name: PlainName; short: boolean }[]>();
+    for (const entry of names.values()) {
+      const kind = entry.name.kind;
+      if (kind === undefined) continue;
+      const group = kinds.get(kind.key) ?? [];
+      group.push({
+        name: entry.name,
+        short: entry.name.one === entry.name.brief,
+      });
+      kinds.set(kind.key, group);
+    }
+    const said: string[] = [];
+    const told = new Set<string>();
+    for (const { name, count } of names.values()) {
+      const kind = name.kind;
+      const group = kind === undefined ? undefined : kinds.get(kind.key);
+      if (kind === undefined || group === undefined || group.length < 2) {
+        said.push(count > 1 ? name.many(count) : name.one);
+        continue;
+      }
+      if (told.has(kind.key)) continue;
+      told.add(kind.key);
+      if (group.some((one) => one.short)) {
+        said.push(kind.plural);
+        continue;
+      }
+      const labels = group.flatMap((one) =>
+        one.name.kind === undefined ? [] : [one.name.kind.label],
+      );
+      said.push(
+        `${kind.plural} ${labels.slice(0, -1).join(", ")} and ${labels.at(-1) ?? ""}${kind.after}`,
+      );
+    }
     return said.length <= 1
       ? (said[0] ?? "the record")
       : `${said.slice(0, -1).join(", ")} and ${said.at(-1) ?? ""}`;
@@ -2463,11 +2708,14 @@ function plainReviewWords(
 }
 
 /**
- * The open points as the card holds them (at most 12): when there are more,
+ * The open points as the card holds them (at most Q_PLAN_OPEN_POINTS_MAX): when there are more,
  * the last place says how many more, so nothing is dropped silently (live
  * 2026-10-30: 17 points were open and 5 vanished without a word).
  */
-export function cappedPoints(points: readonly string[], max = 12): string[] {
+export function cappedPoints(
+  points: readonly string[],
+  max = Q_PLAN_OPEN_POINTS_MAX,
+): string[] {
   const kept = points.filter((point) => point.length > 0);
   if (kept.length <= max) return kept;
   const shown = kept.slice(0, max - 1);
