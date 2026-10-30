@@ -832,8 +832,17 @@ function InvestorFeed({
       }
       top={
         /* One compact control over the pitch; the row is the desktop's. */
-        <div className="cq-feed-filter flex gap-2 lg:hidden">
-          {controls.button}
+        <div className="flex flex-col gap-1 lg:hidden">
+          <div className="cq-feed-filter flex gap-2">{controls.button}</div>
+          {/* Investor lane 2026-10-30 (390 px): the honest line about
+              their regions lived only in the desktop dossier and the card's
+              details sheet, so a phone showed just "outside your regions"
+              on the card. It is over the pitch here, at phone widths. */}
+          {notes.includes("NONE_IN_DECLARED_GEOGRAPHY") ? (
+            <p className="cq-status-line" data-feed-outside-geography-top>
+              {t(NOTE_TEXT.NONE_IN_DECLARED_GEOGRAPHY)}
+            </p>
+          ) : null}
         </div>
       }
       overlay={({ openOptions }) => (

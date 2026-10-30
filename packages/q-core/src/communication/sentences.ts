@@ -122,3 +122,38 @@ export function splitSentences(text: string): string[] {
   if (rest.length > 0) out.push(rest);
   return out;
 }
+
+/**
+ * Text cut to `max` characters for a person to read, never mid-word: the
+ * last whole sentence that fits (when that keeps at least half the room),
+ * else the last whole word with an ellipsis. Live 2026-10-30: reviewer
+ * notes reached the person as "risks soundin", "contracts with cust" and
+ * plan fixes as "source-", "Ledge" -- a character slice on prose. Anything
+ * shown that has a length cap is cut here.
+ */
+export function clipAtWord(text: string, max: number): string {
+  const clean = text.replace(/\s+/gu, " ").trim();
+  if (clean.length <= max) return clean;
+  const room = clean.slice(0, Math.max(0, max - 1));
+  let end = -1;
+  for (const match of room.matchAll(/[.!?](?=\s|$)/gu)) {
+    end = match.index + 1;
+  }
+  if (end >= Math.floor(max / 2)) return room.slice(0, end);
+  const space = room.lastIndexOf(" ");
+  const cut = space > 0 ? space : room.length;
+  return `${room.slice(0, cut).replace(/[\s,;:\-–—]+$/u, "")}…`;
+}
+
+/**
+ * Text cut to at most `max` characters at its last whole word, with an
+ * ellipsis; its own whitespace (line breaks included) is kept. For a cap
+ * on text that is not prose to be re-sentenced (a profile line, a card's
+ * about, a record's field). Live 2026-10-30: such caps cut mid-word.
+ */
+export function cutAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const room = text.slice(0, Math.max(0, max - 1));
+  const whole = room.replace(/\s+\S*$/u, "");
+  return `${(whole.length > 0 ? whole : room).replace(/[\s,;:\-–—]+$/u, "")}…`;
+}

@@ -273,6 +273,8 @@ function seam(options: {
   const compares: unknown[] = [];
   const leadBlocks: unknown[] = [];
   const leads: (string | undefined)[] = [];
+  const leadsSaid: (string | undefined)[] = [];
+  const deltasAtDelegate: number[] = [];
   const closings: (string | undefined)[] = [];
   const unrecordedOffers: boolean[] = [];
   let warmed = 0;
@@ -303,6 +305,8 @@ function seam(options: {
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
+        leadsSaid.push(req.leadLinesSaid?.answerMessageId);
+        deltasAtDelegate.push(options.deltas?.length ?? 0);
         closings.push(req.closingLines);
         unrecordedOffers.push(req.offerTakenUnrecorded === true);
         focuses.push(req.toolFocus);
@@ -463,6 +467,8 @@ function seam(options: {
     },
     probes,
     leads,
+    leadsSaid,
+    deltasAtDelegate,
     closings,
     unrecordedOffers,
     investigated: () => investigated,
@@ -692,6 +698,38 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.events.map((event) => event.type)).toEqual([
       "q.message.completed",
     ]);
+  });
+
+  it("live 2026-10-30: a founder's 'take me to my mandate' never claims to open an investor's page; Q says what a mandate is and opens their raise", async () => {
+    // The reader's own NAVIGATE MANDATE (the live path), and a reading
+    // that named another page while the words name the mandate.
+    for (const destination of ["MANDATE", "PROFILE"] as const) {
+      const run = seam({
+        said: "take me to my mandate",
+        reading: toolReading({
+          kind: "NAVIGATE",
+          destination,
+          visibility: null,
+        }),
+        outcomes: [],
+      });
+      const outcome = await run.answer.answer(request());
+      expect(outcome.kind, destination).toBe("ANSWERED");
+      expect(run.delegated()).toBe(0);
+      const content = run.stored[0]?.content ?? "";
+      expect(content).not.toMatch(/Opening your mandate/u);
+      expect(content).toMatch(/A mandate is an investor's/u);
+      const blocks = run.stored[0]?.blocks ?? [];
+      expect(blocks).not.toContainEqual(
+        expect.objectContaining({
+          intent: { kind: "NAVIGATE", destination: "MANDATE" },
+        }),
+      );
+      expect(blocks).toContainEqual({
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CAPITAL_RAISE" },
+      });
+    }
   });
 
   // Coordinator 23 Oct 2026: "Show me my fundraising pipeline" said only
@@ -1771,7 +1809,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "CRM_PIPELINE",
           "Q_PITCH",
           "BOARD",
-          "MANDATE",
+          // An investor's own screen: no investor organisation in this plan.
         ],
         documents: [],
         visibilityChange: false,
@@ -5699,6 +5737,48 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     await run.answer.answer(request());
     expect(run.leads).toEqual([LEAD]);
     expect(run.investigated()).toBe(0);
+  });
+
+  it("live 2026-10-30 (run 2c8fd21b): with code's priorities leading, a forced web search becomes the model's to reach for (OFFERED), decided by the lead, never by words", async () => {
+    const run = seam({
+      said: "What should I do today?",
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+    });
+    await run.answer.answer(request());
+    expect(run.leads).toEqual([LEAD]);
+    expect(run.directives[0]?.mode).toBe("OFFERED");
+    // Without code's lead, the reading's own decision stands.
+    const plain = seam({
+      said: "What should I do today?",
+      reading: advice(),
+      outcomes: [],
+    });
+    await plain.answer.answer(request());
+    expect(plain.directives[0]?.mode).toBe("EXPLICIT");
+  });
+
+  it("live 2026-10-30 (latency): code's priorities reach the person the moment they are composed, before the answer is asked, as the answer's own message", async () => {
+    const deltas: { text: string; holding?: true }[] = [];
+    const run = seam({
+      said: "What should I do today?",
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      deltas,
+    });
+    await run.answer.answer(request());
+    const lines = LEAD.split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    // Out before the answer (the delegate) was even called.
+    expect(run.deltasAtDelegate[0]).toBeGreaterThanOrEqual(lines.length);
+    expect(
+      deltas.filter((d) => d.holding !== true).map((d) => d.text.trim()),
+    ).toEqual(lines);
+    // The answer is told they were said, and under which message.
+    expect(run.leadsSaid[0]).toMatch(/^[0-9a-f-]{36}$/u);
   });
 
   it("not when it is about someone else, nor when there are no gaps", async () => {

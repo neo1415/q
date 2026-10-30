@@ -342,9 +342,15 @@ const COMPANY_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
   "NEW_PITCH",
 ]);
 
-/** Screens that belong to an investor organisation's own people. */
-const INVESTOR_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
+/**
+ * Screens that belong to an investor organisation's own people. Live
+ * 2026-10-30 (founder.ledgerbridge, "take me to my mandate"): MANDATE was
+ * offered to everyone on Home Q, so a founder was told "Opening your
+ * mandate…" and sent to an investor's page. A founder has no mandate.
+ */
+export const INVESTOR_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
   "YOUR_COMPANIES",
+  "MANDATE",
 ]);
 
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(

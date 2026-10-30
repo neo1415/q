@@ -6,7 +6,7 @@ import type { AnalysisDocumentResult } from "@capital-q/q-core";
 import type { MaterialDocument } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
-import { splitSection } from "./analysis.js";
+import { REVIEWER_OPEN_POINT, splitSection } from "./analysis.js";
 import { CLAIMS_HEADING, measureOf, type CompanyClaim } from "./claims.js";
 
 /**
@@ -294,7 +294,13 @@ export function diligenceContent(input: {
       }),
     ),
   );
-  const gaps = input.content.gaps;
+  // What is not known about the company, never what the review of this
+  // memo left open (investor lane 2026-10-30: "Reviewer's open point (…)"
+  // read as part of the memo). Those stay in the document's gaps, shown
+  // apart under their own label (artifact viewer, PDF).
+  const gaps = input.content.gaps.filter(
+    (gap) => !gap.startsWith(REVIEWER_OPEN_POINT),
+  );
   const notKnown = {
     heading: NOT_KNOWN_HEADING,
     body:

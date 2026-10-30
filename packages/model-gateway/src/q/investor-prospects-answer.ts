@@ -3,6 +3,7 @@ import {
   type QAnswerCard,
   type QAnswerCardsBlock,
 } from "@capital-q/contracts/q";
+import { cutAtWord } from "@capital-q/q-core";
 import type {
   QAnswerRequest,
   QToolCallOutcome,
@@ -147,7 +148,7 @@ function listOf(names: readonly string[]): string {
 }
 
 function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+  return text.length > max ? cutAtWord(text, max) : text;
 }
 
 function sentence(text: string): string {
@@ -185,7 +186,7 @@ function focusOf(description: string | null | undefined): string | null {
     .trim()
     .replace(/[.\s]+$/u, "");
   if (text === undefined || text.length < 8) return null;
-  return text.length > 110 ? `${text.slice(0, 107).trimEnd()}…` : text;
+  return text.length > 110 ? cutAtWord(text, 108) : text;
 }
 
 /**

@@ -34,6 +34,7 @@ import {
   type SlidePicture,
 } from "./slide-pictures";
 import { slideSource } from "./slide-source";
+import { QMarkdown } from "./markdown";
 import { SpreadsheetPreview } from "./spreadsheet-preview";
 import { useT } from "@/features/i18n/language";
 
@@ -253,6 +254,7 @@ export function ArtifactViewer({
   // XLSX-001: a spreadsheet previews its first sheet and downloads as a sheet.
   const workbook = current?.content.workbook;
   const version = current?.version ?? null;
+  const gapsShown = splitGaps(current?.content.gaps ?? []);
 
   useEffect(() => {
     if (!isDeck || version === null) {
@@ -662,7 +664,7 @@ export function ArtifactViewer({
               <DocumentSection key={section.heading} section={section} />
             ))}
 
-            {current.content.gaps.length === 0 ? null : (
+            {gapsShown.evidence.length === 0 ? null : (
               <section className="flex flex-col gap-2" data-q-artifact-gaps>
                 <h3 className="cq-title-sm text-(--cq-text-primary)">
                   {t("Evidence gaps")}
@@ -670,12 +672,37 @@ export function ArtifactViewer({
                 {/* Unknown stays unknown, in the document itself, because
                     an investor should see the shape of the gap. */}
                 <ul className="flex list-disc flex-col gap-1 ps-5">
-                  {current.content.gaps.map((gap) => (
+                  {gapsShown.evidence.map((gap) => (
                     <li
                       key={gap}
                       className="cq-body-sm text-(--cq-text-secondary)"
                     >
                       {gap}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Investor lane 2026-10-30: what the review did not pass was
+                listed among the evidence gaps as "Reviewer's open point
+                (…)", read as part of the memo. It stays (a draft says what
+                its review left open, analysis.ts), under its own label. */}
+            {gapsShown.review.length === 0 ? null : (
+              <section
+                className="flex flex-col gap-2"
+                data-q-artifact-review-open
+              >
+                <h3 className="cq-title-sm text-(--cq-text-primary)">
+                  {t("What the review left open")}
+                </h3>
+                <ul className="flex list-disc flex-col gap-1 ps-5">
+                  {gapsShown.review.map((point) => (
+                    <li
+                      key={point}
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                    >
+                      {point}
                     </li>
                   ))}
                 </ul>
@@ -702,6 +729,32 @@ type ArtifactSection = NonNullable<
   QArtifactDetail["current"]
 >["content"]["sections"][number];
 
+/**
+ * How the server marks a review's open point among a document's gaps
+ * (q-api workforce/analysis.ts REVIEWER_OPEN_POINT; deck-render prints the
+ * same split in the PDF).
+ */
+const REVIEW_POINT = /^Reviewer's open point \(([^)]*)\): (.*)$/su;
+
+/**
+ * A document's gaps, the review's open points apart from the evidence
+ * gaps: each review point as "Section: what is open", without the
+ * internal prefix.
+ */
+export function splitGaps(gaps: readonly string[]): {
+  readonly evidence: readonly string[];
+  readonly review: readonly string[];
+} {
+  const evidence: string[] = [];
+  const review: string[] = [];
+  for (const gap of gaps) {
+    const point = REVIEW_POINT.exec(gap);
+    if (point === null) evidence.push(gap);
+    else review.push(`${point[1] ?? ""}: ${point[2] ?? ""}`);
+  }
+  return { evidence, review };
+}
+
 function DocumentSection({
   section,
   eyebrow,
@@ -717,9 +770,12 @@ function DocumentSection({
       <h3 className="cq-title-sm text-(--cq-text-primary)">
         {section.heading}
       </h3>
-      <p className="cq-body whitespace-pre-wrap text-(--cq-text-primary)">
-        {section.body}
-      </p>
+      {/* Investor lane 2026-10-30 (IC memo): the writer's markdown showed
+          as "**no-go**". A body is rendered as the answer's markdown is. */}
+      <QMarkdown
+        text={section.body}
+        className="cq-body text-(--cq-text-primary)"
+      />
       {section.findings.length === 0 ? null : (
         <SourcesDisclosure count={section.findings.length}>
           <dl className="flex flex-col gap-1 border-s-2 border-(--cq-border-subtle) ps-3">

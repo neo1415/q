@@ -6,9 +6,11 @@ import {
   type QArtifactContent,
   type QArtifactFinding,
 } from "@capital-q/contracts";
-import type {
-  AnalysisCritiqueResult,
-  AnalysisDocumentResult,
+import {
+  clipAtWord,
+  cutAtWord,
+  type AnalysisCritiqueResult,
+  type AnalysisDocumentResult,
 } from "@capital-q/q-core";
 
 import {
@@ -350,11 +352,7 @@ export function recordsCitedAsWeb(
       section: section.heading.slice(0, 120),
       // The quote without its citations: the point is filed in the
       // report's gaps when the last draft still has it.
-      problem:
-        `${RECORD_CITED_PROBLEM}: "${withoutCitations(mixed[0] ?? "").slice(0, 200)}"`.slice(
-          0,
-          400,
-        ),
+      problem: `${RECORD_CITED_PROBLEM}: "${cutAtWord(withoutCitations(mixed[0] ?? ""), 200)}"`,
       fix: "Keep Capital Q records apart from web evidence: the sentence naming the record cites no [S n] and is marked (Capital Q record); put the web evidence in its own sentence.",
     });
   }
@@ -460,11 +458,7 @@ export function basisProblems(
       issues.push({
         kind: "UNSUPPORTED",
         section: section.heading.slice(0, 120),
-        problem:
-          `${String(unlabelled.length)} figure${unlabelled.length === 1 ? "" : "s"} without a basis, e.g. "${(unlabelled[0] ?? "").slice(0, 200)}"`.slice(
-            0,
-            400,
-          ),
+        problem: `${String(unlabelled.length)} figure${unlabelled.length === 1 ? "" : "s"} without a basis, e.g. "${cutAtWord(unlabelled[0] ?? "", 200)}"`,
         fix: "Give each figure its basis in the same sentence: [S n] for a source, (estimate: ...) with the assumptions, (company record), or (Q's inference); or remove it.",
       });
     }
@@ -886,12 +880,14 @@ export function analysisContent(input: {
       : input.publicSources === "NONE_FOUND"
         ? [PUBLIC_NONE_FOUND_GAP]
         : []),
-    ...(input.codeGaps ?? []).map((gap) => gap.slice(0, 300)),
+    // Cut at a word, never mid-word (live 2026-10-30, deep research:
+    // "risks soundin", "contracts with cust").
+    ...(input.codeGaps ?? []).map((gap) => clipAtWord(gap, 300)),
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>
-      `${REVIEWER_OPEN_POINT} (${issue.section}): ${readersWords(issue.problem)}`.slice(
-        0,
+      clipAtWord(
+        `${REVIEWER_OPEN_POINT} (${issue.section}): ${readersWords(issue.problem)}`,
         300,
       ),
     ),

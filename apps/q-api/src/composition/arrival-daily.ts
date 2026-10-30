@@ -7,6 +7,7 @@ import {
   type QDailyEdition,
   type QDailyStory,
 } from "@capital-q/contracts";
+import { cutAtWord } from "@capital-q/q-core";
 
 /**
  * P4: the person's latest Q Daily edition as prepared story objects for
@@ -21,7 +22,7 @@ export const DAILY_FRESH_DAYS = 14;
 
 const clip = (text: string, max: number): string => {
   const clean = text.replace(/\s+/gu, " ").trim();
-  return clean.length <= max ? clean : `${clean.slice(0, max - 1).trimEnd()}…`;
+  return clean.length <= max ? clean : cutAtWord(clean, max);
 };
 
 /** Relevance by section: their own sector and market first, opinion never. */

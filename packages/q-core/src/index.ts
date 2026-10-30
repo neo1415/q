@@ -1265,7 +1265,9 @@ export {
 } from "./communication/promises.js";
 
 export {
+  clipAtWord,
   createSentenceCutter,
+  cutAtWord,
   splitSentences,
   type SentenceCutter,
 } from "./communication/sentences.js";

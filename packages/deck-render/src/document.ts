@@ -53,6 +53,11 @@ export type ArtifactDocument = {
   readonly dateline: string;
   readonly sections: readonly DocumentSection[];
   readonly gaps: readonly string[];
+  /**
+   * What the document's review left open, "Section: point", printed under
+   * its own label after the evidence gaps, never as part of the document.
+   */
+  readonly reviewOpen?: readonly string[] | undefined;
   /** The standing sentence about what this document is not. */
   readonly notice: string;
   /**
@@ -114,6 +119,34 @@ function dateOf(iso: string): string {
   }).format(at);
 }
 
+/**
+ * How a review's open point is filed among a document's gaps (q-api
+ * workforce/analysis.ts REVIEWER_OPEN_POINT; a test there keeps the two
+ * equal).
+ */
+export const REVIEW_OPEN_POINT_PREFIX = "Reviewer's open point";
+
+const REVIEW_POINT = /^Reviewer's open point \(([^)]*)\): (.*)$/su;
+
+/**
+ * Investor lane 2026-10-30 (IC memo): the review's open points were
+ * printed among the evidence gaps as "Reviewer's open point (…)", read as
+ * part of the memo. They are split out, as "Section: point".
+ */
+export function splitReviewPoints(gaps: readonly string[]): {
+  readonly gaps: readonly string[];
+  readonly reviewOpen: readonly string[];
+} {
+  const evidence: string[] = [];
+  const reviewOpen: string[] = [];
+  for (const gap of gaps) {
+    const point = REVIEW_POINT.exec(gap);
+    if (point === null) evidence.push(gap);
+    else reviewOpen.push(`${point[1] ?? ""}: ${point[2] ?? ""}`);
+  }
+  return { gaps: evidence, reviewOpen };
+}
+
 /** One stored version as a document. Adds nothing the version does not say. */
 export function documentFromArtifact(input: {
   readonly type: string;
@@ -133,7 +166,7 @@ export function documentFromArtifact(input: {
         provenance: provenanceOf(finding),
       })),
     })),
-    gaps: version.content.gaps,
+    ...splitReviewPoints(version.content.gaps),
     notice: NOTICE,
     ...(version.content.look === undefined
       ? {}
@@ -425,9 +458,14 @@ export async function documentToPdf(
     flow.gap(16);
   }
 
-  if (document.gaps.length > 0) {
-    heading("Evidence gaps");
-    for (const gap of document.gaps) {
+  const printed: readonly (readonly [string, readonly string[]])[] = [
+    ["Evidence gaps", document.gaps],
+    ["What the review left open", document.reviewOpen ?? []],
+  ];
+  for (const [label, items] of printed) {
+    if (items.length === 0) continue;
+    heading(label);
+    for (const gap of items) {
       const lines = wrapWith(fonts.regular, gap, 10.5, width - 16);
       lines.forEach((line, index) => {
         flow.lines(fonts.regular, [index === 0 ? `•  ${line}` : line], {

@@ -3,7 +3,10 @@ import type {
   QRecordPage,
   QResultBlock,
 } from "@capital-q/contracts";
-import type { TurnReferenceV64 as TurnReference } from "@capital-q/q-core";
+import {
+  clipAtWord,
+  type TurnReferenceV64 as TurnReference,
+} from "@capital-q/q-core";
 import { movePhaseLine } from "@capital-q/q-core/speech";
 import type {
   QAnswerRequest,
@@ -420,7 +423,12 @@ function spokenName(name: string): string {
     .replace(/\s*\([^)]*\)\s*$/u, "")
     .replace(/["“”]/gu, "")
     .trim();
-  return (bare.length === 0 ? name.trim() : bare).slice(0, 60).trim();
+  // At a word, never mid-word (live 2026-10-30: "Opening deep research
+  // on the Nigerian regulatory, governance and fin…"). The move line adds
+  // its own ellipsis, so none is added here.
+  return clipAtWord(bare.length === 0 ? name.trim() : bare, 60)
+    .replace(/…$/u, "")
+    .trim();
 }
 
 /**

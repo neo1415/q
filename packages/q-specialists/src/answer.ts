@@ -105,6 +105,7 @@ import {
   buildShownSheet,
   closestByName,
   eligibleCapabilities,
+  INVESTOR_SCREENS,
   Q_CAPABILITIES,
   SPREADSHEET_ARTIFACT_TYPE,
   spreadsheetReceipt,
@@ -1525,6 +1526,67 @@ function askedIn(history: readonly QConversationMessage[]): string {
 /** Words that ask for the public web, so advice still researches (S7). */
 const NAMES_THE_WEB =
   /\b(?:web|online|internet|news|press|google|public(?:ly)?\s+(?:sources?|information|record|reports?)|search(?:\s+for)?|look\s+(?:it|them|this|that)\s+up|in\s+the\s+media)\b/i;
+
+/**
+ * A screen of an investor's own (INVESTOR_SCREENS) asked for by someone
+ * with no investor organisation: what it is, and where their own side of
+ * it lives. Never "Opening …" for a page this person cannot open.
+ */
+export function notTheirSideLine(
+  asked: QNavigateDestination,
+  own: QNavigateDestination | null,
+): string {
+  const what =
+    asked === "MANDATE"
+      ? "A mandate is an investor's: what they invest in, cheque size, stage and places, so there isn't one on your account."
+      : "That page is for investors, so there's nothing of yours there.";
+  return own === "CAPITAL_RAISE"
+    ? `${what} What investors match you on is your raise, so I'm opening it.`
+    : own === "PROFILE"
+      ? `${what} What investors see of you is your profile, so I'm opening it.`
+      : what;
+}
+
+/**
+ * Their own counterpart of an investor's screen, when this run may open
+ * it (a founder's raise, else their profile); null when neither.
+ */
+function ownCounterpart(
+  navigable: readonly QNavigateDestination[],
+): QNavigateDestination | null {
+  return navigable.includes("CAPITAL_RAISE")
+    ? "CAPITAL_RAISE"
+    : navigable.includes("PROFILE")
+      ? "PROFILE"
+      : null;
+}
+
+/**
+ * Live 2026-10-30 (founder, "take me to my mandate"): Q said "Opening
+ * your mandate…", sent a founder's screen to /mandate and stayed on Home.
+ * A screen of the capability registry's investor side (INVESTOR_SCREENS),
+ * asked for by someone with no investor organisation in this run's plan,
+ * is never claimed: Q says what it is and opens their own counterpart
+ * when this run may.
+ */
+function notTheirSideMove(
+  asked: QNavigateDestination,
+  navigable: readonly QNavigateDestination[],
+): { readonly said: string; readonly blocks: readonly QResultBlock[] } {
+  const own = ownCounterpart(navigable);
+  return {
+    said: notTheirSideLine(asked, own),
+    blocks:
+      own === null
+        ? []
+        : [
+            {
+              kind: "UI_INTENT",
+              intent: { kind: "NAVIGATE", destination: own },
+            },
+          ],
+  };
+}
 
 const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   HOME: "Taking you home now.",
@@ -3339,6 +3401,25 @@ export function createSpecialistQAnswer(
       if (destination === "COMPANY_VISIBILITY" && company === undefined) {
         return null;
       }
+      // The reader may name any destination; one of an investor's own
+      // screens is opened only for someone with an investor organisation
+      // in this run's plan (the registry's INVESTOR_SCREENS eligibility).
+      if (
+        INVESTOR_SCREENS.has(destination) &&
+        ownInvestorOrganisationIn(request.plan) === null
+      ) {
+        const other = notTheirSideMove(destination, navigable);
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "q was asked for an investor's screen by someone with no investor organisation",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          other.said,
+          other.blocks.length === 0 ? undefined : other.blocks,
+        );
+      }
       // The reader's move is followed only when their words ask for that
       // page (live 2026-10-09: statements and negations moved the screen).
       const words = askedIn(history);
@@ -3618,7 +3699,17 @@ export function createSpecialistQAnswer(
         log: `SETTINGS_${target.section}`,
       };
     }
-    if (!navigable.includes(target.destination)) return null;
+    if (!navigable.includes(target.destination)) {
+      // Live 2026-10-30 (founder, "take me to my mandate"): Q said
+      // "Opening your mandate…" and stayed on Home. A screen that belongs
+      // to the other side is never claimed: Q says what it is and opens
+      // their own counterpart of it when this run may (a founder's raise).
+      if (!INVESTOR_SCREENS.has(target.destination)) return null;
+      return {
+        ...notTheirSideMove(target.destination, navigable),
+        log: `NOT_THEIR_SIDE_${target.destination}`,
+      };
+    }
     return {
       said: naturalPlaceLine(DESTINATION_LINES[target.destination], text),
       blocks: [
@@ -4256,7 +4347,7 @@ export function createSpecialistQAnswer(
    * way once to the line naming whom the skim understood, never the other
    * way round.
    */
-  const heldRuns = new Map<string, "HINT" | "NAMED">();
+  const heldRuns = new Map<string, "HINT" | "WRITE_HINT" | "NAMED">();
   const sayHolding = (
     request: QAnswerRequest,
     name: string | null,
@@ -4266,14 +4357,22 @@ export function createSpecialistQAnswer(
     const deltas = dependencies.deltas;
     if (deltas === undefined) return;
     const held = heldRuns.get(request.runId);
-    if (held === "NAMED" || (held === "HINT" && name === null && !writes)) {
+    if (
+      held === "NAMED" ||
+      (held === "HINT" && name === null && !writes) ||
+      // The nameless writing line said once gives way only to a name.
+      (held === "WRITE_HINT" && name === null)
+    ) {
       return;
     }
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    heldRuns.set(request.runId, name === null && !writes ? "HINT" : "NAMED");
+    heldRuns.set(
+      request.runId,
+      name !== null ? "NAMED" : writes ? "WRITE_HINT" : "HINT",
+    );
     while (heldRuns.size > PREREADS_MAX) {
       const oldest = heldRuns.keys().next().value;
       if (oldest === undefined) break;
@@ -5322,6 +5421,14 @@ export function createSpecialistQAnswer(
     // whatever the reading decides; whom Q is looking into is named only
     // from a model's understanding (the skim's, below), which replaces it.
     if (ASKS_SOMETHING.test(latest.content.trim())) sayHolding(request, null);
+    // Live 2026-10-30 ("yes" to Q's plan offer: no Q line in the thread for
+    // 6.1 s while the reading ran): a reply to the offer code recorded with
+    // Q's last answer is a turn Q acts on whatever it says, so it hears
+    // the same nameless line at once. Keyed on code's own record of the
+    // offer, never on the reply's words (DECISIONS 40).
+    else if (offerOfLastTurn(conversationId, history) !== null) {
+      sayHolding(request, null);
+    }
     // Owner 2026-10-30 (a conversational answer at 11-13 s): where the
     // time before the answer goes, per stage, on every turn (counts and
     // milliseconds only; nothing they said). See "q turn timing" below.
@@ -6836,6 +6943,23 @@ export function createSpecialistQAnswer(
           ])
         : [null, null];
     const readinessLeadMs = Date.now() - leadStartedAt;
+    /**
+     * Live 2026-10-30 (founder.ledgerbridge, "What should I do today?"):
+     * code's priorities were composed 3.3 s after Enter but went out only
+     * once the answer's own preparation reached them, about 1 s later, and
+     * the model's first words came seconds after that. They are code's,
+     * from their records, and open the stored answer whatever the model
+     * writes, so they go out the moment they exist, as the answer's own
+     * message (the answer stores it under this id and does not say them
+     * again). Not on a spoken turn: the voice line says the answer.
+     */
+    const leadAnswerId =
+      readinessLead !== null &&
+      dependencies.deltas !== undefined &&
+      !spoken &&
+      request.plan.screen?.route !== "ONBOARDING"
+        ? QMessageIdSchema.parse(randomUUID())
+        : null;
     const ownRecords =
       readinessLead !== null ||
       (!writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS");
@@ -6899,7 +7023,23 @@ export function createSpecialistQAnswer(
     }
     const finalRequest: QAnswerRequest = {
       ...request,
-      research,
+      // Live 2026-10-30 (founder.ledgerbridge, "What should I do today?",
+      // run 2c8fd21b): code's priorities lead this answer from their own
+      // records, yet the reading's EXPLICIT research started the public web
+      // beside it, and the model's first round was stopped as it began
+      // answering, waited for the web (3.1 s) and was asked again; the web
+      // "added nothing useful". Where code's own lead opens the answer, a
+      // forced search is not what it waits on: the model holds the research
+      // tool (OFFERED) and reaches for it when the question needs it.
+      // Decided by the turn's structure (the lead exists), never its words.
+      research:
+        readinessLead === null
+          ? research
+          : research.then((directive) =>
+              directive.mode === "EXPLICIT"
+                ? { ...directive, mode: "OFFERED" as const }
+                : directive,
+            ),
       capabilities: manifestOf(capabilities),
       ...(turnUnread ? { turnUnread: true } : {}),
       // Said aloud: the answer is shaped for the ear (2026-10-07).
@@ -6981,6 +7121,9 @@ export function createSpecialistQAnswer(
           }
         : {}),
       ...(readinessLead === null ? {} : { leadLines: readinessLead }),
+      ...(leadAnswerId === null
+        ? {}
+        : { leadLinesSaid: { answerMessageId: leadAnswerId } }),
       // Only beside code's own priorities: the offer closes that answer.
       ...(readinessLead === null || planOffer === null
         ? {}
@@ -7065,8 +7208,21 @@ export function createSpecialistQAnswer(
         "q turn timing",
       );
     }
+    const adopting = speculation !== null && misfit === null;
+    if (!adopting && leadAnswerId !== null && readinessLead !== null) {
+      for (const line of readinessLead.split("\n")) {
+        const said = line.trim();
+        if (said.length === 0) continue;
+        dependencies.deltas?.publish({
+          runId: request.runId,
+          tenantId: request.tenantId,
+          messageId: leadAnswerId,
+          text: `${said} `,
+        });
+      }
+    }
     const outcome =
-      speculation !== null && misfit === null
+      adopting && speculation !== null
         ? await speculation.adopt()
         : await answerOnce(finalRequest, finalRoute);
     if (writingDocument && outcome.kind === "ANSWERED") {

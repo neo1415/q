@@ -31,6 +31,7 @@ import {
 import { APP_ACTIONS } from "@capital-q/app-actions";
 import type { Logger } from "@capital-q/observability";
 import {
+  clipAtWord,
   PLAN_RUBRIC_V1,
   PLAN_REVIEW_FOCI,
   PROMPT_EMPTY_CASES,
@@ -1263,23 +1264,11 @@ export function pointText(
 }
 
 /**
- * Cut at a word boundary, never mid-word: the last whole sentence that
- * fits, else the last whole word with an ellipsis. Live 2026-10-30: the
- * reviewers' fixes reached the person as "source-", "Ledge", "wh".
+ * Cut at a word boundary, never mid-word (q-core clipAtWord). Live
+ * 2026-10-30: the reviewers' fixes reached the person as "source-",
+ * "Ledge", "wh".
  */
-export function wordClip(text: string, max: number): string {
-  const clean = text.replace(/\s+/gu, " ").trim();
-  if (clean.length <= max) return clean;
-  const room = clean.slice(0, max - 1);
-  let end = -1;
-  for (const match of room.matchAll(/[.!?](?=\s|$)/gu)) {
-    end = match.index + 1;
-  }
-  if (end >= Math.floor(max / 2)) return room.slice(0, end);
-  const space = room.lastIndexOf(" ");
-  const cut = space > 0 ? space : room.length;
-  return `${room.slice(0, cut).replace(/[\s,;:\-–—]+$/u, "")}…`;
-}
+export const wordClip = clipAtWord;
 
 /**
  * A reviewer's fixes as the stored review keeps them (300 characters
@@ -3125,6 +3114,8 @@ const morePoints = (more: number) =>
   `And ${String(more)} more point${more === 1 ? "" : "s"} the reviews raised.`;
 /** The count code's own cap line (morePoints) stands for; 0 for any other. */
 const MORE_POINTS = /^And (\d+) more points? the reviews raised\.$/u;
+/** personLines' continuation of a step's notes on a second point. */
+const STEP_CONTINUED = /^Step \d+, continued: /u;
 
 /** Said first when the redraft did not come back (live 2026-10-30, job 32e70db7). */
 export const FIRST_DRAFT_ONLY =
@@ -3170,7 +3161,11 @@ export function planReadyLine(
       (point) =>
         point !== FIRST_DRAFT_ONLY &&
         point !== EARLIER_DRAFT_KEPT &&
-        !MORE_POINTS.test(point),
+        !MORE_POINTS.test(point) &&
+        // A step's continued note is part of its step's line: the card
+        // folds it into that line (plan-card foldedPoints), so the count
+        // here does too.
+        !STEP_CONTINUED.test(point),
     );
     // The card's own count: what it lists plus what its cap line stands
     // for (live 2026-10-30: chat "and 10 more", card "And 5 more").

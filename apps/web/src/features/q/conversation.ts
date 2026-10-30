@@ -357,8 +357,12 @@ export function followWork(turns: QTurn[]): void {
       (block) => block.kind === "WORK_IN_PROGRESS",
     );
     if (work.length === 0) return;
+    // Live 2026-10-30 (founder.ledgerbridge): a plan job's delivery
+    // carries its PLAN card beside the job's progress block, and the
+    // progress card showed twice in the chat (on the turn that started it
+    // and on the delivery). A PLAN delivers like a document does.
     const delivers = turn.blocks.some(
-      (block) => block.kind === "ARTIFACT_REFERENCE",
+      (block) => block.kind === "ARTIFACT_REFERENCE" || block.kind === "PLAN",
     );
     if (!delivers) {
       for (const block of work) following.add(block.jobId);
@@ -367,7 +371,10 @@ export function followWork(turns: QTurn[]): void {
     const followed = work.some((block) => following.has(block.jobId));
     turns[index] = {
       ...turn,
-      ...(followed ? { deliversDocument: true as const } : {}),
+      ...(followed &&
+      turn.blocks.some((block) => block.kind === "ARTIFACT_REFERENCE")
+        ? { deliversDocument: true as const }
+        : {}),
       deliveredJobs: work.map((block) => block.jobId),
       blocks: turn.blocks.filter(
         (block) =>

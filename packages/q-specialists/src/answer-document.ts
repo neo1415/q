@@ -6,7 +6,7 @@ import {
   type QArtifactContent,
 } from "@capital-q/contracts";
 import { claimsOnScreen } from "@capital-q/model-gateway/q";
-import { splitSentences } from "@capital-q/q-core";
+import { cutAtWord, splitSentences } from "@capital-q/q-core";
 import type { TabularBlock } from "@capital-q/q-tools";
 
 /**
@@ -77,7 +77,7 @@ function body(lines: readonly string[]): string {
 
 function clip(text: string, max: number): string {
   if (text.length <= max) return text;
-  return `${text.slice(0, max - 1).trimEnd()}…`;
+  return cutAtWord(text, max);
 }
 
 /**

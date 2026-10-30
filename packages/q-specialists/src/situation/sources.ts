@@ -7,6 +7,7 @@ import {
   type QSituationSide,
   type QSituationSource,
 } from "@capital-q/contracts";
+import { cutAtWord } from "@capital-q/q-core";
 import {
   FindProspectiveInvestorsOutputSchema,
   GetCapitalObjectiveOutputSchema,
@@ -70,7 +71,7 @@ export type SituationSourceSpec = {
 const TEXT_MAX = 1_000;
 
 const clip = (text: string, max = TEXT_MAX): string =>
-  text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+  text.length <= max ? text : cutAtWord(text, max);
 
 const day = (iso: string | null | undefined): string | null => {
   if (iso === null || iso === undefined) return null;

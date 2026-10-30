@@ -217,6 +217,12 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "Reviewed twice before you saw it": "روجعت مرتين قبل أن تراها",
   "A draft: not fully reviewed yet": "مسودة: لم تُراجع بالكامل بعد",
   "Version {n}": "النسخة {n}",
+  // Live 2026-10-30: which draft the plan card holds, and its reviews.
+  "An earlier draft": "مسودة سابقة",
+  "Not reviewed": "لم تُراجع",
+  "{n} of {n2} reviews passed": "اجتازت {n} من {n2} مراجعات",
+  // Investor lane 2026-10-30: a document's review points, apart.
+  "What the review left open": "ما تركته المراجعة مفتوحًا",
   "Q prepares, you finish": "Q يُعِدّ وأنت تُكمل",
   By: "بحلول",
   "Comes to you for approval first": "تأتيك للموافقة أولًا",

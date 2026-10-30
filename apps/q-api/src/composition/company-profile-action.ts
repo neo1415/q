@@ -25,6 +25,7 @@ import {
   type AnyQActionDefinition,
   type QActionProposer,
 } from "@capital-q/q-actions";
+import { cutAtWord } from "@capital-q/q-core";
 import type { QActionPrepareContext } from "@capital-q/q-runtime";
 import { capability, type AuthorizationService } from "@capital-q/security";
 
@@ -127,7 +128,7 @@ export function describeCompanyProfileChanges(
       : `${FIELD_LABELS[field]}: ${value}`;
   });
   const brief = lines
-    .map((line) => (line.length > 120 ? `${line.slice(0, 117)}…` : line))
+    .map((line) => (line.length > 120 ? cutAtWord(line, 118) : line))
     .join("; ");
   return {
     summary: `Update your company profile. ${brief}`.slice(0, 1000),
