@@ -1,4 +1,5 @@
 import { GEOGRAPHY_VOCABULARY } from "../reference-data/geography.js";
+import { geographyNodeId } from "./node-id.js";
 
 /**
  * Capital Q's one canonical country list (owner 2026-10-30: "hand-made
@@ -21,6 +22,8 @@ export type IsoCountry = {
   readonly iso: string;
   /** The geography node's canonical code ("denmark"). */
   readonly canonicalCode: string;
+  /** The geography node's stable id (the same in every environment). */
+  readonly nodeId: string;
   /** The reference (English) name ("Denmark"). */
   readonly name: string;
   /** The region node it sits under ("nordics"); null for a root. */
@@ -35,6 +38,7 @@ function readCountries(): readonly IsoCountry[] {
     out.push({
       iso,
       canonicalCode: node.code,
+      nodeId: geographyNodeId(node.code),
       name: node.name,
       regionCode: node.parent ?? null,
     });
@@ -47,6 +51,9 @@ export const ISO_COUNTRIES: readonly IsoCountry[] = readCountries();
 
 const BY_ISO: ReadonlyMap<string, IsoCountry> = new Map(
   ISO_COUNTRIES.map((country) => [country.iso, country]),
+);
+const BY_NODE_ID: ReadonlyMap<string, IsoCountry> = new Map(
+  ISO_COUNTRIES.map((country) => [country.nodeId, country]),
 );
 const BY_CANONICAL_CODE: ReadonlyMap<string, IsoCountry> = new Map(
   ISO_COUNTRIES.map((country) => [country.canonicalCode, country]),
@@ -74,6 +81,17 @@ export function countryOfCanonicalCode(
 ): IsoCountry | null {
   if (canonicalCode === null || canonicalCode === undefined) return null;
   return BY_CANONICAL_CODE.get(canonicalCode) ?? null;
+}
+
+/**
+ * The country a geography node id names; null for a region, another
+ * vocabulary's node or an unknown id.
+ */
+export function countryOfNodeId(
+  nodeId: string | null | undefined,
+): IsoCountry | null {
+  if (nodeId === null || nodeId === undefined) return null;
+  return BY_NODE_ID.get(nodeId.toLowerCase()) ?? null;
 }
 
 const displayNames = new Map<string, Intl.DisplayNames | null>();

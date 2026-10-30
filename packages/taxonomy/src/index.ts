@@ -133,6 +133,7 @@ export {
   countryOfCanonicalCode,
   countryOfIso,
   countryOfName,
+  countryOfNodeId,
   isIsoCountryCode,
   type IsoCountry,
 } from "./countries/index.js";
