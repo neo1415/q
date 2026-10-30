@@ -116,6 +116,7 @@ import {
   stillNeeded,
   taxonomyProposal,
   composerHint,
+  keepFailedLine,
   keptAllLine,
   confirmChipLabel,
   keepListedThenConfirm,
@@ -1561,6 +1562,14 @@ export function QOnboardingWorkspace({
     settleReading();
     return actions.resolveSuggestion({ suggestionId, resolution: "ACCEPT" });
   };
+  /** One Keep: a refusal is said, and what is waiting stays on screen. */
+  const keepOne = async (item: {
+    readonly suggestion: { readonly id: string };
+    readonly label: string;
+  }) => {
+    if (!(await keep(item.suggestion.id)))
+      push("Q", keepFailedLine(item.label));
+  };
   const notThis = async (suggestionId: string) => {
     settleReading();
     await actions.resolveSuggestion({ suggestionId, resolution: "REJECT" });
@@ -2382,7 +2391,7 @@ export function QOnboardingWorkspace({
                     size="compact"
                     variant="secondary"
                     disabled={working}
-                    onClick={() => void keep(item.suggestion.id)}
+                    onClick={() => void keepOne(item)}
                   >
                     {t("Keep")}
                   </Button>
@@ -3212,7 +3221,9 @@ function ProgressStrip({
  * what they said earlier") is shown to them in the second person.
  */
 function secondPerson(note: string): string {
+  // Live 2026-10-30: "Q's summary of your words:" stood over their own
+  // quote. The quote is theirs, so it is labelled as what they said.
   return note
     .replace(/^from what they said earlier/iu, "From what you said earlier")
-    .replace(/^Q's summary of their words/u, "Q's summary of your words");
+    .replace(/^Q's summary of (?:their|your) words:\s*/u, "You said: ");
 }

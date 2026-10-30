@@ -371,21 +371,44 @@ export type PickedUp = {
   readonly editorId: string | undefined;
 };
 
+/**
+ * Q's summary of the person's own words, held for their yes (the server's
+ * paraphrase rationale, stored as "Q's summary of your words: …").
+ */
+export function isSummaryOfTheirWords(
+  suggestion: Pick<OnboardingSuggestionView, "rationale">,
+): boolean {
+  const note = suggestion.rationale ?? "";
+  return (
+    note.startsWith("Q's summary of your words") ||
+    note.startsWith("Q's summary of their words")
+  );
+}
+
+/**
+ * What Q picked up for the card: findings from their documents and public
+ * pages. Q's summary of what they said is not here (live 2026-10-30,
+ * Granary): it is said back in the conversation, where they said it, and
+ * their yes there saves it. A card beside it put the same summary to them
+ * twice, and the two raced (one regenerated while the other was tapped).
+ */
 export function pickedUp(
   view: OnboardingSessionView,
   vocabulary: JourneyVocabulary,
   labels?: Readonly<Record<string, string>>,
 ): readonly PickedUp[] {
-  return view.pendingSuggestions.map((suggestion) => ({
-    suggestion,
-    label: vocabulary.stepTitle(suggestion.stepKey),
-    value: vocabulary.describe(
-      suggestion.stepKey,
-      suggestion.suggestedValue,
-      labels,
-    ),
-    editorId: vocabulary.editorFor(suggestion.stepKey),
-  }));
+  return view.pendingSuggestions
+    .filter((suggestion) => !isSummaryOfTheirWords(suggestion))
+    .map((suggestion) => ({
+      suggestion,
+      label: vocabulary.stepTitle(suggestion.stepKey),
+      value: vocabulary.describe(
+        suggestion.stepKey,
+        suggestion.suggestedValue,
+        labels,
+      ),
+      editorId: vocabulary.editorFor(suggestion.stepKey),
+    }));
 }
 
 /**
@@ -1083,6 +1106,14 @@ export async function keepListedThenConfirm(input: {
   if (failed.length > 0) return { confirmed: false, failed };
   await input.confirm();
   return { confirmed: true, failed };
+}
+
+/**
+ * Q's line when one Keep did not go through (live 2026-10-30: a Keep came
+ * back refused and the card simply vanished). Said, never silent.
+ */
+export function keepFailedLine(label: string): string {
+  return `${label} didn't go through, so it isn't saved yet. Have another look at what's waiting and keep it again.`;
 }
 
 /** Q's line when some listed readings did not keep. */

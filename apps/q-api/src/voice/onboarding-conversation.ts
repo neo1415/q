@@ -21,6 +21,7 @@ import type { InvestorResearch } from "./investor-research.js";
 import { definitionFor, toResponseValue } from "./interview-steps.js";
 import {
   createOnboardingPort,
+  isLongAnswerStep,
   sameValue,
   type RecommendationStore,
 } from "./onboarding-port.js";
@@ -165,10 +166,18 @@ export function createOnboardingConversation(dependencies: {
     declined: ReadonlySet<string> = new Set(),
     finishing = false,
     addsTo: ReadonlySet<string> = new Set(),
+    place?: ReturnType<typeof placeOfQuote>,
   ) =>
     createOnboardingPort({
       addsTo,
       logger,
+      // Owner 2026-10-17, re-agreed 2026-10-30: a narrative answer is
+      // saved as Q's summary they agreed to in the conversation, never
+      // as their raw words; a summary not yet agreed is held for it.
+      narrativeFromReadBackOnly: true,
+      ...(place === undefined
+        ? {}
+        : { qLineBefore: place.qLineBefore, saidAt: place.saidAt }),
       chooseCategories:
         dependencies.categories === undefined
           ? undefined
@@ -467,6 +476,7 @@ export function createOnboardingConversation(dependencies: {
       new Set(declined.map((item) => item.stepKey)),
       false,
       addsTo,
+      placeOfQuote(thread.items),
     );
     const recorded =
       answers.length === 0
@@ -791,6 +801,49 @@ export function quotedFrom(quote: string, turns: readonly string[]): boolean {
   });
 }
 
+/**
+ * Where in the conversation a reader's quote was said: the person's line
+ * it comes from (their latest such line, verbatim before loosely), when
+ * they said it, and the Q line they were answering then. Live 2026-10-30
+ * (Granary): Q's summary was agreed to a line or two before the reading
+ * caught up, so the read-back is found by the line the agreement is in,
+ * never only by Q's latest line.
+ */
+export function placeOfQuote(
+  items: readonly {
+    readonly role: "PERSON" | "Q";
+    readonly text: string;
+    readonly createdAt?: string | undefined;
+  }[],
+): {
+  readonly qLineBefore: (quote: string) => string | undefined;
+  readonly saidAt: (quote: string) => string | undefined;
+} {
+  const lineOf = (quote: string): number => {
+    const joined = plain(quote).join(" ");
+    if (joined.length === 0) return -1;
+    const verbatim = items.findLastIndex(
+      (item) =>
+        item.role === "PERSON" && plain(item.text).join(" ").includes(joined),
+    );
+    if (verbatim >= 0) return verbatim;
+    return items.findLastIndex(
+      (item) => item.role === "PERSON" && quotedFrom(quote, [item.text]),
+    );
+  };
+  return {
+    qLineBefore: (quote) => {
+      const at = lineOf(quote);
+      if (at < 0) return undefined;
+      return items.slice(0, at).findLast((item) => item.role === "Q")?.text;
+    },
+    saidAt: (quote) => {
+      const at = lineOf(quote);
+      return at < 0 ? undefined : items[at]?.createdAt;
+    },
+  };
+}
+
 function isWords(value: unknown): value is readonly string[] {
   return (
     Array.isArray(value) && value.every((item) => typeof item === "string")
@@ -941,7 +994,11 @@ function readableSteps(
   return state.steps.filter(isConversational).map((step) => ({
     stepKey: step.stepKey,
     question: topics.get(step.stepKey) ?? step.question,
-    kind: step.kind,
+    // A step told at length is saved only as Q's summary they agreed to
+    // (ONBOARDING_TRANSCRIPT_READER v7 reads LONG_TEXT so).
+    kind: isLongAnswerStep(state.journey, step.stepKey)
+      ? "LONG_TEXT"
+      : step.kind,
     required: step.required,
     // Labels only, each with its opaque id: never a key as a word.
     options: [...(optionIds.get(step.stepKey) ?? new Map<string, string>())]
@@ -987,16 +1044,34 @@ export function briefOf(
             : (step.pendingRecommendation ?? step.offered) !== undefined
               ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
               : "not covered yet";
+    const sayBack =
+      step.status === "OPEN" && isLongAnswerStep(state.journey, step.stepKey)
+        ? " (say back)"
+        : "";
     return `- ${step.required ? "Needed" : "Optional"}: ${topic}${
       choices.length === 0 ? "" : ` (choices: ${choices})`
-    } [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
+    }${sayBack} [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
   });
+  const sayingBack = state.steps.some(
+    (step) =>
+      isConversational(step) &&
+      step.status === "OPEN" &&
+      isLongAnswerStep(state.journey, step.stepKey),
+  );
   const documents = state.steps.some((step) => step.kind === "DOCUMENT");
   const minutes = state.minutesLeft ?? null;
   const groups = optionalGroups(state);
   return [
     `What this setup needs (${state.journey}), in the setup's order. These are topics, not a script: ask in your own plain words, one thing at a time, and group things that belong together.`,
     ...lines,
+    // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long
+    // answer is said back in Q's words at once and saved as what they
+    // agree to; a summary card beside the conversation raced it.
+    ...(sayingBack
+      ? [
+          "Topics marked (say back) are told at length. As soon as they have told you about any of them, say back in your own plain words, one short sentence a topic, what you understood, and ask if that's right, before you ask anything else. What they agree to is what is saved, so never move on to a new question in that same message. A summary waiting for their yes (not confirmed yet) is said back the same way.",
+        ]
+      : []),
     ...(groups.length === 0
       ? []
       : [

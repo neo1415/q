@@ -20,6 +20,8 @@ import {
   nothingNewLine,
   resumedThread,
   keptAllLine,
+  keepFailedLine,
+  pickedUp,
   stillWaiting,
   pendingQuestion,
   confirmChipLabel,
@@ -1049,5 +1051,54 @@ describe("the thread after a reload keeps the order things were said (live 25 Oc
     ).toEqual(["earlier Q", "earlier you", "welcome back", "unsent"]);
     expect(resumedThread([], ["welcome back"], [])).toEqual(["welcome back"]);
     expect(resumedThread(["earlier"], [], [])).toEqual(["earlier"]);
+  });
+});
+
+describe("live 2026-10-30 (Granary): Q's summary of their words is said in the conversation, not on the card", () => {
+  const held = (
+    id: string,
+    rationale: string | null,
+  ): OnboardingSuggestionView => ({
+    id,
+    stepKey: "F1.description",
+    targetField: "f1.description",
+    suggestedValue: { type: "TEXT", text: "Grain stock tracking for co-ops." },
+    confidence: null,
+    status: "PENDING",
+    sourceRefs: [{ sourceType: "Q_RECOMMENDATION", sourceId: "interview" }],
+    rationale,
+    createdAt: "2026-10-30T17:51:47.000Z",
+  });
+
+  it("the card lists document and research findings, never a summary held for their yes in the conversation", () => {
+    const shown = pickedUp(
+      {
+        ...view(),
+        pendingSuggestions: [
+          held(
+            "a1000000-0000-4000-8000-000000000001",
+            'Q\'s summary of your words: "So basically, um, what we do is…"',
+          ),
+          held(
+            "a1000000-0000-4000-8000-000000000002",
+            'Q\'s summary of their words: "we help small grain co-ops"',
+          ),
+          held(
+            "a1000000-0000-4000-8000-000000000003",
+            "found in their uploaded document",
+          ),
+        ],
+      },
+      VOCABULARY,
+    );
+    expect(shown.map((item) => item.suggestion.id)).toEqual([
+      "a1000000-0000-4000-8000-000000000003",
+    ]);
+  });
+
+  it("a Keep that did not go through is said, never silent", () => {
+    expect(keepFailedLine("The Problem")).toBe(
+      "The Problem didn't go through, so it isn't saved yet. Have another look at what's waiting and keep it again.",
+    );
   });
 });

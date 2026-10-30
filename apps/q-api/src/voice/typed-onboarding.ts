@@ -96,6 +96,12 @@ export function createTypedOnboarding(dependencies: {
    * Their next answers go on toward finishing until the read-back.
    */
   const finishAsked = new Set<string>();
+  /**
+   * The step Q's last line asked, per session (live 2026-10-30, Granary):
+   * "yes that's right" to Q's summary was read with no question in view
+   * and taken as finishing. The reading is told what was asked.
+   */
+  const lastAsked = new Map<string, string>();
 
   return {
     turn: async (input) => {
@@ -267,7 +273,9 @@ export function createTypedOnboarding(dependencies: {
                 utterance,
                 lastQ,
                 ...(readBackReview === null
-                  ? {}
+                  ? lastAsked.has(input.onboardingSessionId)
+                    ? { askedStep: lastAsked.get(input.onboardingSessionId) }
+                    : {}
                   : { askedStep: readBackReview }),
                 steps: state.steps.map((step) => ({
                   stepKey: step.stepKey,
@@ -417,6 +425,17 @@ export function createTypedOnboarding(dependencies: {
             input.onboardingSessionId,
           ));
         const askingStep = askingFor(view, input.journeyType, said.asking);
+        if (askingStep === null) {
+          lastAsked.delete(input.onboardingSessionId);
+        } else {
+          lastAsked.delete(input.onboardingSessionId);
+          lastAsked.set(input.onboardingSessionId, askingStep.stepKey);
+          // Bounded: the oldest session's note goes first.
+          if (lastAsked.size > 2_000) {
+            const oldest = lastAsked.keys().next().value;
+            if (oldest !== undefined) lastAsked.delete(oldest);
+          }
+        }
         logger.info(
           {
             path: said.path,
