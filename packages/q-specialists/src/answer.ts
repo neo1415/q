@@ -14,7 +14,11 @@ import {
   toolFocusOf,
 } from "./tool-focus.js";
 import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
-import { planAskRoutes, type QPlanJobPort } from "./plan-job-port.js";
+import {
+  planAskRoutes,
+  type QPlanAskReading,
+  type QPlanJobPort,
+} from "./plan-job-port.js";
 import {
   goAheadGoal,
   earlierRequestGoal,
@@ -215,6 +219,27 @@ import {
 } from "./conversation-entities.js";
 
 /** B6: a reference in the turn, bound to records, with its note. */
+/**
+ * An offer code closed Q's answer with, recorded with the run that made it
+ * (live 2026-10-30). PLAN: the full plan offered after the answer to what
+ * to do now; `ask` is the question that answer answered, which is what
+ * the plan is for.
+ */
+type RecordedOffer = {
+  readonly kind: "PLAN";
+  readonly runId: string;
+  readonly ask: string;
+};
+
+/** The plan Q offered: their own, for a goal or period, from what Q holds. */
+const OFFERED_PLAN_ASK: QPlanAskReading = {
+  kind: "GOAL",
+  research: "NONE",
+  side: null,
+  subject: "OWN",
+  deliverable: "PLAN",
+};
+
 type PointedAt = {
   readonly ask: ReferenceAsk | null;
   /** Null: bound to one of the page's controls, said in `note`. */
@@ -3867,6 +3892,33 @@ export function createSpecialistQAnswer(
   const sequences = new Map<string, QuestionSequence>();
   /** The last turn's tool focus per conversation, bounded like the rest. */
   const focuses = new Map<string, QToolFocus>();
+  /**
+   * Live 2026-10-30: the offer code closed Q's last answer with, per
+   * conversation, recorded with the run that made it -- so "yes" binds to
+   * that exact offer (TURN_READER v74 acceptsOffer), never to a guess from
+   * the words. Kept only while that answer is still Q's last turn; in
+   * memory and bounded like the rest (a restart forgets an offer, and a yes
+   * to a forgotten offer moves nothing, see offerTakenUnrecorded).
+   */
+  const offers = new Map<string, RecordedOffer>();
+  const recordOffer = (conversationId: string, offer: RecordedOffer): void => {
+    offers.delete(conversationId);
+    offers.set(conversationId, offer);
+    if (offers.size > MAX_CONVERSATIONS) {
+      const oldest = offers.keys().next().value;
+      if (oldest !== undefined) offers.delete(oldest);
+    }
+  };
+  /** The offer Q's last turn made, if code recorded one with it. */
+  const offerOfLastTurn = (
+    conversationId: string,
+    history: readonly QConversationMessage[],
+  ): RecordedOffer | null => {
+    const offer = offers.get(conversationId);
+    if (offer === undefined) return null;
+    const lastQ = [...history].reverse().find((m) => m.role === "Q");
+    return lastQ?.runId === offer.runId ? offer : null;
+  };
 
   /**
    * RECOVERY-2026-10 B3 (audit B-02): the core's state, kept durable when a
@@ -6044,12 +6096,26 @@ export function createSpecialistQAnswer(
     // (TURN_READER v70 planAsk), never by words -- starts the plan job at
     // once: one line saying what Q is doing and the card that follows it.
     // The subject is theirs (their company or mandate), resolved by code.
+    // Live 2026-10-30: a yes to Q's own offer binds to the offer recorded
+    // with Q's turn (TURN_READER v74 acceptsOffer, by meaning). Taking up
+    // the plan offer is the plan of what they first asked ("What should I
+    // do today?"), never of the word "yes".
+    const offerTaken =
+      confident && read?.acceptsOffer === true
+        ? offerOfLastTurn(conversationId, history)
+        : null;
+    const offeredPlan = offerTaken?.kind === "PLAN" ? offerTaken : null;
     if (
       confident &&
       dependencies.plan !== undefined &&
-      planAskRoutes(read?.planAsk ?? null)
+      (offeredPlan !== null || planAskRoutes(read?.planAsk ?? null))
     ) {
-      const planAsk = read?.planAsk ?? null;
+      const planAsk =
+        offeredPlan === null
+          ? (read?.planAsk ?? null)
+          : planAskRoutes(read?.planAsk ?? null)
+            ? (read?.planAsk ?? null)
+            : OFFERED_PLAN_ASK;
       if (planAsk !== null) {
         // Live 2026-10-29: the first specific line ("gathering your
         // situation") came 5.6-6.9 s in, after the job was filed. It is
@@ -6057,11 +6123,15 @@ export function createSpecialistQAnswer(
         // anything is filed (one event insert; it never fails the turn).
         await showStage(request, "GATHERING_SITUATION");
         const started = await dependencies.plan
-          .start(request, { ask: latest.content, planAsk })
+          .start(request, {
+            ask: offeredPlan === null ? latest.content : offeredPlan.ask,
+            planAsk,
+          })
           .catch(() => ({ status: "FAILED" as const }));
         logger?.info(
           {
             qRunId: request.runId,
+            offerTaken: offeredPlan !== null,
             planAsk: planAsk.kind,
             deliverable: planAsk.deliverable,
             research: planAsk.research,
@@ -6737,9 +6807,14 @@ export function createSpecialistQAnswer(
     // question about anything else, such as what a SAFE is, was answered
     // under the readiness list.
     const leadStartedAt = Date.now();
+    // Live 2026-10-30 ("What should I do today?" x3): two of three runs
+    // read the question as THEIR_OWN_RECORDS, not ADVICE, and lost the
+    // priorities and the plan offer. Which source a question draws on is
+    // not whether it asks what to do next: that is nextSteps alone, read
+    // beside the class (TURN_READER v74), for any question to Q.
     const asksNextSteps =
       !writingDocument &&
-      read?.question?.kind === "ADVICE" &&
+      read?.kind === "QUESTION_TO_Q" &&
       read.nextSteps === true &&
       read.aboutNamedOther !== true;
     // Owner 2026-10-30: "What should I do today?" is answered in the
@@ -6910,6 +6985,10 @@ export function createSpecialistQAnswer(
       ...(readinessLead === null || planOffer === null
         ? {}
         : { closingLines: planOffer }),
+      // A yes to an offer code did not record: no screen move is guessed.
+      ...(confident && read?.acceptsOffer === true && offerTaken === null
+        ? { offerTakenUnrecorded: true as const }
+        : {}),
       // Only a name the reader was given counts (ADR 0040 parity).
       ...(redirectedTo !== null
         ? { askedAction: redirectedTo }
@@ -6969,6 +7048,15 @@ export function createSpecialistQAnswer(
           readMs,
           readinessLeadMs,
           lead: readinessLead !== null,
+          // Live 2026-10-30: what the lead keyed on, beside the class.
+          questionKind: read?.question?.kind ?? null,
+          nextSteps: read?.nextSteps === true,
+          offerTaken:
+            read?.acceptsOffer === true
+              ? offerTaken === null
+                ? "UNRECORDED"
+                : offerTaken.kind
+              : null,
           // The reading through the routing above, before the answer.
           beforeAnswerMs: Date.now() - turnStartedAt,
           sinceMessageMs: Number.isFinite(sentAt) ? Date.now() - sentAt : null,
@@ -6991,6 +7079,19 @@ export function createSpecialistQAnswer(
     }
     if (outcome.kind === "ANSWERED" && series.step !== null) {
       keepSequence(conversationId, series.next);
+    }
+    // The plan offer that closed this answer is recorded with it, so a yes
+    // next turn binds to exactly this offer (TURN_READER v74 acceptsOffer).
+    if (
+      outcome.kind === "ANSWERED" &&
+      finalRequest.closingLines !== undefined &&
+      finalRequest.closingLines === planOffer
+    ) {
+      recordOffer(conversationId, {
+        kind: "PLAN",
+        runId: request.runId,
+        ask: latest.content,
+      });
     }
     if (outcome.kind === "FAILED") {
       const operation = operationOf(outcome.diagnosticCode);

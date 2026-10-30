@@ -17,7 +17,7 @@ import {
 describe("TURN_READER v67: the top N of a list Q showed is compare", () => {
   it("is the active reader: v66 kept whole plus the rule after the named choice", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(73);
+    expect(active.definition.version).toBe(74);
     expect(TURN_READER_V66.status).toBe("DEPRECATED");
     expect(TURN_READER_V67.template).toContain(
       `${V65_CHOICE_IS_COMPARE}\n${V67_TOP_N_COMPARE}`,

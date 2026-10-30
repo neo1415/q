@@ -9,7 +9,7 @@ import {
 
 import { z } from "zod";
 
-import { withoutUnaskedMoves } from "./unasked-moves.js";
+import { carriesScreenMove, withoutUnaskedMoves } from "./unasked-moves.js";
 import {
   asksForComparison,
   asksForPipelineSummary,
@@ -2684,6 +2684,20 @@ export function createModelGatewayQAnswer(
       if (oldest !== undefined) reviewOnlyRuns.delete(oldest);
     }
   };
+  /**
+   * Live 2026-10-30: runs whose turn took Q up on an offer code did not
+   * record (offerTakenUnrecorded). No tool result moves their screen in
+   * them: the destination would be re-guessed ("the pending approvals"
+   * became account settings). Bounded.
+   */
+  const unmovedRuns = new Set<string>();
+  const markUnmoved = (runId: string): void => {
+    unmovedRuns.add(runId);
+    if (unmovedRuns.size > 256) {
+      const [oldest] = unmovedRuns;
+      if (oldest !== undefined) unmovedRuns.delete(oldest);
+    }
+  };
   /** QA F-114: each run's Discover filter rule (discover-filter-rule.ts). Bounded. */
   const discoverRuleByRun = new Map<string, DiscoverRule>();
   const noteDiscoverRule = (runId: string, rule: DiscoverRule): void => {
@@ -2800,6 +2814,20 @@ export function createModelGatewayQAnswer(
             baseTools.execute(proposal, toolContext),
           ),
       );
+      if (
+        unmovedRuns.has(toolContext.runId) &&
+        outcome.result.ok &&
+        carriesScreenMove(outcome.result.data)
+      ) {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: proposal.name },
+          "q made no move: the offer taken was not recorded",
+        );
+        return notAsked(
+          proposal.callId,
+          "They said yes to something your last answer offered, but where it would take them was not recorded, so their screen does not move this turn. Answer here, in place, from what you hold; do not say you are opening or taking them anywhere.",
+        );
+      }
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
       if (
@@ -4904,6 +4932,7 @@ export function createModelGatewayQAnswer(
        * (early-lead.ts), said the moment the model is asked.
        */
       let leadLines: string | undefined = request.leadLines;
+      if (request.offerTakenUnrecorded === true) markUnmoved(request.runId);
       const took = (phase: string): void => {
         const now = Date.now();
         phases[phase] = now - mark;
@@ -5755,6 +5784,10 @@ export function createModelGatewayQAnswer(
           ownReadiness = ownReadinessFact(outcome.result.data, {
             lead: request.questionKind === "ADVICE" && !aboutSomeoneElse,
             alreadySaid: leadLines !== undefined,
+            // Code closes this answer with its own offer: one offer per
+            // answer, so a yes binds to it (live 2026-10-30, run 2 offered
+            // both a move and a plan, and the yes started the plan).
+            closingOffer: request.closingLines !== undefined,
           });
           ownHeldBack = heldBackDocumentsFact(outcome.result.data);
         }

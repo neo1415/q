@@ -1077,3 +1077,16 @@ export const TurnReaderV70ResultSchema = TurnReaderV65ResultSchema.extend({
   directsWork: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV70Result = z.infer<typeof TurnReaderV70ResultSchema>;
+
+/**
+ * v74 (live 2026-10-30, founder.ledgerbridge): whether the turn takes Q up
+ * on what Q's own last turn offered ("yes", "go ahead", "please do", in any
+ * language), read by meaning. Code binds that yes to the offer it recorded
+ * with Q's turn; it never re-guesses the offer from the words. Lenient:
+ * a malformed value is false, never a lost reading.
+ */
+export const TURN_READER_V74_SCHEMA_VERSION = 74;
+export const TurnReaderV74ResultSchema = TurnReaderV70ResultSchema.extend({
+  acceptsOffer: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV74Result = z.infer<typeof TurnReaderV74ResultSchema>;

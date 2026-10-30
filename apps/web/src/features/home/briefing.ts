@@ -128,6 +128,12 @@ export type BriefingItem = {
   readonly later?: true | undefined;
   /** A visible call to action on the card, when the title alone does not say where it leads. */
   readonly cta?: string | undefined;
+  /**
+   * What keeps investors from finding them (the marketplace readiness the
+   * answer to "what should I do next?" leads with), shown on the Q page as
+   * it opens (owner 2026-10-30, MVP item 7).
+   */
+  readonly discovery?: true | undefined;
 };
 
 export type Briefing = {
@@ -291,6 +297,7 @@ export function readinessItems(
             description: "Q picks up where you left off.",
             href: "/onboarding/founder?from=home",
             cta: "Finish setup with Q",
+            discovery: true,
           },
         ]
       : [];
@@ -305,6 +312,7 @@ export function readinessItems(
       description: first.description,
       href: setupOpen ? "/onboarding/founder?from=home" : first.href,
       cta: setupOpen ? "Finish setup with Q" : "Continue",
+      discovery: true,
     },
   ];
 }

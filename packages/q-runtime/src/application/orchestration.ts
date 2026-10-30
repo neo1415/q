@@ -426,6 +426,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly closingLines?: string | undefined;
   /**
+   * Live 2026-10-30: they said yes to an offer of Q's that code did not
+   * record with that turn (Q's own words offered it), so what was offered
+   * is not known structurally. The answer makes no screen move this turn:
+   * a move would be a guess at the offer ("take you to the pending
+   * approvals" was re-guessed into account settings). Absent: false.
+   */
+  readonly offerTakenUnrecorded?: true | undefined;
+  /**
    * U4/F8 (QA 24 Oct 2026): a screen move their words also asked for ("open
    * the data room and tell me what's missing"), carried by the answer to
    * the question so the move is made and the question still answered.

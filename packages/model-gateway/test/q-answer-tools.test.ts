@@ -760,6 +760,53 @@ describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
     ]);
   });
 
+  it("live 2026-10-30: a yes to an offer code did not record moves nothing -- the move is refused to the model, never guessed", async () => {
+    const OPEN_PAGE_OFFERED: QOfferedTool = {
+      ...SET_THEME_OFFERED,
+      toolName: "client.page.open",
+      definition: { ...SET_THEME_OFFERED.definition, name: "open_page" },
+    };
+    const tools = toolPort([OPEN_PAGE_OFFERED], (p) => ({
+      ...succeeded(p, {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "OPEN_SETTINGS", section: "account" },
+      }),
+      toolName: "client.page.open",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed, alpha } = build({
+      said: "yes",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "t1",
+              name: "open_page",
+              arguments: { page: "SETTINGS", section: "account" },
+            },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult("Your three pending approvals are two messages."),
+          ),
+        },
+      ],
+      tools,
+    });
+    expect(
+      (await seam.answer({ ...request, offerTakenUnrecorded: true })).kind,
+    ).toBe("ANSWERED");
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks ?? []).toEqual([]);
+    // The model was told why, as the tool's own refusal.
+    expect(JSON.stringify(alpha.calls.at(-1))).toContain(
+      "where it would take them was not recorded",
+    );
+  });
+
   it("an empty closing answer after a screen action still delivers the action (founder live 2026-09-30)", async () => {
     const tools = toolPort([SET_THEME_OFFERED], (p) => ({
       ...succeeded(p, {

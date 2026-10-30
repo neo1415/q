@@ -274,6 +274,7 @@ function seam(options: {
   const leadBlocks: unknown[] = [];
   const leads: (string | undefined)[] = [];
   const closings: (string | undefined)[] = [];
+  const unrecordedOffers: boolean[] = [];
   let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
@@ -303,6 +304,7 @@ function seam(options: {
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
         closings.push(req.closingLines);
+        unrecordedOffers.push(req.offerTakenUnrecorded === true);
         focuses.push(req.toolFocus);
         namedOthers.push(req.aboutNamedOther);
         compares.push(req.compare);
@@ -462,6 +464,7 @@ function seam(options: {
     probes,
     leads,
     closings,
+    unrecordedOffers,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -5763,6 +5766,127 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
       expect(typeof fields[key]).toBe("number");
     }
     expect(JSON.stringify(timing?.[1])).not.toContain("today");
+  });
+
+  it("live 2026-10-30: the priorities and the plan offer follow nextSteps, whichever source class the reader chose", async () => {
+    const OFFER = "If you'd like a full plan, say so.";
+    const records = {
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "THEIR_OWN_RECORDS", text: "What should I do today?" },
+      aboutNamedOther: false,
+      nextSteps: true,
+      tool: null,
+      handOver: null,
+    } as unknown as TurnReaderResult;
+    const run = seam({
+      said: "What should I do today?",
+      reading: records,
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      planOffer: () => Promise.resolve(OFFER),
+      plan: { start: () => Promise.resolve({ status: "FAILED" as const }) },
+    });
+    await run.answer.answer(request());
+    expect(run.leads).toEqual([LEAD]);
+    expect(run.closings).toEqual([OFFER]);
+    // The same class without nextSteps is a question about their records.
+    const plain = seam({
+      said: "What's on my company record?",
+      reading: { ...records, nextSteps: false } as TurnReaderResult,
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      planOffer: () => Promise.resolve(OFFER),
+      plan: { start: () => Promise.resolve({ status: "FAILED" as const }) },
+    });
+    await plain.answer.answer(request());
+    expect(plain.leads).toEqual([undefined]);
+    expect(plain.closings).toEqual([undefined]);
+  });
+
+  it("live 2026-10-30: a yes binds to the plan offer recorded with Q's turn, for what they first asked -- never a plan of 'yes'", async () => {
+    const OFFER = "If you'd like a full plan, say so.";
+    const started: { ask: string; planAsk: unknown }[] = [];
+    let turn = 0;
+    const run = seam({
+      said: "What should I do today?",
+      earlier: [{ role: "Q", content: `Here is where things stand. ${OFFER}` }],
+      reading: () => {
+        turn += 1;
+        return turn === 1
+          ? advice()
+          : ({
+              kind: "QUESTION_TO_Q",
+              confidence: "HIGH",
+              transcript: "CLEAR",
+              question: { kind: "ADVICE", text: "yes" },
+              aboutNamedOther: false,
+              nextSteps: false,
+              // The reader may or may not also read it as the plan ask (v73).
+              planAsk: null,
+              acceptsOffer: true,
+              tool: null,
+              handOver: null,
+            } as unknown as TurnReaderResult);
+      },
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      planOffer: () => Promise.resolve(OFFER),
+      plan: {
+        start: (_request, input) => {
+          started.push(input);
+          return Promise.resolve({
+            status: "STARTED" as const,
+            jobId: randomUUID(),
+            title: "Your plan",
+            line: "I'm on it.",
+          });
+        },
+      },
+    });
+    // Turn 1 is the run whose answer the history's Q line is.
+    const first = { ...request(), runId: run.message.runId };
+    await run.answer.answer(first);
+    expect(run.closings).toEqual([OFFER]);
+    (run.message as { content: string }).content = "yes";
+    await run.answer.answer(request());
+    expect(started).toEqual([
+      {
+        ask: "What should I do today?",
+        planAsk: {
+          kind: "GOAL",
+          research: "NONE",
+          side: null,
+          subject: "OWN",
+          deliverable: "PLAN",
+        },
+      },
+    ]);
+  });
+
+  it("live 2026-10-30: a yes to an offer code did not record moves nothing -- the answer is told so, never a guessed page", async () => {
+    const run = seam({
+      said: "yes",
+      earlier: [
+        { role: "Q", content: "Want me to take you to the pending approvals?" },
+      ],
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: { kind: "ADVICE", text: "yes" },
+        aboutNamedOther: false,
+        acceptsOffer: true,
+        replyTo: { kind: "Q_QUESTION", card: null },
+        tool: null,
+        handOver: null,
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.unrecordedOffers).toEqual([true]);
   });
 
   it("offers no plan when the plan job is not composed, nor beside a turn with no lead", async () => {

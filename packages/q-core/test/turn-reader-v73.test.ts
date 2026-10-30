@@ -15,11 +15,12 @@ import {
  * on it is the plan ask -- read by meaning, never a word list in code.
  */
 describe("TURN_READER v73: a yes to Q's offer of a plan is the plan ask", () => {
-  it("is the active reader: v72 with only its PLAN ASK rule extended", () => {
+  it("was the active reader (v74 now): v72 with only its PLAN ASK rule extended", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(73);
-    expect(active.output).toEqual(TURN_READER_V72.output);
+    expect(registry.get("TURN_READER", 73)?.definition.status).toBe(
+      "DEPRECATED",
+    );
+    expect(TURN_READER_V73.output).toEqual(TURN_READER_V72.output);
     expect(TURN_READER_V73.template.replace(V73_PLAN_ASK, V72_PLAN_ASK)).toBe(
       TURN_READER_V72.template,
     );

@@ -390,7 +390,10 @@ export function createQRunStreamService(
     // more (§43): there is no live phase to wait for.
     let runEnded = isTerminalQRunStatus(run.status);
     let replayed = 0;
-    const pending: QLiveDelta[] = [];
+    /** Live text waiting to go out, with when it arrived (wait is logged). */
+    const pending: { readonly delta: QLiveDelta; readonly at: number }[] = [];
+    let deltaWaitMaxMs = 0;
+    let deltasSent = 0;
     let wake: ((value: Wake) => void) | null = null;
     const wakeUp = (value: Wake) => {
       const current = wake;
@@ -415,7 +418,7 @@ export function createQRunStreamService(
               pending.shift();
               deltasDropped += 1;
             }
-            pending.push(delta);
+            pending.push({ delta, at: Date.now() });
             wakeUp("WOKE");
           });
     const onAbort = () => wakeUp("ABORTED");
@@ -437,17 +440,83 @@ export function createQRunStreamService(
         };
       });
 
+    /** Everything queued goes out now, one frame per message. */
+    function* flushDeltas(): Generator<QRunStreamItem> {
+      while (pending.length > 0 && !signal.aborted) {
+        const queued = pending.splice(0, pending.length);
+        const sentAt = Date.now();
+        for (const { at } of queued) {
+          deltaWaitMaxMs = Math.max(deltaWaitMaxMs, sentAt - at);
+        }
+        deltasSent += queued.length;
+        for (const delta of coalesceDeltas(queued.map((one) => one.delta))) {
+          for (const event of deltaEvents(delta, cursor)) {
+            yield { kind: "delta", event };
+          }
+        }
+      }
+    }
+
+    /**
+     * A durable re-read, with live text let through while it waits.
+     *
+     * Live 2026-10-30 (run 2): the answer's opening lines were published
+     * about 3.4 s before the browser showed them. Text queued while the
+     * stream re-read the event table (each stage, finding or message is a
+     * re-read) went out only after that read returned, and the read shares
+     * the database pool with the answer's own reads at exactly that moment.
+     * A delta needs nothing from the table: it is presentation only, keyed
+     * by its message id, and the client drops one whose message is already
+     * persisted, so sending it ahead of a pending durable event is safe.
+     */
+    async function* readingWithDeltas<T>(
+      work: Promise<T>,
+    ): AsyncGenerator<QRunStreamItem, T> {
+      type Settled =
+        | { readonly ok: true; readonly value: T }
+        | { readonly ok: false; readonly error: unknown };
+      // Set by the callbacks below; read through a box so the type is not
+      // narrowed to its initial null.
+      const box: { outcome: Settled | null } = { outcome: null };
+      void work.then(
+        (value) => {
+          box.outcome = { ok: true, value };
+          wakeUp("WOKE");
+        },
+        (error: unknown) => {
+          box.outcome = { ok: false, error };
+          wakeUp("WOKE");
+        },
+      );
+      for (;;) {
+        const settled = box.outcome;
+        if (settled !== null) {
+          if (settled.ok) return settled.value;
+          throw settled.error;
+        }
+        if (pending.length > 0 && !signal.aborted) {
+          yield* flushDeltas();
+          continue;
+        }
+        // Woken by the read settling, a delta, a notice or an abort; an
+        // abort still waits for the read, which is bounded.
+        await new Promise<void>((resolve) => {
+          wake = () => resolve();
+        });
+      }
+    }
+
     try {
       while (!signal.aborted) {
         if (dirty) {
           dirty = false;
           let page: readonly QRunEventRecord[];
           do {
-            page = await repositories.runEvents.listForRun(
-              sql,
-              run.tenantId,
-              run.id,
-              { afterSequence: cursor, limit: options.replayPageSize },
+            page = yield* readingWithDeltas(
+              repositories.runEvents.listForRun(sql, run.tenantId, run.id, {
+                afterSequence: cursor,
+                limit: options.replayPageSize,
+              }),
             );
             for (const record of page) {
               // The cursor moves past every stored row, projected or not: a
@@ -493,16 +562,9 @@ export function createQRunStreamService(
           continue;
         }
 
-        while (pending.length > 0 && !dirty && !signal.aborted) {
-          // Everything queued while the last frame was being written goes
-          // out as one frame per message, not one per fragment.
-          const batch = coalesceDeltas(pending.splice(0, pending.length));
-          for (const delta of batch) {
-            for (const event of deltaEvents(delta, cursor)) {
-              yield { kind: "delta", event };
-            }
-          }
-        }
+        // Everything queued while the last frame was being written goes
+        // out as one frame per message, not one per fragment.
+        yield* flushDeltas();
         if (dirty) {
           continue;
         }
@@ -531,6 +593,14 @@ export function createQRunStreamService(
       unsubscribeNotices();
       unsubscribeDeltas();
       signal.removeEventListener("abort", onAbort);
+      if (deltasSent > 0) {
+        // How long live text waited in this stream before going out; the
+        // measure of the delivery lag a person sees (no content).
+        logger?.info(
+          { qRunId: run.id, deltasSent, deltaWaitMaxMs },
+          "q stream live text delivery",
+        );
+      }
     }
   }
 

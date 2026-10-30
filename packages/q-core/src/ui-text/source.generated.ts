@@ -599,6 +599,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Based on:",
   "Basis",
   "Before",
+  "Before investors can find you",
   "Before you connect",
   "Began",
   "Begin interview",

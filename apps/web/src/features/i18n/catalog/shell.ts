@@ -50,6 +50,7 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "Not yet acted on": "لم يُتخذ إجراء بعد",
   "Nothing is needed from you.": "لا شيء مطلوب منك.",
   "One step before investors can find you": "خطوة واحدة قبل أن يجدك المستثمرون",
+  "Before investors can find you": "قبل أن يجدك المستثمرون",
   "One thing needs you.": "أمر واحد يحتاجك.",
   "Waiting for your approval": "بانتظار موافقتك",
   "Worth a look.": "يستحق نظرة.",
