@@ -275,8 +275,43 @@ export function atLeastOne(input: {
 }
 export const SOME_REF = {
   message:
-    "name the other side: counterpartName (their name as the person said it), or relationshipId, companyId or investorOrganisationId",
+    "name the other side: counterpartName (their name as the person said it), or relationshipId, companyId or investorOrganisationId, or theirOnlyRelationship when it is for their relationships as a group",
 };
+
+/**
+ * Sweep 2026-10-29 ("update my investors", one connected investor): the
+ * model would not address their one relationship and asked whom instead.
+ * Whether the person means their relationships as a group is the model's
+ * reading (this field); which relationship that is, is code's: their own
+ * list, and only when it holds exactly one. The card names whom it goes to
+ * and it still waits for their approval.
+ */
+export const TheirOnlyRelationshipSchema = z
+  .literal(true)
+  .optional()
+  .describe(
+    'True when the message is for the other side of their relationships as a group and names no one ("update my investors", "message my founders"). Capital Q addresses it to their one relationship when they have exactly one; with several it prepares nothing, and you ask whom it is for.',
+  );
+
+export const SEVERAL_RELATIONSHIPS =
+  "They have more than one relationship, so no single one was chosen and nothing was prepared. Ask whom it is for, by name.";
+
+/** Their one relationship, from their own list; null when none or several. */
+export async function onlyRelationship(
+  actor: ActorContext,
+  relationships: RelationshipIntelligencePort,
+): Promise<
+  | { readonly kind: "ONE"; readonly relationshipId: string }
+  | { readonly kind: "NONE" }
+  | { readonly kind: "SEVERAL" }
+> {
+  const own = await relationships.ownRelationships?.(actor).catch(() => null);
+  const items = own?.items ?? [];
+  const only = items.length === 1 ? items[0] : undefined;
+  if (only !== undefined)
+    return { kind: "ONE", relationshipId: only.relationshipId };
+  return items.length === 0 ? { kind: "NONE" } : { kind: "SEVERAL" };
+}
 
 /**
  * One relationship for this run: bound by the firewall when named by id,
@@ -577,6 +612,7 @@ export type ChatProposalOutput = z.infer<typeof ChatProposalOutputSchema>;
 export const ProposeChatMessageInputSchema = z
   .object({
     ...RelationshipRef,
+    theirOnlyRelationship: TheirOnlyRelationshipSchema,
     body: ChatMessageBodySchema.describe(
       "The whole message, in the person's voice. Plain text. No claims the evidence does not support. A note to founders they are not yet connected with says why this investor is interested: their declared mandate (stage, sector, geography, cheque) against what the company does and its stage, from what you have read in this conversation. Never generic, never a claim you have not read.",
     ),
@@ -586,7 +622,10 @@ export const ProposeChatMessageInputSchema = z
     reason: CardReasonSchema,
   })
   .strict()
-  .refine(atLeastOne, SOME_REF);
+  .refine(
+    (input) => atLeastOne(input) || input.theirOnlyRelationship === true,
+    SOME_REF,
+  );
 export type ProposeChatMessageInput = z.infer<
   typeof ProposeChatMessageInputSchema
 >;
@@ -630,12 +669,22 @@ function proposalTool<I extends ProposeChatMessageInput>(
     output: ChatProposalOutputSchema,
     authorize: async (input, { actor, plan }) => {
       try {
-        const agreed = await agreedRelationship(
-          input,
-          actor,
-          plan,
-          relationships,
-        );
+        const agreed =
+          refsGiven(input) === 0 && input.theirOnlyRelationship === true
+            ? await onlyRelationship(actor, relationships).then((only) =>
+                only.kind === "ONE"
+                  ? ({
+                      kind: "ONE",
+                      relationshipId: only.relationshipId,
+                    } as const)
+                  : only.kind === "SEVERAL"
+                    ? ({ kind: "SEVERAL" } as const)
+                    : ({ kind: "ONE", relationshipId: null } as const),
+              )
+            : await agreedRelationship(input, actor, plan, relationships);
+        if (agreed.kind === "SEVERAL") {
+          return deny("NOT_AVAILABLE", SEVERAL_RELATIONSHIPS);
+        }
         if (agreed.kind === "DIFFERENT") {
           return deny("NOT_AVAILABLE", DIFFERENT_COUNTERPARTS);
         }

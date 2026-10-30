@@ -22,7 +22,10 @@ import type {
 import {
   agreedRelationship,
   DIFFERENT_COUNTERPARTS,
+  onlyRelationship,
   refsGiven,
+  SEVERAL_RELATIONSHIPS,
+  TheirOnlyRelationshipSchema,
 } from "./chat.js";
 import { CardReasonSchema, reasonOf } from "./card-reason.js";
 import { closestByName } from "./connection-requests.js";
@@ -80,6 +83,7 @@ export const ProposeEmailInputSchema = z
       .describe(
         "Or the other side's name as the person said it (from any page); Capital Q finds it among their own relationships.",
       ),
+    theirOnlyRelationship: TheirOnlyRelationshipSchema,
     // Guard F-106 (2026-10-25): a name written here instead of an address
     // failed the whole email (INVALID_ARGUMENTS). Anything that is not an
     // address is no recipient named: the relationship's own contact is used.
@@ -117,7 +121,7 @@ export const ProposeEmailInputSchema = z
         input.investorOrganisationId,
         input.counterpartName,
         input.inboundEmailId,
-      ].some((id) => id !== undefined),
+      ].some((id) => id !== undefined) || input.theirOnlyRelationship === true,
     {
       message:
         "name the other side: counterpartName (their name as the person said it), or relationshipId, companyId or investorOrganisationId, or inboundEmailId to reply to an email",
@@ -281,6 +285,17 @@ export function createProposeEmailTool(
             return deny("NOT_AVAILABLE", DIFFERENT_COUNTERPARTS);
           }
           return await prepared(agreed.relationshipId, true);
+        }
+        // Sweep 2026-10-29: "an update email to my investors" with one
+        // investor -- their one relationship, from their own list.
+        if (refsGiven(input) === 0 && input.theirOnlyRelationship === true) {
+          if (relationships === undefined) return deny("NOT_AVAILABLE");
+          const only = await onlyRelationship(actor, relationships);
+          if (only.kind === "SEVERAL") {
+            return deny("NOT_AVAILABLE", SEVERAL_RELATIONSHIPS);
+          }
+          if (only.kind === "NONE") return deny("NOT_AVAILABLE");
+          return await prepared(only.relationshipId, true);
         }
         let relationshipId = input.relationshipId;
         // A name (action parity 2026-10-02, "email Nixo" from any page):
