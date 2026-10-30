@@ -331,6 +331,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V1 } from "./tasks/onboarding-transcript-r
 import { ONBOARDING_TRANSCRIPT_READER_V2 } from "./tasks/onboarding-transcript-reader.v2.js";
 import { ONBOARDING_TRANSCRIPT_READER_V3 } from "./tasks/onboarding-transcript-reader.v3.js";
 import { ONBOARDING_TRANSCRIPT_READER_V4 } from "./tasks/onboarding-transcript-reader.v4.js";
+import { ONBOARDING_TRANSCRIPT_READER_V5 } from "./tasks/onboarding-transcript-reader.v5.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
@@ -506,7 +507,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Production re-test 2026-10-28: what they mainly do is the answer.
     { ...ONBOARDING_TRANSCRIPT_READER_V3, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: option keys by meaning, detail included.
-    ONBOARDING_TRANSCRIPT_READER_V4,
+    { ...ONBOARDING_TRANSCRIPT_READER_V4, status: "DEPRECATED" },
+    // Live recheck 2026-10-30: options as opaque ids, never keys.
+    ONBOARDING_TRANSCRIPT_READER_V5,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.

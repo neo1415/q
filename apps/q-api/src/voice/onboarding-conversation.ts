@@ -23,7 +23,7 @@ import {
   sameValue,
   type RecommendationStore,
 } from "./onboarding-port.js";
-import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
 
 /**
  * Voice onboarding as a conversation first (owner 2026-10-27).
@@ -311,9 +311,10 @@ export function createOnboardingConversation(dependencies: {
     if (personTurns.length === 0) return;
     const state = await portFor(line, personTurns).state();
     if (state.completed) return;
-    const reading = await dependencies.reader.read({
+    const optionIds = optionIdsOf(state);
+    const read = await dependencies.reader.read({
       journey: line.onboarding.journeyType,
-      steps: readableSteps(state),
+      steps: readableSteps(state, optionIds),
       turns,
       attribution: {
         tenantId: line.actor.tenantId,
@@ -321,7 +322,15 @@ export function createOnboardingConversation(dependencies: {
         correlationId: randomUUID(),
       },
     });
-    if (reading === null) return;
+    if (read === null) return;
+    // The reader named options by their ids; back to the journey's keys.
+    const reading = {
+      ...read,
+      answers: read.answers.map((answer) => ({
+        ...answer,
+        value: keysFromIds(answer.value, optionIds.get(answer.stepKey)),
+      })),
+    };
     // What is already on record, unchanged, is never written again: every
     // reading sees the whole conversation (live 2026-10-28: one answer
     // rewritten on each reading, a new version each time).
@@ -815,15 +824,65 @@ function optionLabels(step: OnboardingStepState): string {
   return (step.options ?? []).map((option) => option.label).join(", ");
 }
 
-function readableSteps(state: OnboardingState) {
+/**
+ * Each choice step's options as ids a model sees in place of their keys
+ * (o1, o2, ...), by step: id to key. Live recheck 2026-10-30: "We prefer
+ * to follow a lead" was saved as `follow` ("Follow in later rounds"), not
+ * co_invest ("Co-invest alongside a lead"): a key that is a word they used
+ * pulled the reading to it, whatever the prompt said. A model reads only
+ * the labels; code maps its ids back to the keys.
+ */
+export function optionIdsOf(
+  state: Pick<OnboardingState, "steps">,
+): ReadonlyMap<string, ReadonlyMap<string, string>> {
+  return new Map(
+    state.steps.map(
+      (step) =>
+        [
+          step.stepKey,
+          new Map(
+            (step.options ?? []).map(
+              (option, index) => [`o${String(index + 1)}`, option.key] as const,
+            ),
+          ),
+        ] as const,
+    ),
+  );
+}
+
+/** A reading's value with each option id it names put back as its key. */
+export function keysFromIds<T>(
+  value: T,
+  ids: ReadonlyMap<string, string> | undefined,
+): T {
+  if (ids === undefined || ids.size === 0) return value;
+  const keyOf = (word: string): string =>
+    ids.get(word.trim().toLowerCase()) ?? word;
+  if (typeof value === "string") return keyOf(value) as T;
+  if (Array.isArray(value)) {
+    return value.map((item: unknown) =>
+      typeof item === "string" ? keyOf(item) : item,
+    ) as T;
+  }
+  return value;
+}
+
+function readableSteps(
+  state: OnboardingState,
+  optionIds: ReadonlyMap<string, ReadonlyMap<string, string>>,
+) {
   const topics = topicsOf(state.steps);
   return state.steps.filter(isConversational).map((step) => ({
     stepKey: step.stepKey,
     question: topics.get(step.stepKey) ?? step.question,
     kind: step.kind,
     required: step.required,
-    options: (step.options ?? [])
-      .map((option) => `${option.key}: ${option.label}`)
+    // Labels only, each with its opaque id: never a key as a word.
+    options: [...(optionIds.get(step.stepKey) ?? new Map<string, string>())]
+      .map(
+        ([id, key]) =>
+          `${id}: ${step.options?.find((option) => option.key === key)?.label ?? id}`,
+      )
       .join("; "),
     onRecord:
       step.status === "ANSWERED"
@@ -974,21 +1033,15 @@ function identityOf(state: OnboardingState): {
   };
 }
 
-/** The journey's own short label for a step ("Typical cheque"), for a read-back. */
-function labelOf(state: OnboardingState, step: OnboardingStepState): string {
-  const manifest = definitionFor(state.journey).steps.find(
-    (candidate) => candidate.stepKey === step.stepKey,
-  );
-  return (manifest?.configuration.prompt ?? step.question).replace(
-    /[?.]$/u,
-    "",
-  );
+/** The step's plain label ("Typical cheque"), for a read-back; never its question. */
+function labelOf(step: OnboardingStepState): string {
+  return plainStepLabel(step.stepKey);
 }
 
 function savedLines(state: OnboardingState): string[] {
   return state.steps
     .filter((step) => isConversational(step) && step.status === "ANSWERED")
-    .map((step) => `${labelOf(state, step)}: ${step.value ?? "answered"}`);
+    .map((step) => `${labelOf(step)}: ${step.value ?? "answered"}`);
 }
 
 export function readBack(state: OnboardingState): string {

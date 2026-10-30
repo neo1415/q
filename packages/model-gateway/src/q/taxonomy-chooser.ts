@@ -40,6 +40,9 @@ export type TaxonomyChooser = (input: {
 export const TAXONOMY_CHOICE_CANDIDATES_MAX = 80;
 const CANDIDATES_MAX = TAXONOMY_CHOICE_CANDIDATES_MAX;
 
+/** The id a candidate is shown to the model by: its place in the list. */
+const idOf = (index: number): string => `c${String(index + 1)}`;
+
 const CHOOSE = {
   maxAttempts: 1,
   maxEstimatedCostUsd: 0.006,
@@ -72,10 +75,14 @@ export function createTaxonomyChooser(dependencies: {
         environmentNotes: `You are reading words, not answering anyone. Code decides what happens from your reading. Today's date is ${(dependencies.now ?? (() => new Date()))().toISOString().slice(0, 10)}.`,
         variables: {
           field: input.field.trim().slice(0, 200) || "Categories",
+          // Opaque ids, never the real ones (live recheck 2026-10-30): a
+          // 36-character node id the model must copy back, or an option key
+          // that is a word they used ("follow"), is how a reading goes
+          // wrong. Code maps each id back.
           candidates: candidates
             .map(
-              (c) =>
-                `${c.nodeId} | ${c.displayName.slice(0, 120)} | ${c.vocabularyCode.slice(0, 60)}`,
+              (c, index) =>
+                `${idOf(index)} | ${c.displayName.slice(0, 120)} | ${c.vocabularyCode.slice(0, 60)}`,
             )
             .join("\n"),
           phrase,
@@ -103,14 +110,47 @@ export function createTaxonomyChooser(dependencies: {
           },
           { schema: TaxonomyChoiceV2ResultSchema },
         );
-      if (response.output.kind !== "STRUCTURED") return null;
+      if (response.output.kind !== "STRUCTURED") {
+        dependencies.logger?.warn(
+          { task: "TAXONOMY_CHOICE", kind: response.output.kind },
+          "category words not read: not a structured reading",
+        );
+        return null;
+      }
       const parsed = TaxonomyChoiceV2ResultSchema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
-      if (!parsed.success) return null;
-      // Only the lookup's own candidates: reference data, never invented.
-      const offered = new Set(candidates.map((c) => c.nodeId));
-      return [...new Set(parsed.data.chosen)].filter((id) => offered.has(id));
+      if (!parsed.success) {
+        dependencies.logger?.warn(
+          { task: "TAXONOMY_CHOICE" },
+          "category words not read: the reading did not fit its schema",
+        );
+        return null;
+      }
+      // Only the offered candidates: reference data, never invented.
+      const byId = new Map(
+        candidates.map((c, index) => [idOf(index), c.nodeId] as const),
+      );
+      const said = [...new Set(parsed.data.chosen)];
+      const chosen = said.flatMap((id) => {
+        const nodeId = byId.get(id.trim().toLowerCase());
+        return nodeId === undefined ? [] : [nodeId];
+      });
+      // What was read is on the record (live recheck 2026-10-30: "Benelux"
+      // came back with nothing usable and left no trace). Counts only;
+      // never their words.
+      dependencies.logger?.info(
+        {
+          task: "TAXONOMY_CHOICE",
+          offered: candidates.length,
+          named: said.length,
+          kept: chosen.length,
+        },
+        chosen.length < said.length
+          ? "category reading named ids that were not offered"
+          : "category words read",
+      );
+      return chosen;
     } catch (error: unknown) {
       dependencies.logger?.warn(
         { err: error, task: "TAXONOMY_CHOICE" },

@@ -152,6 +152,7 @@ export { ONBOARDING_TRANSCRIPT_READER_V1 } from "./prompts/tasks/onboarding-tran
 export { ONBOARDING_TRANSCRIPT_READER_V2 } from "./prompts/tasks/onboarding-transcript-reader.v2.js";
 export { ONBOARDING_TRANSCRIPT_READER_V3 } from "./prompts/tasks/onboarding-transcript-reader.v3.js";
 export { ONBOARDING_TRANSCRIPT_READER_V4 } from "./prompts/tasks/onboarding-transcript-reader.v4.js";
+export { ONBOARDING_TRANSCRIPT_READER_V5 } from "./prompts/tasks/onboarding-transcript-reader.v5.js";
 export { TAXONOMY_CHOICE_V1 } from "./prompts/tasks/taxonomy-choice.v1.js";
 export { TAXONOMY_CHOICE_V2 } from "./prompts/tasks/taxonomy-choice.v2.js";
 export * from "./prompts/schemas/taxonomy-choice.js";

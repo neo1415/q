@@ -9,12 +9,12 @@ import { createDefaultPromptRegistry } from "../src/index.js";
  */
 const registry = createDefaultPromptRegistry();
 
-describe("ONBOARDING_TRANSCRIPT_READER v4", () => {
+describe("ONBOARDING_TRANSCRIPT_READER v5 (keeps v4's rules)", () => {
   const active = registry.getActive("ONBOARDING_TRANSCRIPT_READER");
   const template = active.definition.template;
 
   it("is the active version", () => {
-    expect(active.definition.version).toBe(4);
+    expect(active.definition.version).toBe(5);
   });
 
   it("D2/D5: the value is an option key; detail beside an answer still names the option holding it", () => {
@@ -25,10 +25,10 @@ describe("ONBOARDING_TRANSCRIPT_READER v4", () => {
     expect(template).toMatch(/read against today's date in the notes/u);
   });
 
-  it("D6: chosen by the label's meaning, never a key's word (\"follow a lead\" is co-invest)", () => {
-    expect(template).toMatch(
-      /never choose an option because its key is a word they used/u,
-    );
+  it("D6 (recheck 2026-10-30): options are opaque ids beside labels; never a key as a word", () => {
+    expect(template).toMatch(/each option is listed as an id and its label/u);
+    expect(template).toMatch(/The value is the id \(or ids\)/u);
+    expect(template).not.toMatch(/its key is a word they used/u);
   });
 
   it('D6: what they will consider includes what they do only sometimes ("Series A mostly, sometimes seed")', () => {

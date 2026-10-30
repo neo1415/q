@@ -1478,15 +1478,16 @@ export function createOnboardingPort(input: {
         stepKey: step.stepKey,
         outcome: "UNMATCHED",
         reason: OPTION_ONLY_STEPS.has(step.stepKey)
-          ? "That names none of this step's options, and this step is saved only as one of them (it sets them up). Choose the option below that means what they said and record it by its key; if their words leave it open, ask them which."
+          ? "That names none of this step's options, and this step is saved only as one of them (it sets them up). Choose the option below that means what they said and record it by its label exactly; if their words leave it open, ask them which."
           : options.some((o) => o.key === "other")
-            ? "That names none of this step's options. Choose the option below that means what they said and record it by its key. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them."
+            ? "That names none of this step's options. Choose the option below that means what they said and record it by its label exactly. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them."
             : // No catch-all to keep their words in (live 2026-10-01:
               // "a few paying customers" asked for six turns running).
-              "That names none of this step's options, and this step cannot keep other words. If one option plainly means what they said, record it by its key. Otherwise say so once in a few words, recommend the closest option with recommend and ask if it will do; never put the same choice to them again after that.",
-        candidates: options
-          .slice(0, 40)
-          .map((o) => `${o.label} (${o.key})`.slice(0, 160)),
+              "That names none of this step's options, and this step cannot keep other words. If one option plainly means what they said, record it by its label exactly. Otherwise say so once in a few words, recommend the closest option with recommend and ask if it will do; never put the same choice to them again after that.",
+        // Labels only: a key that is a word they used pulls a model to it
+        // (live recheck 2026-10-30: "follow a lead" saved as `follow`).
+        // A label given back exactly names its option.
+        candidates: options.slice(0, 40).map((o) => o.label.slice(0, 160)),
       };
     };
     const step = steps.get(answer.stepKey);
