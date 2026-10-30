@@ -900,6 +900,35 @@ describe("idempotent and race-safe", () => {
     expect(a).toBe(b);
   });
 
+  it("live 2026-10-30 (Hydrolume): a second \"yes\" seconds later, to Q's next summary, is acted on, not handed the first's outcome", async () => {
+    const agent = fakeAgent(() =>
+      Promise.resolve(outcomeOf("The solution is probes. Is that right?")),
+    );
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts().portFor,
+      logger,
+    });
+    const { fetch: f } = api({});
+    await conductor.turn(
+      input(f, "yes", {
+        recentTurns: [
+          { role: "q", text: "The problem is spoilage. Is that right?" },
+        ],
+      }),
+    );
+    await conductor.turn(
+      input(f, "yes", {
+        recentTurns: [
+          { role: "q", text: "The problem is spoilage. Is that right?" },
+          { role: "person", text: "yes" },
+          { role: "q", text: "The solution is probes. Is that right?" },
+        ],
+      }),
+    );
+    expect(agent.calls).toEqual(["yes", "yes"]);
+  });
+
   it("runs a duplicate again, after it, when the first was stopped", async () => {
     const agent = fakeAgent(() =>
       Promise.resolve(outcomeOf("Which country are you based in?")),

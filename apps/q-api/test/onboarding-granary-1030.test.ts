@@ -334,7 +334,8 @@ describe("live 2026-10-30 item 5: 'No website yet' settles the website", () => {
   it("the reader's prompt reads a stated absence as declined, and a long-text step as Q's agreed summary", () => {
     const registry = createDefaultPromptRegistry();
     const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER");
-    expect(reader.definition.version).toBe(7);
+    // v8 (live acceptance 2026-10-30) keeps these rules.
+    expect(reader.definition.version).toBeGreaterThanOrEqual(7);
     expect(reader.definition.template).toContain("no website yet");
     expect(reader.definition.template).toContain("LONG_TEXT");
     const reply = registry.getActive("ONBOARDING_TYPED_REPLY");

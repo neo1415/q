@@ -78,6 +78,36 @@ describe("Skip sets aside the question shown, not the pointer's screen", () => {
     expect(status(pointerKey)).not.toBe("COMPLETED");
   });
 
+  it("a Skip made on a version the session has since left is made again, not dropped (live 2026-10-30, Hydrolume)", async () => {
+    const { port, client, session, laterKey } =
+      await pointerOnReviewWithALaterOptionalOpen();
+    // Q's reading saves something else between the screen's last read and
+    // the Skip: the session moves on without this browser knowing.
+    const before = rawOf(session);
+    const other = before.progress.eligibleSteps.find(
+      (step) =>
+        step.stepKey !== laterKey &&
+        !step.required &&
+        step.status !== "COMPLETED" &&
+        step.status !== "SKIPPED",
+    );
+    expect(other).toBeDefined();
+    await port.skip({
+      sessionId: before.session.id,
+      stepKey: other?.stepKey ?? "",
+      expectedSessionVersion: before.session.version,
+      idempotencyKey: crypto.randomUUID(),
+    });
+    const after = await client.skipStep({
+      stepId: session.currentStepId ?? "",
+      stepKey: laterKey,
+    });
+    expect(
+      rawOf(after).progress.eligibleSteps.find((s) => s.stepKey === laterKey)
+        ?.status,
+    ).toBe("SKIPPED");
+  });
+
   it("a second Skip of the same question is a no-op, not an error", async () => {
     const { client, session, laterKey } =
       await pointerOnReviewWithALaterOptionalOpen();

@@ -45,6 +45,14 @@ const SOURCE_WORDS: Readonly<Record<string, string>> = {
   Q_RECOMMENDATION: "Q's suggestion",
 };
 
+const COVERAGE_REREAD_MS = 5_000;
+const COVERAGE_REREADS = 12;
+
+/** Whether the counts can still change without this screen's own write. */
+export function stillSettling(coverage: OnboardingCoverage): boolean {
+  return coverage.summary.unconfirmed > 0 || coverage.summary.pendingSaves > 0;
+}
+
 /** Reads coverage again whenever the session moves (its version changes). */
 export function useOnboardingCoverage(
   sessionId: string | undefined,
@@ -54,13 +62,32 @@ export function useOnboardingCoverage(
   useEffect(() => {
     if (sessionId === undefined) return;
     let live = true;
-    void onboardingCoverageAction(sessionId)
-      .then((result) => {
-        if (live && result.ok) setCoverage(result.value);
-      })
-      .catch(() => undefined);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let reads = 0;
+    const read = () => {
+      reads += 1;
+      void onboardingCoverageAction(sessionId)
+        .then((result) => {
+          if (!live || !result.ok) return;
+          setCoverage(result.value);
+          // Live 2026-10-30 (Hydrolume): "1 to confirm" stayed after the
+          // person's yes was saved by a reading that landed after Q's
+          // reply, which this screen never re-read. What still waits on
+          // them (or on a save) is read again for a while, bounded.
+          if (
+            result.value !== null &&
+            stillSettling(result.value) &&
+            reads < COVERAGE_REREADS
+          ) {
+            timer = setTimeout(read, COVERAGE_REREAD_MS);
+          }
+        })
+        .catch(() => undefined);
+    };
+    read();
     return () => {
       live = false;
+      if (timer !== undefined) clearTimeout(timer);
     };
   }, [sessionId, sessionVersion]);
   return coverage;

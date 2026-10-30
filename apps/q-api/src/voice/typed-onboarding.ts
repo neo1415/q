@@ -331,10 +331,16 @@ export function createTypedOnboarding(dependencies: {
           finished.reason === REVIEW_NOT_SHOWN_REASON
             ? reviewOf(now, input.journeyType, labelOf)
             : undefined;
+        // Already finishing, Q's last line asked a needed step, and their
+        // answer left it open: it is not put again word for word.
+        const unsettled = stillFinishing
+          ? lastAsked.get(input.onboardingSessionId)
+          : undefined;
         const said = finishingLine(input.journeyType, finished, {
           labelOf,
           questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,
           ...(review === undefined ? {} : { review }),
+          ...(unsettled === undefined ? {} : { unsettled }),
         });
         if (review !== undefined && said !== null) {
           readBackShown.add(input.onboardingSessionId);

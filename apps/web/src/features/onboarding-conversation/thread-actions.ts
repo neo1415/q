@@ -78,6 +78,67 @@ export async function onboardingThreadKeepAction(
   }
 }
 
+const KeptLineSchema = z
+  .object({
+    role: z.enum(["PERSON", "Q"]),
+    text: z.string().trim().min(1).max(4000),
+    stepKey: z
+      .string()
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/)
+      .optional(),
+  })
+  .strict();
+
+/**
+ * Keep lines the screen showed that the interviewer did not write, in the
+ * order shown, each with the step it was about (live 2026-10-30,
+ * Hydrolume): the Skip on "team strengths" and the review question after
+ * it were on screen only, so the conversation Q read had Q's team question
+ * followed by "Yes, that looks right", and the reading took that yes as
+ * agreeing to the examples the question had listed. A skip is kept with
+ * its step, which is how the reading knows when it was set aside.
+ * Awaited by the caller so the lines come before the next words sent;
+ * best effort all the same: a missed line is a worse reading and reload,
+ * never a lost answer.
+ */
+export async function onboardingThreadKeepLinesAction(
+  rawSessionId: string,
+  rawLines: unknown,
+): Promise<void> {
+  const sessionId = z.string().uuid().safeParse(rawSessionId);
+  const lines = z
+    .array(KeptLineSchema)
+    .min(1)
+    .max(2)
+    .refine(
+      (all) => new Set(all.map((line) => line.role)).size === all.length,
+      "each role at most once",
+    )
+    .safeParse(rawLines);
+  if (!sessionId.success || !lines.success) return;
+  const { apiBaseUrl } = loadWebServerConfig();
+  if (apiBaseUrl === undefined) return;
+  const accessToken = await getSessionAccessToken();
+  if (accessToken === null) return;
+  try {
+    await appendOnboardingInterviewTurns(
+      { baseUrl: apiBaseUrl, accessToken },
+      sessionId.data,
+      {
+        turnRef: crypto.randomUUID(),
+        turns: lines.data.map((line) => ({
+          role: line.role,
+          text: line.text,
+          channel: "TEXT" as const,
+          ...(line.stepKey === undefined ? {} : { stepKey: line.stepKey }),
+        })),
+      },
+    );
+  } catch {
+    // A display record; a missed line is a worse reload, never a lost answer.
+  }
+}
+
 /**
  * Keep an exchange the person had by tapping (QA F-129, 25 Oct): their
  * choice and Q's acknowledgement were drawn on screen only, and a reload

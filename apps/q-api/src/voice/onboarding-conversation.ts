@@ -392,20 +392,47 @@ export function createOnboardingConversation(dependencies: {
     // saved (live 2026-10-29: "mostly follow" saved as follow, then the
     // finishing reading re-read the same words and wrote "follow, lead").
     // The reader is a model; re-reading old words is not new information.
-    const personSaid = thread.items.flatMap((turn, index) =>
-      turn.role === "PERSON"
-        ? [
-            {
-              at: Date.parse(turn.createdAt),
-              text: turn.text,
-              // The step Q's line just before asked, when it named one.
-              asked: thread.items
-                .slice(0, index)
-                .findLast((before) => before.role === "Q")?.stepKey,
-            },
-          ]
-        : [],
-    );
+    const personSaid = thread.items.flatMap((turn, index) => {
+      if (turn.role !== "PERSON") return [];
+      const askedAt = thread.items
+        .slice(0, index)
+        .findLastIndex((before) => before.role === "Q");
+      return [
+        {
+          index,
+          at: Date.parse(turn.createdAt),
+          text: turn.text,
+          // The step Q's line just before asked, when it named one.
+          asked: askedAt < 0 ? undefined : thread.items[askedAt]?.stepKey,
+          askedAt,
+        },
+      ];
+    });
+    // Live 2026-10-30 (Hydrolume): they skipped "team strengths"; a later
+    // reading of the whole conversation took their "Yes, that looks right"
+    // (to a different question) as agreeing to the examples Q's question
+    // had listed, and wrote them over the skip. A skip is their answer.
+    // A step they set aside changes only on their own words said after
+    // the skip: to a line of Q's, after the skip, that asked it again, or
+    // about it unprompted (not in answer to another question). The skip
+    // is their line kept with the step (the Skip button keeps it so);
+    // without one, only those two kinds of words count, from anywhere.
+    const reopensSkip = (answer: {
+      readonly stepKey: string;
+      readonly quote: string;
+      readonly aboutStep?: boolean | undefined;
+    }): boolean => {
+      const skippedAt = thread.items.findLastIndex(
+        (item) => item.role === "PERSON" && item.stepKey === answer.stepKey,
+      );
+      return personSaid.some(
+        (turn) =>
+          turn.index > skippedAt &&
+          quotedFrom(answer.quote, [turn.text]) &&
+          ((turn.asked === answer.stepKey && turn.askedAt > skippedAt) ||
+            (turn.asked === undefined && answer.aboutStep === true)),
+      );
+    };
     // Live recheck 2026-10-30: the founder kept their deck's description,
     // Q asked how they would describe their industry, and that answer
     // replaced the description. What is on record changes only on words
@@ -417,9 +444,14 @@ export function createOnboardingConversation(dependencies: {
       readonly stepKey: string;
       readonly quote: string;
       readonly aboutStep?: boolean | undefined;
-    }): "NEW" | "CHANGE" | "OLD_WORDS" | "OTHER_QUESTION" => {
+    }): "NEW" | "CHANGE" | "OLD_WORDS" | "OTHER_QUESTION" | "SKIPPED" => {
       const current = onRecord.find((r) => r.stepKey === answer.stepKey);
-      if (current === undefined) return "NEW";
+      if (current === undefined) {
+        if (stepOf(state, answer.stepKey)?.status !== "SET_ASIDE") {
+          return "NEW";
+        }
+        return reopensSkip(answer) ? "CHANGE" : "SKIPPED";
+      }
       const savedAt = Date.parse(current.createdAt);
       const since = personSaid.filter(
         (turn) => turn.at >= savedAt && quotedFrom(answer.quote, [turn.text]),
@@ -455,9 +487,17 @@ export function createOnboardingConversation(dependencies: {
         "onboarding conversation reading kept back",
       );
     }
-    const declined = reading.declined.filter(
-      (item) => stepOf(state, item.stepKey)?.status === "OPEN",
-    );
+    // Live acceptance 2026-10-30: "I don't know" to a step already on
+    // record left what was there. Not knowing is an answer: a decline of
+    // an answered step takes it back when said, since it was saved, to
+    // Q's question for it (the port withdraws it; a required step is
+    // refused there and stays).
+    const declined = reading.declined.filter((item) => {
+      const status = stepOf(state, item.stepKey)?.status;
+      if (status === "OPEN") return true;
+      if (status !== "ANSWERED") return false;
+      return changesRecord({ ...item, aboutStep: false }) === "CHANGE";
+    });
     if (answers.length === 0 && declined.length === 0) return;
     // A list they add to keeps what is on record, unless the reading found
     // they meant this as the whole list (owner 2026-10-28).

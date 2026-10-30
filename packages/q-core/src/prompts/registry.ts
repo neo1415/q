@@ -342,6 +342,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V4 } from "./tasks/onboarding-transcript-r
 import { ONBOARDING_TRANSCRIPT_READER_V5 } from "./tasks/onboarding-transcript-reader.v5.js";
 import { ONBOARDING_TRANSCRIPT_READER_V6 } from "./tasks/onboarding-transcript-reader.v6.js";
 import { ONBOARDING_TRANSCRIPT_READER_V7 } from "./tasks/onboarding-transcript-reader.v7.js";
+import { ONBOARDING_TRANSCRIPT_READER_V8 } from "./tasks/onboarding-transcript-reader.v8.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
@@ -526,7 +527,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V6, status: "DEPRECATED" },
     // Live 2026-10-30 (Granary): a long answer is Q's agreed summary; a
     // stated absence settles an optional step.
-    ONBOARDING_TRANSCRIPT_READER_V7,
+    { ...ONBOARDING_TRANSCRIPT_READER_V7, status: "DEPRECATED" },
+    // Live acceptance 2026-10-30 (4bcfa584b): examples are never agreed
+    // to, a skip stays a skip, skipping the rest declines the rest.
+    ONBOARDING_TRANSCRIPT_READER_V8,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.

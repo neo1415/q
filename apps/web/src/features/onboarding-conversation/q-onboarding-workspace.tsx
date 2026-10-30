@@ -48,6 +48,7 @@ import { announceQGestures } from "../q-swarm/q-gestures";
 import {
   onboardingThreadAction,
   onboardingThreadKeepAction,
+  onboardingThreadKeepLinesAction,
   onboardingThreadKeepTapAction,
 } from "./thread-actions";
 import { upsertLine } from "../voice/session";
@@ -129,6 +130,9 @@ import {
   welcomeBack,
   resumedThread,
   questionShown,
+  screenOnlyQuestion,
+  settledByFamily,
+  withAnswered,
   questionAfterTap,
   type QQuestion,
   type JourneyVocabulary,
@@ -1046,12 +1050,26 @@ export function QOnboardingWorkspace({
       }
       // The question Q was asking joins the thread with its answer, so the
       // exchange reads back as one; the live prompt below then moves on.
-      if (prompt !== null) {
-        if (liveQuestion !== null) {
-          push("Q", liveQuestion);
-          // Not shown again below while Q answers (live e11, c7).
-          setAnsweredLine({ text: liveQuestion, question: qQuestion });
-        }
+      const answering = prompt !== null ? liveQuestion : null;
+      if (answering !== null) {
+        push("Q", answering);
+        // Not shown again below while Q answers (live e11, c7).
+        setAnsweredLine({ text: answering, question: qQuestion });
+      }
+      const sessionKey = view?.session.id;
+      // A question the screen showed from the step (not a line Q wrote) is
+      // kept in the conversation before their answer, so their words are
+      // read as answering it (live 2026-10-30, Hydrolume: "Yes, that looks
+      // right" to the review was read as agreeing to Q's team examples).
+      if (
+        answering !== null &&
+        prompt !== null &&
+        sessionKey !== undefined &&
+        screenOnlyQuestion(answering, qQuestion)
+      ) {
+        await onboardingThreadKeepLinesAction(sessionKey, [
+          { role: "Q", text: answering, stepKey: prompt.stepKey },
+        ]).catch(() => undefined);
       }
       const personLine = newId();
       push("PERSON", trimmed, personLine);
@@ -1084,7 +1102,10 @@ export function QOnboardingWorkspace({
       const turn = await actions
         .say(
           trimmed,
-          recentTurns(),
+          // Ending on the question they answered: two sends of the same
+          // words to different questions are two turns (live 2026-10-30:
+          // a second "yes" was taken for a repeat of the first).
+          withAnswered(recentTurns(), answering),
           undefined,
           (sentence) => {
             setQThinking(false);
@@ -1557,6 +1578,27 @@ export function QOnboardingWorkspace({
     }, 0);
     return () => clearTimeout(timer);
   }, [prompt, push, actions, recentTurns, voiceActive, arriving]);
+
+  // A question whose concept they already settled through another step
+  // (journey families) is not put to them again in other words: the step
+  // is set aside, which leaves it open for them to add to later, never a
+  // value (live acceptance 2026-10-30: "Sectors to exclude outright?"
+  // after their sectors to avoid were saved). Once per step.
+  const familySettledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      prompt === null ||
+      view === undefined ||
+      voiceActive ||
+      arriving ||
+      familySettledRef.current === prompt.stepKey ||
+      !settledByFamily(view, prompt.stepKey)
+    ) {
+      return;
+    }
+    familySettledRef.current = prompt.stepKey;
+    void actions.skip(prompt.stepKey);
+  }, [prompt, view, actions, voiceActive, arriving]);
 
   const keep = async (suggestionId: string): Promise<boolean> => {
     settleReading();
@@ -2701,7 +2743,34 @@ export function QOnboardingWorkspace({
                   }
                   push("PERSON", "Skip this one");
                   settleReading();
-                  void actions.skip(prompt.stepKey);
+                  const skippedKey = prompt.stepKey;
+                  const sessionKey = view?.session.id;
+                  // The skip joins the conversation Q reads, kept with its
+                  // step: a later reading never fills a skipped step from
+                  // words said before it, or to another question (live
+                  // 2026-10-30, Hydrolume).
+                  const kept =
+                    sessionKey === undefined
+                      ? Promise.resolve()
+                      : onboardingThreadKeepLinesAction(sessionKey, [
+                          ...(liveQuestion !== null &&
+                          screenOnlyQuestion(liveQuestion, qQuestion)
+                            ? [
+                                {
+                                  role: "Q" as const,
+                                  text: liveQuestion,
+                                  stepKey: skippedKey,
+                                },
+                              ]
+                            : []),
+                          {
+                            role: "PERSON" as const,
+                            text: "Skip this one",
+                            stepKey: skippedKey,
+                          },
+                        ]).catch(() => undefined);
+                  void kept;
+                  void actions.skip(skippedKey);
                 }}
               >
                 {t("Skip")}

@@ -733,6 +733,27 @@ export function utteranceKey(utterance: string): string {
   return utterance.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+/**
+ * What makes two sends the same turn: the same words, said to the same
+ * line of Q's. Live 2026-10-30 (Hydrolume): "yes" to the problem summary,
+ * then "yes" to the solution summary seven seconds later, were one key;
+ * the second was handed the first's outcome (40 ms, nothing read, nothing
+ * kept) and Q asked the solution again. A double send of one message is
+ * made from one screen, so it carries the same last line of Q's.
+ */
+export function turnDedupeKey(input: {
+  readonly channel: string;
+  readonly utterance: string;
+  readonly recentTurns: readonly {
+    readonly role: string;
+    readonly text: string;
+  }[];
+}): string {
+  const answering =
+    input.recentTurns.findLast((turn) => turn.role === "q")?.text ?? "";
+  return `${input.channel}:${utteranceKey(input.utterance)}|${utteranceKey(answering)}`;
+}
+
 // ---------------------------------------------------------------------------
 // The conductor
 // ---------------------------------------------------------------------------
@@ -1358,7 +1379,7 @@ export function createOnboardingConductor(
     turn: (input) =>
       serializer.run(
         input.onboardingSessionId,
-        `${input.channel}:${utteranceKey(input.utterance)}`,
+        turnDedupeKey(input),
         () => conduct(input),
         input.signal,
       ),

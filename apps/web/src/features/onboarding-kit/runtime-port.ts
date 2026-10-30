@@ -738,23 +738,30 @@ export function createRuntimeClient<
           // The one question on screen, wherever the pointer is: skipping
           // the pointer's screen instead set aside the wrong step, and a
           // required one (the review) was refused every time.
-          const view = await session();
-          const status = eligibleStatus(view, shown);
-          if (status === "SKIPPED" || status === "COMPLETED") {
-            return present(view);
-          }
-          if (status === undefined) {
-            throw new OnboardingClientError(
-              "REJECTED",
-              "That question isn't open any more.",
-            );
-          }
+          // Live 2026-10-30 (Hydrolume): Q's reading saved the team size
+          // three seconds before the Skip on "team strengths"; the skip went
+          // out on the version before, came back 409, and was dropped, so
+          // Q asked the same question again. A skip is their answer: it is
+          // made again on the version the session moved to, while the step
+          // is still open there.
           const skipped = remember(
-            await port.skip({
-              sessionId: view.session.id,
-              stepKey: shown,
-              expectedSessionVersion: view.session.version,
-              idempotencyKey: crypto.randomUUID(),
+            await rebased(async (view) => {
+              const status = eligibleStatus(view, shown);
+              if (status === "SKIPPED" || status === "COMPLETED") {
+                return view;
+              }
+              if (status === undefined) {
+                throw new OnboardingClientError(
+                  "REJECTED",
+                  "That question isn't open any more.",
+                );
+              }
+              return port.skip({
+                sessionId: view.session.id,
+                stepKey: shown,
+                expectedSessionVersion: view.session.version,
+                idempotencyKey: crypto.randomUUID(),
+              });
             }),
           );
           const owner = model.groups.find((g) => g.stepKeys.includes(shown));

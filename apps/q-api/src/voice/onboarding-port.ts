@@ -79,6 +79,7 @@ import {
   toOpenStep,
   toResponseValue,
   MONEY_STEP,
+  wholeWordsWithin,
 } from "./interview-steps.js";
 import {
   REVIEW_NOT_SHOWN_REASON,
@@ -1314,16 +1315,19 @@ export function createOnboardingPort(input: {
               stored === undefined
                 ? null
                 : // Their own words where the options could not hold them.
-                  (stored.value.type === "SINGLE_SELECT" &&
-                  stored.value.optionKey === "other" &&
-                  stored.note !== null &&
-                  stored.note.length > 0
-                    ? `${stored.note} (in their words)`
-                    : stored.note?.startsWith(ALSO_NAMED_NOTE) === true ||
-                        stored.note?.startsWith(READ_AS_NOTE) === true
-                      ? `${await spoken(step, stored.value, view)} (${stored.note})`
-                      : await spoken(step, stored.value, view)
-                  ).slice(0, 600) || null,
+                  // Never cut mid-word or mid-sentence (live 2026-10-30).
+                  wholeWordsWithin(
+                    stored.value.type === "SINGLE_SELECT" &&
+                      stored.value.optionKey === "other" &&
+                      stored.note !== null &&
+                      stored.note.length > 0
+                      ? `${stored.note} (in their words)`
+                      : stored.note?.startsWith(ALSO_NAMED_NOTE) === true ||
+                          stored.note?.startsWith(READ_AS_NOTE) === true
+                        ? `${await spoken(step, stored.value, view)} (${stored.note})`
+                        : await spoken(step, stored.value, view),
+                    600,
+                  ) || null,
             ...(open?.options === undefined || open.options.length === 0
               ? {}
               : {

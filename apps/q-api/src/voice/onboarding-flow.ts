@@ -610,6 +610,14 @@ export function finishingLine(
     readonly review?:
       | { readonly saved: readonly string[]; readonly stepKey: string }
       | undefined;
+    /**
+     * The needed step Q's last line asked, still open after their answer
+     * ("I don't know"): never asked again word for word (live 2026-10-30,
+     * Kortrijk Polder: the discovery-style question came back verbatim
+     * twice). Another needed one goes first; alone, it is said to be
+     * needed, with the question once more.
+     */
+    readonly unsettled?: string | undefined;
   },
 ): { readonly reply: string; readonly asking: string | null } | null {
   if (
@@ -656,7 +664,13 @@ export function finishingLine(
       asking: null,
     };
   }
-  const [first] = finished.missing;
+  const again =
+    copy.unsettled !== undefined &&
+    finished.missing[0]?.stepKey === copy.unsettled;
+  const ordered = again
+    ? [...finished.missing.slice(1), ...finished.missing.slice(0, 1)]
+    : finished.missing;
+  const [first] = ordered;
   if (first === undefined) return null;
   // The setup's own spoken question, never its internal field labels
   // (production re-test 2026-10-28: "I still need 2 things: discovery and
@@ -666,8 +680,23 @@ export function finishingLine(
       ? "one more answer from you"
       : `${String(finished.missing.length)} more answers from you, starting with this one`;
   const question = (copy.questionOf(first.stepKey) ?? first.question).trim();
+  const asked = question.endsWith("?") ? question : `${question}?`;
+  if (again && first.stepKey === copy.unsettled) {
+    // The only one left, and they could not say: it is needed, so it is
+    // put once more with why it is asked, never word for word.
+    return {
+      reply: `That's fine. This is the one answer I still need before I can finish, and you can change it any time later. Pick whichever is closest for now: ${asked}`,
+      asking: first.stepKey,
+    };
+  }
+  if (again) {
+    return {
+      reply: `That's fine, we can come back to that one. Before I can finish, I still need ${count}. ${asked}`,
+      asking: first.stepKey,
+    };
+  }
   return {
-    reply: `Before I can finish, I still need ${count}. ${question.endsWith("?") ? question : `${question}?`}`,
+    reply: `Before I can finish, I still need ${count}. ${asked}`,
     asking: first.stepKey,
   };
 }

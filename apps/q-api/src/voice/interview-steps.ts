@@ -479,7 +479,7 @@ export function describeValue(
           : `${spokenFigure(number)} ${unit}`;
     }
     case "TEXT":
-      return value.text.slice(0, 300);
+      return wholeWordsWithin(value.text, 600);
     case "CONFIRMATION":
       return value.confirmed ? "confirmed" : "not confirmed";
     case "RESOURCE_REFERENCE":
@@ -1114,3 +1114,27 @@ export const EXCLUSION_SIBLINGS: ReadonlyMap<string, ExclusionSibling> =
           : [],
       ),
   );
+
+/**
+ * Text kept within `max` characters without cutting a word or, when one
+ * ends in reach, a sentence (live 2026-10-30, Kortrijk Polder: the
+ * read-back ended the investor's thesis on "…and a"). Shortened text says
+ * so with an ellipsis; text within `max` is returned whole.
+ */
+export function wholeWordsWithin(text: string, max: number): string {
+  const whole = text.trim();
+  if (whole.length <= max) return whole;
+  const head = whole.slice(0, max);
+  const sentenceEnd = Math.max(
+    head.lastIndexOf(". "),
+    head.lastIndexOf("! "),
+    head.lastIndexOf("? "),
+  );
+  if (sentenceEnd >= max / 2) return head.slice(0, sentenceEnd + 1);
+  const space = head.lastIndexOf(" ");
+  const words = (space > 0 ? head.slice(0, space) : head).replace(
+    /[\s,;:–—-]+$/u,
+    "",
+  );
+  return `${words}…`;
+}

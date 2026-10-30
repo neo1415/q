@@ -6,6 +6,7 @@ import type {
   OnboardingStepView,
   OnboardingSuggestionView,
 } from "@capital-q/contracts";
+import { INVESTOR_CONCEPT_FAMILIES } from "@capital-q/investor-onboarding";
 import { SPOKEN_QUESTIONS } from "@capital-q/onboarding/spoken-questions";
 
 /**
@@ -868,6 +869,67 @@ export function questionShown(
     return qQuestion.text;
   }
   return silentStep ? null : prompt.text;
+}
+
+/**
+ * An optional step whose concept the person already settled through
+ * another step of its family (journey data, "one concept, one answer"):
+ * never put to them again in other words. Live acceptance 2026-10-30
+ * (Kortrijk Polder): after "no consumer apps or crypto" was saved as the
+ * sectors to avoid, the screen asked "Sectors to exclude outright?".
+ */
+export function settledByFamily(
+  view: Pick<OnboardingSessionView, "session" | "progress">,
+  stepKey: string,
+): boolean {
+  if (view.session.journeyType !== "investor") return false;
+  const rows = view.progress.eligibleSteps;
+  const row = rows.find((step) => step.stepKey === stepKey);
+  if (
+    row === undefined ||
+    row.required ||
+    row.status === "COMPLETED" ||
+    row.status === "SKIPPED"
+  ) {
+    return false;
+  }
+  return INVESTOR_CONCEPT_FAMILIES.some(
+    (family) =>
+      family.stepKeys.includes(stepKey) &&
+      rows.some(
+        (other) =>
+          other.stepKey !== stepKey &&
+          family.stepKeys.includes(other.stepKey) &&
+          (other.status === "COMPLETED" || other.status === "SKIPPED"),
+      ),
+  );
+}
+
+/**
+ * Whether the question on screen is the step's own wording rather than a
+ * line Q wrote (Q's lines are already in the kept conversation; the
+ * step's are not until the screen keeps them).
+ */
+export function screenOnlyQuestion(
+  shown: string,
+  qQuestion: QQuestion | null,
+): boolean {
+  return shown.trim() !== (qQuestion?.text.trim() ?? "");
+}
+
+/**
+ * The recent thread sent with a message, ending on the question it
+ * answers when the screen had not yet put that question in the thread.
+ */
+export function withAnswered(
+  recent: readonly { readonly role: "q" | "person"; readonly text: string }[],
+  answering: string | null,
+): { readonly role: "q" | "person"; readonly text: string }[] {
+  if (answering === null) return [...recent];
+  const text = answering.slice(0, 1500);
+  const last = recent.findLast((turn) => turn.role === "q");
+  if (last?.text === text) return [...recent];
+  return [...recent, { role: "q" as const, text }].slice(-12);
 }
 
 /**
