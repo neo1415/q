@@ -52,6 +52,8 @@ export function createTaxonomyChooser(dependencies: {
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
   readonly registry?: PromptRegistry | undefined;
+  /** Today, for times their words name; the clock by default. */
+  readonly now?: (() => Date) | undefined;
 }): TaxonomyChooser {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   return async (input) => {
@@ -66,8 +68,8 @@ export function createTaxonomyChooser(dependencies: {
         task: "TAXONOMY_CHOICE",
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-        environmentNotes:
-          "You are reading words, not answering anyone. Code decides what happens from your reading.",
+        // A time they name ("close in Q1") is read against today.
+        environmentNotes: `You are reading words, not answering anyone. Code decides what happens from your reading. Today's date is ${(dependencies.now ?? (() => new Date()))().toISOString().slice(0, 10)}.`,
         variables: {
           field: input.field.trim().slice(0, 200) || "Categories",
           candidates: candidates

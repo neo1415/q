@@ -25,7 +25,7 @@ const V1_SEVERAL =
   '- Words that name several categories ("fintech and health") give each one.';
 const V2_SEVERAL = `${V1_SEVERAL}
 - Words that name a group the list does not have (a region made of several countries) name the listed members of that group: choose each member that is listed, and only those. Never a neighbour of the group, and never a broader category above it.
-- Words that name something inside one listed category (a city in a listed country) name that category.`;
+- Words that name something inside one listed category (a city in a listed country; a month or a quarter inside a listed span of time, read against today's date in the notes) name that category.`;
 
 if (
   !TAXONOMY_CHOICE_V1.template.includes(V1_INTRO) ||

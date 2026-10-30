@@ -50,7 +50,7 @@ describe("TAXONOMY_CHOICE v2", () => {
       /choose each member that is listed, and only those/u,
     );
     expect(active.definition.template).toMatch(
-      /a city in a listed country\) name that category/u,
+      /a city in a listed country; a month or a quarter inside a listed span of time/u,
     );
   });
 });

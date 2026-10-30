@@ -1281,3 +1281,43 @@ export function readBackBlocks(text: string): string[][] {
     .map((block) => block.split("\n").filter((line) => line.trim() !== ""))
     .filter((lines) => lines.length > 0);
 }
+
+/** The most documents one upload step holds (the definition's maxItems). */
+const UPLOAD_STEP_MAX = 6;
+
+/**
+ * A document uploaded in the conversation, as the answer of the journey's
+ * own upload step (sweep D5, 2026-10-29: a deck uploaded while talking to
+ * Q was read, but the review still said "Documents · Not yet", because only
+ * the form's upload answered that step). It adds to what the step holds;
+ * null when the journey has no open upload step or already holds it.
+ */
+export function uploadAnswer(
+  view: Pick<OnboardingSessionView, "progress" | "responses"> | undefined,
+  stepTypeOf: ((stepKey: string) => string | undefined) | undefined,
+  documentId: string,
+): {
+  readonly stepKey: string;
+  readonly value: OnboardingResponseValue;
+} | null {
+  if (view === undefined || stepTypeOf === undefined) return null;
+  const step = view.progress.eligibleSteps.find(
+    (eligible) => stepTypeOf(eligible.stepKey) === "document_upload",
+  );
+  if (step === undefined) return null;
+  const held = view.responses.find((r) => r.stepKey === step.stepKey)?.value;
+  const ids =
+    held?.type === "RESOURCE_REFERENCE" &&
+    held.resourceType === "EVIDENCE_DOCUMENT"
+      ? held.resourceIds
+      : [];
+  if (ids.includes(documentId)) return null;
+  return {
+    stepKey: step.stepKey,
+    value: {
+      type: "RESOURCE_REFERENCE",
+      resourceType: "EVIDENCE_DOCUMENT",
+      resourceIds: [...ids, documentId].slice(-UPLOAD_STEP_MAX),
+    },
+  };
+}

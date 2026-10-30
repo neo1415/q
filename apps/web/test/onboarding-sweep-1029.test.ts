@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { uploadAnswer } from "../src/features/onboarding-conversation/conversation";
+
 /**
  * Live onboarding sweep 2026-10-29 (production ed9be6cc4): the screen's
  * side of D1 (the read-back's confirm button) and D4 (where finishing goes).
@@ -104,5 +106,57 @@ describe("D7: Keep all answers the line it is under", () => {
     expect(live).toBeGreaterThan(-1);
     expect(live).toBeLessThan(reset);
     expect(reset).toBeLessThan(kept);
+  });
+});
+
+describe("D5: a document uploaded while talking to Q", () => {
+  const stepTypeOf = (key: string) =>
+    key === "F2.materials" ? "document_upload" : "confirmation";
+  const view = (held?: readonly string[]) => ({
+    progress: {
+      eligibleSteps: [
+        { stepKey: "F1.company_name" },
+        { stepKey: "F2.materials" },
+      ],
+    },
+    responses:
+      held === undefined
+        ? []
+        : [
+            {
+              stepKey: "F2.materials",
+              value: {
+                type: "RESOURCE_REFERENCE" as const,
+                resourceType: "EVIDENCE_DOCUMENT" as const,
+                resourceIds: [...held],
+              },
+            },
+          ],
+  });
+  const DECK = "d0000000-0000-4000-8000-000000000001";
+  const MODEL = "d0000000-0000-4000-8000-000000000002";
+
+  it("answers the journey's own upload step, adding to what it holds", () => {
+    expect(uploadAnswer(view() as never, stepTypeOf, DECK)).toEqual({
+      stepKey: "F2.materials",
+      value: {
+        type: "RESOURCE_REFERENCE",
+        resourceType: "EVIDENCE_DOCUMENT",
+        resourceIds: [DECK],
+      },
+    });
+    expect(
+      uploadAnswer(view([DECK]) as never, stepTypeOf, MODEL)?.value,
+    ).toEqual({
+      type: "RESOURCE_REFERENCE",
+      resourceType: "EVIDENCE_DOCUMENT",
+      resourceIds: [DECK, MODEL],
+    });
+  });
+
+  it("writes nothing when it is already held or there is no upload step", () => {
+    expect(uploadAnswer(view([DECK]) as never, stepTypeOf, DECK)).toBeNull();
+    expect(uploadAnswer(view() as never, () => "text", DECK)).toBeNull();
+    expect(uploadAnswer(undefined, stepTypeOf, DECK)).toBeNull();
   });
 });

@@ -105,6 +105,7 @@ import {
   findingsNotFromDocuments,
   publicFindingsNote,
   uploadFindingsNote,
+  uploadAnswer,
   publicSourceOf,
   progressLines,
   promptFor,
@@ -1839,6 +1840,17 @@ export function QOnboardingWorkspace({
         setUploadCard(null);
         return;
       }
+      // The upload is their answer to the journey's own upload step, as the
+      // form's is (sweep D5). Failing to note it loses nothing: the
+      // document and its reading stand either way.
+      const answered = uploadAnswer(
+        viewRef.current,
+        vocabulary.stepType,
+        done.value.documentId,
+      );
+      if (answered !== null) {
+        void actions.submitValue(answered).catch(() => false);
+      }
       setUploadNote(`Reading ${file.name}`);
       setUploadCard({ fileName: file.name, stage: "READING", found: [] });
       // Wait for the reading to land (bounded), then let Q take it from there.
@@ -1995,7 +2007,7 @@ export function QOnboardingWorkspace({
         }
       }
     },
-    [companyIdForUpload, qSubject, actions, voiceActive, push],
+    [companyIdForUpload, qSubject, actions, voiceActive, push, vocabulary],
   );
   // F-49: the waiting file goes up once there is somewhere to file it.
   useEffect(() => {

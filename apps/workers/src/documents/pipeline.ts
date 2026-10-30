@@ -556,51 +556,11 @@ export function createDocumentProcessingPipeline(
       );
     }
 
-    // --- Local figures (owner decision 2026-10-28) ------------------------
-    // A financial document's key figures, read by code from the blocks in
-    // hand (nothing re-read, no model), offered to the founder to confirm.
-    // Idempotent per version; a failure here is logged and never fails or
-    // retries the job: the document is processed either way.
-    if (options.localFigures !== undefined) {
-      const figuresStartedAt = Date.now();
-      try {
-        const figures = await options.localFigures({
-          tenantId,
-          documentId: document.id,
-          documentVersionId: version.id,
-          companyId: document.companyId,
-          documentType: document.documentType,
-          title: document.title,
-          createdByUserId: document.createdByUserId,
-          blocks: output.blocks,
-        });
-        if (figures.kind !== "SKIPPED" || figures.reason !== "NOT_FINANCIAL") {
-          // Counts and codes only: never a figure, a label or a title.
-          logger.info(
-            {
-              msgId: message.msgId,
-              runId: run.id,
-              localFigures: figures.kind,
-              reason: figures.reason,
-              read: figures.read ?? 0,
-              offered: figures.offered ?? 0,
-              localFiguresDurationMs: Date.now() - figuresStartedAt,
-            },
-            "local figures read",
-          );
-        }
-      } catch (error: unknown) {
-        logger.warn(
-          {
-            msgId: message.msgId,
-            runId: run.id,
-            failure: error instanceof Error ? error.name : "unknown",
-          },
-          "local figures not offered",
-        );
-      }
-    }
-
+    // Sweep D5 (2026-10-29): filed first, so the steps below see the kind
+    // it really is. A conversation upload goes up unclassified; read for
+    // local figures before it was filed, a financial document was never
+    // offered back.
+    let filedType: string = document.documentType;
     // --- Filed by what it says (QA QO-23) ----------------------------------
     // Before the document is announced ready, so every reader of the ready
     // event sees its real kind. Only an organisation's unclassified document
@@ -631,6 +591,7 @@ export function createDocumentProcessingPipeline(
               documentId: document.id,
               documentType: kind.data,
             });
+            if (filed) filedType = kind.data;
             logger.info(
               { msgId: message.msgId, runId: run.id, kind: kind.data, filed },
               "document filed by its content",
@@ -646,6 +607,51 @@ export function createDocumentProcessingPipeline(
             "document kind not read; left unclassified",
           );
         }
+      }
+    }
+
+    // --- Local figures (owner decision 2026-10-28) ------------------------
+    // A financial document's key figures, read by code from the blocks in
+    // hand (nothing re-read, no model), offered to the founder to confirm.
+    // Idempotent per version; a failure here is logged and never fails or
+    // retries the job: the document is processed either way.
+    if (options.localFigures !== undefined) {
+      const figuresStartedAt = Date.now();
+      try {
+        const figures = await options.localFigures({
+          tenantId,
+          documentId: document.id,
+          documentVersionId: version.id,
+          companyId: document.companyId,
+          documentType: filedType,
+          title: document.title,
+          createdByUserId: document.createdByUserId,
+          blocks: output.blocks,
+        });
+        if (figures.kind !== "SKIPPED" || figures.reason !== "NOT_FINANCIAL") {
+          // Counts and codes only: never a figure, a label or a title.
+          logger.info(
+            {
+              msgId: message.msgId,
+              runId: run.id,
+              localFigures: figures.kind,
+              reason: figures.reason,
+              read: figures.read ?? 0,
+              offered: figures.offered ?? 0,
+              localFiguresDurationMs: Date.now() - figuresStartedAt,
+            },
+            "local figures read",
+          );
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            msgId: message.msgId,
+            runId: run.id,
+            failure: error instanceof Error ? error.name : "unknown",
+          },
+          "local figures not offered",
+        );
       }
     }
 

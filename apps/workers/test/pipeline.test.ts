@@ -805,6 +805,30 @@ describe("an unclassified upload is filed by what it says (QA QO-23)", () => {
     ).toMatchObject({ documentType: "PITCH_DECK" });
   });
 
+  it("files it before its figures are read, so a financial upload made in the conversation is offered back (sweep D5)", async () => {
+    const version = makeVersion();
+    const evidence = createFakeEvidence({
+      version,
+      document: makeDocument(version, { documentType: "UNCLASSIFIED" }),
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const seen: string[] = [];
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      sandbox: sandboxStub(deckParse),
+      documentKind: () => Promise.resolve("MANAGEMENT_ACCOUNTS"),
+      localFigures: (input) => {
+        seen.push(input.documentType);
+        return Promise.resolve({ kind: "SKIPPED", reason: "NO_FIGURES" });
+      },
+    });
+    const outcome = await handle(jobMessage({ documentVersionId: version.id }));
+    expect(outcome).toEqual({ kind: "DONE" });
+    expect(seen).toEqual(["MANAGEMENT_ACCOUNTS"]);
+  });
+
   it("never re-files a type a person chose, nor reads what they marked highly confidential", async () => {
     let asked = 0;
     const count = () => {
