@@ -100,3 +100,26 @@ export function createToolReadinessLead(dependencies: {
       : null;
   };
 }
+
+/**
+ * Owner 2026-10-30 ("What should I do today?"): the line that closes the
+ * answer to what to do now, offering a full reviewed plan as the next
+ * step rather than starting one. In the person's chosen language; null
+ * when no hand-written copy exists (Q's own answer is in their language,
+ * and an English line is never appended to it).
+ */
+export function createPlanOfferLine(dependencies: {
+  readonly languageOf?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<QLanguageCode | null>)
+    | undefined;
+}): (request: QAnswerRequest) => Promise<string | null> {
+  return async (request) => {
+    const language =
+      dependencies.languageOf === undefined
+        ? null
+        : await dependencies.languageOf(request.actor).catch(() => null);
+    return hasReadinessLeadCopy(language)
+      ? readinessLeadCopy(language).planOffer
+      : null;
+  };
+}

@@ -16,7 +16,7 @@ import {
 describe("TURN_READER v59: acting on a record is not opening it", () => {
   it("v58 kept whole plus one REFERENCE rule (v63 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(72);
+    expect(active.definition.version).toBe(73);
     expect(TURN_READER_V58.status).toBe("DEPRECATED");
     expect(TURN_READER_V59.template).toContain(
       `${TURN_READER_V40_REFERENCES}${V59_ACT_ON_IS_NOT_OPEN}`,

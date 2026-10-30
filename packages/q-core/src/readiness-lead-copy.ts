@@ -16,6 +16,11 @@ export type ReadinessLeadCopy = {
   readonly notFindableHeading: string;
   /** A rule's title or next action in this language, else as given. */
   readonly step: (english: string) => string;
+  /**
+   * Owner 2026-10-30: the line that closes the answer to what to do now,
+   * offering -- never starting -- a full plan, which takes minutes.
+   */
+  readonly planOffer: string;
 };
 
 const AR_STEPS: Readonly<Record<string, string>> = {
@@ -108,12 +113,16 @@ const ENGLISH: ReadinessLeadCopy = {
   notFindableHeading:
     "Investors can't find your company in Discover yet. What to do next, most important first:",
   step: (english) => english,
+  planOffer:
+    "If you'd like a full plan for the weeks ahead, say so and I'll build it. I draft it from where things stand and have it reviewed before you see it, which takes a few minutes.",
 };
 
 const ARABIC: ReadinessLeadCopy = {
   planHeading: "الخطوات التالية لجولة التمويل، الأهم أولاً:",
   notFindableHeading:
     "لا يستطيع المستثمرون العثور على شركتك في Discover بعد. الخطوات التالية، الأهم أولاً:",
+  planOffer:
+    "إن أردت خطة كاملة للأسابيع القادمة فأخبرني وسأعدّها. أكتبها انطلاقاً من وضعك الحالي وتُراجَع قبل أن تراها، ويستغرق ذلك بضع دقائق.",
   step: (english) => {
     const trimmed = english.trim();
     // A step with its trailing full stop is still the same step.

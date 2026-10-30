@@ -8211,6 +8211,16 @@ export function createModelGatewayQAnswer(
           leadListOpen = true;
           sayLeadLines();
         }
+        // Owner 2026-10-30 ("What should I do today?", answer at 11-13 s):
+        // the caller's own opening lines (their priorities, composed by
+        // code before the model is asked) waited for the model's first
+        // sentence, which comes only after its tool rounds (2-6 s, nothing
+        // streamed). They are code's, true now and opening the stored
+        // answer whatever the model writes, so they go out now.
+        if (request.leadLines !== undefined && leadLines !== undefined) {
+          sayLeadLines();
+          took("lead-said");
+        }
 
         /**
          * The public web read by code (see below), once per turn: the
@@ -10023,6 +10033,18 @@ export function createModelGatewayQAnswer(
             "a request had nothing done and nothing said; Q says it could not",
           );
         }
+        // The closing line streams after the model's last sentence, as the
+        // stored answer has it, so a live reader does not wait for the
+        // completed message to see it.
+        if (
+          request.closingLines !== undefined &&
+          couldNot === null &&
+          gapsSaid === null &&
+          streamedText.length > 0
+        ) {
+          streamedText += `${request.closingLines} `;
+          sendSaid(`${request.closingLines} `);
+        }
         let content = (
           gapsSaid !== null
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
@@ -10056,6 +10078,11 @@ export function createModelGatewayQAnswer(
                       ),
                     ]),
                 ...(couldNot === null ? [] : [couldNot]),
+                // Code's closing line (the offer of a full plan), after the
+                // model's words and only when the request was answered.
+                ...(request.closingLines === undefined || couldNot !== null
+                  ? []
+                  : [request.closingLines]),
                 ...actedLines,
                 // The status of earlier changes is not an answer to this
                 // request, and is not said in its place.

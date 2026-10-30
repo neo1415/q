@@ -290,6 +290,52 @@ describe("an answer that arrives as it is written", () => {
     }
   });
 
+  it("owner 2026-10-30: code's opening lines are out before the model has written a word, and its closing offer follows the model's last", async () => {
+    // "What should I do today?" (11-13 s live): the readiness lead waited
+    // for the model's first sentence. Held here before the model writes
+    // anything, the lead must already have reached the listener.
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const lead =
+      "What to do next for your raise, most important first:\n1. Upload your pitch deck.";
+    const offer =
+      "If you'd like a full plan for the weeks ahead, say so and I'll build it.";
+    const { seam, request, published, stored } = build(
+      "Aster wants a meeting, so prepare for it today.",
+      {},
+      {},
+      [],
+      { afterChars: 0, until },
+    );
+    const running = seam.answer({
+      ...request,
+      leadLines: lead,
+      closingLines: offer,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "What to do next for your raise, most important first:",
+      "1. Upload your pitch deck.",
+    ]);
+    expect(stored.inserts).toEqual([]);
+    finish();
+    const outcome = await running;
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "What to do next for your raise, most important first:",
+      "1. Upload your pitch deck.",
+      "Aster wants a meeting, so prepare for it today.",
+      offer,
+    ]);
+    const content = stored.inserts[0]?.content ?? "";
+    expect(content.endsWith(offer)).toBe(true);
+    expect(content.indexOf("Aster wants a meeting")).toBeLessThan(
+      content.indexOf(offer),
+    );
+  });
+
   it("streams a one-sentence answer, which used to reach nobody before completion", async () => {
     const { seam, request, published } = build("Runway is 14 months.");
     await seam.answer(request);

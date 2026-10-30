@@ -20,7 +20,7 @@ const BASE = { kind: "QUESTION_TO_Q", confidence: "HIGH", transcript: "CLEAR" };
 describe("TURN_READER v70: planAsk and directsWork", () => {
   it("is the active reader: v69 kept whole plus two rules after WORK FROM EARLIER", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(72);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(73);
     expect(TURN_READER_V69.status).toBe("DEPRECATED");
     expect(TURN_READER_V70.output).toMatchObject({
       schemaVersion: 70,

@@ -64,6 +64,7 @@ import {
   createToolDelegationPort,
   createToolTeamJobPort,
   type QPlanJobPort,
+  createPlanOfferLine,
   createToolReadinessLead,
   createToolAppActionPort,
   createToolOpenRecordPort,
@@ -669,6 +670,12 @@ export function composeQIntelligence(
     // Lead 2026-10-03: "what should I do next?" opens with their readiness.
     readinessLead: createToolReadinessLead({
       tools,
+      ...(dependencies.languageCodeOf === undefined
+        ? {}
+        : { languageOf: dependencies.languageCodeOf }),
+    }),
+    // Owner 2026-10-30: that answer closes by offering a full plan.
+    planOffer: createPlanOfferLine({
       ...(dependencies.languageCodeOf === undefined
         ? {}
         : { languageOf: dependencies.languageCodeOf }),
