@@ -203,10 +203,10 @@ describe("defect 2: PLAN_WRITE's output is accepted the way the model writes it"
     expect(done.modelCalls).toBeLessThanOrEqual(6);
   });
 
-  it("v2 prompts are the active ones, and are reasoning work, not extraction", () => {
+  it("v2 prompts (and v3, built on them) are reasoning work, not extraction", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("PLAN_WRITE").definition.version).toBe(2);
-    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(2);
+    expect(registry.getActive("PLAN_WRITE").definition.version).toBe(3);
+    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(3);
     expect(PLAN_WRITE_V2.taskClass).toBe("EVIDENCE_SYNTHESIS");
     expect(PLAN_REVIEW_V2.taskClass).toBe("EVIDENCE_SYNTHESIS");
     for (const limit of [
@@ -258,7 +258,7 @@ describe("defect 3: what the reviewers still want is said plainly", () => {
 describe("defect 4: reader v71 reads what they want at the end", () => {
   it("names the live misreadings as cases, by meaning", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(71);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(72);
     const text = TURN_READER_V71.template;
     expect(text).toContain(
       '"I need to hire a CFO before our seed close, sort it out"',

@@ -328,7 +328,13 @@ export function rosterText(roster: readonly RosterEntry[]): string {
         case "TOOL_PROPOSAL":
           return `TOOL_PROPOSAL ${entry.name}: ${entry.does} (prepared for your approval)`;
         case "APP_ACTION":
-          return `APP_ACTION ${entry.name}: ${entry.does.slice(0, 160)}`;
+          // The writer's owner rule reads this mark (PLAN_WRITE v3): Q
+          // prepares it and the person approves it on its own card.
+          return `APP_ACTION ${entry.name}: ${entry.does.slice(0, 160)}${
+            APP_ACTION_CLASS.get(entry.name) === "CONSEQUENTIAL"
+              ? " (needs your approval)"
+              : ""
+          }`;
         case "WORKFORCE":
           return `WORKFORCE ${entry.name}: ${entry.does}`;
       }
@@ -400,13 +406,14 @@ export function classifyStep(
         return entry === undefined || entry.kind !== "WORKFORCE" ? [] : [entry];
       });
       if (entries.length === 0) return task;
+      const outward = entries.some((entry) => entry.outward);
       return {
         owner: byQ,
         action: {
           kind: "WORKFORCE",
           roles: [...new Set(entries.map((entry) => entry.name))],
         },
-        needsApproval: entries.some((entry) => entry.outward),
+        needsApproval: outward,
       };
     }
   }
@@ -891,7 +898,7 @@ export function reviewFixes(result: PlanReviewResult): readonly string[] {
 
 // --- the job -----------------------------------------------------------------------
 
-export const PLAN_PROMPT_VERSION = "PLAN_WRITE@1+PLAN_REVIEW@1";
+export const PLAN_PROMPT_VERSION = "PLAN_WRITE@3+PLAN_REVIEW@3";
 /**
  * Addendum 4: at most one redraft under the six-call budget (write, two
  * reviews, redraft, two reviews). The contract allows up to two.
@@ -1350,8 +1357,13 @@ export async function runPlanJob(
   // What the reviewers still want, in the person's words: "Step 2: …",
   // the change asked for, no fact codes (live 2026-10-29: the card said
   // only "draft", and the line quoted "[s2] … cites F26 …").
+  const factWords = new Map(
+    situationFacts(dossier).map((fact) => [fact.ref, fact.statement]),
+  );
   const points = [
-    ...new Set(openPoints.map((point) => personPoint(point, grounded.steps))),
+    ...new Set(
+      openPoints.map((point) => personPoint(point, grounded.steps, factWords)),
+    ),
   ]
     .filter((point) => point.length > 0)
     .slice(0, 12);
@@ -1540,6 +1552,8 @@ function writtenOfGrounded(plan: GroundedPlan): unknown {
       cites: step.cites,
       owner: step.owner,
       action: step.action,
+      // The reviewers' owner rule reads it (PLAN_REVIEW v3).
+      needsApproval: step.needsApproval,
       due: step.due,
       evidenceNeeded: step.evidenceNeeded,
     })),
@@ -1568,19 +1582,70 @@ function keysOfGrounded(plan: GroundedPlan): ReadonlyMap<string, string> {
 export function personPoint(
   point: string,
   steps: readonly Pick<QPlanStep, "key">[],
+  /**
+   * The situation's facts by ref. Q-page sweep 2026-10-29: with the refs
+   * only taken out, "Add F62 to s6's cites" reached the person as "Add to
+   * s6's cites". Each ref is said as the start of its fact instead.
+   */
+  facts?: ReadonlyMap<string, string>,
 ): string {
   const match = /^\[([^\]]+)\]\s*(.*)$/su.exec(point.trim());
   const key = match?.[1] ?? null;
   const body = match?.[2] ?? point.trim();
   const [problem = "", fix] = body.split(/\s*Fix:\s*/u);
-  const wanted = withoutRefs((fix ?? problem).trim()).replace(/^./u, (letter) =>
-    letter.toUpperCase(),
-  );
+  const wanted = withoutRefs(
+    plainReviewWords(namedFacts((fix ?? problem).trim(), facts), steps),
+  ).replace(/^./u, (letter) => letter.toUpperCase());
   const index = key === null ? -1 : steps.findIndex((one) => one.key === key);
   return sentenceClip(
     index === -1 ? wanted : `Step ${String(index + 1)}: ${wanted}`,
     300,
   );
+}
+
+/** A fact ref as the first words of its fact, quoted; one the situation lacks is "the record". */
+function namedFacts(
+  text: string,
+  facts: ReadonlyMap<string, string> | undefined,
+): string {
+  if (facts === undefined) return text;
+  return text.replace(/\b[FP][1-9]\d{0,3}\b/gu, (ref) => {
+    const statement = facts.get(ref);
+    if (statement === undefined) return "the record";
+    const words = statement
+      .replace(/^You told Q:\s*/u, "")
+      .replace(/\s+/gu, " ")
+      .trim()
+      .split(" ");
+    const start = words
+      .slice(0, 8)
+      .join(" ")
+      .replace(/[\s.,;:]+$/u, "");
+    return `\u201C${start}${words.length > 8 ? "\u2026" : ""}\u201D`;
+  });
+}
+
+/**
+ * A reviewer's bookkeeping words as the person reads them: a step's key is
+ * "step N", and the plan's "cites" are the records a step rests on.
+ */
+function plainReviewWords(
+  text: string,
+  steps: readonly Pick<QPlanStep, "key">[],
+): string {
+  let out = text;
+  steps.forEach((step, index) => {
+    const escaped = step.key.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    out = out.replace(
+      new RegExp(`\\b${escaped}\\b`, "gu"),
+      `step ${String(index + 1)}`,
+    );
+  });
+  return out
+    .replace(/\bcites\b/gu, "sources")
+    .replace(/\bCites\b/gu, "Sources")
+    .replace(/\bcite\b/gu, "point to")
+    .replace(/\bCite\b/gu, "Point to");
 }
 
 /** The plan card: a reference the client reads under the person's authority. */

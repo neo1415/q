@@ -112,6 +112,11 @@ export type BuiltSpreadsheet = {
   readonly gaps: readonly string[];
   /** Asked-for columns it could not fill, and why; for the reply's receipt. */
   readonly unfilled: readonly UnfilledColumn[];
+  /**
+   * A line the receipt adds after what was made, written by the builder
+   * (the financial model: what is Q's projection, what is not known).
+   */
+  readonly note?: string | undefined;
 };
 
 /** "INTEREST_EXPRESSED" -> "Interest expressed". */
@@ -133,7 +138,7 @@ export function sheetName(chosen: string | undefined, fallback: string) {
     : clean;
 }
 
-const text = (value: string | null | undefined): QSheetCell =>
+export const text = (value: string | null | undefined): QSheetCell =>
   value === null || value === undefined || value.trim().length === 0
     ? null
     : value.slice(0, Q_SHEET_TEXT_MAX);
@@ -186,7 +191,7 @@ function oneCurrency(rows: readonly (readonly QSheetCell[])[], at: number) {
 }
 
 /** A sheet, with totals only where they are arithmetic. */
-function sheet(
+export function sheet(
   name: string,
   columns: readonly QSheetColumn[],
   rows: readonly (readonly QSheetCell[])[],
@@ -252,7 +257,7 @@ function unfilledOf(
   return out;
 }
 
-function finish(input: {
+export function finish(input: {
   readonly title: string;
   readonly summary: string;
   readonly sheets: readonly QSheet[];
@@ -260,14 +265,17 @@ function finish(input: {
   readonly today: string;
   readonly gaps?: readonly string[] | undefined;
   readonly unfilled?: readonly UnfilledColumn[] | undefined;
+  readonly provenance?: string | undefined;
+  readonly note?: string | undefined;
 }): BuiltSpreadsheet {
   return {
+    ...(input.note === undefined ? {} : { note: input.note }),
     title: input.title.slice(0, 160),
     summary: input.summary.slice(0, 600),
     workbook: QWorkbookSchema.parse({
       sheets: input.sheets,
       sources: input.sources,
-      provenance: provenanceLine(input.today),
+      provenance: input.provenance ?? provenanceLine(input.today),
     }),
     gaps: [...(input.gaps ?? [])],
     unfilled: [...(input.unfilled ?? [])],
@@ -932,7 +940,7 @@ export function buildShownSheet(
  * was made -- sheets, rows, columns -- and which asked-for columns could
  * not be filled and why. The model adds at most one offer after it.
  */
-const andList = (names: readonly string[]): string =>
+export const andList = (names: readonly string[]): string =>
   names.length <= 1
     ? (names[0] ?? "")
     : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
@@ -963,9 +971,12 @@ export function spreadsheetReceipt(built: BuiltSpreadsheet): string {
             ? `${gap.column}: not known for ${String(gap.rows)} of ${String(gap.of)} rows, left blank`
             : `${gap.column}: not known for any row, left blank`,
     );
-  return (
-    missing.length === 0 ? made : `${made} Not filled: ${missing.join("; ")}.`
-  ).slice(0, 900);
+  const said =
+    missing.length === 0 ? made : `${made} Not filled: ${missing.join("; ")}.`;
+  return (built.note === undefined ? said : `${said} ${built.note}`).slice(
+    0,
+    900,
+  );
 }
 
 // --- a company's stated figures ---------------------------------------------

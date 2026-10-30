@@ -29,6 +29,12 @@ import { actorWideScope, scopesOfKind } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
 import { createReadCompanyFiguresTool } from "./company-figures.js";
 import { createGetInvestorMandateTool } from "./get-investor-mandate.js";
+import { ownSubject } from "./q-card.js";
+import {
+  buildOwnFinancialModelSheet,
+  ownModelNothingLine,
+  type OwnFinancialFigure,
+} from "./spreadsheet-model.js";
 import {
   buildComparisonCardsSheet,
   buildComparisonSheet,
@@ -74,6 +80,9 @@ export const SPREADSHEET_SOURCES = [
   "SHOWN_TABLE",
   "SHOWN_COMPARISON",
   "SHOWN_RANKED_LIST",
+  // Q-page sweep 2026-10-29 (F06): their own company's financial model,
+  // from the figures they told Q, with Q's projection labelled as such.
+  "OWN_FINANCIAL_MODEL",
 ] as const;
 
 /** One of Q's earlier answers in this conversation, newest first. */
@@ -114,6 +123,18 @@ export type SpreadsheetPort = {
   }>;
   /** YYYY-MM-DD; absent: the server's UTC date. */
   readonly today?: (() => string) | undefined;
+  /**
+   * Their own company's financial figures as they told Q (newest first),
+   * read as the actor for a company their organisation owns; a figure
+   * stored above CONFIDENTIAL comes back held back, without its words or
+   * value. Absent: no financial model can be made.
+   */
+  readonly ownFinancials?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<readonly OwnFinancialFigure[]>)
+    | undefined;
 };
 
 export const MakeSpreadsheetInputSchema = z
@@ -121,7 +142,7 @@ export const MakeSpreadsheetInputSchema = z
     source: z
       .enum(SPREADSHEET_SOURCES)
       .describe(
-        "Which data, by what they mean: PIPELINE = their own relationships (and saved/passed companies); COMPANY_FIGURES = one company's stated figures (needs companyId); SHOWN_TABLE / SHOWN_COMPARISON / SHOWN_RANKED_LIST = the table, side-by-side comparison or ranked list you already showed them in this conversation ('put that in Excel').",
+        "Which data, by what they mean: PIPELINE = their own relationships (and saved/passed companies); COMPANY_FIGURES = one company's published figures (needs companyId); OWN_FINANCIAL_MODEL = a founder's own financial model, forecast or projection for their own company (any number of months), built from the figures they told Q, with your projection labelled as yours; SHOWN_TABLE / SHOWN_COMPARISON / SHOWN_RANKED_LIST = the table, side-by-side comparison or ranked list you already showed them in this conversation ('put that in Excel').",
       ),
     companyId: UuidSchema.optional().describe(
       "COMPANY_FIGURES only: the company's id, as given in the conversation context.",
@@ -137,6 +158,27 @@ export const MakeSpreadsheetInputSchema = z
       .optional()
       .describe(
         "PIPELINE only: true when they want how each company fits their mandate in it (mandate fit, cheque fit, stage fit, the round against their cheque), by what they mean in any words. Capital Q joins the fit it computes; you never write a fit.",
+      ),
+    months: z
+      .number()
+      .int()
+      .min(1)
+      .max(36)
+      .optional()
+      .describe(
+        "OWN_FINANCIAL_MODEL only: how many months to project, as they asked (default 12).",
+      ),
+    assumptions: z
+      .object({
+        revenueGrowthPercentPerMonth: z.number().min(-50).max(100).optional(),
+        costGrowthPercentPerMonth: z.number().min(-50).max(100).optional(),
+        basis: z.string().trim().max(300).optional(),
+        theirs: z.boolean().optional(),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "OWN_FINANCIAL_MODEL only: the monthly growth rates the projection applies. When they gave rates, use theirs and set theirs true. Otherwise propose rates from their own record (for example the revenue history in their deck) and say why in basis, one sentence; leave a rate out when nothing on their record supports one (that line is then held flat, and the sheet says so). Never a figure: Capital Q reads their starting figures itself.",
       ),
     columns: z
       .array(z.string().trim().min(1).max(40))
@@ -154,7 +196,13 @@ export const MakeSpreadsheetInputSchema = z
   )
   .refine((input) => input.withFit !== true || input.source === "PIPELINE", {
     message: "withFit is for PIPELINE",
-  });
+  })
+  .refine(
+    (input) =>
+      input.source === "OWN_FINANCIAL_MODEL" ||
+      (input.months === undefined && input.assumptions === undefined),
+    { message: "months and assumptions are for OWN_FINANCIAL_MODEL" },
+  );
 export type MakeSpreadsheetInput = z.infer<typeof MakeSpreadsheetInputSchema>;
 
 const SpreadsheetDocumentSchema = z
@@ -204,6 +252,25 @@ const FIT_KEYS: ReadonlySet<string> = new Set(
 
 export const SPREADSHEET_NOTHING_LINE =
   "There's nothing of that kind on your record to put in a spreadsheet, so I haven't made one.";
+/**
+ * F06 (2026-10-29): one line for every source read as "nothing on your
+ * record" while Q then quoted the figures the founder had told it. Each
+ * source now says what, exactly, had nothing in it.
+ */
+export const SPREADSHEET_NOTHING_LINES: Readonly<
+  Record<
+    Exclude<(typeof SPREADSHEET_SOURCES)[number], "OWN_FINANCIAL_MODEL">,
+    string
+  >
+> = {
+  PIPELINE:
+    "There's nothing in your pipeline to put in a spreadsheet yet, so I haven't made one.",
+  COMPANY_FIGURES:
+    "That company has published no figures on Capital Q, so there was nothing for a sheet of its published figures and I haven't made one.",
+  SHOWN_TABLE: SPREADSHEET_NOTHING_LINE,
+  SHOWN_COMPARISON: SPREADSHEET_NOTHING_LINE,
+  SHOWN_RANKED_LIST: SPREADSHEET_NOTHING_LINE,
+};
 export const SPREADSHEET_FAILED_LINE =
   "I couldn't file the spreadsheet just now. Ask me again in a moment and I'll make it.";
 
@@ -284,7 +351,8 @@ function newestShown<K extends QResultBlock["kind"]>(
   return null;
 }
 
-type Grant = { readonly figures: unknown } | null;
+type Grant =
+  { readonly figures: unknown } | { readonly ownCompanyId: string } | null;
 
 /** read_company_figures' own output, as far as the sheet reads it. */
 const FiguresReadSchema = z.object({
@@ -409,7 +477,7 @@ export function createMakeSpreadsheetTool(
     // where the turn is about documents, and whenever the reader names it.
     providerName: "make_spreadsheet",
     description:
-      "Makes a real Excel spreadsheet (.xlsx, also CSV) of their data and files it as their own private document with a download card: their pipeline, one company's stated figures, or a table, comparison or ranked list you already showed them in this conversation. Call it whenever they ask for a spreadsheet, an Excel, a sheet or a CSV of something. Code writes every cell from their records; you choose only the source, an optional sheet name and columns (and withFit for a pipeline with mandate or cheque fit). The result's `says` is Capital Q's own line -- what was made and what could not be filled -- and is said to them as written: do not repeat or restate it; add at most one short offer, or nothing. NOTHING_TO_PUT_IN_IT: there is no such data (never invent rows).",
+      "Makes a real Excel spreadsheet (.xlsx, also CSV) of their data and files it as their own private document with a download card: their pipeline, one company's published figures, a founder's own financial model (Capital Q projects the months from the figures they told Q, labelled as your projection), or a table, comparison or ranked list you already showed them in this conversation. Call it whenever they ask for a spreadsheet, an Excel, a sheet, a CSV or a financial model. Code writes every cell from their records; you choose only the source, an optional sheet name and columns (withFit for pipeline fit; months and growth rates for a model). The result's `says` is Capital Q's own line -- what was made and what could not be filled -- and is said to them as written: do not repeat or restate it; add at most one short offer, or nothing. NOTHING_TO_PUT_IN_IT: there is no such data (never invent rows).",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [],
@@ -433,6 +501,23 @@ export function createMakeSpreadsheetTool(
       if (!ownConversation(context.actor, context.plan)) {
         return deny("NOT_AVAILABLE");
       }
+      if (input.source === "OWN_FINANCIAL_MODEL") {
+        // Their own company only: one their organisation owns, bound in
+        // this run's plan. Their own figures shown to themselves; nobody
+        // else's, and nothing reaches another reader.
+        if (spreadsheet.ownFinancials === undefined) {
+          return deny("NOT_AVAILABLE");
+        }
+        const own = await ownSubject(
+          ports,
+          context.actor,
+          context.plan,
+          "COMPANY",
+        );
+        return own === null
+          ? deny("NOT_AVAILABLE")
+          : allow("CONFIDENTIAL", { ownCompanyId: own });
+      }
       if (input.source !== "COMPANY_FIGURES") {
         return allow("CONFIDENTIAL", null);
       }
@@ -453,8 +538,38 @@ export function createMakeSpreadsheetTool(
         columns: input.columns,
       };
       const day = today();
+      let nothing: string | null = null;
       const built = await (async (): Promise<BuiltSpreadsheet | null> => {
         switch (input.source) {
+          case "OWN_FINANCIAL_MODEL": {
+            if (
+              grant === null ||
+              !("ownCompanyId" in grant) ||
+              spreadsheet.ownFinancials === undefined
+            ) {
+              return null;
+            }
+            const figures = await spreadsheet.ownFinancials(
+              context.actor,
+              grant.ownCompanyId,
+            );
+            const profile = await ports.companies.findCanonicalCompanyProfile(
+              CompanyIdSchema.parse(grant.ownCompanyId),
+            );
+            const model = buildOwnFinancialModelSheet(
+              {
+                companyId: grant.ownCompanyId,
+                companyName: profile?.canonicalName ?? "Your company",
+                figures,
+                assumptions: input.assumptions ?? {},
+                months: input.months,
+                today: day,
+              },
+              choice,
+            );
+            if (model === null) nothing = ownModelNothingLine(figures);
+            return model;
+          }
           case "PIPELINE": {
             const own = await ports.relationships?.ownRelationships?.(
               context.actor,
@@ -496,7 +611,8 @@ export function createMakeSpreadsheetTool(
             if (
               figuresTool === undefined ||
               input.companyId === undefined ||
-              grant === null
+              grant === null ||
+              !("figures" in grant)
             ) {
               return null;
             }
@@ -574,7 +690,11 @@ export function createMakeSpreadsheetTool(
       if (built === null) {
         return {
           status: "NOTHING_TO_PUT_IN_IT",
-          says: SPREADSHEET_NOTHING_LINE,
+          says:
+            nothing ??
+            (input.source === "OWN_FINANCIAL_MODEL"
+              ? SPREADSHEET_FAILED_LINE
+              : SPREADSHEET_NOTHING_LINES[input.source]),
         };
       }
       const filed = await spreadsheet.file({

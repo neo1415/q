@@ -165,6 +165,7 @@ import { TURN_READER_V68 } from "./tasks/turn-reader.v68.js";
 import { TURN_READER_V69 } from "./tasks/turn-reader.v69.js";
 import { TURN_READER_V70 } from "./tasks/turn-reader.v70.js";
 import { TURN_READER_V71 } from "./tasks/turn-reader.v71.js";
+import { TURN_READER_V72 } from "./tasks/turn-reader.v72.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -213,6 +214,7 @@ import {
   PLAN_WRITE_V1,
 } from "./tasks/plan.v1.js";
 import { PLAN_REVIEW_V2, PLAN_WRITE_V2 } from "./tasks/plan.v2.js";
+import { PLAN_REVIEW_V3, PLAN_WRITE_V3 } from "./tasks/plan.v3.js";
 import { CONVERSATION_RECALL_V1 } from "./tasks/conversation-recall.v1.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
@@ -627,7 +629,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V68,
     TURN_READER_V69,
     { ...TURN_READER_V70, status: "DEPRECATED" },
-    TURN_READER_V71,
+    { ...TURN_READER_V71, status: "DEPRECATED" },
+    TURN_READER_V72,
     MEMORY_EXTRACTOR_V1,
     MEMORY_EXTRACTOR_V2,
     MEETING_NOTES_V1,
@@ -779,8 +782,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...PLAN_WRITE_V1, status: "DEPRECATED" },
     { ...PLAN_REVIEW_V1, status: "DEPRECATED" },
     PLAN_READ_V1,
-    PLAN_WRITE_V2,
-    PLAN_REVIEW_V2,
+    { ...PLAN_WRITE_V2, status: "DEPRECATED" },
+    { ...PLAN_REVIEW_V2, status: "DEPRECATED" },
+    PLAN_WRITE_V3,
+    PLAN_REVIEW_V3,
     CONVERSATION_RECALL_V1,
     TURN_SKIM_V1,
     TURN_SKIM_V2,

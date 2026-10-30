@@ -32,8 +32,13 @@ export function createSpreadsheetPort(dependencies: {
     | ((actor: ActorContext, subject: QSubjectRef) => Promise<string | null>)
     | undefined;
   readonly artifacts: Pick<ArtifactService, "fileOwnAnswer">;
+  /** Their own company's financial figures (own-financials.ts). */
+  readonly ownFinancials?: SpreadsheetPort["ownFinancials"];
 }): SpreadsheetPort {
   return {
+    ...(dependencies.ownFinancials === undefined
+      ? {}
+      : { ownFinancials: dependencies.ownFinancials }),
     shownAnswers: async (actor, runId) => {
       const conversationId = await dependencies.conversationOf(actor, runId);
       if (conversationId === null) return [];

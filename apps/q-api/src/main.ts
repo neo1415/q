@@ -75,6 +75,7 @@ import {
 } from "@capital-q/gateq-intake";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
 import { createSpreadsheetPort } from "./composition/spreadsheets.js";
+import { createOwnFinancialsRead } from "./composition/own-financials.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
 import { hkdfSync, randomUUID } from "node:crypto";
 
@@ -3716,6 +3717,8 @@ const qTools = createQTools({
       artifacts: {
         fileOwnAnswer: (input) => qArtifacts.service.fileOwnAnswer(input),
       },
+      // F06: a founder's own financial model reads what they told Q.
+      ownFinancials: createOwnFinancialsRead(database.sql),
     }),
     // R33: Save / Unsave / Pass, recorded by the interaction service the
     // Discover buttons call, with the feed's own eligibility re-run.
