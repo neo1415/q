@@ -9,6 +9,7 @@ import {
 } from "../src/eligibility/contracts.js";
 import type { EligibilityService } from "../src/eligibility/service.js";
 import { FEATURE_SCHEMA_VERSION } from "../src/features/contracts.js";
+import type { RankingReasonCode } from "../src/ranking/config.js";
 import { RANKER_VERSION } from "../src/ranking/contracts.js";
 import { createProactiveSuppression } from "../src/rerank/suppression.js";
 import {
@@ -89,7 +90,7 @@ async function publish(
     /** The candidate rotation's window this slate read, of how many. */
     readonly window?: { readonly index: number; readonly of: number };
     /** Every item's stored codes; STAGE_ALIGNED + FACTOR_MISSING otherwise. */
-    readonly reasonCodes?: readonly string[];
+    readonly reasonCodes?: readonly RankingReasonCode[];
     /** The build's geography counts (final check 2026-10-30). */
     readonly geography?: {
       readonly aligned: number;
@@ -113,7 +114,8 @@ async function publish(
       rank: index + 1,
       internalScore: 0.9 - index * 0.1,
       reasonCodes: [
-        ...(options.reasonCodes ?? ["STAGE_ALIGNED", "FACTOR_MISSING"]),
+        ...(options.reasonCodes ??
+          (["STAGE_ALIGNED", "FACTOR_MISSING"] as const)),
       ],
       featureSnapshotId: "66666666-0000-4000-8000-000000000001",
       featureSnapshotFingerprint: "a".repeat(64),
