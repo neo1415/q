@@ -336,6 +336,87 @@ describe("an answer that arrives as it is written", () => {
     );
   });
 
+  it("live 2026-10-30 (latency): lead lines the caller already streamed are not sent again; the model's sentences stream as written, under the same message the answer is stored as", async () => {
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const lead =
+      "What to do next for your raise, most important first:\n1. Upload your pitch deck.";
+    const answerMessageId = "77777777-7777-4777-8777-777777777777";
+    const { seam, request, published, stored } = build(
+      "Aster wants a meeting, so prepare for it today. Then send the deck.",
+      {},
+      {},
+      [],
+      {
+        afterChars:
+          `{"answer":"Aster wants a meeting, so prepare for it today. Then`
+            .length,
+        until,
+      },
+    );
+    const running = seam.answer({
+      ...request,
+      leadLines: lead,
+      leadLinesSaid: {
+        answerMessageId: answerMessageId as never,
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // While the model is still writing: its first whole sentence is out,
+    // the lead is not said twice, and nothing is stored yet.
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Aster wants a meeting, so prepare for it today.",
+    ]);
+    expect(published.every((d) => d.messageId === answerMessageId)).toBe(true);
+    expect(stored.inserts).toEqual([]);
+    finish();
+    const outcome = await running;
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Aster wants a meeting, so prepare for it today.",
+      "Then send the deck.",
+    ]);
+    expect(stored.id).toBe(answerMessageId);
+    const content = stored.inserts[0]?.content ?? "";
+    expect(content.startsWith("What to do next for your raise")).toBe(true);
+  });
+
+  it("live 2026-10-30 (two offers): where code closes with its offer, the model's trailing question is neither streamed nor stored", async () => {
+    const offer =
+      "If you'd like a full plan for the weeks ahead, say so and I'll build it.";
+    const { seam, request, published, stored } = build(
+      "Start with founder verification today. Is that the area you mean? Then add revenue evidence. Want me to take you to the verification area?",
+    );
+    const outcome = await seam.answer({ ...request, closingLines: offer });
+    expect(outcome.kind).toBe("ANSWERED");
+    const said = published.map((d) => d.text.trim());
+    // A question followed by the model's own prose is kept as written.
+    expect(said).toEqual([
+      "Start with founder verification today.",
+      "Is that the area you mean?",
+      "Then add revenue evidence.",
+      offer,
+    ]);
+    const content = stored.inserts[0]?.content ?? "";
+    expect(content).not.toContain("verification area?");
+    expect(content).toContain("Is that the area you mean?");
+    expect(content.trim().endsWith(offer)).toBe(true);
+    // Exactly one ask closes the answer: code's.
+    expect(content.split(offer)[1]?.trim() ?? "").toBe("");
+  });
+
+  it("without code's closing offer, the model's closing question stays", async () => {
+    const { seam, request, stored } = build(
+      "Runway is 14 months. Want me to take you to the verification area?",
+    );
+    await seam.answer(request);
+    expect(stored.inserts[0]?.content ?? "").toContain(
+      "Want me to take you to the verification area?",
+    );
+  });
+
   it("streams a one-sentence answer, which used to reach nobody before completion", async () => {
     const { seam, request, published } = build("Runway is 14 months.");
     await seam.answer(request);

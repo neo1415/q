@@ -394,6 +394,17 @@ export function createQRunStreamService(
     const pending: { readonly delta: QLiveDelta; readonly at: number }[] = [];
     let deltaWaitMaxMs = 0;
     let deltasSent = 0;
+    /**
+     * Live 2026-10-30 (run 2c8fd21b): the lead lines were published 4.9 s
+     * after Enter, the browser painted them at 12.4 s, and this log's one
+     * line (written at the stream's end) could not say when they left.
+     * When the first and last live text left this stream, from its open.
+     */
+    const openedAt = Date.now();
+    let firstDeltaMs: number | null = null;
+    let lastDeltaMs: number | null = null;
+    /** The first that was not a holding line: the answer's own text. */
+    let firstTextMs: number | null = null;
     let wake: ((value: Wake) => void) | null = null;
     const wakeUp = (value: Wake) => {
       const current = wake;
@@ -449,6 +460,11 @@ export function createQRunStreamService(
           deltaWaitMaxMs = Math.max(deltaWaitMaxMs, sentAt - at);
         }
         deltasSent += queued.length;
+        firstDeltaMs ??= sentAt - openedAt;
+        lastDeltaMs = sentAt - openedAt;
+        if (queued.some(({ delta }) => delta.holding !== true)) {
+          firstTextMs ??= sentAt - openedAt;
+        }
         for (const delta of coalesceDeltas(queued.map((one) => one.delta))) {
           for (const event of deltaEvents(delta, cursor)) {
             yield { kind: "delta", event };
@@ -597,7 +613,14 @@ export function createQRunStreamService(
         // How long live text waited in this stream before going out; the
         // measure of the delivery lag a person sees (no content).
         logger?.info(
-          { qRunId: run.id, deltasSent, deltaWaitMaxMs },
+          {
+            qRunId: run.id,
+            deltasSent,
+            deltaWaitMaxMs,
+            firstDeltaMs,
+            firstTextMs,
+            lastDeltaMs,
+          },
           "q stream live text delivery",
         );
       }

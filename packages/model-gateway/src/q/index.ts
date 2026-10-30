@@ -4776,7 +4776,10 @@ export function createModelGatewayQAnswer(
         ANSWER_LIMIT_CHARS,
       );
     }
-    const messageId = QMessageIdSchema.parse(randomUUID());
+    // The caller may have streamed the lead under this answer's id already.
+    const messageId =
+      request.leadLinesSaid?.answerMessageId ??
+      QMessageIdSchema.parse(randomUUID());
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         id: messageId,
@@ -5355,7 +5358,11 @@ export function createModelGatewayQAnswer(
        * that goes out early and the message that is finally stored are
        * one thing to whoever is reading.
        */
-      const messageId = QMessageIdSchema.parse(randomUUID());
+      // The caller streamed code's lead under this id (leadLinesSaid): what
+      // follows, and the stored message, are the same message.
+      const messageId =
+        request.leadLinesSaid?.answerMessageId ??
+        QMessageIdSchema.parse(randomUUID());
       /** When the first words went out, from the turn's start. */
       let firstPublishedMs: number | null = null;
       /** The early web search's line was said as the search started. */
@@ -6172,6 +6179,8 @@ export function createModelGatewayQAnswer(
        * it is released the moment the answer goes on.
        */
       let heldPromise: string | null = null;
+      /** A question of the model's, held while code closes with its offer. */
+      let heldAsk: string | null = null;
       /** Code's lead list was the last thing said (see publish below). */
       let leadListOpen = leadLines !== undefined;
       /** When the person got the first sentence, from the seam's start. */
@@ -6222,6 +6231,19 @@ export function createModelGatewayQAnswer(
       };
       /** Code's opening lines, once, before anything else is said. */
       let leadSaid = false;
+      // Already streamed by the caller as soon as code composed them
+      // (leadLinesSaid): heard, so counted as said, and never sent twice.
+      if (
+        request.leadLinesSaid !== undefined &&
+        request.leadLines !== undefined
+      ) {
+        leadSaid = true;
+        firstPublishedMs ??= 0;
+        for (const line of request.leadLines.split("\n")) {
+          const said = line.trim();
+          if (said.length > 0) streamedText += `${said} `;
+        }
+      }
       const sayLeadLines = (): void => {
         // After the early web search's line, code's own opening still
         // follows it; after anything else, it is past.
@@ -6411,6 +6433,18 @@ export function createModelGatewayQAnswer(
         if (heldPromise !== null) {
           publish(heldPromise);
           heldPromise = null;
+        }
+        // Code closes this answer with its own offer (request.closingLines):
+        // a question of the model's is held until a sentence follows it, so
+        // a closing ask of its own never reaches anyone (see
+        // withoutTrailingAsks). One ask per answer, so a yes binds to code's.
+        if (heldAsk !== null) {
+          publish(heldAsk);
+          heldAsk = null;
+        }
+        if (request.closingLines !== undefined && isAsk(said)) {
+          heldAsk = said;
+          return;
         }
         if (isEmptyPromise(said)) {
           heldPromise = said;
@@ -10099,7 +10133,11 @@ export function createModelGatewayQAnswer(
                   ? []
                   : [
                       ((said: string) =>
-                        madeLines.length === 0 ? said : atMostOneOffer(said))(
+                        request.closingLines !== undefined
+                          ? withoutTrailingAsks(said)
+                          : madeLines.length === 0
+                            ? said
+                            : atMostOneOffer(said))(
                         withoutRememberTalk(
                           leadLines === undefined
                             ? (statusTalk?.text ?? guarded.text)
@@ -10932,6 +10970,31 @@ export function documentReceiptOf(
     record.says.trim().length > 0
     ? record.says.trim()
     : null;
+}
+
+/** A sentence that asks the person something: it ends in a question mark. */
+export function isAsk(sentence: string): boolean {
+  return /[?？؟]["'”’)]*\s*$/u.test(sentence.trim());
+}
+
+/**
+ * Live 2026-10-30 (founder.ledgerbridge, "What should I do today?"): the
+ * answer ended with the model's "Want me to take you to the verification
+ * area?" and then code's plan offer -- two asks, so a "yes" could bind to
+ * either. The note telling the model not to offer did not hold, so this is
+ * structural, not a matter of its words: when code closes an answer with
+ * its own recorded offer, the model's trailing questions -- every sentence
+ * at the end of its text that ends in a question mark, whatever it asks --
+ * are dropped. A question mark is how a sentence asks for a reply, and
+ * code's offer is the one reply this answer may take. A question in the
+ * middle, with the model's prose after it, is kept as written.
+ */
+export function withoutTrailingAsks(text: string): string {
+  const sentences = splitSentences(text);
+  let end = sentences.length;
+  while (end > 0 && isAsk(sentences[end - 1] ?? "")) end -= 1;
+  if (end === sentences.length) return text;
+  return sentences.slice(0, end).join("").trim();
 }
 
 /**

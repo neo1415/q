@@ -420,6 +420,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly leadLines?: string | undefined;
   /**
+   * Live 2026-10-30 (latency): `leadLines` were already streamed by the
+   * caller, the moment code composed them, under `answerMessageId`. The
+   * answer opens its stored message with them as usual, stores it under
+   * that id, and does not stream them again. Absent: the answer says them.
+   */
+  readonly leadLinesSaid?:
+    { readonly answerMessageId: QConversationMessage["id"] } | undefined;
+  /**
    * A line code composed to close this answer, after the model's own words
    * (owner 2026-10-30: the offer to build a full plan that ends the answer
    * to "What should I do today?"). Absent: none.
