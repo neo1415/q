@@ -31,6 +31,7 @@
     "@capital-q/observability": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
     "zod": "4.5.4"
   },
   "devDependencies": {

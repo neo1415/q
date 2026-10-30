@@ -7,6 +7,7 @@ import type {
   ExternalPersonConfidence,
   IdentityCandidate,
 } from "@capital-q/contracts/q";
+import { countryName } from "@capital-q/taxonomy/countries";
 
 import type { PublicWebSearchHit } from "../contracts.js";
 import { tokenise } from "./egress.js";
@@ -78,30 +79,15 @@ export type IdentityDecision =
       readonly candidates: readonly PersonCandidate[];
     };
 
-/** Country-code subdomains LinkedIn serves a profile from (qa.linkedin.com). */
-const LINKEDIN_COUNTRY_SUBDOMAINS: Readonly<Record<string, string>> = {
-  qa: "Qatar",
-  ae: "United Arab Emirates",
-  sa: "Saudi Arabia",
-  kw: "Kuwait",
-  bh: "Bahrain",
-  om: "Oman",
-  eg: "Egypt",
-  jo: "Jordan",
-  lb: "Lebanon",
-  uk: "United Kingdom",
-  ng: "Nigeria",
-  ke: "Kenya",
-  za: "South Africa",
-  in: "India",
-  pk: "Pakistan",
-  tr: "Turkey",
-  fr: "France",
-  de: "Germany",
-  ca: "Canada",
-  au: "Australia",
-  sg: "Singapore",
-};
+/**
+ * The country a LinkedIn country subdomain names (qa.linkedin.com): its
+ * ISO 3166-1 code, except "uk" for the United Kingdom, named from the one
+ * canonical country list. Null for any other subdomain.
+ */
+function linkedInCountry(sub: string): string | null {
+  if (!/^[a-z]{2}$/u.test(sub)) return null;
+  return countryName(sub === "uk" ? "GB" : sub.toUpperCase());
+}
 
 const ORG_WORDS = new Set([
   "co",
@@ -238,9 +224,7 @@ export function linkedInProfileOf(rawUrl: string): LinkedInProfileRef | null {
   }
   const sub = host === "linkedin.com" ? null : (host.split(".")[0] ?? null);
   const countrySubdomain =
-    sub !== null && sub !== "www" && sub in LINKEDIN_COUNTRY_SUBDOMAINS
-      ? sub
-      : null;
+    sub !== null && linkedInCountry(sub) !== null ? sub : null;
   return {
     key: `linkedin.com/in/${slug}`,
     url: `https://${host}/in/${rawSlug}`,
@@ -498,7 +482,7 @@ export function rankCandidates(
       draft.profile === null ||
       draft.profile.countrySubdomain === null
         ? null
-        : (LINKEDIN_COUNTRY_SUBDOMAINS[draft.profile.countrySubdomain] ?? null);
+        : linkedInCountry(draft.profile.countrySubdomain);
     const placeMatch = placeReading(
       spec.place,
       draft.facts.location,

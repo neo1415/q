@@ -1,12 +1,21 @@
+import {
+  countryName as canonicalName,
+  countryOfCanonicalCode,
+} from "@capital-q/taxonomy/countries";
+
 /**
  * Country mentions in public text (CQ-Q-RESEARCH-001 §17-§20).
  *
- * A small, static table of ISO 3166-1 alpha-2 codes and the names a page
- * would use. It exists so a deterministic comparison can say "this public
- * source mentions Kenya; Capital Q records headquarters in Nigeria" without
- * a model deciding what counts as a geography. Coverage favours the markets
- * Capital Q serves; a country not listed is simply not detected — absence
- * is not a negative finding.
+ * The countries and their names come from the one canonical country list
+ * (@capital-q/taxonomy/countries, the geography taxonomy). What this table
+ * adds is a different concept: the forms a public page uses for a market
+ * Capital Q detects (demonyms, main cities, short forms), so a
+ * deterministic comparison can say "this public source mentions Kenya;
+ * Capital Q records headquarters in Nigeria" without a model deciding what
+ * counts as a geography. Detection covers these markets only, because a
+ * bare country name that is also a word or a person's name ("Jordan",
+ * "Chad", "Georgia") would otherwise be read as a place; a country not
+ * detected is simply not detected -- absence is not a negative finding.
  */
 
 export type CountryEntry = {
@@ -16,110 +25,83 @@ export type CountryEntry = {
   readonly aliases: readonly string[];
 };
 
-export const COUNTRIES: readonly CountryEntry[] = [
-  { code: "NG", name: "Nigeria", aliases: ["nigerian", "lagos", "abuja"] },
-  { code: "KE", name: "Kenya", aliases: ["kenyan", "nairobi"] },
-  { code: "GH", name: "Ghana", aliases: ["ghanaian", "accra"] },
-  {
-    code: "ZA",
-    name: "South Africa",
-    aliases: ["south african", "johannesburg", "cape town"],
-  },
-  { code: "EG", name: "Egypt", aliases: ["egyptian", "cairo"] },
-  { code: "MA", name: "Morocco", aliases: ["moroccan", "casablanca"] },
-  { code: "TN", name: "Tunisia", aliases: ["tunisian"] },
-  { code: "DZ", name: "Algeria", aliases: ["algerian"] },
-  { code: "ET", name: "Ethiopia", aliases: ["ethiopian", "addis ababa"] },
-  { code: "UG", name: "Uganda", aliases: ["ugandan", "kampala"] },
-  { code: "TZ", name: "Tanzania", aliases: ["tanzanian", "dar es salaam"] },
-  { code: "RW", name: "Rwanda", aliases: ["rwandan", "kigali"] },
-  { code: "SN", name: "Senegal", aliases: ["senegalese", "dakar"] },
-  {
-    code: "CI",
-    name: "Ivory Coast",
-    aliases: ["côte d'ivoire", "cote d'ivoire", "ivorian", "abidjan"],
-  },
-  {
-    code: "CM",
-    name: "Cameroon",
-    aliases: ["cameroonian", "douala", "yaoundé"],
-  },
-  { code: "ZM", name: "Zambia", aliases: ["zambian", "lusaka"] },
-  { code: "ZW", name: "Zimbabwe", aliases: ["zimbabwean", "harare"] },
-  { code: "MZ", name: "Mozambique", aliases: ["mozambican", "maputo"] },
-  { code: "AO", name: "Angola", aliases: ["angolan", "luanda"] },
-  { code: "BW", name: "Botswana", aliases: ["gaborone"] },
-  { code: "NA", name: "Namibia", aliases: ["namibian", "windhoek"] },
-  { code: "MU", name: "Mauritius", aliases: ["mauritian"] },
-  { code: "SD", name: "Sudan", aliases: ["sudanese", "khartoum"] },
-  {
-    code: "CD",
-    name: "DR Congo",
-    aliases: ["democratic republic of congo", "drc", "kinshasa"],
-  },
-  { code: "ML", name: "Mali", aliases: ["malian", "bamako"] },
-  { code: "BF", name: "Burkina Faso", aliases: ["ouagadougou"] },
-  { code: "BJ", name: "Benin", aliases: ["cotonou"] },
-  { code: "TG", name: "Togo", aliases: ["lomé", "lome"] },
-  { code: "SL", name: "Sierra Leone", aliases: ["freetown"] },
-  { code: "LR", name: "Liberia", aliases: ["monrovia"] },
-  { code: "MW", name: "Malawi", aliases: ["lilongwe"] },
-  { code: "SO", name: "Somalia", aliases: ["somali", "mogadishu"] },
-  {
-    code: "US",
-    name: "United States",
-    aliases: ["usa", "u.s.", "america", "american"],
-  },
-  {
-    code: "GB",
-    name: "United Kingdom",
-    aliases: ["uk", "britain", "british", "london"],
-  },
-  { code: "FR", name: "France", aliases: ["french", "paris"] },
-  { code: "DE", name: "Germany", aliases: ["german", "berlin"] },
-  { code: "NL", name: "Netherlands", aliases: ["dutch", "amsterdam"] },
-  {
-    code: "AE",
-    name: "United Arab Emirates",
-    aliases: ["uae", "emirati", "emirates", "dubai", "abu dhabi"],
-  },
-  {
-    code: "SA",
-    name: "Saudi Arabia",
-    aliases: ["saudi", "saudi arabian", "riyadh", "jeddah"],
-  },
-  { code: "QA", name: "Qatar", aliases: ["qatari", "doha"] },
-  { code: "KW", name: "Kuwait", aliases: ["kuwaiti"] },
-  { code: "BH", name: "Bahrain", aliases: ["bahraini", "manama"] },
-  { code: "OM", name: "Oman", aliases: ["omani", "muscat"] },
-  { code: "JO", name: "Jordan", aliases: ["jordanian", "amman"] },
-  { code: "LB", name: "Lebanon", aliases: ["lebanese", "beirut"] },
-  { code: "IQ", name: "Iraq", aliases: ["iraqi", "baghdad"] },
-  { code: "LY", name: "Libya", aliases: ["libyan", "tripoli"] },
-  {
-    code: "IN",
-    name: "India",
-    aliases: ["indian", "bangalore", "bengaluru", "mumbai"],
-  },
-  { code: "SG", name: "Singapore", aliases: ["singaporean"] },
-  { code: "CN", name: "China", aliases: ["chinese"] },
-  {
-    code: "BR",
-    name: "Brazil",
-    aliases: ["brazilian", "são paulo", "sao paulo"],
-  },
-  { code: "CA", name: "Canada", aliases: ["canadian", "toronto"] },
-  { code: "PK", name: "Pakistan", aliases: ["pakistani", "karachi"] },
-  { code: "ID", name: "Indonesia", aliases: ["indonesian", "jakarta"] },
+/** The forms a page uses for each detected market, by ISO code. */
+const PAGE_FORMS: readonly (readonly [string, readonly string[]])[] = [
+  ["NG", ["nigerian", "lagos", "abuja"]],
+  ["KE", ["kenyan", "nairobi"]],
+  ["GH", ["ghanaian", "accra"]],
+  ["ZA", ["south african", "johannesburg", "cape town"]],
+  ["EG", ["egyptian", "cairo"]],
+  ["MA", ["moroccan", "casablanca"]],
+  ["TN", ["tunisian"]],
+  ["DZ", ["algerian"]],
+  ["ET", ["ethiopian", "addis ababa"]],
+  ["UG", ["ugandan", "kampala"]],
+  ["TZ", ["tanzanian", "dar es salaam"]],
+  ["RW", ["rwandan", "kigali"]],
+  ["SN", ["senegalese", "dakar"]],
+  [
+    "CI",
+    ["ivory coast", "côte d'ivoire", "cote d'ivoire", "ivorian", "abidjan"],
+  ],
+  ["CM", ["cameroonian", "douala", "yaoundé"]],
+  ["ZM", ["zambian", "lusaka"]],
+  ["ZW", ["zimbabwean", "harare"]],
+  ["MZ", ["mozambican", "maputo"]],
+  ["AO", ["angolan", "luanda"]],
+  ["BW", ["gaborone"]],
+  ["NA", ["namibian", "windhoek"]],
+  ["MU", ["mauritian"]],
+  ["SD", ["sudanese", "khartoum"]],
+  ["CD", ["dr congo", "democratic republic of congo", "drc", "kinshasa"]],
+  ["ML", ["malian", "bamako"]],
+  ["BF", ["ouagadougou"]],
+  ["BJ", ["cotonou"]],
+  ["TG", ["lomé", "lome"]],
+  ["SL", ["freetown"]],
+  ["LR", ["monrovia"]],
+  ["MW", ["lilongwe"]],
+  ["SO", ["somali", "mogadishu"]],
+  ["US", ["usa", "u.s.", "america", "american"]],
+  ["GB", ["uk", "britain", "british", "london"]],
+  ["FR", ["french", "paris"]],
+  ["DE", ["german", "berlin"]],
+  ["NL", ["dutch", "amsterdam"]],
+  ["AE", ["uae", "emirati", "emirates", "dubai", "abu dhabi"]],
+  ["SA", ["saudi", "saudi arabian", "riyadh", "jeddah"]],
+  ["QA", ["qatari", "doha"]],
+  ["KW", ["kuwaiti"]],
+  ["BH", ["bahraini", "manama"]],
+  ["OM", ["omani", "muscat"]],
+  ["JO", ["jordanian", "amman"]],
+  ["LB", ["lebanese", "beirut"]],
+  ["IQ", ["iraqi", "baghdad"]],
+  ["LY", ["libyan", "tripoli"]],
+  ["IN", ["indian", "bangalore", "bengaluru", "mumbai"]],
+  ["SG", ["singaporean"]],
+  ["CN", ["chinese"]],
+  ["BR", ["brazilian", "são paulo", "sao paulo"]],
+  ["CA", ["canadian", "toronto"]],
+  ["PK", ["pakistani", "karachi"]],
+  ["ID", ["indonesian", "jakarta"]],
 ];
+
+/**
+ * The detected markets: each country's canonical name, then the forms a
+ * page uses for it.
+ */
+export const COUNTRIES: readonly CountryEntry[] = PAGE_FORMS.flatMap(
+  ([code, forms]) => {
+    const name = canonicalName(code);
+    return name === null ? [] : [{ code, name, aliases: forms }];
+  },
+);
 
 const BY_CODE = new Map(COUNTRIES.map((entry) => [entry.code, entry]));
 
+/** Any ISO 3166-1 country's name, from the one canonical list. */
 export function countryName(code: string | null | undefined): string | null {
-  if (code === null || code === undefined) {
-    return null;
-  }
-  return BY_CODE.get(code.toUpperCase())?.name ?? null;
+  return canonicalName(code);
 }
 
 function mentions(text: string, phrase: string): boolean {
@@ -481,16 +463,8 @@ export function countryForms(code: string): readonly string[] {
 
 /**
  * The country a taxonomy geography code names ("south_africa" -> "ZA"),
- * or null for a region or a place not listed.
+ * or null for a region: read from the one canonical country list.
  */
 export function countryOfCode(code: string): string | null {
-  const wanted = code.toLowerCase().replace(/[_-]+/gu, " ").trim();
-  if (wanted.length === 0) return null;
-  const entry = COUNTRIES.find(
-    (one) =>
-      one.name.toLowerCase() === wanted ||
-      one.code.toLowerCase() === wanted ||
-      one.aliases.includes(wanted),
-  );
-  return entry?.code ?? null;
+  return countryOfCanonicalCode(code.trim().toLowerCase())?.iso ?? null;
 }

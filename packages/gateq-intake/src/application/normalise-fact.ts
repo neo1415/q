@@ -1,10 +1,11 @@
+import { countryOfIso, countryOfName } from "@capital-q/taxonomy/countries";
+
 import {
   NewApplicationFactSchema,
   type ApplicationDimension,
   type FactProvenance,
   type NewApplicationFact,
 } from "../contracts/index.js";
-
 import { countryOfCity } from "./cities.js";
 import { amountsIn } from "./stated-amount.js";
 
@@ -56,8 +57,12 @@ function wordsOf(value: ProposedValue): string | null {
   }
 }
 
-/** Common names an ISO region list does not carry. */
-const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
+/**
+ * Everyday names and ISO alpha-3 codes the canonical country list does not
+ * carry as names (synonyms, not a country list: every code here is a
+ * country of @capital-q/taxonomy/countries, which a test asserts).
+ */
+export const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
   usa: "US",
   "u.s.": "US",
   "u.s.a.": "US",
@@ -107,30 +112,6 @@ const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
   sgp: "SG",
 };
 
-let regionNames: ReadonlyMap<string, string> | null = null;
-/** The platform's own English region names, read once (ADR 0011 §4). */
-function regions(): ReadonlyMap<string, string> {
-  if (regionNames !== null) return regionNames;
-  const names = new Intl.DisplayNames(["en"], { type: "region" });
-  const byName = new Map<string, string>();
-  for (let a = 65; a <= 90; a += 1) {
-    for (let b = 65; b <= 90; b += 1) {
-      const code = String.fromCharCode(a, b);
-      let name: string | undefined;
-      try {
-        name = names.of(code);
-      } catch {
-        continue;
-      }
-      if (name !== undefined && name !== code) {
-        byName.set(name.toLowerCase(), code);
-      }
-    }
-  }
-  regionNames = byName;
-  return byName;
-}
-
 /** "Nigeria", "ng", "NGA", "Lagos, Nigeria", "the UK" → ISO 3166-1 alpha-2. */
 export function countryCodeIn(words: string): string | null {
   const wanted = words
@@ -142,11 +123,12 @@ export function countryCodeIn(words: string): string | null {
     .trim();
   if (wanted.length === 0) return null;
   if (/^[a-z]{2}$/u.test(wanted)) {
-    const code = wanted.toUpperCase();
-    return [...regions().values()].includes(code) ? code : null;
+    return countryOfIso(wanted)?.iso ?? null;
   }
+  // The one canonical country list names a country; the synonyms above
+  // are everyday names it does not carry.
   const named = (part: string): string | null =>
-    COUNTRY_ALIASES[part] ?? regions().get(part) ?? null;
+    COUNTRY_ALIASES[part] ?? countryOfName(part)?.iso ?? null;
   const direct = named(wanted) ?? countryOfCity(wanted);
   if (direct !== null) return direct;
   // "Lagos, Nigeria": the part that names a country, last first; else the
