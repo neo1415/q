@@ -28,6 +28,8 @@ import type { WorkforceModels } from "./models.js";
  * Approval Engine's execution gate (as standing instructions' cards do).
  */
 export const WORKFORCE_CARD_ORCHESTRATION_VERSION = "q-workforce-card-v1";
+/** Rewrite rounds for questions over the send limit: the first, and one for any still over. */
+export const DILIGENCE_SHORTEN_ROUNDS = 2;
 
 export type WorkforceDiligenceInput = {
   readonly canContinue: () => Promise<boolean>;
@@ -237,11 +239,22 @@ export function createWorkforceDiligence(dependencies: {
     const questions = drafted.questions.map((one) => one.question);
     const about = drafted.questions.map((one) => one.about);
     // A question over the send limit is never cut and never filed: those
-    // questions alone are rewritten shorter, once, with the same meaning.
-    const tooLong = questions.flatMap((question, index) =>
-      question.length > DILIGENCE_QUESTION_SENT_MAX_LENGTH ? [index] : [],
-    );
-    if (tooLong.length > 0) {
+    // questions alone are rewritten shorter with the same meaning. A
+    // rewrite still over the limit is asked for once more on its own
+    // (live 2026-10-29: one still-long rewrite refused the whole object
+    // twice, and the step lost every question). At most two rounds.
+    const overLimit = () =>
+      questions.flatMap((question, index) =>
+        question.length > DILIGENCE_QUESTION_SENT_MAX_LENGTH ? [index] : [],
+      );
+    const drafted0 = overLimit().length;
+    let rounds = 0;
+    for (
+      let tooLong = overLimit();
+      tooLong.length > 0 && rounds < DILIGENCE_SHORTEN_ROUNDS;
+      tooLong = overLimit()
+    ) {
+      rounds += 1;
       const shortened = await dependencies.shorten(
         { tenantId: actor.tenantId, userId: actor.userId },
         { jobId: input.jobId, runId: input.runId },
@@ -250,20 +263,30 @@ export function createWorkforceDiligence(dependencies: {
           questions: tooLong.map((index) => questions[index] ?? ""),
         },
       );
-      const repaired =
-        shortened !== null &&
-        shortened.length === tooLong.length &&
-        shortened.every(
-          (question) => question.length <= DILIGENCE_QUESTION_SENT_MAX_LENGTH,
-        );
+      // One rewrite per question asked, or none: a merged or dropped
+      // question would change what the investor approves.
+      if (shortened === null || shortened.length !== tooLong.length) break;
+      tooLong.forEach((index, at) => {
+        const rewrite = shortened[at];
+        // Only a rewrite that is shorter replaces the question.
+        if (
+          rewrite !== undefined &&
+          rewrite.length < (questions[index] ?? "").length
+        ) {
+          questions[index] = rewrite;
+        }
+      });
+    }
+    if (drafted0 > 0) {
       // Counts only: never a question's words.
       const counts = {
         jobId: input.jobId,
         drafted: questions.length,
-        overLimit: tooLong.length,
-        repaired,
+        overLimit: drafted0,
+        rounds,
+        repaired: overLimit().length === 0,
       };
-      if (!repaired) {
+      if (!counts.repaired) {
         dependencies.logger?.warn(
           counts,
           "diligence questions over the send limit could not be shortened",
@@ -274,9 +297,6 @@ export function createWorkforceDiligence(dependencies: {
         counts,
         "diligence questions over the send limit rewritten shorter",
       );
-      tooLong.forEach((index, at) => {
-        questions[index] = shortened[at] ?? "";
-      });
     }
     // The send action's own limit, checked again before anything is filed.
     if (

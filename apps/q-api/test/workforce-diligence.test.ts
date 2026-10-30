@@ -40,6 +40,8 @@ function world(
     readonly draft?: readonly { question: string; about: string }[];
     /** What the shortening repair returns (default: null). */
     readonly shortened?: readonly string[] | null;
+    /** Per round, when rounds differ (overrides `shortened`). */
+    readonly shortenedRounds?: readonly (readonly string[] | null)[];
   } = {},
 ) {
   const plan = PermittedContextPlanSchema.parse({
@@ -104,9 +106,15 @@ function world(
             },
     ),
   );
-  const shorten = vi.fn<WorkforceModels["shortenDiligenceQuestions"]>(() =>
-    Promise.resolve(options.shortened ?? null),
-  );
+  let round = 0;
+  const shorten = vi.fn<WorkforceModels["shortenDiligenceQuestions"]>(() => {
+    const answer =
+      options.shortenedRounds === undefined
+        ? (options.shortened ?? null)
+        : (options.shortenedRounds[round] ?? null);
+    round += 1;
+    return Promise.resolve(answer);
+  });
   const logger = { info: vi.fn(), warn: vi.fn() };
   const propose = vi.fn((_input: unknown) =>
     Promise.resolve({ action: { id: "action-1" } } as never),
@@ -295,18 +303,52 @@ describe("the diligence specialist", () => {
 
   it("fails without filing when the repair fails, miscounts or is still too long -- never truncating", async () => {
     const draft = [{ question: long("What was monthly burn"), about: "Burn" }];
-    for (const shortened of [
-      null,
-      [],
-      ["One short question here?", "Two questions back for one given?"],
-      [long("Still too long about burn")],
-    ]) {
+    for (const [shortened, calls] of [
+      [null, 1],
+      [[], 1],
+      [["One short question here?", "Two questions back for one given?"], 1],
+      // Still over the limit: asked once more on its own, then failed.
+      [[long("Still long about burn")], 2],
+    ] as const) {
       const w = world({ draft, shortened });
       const result = await w.diligence(w.input);
       expect(result.status).toBe("FAILED");
-      expect(w.shorten).toHaveBeenCalledTimes(1);
+      expect(w.shorten).toHaveBeenCalledTimes(calls);
       expect(w.propose).not.toHaveBeenCalled();
       expect(w.logger.warn).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it("asks again only for a rewrite still over the limit, and files when that one fits (live 2026-10-29)", async () => {
+    const first = long("What was monthly burn");
+    const third = long("What share of loans defaulted");
+    const stillLong = long("What share of loans");
+    expect(stillLong.length).toBeLessThan(third.length);
+    const w = world({
+      draft: [
+        { question: first, about: "Monthly burn" },
+        {
+          question: "Who are your three largest customers?",
+          about: "Customers",
+        },
+        { question: third, about: "Default rate" },
+      ],
+      shortenedRounds: [
+        [
+          "What was monthly burn over the last three months, and from which accounts?",
+          stillLong,
+        ],
+        ["What share of loans defaulted in the last two quarters?"],
+      ],
+    });
+    const result = await w.diligence(w.input);
+    expect(result.status).toBe("CARDED");
+    expect(w.shorten).toHaveBeenCalledTimes(2);
+    expect(w.shorten.mock.calls[1]?.[2].questions).toEqual([stillLong]);
+    expect(filedQuestions(w)).toEqual([
+      "What was monthly burn over the last three months, and from which accounts?",
+      "Who are your three largest customers?",
+      "What share of loans defaulted in the last two quarters?",
+    ]);
   });
 });

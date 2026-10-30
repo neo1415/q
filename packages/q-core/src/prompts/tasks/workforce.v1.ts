@@ -62,6 +62,9 @@ import {
   DILIGENCE_QUESTIONS_SCHEMA_VERSION_V2,
   DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_NAME,
   DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION,
+  DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION_V2,
+  DiligenceQuestionsShortenResultV2Schema,
+  type DiligenceQuestionsShortenResultV2,
   DILIGENCE_QUESTIONS_SHORTEN_UNTRUSTED,
   DiligenceQuestionsDraftResultSchema,
   DiligenceQuestionsShortenResultSchema,
@@ -1119,4 +1122,22 @@ export const DILIGENCE_QUESTIONS_SHORTEN_V1: PromptDefinition<
     schema: DiligenceQuestionsShortenResultSchema,
   },
   template: DILIGENCE_QUESTIONS_SHORTEN_TEMPLATE,
+};
+
+/** v2: the same words; rewrites accepted at draft length, checked by code. */
+export const DILIGENCE_QUESTIONS_SHORTEN_V2: PromptDefinition<
+  DiligenceQuestionsShortenVariables,
+  DiligenceQuestionsShortenResultV2
+> = {
+  ...DILIGENCE_QUESTIONS_SHORTEN_V1,
+  version: 2,
+  changeDescription:
+    "Live 2026-10-29: one rewrite still over 180 characters refused the whole object twice and the step lost every question. The same prompt; rewrites are accepted up to the draft length (400) and code checks each against the send limit, asking again only for one that still does not fit. Nothing over 180 is filed.",
+  effectiveFrom: "2026-10-30",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_NAME,
+    schemaVersion: DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION_V2,
+    schema: DiligenceQuestionsShortenResultV2Schema,
+  },
 };

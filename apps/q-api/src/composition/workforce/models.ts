@@ -46,8 +46,8 @@ import {
   DiligenceQuestionsDraftResultSchema,
   type DiligenceQuestionsDraftResult,
   type DiligenceQuestionsVariables,
-  DiligenceQuestionsShortenResultSchema,
-  type DiligenceQuestionsShortenResult,
+  DiligenceQuestionsShortenResultV2Schema,
+  type DiligenceQuestionsShortenResultV2,
   type DiligenceQuestionsShortenVariables,
   ReplyReaderResultSchema,
   PlanReviewResultSchema,
@@ -300,8 +300,9 @@ export type WorkforceModels = {
   ) => Promise<DiligenceQuestionsDraftResult | null>;
   /**
    * The repair for drafted questions over the send limit: the same number
-   * back, in order, each rewritten under it (schema-checked). Null when the
-   * call fails or the count differs; the caller then files nothing.
+   * back, in order, each rewritten (v2: up to the draft length; the caller
+   * checks each against the send limit). Null when the call fails or the
+   * count differs; the caller then files nothing.
    */
   readonly shortenDiligenceQuestions: (
     who: Who,
@@ -818,7 +819,7 @@ export function createWorkforceModels(dependencies: {
       if (count < 1 || count > 5) return null;
       const result = await call<
         Omit<DiligenceQuestionsShortenVariables, Frame>,
-        DiligenceQuestionsShortenResult
+        DiligenceQuestionsShortenResultV2
       >({
         task: "DILIGENCE_QUESTIONS_SHORTEN",
         taskClass: "STRUCTURED_EXTRACTION",
@@ -831,7 +832,9 @@ export function createWorkforceModels(dependencies: {
             .map((question, index) => `${String(index + 1)}. ${question}`)
             .join("\n"),
         },
-        schema: DiligenceQuestionsShortenResultSchema,
+        // v2: accepted at draft length; the caller checks each rewrite
+        // against the send limit and asks again only for one still over.
+        schema: DiligenceQuestionsShortenResultV2Schema,
         budget: SMALL,
         environmentNotes:
           "You are shortening questions for the person's approval. Nothing is sent until they approve.",

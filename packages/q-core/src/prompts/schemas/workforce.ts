@@ -972,3 +972,34 @@ export const DiligenceQuestionsShortenResultSchema = z
 export type DiligenceQuestionsShortenResult = z.infer<
   typeof DiligenceQuestionsShortenResultSchema
 >;
+
+/**
+ * v2 (2026-10-30): the rewrites are accepted at draft length, and code
+ * checks each against the send limit. Live 2026-10-29: one rewrite still
+ * over 180 refused the whole object, the gateway asked again with the
+ * identical request, and it failed the same way -- the step lost every
+ * question. Now code keeps the ones that fit and asks again only for the
+ * one that does not (diligence.ts); nothing over 180 is ever filed.
+ */
+export const DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION_V2 = 2;
+export const DiligenceQuestionsShortenResultV2Schema = z
+  .object({
+    questions: z
+      .array(
+        z
+          .object({
+            question: z
+              .string()
+              .trim()
+              .min(8)
+              .max(DILIGENCE_QUESTION_DRAFT_MAX_LENGTH),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export type DiligenceQuestionsShortenResultV2 = z.infer<
+  typeof DiligenceQuestionsShortenResultV2Schema
+>;
