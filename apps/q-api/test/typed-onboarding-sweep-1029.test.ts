@@ -11,6 +11,7 @@ import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createOnboardingConversation } from "../src/voice/onboarding-conversation.js";
+import { savedPlacesInWords } from "../src/voice/onboarding-port.js";
 import {
   createTypedOnboarding,
   savedSoFar,
@@ -284,7 +285,7 @@ describe("sweep D2: a region that is not a category", () => {
       resourceIds: [NETHERLANDS],
     });
     expect(world.recordedNote("I3.geography")).toBe(
-      "Read as: “Benelux” as Netherlands. Kept as they said it: the Nordics.",
+      "Read as: “Benelux” as the Netherlands. Kept as they said it: the Nordics.",
     );
     // The reader chose among the field's own list, never outside it.
     expect([...new Set(offered.map((o) => o.phrase))].sort()).toEqual([
@@ -292,6 +293,28 @@ describe("sweep D2: a region that is not a category", () => {
       "the Nordics",
     ]);
     for (const one of offered) expect(one.ids).toEqual([NETHERLANDS, GERMANY]);
+  });
+});
+
+describe("final check 2026-10-30: the read-back note is built from the saved nodes", () => {
+  it("names countries as a person would, and a region as a region", () => {
+    expect(
+      savedPlacesInWords([
+        { displayName: "Belgium", group: false },
+        { displayName: "Luxembourg", group: false },
+        { displayName: "Netherlands", group: false },
+        { displayName: "Nordics", group: true },
+      ]),
+    ).toBe("Belgium, Luxembourg, the Netherlands and the Nordics region");
+    expect(
+      savedPlacesInWords([
+        { displayName: "United Kingdom", group: false },
+        { displayName: "West Africa", group: true },
+      ]),
+    ).toBe("the United Kingdom and West Africa region");
+    expect(savedPlacesInWords([{ displayName: "Cyprus", group: false }])).toBe(
+      "Cyprus",
+    );
   });
 });
 

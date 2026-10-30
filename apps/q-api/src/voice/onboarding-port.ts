@@ -244,6 +244,48 @@ export function wholeListParts(
   return parts.length > partsMax ? null : parts;
 }
 
+/**
+ * Reference names that take "the" in a sentence ("the Netherlands", "the
+ * Nordics"). Capital Q's own reference data, never a person's words.
+ */
+const THE_NAMES: ReadonlySet<string> = new Set([
+  "Bahamas",
+  "Caribbean",
+  "Comoros",
+  "Gambia",
+  "Gulf (GCC)",
+  "Maldives",
+  "Middle East",
+  "Netherlands",
+  "Nordics",
+  "Philippines",
+  "Seychelles",
+]);
+const THE_WORDS =
+  /\b(?:Republic|Kingdom|States|Emirates|Islands|Territories)\b/u;
+
+/**
+ * The saved categories as a person would say them, built from the saved
+ * nodes themselves (final check 2026-10-30: "Read as: “Benelux” as
+ * Belgium, Luxembourg, Netherlands, Nordics."). A category that holds
+ * others is named as a region, so nobody reads "Nordics" as a country:
+ * "Belgium, Luxembourg, the Netherlands and the Nordics region".
+ */
+export function savedPlacesInWords(
+  nodes: readonly { readonly displayName: string; readonly group: boolean }[],
+): string {
+  const words = nodes.map(({ displayName, group }) => {
+    const the =
+      !/^the\s/iu.test(displayName) &&
+      (THE_NAMES.has(displayName) || THE_WORDS.test(displayName))
+        ? "the "
+        : "";
+    return `${the}${displayName}${group ? " region" : ""}`;
+  });
+  if (words.length <= 1) return words[0] ?? "";
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
 /** The note kept beside the first-named option, saying what to ask. */
 export function alsoNamedNote(labels: readonly string[]): string {
   return `${ALSO_NAMED_NOTE} ${labels.join(", ")}. Only one is kept here, the first they named; ask which is their main one.`.slice(
@@ -1022,6 +1064,8 @@ export function createOnboardingPort(input: {
    * wholeListParts); null when it is too large to offer, or could not be
    * read.
    */
+  /** Listed categories that hold others (a region): said as one. */
+  const groupNodeIds = new Set<string>();
   const wholeLists = new Map<
     string,
     Promise<readonly (readonly WholeListCandidate[])[] | null>
@@ -1052,6 +1096,9 @@ export function createOnboardingPort(input: {
           if (nodes.length > WHOLE_LIST_NODES_MAX) return null;
           cursor = page.nextCursor;
         } while (cursor !== undefined);
+      }
+      for (const node of nodes) {
+        if (node.parentNodeId !== null) groupNodeIds.add(node.parentNodeId);
       }
       return wholeListParts(nodes);
     })().catch(reported("category list read", null));
@@ -1583,16 +1630,19 @@ export function createOnboardingPort(input: {
                   )
                 ).flatMap((one) => one ?? []);
           const whole = parts?.flat();
-          const names: string[] = [];
+          const names: { displayName: string; group: boolean }[] = [];
           for (const id of chosen ?? []) {
             const node = whole?.find((candidate) => candidate.nodeId === id);
             if (node === undefined) continue;
             if (!ids.includes(id)) ids.push(id);
             nodeNames.set(id, node.displayName);
-            names.push(node.displayName);
+            names.push({
+              displayName: node.displayName,
+              group: groupNodeIds.has(id),
+            });
           }
           if (names.length > 0) {
-            readAs.push(`“${phrase}” as ${names.join(", ")}`);
+            readAs.push(`“${phrase}” as ${savedPlacesInWords(names)}`);
             continue;
           }
           unmatched.push(phrase);
