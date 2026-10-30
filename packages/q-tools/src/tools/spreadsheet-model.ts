@@ -240,7 +240,9 @@ export function buildOwnFinancialModelSheet(
   let rev = revenue?.minor ?? null;
   let cost = costs0;
   let cashLeft = cash !== null && oneCurrency ? cash.minor : null;
-  let runsOut: string | null = null;
+  // Set inside the month loop's callback, so held in an object (a
+  // `let` would read as always null to the type checker after it).
+  const outOfCash: { month: string | null } = { month: null };
   const rows = months.map((month): QSheetCell[] => {
     if (rev !== null) rev += scale(rev, revenueBp ?? 0n);
     if (cost !== null) cost += scale(cost, costBp ?? 0n);
@@ -253,8 +255,8 @@ export function buildOwnFinancialModelSheet(
           : null;
     if (cashLeft !== null) {
       cashLeft = net === null ? null : cashLeft - net;
-      if (cashLeft !== null && cashLeft < 0n && runsOut === null) {
-        runsOut = month.slice(0, 7);
+      if (cashLeft !== null && cashLeft < 0n && outOfCash.month === null) {
+        outOfCash.month = month.slice(0, 7);
       }
     }
     return [
@@ -441,9 +443,9 @@ export function buildOwnFinancialModelSheet(
     ...heldBack.map(heldBackLine),
   ];
   const ran =
-    runsOut === null
+    outOfCash.month === null
       ? ""
-      : ` On these assumptions cash runs out in ${runsOut}.`;
+      : ` On these assumptions cash runs out in ${outOfCash.month}.`;
   const noteParts = [
     `The ${String(count)} months are my projection from the figures you told me, not your figures; every assumption is on the Assumptions sheet.${ran}`,
     asks.length === 0
