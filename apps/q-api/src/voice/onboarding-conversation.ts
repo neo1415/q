@@ -167,6 +167,7 @@ export function createOnboardingConversation(dependencies: {
   ) =>
     createOnboardingPort({
       addsTo,
+      logger,
       chooseCategories:
         dependencies.categories === undefined
           ? undefined
@@ -239,23 +240,36 @@ export function createOnboardingConversation(dependencies: {
     const words = text.replace(/\s+/g, " ").trim();
     if (words.length === 0) return;
     const before = writes.get(line.voiceSessionId) ?? Promise.resolve();
+    // One ref for the line: made again once after a failure, it is the
+    // same line (unique per session, ref and role), never a second one.
+    // Their words are what the reading saves from; a line lost here is an
+    // answer lost (live recheck 2026-10-30).
+    const turnRef = randomUUID();
+    const append = () =>
+      appendOnboardingInterviewTurns(
+        sessionOf(line),
+        line.onboarding.sessionId,
+        {
+          turnRef,
+          turns: [
+            {
+              role,
+              text: words.slice(0, 4_000),
+              channel,
+              ...(role === "Q" && stepKey !== null ? { stepKey } : {}),
+            },
+          ],
+        },
+      );
     const next = before
       .then(() =>
-        appendOnboardingInterviewTurns(
-          sessionOf(line),
-          line.onboarding.sessionId,
-          {
-            turnRef: randomUUID(),
-            turns: [
-              {
-                role,
-                text: words.slice(0, 4_000),
-                channel,
-                ...(role === "Q" && stepKey !== null ? { stepKey } : {}),
-              },
-            ],
-          },
-        ),
+        append().catch((error: unknown) => {
+          logger.info(
+            { err: error, qVoiceSessionId: line.voiceSessionId },
+            "onboarding conversation line made again",
+          );
+          return append();
+        }),
       )
       .then(
         () => undefined,
@@ -425,7 +439,13 @@ export function createOnboardingConversation(dependencies: {
     considerResearch(line, identityOf(after));
     await researchFor(line.onboarding.journeyType)
       ?.offerReady(line.onboarding.sessionId, port)
-      .catch(() => 0);
+      .catch((error: unknown) => {
+        logger.warn(
+          { err: error, onboardingSessionId: line.onboarding.sessionId },
+          "research findings not offered",
+        );
+        return 0;
+      });
   };
 
   const readingFor = (line: ConversationLine): Reading => {
@@ -591,7 +611,13 @@ export function createOnboardingConversation(dependencies: {
         session,
         line.onboarding.sessionId,
         THREAD_LIMIT,
-      ).catch(() => ({ items: [] }));
+      ).catch((error: unknown) => {
+        logger.warn(
+          { err: error, onboardingSessionId: line.onboarding.sessionId },
+          "onboarding thread not read",
+        );
+        return { items: [] };
+      });
       // The words the voice passed on are their latest, even when their
       // transcript has not reached the thread yet.
       const personTurns = [

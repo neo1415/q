@@ -1239,6 +1239,7 @@ export function createInterviewAgent(
     let codeDecided: QTurnAuthority | null = null;
     const wordsCheck = dependencies.wordsCheck;
     const port = createOnboardingPort({
+      logger,
       ...(wordsCheck === undefined
         ? {}
         : {

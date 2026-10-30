@@ -132,6 +132,7 @@ export function createTypedOnboarding(dependencies: {
       };
       const portOf = (finishing: boolean) =>
         createOnboardingPort({
+          logger,
           session: input.session,
           onboardingSessionId: input.onboardingSessionId,
           journeyType: input.journeyType,
@@ -209,7 +210,9 @@ export function createTypedOnboarding(dependencies: {
         // background reading of "That's right" finds it already settled.
         await conversation
           .said(line, "PERSON", utterance)
-          .catch(() => undefined);
+          .catch((error: unknown) => {
+            logger.warn({ err: error }, "typed onboarding words not kept");
+          });
         return await outcomeOf({
           text: done.text,
           asking: done.asking,
@@ -231,7 +234,10 @@ export function createTypedOnboarding(dependencies: {
         input.session,
         input.onboardingSessionId,
         THREAD_LIMIT,
-      ).catch(() => ({ items: [] }));
+      ).catch((error: unknown) => {
+        logger.warn({ err: error }, "typed onboarding thread not read");
+        return { items: [] };
+      });
       const turns = thread.items.map((turn) => ({
         role: turn.role,
         text: turn.text,
@@ -275,7 +281,10 @@ export function createTypedOnboarding(dependencies: {
                 attribution,
                 ...(input.signal === undefined ? {} : { signal: input.signal }),
               })
-              .catch(() => null),
+              .catch((error: unknown) => {
+                logger.warn({ err: error }, "typed onboarding intent not read");
+                return null;
+              }),
         reply(input, state, turns).catch((error: unknown) => {
           logger.warn({ err: error }, "typed onboarding reply unavailable");
           return null;
@@ -395,9 +404,14 @@ export function createTypedOnboarding(dependencies: {
             said.text,
             keptStepOf(input.journeyType, said.asking),
           )
-          .catch(() => undefined);
+          .catch((error: unknown) => {
+            logger.warn({ err: error }, "typed onboarding reply not kept");
+          });
         const viewPort = portOf(false);
-        await viewPort.state().catch(() => null);
+        await viewPort.state().catch((error: unknown) => {
+          logger.warn({ err: error }, "typed onboarding state not read");
+          return null;
+        });
         const view =
           viewPort.view() ??
           (await getOnboardingSession(

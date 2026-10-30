@@ -131,6 +131,11 @@ export type WorldOptions = {
    * website). A batch carrying one fails whole, as one transaction does.
    */
   readonly failing?: readonly string[] | undefined;
+  /**
+   * A save on any version but the session's current one is refused 409
+   * VERSION_CONFLICT, as the service does (live recheck 2026-10-30).
+   */
+  readonly strictVersion?: boolean | undefined;
   readonly mandates?:
     | {
         readonly candidates: readonly string[];
@@ -597,10 +602,29 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       return Promise.resolve(Response.json(view()));
     }
 
+    const staleVersion = (body: { expectedSessionVersion?: number }) =>
+      options.strictVersion === true && body.expectedSessionVersion !== version
+        ? new Response(
+            JSON.stringify({
+              type: "urn:capitalq:problem:resource-conflict",
+              title: "The request conflicts with the current state.",
+              status: 409,
+              code: "VERSION_CONFLICT",
+              requestId: "req_test",
+            }),
+            {
+              status: 409,
+              headers: { "content-type": "application/problem+json" },
+            },
+          )
+        : null;
     const submitOne = (body: {
       stepKey: string;
       response: { value: OnboardingResponseValue; note?: string };
+      expectedSessionVersion?: number;
     }): Promise<Response> => {
+      const stale = staleVersion(body);
+      if (stale !== null) return Promise.resolve(stale);
       tried.push(body.stepKey);
       if (options.failing?.includes(body.stepKey) === true) {
         return Promise.resolve(serverError());
@@ -718,7 +742,10 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           stepKey: string;
           response: { value: OnboardingResponseValue; note?: string };
         }[];
+        expectedSessionVersion?: number;
       };
+      const stale = staleVersion(body);
+      if (stale !== null) return Promise.resolve(stale);
       batches.push(body.responses.map((r) => r.stepKey));
       if (
         body.responses.some(

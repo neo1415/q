@@ -7021,6 +7021,7 @@ const investorResearch =
         // is held the moment it is found, as a durable recommendation.
         portFor: ({ actor, session, onboardingSessionId }) =>
           createOnboardingPort({
+            logger,
             session,
             onboardingSessionId,
             journeyType: "investor",
@@ -7055,6 +7056,7 @@ const founderResearch =
         }),
         portFor: ({ actor, session, onboardingSessionId }) =>
           createOnboardingPort({
+            logger,
             session,
             onboardingSessionId,
             journeyType: "founder",
@@ -7348,6 +7350,7 @@ const interviewAgent = createOnboardingConductor({
     }),
   portFor: ({ actor, session, onboardingSessionId, journeyType }) =>
     createOnboardingPort({
+      logger,
       session,
       onboardingSessionId,
       journeyType,

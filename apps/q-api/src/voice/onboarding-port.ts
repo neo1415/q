@@ -49,6 +49,7 @@ import {
   type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+import type { Logger } from "@capital-q/observability";
 import { turnIsEnglish } from "./reply-language.js";
 
 import {
@@ -631,7 +632,51 @@ export function settleFamilies(
   });
 }
 
+/** How many times a write is made again after a version conflict. */
+const FRESH_VERSION_ATTEMPTS = 3;
+
+function isVersionConflict(error: unknown): boolean {
+  const failed = error as {
+    readonly status?: unknown;
+    readonly code?: unknown;
+  };
+  return failed.status === 409 && failed.code === "VERSION_CONFLICT";
+}
+
+/** Each onboarding session's writes from this process, chained in order. */
+const sessionWrites = new Map<string, Promise<unknown>>();
+
+/**
+ * Runs `work` after every write to the same onboarding session made before
+ * it in this process, so one turn's saves (Q's reading, a confirmation,
+ * a replayed held write) never race each other on the session version.
+ */
+export function inSessionOrder<T>(
+  onboardingSessionId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const before = sessionWrites.get(onboardingSessionId) ?? Promise.resolve();
+  const next = before.then(work, work);
+  const tail = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  sessionWrites.set(onboardingSessionId, tail);
+  void tail.then(() => {
+    if (sessionWrites.get(onboardingSessionId) === tail) {
+      sessionWrites.delete(onboardingSessionId);
+    }
+  });
+  return next;
+}
+
 export function createOnboardingPort(input: {
+  /**
+   * Where a failure on the save or reading path is reported with its
+   * reason (live recheck 2026-10-30: failures hidden by catch-all handlers
+   * were invisible). Absent: not reported.
+   */
+  readonly logger?: Pick<Logger, "info" | "warn"> | undefined;
   /**
    * One closed question about their words, read by meaning (J7). Absent:
    * nothing is read, and lists they gave before are kept (QO-27).
@@ -741,6 +786,20 @@ export function createOnboardingPort(input: {
    */
   readonly reviewShown?: ((stepKey: string) => boolean) | undefined;
 }): BoundOnboardingPort {
+  /**
+   * A failure on a save or reading path, reported with its reason (live
+   * recheck 2026-10-30: a reading that failed behind a catch-all left no
+   * trace). The caller goes on with `fallback`, which never claims a save.
+   */
+  const reported =
+    <T>(what: string, fallback: T) =>
+    (error: unknown): T => {
+      input.logger?.warn(
+        { err: error, onboardingSessionId: input.onboardingSessionId, what },
+        "onboarding step failed; went on without it",
+      );
+      return fallback;
+    };
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
       (step) => [step.stepKey, step] as const,
@@ -777,7 +836,9 @@ export function createOnboardingPort(input: {
   ): Promise<"YES" | "NO" | "UNSURE" | null> =>
     quote.trim().length === 0 || input.wordsCheck === undefined
       ? null
-      : input.wordsCheck(REPLACES_QUESTION, quote).catch(() => null);
+      : input
+          .wordsCheck(REPLACES_QUESTION, quote)
+          .catch(reported("replaces check", null));
   /** The steps this turn's answers are for, so a sibling in it counts. */
   const turnSteps = new Set<string>();
   /**
@@ -813,7 +874,7 @@ export function createOnboardingPort(input: {
     .then((list) =>
       list.filter((r) => input.unheardSteps?.has(r.stepKey) !== true),
     )
-    .catch(() => []);
+    .catch(reported("held writes read", []));
   /**
    * A reading from their own document that Q's last turn read back to
    * them word for word (QA F-134, 25 Oct): their plain yes to it is their
@@ -899,7 +960,8 @@ export function createOnboardingPort(input: {
         },
         randomUUID(),
       );
-    } catch {
+    } catch (caught: unknown) {
+      reported("mandate preselection", undefined)(caught);
       return view;
     }
   };
@@ -961,7 +1023,7 @@ export function createOnboardingPort(input: {
         if (nodes.length > WHOLE_VOCABULARY_MAX) return null;
       }
       return nodes.length === 0 ? null : nodes;
-    })().catch(() => null);
+    })().catch(reported("category list read", null));
     wholeLists.set(key, loading);
     return loading;
   };
@@ -986,7 +1048,8 @@ export function createOnboardingPort(input: {
             const name = (await getTaxonomyNode(input.session, id)).displayName;
             nodeNames.set(id, name);
             return name;
-          } catch {
+          } catch (caught: unknown) {
+            reported("category name read", undefined)(caught);
             // A name that cannot be read is left out, never guessed.
             return null;
           }
@@ -1054,10 +1117,12 @@ export function createOnboardingPort(input: {
       (trusted || (readAt !== null && Date.now() - readAt < READ_REUSE_MS))
         ? latest
         : fresh(),
-      pendingNow().catch(() => []),
+      pendingNow().catch(reported("held writes read", [])),
       input.held === undefined
         ? new Set<string>()
-        : input.held.pendingSteps().catch(() => new Set<string>()),
+        : input.held
+            .pendingSteps()
+            .catch(reported("held steps read", new Set<string>())),
     ]);
     // The canonical coverage picture (lane ob1): the same projection the
     // form reads, so Q never re-asks what is known, saved or held.
@@ -1250,24 +1315,34 @@ export function createOnboardingPort(input: {
    * against the fresh version at once, never held as a "temporary fault"
    * (live 2026-10-16: "monthly revenue 180k AED" held three times).
    */
-  const onFreshVersion = async <T>(
+  const onFreshVersion = <T>(
     attempt: (version: number) => Promise<T>,
-  ): Promise<T> => {
-    const view = await current();
-    try {
-      return await attempt(view.session.version);
-    } catch (error: unknown) {
-      const failed = error as {
-        readonly status?: unknown;
-        readonly code?: unknown;
-      };
-      if (failed.status !== 409 || failed.code !== "VERSION_CONFLICT") {
-        throw error;
+  ): Promise<T> =>
+    // One write to this session at a time from this process, in order
+    // (live recheck 2026-10-30: two saves for one turn raced on one
+    // version and the later one was lost to a conflict), and a conflict
+    // with a write from elsewhere (the browser, another tab) is made again
+    // on the fresh version, a bounded number of times.
+    inSessionOrder(input.onboardingSessionId, async () => {
+      let view = await current();
+      for (let tries = 0; ; tries += 1) {
+        try {
+          return await attempt(view.session.version);
+        } catch (error: unknown) {
+          if (!isVersionConflict(error) || tries >= FRESH_VERSION_ATTEMPTS) {
+            throw error;
+          }
+          input.logger?.info(
+            {
+              onboardingSessionId: input.onboardingSessionId,
+              attempt: tries + 1,
+            },
+            "onboarding write made again on the session's fresh version",
+          );
+          view = await fresh();
+        }
       }
-      const again = await fresh();
-      return attempt(again.session.version);
-    }
-  };
+    });
 
   const submit = async (
     stepKey: string,
@@ -1480,7 +1555,7 @@ export function createOnboardingPort(input: {
                     sentence: answer.quote ?? phrase,
                     candidates: whole,
                   })
-                  .catch(() => null);
+                  .catch(reported("category reading (whole list)", null));
           const names: string[] = [];
           for (const id of chosen ?? []) {
             const node = whole?.find((candidate) => candidate.nodeId === id);
@@ -1514,7 +1589,9 @@ export function createOnboardingPort(input: {
                     sentence: answer.quote ?? phrase,
                     candidates: found.candidates.slice(0, 12),
                   })
-                  .catch(() => null);
+                  .catch(
+                    reported("category reading (lookup candidates)", null),
+                  );
           if (chosen !== null && chosen.length > 0) {
             for (const id of chosen) {
               const node = found.candidates.find((cand) => cand.nodeId === id);
@@ -1705,7 +1782,7 @@ export function createOnboardingPort(input: {
               sentence: answer.quote ?? phrase,
               candidates: choices,
             })
-            .catch(() => null);
+            .catch(reported("option reading", null));
           const picked = (chosen ?? []).filter((key) =>
             choices.some((choice) => choice.nodeId === key),
           );
@@ -2054,7 +2131,8 @@ export function createOnboardingPort(input: {
             600,
           ),
       };
-    } catch {
+    } catch (caught: unknown) {
+      reported("answer reading", undefined)(caught);
       return null;
     }
   };
@@ -2075,7 +2153,7 @@ export function createOnboardingPort(input: {
   ): Promise<void> => {
     await input.held
       ?.hold(stepKey, { value, ...(note === undefined ? {} : { note }) })
-      .catch(() => undefined);
+      .catch(reported("hold until step opens", undefined));
   };
 
   const write = async (
@@ -2131,7 +2209,8 @@ export function createOnboardingPort(input: {
               ? HELD_FOR_FIRM_REASON
               : STILL_SAVING_REASON,
           };
-        } catch {
+        } catch (caught: unknown) {
+          reported("hold after a failed save", undefined)(caught);
           // The hold itself failed: report the original failure honestly.
         }
       }
@@ -2752,7 +2831,8 @@ export function createOnboardingPort(input: {
             reason:
               "Held for their confirmation, not recorded yet: it is your reading of something they said earlier. Read it back with any others in one short line; when they agree, accept_recommendation records it.",
           });
-        } catch {
+        } catch (caught: unknown) {
+          reported("recommendation hold", undefined)(caught);
           // Falls through to asking them.
         }
       }
@@ -3028,7 +3108,8 @@ export function createOnboardingPort(input: {
                   question: questionOf(item.plan.step),
                   reason: HELD_FOR_FIRM_REASON,
                 };
-              } catch {
+              } catch (caught: unknown) {
+                reported("hold after a failed save", undefined)(caught);
                 // The hold itself failed: refused below, honestly.
               }
             }
@@ -3074,7 +3155,9 @@ export function createOnboardingPort(input: {
         // lands this turn, not the next: what the batch held is replayed
         // once now that the batch is on the record.
         if (waitingOnStep.size > 0 && written.length > 0) {
-          const drained = await replayHeldWrites().catch(() => null);
+          const drained = await replayHeldWrites().catch(
+            reported("held writes replay", null),
+          );
           if (drained !== null && drained.applied.length > 0) {
             const now = await current();
             for (const index of waitingOnStep) {
@@ -3124,7 +3207,8 @@ export function createOnboardingPort(input: {
                 reason: STILL_SAVING_REASON,
               });
               continue;
-            } catch {
+            } catch (caught: unknown) {
+              reported("hold after a failed save", undefined)(caught);
               // The hold itself failed: report the original failure.
             }
           }
@@ -3136,7 +3220,9 @@ export function createOnboardingPort(input: {
         // (live 2026-10-28: nine mandate answers queued behind a website).
         const heldNow = settled.filter((r) => r.outcome === "HELD_FOR_RETRY");
         if (heldNow.length > 1) {
-          const drained = await replayHeldWrites().catch(() => null);
+          const drained = await replayHeldWrites().catch(
+            reported("held writes replay", null),
+          );
           if (drained !== null && drained.applied.length > 0) {
             const now = await current();
             for (const [index, item] of ready.entries()) {
@@ -3205,7 +3291,8 @@ export function createOnboardingPort(input: {
       await submit(stepKey, value);
       written.push(stepKey);
       return true;
-    } catch {
+    } catch (caught: unknown) {
+      reported("save", undefined)(caught);
       // Not recordable yet (another step first): Q asks as before.
       return false;
     }
@@ -3241,7 +3328,7 @@ export function createOnboardingPort(input: {
     >();
     const listed = input.held?.pendingValues;
     if (listed === undefined) return originals;
-    const pending = await listed().catch(() => []);
+    const pending = await listed().catch(reported("held originals read", []));
     if (pending.length === 0) return originals;
     const onRecord = new Set(
       (latest ?? (await current())).responses.map((r) => r.stepKey),
@@ -3381,7 +3468,9 @@ export function createOnboardingPort(input: {
         }));
       }
       const view = await current();
-      const waiting = await pendingNow().catch(() => []);
+      const waiting = await pendingNow().catch(
+        reported("held writes read", []),
+      );
       const setAside = new Set(
         view.progress.eligibleSteps
           .filter((row) => row.status === "SKIPPED")
@@ -3469,7 +3558,8 @@ export function createOnboardingPort(input: {
             outcome:
               answered === undefined ? "RECOMMENDED" : "DIFFERS_FROM_ANSWER",
           });
-        } catch {
+        } catch (caught: unknown) {
+          reported("recommendation", undefined)(caught);
           results.push({ stepKey: step.stepKey, outcome: "REJECTED" });
         }
       }
@@ -3859,7 +3949,8 @@ export function createOnboardingPort(input: {
             ),
           );
           view = latest;
-        } catch {
+        } catch (caught: unknown) {
+          reported("set aside", undefined)(caught);
           break;
         }
       }
@@ -3868,7 +3959,9 @@ export function createOnboardingPort(input: {
       const saving =
         input.held === undefined
           ? new Set<string>()
-          : await input.held.pendingSteps().catch(() => new Set<string>());
+          : await input.held
+              .pendingSteps()
+              .catch(reported("held steps read", new Set<string>()));
       const open = missing(view);
       const gaps = open.filter((gap) => !saving.has(gap.stepKey));
       if (gaps.length > 0) return { completed: false, missing: gaps };
@@ -4006,7 +4099,7 @@ export function createOnboardingPort(input: {
           (
             await heldOriginals([
               { stepKey: only.step.stepKey, value: only.value },
-            ]).catch(() => new Map())
+            ]).catch(reported("held originals read", new Map()))
           ).size > 0
         );
       };
@@ -4073,7 +4166,7 @@ export function createOnboardingPort(input: {
       // than an answer this turn saved directly are settled, never written
       // over it (the drain compares when each was given).
       if (input.held !== undefined && written.length > writtenBefore) {
-        await replayHeldWrites().catch(() => null);
+        await replayHeldWrites().catch(reported("held writes replay", null));
       }
       return results;
     },
@@ -4135,7 +4228,8 @@ export function createOnboardingPort(input: {
           });
           written.push(stepKey);
           return { stepKey, optionKey: named.optionKey, quote: named.quote };
-        } catch {
+        } catch (caught: unknown) {
+          reported("stated option save", undefined)(caught);
           return null;
         }
       }
@@ -4163,7 +4257,7 @@ export function createOnboardingPort(input: {
     },
     pendingRecommendations: async () => {
       const view = await current();
-      const list = await pendingNow().catch(() => []);
+      const list = await pendingNow().catch(reported("held writes read", []));
       const out: {
         stepKey: string;
         value: string;
