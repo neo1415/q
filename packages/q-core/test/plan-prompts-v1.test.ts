@@ -76,9 +76,9 @@ const fullReview = (): PlanReviewResult => ({
 });
 
 describe("PLAN_WRITE v1", () => {
-  it("is registered (v3 is active, as reasoning work), structured", () => {
+  it("is registered (v4 is active, as reasoning work), structured", () => {
     const record = createDefaultPromptRegistry().getActive("PLAN_WRITE");
-    expect(record.versionId).toBe("plan-write/v3");
+    expect(record.versionId).toBe("plan-write/v4");
     expect(record.definition.taskClass).toBe("EVIDENCE_SYNTHESIS");
     expect(PLAN_WRITE_V1.taskClass).toBe("STRUCTURED_EXTRACTION");
     expect(PLAN_WRITE_V1.output).toMatchObject({
@@ -324,7 +324,7 @@ describe("PLAN_REVIEW v1", () => {
   it("is registered and active, independent, and never rewrites the plan", () => {
     expect(
       createDefaultPromptRegistry().getActive("PLAN_REVIEW").versionId,
-    ).toBe("plan-review/v3");
+    ).toBe("plan-review/v4");
     const t = PLAN_REVIEW_V1.template;
     expect(t).toMatch(/independent reviewer/u);
     expect(t).toMatch(/you must not rewrite it/u);
