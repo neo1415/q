@@ -63,6 +63,12 @@ export type QActionNarrator = {
       readonly alreadyWaiting?: boolean | undefined;
       /** Older cards for the same thing this one replaced (no longer waiting). */
       readonly replaces?: readonly string[] | undefined;
+      /**
+       * Code's line about other cards still waiting, said after this
+       * card's line in the same message, so this card stays the last
+       * thing shown (sweep 2026-10-29).
+       */
+      readonly alsoWaiting?: string | undefined;
     },
   ) => Promise<void>;
   /** The person asked for something that could not be prepared; `reason` is theirs to read. */
@@ -360,7 +366,11 @@ export function createQActionNarrator(dependencies: {
         return say(run, noCardLine(action.summary));
       }
       const defined = definedProposedLine(action);
-      const line = defined ?? proposedLine(action.summary, keepsCard(action));
+      const own = defined ?? proposedLine(action.summary, keepsCard(action));
+      const line =
+        options?.alsoWaiting === undefined
+          ? own
+          : `${own} ${options.alsoWaiting}`;
       return say(
         run,
         options?.alreadyWaiting === true

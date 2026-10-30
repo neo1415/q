@@ -167,6 +167,20 @@ describe("ready is never said without its card (F-106)", () => {
     expect(said[0]?.blocks).toMatchObject([{ kind: "ACTION_PROPOSAL" }]);
   });
 
+  // Sweep 2026-10-29 (I13, F16): what else waits is said in the new
+  // card's own message, so the new card is the last thing Q shows.
+  it("says what else waits in the new card's message, with only the new card", async () => {
+    const { said, n } = narrator();
+    await n.proposed(run, action, approval, {
+      alsoWaiting: "Still waiting for your approval: Update your mandate.",
+    });
+    expect(said).toHaveLength(1);
+    expect(said[0]?.content).toMatch(
+      / Still waiting for your approval: Update your mandate\.$/u,
+    );
+    expect(said[0]?.blocks).toMatchObject([{ kind: "ACTION_PROPOSAL" }]);
+  });
+
   it("names where it waits when no card can be shown", async () => {
     const { said, n } = narrator();
     await n.proposed(run, action, undefined, { alreadyWaiting: true });

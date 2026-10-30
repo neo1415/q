@@ -149,45 +149,36 @@ export function createQActionPort(options: {
   ): Promise<QActionPrepareOutcome> => {
     const covered = new Set<string>();
     const prepared: { actionType: string | null } = { actionType: null };
-    const outcome = await prepare(context, covered, prepared);
+    // Taken before the step: a line about a card still waiting is said
+    // with the new card's own line, never after it.
     const deferred = options.waitingLines?.take(context.runId) ?? null;
     const run = {
       runId: context.runId,
       tenantId: context.actor.tenantId,
       actorUserId: context.actor.userId,
     };
-    const say = async (line: string, reason: string, card?: QActionCard) => {
+    const log = (outcome: "said" | "skipped", reason: string) =>
       options.logger?.info(
-        { qRunId: context.runId, outcome: "said", reason },
+        { qRunId: context.runId, outcome, reason },
         "q waiting reminder",
       );
-      await narrator
-        .note?.(
-          run,
-          line,
-          card === undefined
-            ? undefined
-            : [{ kind: "ACTION_PROPOSAL", proposal: card }],
-        )
-        .catch(() => undefined);
-    };
-    const skip = (reason: string) => {
-      options.logger?.info(
-        { qRunId: context.runId, outcome: "skipped", reason },
-        "q waiting reminder",
-      );
-    };
-    // This turn prepared a new card (lead 2026-10-03, run 0d1ffa3f): any
-    // other card of theirs still waiting in this conversation, and not
-    // covered by this result, is named once after the new card's line --
-    // from the conversation's own cards, never from the decision reader.
-    // Coordinator 2026-10-24 (QA F-89): only beside a new OUTWARD card,
-    // in one short line; a profile edit, a board item or any other own
-    // change says nothing about unrelated cards.
-    const outwardCard =
-      prepared.actionType !== null &&
-      options.outward?.(prepared.actionType) === true;
-    if (outcome.kind === "AWAITING_APPROVAL") {
+    /**
+     * Sweep 2026-10-29 (I13, F16): after a new card, "Still waiting for your
+     * approval: X." was said as its own later message with X's card, so the
+     * older card -- not the one just prepared -- was the last thing Q said.
+     * What else waits is now said in the new card's own message, after its
+     * line and before its card, and no older card is shown again.
+     *
+     * This turn prepared a new card (lead 2026-10-03, run 0d1ffa3f): any
+     * other card of theirs still waiting in this conversation, and not
+     * covered by this result, is named once -- from the conversation's own
+     * cards, never from the decision reader. Coordinator 2026-10-24 (QA
+     * F-89): only beside a new OUTWARD card, in one short line; a profile
+     * edit, a board item or any other own change says nothing about
+     * unrelated cards.
+     */
+    const alsoWaiting = async (actionType: string): Promise<string | null> => {
+      const outwardCard = options.outward?.(actionType) === true;
       const others =
         !outwardCard || options.pendingInConversation === undefined
           ? null
@@ -202,33 +193,35 @@ export function createQActionPort(options: {
               .catch(() => null);
       if (others === null) {
         if (deferred !== null && !covered.has(deferred.actionId)) {
-          await say(
-            deferred.line,
+          log(
+            "said",
             outwardCard
               ? "deferred line, pending cards unread"
               : "deferred line",
           );
-        } else {
-          skip(outwardCard ? "pending cards unread" : "not an outward card");
+          return deferred.line;
         }
-      } else if (others.length === 0) {
-        skip("no other card waiting");
-      } else {
-        // F-106 guard (2026-10-25): the card it names comes with it, so
-        // words about a waiting card are never without the card.
-        await say(
-          waitingLine(others.map((card) => card.summary)),
-          "other card waiting",
-          others.at(-1)?.proposal,
+        log(
+          "skipped",
+          outwardCard ? "pending cards unread" : "not an outward card",
         );
+        return null;
       }
-      return outcome;
-    }
+      if (others.length === 0) {
+        log("skipped", "no other card waiting");
+        return null;
+      }
+      log("said", "other card waiting");
+      return waitingLine(others.map((card) => card.summary));
+    };
+    const outcome = await prepare(context, covered, prepared, alsoWaiting);
+    if (outcome.kind === "AWAITING_APPROVAL") return outcome;
     if (deferred === null) return outcome;
     if (covered.has(deferred.actionId)) {
-      skip("covered by this result");
+      log("skipped", "covered by this result");
     } else {
-      await say(deferred.line, "deferred line");
+      log("said", "deferred line");
+      await narrator.note?.(run, deferred.line).catch(() => undefined);
     }
     return outcome;
   };
@@ -236,6 +229,7 @@ export function createQActionPort(options: {
     context: QActionPrepareContext,
     covered: Set<string>,
     prepared: { actionType: string | null },
+    alsoWaiting: (actionType: string) => Promise<string | null>,
   ): Promise<QActionPrepareOutcome> => {
     {
       const proposal = await proposer.propose(context);
@@ -293,7 +287,9 @@ export function createQActionPort(options: {
           return { kind: "NONE" };
         }
         // Only now, with the proposal and its approval request committed,
-        // may Q say it has prepared anything.
+        // may Q say it has prepared anything -- and, in the same message,
+        // what else still waits (the new card stays the last thing said).
+        const also = await alsoWaiting(proposal.actionType).catch(() => null);
         await narrator.proposed(
           run,
           action,
@@ -301,9 +297,12 @@ export function createQActionPort(options: {
             id: approval.id,
             expiresAt: approval.expiresAt,
           },
-          superseded === undefined || superseded.length === 0
-            ? undefined
-            : { replaces: superseded.map((older) => older.summary) },
+          {
+            ...(superseded === undefined || superseded.length === 0
+              ? {}
+              : { replaces: superseded.map((older) => older.summary) }),
+            ...(also === null ? {} : { alsoWaiting: also }),
+          },
         );
         return {
           kind: "AWAITING_APPROVAL",

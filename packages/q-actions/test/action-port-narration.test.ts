@@ -288,8 +288,12 @@ describe("a deferred waiting line, against the engine's result", () => {
       ),
       proposer: proposer({ actionType: "app.x", payload: {} }),
       narrator: {
-        proposed: (_run, action) => {
-          said.push(`card: ${action.summary}`);
+        proposed: (_run, action, _approval, options) => {
+          said.push(
+            options?.alsoWaiting === undefined
+              ? `card: ${action.summary}`
+              : `card: ${action.summary} | ${options.alsoWaiting}`,
+          );
           return Promise.resolve();
         },
         refused: () => Promise.resolve(),
@@ -334,7 +338,10 @@ describe("a deferred waiting line, against the engine's result", () => {
     expect(said).toEqual(["card: The new card"]);
   });
 
-  it("a diligence request while a raise-share card waits keeps the waiting line, after the new card", async () => {
+  // Sweep 2026-10-29 (I13, F16): said as a later message, the waiting
+  // line was the last thing Q said and buried the new card. It is said in
+  // the new card's own message, after its line.
+  it("a diligence request while a raise-share card waits keeps the waiting line, in the new card's message", async () => {
     const { port, said } = run(
       {
         line: "Still waiting for your approval: Share your raise with Savanna Seed.",
@@ -344,8 +351,7 @@ describe("a deferred waiting line, against the engine's result", () => {
     );
     await port.prepare(context);
     expect(said).toEqual([
-      "card: The new card",
-      "Still waiting for your approval: Share your raise with Savanna Seed.",
+      "card: The new card | Still waiting for your approval: Share your raise with Savanna Seed.",
     ]);
   });
 
@@ -417,8 +423,12 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
       // card the other side receives.
       outward: (type) => type === "app.diligence.document.share",
       narrator: {
-        proposed: (_run, action) => {
+        proposed: (_run, action, _approval, options) => {
           said.push(proposedLine(action.summary));
+          if (options?.alsoWaiting !== undefined) {
+            // In the same message, after the new card's line.
+            said.push(`(same message) ${options.alsoWaiting}`);
+          }
           return Promise.resolve();
         },
         refused: () => Promise.resolve(),
@@ -441,10 +451,12 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     return { port, said, logged, shown };
   };
 
-  // Guard run 1 (2026-10-25, run fd2e668b): "Still waiting for your
-  // approval: Message Savanna Seed Partners." came with no card. The card
-  // the line names is shown with it.
-  it("the waiting line carries the card it names", async () => {
+  // Guard run 1 (2026-10-25, run fd2e668b) showed the older card again
+  // with its line; sweep 2026-10-29 (I13, F16): as a later message that
+  // older card became the last thing Q said, burying the new one. The line
+  // is said in the new card's message, and no older card is shown again
+  // (it stays where it was, and on Work).
+  it("the waiting line is said with the new card, which stays the last card shown", async () => {
     const card = {
       proposalId: RAISE,
       summary: "Message Savanna Seed Partners",
@@ -459,9 +471,10 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     ]);
     await port.prepare(context);
     expect(said.at(-1)).toBe(
-      "Still waiting for your approval: Message Savanna Seed Partners.",
+      "(same message) Still waiting for your approval: Message Savanna Seed Partners.",
     );
-    expect(shown.at(-1)).toEqual([{ kind: "ACTION_PROPOSAL", proposal: card }]);
+    // No separate message, and so no older card after the new one.
+    expect(shown).toEqual([]);
   });
 
   it("the exact sequence: the diligence card, then the raise card still waiting", async () => {
@@ -482,7 +495,7 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     expect(said).toEqual([
       "Share this document with them. Not saved yet: tap Approve on the card, or tell me to go ahead.",
       // QA F-62: the demo record's "(fictional)" marker is not said.
-      "Still waiting for your approval: Share your raise with Savanna Seed Partners.",
+      "(same message) Still waiting for your approval: Share your raise with Savanna Seed Partners.",
     ]);
     expect(logged).toEqual([
       expect.objectContaining({
@@ -529,7 +542,7 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     ]);
     await port.prepare(context);
     expect(said.at(-1)).toBe(
-      "Still waiting for your approval: Share your raise with Savanna Seed Partners (and 1 more).",
+      "(same message) Still waiting for your approval: Share your raise with Savanna Seed Partners (and 1 more).",
     );
   });
 
