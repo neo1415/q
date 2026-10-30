@@ -10,6 +10,7 @@ import {
   Q_SITUATION_FACTS_PER_SECTION_MAX,
   QPlanIdSchema,
   QPlanSchema,
+  QPlanStepSchema,
   QSituationDossierSchema,
   situationFacts,
   type QPlan,
@@ -33,7 +34,9 @@ import {
   PLAN_RUBRIC_V1,
   PLAN_REVIEW_FOCI,
   PROMPT_EMPTY_CASES,
+  PlanFactRefSchema,
   createDefaultPromptRegistry,
+  planMachineWords,
   planReviewVerdict,
   type PlanReviewResult,
   type PlanStepAction,
@@ -887,6 +890,7 @@ export function waitingPoint(
     stepKey: null,
     refs: left,
     problem: `Already waiting for your approval and not decided first: ${left.join(", ")}.`,
+    note: `Already waiting for your decision, and not yet the first thing the plan settles: ${left.join(", ")}.`,
     fix: `Open the plan with a step that asks you to approve, change or decline ${left.join(", ")} on its card, before any new draft of the same thing.`,
   };
 }
@@ -973,7 +977,15 @@ export type ReviewPoint = {
   readonly item: keyof typeof PLAN_RUBRIC_V1 | "firewall";
   readonly stepKey: string | null;
   readonly problem: string;
+  /** The writer's change, over the plan's own fields: never shown to the person. */
   readonly fix: string;
+  /**
+   * PLAN_REVIEW v7: the reviewer's one plain line for the person (what is
+   * still unsettled in that step); code's own line for code's points. Read
+   * through personNote before it is shown; absent, code says the step's
+   * open item in its own words (ITEM_WORDS).
+   */
+  readonly note?: string;
   /**
    * The situation refs it concerns (PLAN_REVIEW v5's refs, with any ref
    * code its words carry); absent: read from its words' ref codes.
@@ -1012,15 +1024,17 @@ const REVIEW_ORDER: readonly (keyof typeof PLAN_RUBRIC_V1)[] = [
  * It cannot be checked, so it is not fatal (planReviewVerdict) -- but it is
  * never passed over: code says it in its own words, as an open point.
  */
-export const FIREWALL_UNNAMED: Pick<ReviewPoint, "problem" | "fix"> = {
+export const FIREWALL_UNNAMED: Pick<ReviewPoint, "problem" | "fix" | "note"> = {
   problem:
     "A reviewer marked a possible private-material problem without naming the step or the words; it is not counted as a breach.",
   fix: "Make sure no step states or shares an investor's private notes or decisions, and that your own private or held-back documents are only named as held back, never quoted, and shared only through their own approval step.",
+  note: "One review raised a possible concern about private material without naming a step; it is not counted as a breach.",
 };
-export const INVENTED_UNNAMED: Pick<ReviewPoint, "problem" | "fix"> = {
+export const INVENTED_UNNAMED: Pick<ReviewPoint, "problem" | "fix" | "note"> = {
   problem:
     "A reviewer judged that the plan states something the situation does not hold, without naming it.",
   fix: "Check every name, figure, date and status against the situation, and say a pending approval or open task as pending, never as done.",
+  note: "One review judged that the plan may state something your records do not hold, without naming it.",
 };
 
 /**
@@ -1095,6 +1109,7 @@ export function reviewPoints(
     defect: Pick<ReviewPoint, "problem" | "fix"> & {
       readonly stepKey: string | null;
       readonly refs?: readonly string[];
+      readonly note?: string;
     },
   ) => {
     const point: ReviewPoint = {
@@ -1104,6 +1119,9 @@ export function reviewPoints(
       problem: defect.problem.trim(),
       fix: defect.fix.trim(),
       ...(defect.refs === undefined ? {} : { refs: [...defect.refs] }),
+      ...(typeof defect.note === "string" && defect.note.trim() !== ""
+        ? { note: defect.note.trim() }
+        : {}),
     };
     if (!points.some((one) => samePoint(one, point))) points.push(point);
   };
@@ -1114,7 +1132,20 @@ export function reviewPoints(
       "exposed" in defect && typeof defect.exposed === "string"
         ? ` The words: \u201C${defect.exposed}\u201D.`
         : "";
-    add("firewall", { ...defect, problem: `${defect.problem}${exposed}` });
+    // Never a model's note: what the person reads of a firewall point is
+    // code's own line, never words written next to the material.
+    add("firewall", {
+      stepKey: defect.stepKey,
+      fix: defect.fix,
+      problem: `${defect.problem}${exposed}`,
+      ...("refs" in defect && Array.isArray(defect.refs)
+        ? {
+            refs: defect.refs.filter(
+              (ref): ref is string => typeof ref === "string",
+            ),
+          }
+        : {}),
+    });
   }
   if (!result.firewall.held && result.firewall.defects.length === 0) {
     add("firewall", { stepKey: null, ...FIREWALL_UNNAMED });
@@ -1286,6 +1317,276 @@ export function redraftFixes(
     used += numbered.length + 1;
   }
   return { text: kept.join("\n"), left };
+}
+
+// --- what the person reads of the reviews ----------------------------------------
+
+/**
+ * A rubric item as the person reads it, when a point's own note cannot be
+ * shown: code's words, never the reviewer's. ("The reviews still question
+ * which of your records it rests on.")
+ */
+export const ITEM_WORDS: Readonly<Record<ReviewPoint["item"], string>> = {
+  situationCoverage: "how it uses what is already on record for you",
+  specificity: "how specific it is to you",
+  citesFacts: "which of your records it rests on",
+  ownerClassification: "who does it",
+  feasibility: "whether it can be done as written, in this order and time",
+  noInventedFacts: "a statement your records do not hold",
+  asksNothingKnown: "whether it asks for something already on record",
+  roleCorrectWording: "its wording",
+  firewall: "how it treats private material",
+};
+
+/**
+ * The plan's machine vocabulary a person-facing note must not carry: the
+ * schema's code-shaped keys, action kinds and roles (planMachineWords), the
+ * stored step's code-shaped keys, and every name this side's roster holds
+ * (tool and app-action names). All code-known, never a word list.
+ */
+export function noteVocabulary(side: QSituationSide): ReadonlySet<string> {
+  const stepKeys = Object.keys(QPlanStepSchema.shape).filter((key) =>
+    /[a-z][A-Z]|_/u.test(key),
+  );
+  return new Set([
+    ...planMachineWords(),
+    ...stepKeys,
+    ...planRoster(side).map((entry) => entry.name),
+  ]);
+}
+
+/**
+ * A reviewer's note when it is fit for the person, else null: a guard over
+ * the MODEL's output (never over anything a person wrote) that refuses a
+ * note carrying the plan's own machine words, a step key or a fact ref --
+ * the signs it was written over the plan's JSON. Tokens are compared whole
+ * against code-known vocabulary; nothing is rewritten.
+ */
+export function personNote(
+  note: string | undefined,
+  vocabulary: ReadonlySet<string>,
+  stepKeys: ReadonlySet<string>,
+): string | null {
+  if (note === undefined) return null;
+  const text = note.replace(/\s+/gu, " ").trim();
+  if (text.length === 0) return null;
+  const tokens = text
+    .split(/[^\p{L}\p{N}_.]+/u)
+    .map((token) => token.replace(/^\.+|\.+$/gu, ""))
+    .filter((token) => token.length > 0);
+  const machine = tokens.some(
+    (token) =>
+      vocabulary.has(token) ||
+      stepKeys.has(token) ||
+      PlanFactRefSchema.safeParse(token).success,
+  );
+  return machine ? null : text;
+}
+
+const sentence = (text: string) => {
+  const clean = text.replace(/\s+/gu, " ").trim();
+  const capital = clean.replace(/^./u, (letter) => letter.toUpperCase());
+  return /[.!?]$/u.test(capital) ? capital : `${capital}.`;
+};
+
+/** Code's line for the items a step's points are under: integrity first. */
+function itemLine(
+  items: readonly ReviewPoint["item"][],
+  whole: boolean,
+): string {
+  const order: readonly ReviewPoint["item"][] = ["firewall", ...REVIEW_ORDER];
+  const words = order
+    .filter((item) => items.includes(item))
+    .map((item) => ITEM_WORDS[item]);
+  const lead = whole
+    ? "For the plan as a whole, the reviews still question"
+    : "The reviews still question";
+  return words.length <= 1
+    ? `${lead} ${words[0] ?? ITEM_WORDS.feasibility}.`
+    : `${lead}: ${words.join("; ")}.`;
+}
+
+/**
+ * The open points as the person reads them: one line per step, under the
+ * step's own number and title, carrying the reviewers' plain notes for it
+ * (each said once); a point on the plan as a whole is its own line, those
+ * sharing a ref merged (mergedPoints). The writer still gets every fix,
+ * whole (redraftLine); the person never reads a fix.
+ *
+ * Live 2026-10-30 (plan c13eabef): 17 lines, the reviewers' fixes
+ * verbatim ("Remove … from step 10's evidenceNeeded list"), step 3 four
+ * times and step 9 four times.
+ *
+ * A note that fails personNote, or a point with none (a v6 review, a
+ * mocked one), is said by its rubric item in code's words. Code's own
+ * points (CODE: waiting approvals) are code's words, their refs said by
+ * the facts' plain names.
+ */
+export function personLines(input: {
+  readonly points: readonly ReviewPoint[];
+  readonly steps: readonly Pick<QPlanStep, "key" | "title">[];
+  readonly vocabulary: ReadonlySet<string>;
+  readonly facts?: ReadonlyMap<string, string>;
+  readonly personName?: string | null;
+  readonly max?: number;
+}): string[] {
+  const max = input.max ?? 300;
+  const keys = new Set(input.steps.map((step) => step.key));
+  const noteOf = (point: ReviewPoint): string | null => {
+    if (point.reviewer === "CODE") {
+      const said = point.note ?? point.problem;
+      return withoutRefs(namedFacts(said, input.facts));
+    }
+    // Code's own lines for an unnamed integrity verdict.
+    const own = [FIREWALL_UNNAMED.note, INVENTED_UNNAMED.note];
+    if (point.note !== undefined && own.includes(point.note)) return point.note;
+    if (point.item === "firewall") return null;
+    const note = personNote(point.note, input.vocabulary, keys);
+    return note === null ? null : secondPerson(note, input.personName);
+  };
+  const said = (points: readonly ReviewPoint[], whole: boolean): string[] => {
+    const notes: string[] = [];
+    const seen = new Set<string>();
+    const unsaid: ReviewPoint["item"][] = [];
+    for (const point of points) {
+      const note = noteOf(point);
+      if (note === null) {
+        unsaid.push(point.item);
+        continue;
+      }
+      const key = plainKey(note);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      notes.push(sentence(note));
+    }
+    const fallback = itemLine(unsaid, whole);
+    if (unsaid.length > 0 && !seen.has(plainKey(fallback))) {
+      notes.push(fallback);
+    }
+    return notes;
+  };
+  const fit = (prefix: string, notes: readonly string[]): string => {
+    const room = max - prefix.length;
+    let body = "";
+    let used = 0;
+    for (const note of notes) {
+      const next = body === "" ? note : `${body} ${note}`;
+      const left = notes.length - used - 1;
+      const tail = left > 0 ? ` And ${String(left)} more.` : "";
+      if (next.length + tail.length > room) break;
+      body = next;
+      used += 1;
+    }
+    if (used === 0) body = wordClip(notes[0] ?? "", room);
+    const left = notes.length - Math.max(used, 1);
+    return `${prefix}${body}${left > 0 ? ` And ${String(left)} more.` : ""}`;
+  };
+
+  const lines: string[] = [];
+  const unstepped = input.points.filter(
+    (point) => point.stepKey === null || !keys.has(point.stepKey),
+  );
+  // Points on no step merge as mergedPoints merges them: by a shared ref,
+  // a firewall point only with a firewall point.
+  const groups: ReviewPoint[][] = [];
+  for (const point of unstepped) {
+    const refs = pointRefs(point);
+    const group = groups.find((one) =>
+      one.some(
+        (other) =>
+          (other.item === "firewall") === (point.item === "firewall") &&
+          [...pointRefs(other)].some((ref) => refs.has(ref)),
+      ),
+    );
+    if (group === undefined) groups.push([point]);
+    else group.push(point);
+  }
+  for (const group of groups) {
+    const notes = said(group, true);
+    if (notes.length > 0) lines.push(fit("", notes));
+  }
+  input.steps.forEach((step, index) => {
+    const mine = input.points.filter((point) => point.stepKey === step.key);
+    if (mine.length === 0) return;
+    const notes = said(mine, false);
+    if (notes.length === 0) return;
+    lines.push(fit(`Step ${String(index + 1)}, “${step.title}”: `, notes));
+  });
+  return [...new Set(lines)];
+}
+
+/**
+ * Which reviewed version the job delivers: the better one by its reviews,
+ * deterministic. Live 2026-10-30 (job 3a4aa98d): round 1 scored 91/87 with
+ * no integrity flag; the redraft scored 88/76 with an invented fact named,
+ * and the redraft was delivered. A revision that the same two reviewers
+ * score worse does not replace the draft it revised.
+ *
+ * Order: both reviews completed; fewer named integrity failures; the
+ * higher total of the two scores; on a tie, the later version (it has the
+ * more fixes in it).
+ */
+export function betterRound<
+  T extends {
+    readonly round: number;
+    readonly reviews: readonly Pick<QPlanReview, "score" | "integrityFailed">[];
+  },
+>(a: T, b: T): T {
+  const rank = (one: T) => [
+    one.reviews.length,
+    -one.reviews.filter((review) => review.integrityFailed).length,
+    one.reviews.reduce((sum, review) => sum + review.score, 0),
+    one.round,
+  ];
+  const ra = rank(a);
+  const rb = rank(b);
+  for (let at = 0; at < ra.length; at += 1) {
+    const x = ra[at] ?? 0;
+    const y = rb[at] ?? 0;
+    if (x !== y) return x > y ? a : b;
+  }
+  return b;
+}
+
+/** Said first when an earlier draft scored better than its revision. */
+export const EARLIER_DRAFT_KEPT =
+  "This is the earlier draft: its revision scored lower in review, so this draft is shown, with the reviews of this draft.";
+
+/**
+ * What a redraft changed, by structure only (keys and refs, never words),
+ * so the job log can show what a revision did. Live 2026-10-30 (job
+ * 3a4aa98d): the redraft's step 9 rested on three remembered notes and
+ * nothing kept the draft it replaced.
+ */
+export function redraftChanges(
+  before: readonly Pick<QPlanStep, "key" | "cites">[],
+  after: readonly Pick<QPlanStep, "key" | "cites">[],
+): {
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+  readonly cites: readonly {
+    readonly key: string;
+    readonly added: readonly string[];
+    readonly removed: readonly string[];
+  }[];
+} {
+  const old = new Map(before.map((step) => [step.key, step.cites]));
+  const now = new Map(after.map((step) => [step.key, step.cites]));
+  return {
+    added: after.filter((step) => !old.has(step.key)).map((step) => step.key),
+    removed: before
+      .filter((step) => !now.has(step.key))
+      .map((step) => step.key),
+    cites: after.flatMap((step) => {
+      const was = old.get(step.key);
+      if (was === undefined) return [];
+      const added = step.cites.filter((ref) => !was.includes(ref));
+      const removed = was.filter((ref) => !step.cites.includes(ref));
+      return added.length + removed.length === 0
+        ? []
+        : [{ key: step.key, added, removed }];
+    }),
+  };
 }
 
 // --- the job -----------------------------------------------------------------------
@@ -1764,6 +2065,14 @@ export async function runPlanJob(
     points: number;
   }[] = [];
   let redrafts = 0;
+  /** Each reviewed version, so the job delivers the better one (betterRound). */
+  const versions: {
+    round: number;
+    grounded: GroundedPlan;
+    reviews: QPlanReview[];
+    failing: ReviewPoint[];
+    unnamedPassing: ReviewPoint[];
+  }[] = [];
   for (let round = 1; ; round += 1) {
     progress({
       stage: "REVIEWING_PLAN",
@@ -1850,6 +2159,13 @@ export async function runPlanJob(
       scores: reviews.map((review) => review.score),
       integrity: reviews.map((review) => review.integrityFailed),
       points: failing.length,
+    });
+    versions.push({
+      round,
+      grounded,
+      reviews: [...reviews],
+      failing: [...failing],
+      unnamedPassing: [...unnamedPassing],
     });
     const code = codeChecks(grounded, dossier, grounded);
     const passed =
@@ -1950,7 +2266,42 @@ export async function runPlanJob(
       progress({ stage: "PLANNING", draft: round, drafts: round });
       break;
     }
+    // What the revision changed, by keys and refs only (never words).
+    dependencies.logger?.info(
+      {
+        jobId: input.jobId,
+        round,
+        ...redraftChanges(grounded.steps, regrounded.steps),
+      },
+      "plan redraft: what changed",
+    );
     grounded = regrounded;
+  }
+
+  // The better reviewed version is delivered, never merely the latest.
+  const last = versions.at(-1);
+  const kept = versions.reduce<(typeof versions)[number] | undefined>(
+    (best, one) => (best === undefined ? one : betterRound(best, one)),
+    undefined,
+  );
+  const earlierKept =
+    kept !== undefined && last !== undefined && kept.round !== last.round;
+  if (earlierKept) {
+    dependencies.logger?.info(
+      {
+        jobId: input.jobId,
+        kept: kept.round,
+        keptScores: kept.reviews.map((one) => one.score),
+        last: last.round,
+        lastScores: last.reviews.map((one) => one.score),
+      },
+      "plan job: the earlier draft scored better and is delivered",
+    );
+    grounded = kept.grounded;
+    reviews = [...kept.reviews];
+    failing = [...kept.failing];
+    unnamedPassing = [...kept.unnamedPassing];
+    progress({ stage: "PLANNING", draft: kept.round, drafts: kept.round });
   }
 
   const fullyReviewed =
@@ -1958,35 +2309,41 @@ export async function runPlanJob(
   const remainingCode = codeCheckLines(grounded, dossier, grounded).map(
     (line) => line.person,
   );
-  const openPoints = [
-    ...(redraftFailed ? [FIRST_DRAFT_ONLY] : []),
-    ...(reviews.length < 2
-      ? ["One of the two reviews could not be completed."]
-      : []),
-    // Merged by structure (step, rubric item, shared refs); a waiting
-    // approval no step decides comes first, so a cap never hides it (live
-    // 2026-10-30: F30 was left to a redraft that timed out).
-    ...mergedPoints([
-      ...(fullyReviewed ? [] : optional(waitingPoint(grounded.steps, dossier))),
-      ...failing,
-      ...unnamedPassing,
-    ]).flatMap(eachFix),
-    ...remainingCode,
-  ];
-  // What the reviewers still want, in the person's words: "Step 2: …",
-  // the change asked for, no fact codes (live 2026-10-29: the card said
-  // only "draft", and the line quoted "[s2] … cites F26 …").
   const factWords = new Map(
     situationFacts(dossier).map((fact) => [fact.ref, fact.statement]),
   );
   const personName =
     (await dependencies.personName?.(actor).catch(() => null)) ?? null;
+  const said = (point: string) =>
+    personPoint(point, grounded.steps, factWords, personName);
+  // What the reviews still want, as the person reads it: one line per
+  // step under its own title, the reviewers' plain notes (PLAN_REVIEW v7),
+  // never a fix -- a fix is the writer's instruction over the plan's JSON
+  // (live 2026-10-30, plan c13eabef: "Remove … from step 10's
+  // evidenceNeeded list"). A waiting approval no step decides comes first,
+  // so a cap never hides it (live 2026-10-30: F30).
   const points = cappedPoints([
-    ...new Set(
-      openPoints.map((point) =>
-        personPoint(point, grounded.steps, factWords, personName),
-      ),
-    ),
+    ...new Set([
+      ...(earlierKept ? [EARLIER_DRAFT_KEPT] : []),
+      ...(redraftFailed ? [FIRST_DRAFT_ONLY] : []),
+      ...(reviews.length < 2
+        ? ["One of the two reviews could not be completed."]
+        : []),
+      ...personLines({
+        points: [
+          ...(fullyReviewed
+            ? []
+            : optional(waitingPoint(grounded.steps, dossier))),
+          ...failing,
+          ...unnamedPassing,
+        ],
+        steps: grounded.steps,
+        vocabulary: noteVocabulary(side),
+        facts: factWords,
+        personName,
+      }),
+      ...remainingCode.map(said),
+    ]),
   ]);
   const review: QPlanReviewSummary = {
     rubricVersion: Q_PLAN_RUBRIC_VERSION,
@@ -2765,9 +3122,13 @@ export function planReadyLine(
   if (first !== undefined) lines.push(`First: ${first.title}`);
   if (plan.review?.fullyReviewed !== true) {
     const all = plan.review?.openPoints ?? [];
-    const firstOnly = all[0] === FIRST_DRAFT_ONLY;
+    const firstOnly = all.includes(FIRST_DRAFT_ONLY);
+    const earlier = all.includes(EARLIER_DRAFT_KEPT);
     const listed = all.filter(
-      (point) => point !== FIRST_DRAFT_ONLY && !MORE_POINTS.test(point),
+      (point) =>
+        point !== FIRST_DRAFT_ONLY &&
+        point !== EARLIER_DRAFT_KEPT &&
+        !MORE_POINTS.test(point),
     );
     // The card's own count: what it lists plus what its cap line stands
     // for (live 2026-10-30: chat "and 10 more", card "And 5 more").
@@ -2777,7 +3138,9 @@ export function planReadyLine(
     const more = listed.length - 2 + capped;
     const lead = firstOnly
       ? "It's the first draft: its revision couldn't finish in time, so the reviews are of this draft and didn't pass it yet."
-      : "It's a draft: the two reviews didn't pass it yet.";
+      : earlier
+        ? "It's the earlier draft: its revision scored lower in review, so the reviews are of this draft and didn't pass it yet."
+        : "It's a draft: the two reviews didn't pass it yet.";
     lines.push(
       listed.length === 0
         ? lead

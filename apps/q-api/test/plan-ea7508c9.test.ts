@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_COMMUNICATION_PROFILE,
   PlanReviewResultV3Schema,
+  PlanReviewResultV4Schema,
   createDefaultPromptRegistry,
   renderPrompt,
   type PlanReviewResultV3,
@@ -267,7 +268,7 @@ describe("1. the reviewers are told today's date (PLAN_REVIEW v6)", () => {
         "TODAY is 2026-10-30: judge every date against TODAY.",
       );
       // The answer is checked by the active version's own schema.
-      expect(rendered.outputSchema).toBe(PlanReviewResultV3Schema);
+      expect(rendered.outputSchema).toBe(PlanReviewResultV4Schema);
       return models.reviewPlan(who, trace, variables);
     };
     const payload: PlanJobPayload = {
@@ -438,7 +439,7 @@ describe("5. the stored prompt version is the registry's", () => {
     expect(PLAN_PROMPT_VERSION).toBe(
       `PLAN_WRITE@${String(registry.getActive("PLAN_WRITE").definition.version)}+PLAN_REVIEW@${String(registry.getActive("PLAN_REVIEW").definition.version)}`,
     );
-    expect(PLAN_PROMPT_VERSION).toBe("PLAN_WRITE@4+PLAN_REVIEW@6");
+    expect(PLAN_PROMPT_VERSION).toBe("PLAN_WRITE@5+PLAN_REVIEW@7");
   });
 });
 

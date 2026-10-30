@@ -2011,6 +2011,14 @@ export {
   REVIEW_FEASIBILITY_V6,
   REVIEW_FIX_V6,
 } from "./prompts/tasks/plan.v6.js";
+export {
+  PLAN_REVIEW_V7,
+  PLAN_WRITE_V5,
+  REVIEW_COVERAGE_V7,
+  REVIEW_NOTE_V7,
+  WRITE_COVERAGE_V5,
+  WRITE_MODE_V5,
+} from "./prompts/tasks/plan.v7.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";

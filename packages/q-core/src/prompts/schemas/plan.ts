@@ -524,3 +524,71 @@ export const PlanWriteResultV2Schema = z.object({
   clarification: PlanClarificationSchema.nullable().default(null),
 });
 export type PlanWriteResultV2 = z.infer<typeof PlanWriteResultV2Schema>;
+
+// --- review v4 (plan job 3a4aa98d, 2026-10-30) ------------------------------------
+
+/**
+ * Live 2026-10-30 (plan c13eabef): the card showed the reviewers' fixes
+ * verbatim -- "Remove … from step 10's evidenceNeeded list", "Replace the
+ * propose_email action with a task …". A fix is an instruction to the
+ * writer over the plan's JSON; the person never sees that JSON. Every
+ * rubric defect now carries `note` as well: one plain line for the
+ * person, read under the step's title, saying what is still unsettled for
+ * them -- never an edit, a field, an action kind, a key or a ref. The fix
+ * still goes to the writer whole. A firewall defect has no note: what the
+ * person reads of it is code's own line, never words near the material.
+ */
+export const PLAN_REVIEW_V4_SCHEMA_VERSION = 4;
+export const PLAN_REVIEW_NOTE_MAX = 200;
+export const PlanReviewDefectV4Schema = PlanReviewDefectV3Schema.extend({
+  note: z.string().trim().min(1).max(PLAN_REVIEW_NOTE_MAX),
+}).strict();
+export type PlanReviewDefectV4 = z.infer<typeof PlanReviewDefectV4Schema>;
+const rubricItemV4 = (max: number) =>
+  z
+    .object({
+      score: z.number().int().min(0).max(max),
+      defects: z.array(PlanReviewDefectV4Schema).max(8).default([]),
+    })
+    .strict();
+export const PlanReviewResultV4Schema = z
+  .object({
+    situationCoverage: rubricItemV4(PLAN_RUBRIC_V1.situationCoverage),
+    specificity: rubricItemV4(PLAN_RUBRIC_V1.specificity),
+    citesFacts: rubricItemV4(PLAN_RUBRIC_V1.citesFacts),
+    ownerClassification: rubricItemV4(PLAN_RUBRIC_V1.ownerClassification),
+    feasibility: rubricItemV4(PLAN_RUBRIC_V1.feasibility),
+    noInventedFacts: rubricItemV4(PLAN_RUBRIC_V1.noInventedFacts),
+    asksNothingKnown: rubricItemV4(PLAN_RUBRIC_V1.asksNothingKnown),
+    roleCorrectWording: rubricItemV4(PLAN_RUBRIC_V1.roleCorrectWording),
+    firewall: z
+      .object({
+        held: z.boolean(),
+        defects: z.array(PlanFirewallDefectV3Schema).max(8).default([]),
+      })
+      .strict(),
+    score: z.number().int().min(0).max(100),
+  })
+  .strict();
+export type PlanReviewResultV4 = z.infer<typeof PlanReviewResultV4Schema>;
+
+/**
+ * The plan's own machine vocabulary, derived from its schemas (never a
+ * word list): the code-shaped keys a written plan carries (camelCase or
+ * snake_case -- a plain-word key such as "goal" is also English), every
+ * action kind and workforce role. A person-facing note that carries one
+ * of these was written over the plan's JSON, not for the person.
+ */
+export function planMachineWords(): ReadonlySet<string> {
+  const codeShaped = (key: string) => /[a-z][A-Z]|_/u.test(key);
+  const keys = [
+    ...Object.keys(PlanWriteResultV2Schema.shape),
+    ...Object.keys(PlanWriteStepV2Schema.shape),
+    ...Object.keys(PlanReviewDefectV4Schema.shape),
+    ...Object.keys(PlanFirewallDefectV3Schema.shape),
+  ].filter(codeShaped);
+  const kinds = PlanStepActionSchema.options.map(
+    (option) => option.shape.kind.value,
+  );
+  return new Set([...keys, ...kinds, ...PLAN_WORKFORCE_ROLES]);
+}

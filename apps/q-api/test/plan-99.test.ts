@@ -283,7 +283,8 @@ describe("1. an integrity verdict must name what it found (job 37655270)", () =>
     if (outcome.status !== "OFFERED") return;
     const plan = plans.latest(outcome.planId);
     expect(plan?.review?.fullyReviewed).toBe(true);
-    expect(plan?.review?.openPoints).toContain(FIREWALL_UNNAMED.fix);
+    // The person reads code's own note, never the writer's fix.
+    expect(plan?.review?.openPoints).toContain(FIREWALL_UNNAMED.note);
   });
 });
 

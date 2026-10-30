@@ -5,6 +5,7 @@ import {
   PLAN_REVIEW_V5,
   PLAN_REVIEW_V6,
   PlanReviewResultV3Schema,
+  PlanReviewResultV4Schema,
   REVIEW_FEASIBILITY_V6,
   REVIEW_FIX_V6,
   REVIEW_REFS_V5,
@@ -57,9 +58,9 @@ const render = (variables: Record<string, unknown>) =>
   });
 
 describe("PLAN_REVIEW v6: today's date, fixes read alone, one change each", () => {
-  it("is active, on v5's output schema and rubric", () => {
+  it("was active (v7 now), on v5's output schema and rubric", () => {
     const active = createDefaultPromptRegistry().getActive("PLAN_REVIEW");
-    expect(active.versionId).toBe("plan-review/v6");
+    expect(active.versionId).toBe("plan-review/v7");
     expect(PLAN_REVIEW_V6.output).toBe(PLAN_REVIEW_V5.output);
     expect(PLAN_REVIEW_V6.output).toMatchObject({
       schemaVersion: 3,
@@ -75,7 +76,8 @@ describe("PLAN_REVIEW v6: today's date, fixes read alone, one change each", () =
   it("renders TODAY in the rubric with the live run's variables", () => {
     const rendered = render(VARIABLES);
     const text = rendered.messages.map((one) => one.content).join("\n");
-    expect(rendered.outputSchema).toBe(PlanReviewResultV3Schema);
+    // v7 (active) keeps v6's lines and answers in schema v4.
+    expect(rendered.outputSchema).toBe(PlanReviewResultV4Schema);
     // The rendered rule, as the reviewer reads it.
     expect(text).toContain(
       "TODAY is 2026-10-30: judge every date against TODAY. A due date on or after TODAY is not past. A record dated after TODAY (a reminder, a meeting, a board date) is in the future; it never means TODAY is later.",

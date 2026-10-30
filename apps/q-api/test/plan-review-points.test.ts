@@ -217,10 +217,18 @@ describe("the plan job hands the reviewers' points on whole", () => {
 
     const plan = plans.latest(outcome.planId);
     const open = plan?.review?.openPoints ?? [];
-    // Each distinct fix is kept under its step (job ea7508c9: merged
-    // fixes were lost); the person reads both reviewers' asks for step 1.
-    expect(open.filter((point) => point.startsWith("Step 1:"))).toHaveLength(2);
-    expect(open).toContain(`Step 3: ${S3_FIX}`);
+    // The person reads one line per step, under its own title, and never
+    // a fix: a fix is the writer's instruction (job 3a4aa98d). These fake
+    // reviews carry no note, so code says what is open in its own words.
+    expect(
+      open.filter((point) => point.startsWith("Step 1, \u201C")),
+    ).toHaveLength(1);
+    expect(
+      open.filter((point) => point.startsWith("Step 3, \u201C")),
+    ).toHaveLength(1);
+    for (const fix of [S1_FIX_R1, S1_FIX_R2, S3_FIX]) {
+      expect(open.join("\n")).not.toContain(fix);
+    }
     for (const point of open) {
       expect(point).not.toMatch(/\w-$|\bde$|\bLedge$|\bwh$/u);
     }
