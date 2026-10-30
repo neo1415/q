@@ -119,24 +119,25 @@ describe("review points: split first, never cut mid-word, once across reviewers"
       stepKey: "s1",
       item: "citesFacts",
       fix: S1_FIX_R1,
-      alsoFix: S1_FIX_R2,
+      alsoFixes: [S1_FIX_R2],
     });
     // An exact repeat (whatever the quotes or spacing) is dropped too.
     expect(
       mergedPoints([...reviewPoints(R2, "R1"), ...reviewPoints(R2, "R2")]).map(
-        (point) => point.alsoFix,
+        (point) => point.alsoFixes,
       ),
-    ).toEqual([null]);
+    ).toEqual([[]]);
   });
 
-  it("a firewall verdict with no defect named is said, and stays fatal", () => {
+  it("a firewall verdict with no defect named is said as a point, not fatal", () => {
     const silent: PlanReviewResult = {
       ...review(0),
       firewall: { held: false, defects: [] },
     };
     const mapped = reviewOf(silent, "R1", 1, "PLAN_WRITE@3+PLAN_REVIEW@3");
-    expect(mapped.passed).toBe(false);
-    expect(mapped.integrityFailed).toBe(true);
+    // Nothing named, nothing to check: the score decides (100 here).
+    expect(mapped.integrityFailed).toBe(false);
+    expect(mapped.passed).toBe(true);
     expect(reviewPoints(silent, "R1")).toEqual([
       { reviewer: "R1", item: "firewall", stepKey: null, ...FIREWALL_UNNAMED },
     ]);
@@ -180,7 +181,7 @@ describe("the plan job hands the reviewers' points on whole", () => {
     const { assembler } = fakeAssembler(FOUNDER_DOSSIER);
     const { models, calls } = fakePlanModels({
       writes: [FOUNDER_PLAN, FOUNDER_PLAN],
-      reviews: [R1, R2, R1, R2],
+      reviews: [R1, R2, R1, R2, R1, R2],
     });
     const outcome = await runPlanJob(
       {

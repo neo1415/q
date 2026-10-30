@@ -261,7 +261,7 @@ describe("the plan job: the founder example end to end", () => {
     );
   });
 
-  it("offers a plan both reviews keep failing as a draft, with what is open, within six calls", async () => {
+  it("offers a plan both reviews keep failing as a draft, with what is open, within nine calls", async () => {
     const h = harness({
       dossier: FOUNDER_DOSSIER,
       writes: [FOUNDER_PLAN],
@@ -277,8 +277,11 @@ describe("the plan job: the founder example end to end", () => {
     });
     expect(outcome.status).toBe("OFFERED");
     if (outcome.status !== "OFFERED") return;
-    expect(outcome.modelCalls).toBe(6);
+    // 90 and 96 are within reach: one more redraft (write, 2 x 3 reviews,
+    // 2 redrafts), then a draft.
+    expect(outcome.modelCalls).toBe(9);
     const plan = h.plans.latest(outcome.planId);
+    expect(plan?.review?.redrafts).toBe(2);
     expect(plan?.review?.fullyReviewed).toBe(false);
     expect(plan?.review?.openPoints.length).toBeGreaterThan(0);
     expect(outcome.block.reviewed).toBe(false);

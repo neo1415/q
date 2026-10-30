@@ -269,6 +269,73 @@ export function planReviewScore(review: PlanReviewResult): {
   return { score, fatal, passes: !fatal && score >= PLAN_REVIEW_BAR };
 }
 
+// --- review v2 (plan job 37655270, 2026-10-30) ------------------------------------
+
+/**
+ * Live 2026-10-30 (plan d79a3147, round 2): R1 marked the firewall failed
+ * while scoring noInventedFacts 15/15 and naming no defect, and no step
+ * quotes private material. A fatal verdict must be checkable: a firewall
+ * defect names the step (or null for the summary or open questions) and
+ * what it exposes. `exposed` goes back to the writer only; the person is
+ * never shown it (it could be the very material at issue).
+ */
+export const PLAN_REVIEW_V2_SCHEMA_VERSION = 2;
+export const PlanFirewallDefectSchema = z
+  .object({
+    stepKey: stepKey.nullable(),
+    /** The plan's own words that carry the private material, as written. */
+    exposed: z.string().trim().min(1).max(300),
+    problem: z.string().trim().min(1).max(300),
+    fix: z.string().trim().min(1).max(300),
+  })
+  .strict();
+export type PlanFirewallDefect = z.infer<typeof PlanFirewallDefectSchema>;
+
+export const PlanReviewResultV2Schema = PlanReviewResultSchema.extend({
+  firewall: z
+    .object({
+      held: z.boolean(),
+      defects: z.array(PlanFirewallDefectSchema).max(8).default([]),
+    })
+    .strict(),
+}).strict();
+export type PlanReviewResultV2 = z.infer<typeof PlanReviewResultV2Schema>;
+
+/**
+ * The review's verdict with integrity held to what the reviewer named.
+ * A firewall breach or an invented fact WITH a named defect is fatal,
+ * whatever the total. The same verdict with nothing named cannot be
+ * checked: it is not fatal, and comes back as `unnamed` so code logs it
+ * and carries it as an open point -- never passed over in silence. The
+ * firewall is not loosened: a named leak, however small, stays fatal.
+ */
+export function planReviewVerdict(review: PlanReviewResult): {
+  readonly score: number;
+  readonly fatal: boolean;
+  readonly passes: boolean;
+  readonly unnamed: readonly ("firewall" | "noInventedFacts")[];
+} {
+  const items = Object.keys(PLAN_RUBRIC_V1) as PlanRubricItem[];
+  const score = items.reduce((sum, item) => sum + review[item].score, 0);
+  const firewallFlag =
+    !review.firewall.held || review.firewall.defects.length > 0;
+  const inventedFlag =
+    review.noInventedFacts.score < PLAN_RUBRIC_V1.noInventedFacts;
+  const firewallNamed = review.firewall.defects.length > 0;
+  const inventedNamed = review.noInventedFacts.defects.length > 0;
+  const unnamed: ("firewall" | "noInventedFacts")[] = [];
+  if (firewallFlag && !firewallNamed) unnamed.push("firewall");
+  if (inventedFlag && !inventedNamed) unnamed.push("noInventedFacts");
+  const fatal =
+    (firewallFlag && firewallNamed) || (inventedFlag && inventedNamed);
+  return {
+    score,
+    fatal,
+    passes: !fatal && score >= PLAN_REVIEW_BAR,
+    unnamed,
+  };
+}
+
 /** R1 and R2 review the same plan independently, each leading on its own focus. */
 export const PLAN_REVIEW_FOCI = [
   "COVERAGE_AND_SPECIFICITY",

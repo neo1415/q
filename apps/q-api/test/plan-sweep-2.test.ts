@@ -39,10 +39,10 @@ import {
  */
 
 describe("writer and reviewers hold one cite rule and one owner rule (v3)", () => {
-  it("v3 is active for both, built on v2 with the rubric and bar unchanged", () => {
+  it("v3 built on v2 (v4 now active), built on v2 with the rubric and bar unchanged", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("PLAN_WRITE").definition.version).toBe(3);
-    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(3);
+    expect(registry.getActive("PLAN_WRITE").definition.version).toBe(4);
+    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(4);
     expect(PLAN_WRITE_V3.output).toEqual(PLAN_WRITE_V2.output);
     expect(PLAN_REVIEW_V3.output).toEqual(PLAN_REVIEW_V2.output);
     for (const kept of ["99/100", "plan-rubric/v1", "citesFacts (0-15)"]) {
@@ -131,7 +131,7 @@ describe("the reviewers see what needs approval", () => {
 });
 
 describe("what the reviewers still want, said plainly", () => {
-  it("a ref is said as the start of its fact, a step key as its number, cites as sources", () => {
+  it("a ref is said as its whole fact when short, a step key as its number, cites as sources", () => {
     const steps = [{ key: "s5" }, { key: "s6" }];
     const facts = new Map([
       [
@@ -146,7 +146,7 @@ describe("what the reviewers still want, said plainly", () => {
         facts,
       ),
     ).toBe(
-      "Step 2: Add “Deck coaching: unit economics and the currency mix…” to step 2's sources.",
+      "Step 2: Add “Deck coaching: unit economics and the currency mix of revenue are not shown” to step 2's sources.",
     );
     // A ref the situation does not hold is never shown as a code.
     expect(personPoint("[s5] x Fix: Cite F99 for it.", steps, facts)).toBe(
