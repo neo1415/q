@@ -805,38 +805,16 @@ export function codeChecks(
   return fixes.slice(0, 8);
 }
 
-/** A step's own words, as the person reads them. */
-const stepWords = (step: Pick<QPlanStep, "title" | "why" | "evidenceNeeded">) =>
-  [step.title, step.why, ...step.evidenceNeeded].join(" ");
-
 /**
- * Words that say a step is prepared for the person's approval. "Waiting for
- * your approval" is left out: that is the situation's wording for a card
- * already waiting, which a decision step may repeat.
- */
-const FOR_APPROVAL =
-  /\b(?:for|to|after|needs?|requires?|subject to) your (?:approval|sign-off)\b/iu;
-const WAITING_FOR = /\bwaiting for your approval\b/giu;
-
-/** A revised, updated or new document a step shares. */
-const REVISED_DOCUMENT =
-  /\b(?:revised|updated|new|reworked|refreshed)\b[^.;]{0,60}\b(?:deck|document|report|model|summary|teaser|memo|note|plan)\b/iu;
-const FILES_IT =
-  /\b(?:file|files|filed|filing|upload|uploads|uploaded|add|adds|added|save|saves|saved|put|puts)\b[^.;]{0,80}\bdata room\b|\bdata room\b[^.;]{0,40}\b(?:file|filed|upload|uploaded|added|saved)\b/iu;
-
-/**
- * Code's mechanical checks of what the reviewers rightly asked for on plan
- * job 37655270 (2026-10-30), each sent back as a numbered fix:
- *
- *   - what already waits for the person's approval (Q_WORK, the
- *     list_pending_approvals facts) is decided first: every waiting item
- *     is cited within the plan's opening steps that cite such items;
- *   - a step whose words say it is prepared for their approval carries
- *     the approval its action gives (needsApproval);
- *   - an activity count (their own recent acts) is cited only by a step
- *     whose words state that activity;
- *   - a revised or new document is filed in the data room by an earlier
- *     step before a step shares it.
+ * Code's structural check of what the reviewers rightly asked for on plan
+ * job 37655270 (2026-10-30): what already waits for the person's approval
+ * (facts from list_pending_approvals, by provenance) is decided first --
+ * every waiting item is cited within the plan's opening steps that cite
+ * such items. Structure only (provenance and cites), never the words:
+ * whether a step's wording promises an approval, whether a cite supports
+ * the words, and whether a shared document was filed first are judged by
+ * the writer's rules (PLAN_WRITE v4) and the reviewers. (A share's action
+ * carries no document id, so filing order cannot be checked structurally.)
  */
 export function consistencyChecks(
   steps: readonly QPlanStep[],
@@ -863,69 +841,7 @@ export function consistencyChecks(
       );
     }
   }
-  for (const step of steps) {
-    const words = stepWords(step).replace(WAITING_FOR, "");
-    if (
-      step.owner !== "YOU" &&
-      !step.needsApproval &&
-      FOR_APPROVAL.test(words)
-    ) {
-      fixes.push(
-        `[${step.key}] Its words say it is prepared for your approval, but its action needs none: word it as a draft Q prepares, and add a later step with an action you approve (a TOOL_PROPOSAL or an action marked "needs your approval") to send or use it.`,
-      );
-    }
-  }
-  const activity = new Map(
-    (
-      dossier.sections.find((section) => section.source === "ACTIVITY")
-        ?.facts ?? []
-    ).map((fact) => [fact.ref, activityPhrase(fact.statement)]),
-  );
-  for (const step of steps) {
-    const words = stepWords(step);
-    const unstated = step.cites.filter((cite) => {
-      const phrase = activity.get(cite);
-      if (phrase === undefined) return false;
-      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-      return !new RegExp(`\\b${escaped}s?\\b`, "iu").test(words);
-    });
-    if (unstated.length > 0) {
-      fixes.push(
-        `[${step.key}] It cites ${unstated.join(", ")} (counts of your own recent activity) that its words do not state: remove ${unstated.length === 1 ? "that cite" : "those cites"}, or say how that activity bears on the step.`,
-      );
-    }
-  }
-  steps.forEach((step, index) => {
-    if (
-      step.action.kind !== "APP_ACTION" ||
-      step.action.name !== "document.access.share"
-    ) {
-      return;
-    }
-    const shared = REVISED_DOCUMENT.exec(stepWords(step));
-    if (shared === null) return;
-    const filed = steps
-      .slice(0, index)
-      .some((earlier) => FILES_IT.test(stepWords(earlier)));
-    if (!filed) {
-      fixes.push(
-        `[${step.key}] It shares the ${shared[0].replace(/^\p{Lu}/u, (letter) => letter.toLowerCase())} that no earlier step files: add a step before it that files that document in the data room, and make this step wait for it.`,
-      );
-    }
-  });
   return fixes;
-}
-
-/**
- * What an activity fact says was done, as words a step would use: "You
- * created an evidence item (11 times; ...)" is "evidence item".
- */
-function activityPhrase(statement: string): string {
-  return statement
-    .replace(/\s*\(.*$/u, "")
-    .replace(/^You\s+\S+\s+(?:an?\s+|the\s+)?/iu, "")
-    .trim()
-    .toLowerCase();
 }
 
 // --- reviews ---------------------------------------------------------------------
@@ -2111,6 +2027,12 @@ const both = (count: number) => (count === 2 ? "both" : `all ${String(count)}`);
  * Africa Ventures”"), or quoted whole when it is short -- never its first
  * words cut with an ellipsis (live 2026-10-30: "Remembered: 2026-10-30
  * LedgerBridge 12-month financial model: Tunde asked…").
+ *
+ * It reads only the prefixes our own situation code writes (sources.ts,
+ * assemble.ts, plan-figures.ts, deckFacts) to find the quoted title; the
+ * title itself is data, quoted as is. A structured plain name carried on
+ * each fact would replace this; that is a situation-contract change, left
+ * to the contract's owner.
  */
 export function plainFactName(statement: string): PlainName {
   const text = statement.replace(/\s+/gu, " ").trim();
