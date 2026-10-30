@@ -83,7 +83,7 @@ describe("reference taxonomy (§110-120)", () => {
       Object.fromEntries(
         REFERENCE_TAXONOMY.vocabularies.map((v) => [v.code, v.version]),
       ),
-    ).toMatchObject({ geography: 4, industry: 2 });
+    ).toMatchObject({ geography: 5, industry: 2 });
     expect(
       REFERENCE_TAXONOMY.vocabularies
         .filter((v) => v.code !== "geography" && v.code !== "industry")
@@ -106,7 +106,8 @@ describe("reference taxonomy (§110-120)", () => {
       expect(referenceNode("industry", code).parentCode, code).toBeNull();
     }
     expect(REFERENCE_TAXONOMY.nodes.length).toBeGreaterThan(100);
-    expect(REFERENCE_TAXONOMY.nodes.length).toBeLessThan(400);
+    // Geography v5 holds every ISO 3166-1 country (249) and its regions.
+    expect(REFERENCE_TAXONOMY.nodes.length).toBeLessThan(500);
     expect(REFERENCE_TAXONOMY.aliases.length).toBeGreaterThanOrEqual(40);
   });
 
@@ -136,6 +137,43 @@ describe("reference taxonomy (§110-120)", () => {
       "west_africa",
     );
     expect(referenceNode("geography", "west_africa").parentCode).toBe("africa");
+  });
+
+  it("v5: every ISO 3166-1 country once, the Nordics and Benelux placeable, no word as an ISO alias", () => {
+    const geography = REFERENCE_TAXONOMY.nodes.filter(
+      (n) => n.vocabularyCode === "geography",
+    );
+    const isos = geography.flatMap((n) =>
+      typeof n.metadata.iso3166Alpha2 === "string"
+        ? [n.metadata.iso3166Alpha2]
+        : [],
+    );
+    expect(isos).toHaveLength(249);
+    expect(new Set(isos).size).toBe(249);
+    expect(geography).toHaveLength(270);
+    for (const code of ["denmark", "sweden", "norway", "finland", "iceland"]) {
+      expect(referenceNode("geography", code).parentCode, code).toBe("nordics");
+    }
+    expect(referenceNode("geography", "nordics").parentCode).toBe("europe");
+    for (const code of ["belgium", "luxembourg", "netherlands"]) {
+      expect(referenceNode("geography", code).parentCode, code).toBe("europe");
+    }
+    // Countries listed before v5 keep their ids and parents.
+    expect(referenceNode("geography", "singapore").parentCode).toBe("asia");
+    expect(referenceNode("geography", "united_kingdom").parentCode).toBe(
+      "europe",
+    );
+    const geographyIds = new Set(geography.map((n) => n.id));
+    const geographyAliases = new Set(
+      REFERENCE_TAXONOMY.aliases
+        .filter((a) => geographyIds.has(a.nodeId))
+        .map((a) => a.normalizedAlias),
+    );
+    for (const word of ["no", "it", "me", "is", "vc", "pe", "ai", "ml", "co"]) {
+      expect(geographyAliases.has(word), word).toBe(false);
+    }
+    expect(geographyAliases.has("the nordics")).toBe(true);
+    expect(geographyAliases.has("cee")).toBe(true);
   });
 
   it("every canonical code is conservative and every alias is normalised", () => {
