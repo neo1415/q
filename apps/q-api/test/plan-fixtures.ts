@@ -435,6 +435,7 @@ export function fakePlanModels(input: {
     mode?: string;
     fixes?: string;
     focus?: string;
+    plan?: string;
   }[] = [];
   let writes = 0;
   let reviews = 0;
@@ -464,9 +465,13 @@ export function fakePlanModels(input: {
       reviewPlan: (
         _who: unknown,
         _trace: unknown,
-        variables: { readonly focus: string },
+        variables: { readonly focus: string; readonly plan?: string },
       ) => {
-        calls.push({ task: "REVIEW", focus: variables.focus });
+        calls.push({
+          task: "REVIEW",
+          focus: variables.focus,
+          ...(variables.plan === undefined ? {} : { plan: variables.plan }),
+        });
         const next =
           input.reviews[Math.min(reviews, input.reviews.length - 1)] ?? null;
         reviews += 1;
