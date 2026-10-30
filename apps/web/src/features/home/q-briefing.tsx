@@ -88,10 +88,16 @@ function SetupNudgeCard({
 export function QBriefing({
   briefing,
   onlyReminder = false,
+  onlyDiscovery = false,
 }: {
   readonly briefing: Promise<Briefing | null>;
   /** Only today's setup reminder card, without the line (the arrival's). */
   readonly onlyReminder?: boolean | undefined;
+  /**
+   * Only what keeps investors from finding them, without the line: the Q
+   * page's arrival stage carries the rest of what waits (owner 2026-10-30).
+   */
+  readonly onlyDiscovery?: boolean | undefined;
 }) {
   const t = useT();
   const [shown, setShown] = useState<Briefing | null>(null);
@@ -101,18 +107,31 @@ export function QBriefing({
     let current = true;
     briefing.then(
       (value) => {
-        if (current) setShown(decideBriefing(value));
+        // What keeps investors from finding them stands until it is done:
+        // shown every time Q opens, not once a day like the briefing.
+        if (current) {
+          setShown(
+            onlyDiscovery && value !== null && value !== undefined
+              ? value
+              : decideBriefing(value),
+          );
+        }
       },
       () => undefined,
     );
     return () => {
       current = false;
     };
-  }, [briefing]);
+  }, [briefing, onlyDiscovery]);
 
   if (shown === null) return null;
+  const only = onlyReminder || onlyDiscovery;
   const items = shown.items.filter(
-    (item) => !putOff.has(item.id) && (!onlyReminder || item.later === true),
+    (item) =>
+      !putOff.has(item.id) &&
+      (!only ||
+        (onlyReminder && item.later === true) ||
+        (onlyDiscovery && item.discovery === true)),
   );
   if (items.length === 0) return null;
   const later = (id: string) => {
@@ -121,13 +140,17 @@ export function QBriefing({
   };
   return (
     <section
-      {...(onlyReminder
-        ? { "aria-label": "Your setup" }
+      {...(only
+        ? {
+            "aria-label": onlyDiscovery
+              ? t("Before investors can find you")
+              : "Your setup",
+          }
         : { "aria-labelledby": "q-briefing-line" })}
       className="flex w-full flex-col gap-2"
       data-q-briefing
     >
-      {onlyReminder ? null : (
+      {only ? null : (
         <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
           {t(shown.line)}
         </p>

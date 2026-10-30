@@ -20,7 +20,7 @@ import {
 describe("TURN_READER v65: a choice between named companies is compare", () => {
   it("is the active reader: v64 plus the choice rule, after COMPARE", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(73);
+    expect(active.definition.version).toBe(74);
     expect(TURN_READER_V64.status).toBe("DEPRECATED");
     const at = TURN_READER_V65.template.indexOf(V65_CHOICE_IS_COMPARE);
     expect(at).toBeGreaterThan(TURN_READER_V65.template.indexOf(V62_COMPARE));

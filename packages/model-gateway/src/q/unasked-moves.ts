@@ -40,3 +40,17 @@ export function withoutUnaskedMoves(
     (block) => block.kind !== "UI_INTENT" || !MOVES.has(block.intent.kind),
   );
 }
+
+/**
+ * Live 2026-10-30: whether a tool's authorised result would move the
+ * person's screen (its clientAction is a move). Used to refuse a move on a
+ * turn that took Q up on an offer code did not record, where any
+ * destination would be a guess at what was offered.
+ */
+export function carriesScreenMove(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  const action = (data as { readonly clientAction?: unknown }).clientAction;
+  if (typeof action !== "object" || action === null) return false;
+  const kind = (action as { readonly kind?: unknown }).kind;
+  return typeof kind === "string" && MOVES.has(kind);
+}

@@ -43,7 +43,12 @@ type Assessment = {
 /** From read_my_record MARKETPLACE_READINESS output ({status, data}). */
 export function ownReadinessFact(
   read: unknown,
-  options: { readonly lead: boolean; readonly alreadySaid?: boolean },
+  options: {
+    readonly lead: boolean;
+    readonly alreadySaid?: boolean;
+    /** Code closes the answer with its own offer; the model makes none. */
+    readonly closingOffer?: boolean;
+  },
 ): AuthorisedFact | null {
   if (typeof read !== "object" || read === null) return null;
   const { status, data } = read as { status?: unknown; data?: unknown };
@@ -102,11 +107,13 @@ export function ownReadinessFact(
         ]),
   ];
   const lead =
-    options.alreadySaid === true
-      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences of plain prose (no numbers, no list) on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
-      : options.lead
-        ? " THEY ASKED WHAT TO DO NEXT: lead with these gaps in this order (and a missing pitch video or deck from what exists on their account), each with the one action that closes it, offering to do it; mention anything else only after."
-        : "";
+    options.alreadySaid === true && options.closingOffer === true
+      ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already, and closes it with its own offer; do not repeat or reorder the gaps. Add at most two sentences of plain prose (no numbers, no list) on the first one. Offer nothing and ask no question yourself: the closing offer is the only one; nothing about markets, sources or other topics unless they asked."
+      : options.alreadySaid === true
+        ? " THEY ASKED WHAT TO DO NEXT: Capital Q opens your answer with these gaps as a numbered list already; do not repeat or reorder them. Add at most two sentences of plain prose (no numbers, no list) on the first one and offer, as a question, to do it now; nothing about markets, sources or other topics unless they asked."
+        : options.lead
+          ? " THEY ASKED WHAT TO DO NEXT: lead with these gaps in this order (and a missing pitch video or deck from what exists on their account), each with the one action that closes it, offering to do it; mention anything else only after."
+          : "";
   return {
     scope: "COMPANY_PROFILE",
     statement:

@@ -578,6 +578,84 @@ describe("createQRunStreamService", () => {
       deltasDropped: 0,
     });
   });
+
+  it("lets live text through while a durable re-read is still waiting on the database (live 2026-10-30)", async () => {
+    // Run 2: the opening lines were published ~3.4 s before the browser
+    // showed them; text queued behind the stream's re-read of the event
+    // table, which waits on the same pool as the answer's own reads.
+    const s = store(run());
+    started(s);
+    const repos = repositories(s);
+    const list = repos.runEvents.listForRun.bind(repos.runEvents);
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reads = 0;
+    const notifier = createInProcessQRunEventNotifier();
+    const deltas = createInProcessQLiveDeltaBus();
+    const service = createQRunStreamService({
+      sql: {} as never,
+      transactions: {} as never,
+      subjects: {} as never,
+      repositories: {
+        ...repos,
+        runEvents: {
+          ...repos.runEvents,
+          listForRun: async (...args: Parameters<typeof list>) => {
+            reads += 1;
+            // The re-read after the stage's notice waits on the database.
+            if (reads === 2) await held;
+            return list(...args);
+          },
+        },
+      },
+      notifier,
+      deltas,
+      options: { safetyPollMs: 60_000 },
+    });
+    const controller = new AbortController();
+    const iterator = service.open({
+      run: s.current,
+      afterSequence: 0,
+      signal: controller.signal,
+    });
+    expect((await iterator.next()).value).toMatchObject({ kind: "durable" });
+    const next = iterator.next();
+    const record = stage(s, "PREPARING_ANALYSIS");
+    notifier.publish({ runId: RUN_ID as never, sequence: record.sequence });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(reads).toBe(2); // the re-read is in flight, and held
+    const messageId = randomUUID();
+    deltas.publish({
+      runId: RUN_ID as never,
+      tenantId: TENANT as never,
+      messageId: messageId as never,
+      text: "Investors can't find your company in Discover yet. ",
+    });
+    const arrived = await Promise.race([
+      next,
+      new Promise<"late">((resolve) => setTimeout(() => resolve("late"), 200)),
+    ]);
+    expect(arrived).not.toBe("late");
+    expect(arrived).toMatchObject({
+      value: {
+        kind: "delta",
+        event: {
+          type: "q.message.delta",
+          data: { text: "Investors can't find your company in Discover yet. " },
+        },
+      },
+    });
+    // The durable event follows once the read returns, in order.
+    release();
+    expect((await iterator.next()).value).toMatchObject({
+      kind: "durable",
+      event: { type: "q.stage.changed", sequence: 2 },
+    });
+    controller.abort();
+    await iterator.return(undefined);
+  });
 });
 
 describe("coalesceDeltas", () => {

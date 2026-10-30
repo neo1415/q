@@ -30,7 +30,7 @@ const REFUSED = {
 describe("TURN_READER v69: each field where it belongs", () => {
   it("is the active reader: v68 kept whole plus the rule after its own line", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(73);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(74);
     expect(TURN_READER_V68.status).toBe("DEPRECATED");
     expect(TURN_READER_V69.output).toMatchObject({ onlyWhatApplies: true });
     expect(TURN_READER_V69.template).toContain(
