@@ -14,6 +14,7 @@ import {
 } from "@capital-q/investors";
 import type { Logger } from "@capital-q/observability";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
+import { cutAtWord } from "@capital-q/q-core";
 import { capability, type AuthorizationService } from "@capital-q/security";
 import { savedReadsLine } from "./saved-line.js";
 
@@ -98,7 +99,7 @@ export function describeInvestorProfileChanges(
       : `${INVESTOR_FIELD_LABELS[field]}: ${value}`;
   });
   const brief = lines
-    .map((line) => (line.length > 120 ? `${line.slice(0, 117)}…` : line))
+    .map((line) => (line.length > 120 ? cutAtWord(line, 118) : line))
     .join("; ");
   return {
     summary: `Update your investor profile. ${brief}`.slice(0, 1000),

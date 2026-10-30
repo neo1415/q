@@ -22,6 +22,7 @@ import {
 import type { BoardService } from "@capital-q/board";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
+import { clipAtWord } from "@capital-q/q-core";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import { boardKey } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -1490,7 +1491,6 @@ function summaryOf(
     deliverable === "DOCUMENT_REVIEW"
       ? "Review of your documents"
       : "Your plan";
-  const words =
-    clean.length <= 120 ? clean : `${clean.slice(0, 117).trimEnd()}…`;
+  const words = clipAtWord(clean, 120);
   return `${head}: ${words}`.slice(0, 400);
 }

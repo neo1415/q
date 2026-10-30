@@ -16,7 +16,7 @@ import {
   type QAnswerCardReasonLevel,
   type QAnswerCardsBlock,
 } from "@capital-q/contracts";
-import { splitSentences, spokenFactsOf } from "@capital-q/q-core";
+import { cutAtWord, splitSentences, spokenFactsOf } from "@capital-q/q-core";
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
 
 import { nameKey } from "./card-subjects.js";
@@ -105,7 +105,7 @@ function aboutOf(text: unknown): string | null {
   if (typeof text !== "string") return null;
   const flat = text.replace(/\s+/gu, " ").trim();
   if (flat.length === 0) return null;
-  return flat.length > 160 ? `${flat.slice(0, 159)}…` : flat;
+  return flat.length > 160 ? cutAtWord(flat, 160) : flat;
 }
 
 function moneyOf(value: unknown): Money | null {
