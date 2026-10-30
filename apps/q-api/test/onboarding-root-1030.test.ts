@@ -35,7 +35,7 @@ function withThread(world: ReturnType<typeof investorSession>) {
     const url = new URL(
       typeof input === "string" ? input : (input as Request).url,
     );
-    if (url.pathname.endsWith("/turns")) {
+    if (/\/turns(\/steps)?$/.test(url.pathname)) {
       if ((init?.method ?? "GET") === "POST") {
         const body = JSON.parse(
           typeof init?.body === "string" ? init.body : "{}",

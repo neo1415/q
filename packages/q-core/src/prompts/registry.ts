@@ -334,6 +334,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V2 } from "./tasks/onboarding-transcript-r
 import { ONBOARDING_TRANSCRIPT_READER_V3 } from "./tasks/onboarding-transcript-reader.v3.js";
 import { ONBOARDING_TRANSCRIPT_READER_V4 } from "./tasks/onboarding-transcript-reader.v4.js";
 import { ONBOARDING_TRANSCRIPT_READER_V5 } from "./tasks/onboarding-transcript-reader.v5.js";
+import { ONBOARDING_TRANSCRIPT_READER_V6 } from "./tasks/onboarding-transcript-reader.v6.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
@@ -511,7 +512,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Onboarding sweep 2026-10-29: option keys by meaning, detail included.
     { ...ONBOARDING_TRANSCRIPT_READER_V4, status: "DEPRECATED" },
     // Live recheck 2026-10-30: options as opaque ids, never keys.
-    ONBOARDING_TRANSCRIPT_READER_V5,
+    { ...ONBOARDING_TRANSCRIPT_READER_V5, status: "DEPRECATED" },
+    // Live recheck 2026-10-30 (891425cbe): a step on record changes only
+    // on words about it; a range of amounts is its two ends.
+    ONBOARDING_TRANSCRIPT_READER_V6,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.

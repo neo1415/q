@@ -235,6 +235,8 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
               value: 50000,
               quote: "make that 50 to 100k, not 25",
               ownWords: false,
+              // A correction of what they said for it (v6 reading).
+              aboutStep: true,
             },
           ],
           declined: [],

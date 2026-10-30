@@ -124,3 +124,51 @@ export const OnboardingTranscriptReaderV2ResultSchema = z
 export type OnboardingTranscriptReaderV2Result = z.infer<
   typeof OnboardingTranscriptReaderV2ResultSchema
 >;
+
+/**
+ * v3 (live recheck 2026-10-30): each answer says whether the person's words
+ * are about that step itself. The description they had confirmed was
+ * replaced by their answer to the industry question: a step already on
+ * record changes only on words about that step (Q asked it, they named it,
+ * or they corrected what they said for it); code also checks the question
+ * Q's line asked.
+ */
+export const ONBOARDING_TRANSCRIPT_READER_V3_SCHEMA_VERSION = 3;
+
+export const OnboardingTranscriptReaderV3ResultSchema = z
+  .object({
+    answers: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            value: ValueSchema,
+            quote: z.string().trim().min(1).max(400),
+            ownWords: z.boolean(),
+            replaces: z.boolean().default(false),
+            /**
+             * True only when their words are about this step itself: Q's
+             * question just before asked about it, they named what it is
+             * about, or they corrected or added to what they said for it.
+             * False when the words answer a different question.
+             */
+            aboutStep: z.boolean().default(false),
+          })
+          .strict(),
+      )
+      .max(60),
+    declined: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            quote: z.string().trim().min(1).max(400),
+          })
+          .strict(),
+      )
+      .max(30),
+  })
+  .strict();
+export type OnboardingTranscriptReaderV3Result = z.infer<
+  typeof OnboardingTranscriptReaderV3ResultSchema
+>;

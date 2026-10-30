@@ -4,6 +4,7 @@ import {
   appendOnboardingInterviewTurns,
   getOnboardingSession,
   listOnboardingInterviewTurns,
+  listOnboardingInterviewTurnSteps,
   type ApiSession,
 } from "@capital-q/api-client";
 import type {
@@ -295,11 +296,31 @@ export function createOnboardingConversation(dependencies: {
     // Everything heard so far is in the thread before it is read.
     await (writes.get(line.voiceSessionId) ?? Promise.resolve());
     const session = sessionOf(line);
-    const thread = await listOnboardingInterviewTurns(
+    // With the step each of Q's lines asked: what their words answered.
+    // The plain thread when that form cannot be read (no step is known
+    // then, and only the reading's own attribution counts).
+    const thread: {
+      readonly items: readonly {
+        readonly role: "PERSON" | "Q";
+        readonly text: string;
+        readonly createdAt: string;
+        readonly stepKey?: string | undefined;
+      }[];
+    } = await listOnboardingInterviewTurnSteps(
       session,
       line.onboarding.sessionId,
       THREAD_LIMIT,
-    );
+    ).catch((error: unknown) => {
+      logger.info(
+        { err: error, onboardingSessionId: line.onboarding.sessionId },
+        "onboarding thread read without its steps",
+      );
+      return listOnboardingInterviewTurns(
+        session,
+        line.onboarding.sessionId,
+        THREAD_LIMIT,
+      );
+    });
     const turns = thread.items.map((turn) => ({
       role: turn.role,
       text: turn.text,
@@ -362,24 +383,69 @@ export function createOnboardingConversation(dependencies: {
     // saved (live 2026-10-29: "mostly follow" saved as follow, then the
     // finishing reading re-read the same words and wrote "follow, lead").
     // The reader is a model; re-reading old words is not new information.
-    const personSaid = thread.items
-      .filter((turn) => turn.role === "PERSON")
-      .map((turn) => ({ at: Date.parse(turn.createdAt), text: turn.text }));
-    const saidSince = (stepKey: string, quote: string): boolean => {
-      const current = onRecord.find((r) => r.stepKey === stepKey);
-      if (current === undefined) return true;
-      const savedAt = Date.parse(current.createdAt);
-      return quotedFrom(
-        quote,
-        personSaid.filter((turn) => turn.at >= savedAt).map((t) => t.text),
-      );
-    };
-    const answers = reading.answers.filter(
-      (answer) =>
-        isAnswerable(state, answer.stepKey) &&
-        !unchanged(answer.stepKey, answer.value) &&
-        saidSince(answer.stepKey, answer.quote),
+    const personSaid = thread.items.flatMap((turn, index) =>
+      turn.role === "PERSON"
+        ? [
+            {
+              at: Date.parse(turn.createdAt),
+              text: turn.text,
+              // The step Q's line just before asked, when it named one.
+              asked: thread.items
+                .slice(0, index)
+                .findLast((before) => before.role === "Q")?.stepKey,
+            },
+          ]
+        : [],
     );
+    // Live recheck 2026-10-30: the founder kept their deck's description,
+    // Q asked how they would describe their industry, and that answer
+    // replaced the description. What is on record changes only on words
+    // said since it was saved that are about that step: said to Q's
+    // question for it (the step Q's line asked), or read as about it by
+    // meaning (the reader's `aboutStep`: named, or a correction of it).
+    // Never on words said to another question.
+    const changesRecord = (answer: {
+      readonly stepKey: string;
+      readonly quote: string;
+      readonly aboutStep?: boolean | undefined;
+    }): "NEW" | "CHANGE" | "OLD_WORDS" | "OTHER_QUESTION" => {
+      const current = onRecord.find((r) => r.stepKey === answer.stepKey);
+      if (current === undefined) return "NEW";
+      const savedAt = Date.parse(current.createdAt);
+      const since = personSaid.filter(
+        (turn) => turn.at >= savedAt && quotedFrom(answer.quote, [turn.text]),
+      );
+      if (since.length === 0) return "OLD_WORDS";
+      if (answer.aboutStep === true) return "CHANGE";
+      return since.some((turn) => turn.asked === answer.stepKey)
+        ? "CHANGE"
+        : "OTHER_QUESTION";
+    };
+    /** What the reading gave that is not saved, by reason: step keys only. */
+    const dropped: string[] = [];
+    const answers = reading.answers.filter((answer) => {
+      const why = !isAnswerable(state, answer.stepKey)
+        ? "not_answerable"
+        : unchanged(answer.stepKey, answer.value)
+          ? null
+          : changesRecord(answer);
+      if (why === "NEW" || why === "CHANGE") return true;
+      if (why !== null) dropped.push(`${answer.stepKey}:${why}`);
+      return false;
+    });
+    // Live recheck 2026-10-30: a reading that saved nothing left no trace
+    // of what it read. Step keys and reasons only, never their words.
+    if (dropped.length > 0 || reading.answers.length === 0) {
+      logger.info(
+        {
+          qVoiceSessionId: line.voiceSessionId,
+          onboardingSessionId: line.onboarding.sessionId,
+          readAnswers: reading.answers.length,
+          dropped: dropped.slice(0, 20),
+        },
+        "onboarding conversation reading kept back",
+      );
+    }
     const declined = reading.declined.filter(
       (item) => stepOf(state, item.stepKey)?.status === "OPEN",
     );

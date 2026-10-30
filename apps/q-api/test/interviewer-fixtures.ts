@@ -107,6 +107,25 @@ export type WorldOptions = {
   readonly taxonomyUntil?: string | undefined;
   /** Each vocabulary's top-level categories, by display name -> node id. */
   readonly taxonomyRoots?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Serve the interviewer's thread form (`/turns/steps`, each Q line with
+   * the step it asked). Opt-in: without it that read fails, as it did for
+   * the tests that predate it, and callers fall back to the plain thread.
+   */
+  readonly servesTurnSteps?: boolean | undefined;
+  /**
+   * The vocabulary's whole node list, served a page at a time (in place of
+   * taxonomyRoots): a hierarchy, as the reference taxonomy is.
+   */
+  readonly taxonomyNodes?:
+    | readonly {
+        readonly id: string;
+        readonly canonicalCode: string;
+        readonly displayName: string;
+        readonly parentNodeId: string | null;
+        readonly depth: number;
+      }[]
+    | undefined;
   /** The mandate candidate context the view carries on the I1 step. */
   /**
    * Steps off this person's path: the fake refuses them the way the
@@ -378,6 +397,25 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     ) {
       const code =
         /\/vocabularies\/([^/]+)\/nodes/.exec(url)?.[1] ?? "industry";
+      if (options.taxonomyNodes !== undefined) {
+        const query = new URL(url, "http://fake.local").searchParams;
+        const limit = Number(query.get("limit") ?? "50");
+        const from = Number(query.get("cursor") ?? "0");
+        const page = options.taxonomyNodes.slice(from, from + limit);
+        return Promise.resolve(
+          Response.json({
+            items: page.map((node) => ({
+              ...node,
+              vocabularyCode: decodeURIComponent(code),
+              description: null,
+              status: "ACTIVE",
+            })),
+            ...(from + limit < options.taxonomyNodes.length
+              ? { nextCursor: String(from + limit) }
+              : {}),
+          }),
+        );
+      }
       return Promise.resolve(
         Response.json({
           items: Object.entries(options.taxonomyRoots ?? {}).map(
@@ -482,6 +520,15 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           },
         }),
       );
+    }
+
+    if (
+      options.servesTurnSteps === true &&
+      method === "GET" &&
+      /\/turns\/steps(\?limit=\d+)?$/.test(url)
+    ) {
+      // The interviewer's form: each of Q's lines with the step it asked.
+      return Promise.resolve(Response.json({ items: thread }));
     }
 
     if (/\/turns(\?limit=\d+)?$/.test(url)) {

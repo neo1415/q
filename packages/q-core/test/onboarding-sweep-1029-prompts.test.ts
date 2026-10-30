@@ -9,12 +9,30 @@ import { createDefaultPromptRegistry } from "../src/index.js";
  */
 const registry = createDefaultPromptRegistry();
 
-describe("ONBOARDING_TRANSCRIPT_READER v5 (keeps v4's rules)", () => {
+describe("ONBOARDING_TRANSCRIPT_READER v6 (keeps v4's and v5's rules)", () => {
   const active = registry.getActive("ONBOARDING_TRANSCRIPT_READER");
   const template = active.definition.template;
 
   it("is the active version", () => {
-    expect(active.definition.version).toBe(5);
+    expect(active.definition.version).toBe(6);
+  });
+
+  it("recheck 2026-10-30 (891425cbe): a step on record changes only on words about it; each answer says so", () => {
+    expect(template).toMatch(
+      /A step that already has something on record changes only when their words are about that step/u,
+    );
+    expect(template).toMatch(
+      /Words that answer a different question .* are never a new answer to the step on record/u,
+    );
+    expect(template).toMatch(/"aboutStep": false/u);
+    expect(active.definition.output.kind).toBe("STRUCTURED");
+  });
+
+  it("recheck 2026-10-30: a range of amounts is its two ends, whatever question it was said to", () => {
+    expect(template).toMatch(
+      /A range of amounts they give .* is its two ends: the lower figure answers the step for the smallest amount and the higher figure the step for the largest/u,
+    );
+    expect(template).toMatch(/whichever question it was said to/u);
   });
 
   it("D2/D5: the value is an option key; detail beside an answer still names the option holding it", () => {

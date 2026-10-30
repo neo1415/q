@@ -74,7 +74,7 @@ function withThread(world: InvestorWorld) {
     const url = new URL(
       typeof input === "string" ? input : (input as Request).url,
     );
-    if (url.pathname.endsWith("/turns")) {
+    if (/\/turns(\/steps)?$/.test(url.pathname)) {
       if ((init?.method ?? "GET") === "POST") {
         const body = JSON.parse(
           typeof init?.body === "string" ? init.body : "{}",
@@ -692,6 +692,8 @@ describe("voice onboarding, owner live run 2026-10-28 (Tiara)", () => {
               quote: "adult content as well",
               ownWords: false,
               replaces,
+              // Said to Q's question about it, adding to it (v6 reading).
+              aboutStep: true,
             },
           ],
           declined: [],

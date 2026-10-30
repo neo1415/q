@@ -3,9 +3,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  OnboardingTranscriptReaderV2ResultSchema,
+  OnboardingTranscriptReaderV3ResultSchema,
   renderPrompt,
-  type OnboardingTranscriptReaderV2Result,
+  type OnboardingTranscriptReaderV3Result,
   type OnboardingTranscriptReaderVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -21,16 +21,22 @@ import type { ModelGateway } from "../gateway.js";
  */
 export type OnboardingTranscriptReading = {
   readonly answers: readonly (Omit<
-    OnboardingTranscriptReaderV2Result["answers"][number],
-    "replaces"
+    OnboardingTranscriptReaderV3Result["answers"][number],
+    "replaces" | "aboutStep"
   > & {
     /**
      * A list step: true when they meant it as the whole list (read by
      * meaning). Absent or false: it adds to what is on record.
      */
     readonly replaces?: boolean | undefined;
+    /**
+     * Their words are about this step itself: Q asked it, they named it,
+     * or they corrected what they said for it (read by meaning). Absent or
+     * false: not.
+     */
+    readonly aboutStep?: boolean | undefined;
   })[];
-  readonly declined: OnboardingTranscriptReaderV2Result["declined"];
+  readonly declined: OnboardingTranscriptReaderV3Result["declined"];
 };
 
 export type OnboardingTranscriptReader = {
@@ -151,15 +157,40 @@ export function createOnboardingTranscriptReader(dependencies: {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: OnboardingTranscriptReaderV2ResultSchema,
+            schema: OnboardingTranscriptReaderV3ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = OnboardingTranscriptReaderV2ResultSchema.safeParse(
+        const parsed = OnboardingTranscriptReaderV3ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          // Paths only, never what the model wrote (live recheck
+          // 2026-10-30: a reading that saved nothing left no trace).
+          logger.warn(
+            {
+              task: "ONBOARDING_TRANSCRIPT_READER",
+              issues: parsed.error.issues
+                .slice(0, 8)
+                .map((issue) => issue.path.join(".").slice(0, 80)),
+            },
+            "onboarding transcript reading did not fit its schema",
+          );
+          return null;
+        }
+        const unknown = parsed.data.answers.filter(
+          (a) => !known.has(a.stepKey),
+        );
+        if (unknown.length > 0) {
+          logger.info(
+            {
+              task: "ONBOARDING_TRANSCRIPT_READER",
+              unknownSteps: unknown.length,
+            },
+            "onboarding transcript reading named steps the setup does not have",
+          );
+        }
         return {
           // Only the setup's own steps; a required step is never declined.
           answers: parsed.data.answers.filter((a) => known.has(a.stepKey)),
