@@ -551,6 +551,7 @@ export {
   SPREADSHEET_ARTIFACT_TYPE,
   SPREADSHEET_FAILED_LINE,
   SPREADSHEET_NOTHING_LINE,
+  SPREADSHEET_NOTHING_LINES,
   SPREADSHEET_SOURCES,
   type MakeSpreadsheetInput,
   type MakeSpreadsheetOutput,
@@ -577,6 +578,14 @@ export {
   type TabularBlock,
   type UnfilledColumn,
 } from "./tools/spreadsheet-build.js";
+export {
+  buildOwnFinancialModelSheet,
+  decimalOfMinor,
+  MODEL_MONTHS_DEFAULT,
+  ownModelNothingLine,
+  type ModelAssumptions,
+  type OwnFinancialFigure,
+} from "./tools/spreadsheet-model.js";
 
 // DAILY block: The Q Daily tools.
 export {

@@ -554,7 +554,7 @@ const OFFERS: readonly QCapability[] = [
   tool(
     "make_spreadsheet",
     "DOCUMENT",
-    "Makes an Excel spreadsheet (.xlsx, CSV) of their pipeline, a company's stated figures, or a table, comparison or ranked list Q showed, as their own private document; every cell is copied from their records.",
+    "Makes an Excel spreadsheet (.xlsx, CSV) as their own private document: their pipeline, a company's figures, a founder's own financial model (Q's labelled projection), or a table, comparison or ranked list Q showed.",
     { acts: true },
   ),
   // BIZ-008 (B8 worker block).
