@@ -352,7 +352,14 @@ export function recordsCitedAsWeb(
       section: section.heading.slice(0, 120),
       // The quote without its citations: the point is filed in the
       // report's gaps when the last draft still has it.
-      problem: `${RECORD_CITED_PROBLEM}: "${cutAtWord(withoutCitations(mixed[0] ?? ""), 200)}"`,
+      // Model input only (the redraft reads it; what the person reads is
+      // cut at a word in analysisContent). Unchanged so recorded research
+      // replays stay identical.
+      problem:
+        `${RECORD_CITED_PROBLEM}: "${withoutCitations(mixed[0] ?? "").slice(0, 200)}"`.slice(
+          0,
+          400,
+        ),
       fix: "Keep Capital Q records apart from web evidence: the sentence naming the record cites no [S n] and is marked (Capital Q record); put the web evidence in its own sentence.",
     });
   }
@@ -458,7 +465,12 @@ export function basisProblems(
       issues.push({
         kind: "UNSUPPORTED",
         section: section.heading.slice(0, 120),
-        problem: `${String(unlabelled.length)} figure${unlabelled.length === 1 ? "" : "s"} without a basis, e.g. "${cutAtWord(unlabelled[0] ?? "", 200)}"`,
+        // Model input only; see recordsCitedAsWeb.
+        problem:
+          `${String(unlabelled.length)} figure${unlabelled.length === 1 ? "" : "s"} without a basis, e.g. "${(unlabelled[0] ?? "").slice(0, 200)}"`.slice(
+            0,
+            400,
+          ),
         fix: "Give each figure its basis in the same sentence: [S n] for a source, (estimate: ...) with the assumptions, (company record), or (Q's inference); or remove it.",
       });
     }
