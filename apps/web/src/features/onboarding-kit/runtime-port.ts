@@ -217,13 +217,18 @@ export function sameValue(
   return a !== undefined && JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** How many times one step's answer is made again after a conflict. */
+const REBASE_ATTEMPTS = 2;
+
 /**
  * One OnboardingClient over any RuntimePort and JourneyModel. Owns the
  * mapping from composite screens to runtime steps: a composite save becomes
  * ordered runtime submissions, each carrying the version the previous one
  * returned, skipping steps the live session says are not eligible and plain
  * answers that are unchanged (confirmations are always re-committed).
- * Version conflicts surface as CONFLICT after the cached session is dropped.
+ * Writes go one at a time, in order. A version conflict surfaces as
+ * CONFLICT after the cached session is dropped, except for one step's
+ * whole answer, which is made again on the fresh version (bounded).
  */
 export function createRuntimeClient<
   TView extends SessionPresentation<unknown>,
@@ -249,7 +254,7 @@ export function createRuntimeClient<
     return remember(current ?? (await port.start(crypto.randomUUID())));
   };
 
-  const guarded = async <T>(work: () => Promise<T>): Promise<T> => {
+  const unqueued = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
       return await work();
     } catch (error) {
@@ -257,6 +262,46 @@ export function createRuntimeClient<
         latest = null;
       }
       throw error;
+    }
+  };
+
+  /**
+   * One write of this session's at a time, in the order they were made
+   * (live recheck 2026-10-30: an upload's answer and a tapped chip went out
+   * against the same session version; the second came back a conflict).
+   * Each write reads the version the one before it returned.
+   */
+  let queue: Promise<unknown> = Promise.resolve();
+  const guarded = <T>(work: () => Promise<T>): Promise<T> => {
+    const next = queue.then(
+      () => unqueued(work),
+      () => unqueued(work),
+    );
+    queue = next.catch(() => undefined);
+    return next;
+  };
+
+  /**
+   * One step's whole answer, made again on the version the session moved
+   * to when something else saved first (live recheck 2026-10-30: Q's
+   * reading saved the company's categories at 03:21:23; the upload's
+   * answer, sent at 03:21:27 on the version before, came back 409 and was
+   * dropped). The answer does not depend on the other steps, so it stands
+   * on the fresh version; the API still validates it there. Bounded.
+   */
+  const rebased = async <T>(
+    attempt: (view: OnboardingSessionView) => Promise<T>,
+  ): Promise<T> => {
+    for (let tries = 0; ; tries += 1) {
+      const view = await session();
+      try {
+        return await attempt(view);
+      } catch (error) {
+        const conflict =
+          error instanceof OnboardingClientError && error.kind === "CONFLICT";
+        if (!conflict || tries >= REBASE_ATTEMPTS) throw error;
+        latest = null;
+      }
     }
   };
 
@@ -372,7 +417,7 @@ export function createRuntimeClient<
   };
 
   return {
-    getSession: () => guarded(async () => present(await session())),
+    getSession: () => unqueued(async () => present(await session())),
 
     ...(port.uploadMaterial === undefined
       ? {}
@@ -460,24 +505,25 @@ export function createRuntimeClient<
                   "Capital Q can't record that answer yet. Use the form for this step.",
                 );
               }
-              const view = await session();
               return present(
                 remember(
-                  await answer({
-                    sessionId: view.session.id,
-                    questionId: input.questionId,
-                    stepKey: input.stepKey,
-                    value: input.value,
-                    expectedSessionVersion: view.session.version,
-                    idempotencyKey: crypto.randomUUID(),
-                  }),
+                  await rebased((view) =>
+                    answer({
+                      sessionId: view.session.id,
+                      questionId: input.questionId,
+                      stepKey: input.stepKey,
+                      value: input.value,
+                      expectedSessionVersion: view.session.version,
+                      idempotencyKey: crypto.randomUUID(),
+                    }),
+                  ),
                 ),
               );
             }),
         }),
 
     reload: () =>
-      guarded(async () => {
+      unqueued(async () => {
         latest = null;
         return present(await session());
       }),
@@ -489,22 +535,23 @@ export function createRuntimeClient<
       readonly stepKey: string;
       readonly value: OnboardingResponseValue;
     }) =>
-      guarded(async () => {
-        const view = await session();
-        return present(
+      guarded(async () =>
+        present(
           remember(
-            await port.submit({
-              sessionId: view.session.id,
-              stepKey: input.stepKey,
-              value: input.value,
-              expectedSessionVersion: view.session.version,
-              idempotencyKey: crypto.randomUUID(),
-              // A tapped option in the conversation with Q.
-              channel: "CONVERSATION",
-            }),
+            await rebased((view) =>
+              port.submit({
+                sessionId: view.session.id,
+                stepKey: input.stepKey,
+                value: input.value,
+                expectedSessionVersion: view.session.version,
+                idempotencyKey: crypto.randomUUID(),
+                // A tapped option in the conversation with Q.
+                channel: "CONVERSATION",
+              }),
+            ),
           ),
-        );
-      }),
+        ),
+      ),
 
     ...(port.say === undefined
       ? {}
