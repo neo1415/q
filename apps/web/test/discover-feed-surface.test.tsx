@@ -1136,6 +1136,33 @@ describe("degraded and empty states", () => {
     );
   });
 
+  it("investor lane 2026-10-30 (390 px): the regions line is over the pitch at phone widths too, without opening the details", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: "99999999-9999-4999-8999-999999999999",
+        rankingVersion: "declared.v1",
+        items: [
+          company(1, {
+            headquartersCountry: "US",
+            reasonCodes: ["STAGE_ALIGNED", "GEOGRAPHY_MISMATCH"],
+          }),
+        ],
+        notes: ["NONE_IN_DECLARED_GEOGRAPHY"],
+        nextCursor: null,
+        declaredGeographyWithoutPitch: 0,
+      },
+    });
+    render(<InvestorFeedScreen />);
+    await screen.findByRole("heading", { name: "Company 1" });
+    const top = document.querySelector("[data-feed-outside-geography-top]");
+    expect(top?.textContent).toBe(
+      "No companies with a pitch in your regions yet.",
+    );
+    // Shown below the desktop breakpoint, where the dossier is not.
+    expect(top?.closest(".lg\\:hidden")).not.toBeNull();
+  });
+
   it("the outside-the-regions sentences: one company, or none counted", async () => {
     const { outsideGeographySentences } =
       await import("../src/features/discover/investor-feed-screen");

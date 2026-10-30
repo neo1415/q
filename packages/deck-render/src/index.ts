@@ -51,6 +51,8 @@ export {
   documentFromArtifact,
   documentToPdf,
   DOCUMENT_PAGE,
+  REVIEW_OPEN_POINT_PREFIX,
+  splitReviewPoints,
   type ArtifactDocument,
   type DocumentFinding,
   type DocumentSection,

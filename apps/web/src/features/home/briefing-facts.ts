@@ -102,10 +102,22 @@ const NEWS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 /** Enough of the slate to find a few pitches, never the whole feed. */
 const SLATE_LOOK = 12;
 
-async function within<T>(read: () => Promise<T>): Promise<T | undefined> {
+/**
+ * The slate's own budget. Investor lane 2026-10-30 (first open, no
+ * reload: only the greeting; after a reload, "12 pitches…"): a cold slate
+ * read took longer than READ_BUDGET_MS, so the briefing said nothing about
+ * pitches until the slate was warm. The briefing streams in beside Q (it
+ * is never awaited by the page), so waiting longer for it holds nothing up.
+ */
+const SLATE_BUDGET_MS = 6000;
+
+async function within<T>(
+  read: () => Promise<T>,
+  budgetMs: number = READ_BUDGET_MS,
+): Promise<T | undefined> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<undefined>((resolve) => {
-    timer = setTimeout(() => resolve(undefined), READ_BUDGET_MS);
+    timer = setTimeout(() => resolve(undefined), budgetMs);
   });
   try {
     return await Promise.race([read(), late]);
@@ -303,7 +315,7 @@ export async function readBriefingFacts(
         await Promise.all([
           within(reads.pendingApprovals),
           within(reads.investorRelationships),
-          within(reads.companySlate),
+          within(reads.companySlate, SLATE_BUDGET_MS),
           within(reads.setupNudge),
           partnersWithin(reads, now),
         ]);
@@ -323,6 +335,10 @@ export async function readBriefingFacts(
             companyId: item.companyId,
             name: item.canonicalName,
           })),
+        // None in their declared regions: the slate shows others, and the
+        // briefing says so rather than "match your mandate".
+        pitchesOutsideRegions:
+          slate?.notes.includes("NONE_IN_DECLARED_GEOGRAPHY") === true,
         mandate:
           slate === undefined
             ? undefined

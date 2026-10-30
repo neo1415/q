@@ -21,6 +21,11 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "Q picks up where you left off.": "يتابع Q من حيث توقفت.",
   "A pitch from {name}": "عرض من {name}",
   "{n} pitches that match your mandate": "{n} عروض تطابق تفويضك",
+  // Investor lane 2026-10-30: pitches outside their declared regions.
+  "A pitch from {name}, outside your regions": "عرض من {name}، خارج مناطقك",
+  "{n} pitches outside your regions": "{n} عروض خارج مناطقك",
+  "None in your regions has a pitch yet; showing {list}.":
+    "لا يوجد عرض في مناطقك بعد؛ نعرض {list}.",
   "Setup: {n} of {n2} done — {minutes}":
     "الإعداد: اكتمل {n} من {n2} — {minutes}",
   "about a minute left": "تبقّت دقيقة تقريباً",

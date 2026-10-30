@@ -55,6 +55,60 @@ export function shownPoints(
   return all ? points : points.slice(0, PLAN_POINTS_SHOWN);
 }
 
+/** A step's note continued past one line's room (plan-job personLines). */
+const CONTINUED = /^Step (\d+), continued: (.*)$/su;
+const STEP_HEAD = /^Step (\d+), /u;
+
+/**
+ * One line per step (live 2026-10-30, founder.ledgerbridge: "Step 9" and
+ * "Step 9, continued" as two points). The server keeps each stored point
+ * within its 300-character room by continuing a step's notes on a second
+ * point; the card folds that continuation back into its step's line, so a
+ * step is one point (expandable, below), never two.
+ */
+export function foldedPoints(points: readonly string[]): readonly string[] {
+  const out: string[] = [];
+  for (const point of points) {
+    const continued = CONTINUED.exec(point);
+    const previous = out.at(-1);
+    if (
+      continued !== null &&
+      previous !== undefined &&
+      STEP_HEAD.exec(previous)?.[1] === continued[1]
+    ) {
+      out[out.length - 1] = `${previous} ${continued[2] ?? ""}`.trim();
+      continue;
+    }
+    out.push(point);
+  }
+  return out;
+}
+
+/** Shown on the card in place of the earlier-draft open point's wording. */
+const EARLIER_DRAFT =
+  /^This is the earlier draft: its revision scored lower in review/u;
+
+/**
+ * Which draft the card holds and what its reviews said (live 2026-10-30:
+ * the card said "Version 1" while the progress said "Draft 3 · Two
+ * reviews"). "Version" counts the person's own changes; the writing's
+ * draft and its review result are what a person needs to judge a draft.
+ */
+export function draftLabel(review: {
+  readonly redrafts: number;
+  readonly reviews: readonly { readonly passed: boolean }[];
+  readonly openPoints: readonly string[];
+}): readonly string[] {
+  const earlier = review.openPoints.some((point) => EARLIER_DRAFT.test(point));
+  const passed = review.reviews.filter((one) => one.passed).length;
+  return [
+    earlier ? "An earlier draft" : `Draft ${String(review.redrafts + 1)}`,
+    review.reviews.length === 0
+      ? "Not reviewed"
+      : `${String(passed)} of ${String(review.reviews.length)} reviews passed`,
+  ];
+}
+
 /** Who does a step, in plain words for the person. */
 export function ownerWords(step: Pick<QPlanStep, "owner">): string {
   switch (step.owner) {
@@ -342,7 +396,9 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const reviewed = plan?.review?.fullyReviewed ?? block.reviewed;
   const current = view?.current ?? true;
   const facts = new Map((view?.facts ?? []).map((fact) => [fact.ref, fact]));
-  const stillWanted = reviewed ? [] : (plan?.review?.openPoints ?? []);
+  const stillWanted = reviewed
+    ? []
+    : foldedPoints(plan?.review?.openPoints ?? []);
   const running = view !== null && planRunning(view.status);
   const runningJobs = current
     ? (plan?.steps ?? []).flatMap((step) =>
@@ -376,7 +432,10 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
             {reviewed
               ? t("Reviewed twice before you saw it")
               : t("A draft: not fully reviewed yet")}
-            {plan === null
+            {plan?.review == null
+              ? null
+              : draftLabel(plan.review).map((part) => ` · ${t(part)}`)}
+            {plan === null || plan.version <= 1
               ? null
               : ` · ${t(`Version ${String(plan.version)}`)}`}
           </p>

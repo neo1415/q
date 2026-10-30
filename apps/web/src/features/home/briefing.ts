@@ -107,6 +107,8 @@ export type InvestorBriefingFacts = {
   readonly relationships?: readonly RelationshipFact[] | undefined;
   /** Companies ranked against their mandate that have a pitch. */
   readonly pitches?: readonly PitchFact[] | undefined;
+  /** The slate found none in their declared regions; these are outside. */
+  readonly pitchesOutsideRegions?: boolean | undefined;
   /** What the slate says about their mandate, when it says anything. */
   readonly mandate?: "ACTIVE" | "NOT_ACTIVE" | "NO_PREFERENCES" | undefined;
   readonly setupNudge?: SetupNudgeFact | undefined;
@@ -333,14 +335,22 @@ function pitchItems(facts: InvestorBriefingFacts): BriefingItem[] {
   return [
     {
       id: `pitches:${fresh.map((p) => p.companyId).join(",")}`,
+      // Investor lane 2026-10-30: "12 pitches that match your mandate"
+      // when none was in their regions. Outside their regions is said.
       title:
-        fresh.length === 1
-          ? `A pitch from ${first.name}`
-          : `${String(fresh.length)} pitches that match your mandate`,
+        facts.pitchesOutsideRegions === true
+          ? fresh.length === 1
+            ? `A pitch from ${first.name}, outside your regions`
+            : `${String(fresh.length)} pitches outside your regions`
+          : fresh.length === 1
+            ? `A pitch from ${first.name}`
+            : `${String(fresh.length)} pitches that match your mandate`,
       description:
-        fresh.length === 1
-          ? "Matches your mandate. You haven't acted on it yet."
-          : names(fresh.map((p) => p.name)),
+        facts.pitchesOutsideRegions === true
+          ? `None in your regions has a pitch yet; showing ${names(fresh.map((p) => p.name))}.`
+          : fresh.length === 1
+            ? "Matches your mandate. You haven't acted on it yet."
+            : names(fresh.map((p) => p.name)),
       href: "/discover",
     },
   ];
