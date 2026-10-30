@@ -82,6 +82,15 @@ export type OnboardingQRecommendations = {
     readonly value: OnboardingResponseValue;
     readonly rationale: string;
     readonly runId: string | null;
+    /**
+     * Q's summary of words the person said at this time (ISO): a Q
+     * recommendation for the step held at or after it already stands for
+     * those words, so it is kept, not replaced by a newly worded one (live
+     * 2026-10-30: each re-reading of the same words expired the summary
+     * on the person's screen, and their Keep was refused). Absent: the
+     * new recommendation supersedes the step's pending one.
+     */
+    readonly keepPendingSince?: string | undefined;
     /** The public pages it was read from, when it was (BIZ-009). */
     readonly sources?:
       | readonly {
@@ -178,6 +187,28 @@ export function createOnboardingQRecommendations(options: {
           throw new OnboardingSessionStateError("SUGGESTION_REJECTED_BEFORE");
         }
         const waiting = await suggestions.listPending(tx.sql, sessionId);
+        const since =
+          input.keepPendingSince === undefined
+            ? Number.NaN
+            : Date.parse(input.keepPendingSince);
+        const standing = Number.isNaN(since)
+          ? undefined
+          : waiting.find(
+              (earlier) =>
+                earlier.stepKey === step.stepKey &&
+                isQ(earlier.sourceRefs) &&
+                Date.parse(earlier.createdAt) >= since,
+            );
+        if (standing !== undefined) {
+          return {
+            id: standing.id,
+            stepKey: standing.stepKey,
+            value: standing.suggestedValue,
+            rationale: standing.rationale ?? null,
+            payloadSha256: payloadSha256(standing.suggestedValue),
+            sources: publicOf(standing.sourceRefs),
+          };
+        }
         for (const earlier of waiting) {
           if (earlier.stepKey === step.stepKey && isQ(earlier.sourceRefs)) {
             await suggestions.resolve(tx, earlier.id, "EXPIRED");

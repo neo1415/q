@@ -808,6 +808,30 @@ export function createOnboardingPort(input: {
    */
   readonly lastQTurn?: string | undefined;
   /**
+   * A whole-conversation reading (live 2026-10-30, Granary): the Q line
+   * the person was answering when they said the words a quote is from,
+   * so a summary Q said back there and they agreed to is theirs however
+   * long ago the reading caught up with it. Absent: only `lastQTurn`.
+   */
+  readonly qLineBefore?: ((quote: string) => string | undefined) | undefined;
+  /**
+   * When the person said the words a quote is from (ISO), so a re-reading
+   * of the same words keeps the summary already held for their yes rather
+   * than replacing it with a newly worded one (live 2026-10-30: every
+   * reading re-held five summaries, expiring the ones on screen, and the
+   * person's Keep came back 409). Absent: a hold always replaces.
+   */
+  readonly saidAt?: ((quote: string) => string | undefined) | undefined;
+  /**
+   * The conversation-first path (owner 2026-10-17, re-agreed 2026-10-30):
+   * a narrative answer (what the company does, how it makes money) is
+   * saved only as Q's summary that Q said back in the conversation and
+   * they agreed to; never their raw words written straight in, however
+   * close the reading's cut of them is. Absent: their own words may be
+   * written directly (the guided interview, which reads back itself).
+   */
+  readonly narrativeFromReadBackOnly?: boolean | undefined;
+  /**
    * What the person's latest words establish, read independently of the
    * acting model (DELEGATION_READER): the steps they state about
    * themselves, decline, hand to Q or approve, and whether they want to
@@ -2334,6 +2358,31 @@ export function createOnboardingPort(input: {
   };
 
   /**
+   * Text Q said back in the line the person was answering, which the
+   * reading found they agreed to (the quote is their agreeing words): the
+   * reading decides the agreement by meaning; code only checks that every
+   * word carrying the text is in what Q said to them there.
+   */
+  const agreedReadBack = (text: string, quote: string): boolean => {
+    const qLine = input.qLineBefore?.(quote);
+    return qLine !== undefined && heardBack(text, qLine);
+  };
+  /**
+   * Their own words from a short line of theirs, a sentence or two
+   * ("Robotics for warehouse logistics.", "change our description to
+   * …"): nothing to say back. Words cut from a long line were told at
+   * length and are said back first (live 2026-10-30: a ramble minus "so
+   * basically, um" was saved as the description). Structure only: how
+   * long their line is and whether the words are in it, never what they
+   * mean.
+   */
+  const shortWholeLine = (text: string): boolean =>
+    input.personTurns.some(
+      (said) =>
+        said.trim().split(/\s+/u).length <= SHORT_ANSWER_WORDS &&
+        textStatedIn(text, said),
+    );
+  /**
    * Whether free text is theirs: in their words (the quote, or the turn of
    * theirs it is cut from), or read back to them in Q's last turn and
    * agreed to in their latest words ("Nixo, right?" "Yes."). A reply that
@@ -2349,6 +2398,7 @@ export function createOnboardingPort(input: {
       readBackReplyOf(latest) !== "CORRECT";
     return (
       readBack ||
+      agreedReadBack(text, quote) ||
       textStatedIn(text, quote) ||
       // Or the field's part of the same turn of theirs the quote is from
       // (a quote cut short before the words about this field).
@@ -2401,6 +2451,7 @@ export function createOnboardingPort(input: {
           value,
           rationale: paraphraseRationale(quote),
           runId: input.runId ?? null,
+          keepPendingSince: input.saidAt?.(quote),
         });
       } catch (error: unknown) {
         if (
@@ -2788,7 +2839,10 @@ export function createOnboardingPort(input: {
       PARAPHRASABLE.has(narrative.configuration.stepType) &&
       typeof answer.value === "string" &&
       answer.value.trim().length > 0 &&
-      !textInTheirWords(answer.value.trim(), answer.quote)
+      !(input.narrativeFromReadBackOnly === true
+        ? agreedReadBack(answer.value.trim(), answer.quote) ||
+          shortWholeLine(answer.value.trim())
+        : textInTheirWords(answer.value.trim(), answer.quote))
     ) {
       const resolvedText = await (warmed.get(answer) ?? resolve(answer));
       if (!resolvedText.ok) return done(resolvedText.result);
@@ -4451,6 +4505,23 @@ const NOT_STATED_REASON =
   "Their latest words do not state this about themselves, so nothing was recorded. A question, advice or a mention is never their answer; ask them if you want to know.";
 
 const PARAPHRASABLE: ReadonlySet<string> = new Set(["long_text", "voice_text"]);
+/** The most words a line of theirs may have and still need no say-back. */
+const SHORT_ANSWER_WORDS = 30;
+
+/**
+ * Whether a step's answer is told at length (what the company does, the
+ * problem, how it makes money): saved as Q's summary they agreed to in
+ * the conversation, never as their raw words.
+ */
+export function isLongAnswerStep(
+  journeyType: "investor" | "founder",
+  stepKey: string,
+): boolean {
+  const step = definitionFor(journeyType).steps.find(
+    (s) => s.stepKey === stepKey,
+  );
+  return step !== undefined && PARAPHRASABLE.has(step.configuration.stepType);
+}
 
 /** The most answers one transactional save carries (the API's own bound). */
 const BATCH_MAX = 24;

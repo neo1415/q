@@ -13,8 +13,8 @@ describe("ONBOARDING_TRANSCRIPT_READER v6 (keeps v4's and v5's rules)", () => {
   const active = registry.getActive("ONBOARDING_TRANSCRIPT_READER");
   const template = active.definition.template;
 
-  it("is the active version", () => {
-    expect(active.definition.version).toBe(6);
+  it("is the active version, or a later one that keeps its rules (v7, live 2026-10-30)", () => {
+    expect(active.definition.version).toBeGreaterThanOrEqual(6);
   });
 
   it("recheck 2026-10-30 (891425cbe): a step on record changes only on words about it; each answer says so", () => {

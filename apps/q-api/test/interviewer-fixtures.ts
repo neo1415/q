@@ -63,6 +63,14 @@ export type InvestorWorld = {
    * session's resolve route exactly as in production.
    */
   readonly recommendations: RecommendationStore;
+  /** Every recommendation held, with its status, in the order held. */
+  readonly heldSuggestions: () => readonly {
+    readonly id: string;
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+    readonly rationale: string | null;
+    readonly status: "PENDING" | "ACCEPTED" | "EXPIRED";
+  }[];
 };
 
 export type WorldOptions = {
@@ -237,6 +245,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       readonly sourceId: string;
     }[];
     status: "PENDING" | "ACCEPTED" | "EXPIRED";
+    readonly createdAt: string;
   };
   const kept: Kept[] = [];
   let completed = false;
@@ -873,8 +882,40 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     batches: () => batches.map((b) => [...b]),
     history: (stepKey) =>
       versions.filter((v) => v.stepKey === stepKey).map((v) => v.value),
+    heldSuggestions: () =>
+      kept.map((k) => ({
+        id: k.id,
+        stepKey: k.stepKey,
+        value: k.value,
+        rationale: k.rationale,
+        status: k.status,
+      })),
     recommendations: {
       recommend: (input) => {
+        // As the service: a summary already held for words said at or
+        // before it stands for them, and is kept.
+        const since =
+          input.keepPendingSince === undefined
+            ? Number.NaN
+            : Date.parse(input.keepPendingSince);
+        const standing = Number.isNaN(since)
+          ? undefined
+          : kept.find(
+              (k) =>
+                k.stepKey === input.stepKey &&
+                k.status === "PENDING" &&
+                Date.parse(k.createdAt) >= since,
+            );
+        if (standing !== undefined) {
+          return Promise.resolve({
+            id: OnboardingSuggestionIdSchema.parse(standing.id),
+            stepKey: standing.stepKey,
+            value: standing.value,
+            rationale: standing.rationale,
+            payloadSha256: JSON.stringify(standing.value),
+            sources: standing.sources,
+          });
+        }
         for (const earlier of kept) {
           if (
             earlier.stepKey === input.stepKey &&
@@ -893,6 +934,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
             sourceId: source.url,
           })),
           status: "PENDING",
+          createdAt: new Date().toISOString(),
         };
         kept.push(item);
         return Promise.resolve({
