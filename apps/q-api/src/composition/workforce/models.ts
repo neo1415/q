@@ -50,10 +50,10 @@ import {
   type DiligenceQuestionsShortenResultV2,
   type DiligenceQuestionsShortenVariables,
   ReplyReaderResultSchema,
-  PlanReviewResultV2Schema,
+  PlanReviewResultV3Schema,
   PlanWriteResultV2Schema,
   type PlanReviewResult,
-  type PlanReviewResultV2,
+  type PlanReviewResultV3,
   type PlanReviewVariables,
   type PlanWriteResult,
   type PlanWriteVariables,
@@ -814,13 +814,16 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     reviewPlan: (who, trace, input) =>
-      call<PlanReviewInput, PlanReviewResultV2>({
+      call<PlanReviewInput, PlanReviewResultV3>({
         task: "PLAN_REVIEW",
         taskClass: PLAN_TASK_CLASS,
         who,
         trace,
         variables: input,
-        schema: PlanReviewResultV2Schema,
+        // PLAN_REVIEW v5's own schema (live 2026-10-30, 0050ac002: the v5
+        // prompt asked for refs, the call checked v2, and both reviews were
+        // refused with unrecognized_keys(refs)).
+        schema: PlanReviewResultV3Schema,
         budget: PLAN_REVIEW_BUDGET,
         reasoning: PLAN_REVIEW_REASONING,
         dropListItems: true,
