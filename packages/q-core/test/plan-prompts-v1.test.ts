@@ -324,7 +324,7 @@ describe("PLAN_REVIEW v1", () => {
   it("is registered and active, independent, and never rewrites the plan", () => {
     expect(
       createDefaultPromptRegistry().getActive("PLAN_REVIEW").versionId,
-    ).toBe("plan-review/v5");
+    ).toBe("plan-review/v6");
     const t = PLAN_REVIEW_V1.template;
     expect(t).toMatch(/independent reviewer/u);
     expect(t).toMatch(/you must not rewrite it/u);
@@ -343,6 +343,7 @@ describe("PLAN_REVIEW v1", () => {
       const text = render("PLAN_REVIEW", {
         side: "INVESTOR",
         focus,
+        today: "2026-10-30",
         ask: "How do I get better deal flow?",
         situation: SITUATION,
         publicFindings: "",

@@ -407,6 +407,17 @@ export const PlanReviewVariablesSchema = z
   })
   .strict();
 export type PlanReviewVariables = z.infer<typeof PlanReviewVariablesSchema>;
+/**
+ * PLAN_REVIEW v6: the reviewers are told today's date. Live 2026-10-30
+ * (plan job ea7508c9): with no date given, a reviewer read the latest
+ * dated record as "now" and called due dates 31 Oct-13 Nov "already past"
+ * on 30 Oct.
+ */
+export const PlanReviewVariablesV6Schema = PlanReviewVariablesSchema.extend({
+  /** YYYY-MM-DD: the day the plan is reviewed; every date is judged against it. */
+  today: PlanLocalDateSchema,
+}).strict();
+export type PlanReviewVariablesV6 = z.infer<typeof PlanReviewVariablesV6Schema>;
 export const PLAN_REVIEW_UNTRUSTED = [
   "ask",
   "situation",
