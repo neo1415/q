@@ -158,6 +158,27 @@ const RETRIED_PLAN_FAILURES: ReadonlySet<string> = new Set([
   "PROVIDER_OUTAGE",
   "TIMEOUT",
 ]);
+/**
+ * Live 2026-10-29 (case D, the IC-memo run): a truncated plan, a 45 s
+ * timeout and a retry took round one's whole share of the deadline, so no
+ * search ran and the person got no dossier at all. A round one whose plan
+ * failed always keeps a window to search in (reduced, and said so), inside
+ * the job's deadline. The plan is still asked again within round one's
+ * share (recorded case E: its retry at 63 s planned the investigation).
+ */
+const PLAN_RETRY_BEFORE = 0.45;
+export const ROUND_ONE_MIN_SEARCH_MS = 25_000;
+/** When round one's searches must end: its share, or its least window. */
+export function roundOneDeadline(
+  started: number,
+  deadlineMs: number,
+  at: number,
+): number {
+  return Math.min(
+    started + deadlineMs * 0.8,
+    Math.max(started + deadlineMs * 0.45, at + ROUND_ONE_MIN_SEARCH_MS),
+  );
+}
 const BRIEF_CEILING_USD = 0.05;
 const FACTS_CEILING_USD = 0.05;
 const RECORDS_MAX = 12;
@@ -290,6 +311,75 @@ export const ResearchDossierSchema = z
   })
   .strict();
 export type ResearchDossier = z.infer<typeof ResearchDossierSchema>;
+
+/** Bytes a value takes as JSON text (what jsonb keeps is about the same). */
+export function jsonBytes(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value) ?? "", "utf8");
+}
+
+/** Facts and writer text a compacted dossier keeps at the least. */
+const COMPACT_FACTS_MIN = 12;
+const COMPACT_WRITER_CHARS = 4_000;
+
+/**
+ * Production 2026-10-29: a 40-source dossier, kept with its step on the
+ * job's row, broke the row's size cap and the finished research was marked
+ * FAILED. The copy kept on the row (read back only when a restarted job
+ * resumes after this step) is made to fit `maxBytes`: the lowest-ranked
+ * facts go first (both sides of a contradiction stay), then the sources no
+ * kept fact cites, then the writer's brief is shortened. Null: it cannot
+ * fit at all. The step's own result, handed to the next step, is untouched.
+ */
+export function compactDossier(
+  dossier: ResearchDossier,
+  maxBytes: number,
+): ResearchDossier | null {
+  if (jsonBytes(dossier) <= maxBytes) return dossier;
+  const shape = (keep: number, writerChars: number): ResearchDossier => {
+    const facts = dossier.facts.filter(
+      (fact, index) => index < keep || fact.lifecycleStatus === "CONTRADICTORY",
+    );
+    const kept = new Set(facts.map((fact) => fact.id));
+    const cited = new Set(facts.map((fact) => fact.source));
+    return {
+      ...dossier,
+      sources: dossier.sources.filter((source) => cited.has(source.index)),
+      facts: facts.map((fact) => ({
+        ...fact,
+        ...(fact.corroboratedBy === undefined
+          ? {}
+          : {
+              corroboratedBy: fact.corroboratedBy.filter((id) => kept.has(id)),
+            }),
+        ...(fact.contradicts === undefined
+          ? {}
+          : { contradicts: fact.contradicts.filter((id) => kept.has(id)) }),
+      })),
+      ...(dossier.brief === undefined
+        ? {}
+        : {
+            brief: {
+              summary: dossier.brief.summary,
+              writer: dossier.brief.writer.slice(0, writerChars),
+            },
+          }),
+    };
+  };
+  const writerFull = dossier.brief?.writer.length ?? 0;
+  for (
+    let keep = dossier.facts.length;
+    keep >= COMPACT_FACTS_MIN;
+    keep =
+      keep === COMPACT_FACTS_MIN
+        ? -1
+        : Math.max(COMPACT_FACTS_MIN, Math.floor(keep * 0.75))
+  ) {
+    const candidate = shape(keep, writerFull);
+    if (jsonBytes(candidate) <= maxBytes) return candidate;
+  }
+  const smallest = shape(COMPACT_FACTS_MIN, COMPACT_WRITER_CHARS);
+  return jsonBytes(smallest) <= maxBytes ? smallest : null;
+}
 
 /** Jobs whose search budgets are held at once (one process). */
 const JOB_BUDGETS_MAX = 500;
@@ -1185,7 +1275,7 @@ export function workforceDeepResearch(dependencies: {
         !transient ||
         modelCalls >= MODEL_CALLS_MAX ||
         !spend.canAfford(PLAN_CEILING_USD) ||
-        now() >= started + deadlineMs * 0.45
+        now() >= started + deadlineMs * PLAN_RETRY_BEFORE
       )
         return { ...first, retried: false, transient };
       logger?.warn(
@@ -1416,7 +1506,14 @@ export function workforceDeepResearch(dependencies: {
           ],
           earlierUserText: context.earlier,
           known: state.sources,
-          deadlineAt: started + deadlineMs * (state.round === 1 ? 0.45 : 0.75),
+          // A round one whose plan failed keeps its least window (the
+          // clock is read only then: a planned round's schedule is as it was).
+          deadlineAt:
+            state.round !== 1
+              ? started + deadlineMs * 0.75
+              : state.reduced === undefined
+                ? started + deadlineMs * 0.45
+                : roundOneDeadline(started, deadlineMs, now()),
           pagesPerQuestion: state.round === 1 ? PAGES_PER_LANE : 3,
           searchBudget: budget,
         });
@@ -1606,15 +1703,21 @@ export function workforceDeepResearch(dependencies: {
     }
 
     if (state.sources.length === 0) {
+      // Nothing was searched (no provider answered, or no line ran before
+      // the deadline) is not "found nothing": it is said as unchecked.
       const unavailable = state.lanes.every(
         (lane) =>
-          lane.status === "PROVIDER_UNAVAILABLE" || lane.status === "FAILED",
+          lane.status === "PROVIDER_UNAVAILABLE" ||
+          lane.status === "FAILED" ||
+          lane.status === "SKIPPED_DEADLINE",
       );
+      const said = unavailable
+        ? "Public sources couldn't be checked just now."
+        : "The searches found no public sources for this.";
       return {
         status: "UNAVAILABLE",
-        message: unavailable
-          ? "Public sources couldn't be checked just now."
-          : "The searches found no public sources for this.",
+        message:
+          state.reduced === undefined ? said : `${state.reduced} ${said}`,
         reason: unavailable ? "PUBLIC_UNAVAILABLE" : "NO_SOURCES",
       };
     }

@@ -51,6 +51,10 @@ const TABLE: readonly (readonly [string, string])[] = [
   ["Show my pipeline", "CRM_PIPELINE"],
   ["show our investors", "INVESTORS"],
   ["take me to my work board", "BOARD"],
+  // Sweep 2026-10-29: read by a model, it landed on Settings after 18 s.
+  ["Take me to my mandate", "MANDATE"],
+  ["open my investment mandate", "MANDATE"],
+  ["show me my mandate", "MANDATE"],
   // Lane ov 2026-10-16: the CRM by its name and its tabs.
   ["open the CRM", "RELATIONSHIPS"],
   ["take me to the crm overview", "RELATIONSHIPS"],
@@ -171,6 +175,7 @@ describe("a page asked for by name (voice-cards)", () => {
       "show my latest metrics",
       "show my pipeline by stage",
       "show them my deck",
+      "show me the companies that fit my mandate",
     ]) {
       expect(pageRequestOf(said), said).toBeNull();
     }

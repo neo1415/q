@@ -228,11 +228,27 @@ describe("a plan made from Q's own earlier answer (run 8b649d10)", () => {
     expect(outcome.status).toBe("PREPARED");
   });
 
-  it("without an earlier answer an empty plan is not retried (unchanged)", async () => {
+  // Live 2026-10-29 (sweep I16): a clear research request, no earlier
+  // answer, came back with no steps and was never asked again.
+  it("without an earlier answer an empty plan is asked again once, saying so", async () => {
     const { seen, port } = world([EMPTY, RESEARCHED]);
-    const outcome = await port.propose(request, "Do the thing");
-    expect(seen).toHaveLength(1);
+    const outcome = await port.propose(
+      request,
+      "Investigate the Nigerian B2B payments sector and give me an evidence-backed report",
+    );
+    expect(seen).toHaveLength(2);
     expect(seen[0]?.priorAnswer).toBeUndefined();
+    expect(seen[1]?.priorAnswer).toBeUndefined();
+    expect(seen[1]?.allowed).toMatch(
+      /YOUR LAST PLAN HAD NO STEPS\. The job is work the person asked you to carry out/u,
+    );
+    expect(outcome.status).toBe("PREPARED");
+  });
+
+  it("without an earlier answer, still empty after the retry is not planned", async () => {
+    const { seen, port } = world([EMPTY, EMPTY]);
+    const outcome = await port.propose(request, "Do the thing");
+    expect(seen).toHaveLength(2);
     expect(outcome).toEqual({ status: "NOT_PLANNED" });
   });
 

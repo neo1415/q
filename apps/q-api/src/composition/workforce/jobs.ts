@@ -1264,21 +1264,22 @@ export function createWorkforceJobs(dependencies: {
       );
       if (again !== null) made = again;
     }
-    if (
-      made.bound.steps.length === 0 &&
-      made.bound.refused.length === 0 &&
-      input.priorAnswer !== undefined
-    ) {
+    if (made.bound.steps.length === 0 && made.bound.refused.length === 0) {
       // Live 2026-10-28 (run 8b649d10): "make it into a plan and execute
-      // it" came back with no step. With Q's earlier answer beside the job,
-      // the lead is asked once more to plan its items; still empty is not
-      // planned, and the person is asked which item comes first.
+      // it" came back with no step; live 2026-10-29 (sweep I16) a clear
+      // research request did too, with no earlier answer at all, and the
+      // person was told Q could not plan it. An empty plan is asked once
+      // more, saying what went wrong (with the earlier answer when the job
+      // refers to one); still empty is not planned.
+      const fromEarlier = input.priorAnswer !== undefined;
       dependencies.logger?.info(
-        { steps: 0, priorAnswer: true },
-        "workforce plan came back empty; replanning once from the earlier answer",
+        { steps: 0, priorAnswer: fromEarlier },
+        "workforce plan came back empty; replanning once",
       );
       const again = await attempt(
-        " YOUR LAST PLAN HAD NO STEPS. The job refers to your earlier answer (YOUR EARLIER ANSWER): plan steps for its concrete items that the roster can work on, most important first, and put the items no role can do in cannot.",
+        fromEarlier
+          ? " YOUR LAST PLAN HAD NO STEPS. The job refers to your earlier answer (YOUR EARLIER ANSWER): plan steps for its concrete items that the roster can work on, most important first, and put the items no role can do in cannot."
+          : " YOUR LAST PLAN HAD NO STEPS. The job is work the person asked you to carry out: plan the steps the roster can do for it, and put only what no role can do in cannot.",
       );
       if (again !== null) made = again;
     }
@@ -1415,6 +1416,7 @@ export function createWorkforceJobs(dependencies: {
           checkpoints: options.durable?.checkpoint,
         }),
         options.durable,
+        dependencies.logger,
       ),
       recorder: {
         ...recorderFor(store, owner),
@@ -1590,6 +1592,7 @@ export function jobStatusOf(
 function withDurableResults(
   executors: Partial<Record<QAgentRole, AgentExecutor>>,
   durable: DurableSteps | undefined,
+  logger?: Logger,
 ): Partial<Record<QAgentRole, AgentExecutor>> {
   if (durable === undefined) return executors;
   return Object.fromEntries(
@@ -1606,7 +1609,18 @@ function withDurableResults(
             : { ...step, goal: withDirection(step.goal, direction) },
           context,
         );
-        await durable.record(step.key, result, context.runId);
+        // Production 2026-10-29: the write of a finished research step's
+        // result threw and the step that had succeeded was marked FAILED.
+        // A result that cannot be kept costs a resume (the step runs again
+        // after a restart), never the work done.
+        await durable
+          .record(step.key, result, context.runId)
+          .catch((error: unknown) =>
+            logger?.warn(
+              { err: error, stepKey: step.key, runId: context.runId },
+              "workforce step result could not be kept; it stands, a restart redoes it",
+            ),
+          );
         return result;
       },
     ]),

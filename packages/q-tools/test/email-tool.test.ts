@@ -177,6 +177,73 @@ describe("propose_email", () => {
 });
 
 describe("propose_email by name, from any page (action parity 2026-10-02)", () => {
+  // Sweep 2026-10-29: "draft an update email to my investors" with one
+  // investor was answered "no specific relationship was named".
+  it("an email for their relationships as a group goes to their one relationship, for approval", async () => {
+    const prepared: unknown[] = [];
+    const email: EmailIntelligencePort = {
+      counterpart: (actor, relationshipId) =>
+        Promise.resolve(
+          actor.userId === actorB.userId && relationshipId === RELATIONSHIP
+            ? {
+                kind: "COMPANY" as const,
+                id: COMPANY_B_NETWORK,
+                name: "Apex",
+                contacts: [ADA],
+              }
+            : null,
+        ),
+      mailbox: () => Promise.resolve({ email: "investor@example.invalid" }),
+      prepareForApproval: (entry) => {
+        prepared.push(entry.payload);
+        return "PREPARED";
+      },
+    };
+    const relationships = {
+      ownRelationships: (actor: typeof actorA) =>
+        Promise.resolve({
+          side: "INVESTOR" as const,
+          items:
+            actor.userId === actorB.userId
+              ? [
+                  {
+                    relationshipId: RELATIONSHIP,
+                    counterpart: {
+                      kind: "COMPANY",
+                      id: COMPANY_B_NETWORK,
+                      name: "Apex",
+                    },
+                    state: "CONNECTED",
+                  },
+                ]
+              : [],
+        } as never),
+    } as never;
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(fakePorts({ email, relationships })),
+      ),
+    });
+    const outcome = await executor.execute(
+      {
+        callId: "e10",
+        name: "propose_email",
+        arguments: {
+          theirOnlyRelationship: true,
+          subject: "Our October update",
+          body: "Hi Ada, a short update on our month. Best, Ben",
+        },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared).toHaveLength(1);
+    expect(JSON.stringify(prepared[0])).toContain(ADA.email);
+  });
+
   it("'email apex' drafts to the relationship they have with Apex; a stranger gets nothing", async () => {
     const prepared: unknown[] = [];
     const email: EmailIntelligencePort = {

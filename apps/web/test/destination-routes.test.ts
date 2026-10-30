@@ -69,6 +69,9 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   // Q Pitch v6: the entry starts the tour for the person's side.
   Q_PITCH: "/q-pitch?start=1",
   BOARD: "/board",
+  // Sweep 2026-10-29: the bare address, resolved on the server to the
+  // investor's mandate on their profile.
+  MANDATE: "/mandate",
 };
 
 /**
@@ -91,8 +94,6 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/gateway": "old address, redirects to /gateq",
   "/company":
     "the bare company address, redirects to the founder's own /company/<id> (Q opens it by name)",
-  "/mandate":
-    "the bare mandate address, redirects to the investor's profile (Q's PROFILE)",
   "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",
   "/capital": "old address, redirects to the CRM's Capital tab (Q's CAPITAL)",
   "/discover/yours": "old address, redirects to /discover?tab=yours",

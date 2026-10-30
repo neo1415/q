@@ -278,6 +278,13 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "q's team": d("WORK_TEAM"),
   "work cost": d("WORK_COST"),
   "work costs": d("WORK_COST"),
+  // Sweep 2026-10-29 ("take me to my mandate" reached a model and landed on
+  // Settings after 18 s): an investor's mandate, by its own name.
+  mandate: d("MANDATE"),
+  mandates: d("MANDATE"),
+  "investment mandate": d("MANDATE"),
+  "fund mandate": d("MANDATE"),
+  "mandate settings": d("MANDATE"),
 };
 
 export const PAGE_VERB =

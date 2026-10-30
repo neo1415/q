@@ -1716,6 +1716,40 @@ describe("J7: a document about a relationship carries its history", () => {
     );
   });
 
+  // Live 2026-10-29: an IC memo's research brief left the mandate out, and
+  // the own-context read skipped it because a brief existed.
+  it("hands the writer the investor's mandate even when a brief exists", async () => {
+    const records: string[] = [];
+    const read = createOwnContextReader({
+      ownInvestorOrganisation: () => Promise.resolve(randomUUID()),
+      records: {
+        read: (_actor, input) => {
+          records.push(input.record);
+          return Promise.resolve(
+            input.record === "INVESTOR_MANDATES"
+              ? ({ mandates: [{ name: "Seed fintech, West Africa" }] } as never)
+              : ({ name: "Kestrel Partners" } as never),
+          );
+        },
+      },
+      relationships: () => Promise.resolve(pipeline as never),
+    });
+    const text =
+      (await read(actor, {
+        companyId: LEDGERBRIDGE,
+        goal: "Write an IC memo on LedgerBridge",
+        briefed: true,
+      })) ?? "";
+    expect(records.sort()).toEqual([
+      "INVESTOR_MANDATES",
+      "INVESTOR_ORGANISATION",
+    ]);
+    expect(text).toContain("Their mandates (declared):");
+    expect(text).toContain("Seed fintech, West Africa");
+    // The pipeline the brief already holds is not repeated.
+    expect(text).not.toContain("Their pipeline");
+  });
+
   it("says unknown, never 'nothing', when the history cannot be read", async () => {
     const read = createOwnContextReader({
       ownInvestorOrganisation: () => Promise.resolve(null),

@@ -19,6 +19,8 @@ import {
 } from "../src/composition/workforce/analysis.js";
 import {
   InvestigationCheckpointSchema,
+  ROUND_ONE_MIN_SEARCH_MS,
+  roundOneDeadline,
   workforceDeepResearch,
   type ResearchDossier,
 } from "../src/composition/workforce/deep-research.js";
@@ -977,6 +979,54 @@ describe("a research plan that fails (live 2026-10-29)", () => {
       },
     });
     expect(text.split("\n\n")[2]).toBe(reduced);
+  });
+
+  // Live case D (2026-10-29): a truncated plan and a 45 s timeout spent
+  // round one's share of the deadline; 0 searches ran and no dossier came.
+  it("still searches, reduced, when failed plans used up round one's time", async () => {
+    const sent: string[] = [];
+    const inputs: ResearchPlanInput[] = [];
+    let clock = Date.parse("2026-10-29T23:04:00Z");
+    const slowFailure = failing(["TIMEOUT", "TIMEOUT"], ROUND_ONE, inputs);
+    const found = await research({
+      sent,
+      now: () => clock,
+      models: {
+        planResearch: (who, trace, input, options) => {
+          // Each failed plan took a whole 57 s (attempt, then timeout).
+          clock += 57_000;
+          return slowFailure(who, trace, input, options);
+        },
+        researchFacts: readerOf([]),
+      },
+    })({
+      actor,
+      runId: randomUUID(),
+      request: REQUEST,
+      query: "x",
+      budgetUsd: 2,
+    });
+    // Asked again inside round one's share (57 s), and failed again: by
+    // then (114 s) round one's share of the deadline was spent.
+    expect(
+      inputs.filter((input) => input.gaps === FIRST_ROUND_GAPS),
+    ).toHaveLength(2);
+    // The request's own words were still searched, and it says it ran reduced.
+    expect(sent.length).toBeGreaterThanOrEqual(1);
+    expect(found.status).toBe("OK");
+    if (found.status !== "OK") return;
+    expect(found.dossier?.investigation?.reduced).toMatch(
+      /^This investigation ran in a reduced form/u,
+    );
+  });
+
+  it("keeps round one a window to search in, inside the job's deadline", () => {
+    const started = 0;
+    expect(roundOneDeadline(started, 150_000, 1_000)).toBe(67_500);
+    expect(roundOneDeadline(started, 150_000, 60_000)).toBe(
+      60_000 + ROUND_ONE_MIN_SEARCH_MS,
+    );
+    expect(roundOneDeadline(started, 150_000, 119_000)).toBe(120_000);
   });
 
   it("does not ask again after a failure that is not transient, and says it ran reduced", async () => {

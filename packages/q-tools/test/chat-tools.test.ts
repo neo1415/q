@@ -11,7 +11,10 @@ import {
   type ScheduleIntelligencePort,
 } from "../src/index.js";
 import { actorA, actorB, contextFor, fakePorts, planFor } from "./support.js";
-import { DIFFERENT_COUNTERPARTS } from "../src/tools/chat.js";
+import {
+  DIFFERENT_COUNTERPARTS,
+  SEVERAL_RELATIONSHIPS,
+} from "../src/tools/chat.js";
 
 /**
  * R34 chat tools: Q reads a thread and prepares chat actions only for a
@@ -59,6 +62,8 @@ function world(
     readonly richRows?: boolean;
     /** The other side as a record, so the thread carries its chat card. */
     readonly withCounterpart?: boolean;
+    /** A second relationship on their own list. */
+    readonly several?: boolean;
   } = {},
 ) {
   const counterpart = options.counterpart ?? "Apex";
@@ -130,6 +135,19 @@ function world(
                   },
                   state: "CONNECTED",
                 },
+                ...(options.several === true
+                  ? [
+                      {
+                        relationshipId: OTHER,
+                        counterpart: {
+                          kind: "COMPANY",
+                          id: OTHER,
+                          name: "Birch",
+                        },
+                        state: "CONNECTED",
+                      },
+                    ]
+                  : []),
               ]
             : [],
       } as never),
@@ -365,6 +383,64 @@ describe("chat proposals", () => {
     );
     expect(stranger.result).not.toMatchObject({ data: { status: "PREPARED" } });
     expect(prepared).toHaveLength(1);
+  });
+
+  // Sweep 2026-10-29: "update my investors" with one connected investor
+  // was asked "to whom?". Their one relationship is code's to find.
+  it("addresses a message for their relationships as a group to their one relationship, for approval", async () => {
+    const { executor, prepared } = world();
+    const outcome = await executor.execute(
+      {
+        callId: "c4o",
+        name: "propose_chat_message",
+        arguments: {
+          theirOnlyRelationship: true,
+          body: "A short update on our progress this month.",
+        },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    // Prepared for their approval, naming whom it goes to; nothing sent.
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED", awaitingApprovalOf: "Message Apex" },
+    });
+    expect(prepared).toEqual([
+      {
+        actionType: "chat.message.send",
+        payload: {
+          relationshipId: RELATIONSHIP,
+          counterpartName: "Apex",
+          body: "A short update on our progress this month.",
+        },
+      },
+    ]);
+    // No relationship at all: nothing prepared.
+    const none = await executor.execute(
+      {
+        callId: "c4p",
+        name: "propose_chat_message",
+        arguments: { theirOnlyRelationship: true, body: "Hi" },
+      },
+      contextFor(actorA, base(actorA)),
+    );
+    expect(none.result).not.toMatchObject({ data: { status: "PREPARED" } });
+    expect(prepared).toHaveLength(1);
+  });
+
+  it("with several relationships, prepares nothing and says to ask whom", async () => {
+    const { executor, prepared } = world({ several: true });
+    const outcome = await executor.execute(
+      {
+        callId: "c4q",
+        name: "propose_chat_message",
+        arguments: { theirOnlyRelationship: true, body: "An update." },
+      },
+      contextFor(actorB, base(actorB)),
+    );
+    expect(outcome.result).not.toMatchObject({ data: { status: "PREPARED" } });
+    expect(JSON.stringify(outcome)).toContain(SEVERAL_RELATIONSHIPS);
+    expect(prepared).toEqual([]);
   });
 
   // Live d3a197b4 (2026-10-26): a message named twice was refused at

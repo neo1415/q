@@ -70,6 +70,8 @@ export type AnalystResultLike = {
          * ("holds no authorised understanding of customers").
          */
         readonly derivation?: string | undefined;
+        /** What the model said supports it (ModelFindingSchema.basis). */
+        readonly basis?: readonly string[] | undefined;
       }[]
     | undefined;
   readonly missingEvidence?: readonly string[] | undefined;
@@ -412,17 +414,30 @@ export function findingBlockOf(
   // rather than re-decided here. An unrecognised value becomes the
   // weakest honest one: a claim whose standing we cannot read is a user
   // claim with no evidence, never a fact.
-  const truthClass = (
+  const read = (
     TRUTH_CLASSES.has(finding.truthClass ?? "")
       ? finding.truthClass
       : "USER_CLAIM"
   ) as TruthClass;
-  const evidenceStatus = coherentEvidence(
-    truthClass,
-    (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
-      ? finding.evidenceStatus
-      : "SELF_REPORTED") as EvidenceStatus,
-  );
+  // Live 2026-10-29 (F06): "The spreadsheet request could not be
+  // fulfilled…" reached the person as a VERIFIED, PLATFORM_VERIFIED fact.
+  // VERIFIED is a supplied fact's standing, carried over; a model finding
+  // that names nothing it rests on has none to carry, so it reads as Q's
+  // own statement with no evidence (code's own findings carry no basis).
+  const unsupported =
+    read === "VERIFIED" &&
+    finding.derivation !== "DETERMINISTIC" &&
+    finding.basis !== undefined &&
+    finding.basis.every((one) => one.trim().length === 0);
+  const truthClass: TruthClass = unsupported ? "Q_INFERENCE" : read;
+  const evidenceStatus = unsupported
+    ? "NO_EVIDENCE"
+    : coherentEvidence(
+        truthClass,
+        (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
+          ? finding.evidenceStatus
+          : "SELF_REPORTED") as EvidenceStatus,
+      );
   return {
     kind: "FINDING",
     finding: {

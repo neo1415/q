@@ -160,17 +160,31 @@ const CRITIQUE = {
   maxOutputTokens: 1_600,
   attemptTimeoutMs: 60_000,
 } as const;
-/** Owner 2026-10-23: deep work's calls, each bounded on its own. */
+/**
+ * Owner 2026-10-23: deep work's calls, each bounded on its own.
+ *
+ * Live 2026-10-29: the plan call stopped at exactly its 1,600-token
+ * ceiling (12.4 s, the object unclosed); the gateway then asked again at
+ * the model's maximum and timed out, and round one never searched. The
+ * ledger's 48 hours: every STRUCTURED_EXTRACTION refusal on a long input
+ * sat at 1,440-2,376 output tokens -- the plan's and the facts' ceilings --
+ * while successful calls ran to 4,400. The schema admits 16 questions (code
+ * keeps 12) and the output count includes any reasoning the provider
+ * spends (these calls ask for none: the request's reasoning defaults to
+ * NONE). Room for 16 questions with their second queries, and for 12
+ * facts with their statements; at gpt-5.6-luna's $1.20 per million output
+ * tokens 4,000 tokens cost about half a cent, inside each cap.
+ */
 export const RESEARCH_PLAN_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.04,
-  maxOutputTokens: 1_600,
+  maxOutputTokens: 4_000,
   attemptTimeoutMs: 45_000,
 } as const;
 export const RESEARCH_FACTS_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.05,
-  maxOutputTokens: 2_400,
+  maxOutputTokens: 4_800,
   attemptTimeoutMs: 60_000,
 } as const;
 /** A whole document in one structured object: room to finish it. */
@@ -190,7 +204,9 @@ export const ANALYSIS_CRITIQUE_BUDGET = {
 export const RESEARCH_BRIEF_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.05,
-  maxOutputTokens: 1_800,
+  // The same room as the plan's (a brief is a selection and a writer's
+  // note): EVIDENCE_SYNTHESIS calls ran to 5,200 output tokens.
+  maxOutputTokens: 4_000,
   attemptTimeoutMs: 45_000,
 } as const;
 

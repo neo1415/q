@@ -328,6 +328,9 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // Work-board lane (2026-10-23): their own work board, a Work tab.
   BOARD:
     "Opens their own work board (a Work tab): what they and Q keep and work on.",
+  // Sweep 2026-10-29: "take me to my mandate" went to Settings.
+  MANDATE:
+    "Opens an investor's mandate on their profile (what they invest in, cheque, stage, places), where they edit it.",
 };
 
 /** Screens that belong to a company's own people. */

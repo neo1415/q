@@ -27,8 +27,10 @@ export type OwnContextFocus = {
   readonly goal: string;
   /**
    * Owner 2026-10-29: a research brief written from their whole situation
-   * already holds their organisation, mandate and pipeline; only the
-   * history of a relationship in focus is read here then.
+   * already holds their pipeline; it is not read again here then. Their
+   * organisation and the mandate in force are read whatever the brief
+   * says (live 2026-10-29: an IC memo's brief left the mandate out, and
+   * the memo judged fit against none).
    */
   readonly briefed?: boolean | undefined;
 };
@@ -97,9 +99,11 @@ export function createOwnContextReader(dependencies: {
   ): Promise<string | null> => {
     const lines: string[] = [];
     const briefed = focus?.briefed === true;
-    const investorId = briefed
-      ? null
-      : await dependencies.ownInvestorOrganisation(actor).catch(() => null);
+    // The declared mandate in force is code's to hand the writer, never a
+    // model's selection to make (a brief is one).
+    const investorId = await dependencies
+      .ownInvestorOrganisation(actor)
+      .catch(() => null);
     if (investorId !== null) {
       const read = (record: "INVESTOR_ORGANISATION" | "INVESTOR_MANDATES") =>
         dependencies.records
