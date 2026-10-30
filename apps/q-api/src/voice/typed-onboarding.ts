@@ -1,9 +1,6 @@
-import { randomUUID } from "node:crypto";
-
 import {
   getOnboardingSession,
   listOnboardingInterviewTurns,
-  submitOnboardingResponse,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -46,6 +43,7 @@ import {
   createOnboardingPort,
   type RecommendationStore,
 } from "./onboarding-port.js";
+import { writeSession } from "./session-writes.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 
 /**
@@ -186,22 +184,22 @@ export function createTypedOnboarding(dependencies: {
           finishing: portOf(true),
           state: () => portOf(false).state(),
           confirmOne: async () => {
-            const view = await getOnboardingSession(
-              input.session,
-              input.onboardingSessionId,
-            );
-            await submitOnboardingResponse(
-              input.session,
-              input.onboardingSessionId,
+            await writeSession(
               {
-                stepKey: tapped,
-                response: {
-                  value: { type: "CONFIRMATION", confirmed: true },
-                  channel: "CONVERSATION",
-                },
-                expectedSessionVersion: view.session.version,
+                session: input.session,
+                onboardingSessionId: input.onboardingSessionId,
+                logger,
               },
-              randomUUID(),
+              {
+                kind: "SUBMIT",
+                request: {
+                  stepKey: tapped,
+                  response: {
+                    value: { type: "CONFIRMATION", confirmed: true },
+                    channel: "CONVERSATION",
+                  },
+                },
+              },
             );
           },
           labelOf,

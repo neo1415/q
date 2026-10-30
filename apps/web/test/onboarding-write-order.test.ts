@@ -111,4 +111,44 @@ describe("one session's writes are sequenced", () => {
     ]);
     expect(sent[1]?.version).toBe((sent[0]?.version ?? 0) + 1);
   });
+
+  it("an upload's answer that lands after another document merges with the step's list on the server", async () => {
+    const { client, reader, storage } = twoWriters();
+    const submitValue = client.submitValue;
+    if (submitValue === undefined) throw new Error("no submitValue");
+    // The journey up to the documents step, then the browser's cached view.
+    await submitValue(READER_SAVE);
+    await submitValue(UPLOAD_ANSWER);
+    await client.getSession();
+    const DOC_A = "d0000000-0000-4000-8000-00000000000a";
+    const DOC_B = "d0000000-0000-4000-8000-00000000000b";
+    const view = await reader.current();
+    if (view === null) throw new Error("no session");
+    const docs = (ids: string[]) =>
+      ({
+        type: "RESOURCE_REFERENCE",
+        resourceType: "EVIDENCE_DOCUMENT",
+        resourceIds: ids,
+      }) as const;
+    // Document A lands from elsewhere at the same moment the browser
+    // answers with document B, built from its cached (empty) list.
+    await Promise.all([
+      reader.submit({
+        sessionId: view.session.id,
+        stepKey: "F2.materials",
+        value: docs([DOC_A]),
+        expectedSessionVersion: view.session.version,
+        idempotencyKey: crypto.randomUUID(),
+      }),
+      submitValue({
+        stepKey: "F2.materials",
+        value: docs([DOC_B]),
+        adds: { max: 6 },
+      }),
+    ]);
+    const stored = JSON.parse(storage.getItem(FIXTURE_STORAGE_KEY) ?? "{}") as {
+      responses: Record<string, unknown>;
+    };
+    expect(stored.responses["F2.materials"]).toEqual(docs([DOC_A, DOC_B]));
+  });
 });

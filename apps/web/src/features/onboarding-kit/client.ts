@@ -73,6 +73,12 @@ export type OnboardingClient<TView, TResponse> = {
     | ((input: {
         readonly stepKey: string;
         readonly value: OnboardingResponseValue;
+        /**
+         * A list of references this adds to (an upload): on whatever version
+         * it lands on, merged with what the step holds there, keeping at most
+         * `max` (the newest).
+         */
+        readonly adds?: { readonly max: number } | undefined;
       }) => Promise<TView>)
     | undefined;
   readonly say?:

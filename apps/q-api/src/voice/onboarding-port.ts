@@ -1,17 +1,9 @@
-import { randomUUID } from "node:crypto";
-
 import {
-  completeOnboardingSession,
   findTaxonomyCandidates,
-  skipOnboardingStep,
   getOnboardingSession,
   getTaxonomyNode,
-  resolveOnboardingSuggestion,
   listInvestorMandates,
   listTaxonomyNodes,
-  submitOnboardingResponse,
-  submitOnboardingResponses,
-  withdrawOnboardingResponse,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
@@ -89,6 +81,11 @@ import {
   REVIEW_NOT_SHOWN_REASON,
   STILL_SAVING_FINISH_REASON,
 } from "./onboarding-flow.js";
+import {
+  writeSession,
+  type SessionWrite,
+  type SessionWriteContext,
+} from "./session-writes.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 import {
   heardBack,
@@ -549,22 +546,26 @@ export async function settleMandateStep(
     });
     const mandateId = preselectedMandate(page.items);
     if (mandateId === null) return view;
-    return await submitOnboardingResponse(
-      session,
-      onboardingSessionId,
+    return await writeSession(
       {
-        stepKey: INVESTOR_STEPS.mandateContext,
-        response: {
-          value: {
-            type: "RESOURCE_REFERENCE",
-            resourceType: "INVESTOR_MANDATE",
-            resourceIds: [mandateId],
-          },
-          channel: "CONVERSATION",
-        },
-        expectedSessionVersion: view.session.version,
+        session,
+        onboardingSessionId,
+        version: () => Promise.resolve(view.session.version),
       },
-      randomUUID(),
+      {
+        kind: "SUBMIT",
+        request: {
+          stepKey: INVESTOR_STEPS.mandateContext,
+          response: {
+            value: {
+              type: "RESOURCE_REFERENCE",
+              resourceType: "INVESTOR_MANDATE",
+              resourceIds: [mandateId],
+            },
+            channel: "CONVERSATION",
+          },
+        },
+      },
     );
   } catch {
     return view;
@@ -630,44 +631,6 @@ export function settleFamilies(
     const by = coveredBy.get(row.stepKey);
     return by === undefined ? row : { ...row, coveredBy: by };
   });
-}
-
-/** How many times a write is made again after a version conflict. */
-const FRESH_VERSION_ATTEMPTS = 3;
-
-function isVersionConflict(error: unknown): boolean {
-  const failed = error as {
-    readonly status?: unknown;
-    readonly code?: unknown;
-  };
-  return failed.status === 409 && failed.code === "VERSION_CONFLICT";
-}
-
-/** Each onboarding session's writes from this process, chained in order. */
-const sessionWrites = new Map<string, Promise<unknown>>();
-
-/**
- * Runs `work` after every write to the same onboarding session made before
- * it in this process, so one turn's saves (Q's reading, a confirmation,
- * a replayed held write) never race each other on the session version.
- */
-export function inSessionOrder<T>(
-  onboardingSessionId: string,
-  work: () => Promise<T>,
-): Promise<T> {
-  const before = sessionWrites.get(onboardingSessionId) ?? Promise.resolve();
-  const next = before.then(work, work);
-  const tail = next.then(
-    () => undefined,
-    () => undefined,
-  );
-  sessionWrites.set(onboardingSessionId, tail);
-  void tail.then(() => {
-    if (sessionWrites.get(onboardingSessionId) === tail) {
-      sessionWrites.delete(onboardingSessionId);
-    }
-  });
-  return next;
 }
 
 export function createOnboardingPort(input: {
@@ -943,22 +906,22 @@ export function createOnboardingPort(input: {
     const suggested = step.context?.["suggestedMandateId"];
     if (typeof suggested !== "string" || suggested.length === 0) return view;
     try {
-      return await submitOnboardingResponse(
-        input.session,
-        input.onboardingSessionId,
+      return await sessionWrite(
         {
-          stepKey: step.stepKey,
-          response: {
-            value: {
-              type: "RESOURCE_REFERENCE",
-              resourceType,
-              resourceIds: [suggested],
+          kind: "SUBMIT",
+          request: {
+            stepKey: step.stepKey,
+            response: {
+              value: {
+                type: "RESOURCE_REFERENCE",
+                resourceType,
+                resourceIds: [suggested],
+              },
+              channel: "CONVERSATION",
             },
-            channel: "CONVERSATION",
           },
-          expectedSessionVersion: view.session.version,
         },
-        randomUUID(),
+        { version: () => Promise.resolve(view.session.version) },
       );
     } catch (caught: unknown) {
       reported("mandate preselection", undefined)(caught);
@@ -1315,34 +1278,27 @@ export function createOnboardingPort(input: {
    * against the fresh version at once, never held as a "temporary fault"
    * (live 2026-10-16: "monthly revenue 180k AED" held three times).
    */
-  const onFreshVersion = <T>(
-    attempt: (version: number) => Promise<T>,
-  ): Promise<T> =>
-    // One write to this session at a time from this process, in order
-    // (live recheck 2026-10-30: two saves for one turn raced on one
-    // version and the later one was lost to a conflict), and a conflict
-    // with a write from elsewhere (the browser, another tab) is made again
-    // on the fresh version, a bounded number of times.
-    inSessionOrder(input.onboardingSessionId, async () => {
-      let view = await current();
-      for (let tries = 0; ; tries += 1) {
-        try {
-          return await attempt(view.session.version);
-        } catch (error: unknown) {
-          if (!isVersionConflict(error) || tries >= FRESH_VERSION_ATTEMPTS) {
-            throw error;
-          }
-          input.logger?.info(
-            {
-              onboardingSessionId: input.onboardingSessionId,
-              attempt: tries + 1,
-            },
-            "onboarding write made again on the session's fresh version",
-          );
-          view = await fresh();
-        }
-      }
-    });
+  /**
+   * Every write of this port's goes through the one per-session chain
+   * (session-writes.ts): in order with this process's other writes to the
+   * session, made again on the fresh version after a conflict.
+   */
+  const sessionWrite = <W extends SessionWrite>(
+    write: W,
+    options: Pick<SessionWriteContext, "version" | "idempotencyKey"> = {},
+  ) =>
+    writeSession(
+      {
+        session: input.session,
+        onboardingSessionId: input.onboardingSessionId,
+        version:
+          options.version ?? (async () => (await current()).session.version),
+        fresh: async () => (await fresh()).session.version,
+        idempotencyKey: options.idempotencyKey,
+        logger: input.logger,
+      },
+      write,
+    );
 
   const submit = async (
     stepKey: string,
@@ -1352,23 +1308,18 @@ export function createOnboardingPort(input: {
     trusted = false;
     readAt = null;
     latest = await settle(
-      await onFreshVersion((version) =>
-        submitOnboardingResponse(
-          input.session,
-          input.onboardingSessionId,
-          {
-            stepKey,
-            response: {
-              value,
-              ...(note === undefined ? {} : { note }),
-              // Given in the conversation with Q, not the form (lane ob1).
-              channel: "CONVERSATION",
-            },
-            expectedSessionVersion: version,
+      await sessionWrite({
+        kind: "SUBMIT",
+        request: {
+          stepKey,
+          response: {
+            value,
+            ...(note === undefined ? {} : { note }),
+            // Given in the conversation with Q, not the form (lane ob1).
+            channel: "CONVERSATION",
           },
-          randomUUID(),
-        ),
-      ),
+        },
+      }),
     );
     trusted = true;
   };
@@ -1943,17 +1894,10 @@ export function createOnboardingPort(input: {
   };
 
   const withdraw = async (stepKey: string): Promise<void> => {
-    const view = await current();
     trusted = false;
     readAt = null;
     latest = await settle(
-      await withdrawOnboardingResponse(
-        input.session,
-        input.onboardingSessionId,
-        stepKey,
-        { expectedSessionVersion: view.session.version },
-        randomUUID(),
-      ),
+      await sessionWrite({ kind: "WITHDRAW", stepKey, request: {} }),
     );
   };
 
@@ -2574,10 +2518,10 @@ export function createOnboardingPort(input: {
         if (view.progress.canComplete) {
           trusted = false;
           readAt = null;
-          latest = await completeOnboardingSession(
-            input.session,
-            input.onboardingSessionId,
-            { expectedSessionVersion: view.session.version },
+          const before = view;
+          latest = await sessionWrite(
+            { kind: "COMPLETE", request: {} },
+            { version: () => Promise.resolve(before.session.version) },
           );
           view = latest;
         }
@@ -3026,24 +2970,19 @@ export function createOnboardingPort(input: {
           readonly note?: string | undefined;
         };
         const submitBatch = (items: readonly BatchItem[]) =>
-          onFreshVersion((version) =>
-            submitOnboardingResponses(
-              input.session,
-              input.onboardingSessionId,
-              {
-                responses: items.map((item) => ({
-                  stepKey: item.stepKey,
-                  response: {
-                    value: item.value,
-                    ...(item.note === undefined ? {} : { note: item.note }),
-                    channel: "CONVERSATION" as const,
-                  },
-                })),
-                expectedSessionVersion: version,
-              },
-              randomUUID(),
-            ),
-          );
+          sessionWrite({
+            kind: "SUBMIT_MANY",
+            request: {
+              responses: items.map((item) => ({
+                stepKey: item.stepKey,
+                response: {
+                  value: item.value,
+                  ...(item.note === undefined ? {} : { note: item.note }),
+                  channel: "CONVERSATION" as const,
+                },
+              })),
+            },
+          });
         const asItem = (item: (typeof ready)[number]): BatchItem => ({
           stepKey: item.plan.step.stepKey,
           value: item.value,
@@ -3380,19 +3319,13 @@ export function createOnboardingPort(input: {
         trusted = false;
         readAt = null;
         latest = await settle(
-          await onFreshVersion((version) =>
-            submitOnboardingResponse(
-              input.session,
-              input.onboardingSessionId,
-              {
-                stepKey: write.stepKey,
-                response,
-                expectedSessionVersion: version,
-              },
+          await sessionWrite(
+            { kind: "SUBMIT", request: { stepKey: write.stepKey, response } },
+            {
               // Derived from the held row and the version it targets: a
               // retried replay of the same version replays, not repeats.
-              pendingReplayKey(write.id, version),
-            ),
+              idempotencyKey: (version) => pendingReplayKey(write.id, version),
+            },
           ),
         );
         written.push(write.stepKey);
@@ -3649,20 +3582,14 @@ export function createOnboardingPort(input: {
           continue;
         }
         try {
-          const view = await current();
           trusted = false;
           readAt = null;
           latest = await settle(
-            await resolveOnboardingSuggestion(
-              input.session,
-              input.onboardingSessionId,
-              held.id,
-              {
-                resolution: "ACCEPT",
-                expectedSessionVersion: view.session.version,
-              },
-              randomUUID(),
-            ),
+            await sessionWrite({
+              kind: "RESOLVE",
+              suggestionId: held.id,
+              request: { resolution: "ACCEPT" },
+            }),
           );
           written.push(stepKey);
           results.push({
@@ -3838,13 +3765,11 @@ export function createOnboardingPort(input: {
           } else {
             trusted = false;
             readAt = null;
+            const before = view;
             latest = await settle(
-              await skipOnboardingStep(
-                input.session,
-                input.onboardingSessionId,
-                step.stepKey,
-                { expectedSessionVersion: view.session.version },
-                randomUUID(),
+              await sessionWrite(
+                { kind: "SKIP", stepKey: step.stepKey, request: {} },
+                { version: () => Promise.resolve(before.session.version) },
               ),
             );
           }
@@ -3940,13 +3865,11 @@ export function createOnboardingPort(input: {
         try {
           trusted = false;
           readAt = null;
+          const before = view;
           latest = await settle(
-            await skipOnboardingStep(
-              input.session,
-              input.onboardingSessionId,
-              waitingStep.stepKey,
-              { expectedSessionVersion: view.session.version },
-              randomUUID(),
+            await sessionWrite(
+              { kind: "SKIP", stepKey: waitingStep.stepKey, request: {} },
+              { version: () => Promise.resolve(before.session.version) },
             ),
           );
           view = latest;
@@ -4023,10 +3946,10 @@ export function createOnboardingPort(input: {
       try {
         trusted = false;
         readAt = null;
-        latest = await completeOnboardingSession(
-          input.session,
-          input.onboardingSessionId,
-          { expectedSessionVersion: view.session.version },
+        const before = view;
+        latest = await sessionWrite(
+          { kind: "COMPLETE", request: {} },
+          { version: () => Promise.resolve(before.session.version) },
         );
         return { completed: true, missing: [] };
       } catch (error: unknown) {

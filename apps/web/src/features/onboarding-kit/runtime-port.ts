@@ -217,6 +217,31 @@ export function sameValue(
   return a !== undefined && JSON.stringify(a) === JSON.stringify(b);
 }
 
+/**
+ * A reference list added to a step, merged with what the step holds on
+ * `view` (live recheck 2026-10-30: a rebased upload answer reused the
+ * browser's cached list and could drop a document that landed meanwhile).
+ * Held ids first, then the new ones; the newest `max` are kept.
+ */
+export function mergedOnto(
+  view: Pick<OnboardingSessionView, "responses">,
+  stepKey: string,
+  value: OnboardingResponseValue,
+  max: number,
+): OnboardingResponseValue {
+  if (value.type !== "RESOURCE_REFERENCE") return value;
+  const held = view.responses.find((r) => r.stepKey === stepKey)?.value;
+  const before =
+    held?.type === "RESOURCE_REFERENCE" &&
+    held.resourceType === value.resourceType
+      ? held.resourceIds
+      : [];
+  return {
+    ...value,
+    resourceIds: [...new Set([...before, ...value.resourceIds])].slice(-max),
+  };
+}
+
 /** How many times one step's answer is made again after a conflict. */
 const REBASE_ATTEMPTS = 2;
 
@@ -534,6 +559,7 @@ export function createRuntimeClient<
     submitValue: (input: {
       readonly stepKey: string;
       readonly value: OnboardingResponseValue;
+      readonly adds?: { readonly max: number } | undefined;
     }) =>
       guarded(async () =>
         present(
@@ -542,7 +568,17 @@ export function createRuntimeClient<
               port.submit({
                 sessionId: view.session.id,
                 stepKey: input.stepKey,
-                value: input.value,
+                // An addition is merged with what the step holds on the
+                // version it lands on, never with the browser's cached list.
+                value:
+                  input.adds === undefined
+                    ? input.value
+                    : mergedOnto(
+                        view,
+                        input.stepKey,
+                        input.value,
+                        input.adds.max,
+                      ),
                 expectedSessionVersion: view.session.version,
                 idempotencyKey: crypto.randomUUID(),
                 // A tapped option in the conversation with Q.

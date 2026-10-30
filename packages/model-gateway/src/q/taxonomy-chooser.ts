@@ -137,14 +137,20 @@ export function createTaxonomyChooser(dependencies: {
         return nodeId === undefined ? [] : [nodeId];
       });
       // What was read is on the record (live recheck 2026-10-30: "Benelux"
-      // came back with nothing usable and left no trace). Counts only;
-      // never their words.
+      // came back with nothing usable and left no trace). The ids the model
+      // named, exactly as it gave them, and the offered ids they matched;
+      // never the person's words or a category's name.
       dependencies.logger?.info(
         {
           task: "TAXONOMY_CHOICE",
           offered: candidates.length,
           named: said.length,
           kept: chosen.length,
+          namedIds: said.slice(0, 16).map((id) => id.slice(0, 64)),
+          keptIds: said
+            .map((id) => id.trim().toLowerCase())
+            .filter((id) => byId.has(id))
+            .slice(0, 16),
         },
         chosen.length < said.length
           ? "category reading named ids that were not offered"

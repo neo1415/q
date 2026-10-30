@@ -171,4 +171,38 @@ describe("readers never see a real id or key", () => {
     expect(seen[0]).not.toMatch(/\bco_invest\b|\bfollow \|/u);
     expect(seen[0]).toContain("c3 | Follow in later rounds");
   });
+
+  it("logs the raw ids the model named and which matched, never their words", async () => {
+    const lines: { obj: Record<string, unknown>; msg: string }[] = [];
+    const spy = {
+      info: (obj: Record<string, unknown>, msg: string) => {
+        lines.push({ obj, msg });
+      },
+      warn: () => undefined,
+    } as unknown as typeof logger;
+    const { gateway } = recording({
+      chosen: ["20dc8cd8-bb51-517f-8fe0-1f6264e51a3c", "c3"],
+    });
+    const choose = createTaxonomyChooser({ gateway, logger: spy });
+    await choose({
+      who: { tenantId: "c0000000-0000-4000-8000-000000000001", userId: null },
+      field: "Where do you invest?",
+      phrase: "Benelux",
+      sentence: "Benelux and the Nordics",
+      candidates: GEOGRAPHY.map(([nodeId, displayName]) => ({
+        nodeId,
+        displayName,
+        vocabularyCode: "geography",
+      })),
+    });
+    const [line] = lines;
+    expect(line?.obj).toMatchObject({
+      offered: 4,
+      named: 2,
+      kept: 1,
+      namedIds: ["20dc8cd8-bb51-517f-8fe0-1f6264e51a3c", "c3"],
+      keptIds: ["c3"],
+    });
+    expect(JSON.stringify(lines)).not.toMatch(/Benelux|Nordics|Netherlands/u);
+  });
 });

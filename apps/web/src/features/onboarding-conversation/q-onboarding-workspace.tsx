@@ -106,6 +106,7 @@ import {
   publicFindingsNote,
   uploadFindingsNote,
   uploadAnswer,
+  UPLOAD_STEP_MAX,
   publicSourceOf,
   progressLines,
   promptFor,
@@ -187,6 +188,12 @@ export type QOnboardingWorkspaceActions = {
   readonly submitValue: (input: {
     readonly stepKey: string;
     readonly value: OnboardingResponseValue;
+    /**
+     * A list of references this adds to (an upload): on whatever version
+     * it lands on, merged with what the step holds there, keeping at most
+     * `max` (the newest).
+     */
+    readonly adds?: { readonly max: number } | undefined;
   }) => Promise<boolean>;
   readonly resolveSuggestion: (input: {
     readonly suggestionId: string;
@@ -1872,7 +1879,8 @@ export function QOnboardingWorkspace({
       );
       if (answered !== null) {
         const noted = await actions
-          .submitValue(answered)
+          // Merged with the step's documents on the version it lands on.
+          .submitValue({ ...answered, adds: { max: UPLOAD_STEP_MAX } })
           .catch((error: unknown) => {
             console.warn("[onboarding] upload answer failed", {
               stepKey: answered.stepKey,
