@@ -102,7 +102,9 @@ describe("a cut-off plan is never a 0-step plan", () => {
   });
 
   it("the ceiling fits a whole plan, with money for a third attempt at it", () => {
-    expect(PLAN_BUDGET.maxOutputTokens).toBeGreaterThanOrEqual(6_000);
+    // 1.7 times the largest plan production wrote in 7 days (2,322 tokens,
+    // 2026-10-30); a cut-off retry gets twice it from the gateway.
+    expect(PLAN_BUDGET.maxOutputTokens).toBeGreaterThanOrEqual(4_000);
     expect(PLAN_BUDGET.maxAttempts).toBe(3);
     const g = scripted([{ steps: [step] }]);
     const models = createWorkforceModels({ gateway: g.gateway });

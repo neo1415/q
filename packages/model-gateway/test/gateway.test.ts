@@ -725,7 +725,7 @@ describe("structured output", () => {
     });
   });
 
-  it("treats an answer cut off at the ceiling as room, not competence, and gives the next attempt the model's own maximum", async () => {
+  it("treats an answer cut off at the ceiling as room, not competence, and gives the next attempt twice the room", async () => {
     // Seen in production: a long answer stopped at exactly maxOutputTokens,
     // so the JSON never closed, the parse failed, and every later attempt
     // repeated it at the same ceiling until the budget ran out and the
@@ -749,10 +749,11 @@ describe("structured output", () => {
       value: { category: "investment_software", confidence: "high" },
     });
     expect(beta.calls).toHaveLength(2);
-    // The first asks for the task's usual allowance; the second asks
-    // beta-cheap for everything it will write.
+    // The first asks for the task's usual allowance; the second for twice
+    // it (2026-10-30: the model's whole maximum at the same timeout ran a
+    // research plan into its 45 s timeout, at a cost nothing estimated).
     expect(beta.calls[0]?.request.maxOutputTokens).toBe(256);
-    expect(beta.calls[1]?.request.maxOutputTokens).toBe(1_024);
+    expect(beta.calls[1]?.request.maxOutputTokens).toBe(512);
   });
 
   it("classifies invalid JSON and schema mismatches as INVALID_MODEL_OUTPUT, retries once, then falls back", async () => {

@@ -34,7 +34,11 @@ import {
   type ProviderHealthPort,
   type TenantModelPolicyPort,
 } from "./ports.js";
-import { estimateInputTokens, priceUsage } from "./policy/cost.js";
+import {
+  estimateAttemptCost,
+  estimateInputTokens,
+  priceUsage,
+} from "./policy/cost.js";
 import type { SyntheticDemoRoutingAllowance } from "./policy/synthetic-demo.js";
 import {
   planRoute,
@@ -354,9 +358,9 @@ export function createModelGateway(
     attemptNumber: number,
     schema: z.ZodType<T> | undefined,
     callerSignal: AbortSignal,
-    // Set after an attempt ran out of room: ask this model for everything
-    // it will give rather than for the task's usual allowance.
-    reachForModelMaximum: boolean,
+    // Set after an attempt ran out of room: the output tokens this attempt
+    // may write instead of the task's usual allowance (retryRoomAfterCutOff).
+    raisedRoom: number | null,
     /** Where text goes as it is written, when the caller wants it. */
     onTextDelta: ((text: string) => void) | undefined,
     /** Set by this attempt the first time it emits; read by the caller. */
@@ -384,12 +388,13 @@ export function createModelGateway(
         const startedAt = Date.now();
         const timeoutSignal = AbortSignal.timeout(timeoutMs);
         const signal = AbortSignal.any([callerSignal, timeoutSignal]);
-        const outputTokens = reachForModelMaximum
-          ? candidate.model.maxOutputTokens
-          : Math.min(
-              request.budget.maxOutputTokens,
-              candidate.model.maxOutputTokens,
-            );
+        const outputTokens =
+          raisedRoom !== null
+            ? Math.min(raisedRoom, candidate.model.maxOutputTokens)
+            : Math.min(
+                request.budget.maxOutputTokens,
+                candidate.model.maxOutputTokens,
+              );
         let outcome: AttemptOutcome<T>;
         let usage: ModelUsage | undefined;
         let cost: ModelCost | undefined;
@@ -991,12 +996,18 @@ export function createModelGateway(
         // The first model is held to the caller's shorter patience only
         // when there is somewhere else to go. A last resort gets the whole
         // attempt budget.
+        // After a cut-off, this attempt's room and the time to write it.
+        const raised = room.ranOut
+          ? retryRoomAfterCutOff(request.budget, candidate, spentUsd)
+          : null;
         const timeoutMs =
-          attemptNumber === 0 &&
-          anotherCandidateWaits &&
-          firstAttemptTimeoutMs !== undefined
-            ? Math.min(firstAttemptTimeoutMs, request.budget.attemptTimeoutMs)
-            : request.budget.attemptTimeoutMs;
+          raised !== null
+            ? raised.timeoutMs
+            : attemptNumber === 0 &&
+                anotherCandidateWaits &&
+                firstAttemptTimeoutMs !== undefined
+              ? Math.min(firstAttemptTimeoutMs, request.budget.attemptTimeoutMs)
+              : request.budget.attemptTimeoutMs;
         attemptNumber += 1;
         attemptsOnCandidate += 1;
         const spoke = { spoke: false };
@@ -1015,7 +1026,7 @@ export function createModelGateway(
             number,
             schema,
             signal,
-            room.ranOut,
+            raised?.outputTokens ?? null,
             onTextDelta,
             spoke,
             ms,
@@ -1286,6 +1297,54 @@ type Attempted<T> = AttemptOutcome<T> & {
  * Only for requests that stream nothing (the caller checks): two models
  * must never both be heard.
  */
+/**
+ * How much more room an attempt gets after an earlier one was cut off at
+ * the ceiling, and how long it may take to write it.
+ *
+ * It used to be the model's own maximum, at the task's usual timeout.
+ * Production 2026-10-29: a research plan cut off at 1,600 tokens was asked
+ * again at the maximum and ran 45 s to its timeout; a job plan running away
+ * to its 6,000-token ceiling would have been asked for many times that,
+ * with no estimate of what it cost. Now it is twice the task's allowance
+ * (within the model's maximum and what the request's money cap still pays
+ * for, never less than the allowance itself), with twice the time.
+ */
+export const CUT_OFF_ROOM_FACTOR = 2;
+
+export function retryRoomAfterCutOff(
+  budget: ModelGatewayRequest["budget"],
+  candidate: EligibleCandidate,
+  spentUsd: number,
+): { readonly outputTokens: number; readonly timeoutMs: number } {
+  const allowance = Math.min(
+    budget.maxOutputTokens,
+    candidate.model.maxOutputTokens,
+  );
+  const wanted = Math.min(
+    budget.maxOutputTokens * CUT_OFF_ROOM_FACTOR,
+    candidate.model.maxOutputTokens,
+  );
+  const cost = (tokens: number) =>
+    estimateAttemptCost(candidate.estimatedInputTokens, tokens, candidate.price)
+      .amount;
+  const left = budget.maxEstimatedCostUsd - spentUsd;
+  let outputTokens = wanted;
+  if (candidate.price !== null && cost(wanted) > left) {
+    const perToken = (cost(allowance) - cost(0)) / Math.max(1, allowance);
+    const affordable =
+      perToken > 0
+        ? Math.floor((left - cost(0)) / perToken)
+        : Number.POSITIVE_INFINITY;
+    outputTokens = Math.max(allowance, Math.min(wanted, affordable));
+  }
+  return {
+    outputTokens,
+    timeoutMs: Math.round(
+      budget.attemptTimeoutMs * (outputTokens / Math.max(1, allowance)),
+    ),
+  };
+}
+
 async function hedged<T>(input: {
   readonly first: (signal: AbortSignal) => Promise<Attempted<T>>;
   readonly second: (signal: AbortSignal) => Promise<Attempted<T>>;

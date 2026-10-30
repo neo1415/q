@@ -231,7 +231,13 @@ export const PLAN_BUDGET = {
   // beside telling them Q failed.
   maxAttempts: 3,
   maxEstimatedCostUsd: 0.25,
-  maxOutputTokens: 6_000,
+  // Production 7 days to 2026-10-30 (ai_ops.model_usage): successful job
+  // plans wrote p99 1,672 and at most 2,322 output tokens. The two that
+  // stopped at the 6,000 ceiling were runaways (44.9 s; the next attempt
+  // planned the same job in 500 tokens), not plans that needed the room.
+  // 4,000 is 1.7 times the largest real plan; a cut-off is asked again
+  // with twice that (gateway retryRoomAfterCutOff), about a cent at most.
+  maxOutputTokens: 4_000,
   attemptTimeoutMs: 60_000,
 } as const;
 const PLAN = PLAN_BUDGET;
