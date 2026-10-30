@@ -85,12 +85,28 @@ async function labelsFor(
   const vocabularies = [
     ...new Set(mandate.taxonomyPreferences.map((p) => p.vocabularyCode)),
   ];
+  // Every page (live recheck 2026-10-30: the geography list holds every
+  // country, 270 entries; one page of 100 left most of them unnamed).
   const pages = await Promise.all(
-    vocabularies.map((vocabulary) =>
-      listTaxonomyNodes(session, vocabulary, { status: "ACTIVE", limit: 100 })
-        .then((page) => page.items)
-        .catch(() => []),
-    ),
+    vocabularies.map(async (vocabulary) => {
+      const items: { readonly id: string; readonly displayName: string }[] = [];
+      let cursor: string | undefined;
+      try {
+        for (let page = 0; page < 6; page += 1) {
+          const result = await listTaxonomyNodes(session, vocabulary, {
+            status: "ACTIVE",
+            limit: 100,
+            ...(cursor === undefined ? {} : { cursor }),
+          });
+          items.push(...result.items);
+          cursor = result.nextCursor;
+          if (cursor === undefined) break;
+        }
+      } catch {
+        // What was read is kept; an unread name shows as unnamed.
+      }
+      return items;
+    }),
   );
   return new Map(pages.flat().map((node) => [node.id, node.displayName]));
 }

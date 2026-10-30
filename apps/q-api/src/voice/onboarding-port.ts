@@ -170,8 +170,79 @@ export const ALSO_NAMED_NOTE = "Also named:";
  */
 export const READ_AS_NOTE = "Read as:";
 
-/** The most categories a field may have for its whole list to be offered. */
+/** The most categories one reading of a field's whole list is offered. */
 const WHOLE_VOCABULARY_MAX = 80;
+/**
+ * The most categories a field may have for its whole list to be read, in
+ * parts of at most WHOLE_VOCABULARY_MAX (live recheck 2026-10-30: the
+ * geography list grew to every country, 270 entries).
+ */
+const WHOLE_LIST_NODES_MAX = 400;
+/** The most parts one whole list is read in (one bounded reading each). */
+const WHOLE_LIST_PARTS_MAX = 5;
+
+/** A category as the reader is offered it. */
+export type WholeListCandidate = {
+  readonly nodeId: string;
+  readonly displayName: string;
+  readonly vocabularyCode: string;
+};
+
+/**
+ * A field's whole list in parts the reader is offered one at a time, each
+ * holding whole branches of the hierarchy (a region with every country in
+ * it), so words naming a group the list lacks ("Benelux") are read against
+ * a part that holds all of the group's members. A list that fits one part
+ * is one part, as before. Null: a branch alone is larger than one part, or
+ * the list needs more parts than allowed (it is not offered).
+ */
+export function wholeListParts(
+  nodes: readonly (WholeListCandidate & {
+    readonly parentNodeId: string | null;
+  })[],
+  max: number = WHOLE_VOCABULARY_MAX,
+  partsMax: number = WHOLE_LIST_PARTS_MAX,
+): readonly (readonly WholeListCandidate[])[] | null {
+  const plain = (node: WholeListCandidate): WholeListCandidate => ({
+    nodeId: node.nodeId,
+    displayName: node.displayName,
+    vocabularyCode: node.vocabularyCode,
+  });
+  if (nodes.length === 0) return null;
+  if (nodes.length <= max) return [nodes.map(plain)];
+  const ids = new Set(nodes.map((node) => node.nodeId));
+  const children = new Map<string, (typeof nodes)[number][]>();
+  const roots: (typeof nodes)[number][] = [];
+  for (const node of nodes) {
+    // A node whose parent is not listed starts a branch of its own.
+    if (node.parentNodeId === null || !ids.has(node.parentNodeId)) {
+      roots.push(node);
+      continue;
+    }
+    const list = children.get(node.parentNodeId) ?? [];
+    list.push(node);
+    children.set(node.parentNodeId, list);
+  }
+  const branchOf = (root: (typeof nodes)[number]): WholeListCandidate[] => {
+    const out: WholeListCandidate[] = [];
+    const visit = (node: (typeof nodes)[number]) => {
+      out.push(plain(node));
+      for (const child of children.get(node.nodeId) ?? []) visit(child);
+    };
+    visit(root);
+    return out;
+  };
+  const branches = roots.map(branchOf);
+  if (branches.some((branch) => branch.length > max)) return null;
+  // Largest branches first, each into the first part with room for it.
+  const parts: WholeListCandidate[][] = [];
+  for (const branch of [...branches].sort((a, b) => b.length - a.length)) {
+    const part = parts.find((p) => p.length + branch.length <= max);
+    if (part === undefined) parts.push([...branch]);
+    else part.push(...branch);
+  }
+  return parts.length > partsMax ? null : parts;
+}
 
 /** The note kept beside the first-named option, saying what to ask. */
 export function alsoNamedNote(labels: readonly string[]): string {
@@ -946,46 +1017,43 @@ export function createOnboardingPort(input: {
   /** Category names the classifier gave this turn, by node id. */
   const nodeNames = new Map<string, string>();
   /**
-   * A small field's whole category list (geography), by vocabulary codes,
-   * for words the lookup found nothing for; null when it is too large to
-   * offer (sectors), or could not be read.
+   * A field's whole category list (geography), by vocabulary codes, for
+   * words the lookup found nothing for, in parts of whole branches (see
+   * wholeListParts); null when it is too large to offer, or could not be
+   * read.
    */
   const wholeLists = new Map<
     string,
-    Promise<
-      | readonly {
-          readonly nodeId: string;
-          readonly displayName: string;
-          readonly vocabularyCode: string;
-        }[]
-      | null
-    >
+    Promise<readonly (readonly WholeListCandidate[])[] | null>
   >();
   const wholeVocabulary = (codes: readonly string[]) => {
     const key = [...codes].sort().join(",");
     const cached = wholeLists.get(key);
     if (cached !== undefined) return cached;
     const loading = (async () => {
-      const nodes: {
-        readonly nodeId: string;
-        readonly displayName: string;
-        readonly vocabularyCode: string;
-      }[] = [];
+      const nodes: (WholeListCandidate & {
+        readonly parentNodeId: string | null;
+      })[] = [];
       for (const code of codes) {
-        const page = await listTaxonomyNodes(input.session, code, {
-          limit: 100,
-        });
-        if (page.nextCursor !== undefined) return null;
-        for (const node of page.items) {
-          nodes.push({
-            nodeId: node.id,
-            displayName: node.displayName,
-            vocabularyCode: node.vocabularyCode,
+        let cursor: string | undefined;
+        do {
+          const page = await listTaxonomyNodes(input.session, code, {
+            limit: 100,
+            ...(cursor === undefined ? {} : { cursor }),
           });
-        }
-        if (nodes.length > WHOLE_VOCABULARY_MAX) return null;
+          for (const node of page.items) {
+            nodes.push({
+              nodeId: node.id,
+              displayName: node.displayName,
+              vocabularyCode: node.vocabularyCode,
+              parentNodeId: node.parentNodeId,
+            });
+          }
+          if (nodes.length > WHOLE_LIST_NODES_MAX) return null;
+          cursor = page.nextCursor;
+        } while (cursor !== undefined);
       }
-      return nodes.length === 0 ? null : nodes;
+      return wholeListParts(nodes);
     })().catch(reported("category list read", null));
     wholeLists.set(key, loading);
     return loading;
@@ -1490,24 +1558,31 @@ export function createOnboardingPort(input: {
           // list is offered to the reader, which reads, by meaning, which
           // listed categories the words name (a region: its listed
           // members only). Nothing listed: kept in their words, as before.
-          const whole =
+          // A large list (every country) is read in parts of whole
+          // regions, side by side; what each part names is kept.
+          const parts =
             input.chooseCategories === undefined
               ? null
               : await wholeVocabulary(c.vocabularyCodes);
+          const choose = input.chooseCategories;
           const chosen =
-            whole === null || input.chooseCategories === undefined
+            parts === null || choose === undefined
               ? null
-              : await input
-                  .chooseCategories({
-                    field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(
-                      0,
-                      200,
+              : (
+                  await Promise.all(
+                    parts.map((part) =>
+                      choose({
+                        field: (
+                          SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt
+                        ).slice(0, 200),
+                        phrase,
+                        sentence: answer.quote ?? phrase,
+                        candidates: part,
+                      }).catch(reported("category reading (whole list)", null)),
                     ),
-                    phrase,
-                    sentence: answer.quote ?? phrase,
-                    candidates: whole,
-                  })
-                  .catch(reported("category reading (whole list)", null));
+                  )
+                ).flatMap((one) => one ?? []);
+          const whole = parts?.flat();
           const names: string[] = [];
           for (const id of chosen ?? []) {
             const node = whole?.find((candidate) => candidate.nodeId === id);
