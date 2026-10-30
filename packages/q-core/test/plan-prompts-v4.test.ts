@@ -70,9 +70,14 @@ describe("PLAN_WRITE v4 / PLAN_REVIEW v4 (plan job 37655270)", () => {
   it("the reviewer must name the step and the words that expose private material", () => {
     expect(PLAN_REVIEW_V4.template).toContain(REVIEW_FIREWALL_V4);
     expect(PLAN_REVIEW_V4.template).toContain('"the person"');
-    expect(PLAN_REVIEW_V4.output.schema).toBe(PlanReviewResultV2Schema);
-    expect(PLAN_REVIEW_V4.output.schemaVersion).toBe(2);
-    expect(PLAN_REVIEW_V3.output.schema).toBe(PlanReviewResultSchema);
+    expect(PLAN_REVIEW_V4.output).toMatchObject({
+      kind: "STRUCTURED",
+      schemaVersion: 2,
+      schema: PlanReviewResultV2Schema,
+    });
+    expect(PLAN_REVIEW_V3.output).toMatchObject({
+      schema: PlanReviewResultSchema,
+    });
     const named = {
       ...full(),
       firewall: {
