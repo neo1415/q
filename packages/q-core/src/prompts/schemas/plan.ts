@@ -301,6 +301,53 @@ export const PlanReviewResultV2Schema = PlanReviewResultSchema.extend({
 }).strict();
 export type PlanReviewResultV2 = z.infer<typeof PlanReviewResultV2Schema>;
 
+// --- review v3 (plan job 32e70db7, 2026-10-30) ------------------------------------
+
+/**
+ * Live 2026-10-30 (plan 08ce8485): both reviewers asked for an
+ * organisation-verification step and for the waiting company-profile
+ * update, each as a point on no step, in other words -- and code had
+ * nothing structural to see they were the same, so the person read both.
+ * Every defect now names the situation refs it concerns (`refs`; the facts
+ * a missing step must use, or the facts behind the problem). Code merges
+ * points on the same step, and points on no step that share a ref.
+ */
+export const PLAN_REVIEW_V3_SCHEMA_VERSION = 3;
+const refsField = z.array(PlanFactRefSchema).max(8);
+export const PlanReviewDefectV3Schema = PlanReviewDefectSchema.extend({
+  refs: refsField,
+}).strict();
+export const PlanFirewallDefectV3Schema = PlanFirewallDefectSchema.extend({
+  refs: refsField,
+}).strict();
+const rubricItemV3 = (max: number) =>
+  z
+    .object({
+      score: z.number().int().min(0).max(max),
+      defects: z.array(PlanReviewDefectV3Schema).max(8).default([]),
+    })
+    .strict();
+export const PlanReviewResultV3Schema = z
+  .object({
+    situationCoverage: rubricItemV3(PLAN_RUBRIC_V1.situationCoverage),
+    specificity: rubricItemV3(PLAN_RUBRIC_V1.specificity),
+    citesFacts: rubricItemV3(PLAN_RUBRIC_V1.citesFacts),
+    ownerClassification: rubricItemV3(PLAN_RUBRIC_V1.ownerClassification),
+    feasibility: rubricItemV3(PLAN_RUBRIC_V1.feasibility),
+    noInventedFacts: rubricItemV3(PLAN_RUBRIC_V1.noInventedFacts),
+    asksNothingKnown: rubricItemV3(PLAN_RUBRIC_V1.asksNothingKnown),
+    roleCorrectWording: rubricItemV3(PLAN_RUBRIC_V1.roleCorrectWording),
+    firewall: z
+      .object({
+        held: z.boolean(),
+        defects: z.array(PlanFirewallDefectV3Schema).max(8).default([]),
+      })
+      .strict(),
+    score: z.number().int().min(0).max(100),
+  })
+  .strict();
+export type PlanReviewResultV3 = z.infer<typeof PlanReviewResultV3Schema>;
+
 /**
  * The review's verdict with integrity held to what the reviewer named.
  * A firewall breach or an invented fact WITH a named defect is fatal,

@@ -206,7 +206,7 @@ describe("defect 2: PLAN_WRITE's output is accepted the way the model writes it"
   it("v2 prompts (and v3, v4, built on them) are reasoning work, not extraction", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("PLAN_WRITE").definition.version).toBe(4);
-    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(4);
+    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(5);
     expect(PLAN_WRITE_V2.taskClass).toBe("EVIDENCE_SYNTHESIS");
     expect(PLAN_REVIEW_V2.taskClass).toBe("EVIDENCE_SYNTHESIS");
     for (const limit of [
