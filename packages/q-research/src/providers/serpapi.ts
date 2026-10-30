@@ -9,6 +9,7 @@ import {
   type PublicWebSearchRequest,
   type PublicWebSearchResult,
 } from "../contracts.js";
+import { webText } from "./web-text.js";
 
 /**
  * SerpApi (serpapi.com) behind the PublicWebResearchProvider port: Google
@@ -139,11 +140,10 @@ export function createSerpApiResearchProvider(
           url: verdict.url,
           title:
             typeof result.title === "string" && result.title.length > 0
-              ? result.title.slice(0, 300)
+              ? webText(result.title).slice(0, 300)
               : null,
-          snippet: (typeof result.snippet === "string"
-            ? result.snippet
-            : ""
+          snippet: webText(
+            typeof result.snippet === "string" ? result.snippet : "",
           ).slice(0, RESEARCH_BOUNDS.maxSnippetChars),
           publishedAt:
             typeof result.date === "string" && result.date.length > 0

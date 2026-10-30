@@ -9,6 +9,7 @@ import {
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "../ports.js";
+import { webText } from "./web-text.js";
 
 /**
  * Serper.dev (google.serper.dev) behind the PublicWebResearchProvider
@@ -154,11 +155,10 @@ export function createSerperResearchProvider(
           url: verdict.url,
           title:
             typeof result.title === "string" && result.title.length > 0
-              ? result.title.slice(0, 300)
+              ? webText(result.title).slice(0, 300)
               : null,
-          snippet: (typeof result.snippet === "string"
-            ? result.snippet
-            : ""
+          snippet: webText(
+            typeof result.snippet === "string" ? result.snippet : "",
           ).slice(0, RESEARCH_BOUNDS.maxSnippetChars),
           publishedAt:
             typeof result.date === "string" && result.date.length > 0
@@ -207,7 +207,7 @@ export function createSerperResearchProvider(
                 url,
                 title:
                   typeof title === "string" && title.length > 0
-                    ? title.slice(0, 300)
+                    ? webText(title).slice(0, 300)
                     : null,
                 text: text.slice(0, 200_000),
               },

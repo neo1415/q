@@ -12,6 +12,7 @@ import {
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "../ports.js";
+import { webText } from "./web-text.js";
 
 /**
  * Tavily behind the PublicWebResearchProvider port (CQ-Q-RESEARCH-001 §5-§6).
@@ -216,9 +217,9 @@ export function createTavilyResearchProvider(
           url: verdict.url,
           title:
             typeof result.title === "string" && result.title.length > 0
-              ? result.title.slice(0, 300)
+              ? webText(result.title).slice(0, 300)
               : null,
-          snippet: (result.content ?? "").slice(
+          snippet: webText(result.content ?? "").slice(
             0,
             RESEARCH_BOUNDS.maxSnippetChars,
           ),
@@ -269,7 +270,7 @@ export function createTavilyResearchProvider(
           url: verdict.url,
           title:
             typeof result.title === "string" && result.title.length > 0
-              ? result.title.slice(0, 300)
+              ? webText(result.title).slice(0, 300)
               : null,
           text: (result.rawContent ?? "").slice(0, 200_000),
         });
