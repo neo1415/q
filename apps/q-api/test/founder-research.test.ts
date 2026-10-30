@@ -50,7 +50,8 @@ describe("founder research findings", () => {
     );
     expect(findings.map((f) => [f.stepKey, f.value])).toEqual([
       ["F1.description", "We run solar cold rooms for farmers in Lagos."],
-      ["F1.country", "ng"],
+      // Any country, offered by its canonical name (v8: its geography node).
+      ["F1.country", "Nigeria"],
       ["F1.stage", "seed"],
       ["F4.team_size", 14],
     ]);

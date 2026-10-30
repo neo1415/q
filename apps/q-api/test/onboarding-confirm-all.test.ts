@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
+import { founderCountryAnswer } from "@capital-q/founder-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
 import type { InvestorResearchReaderResult } from "@capital-q/q-core";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 
 import { validateFounderReading } from "../src/voice/founder-research.js";
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
@@ -169,11 +171,15 @@ const founderFindings = (pages: readonly ResearchPage[]) =>
     "Greenbox",
   );
 
+const NIGERIA = countryOfIso("NG")?.nodeId ?? "";
+
 async function founderSignUp() {
   const world = investorSession({
     journey: "founder",
     currentStepKey: "F1.website",
     recorded: { "F0.intent": "raising_now", "F1.company_name": "Greenbox" },
+    // Founder v8: the country is a geography node, found by its name.
+    taxonomy: { nigeria: NIGERIA },
   });
   const { research, done } = researching(world, "founder", [GREENBOX], {
     founder: founderFindings,
@@ -246,10 +252,9 @@ describe("founder sign-up: Q found 5 answers and puts them to the founder", () =
       founderResearch: research,
       delegation: readerOf(reading({ approved: found })),
     }).turn({ ...turn(world, "Yes, all of that is correct."), actor });
-    expect(world.recordedValue("F1.country")).toEqual({
-      type: "SINGLE_SELECT",
-      optionKey: "ng",
-    });
+    expect(world.recordedValue("F1.country")).toEqual(
+      founderCountryAnswer("NG"),
+    );
     expect(world.recordedValue("F1.stage")).toEqual({
       type: "SINGLE_SELECT",
       optionKey: "seed",

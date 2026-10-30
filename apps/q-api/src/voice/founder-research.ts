@@ -1,11 +1,8 @@
-import {
-  COUNTRY_OPTIONS,
-  FOUNDER_STEPS,
-  STAGE_OPTIONS,
-} from "@capital-q/founder-onboarding";
+import { FOUNDER_STEPS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import type { QRecommendationPublicSourceType } from "@capital-q/onboarding";
 import type { FounderResearchReaderResult } from "@capital-q/q-core";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 
 import type { ResearchFinding, ResearchPage } from "./investor-research.js";
 
@@ -22,7 +19,6 @@ import type { ResearchFinding, ResearchPage } from "./investor-research.js";
  */
 
 const STAGE_KEYS = new Set(STAGE_OPTIONS.map((o) => o.optionKey));
-const COUNTRY_KEYS = new Set(COUNTRY_OPTIONS.map((o) => o.optionKey));
 
 /** The journey's stages, for the reader's prompt. */
 export const FOUNDER_READER_OPTIONS = {
@@ -250,9 +246,11 @@ export function validateFounderReading(
     );
   }
   if (reading.country !== null) {
-    const key = reading.country.value.trim().toLowerCase();
-    if (COUNTRY_KEYS.has(key))
-      push(FOUNDER_STEPS.country, key, reading.country);
+    // Any ISO 3166-1 country, offered by its name: a v8 step finds its
+    // geography node by that name, a v1-v7 step its option by label.
+    const country = countryOfIso(reading.country.value);
+    if (country !== null)
+      push(FOUNDER_STEPS.country, country.name, reading.country);
   }
   if (reading.stage !== null) {
     const key = reading.stage.value.trim().toLowerCase();

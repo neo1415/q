@@ -1,0 +1,240 @@
+-- Owner 2026-10-30 · Founder onboarding v8: the country chosen from the
+-- geography taxonomy, one canonical country list.
+--
+-- Up to v7 F1.country was a single select over a fixed list of twenty
+-- countries plus "somewhere else", so "Copenhagen, Denmark" was saved as
+-- "other". v8 binds the step to the geography vocabulary, which holds every
+-- ISO 3166-1 country (20261231180000, geography v5): a reference to one
+-- node, at most one, searched like the investor geography step. The write
+-- target accepts only a node with an ISO code (a country, never a region)
+-- and stores that code as core.companies.headquarters_country, as before.
+-- A city stays free text, in the answer note.
+--
+-- v7 (and v1-v6) stay published and immutable: sessions pinned to them keep
+-- their option answers, whose keys are lowercase ISO codes and map to the
+-- geography node carrying that code (the pgTAP test proves every one does).
+-- No existing row is rewritten, so no mapping update is needed. Every other
+-- v7 step is unchanged. Additive only: no table, column, grant or policy
+-- changes, and nothing is dropped.
+
+-- OWNER-ONE-COUNTRY-SOURCE · Founder onboarding v8 (journey "founder")
+-- GENERATED from packages/founder-onboarding/src/definition by renderOnboardingDefinitionMigration.
+-- Do not edit by hand: a change to the journey is a new definition version.
+-- Reference data published through the same rows the runtime publisher writes;
+-- publishing the same manifest again is an idempotent no-op (manifest hash below).
+
+insert into onboarding.definitions (id, journey_type, name)
+values ('15f819f2-2265-54fc-90f4-30ab90d01cc6', $cq$founder$cq$, $cq$Founder onboarding$cq$)
+on conflict (journey_type) do nothing;
+
+insert into onboarding.definition_versions (id, definition_id, version, schema, manifest_hash)
+select 'ecc39783-6cdb-5dc3-8873-850ff3953569', d.id, 8,
+       $cq${"schemaVersion":1,"phases":[{"phaseKey":"F0","label":"Welcome"},{"phaseKey":"F1","label":"Company"},{"phaseKey":"F2","label":"Materials"},{"phaseKey":"F3","label":"Review"},{"phaseKey":"F4","label":"Team"},{"phaseKey":"F5","label":"Traction"},{"phaseKey":"F6","label":"Raise"},{"phaseKey":"F9","label":"Company profile"},{"phaseKey":"F7","label":"A few questions"},{"phaseKey":"F8","label":"Snapshot"}],"runtime":{"subjectType":"COMPANY","allowUnboundStart":true}}$cq$::jsonb,
+       '91b8dfeea06a532b427225f83e3bbd227b8de11490c383fd1c1d7a6125905d99'
+  from onboarding.definitions d
+ where d.journey_type = $cq$founder$cq$;
+
+insert into onboarding.steps
+  (id, definition_version_id, step_key, sequence_order, step_type, required, configuration, branching_expression, writes_to)
+values
+  ('1865a4c8-765c-54aa-8a88-034c643cad5b', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F0.intent$cq$, 0, $cq$single_select$cq$, true,
+   $cq${"prompt":"What brings you to Capital Q?","supportingText":"One tap. You can change this later.","phaseKey":"F0","options":[{"optionKey":"raising_now","label":"I'm raising for a company","description":"There is a round in motion or about to be."},{"optionKey":"preparing_to_raise","label":"I'm preparing to raise","description":"Getting the company and the story ready first."},{"optionKey":"exploring","label":"I'm exploring Capital Q","description":"Curious what Q can see before committing."}]}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('f90171d1-1560-5e17-b17a-80d8c8e25532', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F1.company_name$cq$, 1, $cq$short_text$cq$, true,
+   $cq${"prompt":"Your company","supportingText":"The name investors would recognise.","phaseKey":"F1","minLength":1,"maxLength":120}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.bootstrap"}]$cq$::jsonb),
+  ('a5966863-195f-5196-bfad-53a06d736bf6', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F1.website$cq$, 2, $cq$short_text$cq$, false,
+   $cq${"prompt":"Website","supportingText":"Optional. Q can read a website later to fill gaps.","phaseKey":"F1","minLength":1,"maxLength":200,"placeholder":"example.com"}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.basics"}]$cq$::jsonb),
+  ('50abe20d-efbe-5852-b96c-9c9404bd71d1', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F1.country$cq$, 3, $cq$reference_select$cq$, false,
+   $cq${"prompt":"Where is the company based?","supportingText":"Optional for now. Search for the country; a city can go in your own words.","phaseKey":"F1","resourceType":"TAXONOMY_NODE","vocabularyCodes":["geography"],"minItems":1,"maxItems":1}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.basics"}]$cq$::jsonb),
+  ('5c6fbdbb-450e-56f9-9426-1014651681bd', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F1.stage$cq$, 4, $cq$single_select$cq$, true,
+   $cq${"prompt":"What stage is the company at?","whyQAsks":"Stage decides which questions come next and how investors read the numbers.","phaseKey":"F1","options":[{"optionKey":"pre_seed","label":"Pre-seed"},{"optionKey":"seed","label":"Seed"},{"optionKey":"series_a","label":"Series A"},{"optionKey":"series_b","label":"Series B"},{"optionKey":"series_c_plus","label":"Series C or later"},{"optionKey":"unsure","label":"Not sure yet"}]}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.basics"}]$cq$::jsonb),
+  ('d099a6ee-ade9-52d9-a51e-66b979f77125', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F1.description$cq$, 5, $cq$long_text$cq$, false,
+   $cq${"prompt":"In a sentence or two, what does the company do?","supportingText":"Plain words are best. Who it's for and what it changes for them.","phaseKey":"F1","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.basics"}]$cq$::jsonb),
+  ('ac0336e1-25a0-5cc9-ac5f-67d726da9997', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F1.categories$cq$, 6, $cq$reference_select$cq$, false,
+   $cq${"prompt":"How would you categorise the company?","supportingText":"Suggested categories come from your description. Pick the ones that fit; nothing is assigned until you confirm.","phaseKey":"F1","resourceType":"TAXONOMY_NODE","vocabularyCodes":["industry","product_category","business_model","customer_type"],"minItems":1,"maxItems":8}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.taxonomy"}]$cq$::jsonb),
+  ('f31fe026-700a-5e84-93a9-efe5d3339fd1', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F2.materials$cq$, 7, $cq$document_upload$cq$, false,
+   $cq${"prompt":"What do you already have?","supportingText":"Give Q anything that already explains the business — a deck, a financial model, management accounts. Private to your company unless you choose to share it. You can skip this.","phaseKey":"F2","allowedResourceTypes":["EVIDENCE_DOCUMENT"],"minItems":0,"maxItems":6}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('5e75bfca-10e2-595c-90fc-e648b5d85770', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F3.review$cq$, 8, $cq$confirmation$cq$, true,
+   $cq${"prompt":"Here's what I understood","supportingText":"From what you gave me. Confirm what's right, fix what isn't, and tell me what I missed.","phaseKey":"F3","confirmLabel":"That's right","requireAffirmative":true,"contextKey":"founder.review"}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('68bfcf62-feac-591e-8c94-cbe46a1d5396', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F4.founder_role$cq$, 9, $cq$single_select$cq$, true,
+   $cq${"prompt":"Your role","phaseKey":"F4","options":[{"optionKey":"ceo","label":"CEO"},{"optionKey":"cto","label":"CTO"},{"optionKey":"coo","label":"COO"},{"optionKey":"cpo","label":"Product"},{"optionKey":"other","label":"Something else"}]}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"founder.membership"}]$cq$::jsonb),
+  ('cbb7d5ff-6a2d-57c0-b0d8-360da56c5859', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F4.founder_count$cq$, 10, $cq$range$cq$, true,
+   $cq${"prompt":"How many founders?","phaseKey":"F4","min":"1","max":"50","step":"1"}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.team_facts"}]$cq$::jsonb),
+  ('77c8241d-a841-5551-bf7d-b7516130113d', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F4.full_time$cq$, 11, $cq$single_select$cq$, true,
+   $cq${"prompt":"Are the founders full-time?","phaseKey":"F4","options":[{"optionKey":"all","label":"All founders are full-time"},{"optionKey":"some","label":"Some founders are full-time"},{"optionKey":"none","label":"Not full-time yet"}]}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.team_facts"}]$cq$::jsonb),
+  ('df36c618-c69c-577c-aed7-d78122f248ee', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F4.team_size$cq$, 12, $cq$range$cq$, true,
+   $cq${"prompt":"How many people work on the company today?","supportingText":"Founders included.","phaseKey":"F4","min":"1","max":"100000","step":"1"}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.team_facts"}]$cq$::jsonb),
+  ('d8ca0bfb-5273-5ec5-8393-cff6720d425e', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F4.functions$cq$, 13, $cq$multi_select$cq$, false,
+   $cq${"prompt":"Which of these does the founding team cover?","phaseKey":"F4","options":[{"optionKey":"product","label":"Product"},{"optionKey":"engineering","label":"Engineering"},{"optionKey":"sales","label":"Sales and partnerships"},{"optionKey":"operations","label":"Operations"},{"optionKey":"finance","label":"Finance"},{"optionKey":"domain","label":"Deep industry expertise"}],"minSelections":1,"maxSelections":6,"exclusiveOptionKeys":[]}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('4209a76b-9be2-5391-bc40-533f1f0e7970', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.signal$cq$, 14, $cq$single_select$cq$, true,
+   $cq${"prompt":"What early signal do you have?","phaseKey":"F5","options":[{"optionKey":"pilots","label":"Pilots running"},{"optionKey":"lois","label":"Signed letters of intent"},{"optionKey":"waitlist","label":"A waitlist"},{"optionKey":"users","label":"Active users, not yet paying"},{"optionKey":"paying","label":"Paying customers"},{"optionKey":"partnerships","label":"Signed partnerships or distribution deals"},{"optionKey":"none","label":"Nothing measurable yet"}]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F1.stage","values":["pre_seed","seed","unsure"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('d6253de4-78b9-5932-a808-8e458f388ae7', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.pilots$cq$, 15, $cq$range$cq$, false,
+   $cq${"prompt":"How many pilots or design partners?","phaseKey":"F5","min":"0","max":"10000","step":"1"}$cq$::jsonb,
+   $cq${"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["pre_seed","seed","unsure"]},{"op":"IN","stepKey":"F5.signal","values":["pilots","lois"]}]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('66396ceb-b8a7-5e67-9c32-8e47c4dfe758', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.revenue_status$cq$, 16, $cq$single_select$cq$, true,
+   $cq${"prompt":"How would you describe revenue today?","phaseKey":"F5","options":[{"optionKey":"recurring","label":"Recurring and growing"},{"optionKey":"recurring_flat","label":"Recurring, roughly flat"},{"optionKey":"project","label":"Project or one-off revenue"},{"optionKey":"early","label":"First revenue only"}]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F1.stage","values":["series_a","series_b","series_c_plus"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('b27ce082-1791-5e2c-8ba1-cbc1f4c5625c', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.customers$cq$, 17, $cq$range$cq$, false,
+   $cq${"prompt":"Paying customers","phaseKey":"F5","min":"0","max":"10000000","step":"1"}$cq$::jsonb,
+   $cq${"op":"ANY","expressions":[{"op":"IN","stepKey":"F1.stage","values":["series_a","series_b","series_c_plus"]},{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["pre_seed","seed","unsure"]},{"op":"IN","stepKey":"F5.signal","values":["paying"]}]}]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('a580dd1b-dc93-543d-8e37-af98c816c739', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.growth$cq$, 18, $cq$single_select$cq$, false,
+   $cq${"prompt":"Growth over the last six months","phaseKey":"F5","options":[{"optionKey":"over_100","label":"More than doubled"},{"optionKey":"50_100","label":"Grew 50–100%"},{"optionKey":"under_50","label":"Grew under 50%"},{"optionKey":"flat","label":"Flat or down"}]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F1.stage","values":["series_a","series_b","series_c_plus"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('4ff8401c-2e45-5f34-8f23-d1884022e087', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.fin_currency$cq$, 19, $cq$single_select$cq$, false,
+   $cq${"prompt":"Which currency do you report your numbers in?","supportingText":"Only your team sees your financials. Skip anything you don't know yet.","phaseKey":"F5","options":[{"optionKey":"usd","label":"US dollar"},{"optionKey":"eur","label":"Euro"},{"optionKey":"gbp","label":"Pound sterling"},{"optionKey":"ngn","label":"Nigerian naira"},{"optionKey":"kes","label":"Kenyan shilling"},{"optionKey":"zar","label":"South African rand"},{"optionKey":"aed","label":"UAE dirham"},{"optionKey":"inr","label":"Indian rupee"},{"optionKey":"sgd","label":"Singapore dollar"}]}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('ba2ad043-3cf1-5170-8384-359f3ee1db44', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.monthly_revenue$cq$, 20, $cq$range$cq$, false,
+   $cq${"prompt":"Roughly what did you bill last month?","supportingText":"A round number is fine.","phaseKey":"F5","min":"0","max":"1000000000000","step":"1"}$cq$::jsonb,
+   $cq${"op":"ANY","expressions":[{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["series_a","series_b","series_c_plus"]},{"op":"EXISTS","stepKey":"F5.revenue_status"}]},{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["pre_seed","seed","unsure"]},{"op":"IN","stepKey":"F5.signal","values":["paying"]}]}]}$cq$::jsonb,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('e58388ea-4cbb-5988-89eb-0f4be6f3b84d', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.revenue_trend$cq$, 21, $cq$single_select$cq$, false,
+   $cq${"prompt":"How has monthly revenue moved lately?","phaseKey":"F5","options":[{"optionKey":"growing","label":"Growing month on month"},{"optionKey":"flat","label":"Roughly flat"},{"optionKey":"declining","label":"Declining"},{"optionKey":"lumpy","label":"Lumpy: depends on the month"}]}$cq$::jsonb,
+   $cq${"op":"ANY","expressions":[{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["series_a","series_b","series_c_plus"]},{"op":"EXISTS","stepKey":"F5.revenue_status"}]},{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["pre_seed","seed","unsure"]},{"op":"IN","stepKey":"F5.signal","values":["paying"]}]}]}$cq$::jsonb,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('d32db405-ae08-5a45-9d9b-97deb9827d62', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.gross_margin$cq$, 22, $cq$range$cq$, false,
+   $cq${"prompt":"What is your gross margin?","supportingText":"As a percentage of revenue.","phaseKey":"F5","min":"-100","max":"100","step":"1","unit":"%"}$cq$::jsonb,
+   $cq${"op":"ANY","expressions":[{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["series_a","series_b","series_c_plus"]},{"op":"EXISTS","stepKey":"F5.revenue_status"}]},{"op":"ALL","expressions":[{"op":"IN","stepKey":"F1.stage","values":["pre_seed","seed","unsure"]},{"op":"IN","stepKey":"F5.signal","values":["paying"]}]}]}$cq$::jsonb,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('8b450388-8bb2-57bd-9b8c-b050449fe899', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.monthly_burn$cq$, 23, $cq$range$cq$, false,
+   $cq${"prompt":"How much do you spend beyond revenue each month?","supportingText":"Net burn. Investors never see this unless you share it.","phaseKey":"F5","min":"0","max":"1000000000000","step":"1"}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('f6b2f2f3-3456-59f1-8874-630c6110f791', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.cash$cq$, 24, $cq$range$cq$, false,
+   $cq${"prompt":"How much cash is in the bank today?","supportingText":"Investors never see this unless you share it.","phaseKey":"F5","min":"0","max":"1000000000000","step":"1"}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('130f700c-984d-50f0-9117-9cd2acd66140', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F5.runway_months$cq$, 25, $cq$range$cq$, false,
+   $cq${"prompt":"How many months of runway is that?","phaseKey":"F5","min":"0","max":"240","step":"1","unit":"months"}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('1c3293d4-1a51-58e6-b997-ce55eeeaa288', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.raising$cq$, 26, $cq$single_select$cq$, true,
+   $cq${"prompt":"Are you raising now?","phaseKey":"F6","options":[{"optionKey":"active","label":"Yes, actively"},{"optionKey":"preparing","label":"Preparing to raise"},{"optionKey":"not_now","label":"Not right now"}]}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('a8a34b45-8d05-55ab-80ce-a544d848ac02', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.currency$cq$, 27, $cq$single_select$cq$, true,
+   $cq${"prompt":"Currency","phaseKey":"F6","options":[{"optionKey":"usd","label":"US dollar"},{"optionKey":"eur","label":"Euro"},{"optionKey":"gbp","label":"Pound sterling"},{"optionKey":"ngn","label":"Nigerian naira"},{"optionKey":"kes","label":"Kenyan shilling"},{"optionKey":"zar","label":"South African rand"},{"optionKey":"aed","label":"UAE dirham"},{"optionKey":"inr","label":"Indian rupee"},{"optionKey":"sgd","label":"Singapore dollar"}]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('3dbf9c33-db04-5574-a435-9cbd3c4c81d5', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.target_amount$cq$, 28, $cq$range$cq$, true,
+   $cq${"prompt":"Target amount","supportingText":"An exact figure, in the currency above.","phaseKey":"F6","min":"1","max":"1000000000000","step":"1"}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('cd60e948-967c-542d-873d-089dd8a9c730', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.instrument$cq$, 29, $cq$single_select$cq$, false,
+   $cq${"prompt":"Instrument","phaseKey":"F6","options":[{"optionKey":"priced","label":"Priced equity round"},{"optionKey":"safe","label":"SAFE"},{"optionKey":"convertible","label":"Convertible note"},{"optionKey":"unsure","label":"Not sure yet"}]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('748fcffc-dd92-509b-9b62-4a860a0aeb26', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.timeframe$cq$, 30, $cq$single_select$cq$, false,
+   $cq${"prompt":"When do you want to close?","phaseKey":"F6","options":[{"optionKey":"under_3","label":"Within 3 months"},{"optionKey":"3_6","label":"3–6 months"},{"optionKey":"6_12","label":"6–12 months"},{"optionKey":"unsure","label":"Not sure yet"}]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('e0ea93b5-db2e-5930-9fd6-f18f7cff6c5c', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.use_of_funds$cq$, 31, $cq$multi_select$cq$, false,
+   $cq${"prompt":"What will the money mainly go to?","phaseKey":"F6","options":[{"optionKey":"product","label":"Product and engineering"},{"optionKey":"hiring","label":"Key hires"},{"optionKey":"gtm","label":"Sales and go-to-market"},{"optionKey":"runway","label":"Runway and operations"},{"optionKey":"expansion","label":"New markets"}],"minSelections":1,"maxSelections":5,"exclusiveOptionKeys":[]}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[]$cq$::jsonb),
+  ('8b0688bf-ce1c-59e5-bb59-cdb6c7738215', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.min_cheque$cq$, 32, $cq$range$cq$, false,
+   $cq${"prompt":"What is the smallest cheque you would take?","supportingText":"In the raise's currency. Skip if any size is welcome.","phaseKey":"F6","min":"0","max":"1000000000000","step":"1"}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[{"targetKey":"company.financial_claims"}]$cq$::jsonb),
+  ('382c8b88-43e2-510a-a64c-0b0268b08ead', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F6.confirm$cq$, 33, $cq$confirmation$cq$, true,
+   $cq${"prompt":"Save this as your capital objective?","supportingText":"This becomes the company's current raise. You can recalibrate it any time.","phaseKey":"F6","confirmLabel":"Save my raise","requireAffirmative":true,"contextKey":"founder.raise"}$cq$::jsonb,
+   $cq${"op":"IN","stepKey":"F6.raising","values":["active","preparing"]}$cq$::jsonb,
+   $cq$[{"targetKey":"capital.objective"}]$cq$::jsonb),
+  ('2af5ff7d-89c9-5864-8125-255e3304e9ad', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.opportunity$cq$, 34, $cq$long_text$cq$, false,
+   $cq${"prompt":"How big is the opportunity, and how do the economics work for you?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('dfc8e0a4-a137-5269-ab1a-87f09ed3ea97', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.problem$cq$, 35, $cq$long_text$cq$, false,
+   $cq${"prompt":"What problem are you solving, and for whom?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('35a0c319-0044-562d-a144-b957d7532463', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.solution$cq$, 36, $cq$long_text$cq$, false,
+   $cq${"prompt":"What is your solution?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('19ef51b6-f029-5aa9-8b45-40f2975594f8', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.how_it_works$cq$, 37, $cq$long_text$cq$, false,
+   $cq${"prompt":"Briefly, how does it work?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('2973b554-1420-5265-848f-eb085ca73c87', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.business_model$cq$, 38, $cq$long_text$cq$, false,
+   $cq${"prompt":"How do you make money?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('67f3650b-dfd6-50f6-87f6-b2ed806ca05a', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.vision$cq$, 39, $cq$long_text$cq$, false,
+   $cq${"prompt":"What is your long-term vision for the company?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('3b5577f1-dc1b-5310-ad4b-2678dbecd669', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.go_to_market$cq$, 40, $cq$long_text$cq$, false,
+   $cq${"prompt":"How do you reach and win customers?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('6c85cc36-82b5-5d17-95e7-3bd49c4ec7d0', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.competition$cq$, 41, $cq$long_text$cq$, false,
+   $cq${"prompt":"Who else is solving this, and how are you different?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('749cd0aa-8f59-5adf-bbe0-0405e77bb2ca', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.moats$cq$, 42, $cq$long_text$cq$, false,
+   $cq${"prompt":"What makes your position hard to copy?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('47906b3a-7e1a-57ce-a4d6-5c1bf31e783d', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.roadmap$cq$, 43, $cq$long_text$cq$, false,
+   $cq${"prompt":"What are the next milestones on your roadmap?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('9bd39322-a158-532b-96f0-2dc899933f5b', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.why_us_why_now$cq$, 44, $cq$long_text$cq$, false,
+   $cq${"prompt":"Why are you the team to do this, and why now?","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('f9044f3d-e004-50f0-9e81-448fdecd8d0d', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F9.closing$cq$, 45, $cq$long_text$cq$, false,
+   $cq${"prompt":"Closing","supportingText":"Optional. A few sentences is plenty; Q drafts this from your deck or pitch when it can.","phaseKey":"F9","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('f5f77d60-2573-5392-a88a-8d6d3e3173c0', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F7.follow_up$cq$, 46, $cq$long_text$cq$, false,
+   $cq${"prompt":"A few things I still need","supportingText":"Only what materially changes what I understand. Answer what you can; \"I don't know\" is a real answer.","phaseKey":"F7","minLength":1,"maxLength":2000}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb),
+  ('6c60d9cc-fde2-5138-8ca6-00d61b52b988', 'ecc39783-6cdb-5dc3-8873-850ff3953569', $cq$F8.snapshot$cq$, 47, $cq$confirmation$cq$, true,
+   $cq${"prompt":"Here's how I currently understand your company","supportingText":"Built from what you told me and the material you shared. It will get sharper as more evidence arrives.","phaseKey":"F8","confirmLabel":"Go to Home","requireAffirmative":true,"contextKey":"founder.snapshot"}$cq$::jsonb,
+   null,
+   $cq$[]$cq$::jsonb);
+
+-- Publication freezes the version and its steps (trigger-enforced).
+update onboarding.definition_versions set published_at = now() where id = 'ecc39783-6cdb-5dc3-8873-850ff3953569';
+
+-- New sessions pin to this version; existing sessions keep theirs.
+update onboarding.definitions
+   set current_version = 8
+ where journey_type = $cq$founder$cq$
+   and (current_version is null or current_version < 8);

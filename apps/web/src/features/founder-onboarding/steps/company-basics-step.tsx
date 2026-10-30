@@ -4,11 +4,11 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
-import { Select } from "@capital-q/ui/select";
+import { countryName, countryOfName } from "@capital-q/taxonomy/countries";
 
 import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
-import { useT } from "@/features/i18n/language";
+import { useT, useUiLanguage } from "@/features/i18n/language";
 
 /** "https://www.acme.com/" read as "acme.com". */
 function displayHost(url: string): string {
@@ -18,7 +18,11 @@ function displayHost(url: string): string {
     .replace(/\/$/, "");
 }
 
-/** Name first; website optional; country from a native picker. */
+/**
+ * Name first; website optional; the country searched by name among every
+ * country of the one canonical list (founder v8), with the browser's own
+ * suggestions as they type.
+ */
 export function CompanyBasicsStep({
   step,
   formId,
@@ -33,10 +37,33 @@ export function CompanyBasicsStep({
     step.response?.name === undefined && registered !== null;
   const [name, setName] = useState(step.response?.name ?? registered ?? "");
   const [website, setWebsite] = useState(step.response?.website ?? "");
-  const [countryCode, setCountryCode] = useState(
-    step.response?.countryCode ?? "",
+  const language = useUiLanguage();
+  // Each country in the reader's language (Arabic from the platform's
+  // ICU names), the canonical English name otherwise.
+  const countries = step.countries.map((c) => ({
+    value: c.value,
+    label: countryName(c.value, language) ?? c.label,
+    english: c.label,
+  }));
+  const nameOf = (code: string | undefined) =>
+    countries.find((c) => c.value === code)?.label ?? "";
+  const [countryText, setCountryText] = useState(
+    nameOf(step.response?.countryCode),
   );
   const [error, setError] = useState<string | undefined>(undefined);
+  const [countryError, setCountryError] = useState<string | undefined>(
+    undefined,
+  );
+  /** The offered country these words name, exactly; undefined for none. */
+  const countryCodeOf = (words: string): string | undefined => {
+    const wanted = words.trim().toLowerCase();
+    const listed = countries.find(
+      (c) =>
+        c.label.toLowerCase() === wanted || c.english.toLowerCase() === wanted,
+    )?.value;
+    const iso = listed ?? countryOfName(words)?.iso;
+    return countries.some((c) => c.value === iso) ? iso : undefined;
+  };
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,11 +72,17 @@ export function CompanyBasicsStep({
       setError("Enter the company name to continue.");
       return;
     }
+    const countryCode =
+      countryText.trim().length === 0 ? undefined : countryCodeOf(countryText);
+    if (countryText.trim().length > 0 && countryCode === undefined) {
+      setCountryError(t("Choose a country from the list."));
+      return;
+    }
     void actions.submit({
       kind: "company_basics",
       name: trimmed,
       ...(website.trim().length > 0 ? { website: website.trim() } : {}),
-      ...(countryCode.length === 2 ? { countryCode } : {}),
+      ...(countryCode === undefined ? {} : { countryCode }),
     });
   }
 
@@ -108,16 +141,26 @@ export function CompanyBasicsStep({
           </Button>
         </div>
       ) : null}
-      <Select
+      <Input
         id="company-country"
         label={t("Where is the company based?")}
-        description={t("Optional for now.")}
+        description={t("Optional for now. Search for the country.")}
         placeholder={t("Choose a country")}
-        options={step.countries}
-        value={countryCode}
+        list="company-country-options"
+        autoComplete="country-name"
+        value={countryText}
         disabled={busy}
-        onChange={(event) => setCountryCode(event.target.value)}
+        error={countryError}
+        onChange={(event) => {
+          setCountryText(event.target.value);
+          setCountryError(undefined);
+        }}
       />
+      <datalist id="company-country-options">
+        {countries.map((country) => (
+          <option key={country.value} value={country.label} />
+        ))}
+      </datalist>
     </form>
   );
 }

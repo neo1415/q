@@ -7,6 +7,7 @@ import {
   type ApplicationSummaryDto,
   type PublicGatewayDto,
 } from "@capital-q/contracts";
+import { ISO_COUNTRIES, countryOfIso } from "@capital-q/taxonomy/countries";
 
 /**
  * The GateQ form (F1, 2026-10-06): what the founder answers, step by step,
@@ -80,37 +81,22 @@ export const SECTOR_CHOICES: readonly Choice[] = [
   { value: "Software", label: "Software" },
 ];
 
-export const COUNTRY_CHOICES: readonly Choice[] = [
-  { value: "NG", label: "Nigeria" },
-  { value: "GH", label: "Ghana" },
-  { value: "KE", label: "Kenya" },
-  { value: "ZA", label: "South Africa" },
-  { value: "EG", label: "Egypt" },
-];
+/**
+ * The quick picks shown first: the markets most GateQ applicants here
+ * name. A shortcut over the one canonical country list, which names them
+ * and offers every other country under "Elsewhere".
+ */
+const QUICK_PICKS = "NG GH KE ZA EG".split(" ");
 
-/** "Elsewhere" opens this longer list. ISO 3166-1 alpha-2. */
-export const MORE_COUNTRIES: readonly Choice[] = [
-  { value: "SN", label: "Senegal" },
-  { value: "CI", label: "Côte d'Ivoire" },
-  { value: "RW", label: "Rwanda" },
-  { value: "UG", label: "Uganda" },
-  { value: "TZ", label: "Tanzania" },
-  { value: "ET", label: "Ethiopia" },
-  { value: "MA", label: "Morocco" },
-  { value: "TN", label: "Tunisia" },
-  { value: "CM", label: "Cameroon" },
-  { value: "AE", label: "United Arab Emirates" },
-  { value: "SA", label: "Saudi Arabia" },
-  { value: "GB", label: "United Kingdom" },
-  { value: "US", label: "United States" },
-  { value: "DE", label: "Germany" },
-  { value: "FR", label: "France" },
-  { value: "NL", label: "Netherlands" },
-  { value: "IN", label: "India" },
-  { value: "SG", label: "Singapore" },
-  { value: "BR", label: "Brazil" },
-  { value: "CA", label: "Canada" },
-];
+export const COUNTRY_CHOICES: readonly Choice[] = QUICK_PICKS.flatMap((iso) => {
+  const country = countryOfIso(iso);
+  return country === null ? [] : [{ value: iso, label: country.name }];
+});
+
+/** "Elsewhere" opens every other ISO 3166-1 country, by name. */
+export const MORE_COUNTRIES: readonly Choice[] = ISO_COUNTRIES.filter(
+  (country) => !QUICK_PICKS.includes(country.iso),
+).map((country) => ({ value: country.iso, label: country.name }));
 
 /**
  * Round-size bands. A band is a quick way to find the exact figure, never a

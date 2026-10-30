@@ -5,6 +5,8 @@ import {
   FOUNDER_STEPS,
 } from "@capital-q/founder-onboarding";
 
+import { ISO_COUNTRIES, countryOfNodeId } from "@capital-q/taxonomy/countries";
+
 import type { JourneyVocabulary } from "../onboarding-conversation/conversation";
 import { groupOf } from "./models/journey";
 
@@ -93,7 +95,10 @@ function describe(
     case "TEXT":
       return value.text;
     case "RESOURCE_REFERENCE": {
-      const named = value.resourceIds.map((id) => labels?.[id]);
+      // A country (v8) is named from the one canonical list.
+      const named = value.resourceIds.map(
+        (id) => labels?.[id] ?? countryOfNodeId(id)?.name,
+      );
       if (named.every((label) => label !== undefined)) {
         return named.join(", ");
       }
@@ -106,7 +111,36 @@ function describe(
   }
 }
 
+/** The most countries offered for what they typed. */
+const COUNTRY_MATCHES_MAX = 8;
+
+/**
+ * The founder's country (v8) is searched in the one canonical country
+ * list, here: every country, never a region, and never a category.
+ * Names that start with their words first, then names that contain them.
+ */
+function countriesFor(text: string) {
+  const wanted = text.trim().toLocaleLowerCase();
+  if (wanted.length === 0) return [];
+  const starts = ISO_COUNTRIES.filter((c) =>
+    c.name.toLocaleLowerCase().startsWith(wanted),
+  );
+  const contains = ISO_COUNTRIES.filter(
+    (c) => !starts.includes(c) && c.name.toLocaleLowerCase().includes(wanted),
+  );
+  return [...starts, ...contains].slice(0, COUNTRY_MATCHES_MAX).map((c) => ({
+    nodeId: c.nodeId,
+    label: c.name,
+    vocabularyLabel: "Country",
+  }));
+}
+
 export const FOUNDER_VOCABULARY: JourneyVocabulary = {
+  searchFor: (stepKey, text) =>
+    stepKey === S.country &&
+    STEPS.get(stepKey)?.configuration.stepType === "reference_select"
+      ? countriesFor(text)
+      : undefined,
   subject: "founder",
   // A step's plain label, never its question (live recheck 2026-10-30:
   // "What is your long-term vision for the company? · ..." on a card): the

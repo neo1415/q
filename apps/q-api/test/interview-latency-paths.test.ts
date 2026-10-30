@@ -7,6 +7,7 @@ import type { ModelGateway } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 
 import { codeReading } from "../src/voice/code-reading.js";
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
@@ -73,6 +74,8 @@ const founderWorld = () =>
       "F0.intent": "raising_now",
       "F1.company_name": "Quillmark Health",
     },
+    // Founder v8: the country is a geography node, found by its name.
+    taxonomy: { kenya: countryOfIso("KE")?.nodeId ?? "" },
   });
 
 type Answer = { stepKey: string; value: string | number; quote: string };
@@ -230,7 +233,7 @@ describe("the reply after a clean save is written by code", () => {
   const said = "Seed stage, based in Kenya.";
   const answers = [
     { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
-    { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+    { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
   ];
 
   it("one model round: what committed, then the next coverage question", async () => {
@@ -307,7 +310,7 @@ describe("faster answers, with their stages shown (owner 2026-10-21)", () => {
   const said = "Seed stage, based in Kenya.";
   const answers = [
     { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
-    { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+    { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
   ];
 
   it("shows only stages that name something: the steps being saved (owner review 2026-10-21)", async () => {
@@ -478,7 +481,7 @@ describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)",
       "Seed stage, based in Kenya, raising half a million, 12 people.";
     const model = recordingModel([
       { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
-      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+      { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
     ]);
     await createInterviewAgent({
       gateway: model.gateway,
@@ -497,7 +500,7 @@ describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)",
     const said = "Seed stage, based in Kenya, raising half a million.";
     const model = recordingModel([
       { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
-      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+      { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
     ]);
     const outcome = await createInterviewAgent({
       gateway: model.gateway,
@@ -531,7 +534,7 @@ describe("a stated step off their path never holds the code reply (live 25 Oct e
     const said = "Seed stage, based in Kenya, with 210 paying customers.";
     const model = recordingModel([
       { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
-      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+      { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
     ]);
     const outcome = await createInterviewAgent({
       gateway: model.gateway,
@@ -948,7 +951,7 @@ describe("the reply is in their language (ob1 live on AF)", () => {
   function answers() {
     return [
       { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
-      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+      { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
     ];
   }
 });

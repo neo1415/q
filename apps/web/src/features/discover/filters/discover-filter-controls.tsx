@@ -240,25 +240,49 @@ function FilterSheetBody({
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
             {t("Country")}
           </legend>
-          <div className="flex flex-wrap gap-2">
-            {COUNTRY_FILTER_OPTIONS.map((country) => (
-              <ChoiceChip
-                key={country.value}
-                selected={draft.countryCodes.includes(country.value)}
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    countryCodes: toggleValue(
-                      draft.countryCodes,
-                      country.value,
-                    ),
-                  })
-                }
-              >
-                {country.label}
-              </ChoiceChip>
-            ))}
-          </div>
+          {/* Every country can be chosen; the chosen ones show as chips
+              that remove themselves when pressed. */}
+          {draft.countryCodes.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {COUNTRY_FILTER_OPTIONS.filter((country) =>
+                draft.countryCodes.includes(country.value),
+              ).map((country) => (
+                <ChoiceChip
+                  key={country.value}
+                  selected
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      countryCodes: toggleValue(
+                        draft.countryCodes,
+                        country.value,
+                      ),
+                    })
+                  }
+                >
+                  {country.label}
+                </ChoiceChip>
+              ))}
+            </div>
+          ) : null}
+          <Select
+            id="discover-country-add"
+            label={t("Add a country")}
+            labelHidden
+            placeholder={t("Add a country")}
+            options={COUNTRY_FILTER_OPTIONS.filter(
+              (country) => !draft.countryCodes.includes(country.value),
+            )}
+            value=""
+            onChange={(event) => {
+              const code = event.target.value;
+              if (code.length === 0) return;
+              setDraft({
+                ...draft,
+                countryCodes: toggleValue(draft.countryCodes, code),
+              });
+            }}
+          />
         </fieldset>
 
         <fieldset className="flex flex-col gap-3">

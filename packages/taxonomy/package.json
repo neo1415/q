@@ -20,6 +20,10 @@
     "./reference-data": {
       "types": "./dist/reference-data/index.d.ts",
       "default": "./dist/reference-data/index.js"
+    },
+    "./countries": {
+      "types": "./dist/countries/index.d.ts",
+      "default": "./dist/countries/index.js"
     }
   },
   "main": "./dist/index.js",

@@ -54,6 +54,23 @@ export type JourneyVocabulary = {
   readonly finalStepKeys: readonly string[];
   /** What the person is setting up, for the composer cue. */
   readonly subject: "founder" | "investor";
+  /**
+   * A step whose choices are known here without a lookup (the founder's
+   * country: the one canonical country list): the matches for what they
+   * typed. Undefined: the step searches the taxonomy as usual.
+   */
+  readonly searchFor?:
+    | ((
+        stepKey: string,
+        text: string,
+      ) =>
+        | readonly {
+            readonly nodeId: string;
+            readonly label: string;
+            readonly vocabularyLabel: string;
+          }[]
+        | undefined)
+    | undefined;
 };
 
 export type QuickChip = {

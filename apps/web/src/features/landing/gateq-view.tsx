@@ -1,5 +1,7 @@
 import type { CriterionStatus } from "@capital-q/gateq/engine";
 
+import { countryName } from "@capital-q/taxonomy/countries";
+
 import { DEMO_INVESTOR_LABEL, DEMO_INVESTOR_NAME } from "./gateq-demo";
 import { SIGN_UP_HREF } from "./landing-content";
 
@@ -39,12 +41,11 @@ export const GATE_QUESTIONS: readonly {
   {
     id: "country",
     label: "Headquarters",
-    options: [
-      ["NG", "Nigeria"],
-      ["KE", "Kenya"],
-      ["GB", "United Kingdom"],
-      ["US", "United States"],
-    ],
+    // The scripted demo's sample answers: three inside the gateway's
+    // rule and one outside it, named from the one canonical list.
+    options: ["NG", "KE", "GB", "US"].map(
+      (iso) => [iso, countryName(iso) ?? iso] as const,
+    ),
   },
   {
     id: "amount",

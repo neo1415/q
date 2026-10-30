@@ -617,10 +617,19 @@ export function QOnboardingWorkspace({
   const picks = draft.picks;
   const taxonomyPicks = draft.taxonomyPicks;
   const taxonomyQuery = draft.taxonomyQuery;
+  // A step with its own list (the founder's country) is searched here,
+  // with no lookup; any other step searches the taxonomy below.
+  const localResults = useMemo(
+    () =>
+      stepKey === null || taxonomyQuery.trim().length < TAXONOMY_SEARCH_MIN
+        ? undefined
+        : vocabulary.searchFor?.(stepKey, taxonomyQuery.trim()),
+    [stepKey, taxonomyQuery, vocabulary],
+  );
   const taxonomyResults =
-    taxonomyQuery.trim().length >= TAXONOMY_SEARCH_MIN
-      ? draft.taxonomyResults
-      : EMPTY_RESULTS;
+    taxonomyQuery.trim().length < TAXONOMY_SEARCH_MIN
+      ? EMPTY_RESULTS
+      : (localResults ?? draft.taxonomyResults);
   const updateDraft = useCallback(
     (change: (current: StepDraft) => Partial<StepDraft>) => {
       setStepDraft((current) => {
@@ -697,6 +706,7 @@ export function QOnboardingWorkspace({
     if (!taxonomyControl || query.length < TAXONOMY_SEARCH_MIN) {
       return;
     }
+    if (localResults !== undefined) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       actions
@@ -716,7 +726,13 @@ export function QOnboardingWorkspace({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [taxonomyQuery, taxonomyControl, actions, setTaxonomyResults]);
+  }, [
+    taxonomyQuery,
+    taxonomyControl,
+    actions,
+    setTaxonomyResults,
+    localResults,
+  ]);
 
   useEffect(
     () => () => {

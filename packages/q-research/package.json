@@ -90,6 +90,7 @@
     "@capital-q/observability": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
     "@tavily/core": "0.7.11",
     "zod": "4.5.4"
   },

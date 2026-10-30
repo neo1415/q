@@ -34,11 +34,15 @@ import {
   type ActorContext,
   type OrganisationId,
 } from "@capital-q/security";
-import { TaxonomyNodeIdSchema, type TaxonomyNode } from "@capital-q/taxonomy";
+import {
+  TaxonomyNodeIdSchema,
+  countryOfIso,
+  countryOfName,
+  type TaxonomyNode,
+} from "@capital-q/taxonomy";
 
 import {
   CATEGORY_VOCABULARIES,
-  COUNTRY_OTHER_OPTION,
   FOUNDER_ROLE_TITLES,
   FOUNDER_STEPS,
   FOUNDER_WRITE_TARGETS,
@@ -63,6 +67,7 @@ import {
   type FinancialKnowledgePort,
 } from "./financial-claims.js";
 import { localFigureOf } from "../local-figures/provenance.js";
+import { founderCountryOf } from "../definition/country.js";
 import { FOUNDER_FINANCIAL_WRITE_TARGET } from "../definition/founder-v4.js";
 import {
   createFounderDomainServices,
@@ -345,57 +350,61 @@ async function bootstrapCompany(
 
 /**
  * A country named in the person's words, as its ISO code: "Uzbekistan"
- * outside the short list is still a country (founder direction
- * 2026-09-30: an answer outside the options is kept, never lost to
- * "Somewhere else"). A validator's normalisation over the platform's own
- * region names (ADR 0011 §4); null when the words name no country.
+ * outside an older version's short list is still a country (founder
+ * direction 2026-09-30: an answer outside the options is kept, never lost
+ * to "Somewhere else"). Read against the one canonical country list
+ * (@capital-q/taxonomy/countries); exact names only, a validator's
+ * normalisation, never a reading of a sentence. Null when the words are
+ * not a country's name.
  */
 export function countryCodeOf(words: string | null): string | null {
-  if (words === null) return null;
-  const wanted = words.trim().toLowerCase();
-  if (wanted.length === 0) return null;
-  const names = new Intl.DisplayNames(["en"], { type: "region" });
-  for (let a = 65; a <= 90; a += 1) {
-    for (let b = 65; b <= 90; b += 1) {
-      const code = String.fromCharCode(a, b);
-      let name: string | undefined;
-      try {
-        name = names.of(code);
-      } catch {
-        continue;
-      }
-      if (
-        name !== undefined &&
-        name !== code &&
-        name.toLowerCase() === wanted
-      ) {
-        return code;
-      }
-    }
+  return countryOfName(words)?.iso ?? null;
+}
+
+/**
+ * The headquarters country an F1.country answer sets: the ISO code of the
+ * country it names, in any definition version. A v8 answer must be a
+ * geography node that is a country (it carries an ISO code); a region
+ * ("West Africa") is refused, never stored as a country.
+ */
+async function headquartersCountryOf(
+  services: FounderDomainServices,
+  values: ResponseValues,
+  note: string | null,
+): Promise<string | null> {
+  const value = values.get(FOUNDER_STEPS.country);
+  if (value === undefined) return null;
+  if (value.type !== "RESOURCE_REFERENCE") {
+    return founderCountryOf(value, note)?.iso ?? null;
   }
-  return null;
+  const ids = value.resourceIds.map((id) => TaxonomyNodeIdSchema.parse(id));
+  const nodes =
+    ids.length === 1 ? await services.taxonomy.query.findNodesByIds(ids) : [];
+  const node = nodes[0];
+  const iso =
+    node !== undefined &&
+    node.vocabularyCode === "geography" &&
+    node.status === "ACTIVE"
+      ? (node.metadata.iso3166Alpha2 ?? null)
+      : null;
+  if (iso === null || countryOfIso(iso) === null) {
+    invalid(
+      "value.resourceIds",
+      "not_a_country",
+      "Choose the country the company is based in.",
+    );
+  }
+  return iso;
 }
 
 function companyBasicsChanges(
   stepKey: string,
   values: ResponseValues,
-  note: string | null = null,
 ): Record<string, string | null> {
   switch (stepKey) {
     case FOUNDER_STEPS.website: {
       const raw = text(values, stepKey);
       return { websiteUrl: raw === null ? null : normaliseWebsite(raw) };
-    }
-    case FOUNDER_STEPS.country: {
-      const code = singleSelect(values, stepKey);
-      return {
-        headquartersCountry:
-          code === null
-            ? null
-            : code === COUNTRY_OTHER_OPTION
-              ? countryCodeOf(note)
-              : code.toUpperCase(),
-      };
     }
     case FOUNDER_STEPS.stage: {
       const code = singleSelect(values, stepKey);
@@ -629,14 +638,19 @@ export function createFounderWriteTargets(
           context.actor,
           context.session,
         );
+        const values = responseValues(context.currentResponses, response);
         await updateCompanyIfChanged(
           services,
           bound,
-          companyBasicsChanges(
-            response.stepKey,
-            responseValues(context.currentResponses, response),
-            response.note,
-          ),
+          response.stepKey === FOUNDER_STEPS.country
+            ? {
+                headquartersCountry: await headquartersCountryOf(
+                  services,
+                  values,
+                  response.note,
+                ),
+              }
+            : companyBasicsChanges(response.stepKey, values),
           context.correlationId,
         );
       },

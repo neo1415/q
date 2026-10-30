@@ -23,6 +23,7 @@
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/q-pitch": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
     "@capital-q/ui": "workspace:*",
     "@deepgram/agents": "^0.1.2",
     "@elevenlabs/react": "1.15.2",

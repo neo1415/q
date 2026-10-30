@@ -43,6 +43,7 @@ import {
   type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+import { countryOfNodeId } from "@capital-q/taxonomy/countries";
 import type { Logger } from "@capital-q/observability";
 import { turnIsEnglish } from "./reply-language.js";
 
@@ -182,6 +183,27 @@ const WHOLE_VOCABULARY_MAX = 80;
 const WHOLE_LIST_NODES_MAX = 400;
 /** The most parts one whole list is read in (one bounded reading each). */
 const WHOLE_LIST_PARTS_MAX = 5;
+
+/**
+ * Steps whose answer is one country, chosen from the geography taxonomy
+ * (founder v8 F1.country): a region is never offered or saved for them,
+ * and the canonical country list says which nodes are countries.
+ */
+const COUNTRY_ONLY_STEPS: ReadonlySet<string> = new Set([
+  FOUNDER_STEPS.country,
+]);
+
+/** A lookup's candidates that are countries; a region dropped is no exact match. */
+function onlyCountries(
+  found: TaxonomyCandidateResponse,
+): TaxonomyCandidateResponse {
+  const candidates = found.candidates.filter(
+    (candidate) => countryOfNodeId(candidate.nodeId) !== null,
+  );
+  return candidates.length === found.candidates.length
+    ? found
+    : { ...found, resolution: "CANDIDATES", candidates };
+}
 
 /** A category as the reader is offered it. */
 export type WholeListCandidate = {
@@ -1594,6 +1616,7 @@ export function createOnboardingPort(input: {
       c.stepType === "reference_select" &&
       c.resourceType === "TAXONOMY_NODE"
     ) {
+      const countryOnly = COUNTRY_ONLY_STEPS.has(step.stepKey);
       // typeof, not Array.isArray: the latter widens a readonly list to any[].
       const phrases = (
         typeof answer.value === "object" ? answer.value : [String(answer.value)]
@@ -1603,13 +1626,14 @@ export function createOnboardingPort(input: {
       /** Words read as listed categories they did not name as such. */
       const readAs: string[] = [];
       for (const phrase of phrases) {
-        const found: TaxonomyCandidateResponse = await findTaxonomyCandidates(
+        const looked: TaxonomyCandidateResponse = await findTaxonomyCandidates(
           input.session,
           {
             text: phrase,
             vocabularyCodes: [...c.vocabularyCodes],
           },
         );
+        const found = countryOnly ? onlyCountries(looked) : looked;
         const best = found.candidates[0];
         if (best === undefined) {
           // Sweep D2 (2026-10-29): "Benelux and the Nordics" matched no
@@ -1619,10 +1643,19 @@ export function createOnboardingPort(input: {
           // members only). Nothing listed: kept in their words, as before.
           // A large list (every country) is read in parts of whole
           // regions, side by side; what each part names is kept.
-          const parts =
+          const listed =
             input.chooseCategories === undefined
               ? null
               : await wholeVocabulary(c.vocabularyCodes);
+          // One country (founder v8): the whole list is its countries.
+          const parts =
+            listed === null || !countryOnly
+              ? listed
+              : listed
+                  .map((part) =>
+                    part.filter((n) => countryOfNodeId(n.nodeId) !== null),
+                  )
+                  .filter((part) => part.length > 0);
           const choose = input.chooseCategories;
           const chosen =
             parts === null || choose === undefined

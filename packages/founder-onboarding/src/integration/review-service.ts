@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { OnboardingResponseValueSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { DocumentRepository } from "@capital-q/evidence";
 import type { Logger } from "@capital-q/observability";
@@ -17,6 +18,7 @@ import {
   FOUNDER_JOURNEY_TYPE,
   FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
+  founderCountryOf,
 } from "../definition/index.js";
 import type { FounderExtractionOutcome } from "../intelligence/contracts.js";
 import type {
@@ -322,16 +324,36 @@ export function createFounderDocumentReview(
     for (const draft of plan.suggestions) {
       // One at a time and independently: a single rejected draft — a value
       // the pinned step's schema refuses — must not discard the others.
-      try {
-        await createSuggestion({
+      const offer = (suggestedValue: Readonly<Record<string, unknown>>) =>
+        createSuggestion({
           sessionId,
           stepKey: draft.stepKey,
           targetField: draft.targetField,
-          suggestedValue: draft.suggestedValue,
+          suggestedValue,
           sourceRefs:
             draft.sourceRefs.length === 0 ? [sourceRef] : draft.sourceRefs,
           confidence: draft.confidence,
         });
+      try {
+        try {
+          await offer(draft.suggestedValue);
+        } catch (refused: unknown) {
+          // A session pinned to v1-v7 answers the country with an option
+          // whose key is the lowercase ISO code; the same country is
+          // offered in that shape, which its own options still validate.
+          const parsed = OnboardingResponseValueSchema.safeParse(
+            draft.suggestedValue,
+          );
+          const country =
+            draft.stepKey === FOUNDER_STEPS.country && parsed.success
+              ? founderCountryOf(parsed.data)
+              : null;
+          if (country === null) throw refused;
+          await offer({
+            type: "SINGLE_SELECT",
+            optionKey: country.iso.toLowerCase(),
+          });
+        }
         created += 1;
       } catch (error: unknown) {
         logger?.warn(

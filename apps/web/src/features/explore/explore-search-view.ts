@@ -6,7 +6,7 @@ import {
   type ExploreTileDto,
 } from "@capital-q/contracts";
 
-import { COUNTRY_OPTIONS } from "@capital-q/founder-onboarding";
+import { ISO_COUNTRIES } from "@capital-q/taxonomy/countries";
 
 import { countryLabel, stageLabel } from "../company/declared-labels";
 
@@ -129,11 +129,11 @@ export function parseSearch(
       sectorNodeIds.push(sector.nodeId);
     }
   }
-  for (const option of COUNTRY_OPTIONS) {
-    const phrase = option.label.toLowerCase();
+  for (const country of ISO_COUNTRIES) {
+    const phrase = country.name.toLowerCase();
     if (rest.includes(` ${phrase} `)) {
       chips.push({
-        label: option.label,
+        label: country.name,
         kind: "country",
         without: without(phrase),
       });

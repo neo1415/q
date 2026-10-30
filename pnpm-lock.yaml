@@ -382,6 +382,9 @@ importers:
       '@capital-q/q-specialists':
         specifier: workspace:*
         version: link:../../packages/q-specialists
+      '@capital-q/taxonomy':
+        specifier: workspace:*
+        version: link:../../packages/taxonomy
       '@capital-q/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1166,6 +1169,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
+      '@capital-q/taxonomy':
+        specifier: workspace:*
+        version: link:../taxonomy
       zod:
         specifier: 4.5.4
         version: 4.5.4
@@ -2127,6 +2133,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
+      '@capital-q/taxonomy':
+        specifier: workspace:*
+        version: link:../taxonomy
       '@tavily/core':
         specifier: 0.7.11
         version: 0.7.11(debug@4.4.3)

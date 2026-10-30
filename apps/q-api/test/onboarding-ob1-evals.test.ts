@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
+import { founderCountryAnswer } from "@capital-q/founder-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "@capital-q/onboarding";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 
 import { createHeldWritesStore } from "../src/voice/held-writes.js";
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
@@ -298,8 +300,10 @@ describe("ob1 evals · a correction to an earlier answer", () => {
         "F0.intent": "raising_now",
         "F1.company_name": "Harbourline Cargo",
         "F1.stage": "seed",
-        "F1.country": "ng",
+        // Founder v8: the country is a geography node.
+        "F1.country": countryOfIso("NG")?.nodeId ?? "",
       },
+      taxonomy: { ghana: countryOfIso("GH")?.nodeId ?? "" },
     });
     const { gateway, seen } = model([
       {
@@ -310,7 +314,7 @@ describe("ob1 evals · a correction to an earlier answer", () => {
               corrections: [
                 {
                   stepKey: "F1.country",
-                  value: "gh",
+                  value: "Ghana",
                   quote: "sorry, we're actually in Ghana",
                 },
               ],
@@ -325,10 +329,9 @@ describe("ob1 evals · a correction to an earlier answer", () => {
       ...turn(world, "Oh, sorry, we're actually in Ghana, not Nigeria."),
       actor,
     });
-    expect(world.recordedValue("F1.country")).toEqual({
-      type: "SINGLE_SELECT",
-      optionKey: "gh",
-    });
+    expect(world.recordedValue("F1.country")).toEqual(
+      founderCountryAnswer("GH"),
+    );
     expect(world.recordedValue("F1.stage")).toEqual({
       type: "SINGLE_SELECT",
       optionKey: "seed",

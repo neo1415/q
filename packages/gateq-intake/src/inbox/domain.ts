@@ -5,6 +5,7 @@ import type {
   GateqPassReason,
   GateqReplyState,
 } from "@capital-q/contracts";
+import { countryName as canonicalCountryName } from "@capital-q/taxonomy/countries";
 
 /**
  * F4: the investor's GateQ inbox, as pure functions over what was
@@ -194,14 +195,9 @@ export const LEAD_WORDS: Readonly<Record<string, string>> = {
   NOT_NEEDED: "No lead needed",
 };
 
-let regions: Intl.DisplayNames | null = null;
+/** A stored ISO code by its name in the one canonical country list. */
 export function countryName(code: string): string {
-  try {
-    regions ??= new Intl.DisplayNames(["en"], { type: "region" });
-    return regions.of(code) ?? code;
-  } catch {
-    return code;
-  }
+  return canonicalCountryName(code) ?? code;
 }
 
 /** What the founder told the gate, in words, with "not said" kept as such. */

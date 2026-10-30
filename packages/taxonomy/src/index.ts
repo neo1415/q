@@ -127,5 +127,15 @@ export {
   type ReferenceVocabulary,
 } from "./reference-data/index.js";
 export { renderReferenceTaxonomySql } from "./reference-data/sql.js";
+export {
+  ISO_COUNTRIES,
+  countryName,
+  countryOfCanonicalCode,
+  countryOfIso,
+  countryOfName,
+  countryOfNodeId,
+  isIsoCountryCode,
+  type IsoCountry,
+} from "./countries/index.js";
 
 export const PACKAGE_NAME = "@capital-q/taxonomy" as const;

@@ -9,7 +9,7 @@ select plan(5);
 
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  7, 'new founder sessions pin to v7, the version after v6 (992 covers v7)');
+  8, 'new founder sessions pin to v8, a later version than v6 (992 covers v7, 996 v8)');
 
 select ok(
   exists (select 1 from onboarding.definition_versions v

@@ -53,6 +53,7 @@ import {
   FOUNDER_FINANCIAL_STEPS,
   FOUNDER_PROFILE_STEPS,
   FOUNDER_STEPS,
+  founderCountryAnswer,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
@@ -411,9 +412,10 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      // v6 is the published journey (20261228180500): v4's optional
-      // financials, then v5 and v6's optional company-profile sections.
-      expect(journey.view().session.definitionVersion).toBe(6);
+      // v8 is the published journey (20261231190000): v4's optional
+      // financials, v6's company-profile sections, v7's customers at seed,
+      // and v8's country from the geography taxonomy.
+      expect(journey.view().session.definitionVersion).toBe(8);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(
@@ -461,7 +463,23 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       });
 
       await journey.submit(FOUNDER_STEPS.website, text("nexarail.example"));
-      await journey.submit(FOUNDER_STEPS.country, single("ng"));
+      // v8 (20261231190000): the country is a geography node, and only a
+      // country is one; a region is refused.
+      const [region] = await tx.sql<{ id: string }[]>`
+        select n.id from taxonomy.nodes n join taxonomy.vocabularies v on v.id = n.vocabulary_id
+         where v.code = 'geography' and n.canonical_code = 'west_africa'`;
+      await expect(
+        journey.submit(FOUNDER_STEPS.country, {
+          type: "RESOURCE_REFERENCE",
+          resourceType: "TAXONOMY_NODE",
+          resourceIds: [region?.id ?? ""],
+        }),
+      ).rejects.toThrow();
+      await journey.submit(FOUNDER_STEPS.country, founderCountryAnswer("DK"));
+      expect((await companyRow(tx, companyId))?.headquarters_country).toBe(
+        "DK",
+      );
+      await journey.submit(FOUNDER_STEPS.country, founderCountryAnswer("NG"));
       await journey.submit(FOUNDER_STEPS.stage, single("seed"));
       await journey.submit(
         FOUNDER_STEPS.description,

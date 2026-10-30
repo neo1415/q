@@ -9,6 +9,12 @@ import type {
 } from "@capital-q/model-gateway/q";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
+import {
+  ISO_COUNTRIES,
+  countryOfIso,
+  countryOfNodeId,
+} from "@capital-q/taxonomy/countries";
+import { REFERENCE_TAXONOMY } from "@capital-q/taxonomy/reference-data";
 
 import { createOnboardingConversation } from "../src/voice/onboarding-conversation.js";
 import { savedPlacesInWords } from "../src/voice/onboarding-port.js";
@@ -345,49 +351,81 @@ describe("final check 2026-10-30: the read-back note is built from the saved nod
   });
 });
 
-describe("sweep D2: a listed option named with more detail", () => {
-  it('"Eindhoven, the Netherlands" is the Netherlands, read among the step\'s own options, never "Somewhere else"', async () => {
-    const world = investorSession({
-      journey: "founder",
-      currentStepKey: "F1.country",
-      subject: { type: "COMPANY", id: "e0000000-0000-4000-8000-000000000002" },
-      recorded: { "F0.intent": "raising_now", "F1.company_name": "Ferrowick" },
+describe("sweep D2: a country named with more detail", () => {
+  // Owner 2026-10-30: "Copenhagen, Denmark" was saved as "other" because
+  // the founder country step offered twenty countries. v8 chooses it from
+  // the geography taxonomy: the reader is offered every country (the whole
+  // list, in parts, regions left out) and reads which one their words name.
+  const geography = REFERENCE_TAXONOMY.nodes
+    .filter((node) => node.vocabularyCode === "geography")
+    .map((node) => ({
+      id: node.id,
+      canonicalCode: node.canonicalCode,
+      displayName: node.displayName,
+      parentNodeId: node.parentNodeId,
+      depth: node.depth,
+    }));
+  const denmark = countryOfIso("DK")?.nodeId ?? "";
+  const netherlands = countryOfIso("NL")?.nodeId ?? "";
+
+  for (const [words, nodeId] of [
+    ["Copenhagen, Denmark", denmark],
+    ["Eindhoven, the Netherlands", netherlands],
+  ] as const) {
+    it(`"${words}" is that country, read among every country, never "Somewhere else"`, async () => {
+      const world = investorSession({
+        journey: "founder",
+        currentStepKey: "F1.country",
+        subject: {
+          type: "COMPANY",
+          id: "e0000000-0000-4000-8000-000000000002",
+        },
+        recorded: {
+          "F0.intent": "raising_now",
+          "F1.company_name": "Ferrowick",
+        },
+        taxonomyNodes: geography,
+      });
+      const offered: string[] = [];
+      const say = typedWorld({
+        world,
+        authority: () => reading({}),
+        categories: (input) => {
+          offered.push(...input.candidates.map((c) => c.nodeId));
+          return Promise.resolve(
+            input.phrase === words &&
+              input.candidates.some((c) => c.nodeId === nodeId)
+              ? [nodeId]
+              : [],
+          );
+        },
+        reading: {
+          answers: [
+            {
+              stepKey: "F1.country",
+              value: words,
+              quote: words,
+              ownWords: true,
+            },
+          ],
+          declined: [],
+        },
+      });
+      await say(`We're based in ${words}`);
+      for (let i = 0; i < 200; i += 1) {
+        if (world.recordedValue("F1.country") !== undefined) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(world.recordedValue("F1.country")).toEqual({
+        type: "RESOURCE_REFERENCE",
+        resourceType: "TAXONOMY_NODE",
+        resourceIds: [nodeId],
+      });
+      // Offered every country and no region: one country is the answer.
+      expect(new Set(offered).size).toBe(ISO_COUNTRIES.length);
+      expect(offered.every((id) => countryOfNodeId(id) !== null)).toBe(true);
     });
-    const offered: string[][] = [];
-    const say = typedWorld({
-      world,
-      authority: () => reading({}),
-      categories: (input) => {
-        offered.push(input.candidates.map((c) => c.nodeId));
-        return Promise.resolve(
-          input.phrase === "Eindhoven, the Netherlands" ? ["nl"] : [],
-        );
-      },
-      reading: {
-        answers: [
-          {
-            stepKey: "F1.country",
-            value: "Eindhoven, the Netherlands",
-            quote: "Eindhoven, the Netherlands",
-            ownWords: true,
-          },
-        ],
-        declined: [],
-      },
-    });
-    await say("We're based in Eindhoven, the Netherlands");
-    for (let i = 0; i < 200; i += 1) {
-      if (world.recordedValue("F1.country") !== undefined) break;
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    expect(world.recordedValue("F1.country")).toEqual({
-      type: "SINGLE_SELECT",
-      optionKey: "nl",
-    });
-    // Offered the step's options, never its catch-all.
-    expect(offered[0]).toContain("nl");
-    expect(offered[0]).not.toContain("other");
-  });
+  }
 });
 
 describe("sweep D1: asked to finish, the last essential answered", () => {
