@@ -5,9 +5,9 @@ import {
   parseMoney,
 } from "@capital-q/onboarding";
 import type { FounderFactKey } from "@capital-q/q-core";
+import { countryOfName } from "@capital-q/taxonomy/countries";
 
 import {
-  COUNTRY_OPTIONS,
   CURRENCY_OPTIONS,
   FULL_TIME_OPTIONS,
   FUNCTION_OPTIONS,
@@ -22,6 +22,7 @@ import {
   USE_OF_FUNDS_OPTIONS,
 } from "../definition/founder-v1.js";
 import { FOUNDER_UTTERANCE_ALIASES } from "../definition/utterance-aliases.js";
+import { founderCountryAnswer } from "../definition/country.js";
 import type {
   FounderCandidate,
   FounderConflict,
@@ -85,7 +86,6 @@ type Option = { readonly optionKey: string; readonly label: string };
 const SINGLE_SELECT_KEYS: ReadonlyMap<FounderFactKey, readonly Option[]> =
   new Map<FounderFactKey, readonly Option[]>([
     ["stage", STAGE_OPTIONS],
-    ["country", COUNTRY_OPTIONS],
     ["founder_role", FOUNDER_ROLE_OPTIONS],
     ["full_time", FULL_TIME_OPTIONS],
     ["signal", SIGNAL_OPTIONS],
@@ -198,6 +198,23 @@ export function structuredValueFor(
     const text = withoutAbsences(value.trim());
     return text.length === 0 ? null : { type: "TEXT", text };
   }
+  if (key === "country") {
+    // The one canonical country list, in the current (v8) shape: a
+    // reference to the country's geography node. The reading is the
+    // model's value for the field; a part of it that is exactly a
+    // country's name ("Copenhagen, Denmark") names it, and two different
+    // countries name none (unknown stays unknown).
+    const named = new Set(
+      [value, ...value.split(/[,;()/]/u)].flatMap((part) => {
+        const country = countryOfName(part);
+        return country === null ? [] : [country.iso];
+      }),
+    );
+    const [iso] = [...named];
+    return named.size === 1 && iso !== undefined
+      ? founderCountryAnswer(iso)
+      : null;
+  }
   const single = SINGLE_SELECT_KEYS.get(key);
   if (single !== undefined) {
     const matched = matchingOptions(key, value, single);
@@ -240,7 +257,8 @@ export function structuredValueFor(
 export function isDirectlySuggestable(key: FounderFactKey): boolean {
   return (
     stepForFactKey(key) !== null &&
-    (FREE_TEXT_KEYS.has(key) ||
+    (key === "country" ||
+      FREE_TEXT_KEYS.has(key) ||
       SINGLE_SELECT_KEYS.has(key) ||
       MULTI_SELECT_KEYS.has(key) ||
       RANGE_KEYS.has(key))

@@ -11,6 +11,7 @@ import {
   factAppliesTo,
   factKeyForStep,
   FOUNDER_DEFINITION_V1,
+  FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2,
   FOUNDER_FOLLOW_UP_BUDGET,
   FOUNDER_REQUIRED_FACTS,
@@ -436,8 +437,11 @@ describe("QFOU-009 · a drafted suggestion is a valid answer to its step", () =>
     // text while its step is a multi_select over a fixed vocabulary, so
     // every suggestion Q made for it was refused. Asserting against the
     // published definition means the mapping cannot drift from the journey.
+    // The current definition: v8 chooses the country from the geography
+    // taxonomy (a reference to one node); a v1-v7 session is offered the
+    // same country as its option (review-service).
     const stepTypes = new Map(
-      FOUNDER_DEFINITION_V2.steps.map((step) => [
+      FOUNDER_DEFINITION_CURRENT.steps.map((step) => [
         step.stepKey,
         step.configuration.stepType,
       ]),
@@ -448,6 +452,7 @@ describe("QFOU-009 · a drafted suggestion is a valid answer to its step", () =>
       single_select: "SINGLE_SELECT",
       multi_select: "MULTI_SELECT",
       range: "RANGE",
+      reference_select: "RESOURCE_REFERENCE",
     };
     const sample: Readonly<Partial<Record<FounderFactKey, string>>> = {
       company_name: "Northstar",

@@ -66,16 +66,23 @@ export {
   FOUNDER_DEFINITION_V5_VERSION,
   GCC_COUNTRY_OPTIONS,
 } from "./founder-v5.js";
-/**
- * The version new founder sessions pin to, for code that reads the journey
- * (labels, step order, the interview). It is a superset of v2-v6, so an
- * older session reads correctly through it.
- */
 export {
   FOUNDER_DEFINITION_V7,
-  FOUNDER_DEFINITION_V7 as FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V7_VERSION,
 } from "./founder-v7.js";
+/**
+ * The version new founder sessions pin to, for code that reads the journey
+ * (labels, step order, the interview). It is a superset of v2-v7, so an
+ * older session reads correctly through it, except F1.country: an older
+ * session's country is an option key, which `founderCountryOf` reads.
+ */
+export {
+  FOUNDER_COUNTRY_VOCABULARIES,
+  FOUNDER_DEFINITION_V8,
+  FOUNDER_DEFINITION_V8 as FOUNDER_DEFINITION_CURRENT,
+  FOUNDER_DEFINITION_V8_VERSION,
+} from "./founder-v8.js";
+export { founderCountryAnswer, founderCountryOf } from "./country.js";
 export {
   FOUNDER_DEFINITION_V6,
   FOUNDER_DEFINITION_V6_VERSION,

@@ -1,3 +1,4 @@
+import { OnboardingResponseValueSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { FounderFactKey } from "@capital-q/q-core";
@@ -19,6 +20,7 @@ import {
   factKeyForStep,
   stepForFactKey,
 } from "./mapping.js";
+import { founderCountryOf } from "../definition/country.js";
 import { isAccountHoldersOwn } from "./account-holder.js";
 import { planFollowUpQuestions } from "./planner.js";
 import { currencyConflicts, draftSuggestions } from "./suggestions.js";
@@ -92,7 +94,12 @@ export function sessionFactsFrom(input: {
       continue;
     }
     answered.add(key);
-    const described = describeValue(response.value);
+    // A country is known by its name, in any version's shape (a v8 answer
+    // is a geography node id, which says nothing to a reader).
+    const described =
+      key === "country"
+        ? (countryNameOf(response.value) ?? describeValue(response.value))
+        : describeValue(response.value);
     if (described !== null) {
       known.push({ key, value: described });
       if (key === "revenue_status") {
@@ -120,6 +127,12 @@ export function sessionFactsFrom(input: {
     revenueStatus,
     stage,
   };
+}
+
+/** A country answer's name, from any version's shape; null otherwise. */
+function countryNameOf(value: unknown): string | null {
+  const parsed = OnboardingResponseValueSchema.safeParse(value);
+  return parsed.success ? (founderCountryOf(parsed.data)?.name ?? null) : null;
 }
 
 /** A response value as one short string. Never a nested object dumped raw. */

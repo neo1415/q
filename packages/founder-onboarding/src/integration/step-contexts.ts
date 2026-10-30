@@ -9,6 +9,7 @@ import {
   type CompanyTeamFacts,
 } from "@capital-q/companies";
 import type { DatabaseExecutor } from "@capital-q/database";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 import { DocumentIdSchema } from "@capital-q/evidence";
 import type {
   OnboardingStepContextInput,
@@ -21,7 +22,6 @@ import type {
   FounderSnapshotContext,
 } from "../definition/contexts.js";
 import {
-  COUNTRY_OPTIONS,
   FOUNDER_ROLE_OPTIONS,
   FOUNDER_STEP_CONTEXTS,
   FOUNDER_STEPS,
@@ -58,6 +58,16 @@ import {
   capitalObjectiveInput,
   type BoundCompany,
 } from "./write-targets.js";
+
+/** A stored ISO code as the founder sees it; the key stays the lowercase code. */
+function countryLabelOf(
+  iso: string | null,
+): { key: string; label: string } | null {
+  const country = countryOfIso(iso);
+  return country === null
+    ? null
+    : { key: country.iso.toLowerCase(), label: country.name };
+}
 
 /**
  * Step-context providers for F3 (review), F6 (raise confirmation) and F8
@@ -112,12 +122,9 @@ async function companyFacts(
   return {
     name: company.canonicalName,
     websiteUrl: company.websiteUrl,
-    country: labelOf(
-      COUNTRY_OPTIONS,
-      company.headquartersCountry === null
-        ? null
-        : company.headquartersCountry.toLowerCase(),
-    ),
+    // Any ISO country, named from the one canonical list (an older
+    // version's short list named only its own twenty).
+    country: countryLabelOf(company.headquartersCountry),
     stage: labelOf(STAGE_OPTIONS, company.currentStageCode),
     description: company.primaryDescription,
     categories: assignments.map((assignment) => ({

@@ -27,7 +27,7 @@ describe("founder definition v6", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V6),
     ).not.toThrow();
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(7);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(8);
   });
 
   it("keeps every v5 step unchanged and in v5's relative order", () => {
