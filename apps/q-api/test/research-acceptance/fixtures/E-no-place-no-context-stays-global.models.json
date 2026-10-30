@@ -1,0 +1,2376 @@
+{
+ "version": 2,
+ "recordedAt": "2026-10-29T23:20:51.565Z",
+ "calls": [
+  {
+   "hash": "131cbb72d21b2d3dd6e7674b675fd0e60a6c55dbdaef754272b1bdf5091eead9",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "ResearchBriefResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 2700,
+     "outputTokens": 403,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 5060,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0010236,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5060,
+      "usage": {
+       "inputTokens": 2700,
+       "outputTokens": 403,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0010236,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_006eb1f92d6b1982016ae3d4d448ec87d2acf316939a1a1386",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:20:56.667Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "question": "What is the current global embedded finance market, how is it developing, who are the principal participants, what business models and sectors are driving it, and what evidence-backed opportunities, risks and outlook should an institutional investor understand?",
+      "market": {
+       "places": [],
+       "sectors": [
+        {
+         "name": "Embedded finance",
+         "from": "\"Research the embedded finance market\""
+        }
+       ],
+       "stage": null,
+       "subjects": [
+        {
+         "name": "Embedded finance providers and platforms",
+         "from": "\"Research the embedded finance market\""
+        },
+        {
+         "name": "Businesses embedding financial products",
+         "from": "\"Research the embedded finance market\""
+        },
+        {
+         "name": "Relevant financial regulators and official bodies",
+         "from": "\"Research the embedded finance market\""
+        }
+       ]
+      },
+      "relevant": [],
+      "unknowns": [
+       {
+        "what": "The intended geographic scope, since no country or region is specified",
+        "establish": "PERSON"
+       },
+       {
+        "what": "The intended investor lens, including preferred sectors, company stage, time horizon and decision to inform",
+        "establish": "PERSON"
+       },
+       {
+        "what": "Current market size, growth, adoption, unit economics, competitive landscape, regulation and company-level evidence",
+        "establish": "RESEARCH"
+       },
+       {
+        "what": "Which embedded finance segments to prioritise, such as payments, lending, banking, insurance, payroll or investment products",
+        "establish": "RESEARCH"
+       }
+      ],
+      "angles": [],
+      "irrelevant": [],
+      "summary": "The research will assess the global embedded finance market: its size, segments, participants, business models, regulation, growth drivers and risks. Because no geography or investment lens is specified, the initial brief should remain global and sector-wide, with those parameters narrowed if a more decision-specific report is required."
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "8be6f85d321c505ad3500b103c87ce5e4a794bbb472e93077f4aaf10cb06eff2",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchPlanResult",
+   "result": null,
+   "failure": {
+    "failureClass": "TIMEOUT"
+   }
+  },
+  {
+   "hash": "8be6f85d321c505ad3500b103c87ce5e4a794bbb472e93077f4aaf10cb06eff2",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchPlanResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 2789,
+     "outputTokens": 339,
+     "cachedInputTokens": 2786
+    },
+    "latencyMs": 4238,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00046312,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 4239,
+      "usage": {
+       "inputTokens": 2789,
+       "outputTokens": 339,
+       "cachedInputTokens": 2786
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00046312,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_07a132dd476195d3016ae3d513b8f487d2baf8955766ce10a4",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:21:59.108Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "questions": [
+       {
+        "lane": "MARKET_SIZE",
+        "query": "global embedded finance market size 2025",
+        "alsoQuery": "embedded finance market revenue forecast 2030",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "DEMAND_CUSTOMERS",
+        "query": "embedded finance adoption business customer demand",
+        "alsoQuery": "embedded banking payments platform adoption survey",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "global embedded finance platform companies",
+        "alsoQuery": "embedded banking fintech infrastructure providers",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "ALTERNATIVES_SUBSTITUTES",
+        "query": "embedded finance alternatives traditional financial services",
+        "alsoQuery": "banking payments infrastructure alternatives embedded finance",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "REGULATION",
+        "query": "global embedded finance regulation licensing payments",
+        "alsoQuery": "financial regulators embedded banking payments guidance",
+        "recent": false,
+        "primary": true
+       },
+       {
+        "lane": "UNIT_ECONOMICS_PRICING",
+        "query": "embedded finance platform pricing interchange economics",
+        "alsoQuery": "embedded payments revenue share pricing benchmarks",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "PRODUCT_DEVELOPMENTS",
+        "query": "embedded finance product developments 2025",
+        "alsoQuery": "embedded finance banking payments technology trends",
+        "recent": true,
+        "primary": false
+       },
+       {
+        "lane": "FUNDING_NEWS",
+        "query": "embedded finance funding acquisitions 2025",
+        "alsoQuery": "embedded finance fintech investment news 2025",
+        "recent": true,
+        "primary": false
+       },
+       {
+        "lane": "OPPORTUNITIES",
+        "query": "embedded finance underserved sectors opportunities",
+        "alsoQuery": "embedded financial services market opportunities platforms",
+        "recent": false,
+        "primary": false
+       }
+      ],
+      "internalQuery": "embedded finance global market"
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "b7ca2ed6c7599a560141262ff2fb283085740c7cfdbaa0fe2106d09892e6e910",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3489,
+     "outputTokens": 37,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 1731,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00047022,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 1732,
+      "usage": {
+       "inputTokens": 3489,
+       "outputTokens": 37,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00047022,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0e20396814d13194016ae3d51b4a1087d29bdcb225d9fdd75f",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:04.325Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [],
+      "followUps": [
+       {
+        "lane": "MARKET_SIZE",
+        "query": "MarketsandMarkets embedded finance 2025 market size"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "c6ec1ea2b10517e1ab1752bba8cda739424e6365db2d13396b538a74f7b63558",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3194,
+     "outputTokens": 442,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 3996,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0011692,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 3996,
+      "usage": {
+       "inputTokens": 3194,
+       "outputTokens": 442,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0011692,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0ea9e801d4cacfd6016ae3d51b0b5487d2ac2031f451bf549b",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:06.590Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Globally, 90% of FinTechs offer embedded payments, according to PYMNTS, as of February 2026.",
+        "figure": "90%",
+        "asOf": "February 2026",
+        "source": 2,
+        "kind": "FIGURE",
+        "measure": "FinTechs offering embedded payments",
+        "entity": "global FinTechs"
+       },
+       {
+        "statement": "PYMNTS says embedded finance has become a competitive differentiator for FinTechs globally, as of February 2026.",
+        "figure": null,
+        "asOf": "February 2026",
+        "source": 2,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "global FinTechs"
+       },
+       {
+        "statement": "PYMNTS says embedded finance enables FinTechs globally to integrate payments and other financial functions directly into digital ecosystems, as of February 2026.",
+        "figure": null,
+        "asOf": "February 2026",
+        "source": 2,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "global FinTechs"
+       },
+       {
+        "statement": "PYMNTS says embedded finance can create more complete customer relationships and increase customer lifetime value for FinTechs globally, as of February 2026.",
+        "figure": null,
+        "asOf": "February 2026",
+        "source": 2,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "global FinTechs"
+       },
+       {
+        "statement": "PYMNTS says embedded finance allows providers globally to move beyond traditional fee models by capturing interchange income, as of February 2026.",
+        "figure": null,
+        "asOf": "February 2026",
+        "source": 2,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "global embedded finance providers"
+       },
+       {
+        "statement": "PYMNTS says embedded finance enables cross-selling supported by richer customer data for providers globally, as of February 2026.",
+        "figure": null,
+        "asOf": "February 2026",
+        "source": 2,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "global embedded finance providers"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "DEMAND_CUSTOMERS",
+        "query": "EY embedded payments growth engine customer demand"
+       },
+       {
+        "lane": "DEMAND_CUSTOMERS",
+        "query": "PYMNTS FinTechs embedded payments customer relationships"
+       },
+       {
+        "lane": "DEMAND_CUSTOMERS",
+        "query": "embedded finance adoption business customers survey"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "48c2d106049412e2e6fa641eada028819a8a3b1a49f9019a2e51fdd8301e405d",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3227,
+     "outputTokens": 596,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 5208,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00108862,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5208,
+      "usage": {
+       "inputTokens": 3227,
+       "outputTokens": 596,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00108862,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_07116031170fa859016ae3d51b528887d29f7c1088f2fe2f1d",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:07.802Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "ConnectPay offers embedded-finance modules through a single set of APIs while operating under its EMI licence; the page does not state a location or period.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "ConnectPay"
+       },
+       {
+        "statement": "ConnectPay lists IBAN accounts, digital wallets, business and personal accounts, segregated accounts, cards, payments, currency exchange and open banking among its embedded-finance products; no period is stated.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "ConnectPay"
+       },
+       {
+        "statement": "ConnectPay lists SEPA instant and SCT euro-zone payments, cross-border and SWIFT transactions, and currency exchange supporting 80+ currencies; no period is stated.",
+        "figure": "80+ currencies",
+        "asOf": null,
+        "source": 11,
+        "kind": "FIGURE",
+        "measure": "supported currencies",
+        "entity": "ConnectPay"
+       },
+       {
+        "statement": "ConnectPay identifies retail, fintech, marketplace, neobank, lending, wealth-management and e-commerce businesses as embedded-finance use cases; no period is stated.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "ConnectPay"
+       },
+       {
+        "statement": "ConnectPay lists InSoil, Softloans and BeMyBond as success-story customers or use cases for embedded financial infrastructure; no period is stated.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "ConnectPay"
+       },
+       {
+        "statement": "SDK.finance presents digital wallets, white-label banking, mobile banking apps, neobank platforms, core banking, money transfer, card issuing and merchant payment processing as products or solutions; no period is stated.",
+        "figure": null,
+        "asOf": null,
+        "source": 7,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "SDK.finance"
+       },
+       {
+        "statement": "SDK.finance lists payment service providers, electronic money institutions, marketplaces and ecommerce platforms, super apps, telecom providers and non-financial enterprises as target industries; no period is stated.",
+        "figure": null,
+        "asOf": null,
+        "source": 7,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "SDK.finance"
+       },
+       {
+        "statement": "SDK.finance lists case studies involving Geidea, TheOneGate, MPAY, Paywell and Nebeus, covering transaction accounting, corporate money transfer, digital wallets, mobile money and crypto-to-fiat connectivity; no period is stated.",
+        "figure": null,
+        "asOf": null,
+        "source": 7,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "SDK.finance"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "COMPETITORS",
+        "query": "embedded finance market size 2026"
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "global embedded finance platform competitors"
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "embedded finance regulatory licence providers"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "ebeef45e93b293b88b9d1abbe1088521e3449267ce040a0e8f29243a2873a6ed",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3224,
+     "outputTokens": 649,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 5913,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00115162,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5913,
+      "usage": {
+       "inputTokens": 3224,
+       "outputTokens": 649,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00115162,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0ef40f003d5f4b95016ae3d51b594887d2b002fa7f020d84bd",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:08.507Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Airwallex's embedded-finance platform offers programmatic account creation and onboarding for connected accounts, alongside account management, payments, payouts, issuing and transactional FX.",
+        "figure": null,
+        "asOf": null,
+        "source": 4,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "Airwallex embedded-finance platform"
+       },
+       {
+        "statement": "Airwallex offers businesses multi-currency accounts, international transfers, corporate cards, expense management, bill pay, payment acceptance, invoicing and subscription management.",
+        "figure": null,
+        "asOf": null,
+        "source": 4,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "Airwallex business financial services"
+       },
+       {
+        "statement": "Airwallex's platform targets SaaS platforms, marketplaces, eCommerce and retail, travel, professional services, wholesale and trade, and fintechs and financial services.",
+        "figure": null,
+        "asOf": null,
+        "source": 4,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "Airwallex target sectors"
+       },
+       {
+        "statement": "ConnectPay offers embedded-finance modules through a single set of APIs, including IBAN accounts, digital wallets, business and personal accounts, cards, payments, currency exchange, open banking and card acquiring.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "ConnectPay embedded-finance platform"
+       },
+       {
+        "statement": "ConnectPay states that its embedded-finance offering operates under an EMI licence and includes compliance built into embedded finance.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "ConnectPay embedded-finance offering"
+       },
+       {
+        "statement": "ConnectPay lists euro-zone payments, global transactions, and currency exchange covering 80+ currencies among its payment products.",
+        "figure": "80+ currencies",
+        "asOf": null,
+        "source": 11,
+        "kind": "FIGURE",
+        "measure": "currencies supported",
+        "entity": "ConnectPay payment products"
+       },
+       {
+        "statement": "ConnectPay lists retail, fintech, marketplaces, neobanks, lending, wealth management and e-commerce as embedded-finance use cases.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "ConnectPay embedded-finance use cases"
+       },
+       {
+        "statement": "ConnectPay identifies loyalty programmes, sports clubs, remittance, platforms, startups and crowdfunding as use cases for its financial infrastructure.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "ALTERNATIVE",
+        "measure": null,
+        "entity": "ConnectPay financial infrastructure use cases"
+       },
+       {
+        "statement": "ConnectPay lists Softloans as a success story for embedded lending infrastructure and BeMyBond as a success story for scaling bond investments.",
+        "figure": null,
+        "asOf": null,
+        "source": 11,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "Softloans and BeMyBond"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "ALTERNATIVES_SUBSTITUTES",
+        "query": "embedded finance market size traditional banking comparison"
+       },
+       {
+        "lane": "ALTERNATIVES_SUBSTITUTES",
+        "query": "Marqeta Unit Stripe Treasury embedded finance alternatives"
+       },
+       {
+        "lane": "ALTERNATIVES_SUBSTITUTES",
+        "query": "sponsor banks embedded finance API providers"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "330250bf8be4534c238ca37268a7daa6f9f1f6c5cb8c32f12643b14a5b51bdee",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchPlanResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 2851,
+     "outputTokens": 299,
+     "cachedInputTokens": 1428
+    },
+    "latencyMs": 4485,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00067196,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 4485,
+      "usage": {
+       "inputTokens": 2851,
+       "outputTokens": 299,
+       "cachedInputTokens": 1428
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00067196,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0d6717827773f641016ae3d52142f087d2801f626475a744d9",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:13.006Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "questions": [
+       {
+        "lane": "MARKET_SIZE",
+        "query": "global embedded finance market size forecast 2030",
+        "alsoQuery": "embedded finance revenue market forecast report",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "CUSTOMER_DEMAND",
+        "query": "embedded finance adoption enterprise customer demand",
+        "alsoQuery": "embedded financial services business usage survey",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "COMPETITORS",
+        "query": "global embedded finance platform companies",
+        "alsoQuery": "embedded banking payments lending providers",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "ALTERNATIVES",
+        "query": "embedded finance alternatives traditional financial services",
+        "alsoQuery": "businesses using banks instead embedded finance",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "REGULATION",
+        "query": "global embedded finance regulation licensing policy",
+        "alsoQuery": "financial regulators embedded banking payments guidance",
+        "recent": true,
+        "primary": true
+       },
+       {
+        "lane": "UNIT_ECONOMICS",
+        "query": "embedded finance pricing interchange take rate benchmarks",
+        "alsoQuery": "embedded banking platform pricing economics",
+        "recent": false,
+        "primary": false
+       },
+       {
+        "lane": "FUNDING_NEWS",
+        "query": "embedded finance funding acquisitions news 2025",
+        "alsoQuery": "embedded finance partnership launches 2026",
+        "recent": true,
+        "primary": false
+       },
+       {
+        "lane": "OPPORTUNITIES",
+        "query": "embedded finance underserved segments growth opportunities",
+        "alsoQuery": "embedded financial services industry use cases growth",
+        "recent": false,
+        "primary": false
+       }
+      ],
+      "internalQuery": "embedded finance global market"
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "2e8b0c1cfab3b0a0c60780e11962b364e495d276a3031f9bc62330818d2d2015",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3449,
+     "outputTokens": 618,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 4864,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00115942,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 4865,
+      "usage": {
+       "inputTokens": 3449,
+       "outputTokens": 618,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00115942,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0f1b16aaa2f7e3d2016ae3d52884ec87d2a8fd1e291bf895e5",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:20.952Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Embedded finance includes payments, lending, banking, insurance and investments integrated directly into a non-financial platform or user experience, according to Ascent RegTech's June 2026 article.",
+        "figure": null,
+        "asOf": "June 2026",
+        "source": 19,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "embedded finance"
+       },
+       {
+        "statement": "In an embedded finance arrangement, the platform distributes the product and owns the customer relationship, according to Ascent RegTech's June 2026 article.",
+        "figure": null,
+        "asOf": "June 2026",
+        "source": 19,
+        "kind": "REGULATION",
+        "measure": null,
+        "entity": "embedded finance platforms"
+       },
+       {
+        "statement": "Analysts project the global embedded finance sector to grow from USD 85.8 billion in 2026 to USD 370.9 billion by 2036, according to TransferMate's April 2026 article.",
+        "figure": "USD 370.9 billion",
+        "asOf": "2036",
+        "source": 12,
+        "kind": "FIGURE",
+        "measure": "market size",
+        "entity": "global embedded finance sector"
+       },
+       {
+        "statement": "Analysts project the global embedded finance sector to grow from USD 85.8 billion in 2026 to USD 370.9 billion by 2036, according to TransferMate's April 2026 article.",
+        "figure": "USD 85.8 billion",
+        "asOf": "2026",
+        "source": 12,
+        "kind": "FIGURE",
+        "measure": "market size",
+        "entity": "global embedded finance sector"
+       },
+       {
+        "statement": "U.S. Bank lists embedded payments among its treasury management offerings and corporate payment APIs among its cards and payment solutions in March 2026.",
+        "figure": null,
+        "asOf": "March 2026",
+        "source": 15,
+        "kind": "COMPETITOR",
+        "measure": null,
+        "entity": "U.S. Bank"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "REGULATION",
+        "query": "global embedded payments licensing requirements"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "embedded finance sponsor bank accountability rules"
+       },
+       {
+        "lane": "REGULATION",
+        "query": "payment institution licensing by country"
+       }
+      ]
+     },
+     "dropped": [
+      "facts.2.source:invalid_type",
+      "facts.3.source:invalid_type",
+      "facts.4.source:invalid_type"
+     ]
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "c1401c3549b9725c626e4f4a42fce8440b2dedeb0043ac56cee29b705970532a",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 2995,
+     "outputTokens": 276,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 3122,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00065822,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 3125,
+      "usage": {
+       "inputTokens": 2995,
+       "outputTokens": 276,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00065822,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0ed459871fc32833016ae3d528d13887d289af0fc24b866ccb",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:19.211Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Rainforest says vertical SaaS companies’ embedded-payments margin depends on their revenue-recognition model, processing costs and sell price, in an article dated December 21, 2024.",
+        "figure": null,
+        "asOf": "December 21, 2024",
+        "source": 16,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "embedded payments"
+       },
+       {
+        "statement": "Rainforest describes net revenue recognition as the provider collecting processing fees, deducting interchange passthrough and provider fees, and distributing the residual to the platform, in December 2024.",
+        "figure": null,
+        "asOf": "December 2024",
+        "source": 16,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "embedded payments"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "UNIT_ECONOMICS_PRICING",
+        "query": "Rainforest embedded payments pricing strategy resource"
+       },
+       {
+        "lane": "UNIT_ECONOMICS_PRICING",
+        "query": "embedded finance platform pricing interchange fees"
+       },
+       {
+        "lane": "UNIT_ECONOMICS_PRICING",
+        "query": "Backbase embedded finance platform costs"
+       }
+      ]
+     },
+     "dropped": [
+      "facts.2.source:invalid_type"
+     ]
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "fb56c432868045d8f0696d13efcd23299f764541531e1c7e86338bfa26a0639e",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3222,
+     "outputTokens": 595,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 5330,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00108642,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 5331,
+      "usage": {
+       "inputTokens": 3222,
+       "outputTokens": 595,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00108642,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0e5b4c0ce9c9b15c016ae3d528ddb487d296134be57d0f59fa",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:21.418Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "Embedded finance products include payments, lending, insurance and investment embedded into non-financial platforms used by consumers and businesses, according to FinTechtris in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 14,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "embedded finance"
+       },
+       {
+        "statement": "FinTechtris says embedded finance has evolved from online-shopping checkout optimisation into a multi-trillion-dollar industry by 2026.",
+        "figure": "multi-trillion-dollar",
+        "asOf": "2026",
+        "source": 14,
+        "kind": "TREND",
+        "measure": "industry scale",
+        "entity": "embedded finance"
+       },
+       {
+        "statement": "McKinsey's report, as cited by FinTechtris, projects global embedded-finance revenues could exceed $7T by 2030.",
+        "figure": "$7T",
+        "asOf": "2030",
+        "source": 14,
+        "kind": "FIGURE",
+        "measure": "global revenues",
+        "entity": "embedded finance"
+       },
+       {
+        "statement": "FinTechtris identifies lending, insurance, compliance and investments as embedded-finance categories relevant to companies planning their 2026 strategy.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 14,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "embedded finance"
+       },
+       {
+        "statement": "FinTechtris identifies B2B embedded finance as a market deserving attention in its 2026 playbook.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 14,
+        "kind": "TREND",
+        "measure": null,
+        "entity": "B2B embedded finance"
+       },
+       {
+        "statement": "SDK.finance lists digital wallets, white-label banking, mobile banking apps, neobank platforms and core banking among embedded-finance product solutions in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 17,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "SDK.finance"
+       },
+       {
+        "statement": "SDK.finance lists money transfer and remittance, card issuing, merchant payment processing and white-label PSPs among its embedded-finance solutions in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 17,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "SDK.finance"
+       },
+       {
+        "statement": "SDK.finance lists crypto banking, closed-loop wallets and super apps among its embedded-finance product solutions in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 17,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "SDK.finance"
+       },
+       {
+        "statement": "SDK.finance identifies marketplaces, ecommerce platforms, super apps, telecom providers and non-financial enterprises as embedded-finance industry users in 2026.",
+        "figure": null,
+        "asOf": "2026",
+        "source": 17,
+        "kind": "FACT",
+        "measure": null,
+        "entity": "embedded finance"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "PRODUCT_DEVELOPMENTS",
+        "query": "FIS embedded financing 2025 revenue forecast"
+       },
+       {
+        "lane": "PRODUCT_DEVELOPMENTS",
+        "query": "2025 embedded finance product launches"
+       },
+       {
+        "lane": "PRODUCT_DEVELOPMENTS",
+        "query": "embedded finance regulatory developments 2025"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "627e57641af8323f6bc2f112356c0ea02a6608b2be8dc93e43c3b8a6746359d9",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "ResearchFactsResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 3332,
+     "outputTokens": 138,
+     "cachedInputTokens": 1511
+    },
+    "latencyMs": 2020,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00056002,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 2021,
+      "usage": {
+       "inputTokens": 3332,
+       "outputTokens": 138,
+       "cachedInputTokens": 1511
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00056002,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_0f8486a9ba75fe25016ae3d528da4087d28ff21bdc4781714b",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:18.108Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "facts": [
+       {
+        "statement": "McKinsey’s report, as cited by FinTechtris, says global embedded-finance revenues could exceed $7T by 2030.",
+        "figure": "$7T",
+        "asOf": "2030",
+        "source": 14,
+        "kind": "FIGURE",
+        "measure": "market revenue",
+        "entity": "global embedded finance"
+       }
+      ],
+      "followUps": [
+       {
+        "lane": "FUNDING_NEWS",
+        "query": "Tracxn embedded finance 2025 investments trends"
+       },
+       {
+        "lane": "FUNDING_NEWS",
+        "query": "2025 embedded finance funding acquisitions"
+       },
+       {
+        "lane": "FUNDING_NEWS",
+        "query": "embedded finance M&A 2025"
+       }
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "1f93d98626b10ad036a4e6f158b2739d2623cb51a86852363d5e3a6e99931066",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "AnalysisDocumentResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 5769,
+     "outputTokens": 2657,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 24935,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0043422,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 24936,
+      "usage": {
+       "inputTokens": 5769,
+       "outputTokens": 2657,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0043422,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_008db18cf37d887d016ae3d52ddeb087d2af2388afd6e72322",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:46.377Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "title": "Embedded finance: global market, development and investment implications",
+      "summary": "Embedded finance is moving from payment functionality toward a broader distribution model spanning payments, accounts, cards, lending, insurance and investments. Demand is evident, but the research does not support a single reliable global market-size estimate: published figures range from $85.8 billion in 2026 to $370.9 billion by 2036 [S12] and a separate claim of more than $7 trillion of revenue by 2030 [S14], indicating differing definitions rather than a coherent valuation. The strongest near-term investment opportunity is in infrastructure and vertical distribution, particularly B2B, cross-border payments and platforms that control customer workflows; regulatory ownership, margin structure and dependency on licensed partners remain the principal risks.",
+      "sections": [
+       {
+        "heading": "Executive summary",
+        "body": "Embedded finance integrates financial products into non-financial platforms, including payments, lending, banking, insurance and investments [S19]. Payments remains the most established segment: 90% of fintechs reportedly offer embedded payments as of February 2026, although this is a single secondary-source statistic [S2]. The market is broadening into accounts, cards, payouts, FX, lending, insurance and investment products, with B2B embedded finance identified as an area requiring particular attention in 2026 [S14].\n\nThe market-sizing evidence is not decision-grade. One source reports growth from $85.8 billion in 2026 to $370.9 billion in 2036 [S12], while another cites a projection of more than $7 trillion of global embedded-finance revenues by 2030 [S14]. These figures likely measure materially different scopes; the available evidence does not establish which definition is correct. An institutional investor should therefore underwrite companies using segment-level transaction volume, take rate, contribution margin, credit losses where relevant, retention and regulatory economics rather than relying on a headline total-addressable-market figure.\n\nThe investable thesis is strongest where a provider is embedded in a recurring business workflow, owns differentiated distribution or data, and can expand from payments into adjacent products without assuming unpriced regulatory or balance-sheet risk (Q's inference)."
+       },
+       {
+        "heading": "Key developments",
+        "body": "2026 — Embedded finance is described as having expanded from online-checkout optimisation into a broader industry spanning payments, lending, insurance, compliance and investments [S14]. This is a current, single-source secondary account and should be treated as directional rather than independently verified.\n\n2026 — B2B embedded finance is identified as a market area deserving attention, alongside products such as lending, insurance, compliance and investments [S14]. This is a current, single-source secondary account.\n\nFebruary 2026 — PYMNTS reports that 90% of fintechs offer embedded payments and characterises embedded finance as a competitive differentiator supporting richer customer relationships, cross-selling and interchange revenue [S2]. These are current claims from one secondary source; the research does not provide the underlying sample, methodology or corroborating study.\n\nDecember 2024 — Rainforest states that embedded-payments margin depends on revenue-recognition treatment, processing costs and selling price [S16]. It describes a net-revenue model in which processing fees are collected, interchange pass-through and provider fees are deducted, and the residual is distributed to the platform [S16]. These are current structural observations from a provider article, not evidence of a market-wide margin level.\n\n2026 — Platforms are increasingly offering multi-product infrastructure. Airwallex describes account creation, onboarding, account management, payments, payouts, issuing and transactional FX, while ConnectPay describes IBAN accounts, wallets, business and personal accounts, cards, payments, FX, open banking and acquiring through APIs [S4][S11]. These are current company descriptions and establish product scope, not independent evidence of adoption or profitability."
+       },
+       {
+        "heading": "Regulatory risks",
+        "body": "The operating model separates product distribution from regulated provision: Ascent RegTech states that the platform typically owns the customer relationship and distributes the financial product [S19]. This creates potential accountability and conduct risk for the platform even where a licensed partner provides the regulated service (Q's inference).\n\nLicensing and compliance are central operating dependencies. ConnectPay states that its embedded-finance offering operates under an electronic-money institution licence and includes compliance within the product [S11]. This is a company claim and does not establish the sufficiency of its licensing for every jurisdiction or product.\n\nThe research does not include primary regulator publications, licence-register extracts, enforcement actions or jurisdiction-specific rules. Accordingly, it cannot establish the regulatory perimeter for a globally operated embedded-finance business, the extent of platform liability, safeguarding requirements, consumer-credit obligations, insurance distribution rules, investment permissions or outsourcing expectations. Those are material diligence gaps, not evidence that the risks are absent."
+       },
+       {
+        "heading": "Competitive landscape",
+        "body": "Name | What they offer | Where | Scale or funding | Source\nAirwallex | Programmatic account creation and onboarding, account management, payments, payouts, issuing and transactional FX; also multi-currency accounts, transfers, cards, expense management, bill pay, acceptance, invoicing and subscriptions | Targets SaaS platforms, marketplaces, ecommerce and retail, travel, professional services, wholesale and trade, fintechs and financial services | No scale or funding figure in the research | [S4]\nConnectPay | IBAN accounts, wallets, business and personal accounts, cards, payments, FX, open banking and acquiring through APIs; states that compliance is built into its EMI-licensed offering | Retail, fintech, marketplaces, neobanks, lending, wealth management, ecommerce, loyalty, remittance, platforms, startups and crowdfunding | 80+ currencies; no revenue, volume or funding figure in the research | [S11]\nSoftloans | Identified by ConnectPay as a success story for embedded-lending infrastructure | Not specified | No scale or funding figure in the research | [S11]\nBeMyBond | Identified by ConnectPay as a success story for scaling bond investments | Not specified | No scale or funding figure in the research | [S11]\nSDK.finance | Describes embedded-finance infrastructure for marketplaces, ecommerce platforms, super apps, telecom providers and non-financial enterprises | Global scope not specified | No scale or funding figure in the research | [S17]"
+       },
+       {
+        "heading": "Opportunities",
+        "body": "Payments and acquiring remain the clearest entry point because payment functionality is already widely adopted among fintechs, with 90% reported by PYMNTS [S2]. The opportunity is not simply payment processing; it is to provide a defensible workflow, distribution channel or data advantage that supports expansion into accounts, payouts, FX, cards or working capital (Q's inference).\n\nB2B and cross-border infrastructure appear attractive areas for investigation. B2B embedded finance is specifically highlighted in the 2026 market commentary [S14], while Airwallex and ConnectPay both describe multi-currency, international-payment or FX capabilities [S4][S11]. The evidence supports product relevance, but not yet superior economics or market share.\n\nVertical software and marketplaces may offer efficient distribution because the platform already controls a recurring customer interaction. Airwallex explicitly targets SaaS platforms, marketplaces, ecommerce, travel and professional services [S4], and SDK.finance identifies marketplaces, ecommerce, super apps, telecoms and non-financial enterprises as users [S17]. The investment question is whether the platform can convert distribution into durable revenue after processing, partner and compliance costs.\n\nAdjacent products such as lending, insurance and investments could increase revenue per customer and lifetime value. PYMNTS links embedded finance to cross-selling and richer customer data [S2], while FinTechtris identifies these categories as relevant 2026 products [S14]. These products also introduce materially higher underwriting, conduct, capital and regulatory complexity (Q's inference)."
+       },
+       {
+        "heading": "Implications for your thesis",
+        "body": "No investor mandate, preferred stage, time horizon or named pipeline companies is recorded, so the implications below are for an institutional investor evaluating the global embedded-finance sector.\n\n(Q's inference) A core infrastructure thesis is more defensible than a broad “embedded finance” thesis. Investors should prioritise companies with repeatable distribution, multi-product expansion and transparent net economics, because the market label covers both low-differentiation payment functionality and more complex regulated products.\n\n(Q's inference) The preferred underwriting sequence is payments or account infrastructure first, then adjacent products. Payments provide observable volume and retention metrics; lending, insurance and investments may expand revenue but require separate diligence on losses, capital, licensing and conduct.\n\n(Q's inference) A downside scenario is margin compression and commoditisation in payments, with platforms retaining more economics and providers competing on price. A base scenario is continued expansion from payments into accounts, cards, FX and selected B2B products, subject to partner and regulatory constraints. An upside scenario is that embedded distribution materially lowers acquisition costs and enables profitable cross-selling across several financial products. The research does not establish probabilities for these scenarios.\n\n(Q's inference) The sector is investable only with segment-specific definitions. The $85.8 billion 2026 estimate and the greater-than-$7 trillion 2030 projection cannot be combined or treated as a reliable market range because their definitions and methodologies are not provided [S12][S14]."
+       },
+       {
+        "heading": "Gaps and next actions",
+        "body": "1. What is the correct market definition and size by segment? Request the methodologies, inclusion criteria, geography, revenue basis and underlying datasets for the $85.8 billion-to-$370.9 billion forecast [S12] and the greater-than-$7 trillion projection [S14]; reconcile them before using any TAM in an investment paper.\n\n2. Which jurisdictions and products are in scope? Build a jurisdiction-by-jurisdiction regulatory matrix using official regulator guidance and licence registers, covering payments, e-money, banking, consumer credit, insurance distribution, investments, safeguarding, outsourcing and data obligations.\n\n3. Are reported adoption claims representative? Ask PYMNTS for the survey population, sample size and question wording behind the 90% fintech-adoption statistic [S2], then seek at least one independent dataset on embedded-payment penetration.\n\n4. Where are the durable economics? Request provider-level data on gross processing revenue, interchange and processor pass-through, partner fees, compliance costs, fraud losses, customer acquisition cost, retention, take rate and contribution margin. Rainforest’s description confirms that revenue-recognition and cost structure matter but supplies no market-wide benchmark [S16].\n\n5. Which competitors have meaningful scale? Verify transaction volume, active platform and end-customer counts, revenue, growth, funding and profitability directly from company filings, audited accounts, investor materials or credible databases. The current research provides product descriptions but almost no comparable scale data [S4][S11][S17].\n\n6. What is the risk allocation between platform and licensed provider? Request sample programme agreements and confirm responsibility for KYC/AML, safeguarding, complaints, fraud, credit losses, operational resilience, data and regulatory reporting with the relevant regulated entities."
+       }
+      ],
+      "topRecommendations": [
+       "Underwrite embedded finance by product segment and unit economics rather than headline TAM, because the available forecasts range from $85.8 billion in 2026 to more than $7 trillion by 2030 and are not definitionally comparable [S12][S14]; start now, with the investment team owning the work, and measure whether every target has a reconciled revenue, volume and margin bridge.",
+       "Prioritise B2B, cross-border and workflow-led platform infrastructure for initial screening, because B2B is highlighted as an area of attention and leading providers target platforms with accounts, payments, payouts and FX [S14][S4][S11]; complete the first screen in Q4 2026, with the sector lead owning it, and measure the number of targets with repeatable distribution and verified contribution economics.",
+       "Make regulatory and partner dependency a gating diligence item before advancing any opportunity, because embedded platforms may own the customer relationship while relying on licensed providers [S19] and the current research lacks primary regulatory evidence; implement in Q4 2026–Q1 2027, owned by investment and legal diligence, and measure completion of jurisdiction-specific licensing, accountability and safeguarding assessments."
+      ],
+      "gaps": [
+       "The market-size sources use incompatible or undisclosed definitions, so no single current global market size can be established from the evidence supplied.",
+       "No primary regulator sources, licence-register checks or jurisdiction-specific analysis are included.",
+       "Adoption, transaction volume, revenue, growth, market share, profitability and funding data are largely absent for named competitors.",
+       "There is no recorded investor mandate, target stage, time horizon or named pipeline, preventing a more specific investment prioritisation.",
+       "The research does not establish segment-level margins, customer acquisition costs, retention, fraud losses, credit losses or capital requirements."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "d215290fc6f4239e0383b1330fe82bae236450a3a32b9e50e61efcb308cad41f",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "AnalysisCritiqueResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 6380,
+     "outputTokens": 932,
+     "cachedInputTokens": 0
+    },
+    "latencyMs": 11586,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.0023944,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 11586,
+      "usage": {
+       "inputTokens": 6380,
+       "outputTokens": 932,
+       "cachedInputTokens": 0
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.0023944,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_015b7e422f7c8739016ae3d546ce0487d2b07b888dc0971cc6",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:22:57.967Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "passes": false,
+      "score": 62,
+      "issues": [
+       {
+        "kind": "MISSING_SECTION",
+        "section": "Executive summary / overall report",
+        "problem": "The report does not clearly explain the principal participant categories across the ecosystem—financial institutions, licensed infrastructure providers, distributors/platforms, and technology or compliance vendors—with their respective roles and economics.",
+        "fix": "Add an ecosystem map describing each participant category, its role, revenue capture, dependencies and representative examples from the available evidence."
+       },
+       {
+        "kind": "WEAK_SIZING",
+        "section": "Market sizing",
+        "problem": "The report repeats precise forecasts of $85.8bn, $370.9bn and $7tn even though their definitions, methodologies and bases are unavailable; describing them as incompatible does not remove the risk that the precision misleads.",
+        "fix": "Present them only as non-comparable third-party claims, explicitly label the figures as unvalidated, and avoid using them as a numerical market range or foundation for the investment thesis."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Opening conclusion",
+        "problem": "The statement that the strongest near-term opportunity is infrastructure and vertical distribution is an investment conclusion not directly established by the limited evidence and is left unfinished with “B2B,…”.",
+        "fix": "Complete the sentence and label the conclusion explicitly as an inference, tying it to the observed product breadth and distribution evidence while stating that comparative attractiveness and economics remain unproven."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Regulatory risks",
+        "problem": "The report omits several material operational and financial risks suggested by the product set, including fraud, cyber and operational resilience, safeguarding or counterparty failure, data/privacy, and payment-network or partner concentration risk.",
+        "fix": "Add these risks and distinguish evidence-supported risks from diligence gaps; identify the evidence required to assess severity and allocation."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Opportunities / implications for your thesis",
+        "problem": "The prioritisation of B2B, cross-border and workflow-led infrastructure is only partly supported by provider marketing descriptions and a single commentary source, and it is not tailored to a recorded investor mandate because none exists.",
+        "fix": "Call this a preliminary research-screening hypothesis rather than an investor-specific recommendation, explain the evidence limitation, and state that investor mandate and time horizon must be obtained before final prioritisation."
+       },
+       {
+        "kind": "MISSING_SECTION",
+        "section": "Top recommendations",
+        "problem": "The recommendations are not operationally complete: items end with missing owners (“the sector lead…”, “owned by…”) and contain timing commitments unsupported by the request or record.",
+        "fix": "Remove arbitrary Q4 2026–Q1 2027 dates unless authorised, assign explicit roles only where known, or state that owners and timing require confirmation; sequence the actions by immediate evidence reconciliation, regulatory research, then company screening."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Competitive landscape",
+        "problem": "The table calls Airwallex, ConnectPay, Softloans, BeMyBond and SDK.finance a competitive landscape, but the evidence establishes mainly product descriptions, and Softloans and BeMyBond are merely success stories cited by ConnectPay rather than independently assessed competitors.",
+        "fix": "Rename the section “illustrative providers and use cases,” distinguish provider self-descriptions from independent evidence, and avoid implying comparable competitive position or market participation where unverified."
+       },
+       {
+        "kind": "UNCLEAR_CONCLUSION",
+        "section": "Implications for your thesis",
+        "problem": "The report recommends that the sector is “investable only” with segment-specific definitions, an overly categorical conclusion not warranted by the evidence and potentially confusing sector research with an investment decision.",
+        "fix": "Change this to a diligence condition for the current research base—for example, “the current evidence is insufficient for a sector-level investment conclusion; any company assessment should use segment-specific definitions.”"
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Market development / outlook",
+        "problem": "The outlook gives upside, base and downside scenarios but does not identify the principal mechanisms that could drive them beyond broad references to commoditisation and regulation, nor does it distinguish market growth from provider value capture.",
+        "fix": "Tie each scenario to observable drivers such as adoption by platforms, product expansion, payment pricing, partner economics and regulatory constraints, and state that no probabilities or market-wide evidence are available."
+       }
+      ],
+      "strengths": [
+       "It appropriately refuses to present the conflicting market figures as a coherent global market size and explains why the estimates cannot be reconciled.",
+       "It distinguishes company marketing claims and single-source secondary research from independently verified market evidence in several places.",
+       "It identifies important diligence gaps around regulation, unit economics, adoption, scale and partner dependencies, and generally avoids inventing missing figures."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "2147561f38da58accad568ff580430ad26540437c01a85662abca1db18e16e6f",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "AnalysisDocumentResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 9082,
+     "outputTokens": 4029,
+     "cachedInputTokens": 1428
+    },
+    "latencyMs": 32948,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00639416,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 32948,
+      "usage": {
+       "inputTokens": 9082,
+       "outputTokens": 4029,
+       "cachedInputTokens": 1428
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00639416,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_08b18228f1eb589f016ae3d55265cc87d2af84cd933dbed181",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:23:30.918Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "title": "Global embedded finance: market structure, development and investment implications",
+      "summary": "Embedded finance is broadening from payments into accounts, cards, payouts, FX, lending, insurance and investments, but the available research does not establish a reliable global market size. The current evidence supports a preliminary screening hypothesis around infrastructure and workflow-led distribution—especially B2B and cross-border use cases—but does not establish superior economics, market share or investability; those require segment-specific diligence.",
+      "sections": [
+       {
+        "heading": "Executive summary",
+        "body": "Embedded finance integrates financial products into non-financial platforms, including payments, lending, banking, insurance and investments [S19]. Payments appears to be the most established entry point: PYMNTS reports that 90% of fintechs offer embedded payments as of February 2026, but this is a single secondary-source claim whose sample and methodology are not provided [S2].\n\nThe market is developing through product expansion and distribution: providers describe account creation, wallets, cards, payouts, FX, acquiring, lending and investment capabilities [S4][S11][S14]. The evidence does not support a single current global market-size figure. The reported USD 85.8 billion in 2026, USD 370.9 billion by 2036 and more than USD 7 trillion by 2030 are unvalidated, non-comparable third-party claims with undisclosed definitions and methodologies [S12][S14]. They should not be used as a numerical market range or as the foundation of an investment thesis.\n\n(Q's inference) The most useful preliminary screening hypothesis is infrastructure and workflow-led distribution, particularly in B2B and cross-border contexts, because the available evidence shows broad provider functionality and repeated targeting of platforms, marketplaces and business workflows [S4][S11][S17]. Comparative attractiveness, defensibility and economics remain unproven. The current evidence is insufficient for a sector-level investment conclusion; any company assessment should use segment-specific definitions and verified operating data."
+       },
+       {
+        "heading": "Market and sizing",
+        "body": "The research defines embedded finance broadly as financial products integrated into a non-financial platform or user experience, covering payments, lending, banking, insurance and investments [S19]. Product examples in the research include accounts, wallets, cards, acquiring, payments, payouts, FX, open banking and investment products [S4][S11][S14].\n\nThree published figures should be treated only as separate, unvalidated claims:\n- USD 85.8 billion in 2026 rising to USD 370.9 billion by 2036, reported by TransferMate while citing an analyst forecast [S12]. The research does not state whether this is revenue, transaction value, platform revenue, provider revenue or another measure.\n- More than USD 7 trillion of global embedded-finance revenues by 2030, reported by FinTechtris while citing McKinsey [S14]. The definition, methodology and reconciliation with the USD 85.8 billion figure are unavailable.\n- The research therefore cannot provide a defensible top-down market range. The figures may measure different products, geographies or economic bases; treating them as comparable would create false precision.\n\nA bottom-up estimate is also not supportable from the available evidence. The research provides no global transaction volume, active platform count, product-level take rates, revenue pool, adoption denominator, regional split or provider market share. A decision-grade estimate would require segment-by-segment volumes for payments, accounts, cards, lending, insurance and investments; the applicable revenue basis; geographic coverage; platform adoption; and provider economics.\n\nThe available evidence is more useful for market structure than for valuation. PYMNTS reports that embedded finance can support cross-selling, richer customer relationships, lifetime-value expansion and interchange income [S2]. Rainforest states that margins depend on revenue recognition, processing costs and selling price, and describes a net-revenue model in which processing fees, interchange pass-through and provider fees are deducted before the residual is distributed to the platform [S16]. These are structural observations, not market-wide margin benchmarks."
+       },
+       {
+        "heading": "Key developments",
+        "body": "2026 — Embedded finance is described as having expanded from online-checkout optimisation into a broader category spanning payments, lending, insurance, compliance and investments [S14]. Source tier: secondary; evidence: one source; status: current but directional.\n\n2026 — B2B embedded finance is identified as an area deserving attention, alongside lending, insurance, compliance and investments [S14]. Source tier: secondary; evidence: one source; status: current but not independently corroborated.\n\nFebruary 2026 — PYMNTS reports that 90% of fintechs offer embedded payments and says embedded finance is becoming a competitive differentiator supporting cross-selling, richer data and interchange income [S2]. Source tier: secondary; evidence: one source; status: current, with methodology unavailable.\n\nDecember 2024 — Rainforest explains that embedded-payments margin depends on revenue recognition, processing costs and selling price. It describes both gross and net revenue-recognition approaches [S16]. Source tier: primary company claim; evidence: the company's own explanation; status: current structural information, not a market-wide benchmark.\n\n2026 — Provider descriptions show increasing product breadth. Airwallex describes account creation, onboarding, account management, payments, payouts, issuing and transactional FX [S4]. ConnectPay describes IBAN accounts, wallets, business and personal accounts, cards, payments, FX, open banking and acquiring through APIs [S11]. Source tier: primary company claim; evidence: each company's own description; status: current, with adoption and profitability unverified."
+       },
+       {
+        "heading": "Ecosystem map",
+        "body": "Financial institutions — Banks, electronic-money institutions and other regulated entities provide licences, safeguarding, settlement, compliance frameworks, balance-sheet capacity and, where applicable, credit or insurance capacity. Their economics may include processing, interest, interchange, programme, account or partnership fees, but the available research does not quantify them. ConnectPay states that its offering operates under an EMI licence [S11]; this is a company claim, not an independent licence-register verification.\n\nLicensed infrastructure providers — These providers package regulated or financial infrastructure into APIs and modules for platforms. Examples described in the research include Airwallex and ConnectPay, offering accounts, payments, payouts, cards, FX and acquiring [S4][S11]. Their revenue may come from processing, interchange, account, FX, programme or platform fees; actual pricing, margins and scale are not established.\n\nDistributors and platforms — SaaS platforms, marketplaces, ecommerce businesses, super apps, telecoms providers and other non-financial enterprises embed financial products into an existing customer workflow [S4][S17]. The platform typically owns the customer relationship and distributes the product, according to Ascent RegTech [S19]. It may capture payment economics, referral or programme revenue and higher retention or lifetime value, but the research provides no verified benchmark for those outcomes.\n\nTechnology, compliance and programme vendors — These vendors supply APIs, onboarding, KYC/AML, fraud controls, ledgering, orchestration, reporting and other operating components. The research identifies compliance as part of ConnectPay's offering and compliance as an embedded-finance category in FinTechtris [S11][S14]. The evidence does not establish the relative economics or market positions of specialist technology vendors.\n\nDependencies and economics — The model depends on regulated partners, payment networks, processors, data, operational systems and platform distribution. Revenue capture is consequently shared across several participants, while fraud, compliance, safeguarding, operational and counterparty risks may be allocated contractually. The available evidence does not show how these risks or economics are allocated in practice for any named provider."
+       },
+       {
+        "heading": "Regulatory risks",
+        "body": "The regulatory perimeter is product- and jurisdiction-specific. The research does not include primary regulator publications, licence-register extracts or jurisdiction-specific rules, so it cannot establish requirements for payments, e-money, banking, consumer credit, insurance distribution, investments, safeguarding, outsourcing or data use.\n\nPlatform accountability and conduct — Ascent RegTech states that the platform distributes the product and owns the customer relationship [S19]. (Q's inference) This can create conduct, disclosure, complaints and customer-outcome exposure even where a regulated partner performs the licensed activity. Required evidence: programme agreements, responsibility matrices, complaints data, regulatory correspondence and jurisdiction-specific legal analysis.\n\nLicensing and partner dependency — ConnectPay states that its offering operates under an EMI licence and includes compliance [S11]. This is a company claim and does not establish that the licence covers every product, customer type or jurisdiction. Required evidence: regulator-register extracts, licence permissions, passporting or local-authorisation analysis, and regulated-partner agreements.\n\nFraud and financial crime — Payments, accounts, cards, lending and cross-border activity create potential fraud, AML, sanctions and identity risks. The research establishes the product breadth but provides no fraud-loss, chargeback, suspicious-activity or control-effectiveness data. Required evidence: loss rates, chargebacks, alert volumes, investigation performance, audit findings and control testing.\n\nCybersecurity and operational resilience — API-led financial infrastructure creates dependency on systems, data, vendors and payment connectivity. The research provides no uptime, incident, recovery-time, penetration-testing or outsourcing data. Required evidence: incident history, resilience testing, service-level agreements, business-continuity plans and critical-vendor inventories.\n\nSafeguarding and counterparty failure — Wallets, accounts and payment balances may create safeguarding or settlement exposure, while platform continuity may depend on a regulated partner. The research does not establish safeguarding arrangements, reconciliation controls, insolvency treatment or recovery plans. Required evidence: safeguarding accounts, reconciliations, audit reports, resolution plans and partner financial information.\n\nData and privacy — Embedded products use customer and transaction data, but the research does not establish data permissions, cross-border transfer arrangements, retention practices or accountability between platform and provider. Required evidence: data-processing agreements, privacy assessments, consent flows and security controls.\n\nPayment-network and partner concentration — Provider descriptions imply dependence on payment networks, banks, processors and regulated partners [S4][S11]. The research contains no concentration, termination, pricing or substitutability data. Required evidence: supplier concentration, contract terms, renewal history, outage exposure and alternative-provider testing."
+       },
+       {
+        "heading": "Illustrative providers and use cases",
+        "body": "The available evidence is mainly provider self-description and does not establish comparable market participation, market share, customer scale or profitability. Softloans and BeMyBond are presented by ConnectPay as customer or success-story examples, not independently assessed competitors.\n\nName | What they offer | Where | Scale or funding | Source\nAirwallex | Programmatic account creation and onboarding, account management, payments, payouts, issuing, transactional FX, multi-currency accounts, transfers, cards, expense management, bill pay, acceptance, invoicing and subscription management | Targets SaaS platforms, marketplaces, ecommerce and retail, travel, professional services, wholesale and trade, fintechs and financial services | No verified scale or funding figure in the research | [S4]\nConnectPay | IBAN accounts, wallets, business and personal accounts, cards, payments, FX, open banking and acquiring through APIs; states that compliance is built into its EMI-licensed offering | Retail, fintech, marketplaces, neobanks, lending, wealth management, ecommerce, loyalty, remittance, platforms, startups and crowdfunding | States coverage of 80+ currencies; no verified revenue, volume or funding figure | [S11]\nSDK.finance | Describes embedded-finance infrastructure for marketplaces, ecommerce platforms, super apps, telecom providers and non-financial enterprises | Geography not specified | No verified scale or funding figure in the research | [S17]\nSoftloans | Identified by ConnectPay as a success story for embedded-lending infrastructure | Not specified | No independent scale or funding data | [S11]\nBeMyBond | Identified by ConnectPay as a success story for scaling bond investments | Not specified | No independent scale or funding data | [S11]"
+       },
+       {
+        "heading": "Opportunities",
+        "body": "Payments and acquiring are the clearest evidence-supported entry point because PYMNTS reports that 90% of fintechs offer embedded payments [S2]. (Q's inference) The opportunity should be screened for workflow ownership, distribution, retention and net contribution margin rather than payment volume alone, because processing, interchange pass-through, provider fees and revenue-recognition choices affect economics [S16].\n\nB2B and cross-border infrastructure are preliminary research-screening hypotheses, not investor-specific recommendations. B2B is highlighted in the 2026 commentary [S14], while Airwallex and ConnectPay describe multi-currency, international-payment or FX functionality [S4][S11]. The evidence demonstrates product relevance and provider positioning, but not superior growth, margins, defensibility or market share.\n\nVertical software, marketplaces and other recurring workflows may provide distribution advantages because providers target these customer types [S4][S17]. (Q's inference) The investment case depends on whether the platform can convert an existing customer relationship into durable financial revenue after processing, partner, compliance, fraud and support costs.\n\nAdjacent products—lending, insurance and investments—may increase revenue per customer and lifetime value; PYMNTS links embedded finance with cross-selling and richer customer data [S2], and FinTechtris identifies these categories as relevant products [S14]. (Q's inference) These products also require separate diligence on underwriting, capital, claims, conduct, licensing and loss economics. The research does not show that adjacency is profitable at market level."
+       },
+       {
+        "heading": "Implications for your thesis",
+        "body": "No investor mandate, preferred sectors, target stage, time horizon or decision context is recorded. The following is therefore a preliminary sector-screening view for an institutional investor, not an investor-specific recommendation.\n\n(Q's inference) The current evidence is insufficient for a sector-level investment conclusion. A defensible thesis should define the product segment, revenue basis, regulatory perimeter, customer type and economic owner before comparing companies.\n\n(Q's inference) A preliminary infrastructure thesis is more supportable than a broad embedded-finance thesis because the evidence repeatedly shows APIs, regulated partners, platforms and multi-product workflows [S4][S11][S17][S19]. It remains unproven whether infrastructure providers capture durable value or whether economics accrue primarily to distributors, regulated institutions or payment networks.\n\n(Q's inference) Three scenarios are useful for screening, but no probabilities are supported. In an upside scenario, platform adoption expands, providers add products successfully, payment pricing remains adequate and partner economics support profitable cross-selling. In a base scenario, adoption continues but value capture is mixed, with growth concentrated in payments, accounts, FX and selected B2B use cases. In a downside scenario, payment pricing compresses, platforms retain more economics, partner costs rise, fraud or operational losses increase, or regulatory constraints slow product expansion. These scenarios describe mechanisms, not forecasts.\n\n(Q's inference) Any company assessment should begin with verified volume, take rate, net revenue, contribution margin, retention, customer concentration, fraud losses, regulatory permissions and partner dependency. The headline market forecasts should not substitute for that evidence."
+       },
+       {
+        "heading": "Gaps and next actions",
+        "body": "1. Market definition and size — Request the methodologies, inclusion criteria, geography, revenue basis and underlying datasets for the USD 85.8 billion-to-USD 370.9 billion forecast [S12] and the greater-than-USD 7 trillion projection [S14]. Reconcile them before using any TAM in an investment paper.\n\n2. Investor mandate — Confirm preferred sectors, stage, time horizon, geography and investment decision. Without this, B2B, cross-border and workflow-led infrastructure remain preliminary screening hypotheses rather than prioritised recommendations.\n\n3. Regulatory perimeter — Build a jurisdiction-by-jurisdiction matrix from official regulator guidance and licence registers covering payments, e-money, banking, credit, insurance, investments, safeguarding, outsourcing, resilience and data obligations.\n\n4. Adoption evidence — Request the survey population, sample, question wording and underlying dataset for PYMNTS's 90% fintech-adoption statistic [S2], then compare it with an independent adoption dataset.\n\n5. Economics — Request provider-level gross processing revenue, pass-through costs, partner fees, compliance costs, fraud losses, customer acquisition cost, retention, take rate and contribution margin. Rainforest identifies the relevant mechanics but supplies no market-wide benchmark [S16].\n\n6. Competitive scale — Verify active platforms, end customers, transaction volume, revenue, growth, market share, funding and profitability from filings, audited accounts, investor materials or credible databases for named providers. The current evidence is primarily product description [S4][S11][S17].\n\n7. Risk allocation — Request programme agreements and confirm responsibility for KYC/AML, safeguarding, complaints, fraud, credit losses, operational resilience, data, reporting and partner termination."
+       },
+       {
+        "heading": "Top recommendations",
+        "body": "1. Reconcile the market definitions before using any TAM. The current USD 85.8 billion, USD 370.9 billion and greater-than-USD 7 trillion figures are unvalidated, non-comparable claims [S12][S14]. Timing and owner require confirmation; proposed owner: investment research lead once assigned. Success metric: a documented segment-level market definition with reconciled or explicitly rejected estimates.\n\n2. Screen companies by segment-specific unit economics and risk allocation rather than by the embedded-finance label. This follows the evidence that margins depend on processing costs, pass-through economics and pricing [S16], while platforms, regulated providers and infrastructure vendors may share customer ownership and economics [S19]. Timing and owner require confirmation; proposed owner: investment team. Success metric: comparable underwriting sheets covering volume, take rate, net revenue, contribution margin, retention, losses, regulatory permissions and partner concentration.\n\n3. Prioritise regulatory and partner diligence before advancing any company assessment. The available research lacks primary regulatory evidence, licence verification and data on safeguarding, fraud, cyber, resilience and counterparty exposure. Timing and owner require confirmation; proposed owner: legal, compliance or risk lead, subject to the investor's operating model. Success metric: a completed jurisdiction/product matrix, verified licences and documented responsibility for material operational and financial risks."
+       }
+      ],
+      "topRecommendations": [
+       "Reconcile the competing market definitions before using any embedded-finance TAM; the available figures are unvalidated and non-comparable [S12][S14].",
+       "Underwrite companies by product segment, net unit economics, distribution durability and risk allocation rather than by the broad embedded-finance label [S4][S16][S19].",
+       "Make primary regulatory, licence, partner, safeguarding, fraud, cyber and resilience diligence a gating step before advancing any company assessment."
+      ],
+      "gaps": [
+       "The methodologies, definitions and revenue bases behind the USD 85.8 billion, USD 370.9 billion and greater-than-USD 7 trillion claims are unavailable.",
+       "No primary regulator sources, licence-register checks or jurisdiction-specific regulatory analysis are included.",
+       "Adoption, transaction volume, market share, revenue, profitability, funding and customer-scale data are largely absent for named providers.",
+       "No investor mandate, target stage, time horizon, geography or named pipeline is recorded, so prioritisation cannot be investor-specific.",
+       "The evidence does not establish segment-level margins, customer-acquisition costs, retention, fraud losses, credit losses, capital requirements or the allocation of risk between platforms and regulated partners."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "df98171a65242587e1e7bd70979bc5c5cf27723b0c66385fd60dc76061ab0b5e",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "AnalysisCritiqueResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 7773,
+     "outputTokens": 885,
+     "cachedInputTokens": 1454
+    },
+    "latencyMs": 10146,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00235488,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 10146,
+      "usage": {
+       "inputTokens": 7773,
+       "outputTokens": 885,
+       "cachedInputTokens": 1454
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00235488,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_03ace87b2f3688c0016ae3d5735a3487d2a803c20a5ec0c5f0",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:23:41.069Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "passes": false,
+      "score": 72,
+      "issues": [
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Executive summary / Market and sizing",
+        "problem": "The report calls the USD 85.8bn-to-USD 370.9bn forecast and the greater-than-USD 7tn projection “unvalidated” and “non-comparable,” but the record only establishes that their definitions and methodologies are unavailable; it does not establish that the figures are invalid or definitively non-comparable.",
+        "fix": "Use the narrower formulation that the figures are unverified, methodologically opaque and not safely comparable on the available evidence."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Ecosystem map",
+        "problem": "It asserts that financial institutions provide safeguarding, settlement, compliance frameworks, balance-sheet capacity and credit or insurance capacity, and that technology vendors supply KYC/AML, fraud, ledgering and orchestration, although these capabilities are not established by the supplied research.",
+        "fix": "Label these as general ecosystem functions or remove them; distinguish general industry knowledge from evidence-backed findings."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Regulatory risks",
+        "problem": "The statement that payments, accounts, cards and cross-border activity create potential fraud, AML, sanctions and identity risks, and that API infrastructure creates particular dependency risks, is reasonable but not directly evidenced by the supplied sources.",
+        "fix": "Present these explicitly as general risk implications requiring primary regulatory and company evidence, rather than as findings established by the research."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Top recommendations",
+        "problem": "The recommendations are largely diligence principles that could apply to almost any regulated fintech and do not convert the market evidence into a concise, investor-useful prioritisation of segments or participant types.",
+        "fix": "State a bounded market view: for example, payments and B2B/cross-border infrastructure are the best-supported screening areas, while lending, insurance and investments warrant higher-risk, separate diligence; explain why and identify evidence that would change that view."
+       },
+       {
+        "kind": "MISSING_SECTION",
+        "section": "Key developments",
+        "problem": "The report describes product expansion but does not adequately explain how the market is developing competitively or commercially, including the implications of platform ownership, provider bundling and the shift from payments toward adjacent products.",
+        "fix": "Add a short development narrative distinguishing evidenced trends from hypotheses, including the likely value-capture tension between distributors, infrastructure providers, regulated partners and networks."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Regulatory risks",
+        "problem": "The risk section omits explicit credit, insurance and investment-specific risks despite presenting those as major embedded-finance categories, including underwriting and credit-loss risk, claims and distribution risk, and suitability, conduct and investor-protection risk.",
+        "fix": "Add a product-specific risk subsection or clearly limit the report’s risk discussion to payments and account infrastructure."
+       },
+       {
+        "kind": "CONTRADICTION",
+        "section": "Whole document",
+        "problem": "The report says there is no investor-specific recommendation, but its conclusion uses directive language such as “prioritise regulatory and partner diligence” and “make ... diligence a gating step,” without clearly framing these as conditional screening recommendations.",
+        "fix": "State that these are proposed screening priorities for a generic institutional investor, not recommendations tailored to an identified mandate."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Gaps and next actions / Top recommendations",
+        "problem": "Several actions depend on an unrecorded owner, timing and investor mandate, making the promised actionability incomplete despite the document’s otherwise strong caveating.",
+        "fix": "Use role-based owners only where justified, mark timing as not known, and state that sequencing is provisional until the investor lens is confirmed."
+       },
+       {
+        "kind": "UNCLEAR_CONCLUSION",
+        "section": "Top recommendations",
+        "problem": "The duplicated “Top recommendations” sections create two competing endings, with the first containing owners and metrics and the second omitting them, weakening the final conclusion.",
+        "fix": "Delete the duplicate and retain one ranked conclusion with the preferred screening view, rationale, risks, evidence gaps and next step."
+       }
+      ],
+      "strengths": [
+       "It correctly refuses to manufacture a global market size and clearly separates the three headline forecasts rather than presenting them as a range.",
+       "It is unusually disciplined about marking provider claims as self-reported and distinguishing product descriptions from verified scale, economics and market share.",
+       "It provides a strong, specific risk inventory covering licensing, safeguarding, fraud, resilience, data, concentration and partner dependency, with useful evidence requests."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "4979f06438df3c8ca523a829266e7ca41a14e17f0b81debae9cc6bb5a775c4f2",
+   "taskClass": "EVIDENCE_SYNTHESIS",
+   "schemaName": "AnalysisDocumentResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "EVIDENCE_SYNTHESIS",
+    "routingPolicyCode": "evidence_synthesis.v1",
+    "usage": {
+     "inputTokens": 10501,
+     "outputTokens": 4176,
+     "cachedInputTokens": 1428
+    },
+    "latencyMs": 32993,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00685436,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 32993,
+      "usage": {
+       "inputTokens": 10501,
+       "outputTokens": 4176,
+       "cachedInputTokens": 1428
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00685436,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_08c70b7e28daa861016ae3d57d814487d28ec1a5b01df3e636",
+    "route": {
+     "routingPolicyCode": "evidence_synthesis.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:24:14.067Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "title": "Global embedded finance: market development, participants and investment implications",
+      "summary": "Embedded finance is expanding from payments into accounts, cards, FX, lending, insurance and investments, but the supplied evidence does not support a defensible current global market size. The best-supported screening view for a generic institutional investor is to focus first on payments and B2B or cross-border infrastructure, while treating lending, insurance and investments as separate, higher-risk diligence categories; this is a provisional view because no mandate, geography, stage or time horizon is recorded.",
+      "sections": [
+       {
+        "heading": "Executive summary",
+        "body": "Embedded finance integrates financial products into non-financial platforms and user experiences, including payments, lending, banking, insurance and investments [S19]. Payments appears to be the most established segment: PYMNTS reports that 90% of fintechs offer embedded payments as of February 2026, although the supplied evidence does not provide the survey methodology or denominator [S2].\n\nThe market is developing through broader product bundles and deeper platform distribution. Airwallex describes accounts, onboarding, payments, payouts, issuing and FX, while ConnectPay describes accounts, wallets, cards, payments, FX, open banking and acquiring through APIs [S4][S11]. Platforms are described as owning the customer relationship and distributing embedded products [S19]. (Q's inference) This creates a value-capture tension between distributors, infrastructure providers, regulated partners and payment networks; the supplied evidence does not establish which participant captures the largest share of economics.\n\nPublished market estimates are not safely comparable on the available evidence. TransferMate reports a forecast from USD 85.8 billion in 2026 to USD 370.9 billion in 2036 [S12], while FinTechtris, citing McKinsey, reports embedded-finance revenues could exceed USD 7 trillion by 2030 [S14]. Their definitions, revenue bases, geographic coverage and methodologies are not provided, so neither should anchor an investment thesis without reconciliation.\n\n(Q's inference) For a generic institutional investor, payments and B2B or cross-border infrastructure are the most defensible initial screening areas because the evidence shows high reported fintech adoption of embedded payments, explicit B2B interest and repeated provider focus on multi-currency and platform workflows [S2][S4][S11][S14]. Lending, insurance and investments may offer higher revenue per customer but require separate diligence on credit, claims, suitability, conduct and capital risk [S14][S19]."
+       },
+       {
+        "heading": "Key developments",
+        "body": "**October 2026 — Platform breadth and competitive bundling.** Airwallex describes programmatic account creation, onboarding, account management, payments, payouts, issuing and transactional FX, alongside multi-currency accounts, transfers, cards, expense management, bill pay, acceptance, invoicing and subscription management [S4]. Source tier: primary company claim; evidence: one company's own claim; status: current. (Q's inference) Bundling may increase distribution convenience but can also intensify competition across payments, accounts, FX and adjacent infrastructure.\n\n**September 2026 — API-based financial infrastructure.** ConnectPay describes IBAN accounts, wallets, business and personal accounts, cards, payments, currency exchange, open banking and acquiring through one API set [S11]. Source tier: primary company claim; evidence: one company's own claim; status: current. It also states that its offering operates under an EMI licence [S11]. Source tier: primary company claim; evidence: one company's own claim; status: current, with independent licence verification absent.\n\n**August–September 2026 — B2B and platform use cases gain attention.** FinTechtris identifies B2B embedded finance as an area deserving attention in its 2026 playbook [S14]. SDK.finance identifies marketplaces, ecommerce platforms, super apps, telecom providers and non-financial enterprises as users of embedded finance [S17]. Source tier: secondary; evidence: two sources, not independent market-share evidence; status: current.\n\n**June–August 2026 — Product scope expands beyond payments.** Embedded finance is described as including payments, lending, insurance, investments and compliance, with products embedded into non-financial platforms [S14][S19]. Source tier: secondary; evidence: two sources; status: current. The evidence supports category expansion, not market-wide adoption or profitability of each segment.\n\n**February 2026 — Payments remain the leading reported entry point.** PYMNTS reports that 90% of fintechs offer embedded payments and describes embedded finance as supporting cross-selling, richer customer relationships, lifetime value and interchange income [S2]. Source tier: secondary; evidence: one source; status: current, with methodology unavailable.\n\n**December 2024 — Economics depend on revenue architecture.** Rainforest states that embedded-payments margins depend on revenue recognition, processing costs and selling price; under a net-revenue model, processing fees, interchange pass-through and provider fees are deducted before the residual is distributed to the platform [S16]. Source tier: primary company claim; evidence: one company's own explanation; status: current structural information, not a market-wide benchmark.\n\n(Q's inference) The commercial development is therefore not simply product proliferation. Platforms may control distribution and customer ownership, while infrastructure providers compete to supply multiple products and regulated partners retain important permissions and capacity. The available evidence does not establish the resulting allocation of revenue, risk or bargaining power."
+       },
+       {
+        "heading": "Market and sizing",
+        "body": "The supplied research supports a broad qualitative definition but not a decision-grade global market size. Embedded finance includes financial products integrated into non-financial platforms, spanning payments, lending, banking, insurance and investments [S19].\n\nThe principal published estimates are:\n- USD 85.8 billion in 2026 rising to USD 370.9 billion by 2036, according to an analyst forecast cited by TransferMate [S12]. The evidence does not state whether the figures represent revenue, transaction value, provider revenue, platform revenue or another basis.\n- More than USD 7 trillion of global embedded-finance revenues by 2030, according to McKinsey as cited by FinTechtris [S14]. The evidence does not provide the underlying methodology, segment coverage or reconciliation with the TransferMate-cited forecast.\n\nThese figures are therefore unverified, methodologically opaque and not safely comparable on the available evidence. They should be treated as separate published claims rather than a market range. A defensible top-down estimate would require consistent definitions, geographic scope, segment inclusion, revenue basis, forecast methodology and underlying datasets.\n\nA bottom-up estimate is also unavailable. The research provides no global transaction volume, number of active platforms, product-level take rates, adoption denominator, regional split, provider market share or segment-level revenue pool. (Q's inference) The appropriate current conclusion is that the market is demonstrably broad and expanding in product scope, but its aggregate economic size remains unresolved.\n\nThe available economics evidence is directional. PYMNTS links embedded finance with cross-selling, customer lifetime value and interchange income [S2]. Rainforest identifies processing costs, pass-through fees, selling price and revenue-recognition treatment as margin drivers [S16]. These observations do not establish market-wide margins or returns."
+       },
+       {
+        "heading": "Customer segments and business models",
+        "body": "**Platforms and vertical software.** Airwallex targets SaaS platforms, marketplaces, ecommerce and retail, travel, professional services, wholesale and trade, fintechs and financial services [S4]. SDK.finance identifies marketplaces, ecommerce platforms, super apps, telecom providers and non-financial enterprises as users [S17]. (Q's inference) These businesses can use embedded finance to deepen an existing workflow, but the research does not quantify retention, conversion or revenue uplift.\n\n**B2B and cross-border workflows.** Airwallex describes multi-currency accounts, international transfers and transactional FX [S4]. ConnectPay lists euro-zone payments, global transactions and currency exchange across 80+ currencies [S11]. Source tier: primary company claim; evidence: two company claims; status: current. (Q's inference) B2B and cross-border infrastructure merit initial screening because they recur in the provider evidence, but the evidence does not establish superior margins or defensibility.\n\n**Marketplaces, ecommerce and retail.** ConnectPay identifies retail, marketplaces and ecommerce among its use cases [S11]. Providers can combine payment acceptance, wallets, accounts, payouts and acquiring [S4][S11]. The supplied research does not show whether distributors or infrastructure providers retain the customer, pricing power or economics in practice.\n\n**Lending, insurance and investments.** FinTechtris identifies lending, insurance and investments as embedded-finance categories relevant to 2026 strategy [S14]. ConnectPay presents Softloans as a success story for embedded lending infrastructure and BeMyBond as a success story for scaling bond investments [S11]. These are company-presented examples, not independent evidence of segment scale or returns.\n\n**Business models.** The evidence indicates several possible models: transaction and processing revenue, interchange-related income, FX revenue, account or platform fees, and revenue-sharing between providers and platforms [S2][S4][S16]. Actual pricing, contribution margins, customer-acquisition costs and risk allocation are not established for named participants."
+       },
+       {
+        "heading": "Competitive landscape",
+        "body": "The supplied evidence is primarily provider self-description. It does not establish comparable market share, customer count, transaction volume, profitability or funding for the named organisations.\n\nName | What they offer | Where | Scale or funding | Source\nAirwallex | Account creation and onboarding, account management, payments, payouts, issuing, transactional FX, multi-currency accounts, transfers, cards, expense management, bill pay, payment acceptance, invoicing and subscription management | SaaS platforms, marketplaces, ecommerce and retail, travel, professional services, wholesale and trade, fintechs and financial services | No verified scale or funding figure in the supplied research | [S4]\nConnectPay | IBAN accounts, digital wallets, business and personal accounts, cards, payments, currency exchange, open banking and acquiring through APIs; states that compliance is built into its offering and that it operates under an EMI licence | Retail, fintech, marketplaces, neobanks, lending, wealth management, ecommerce, loyalty, remittance, platforms, startups and crowdfunding | States coverage of 80+ currencies; no verified revenue, volume or funding figure | [S11]\nSDK.finance | Embedded-finance infrastructure for marketplaces, ecommerce platforms, super apps, telecom providers and non-financial enterprises | Geography not specified | No verified scale or funding figure in the supplied research | [S17]\nSoftloans | Embedded-lending infrastructure, identified as a ConnectPay success story | Geography not specified | No independent scale or funding data; success-story status is a ConnectPay claim | [S11]\nBeMyBond | Infrastructure for scaling bond investments, identified as a ConnectPay success story | Geography not specified | No independent scale or funding data; success-story status is a ConnectPay claim | [S11]"
+       },
+       {
+        "heading": "Regulatory risks",
+        "body": "The supplied research contains no primary regulator publications, licence-register extracts or jurisdiction-specific legal analysis. Regulatory conclusions should therefore be treated as diligence requirements rather than established findings.\n\n**Payments, accounts and cross-border infrastructure.** ConnectPay states that its offering operates under an EMI licence [S11]. This does not establish the scope of permissions, jurisdictions, safeguarding arrangements or applicability to every product. General risk implications requiring verification include licensing, safeguarding, settlement, AML, sanctions, identity, fraud, complaints, data and outsourcing obligations.\n\n**Platform accountability and customer conduct.** Ascent RegTech states that the platform distributes the product and owns the customer relationship [S19]. (Q's inference) This may create practical exposure for disclosure, complaints and customer outcomes even where a regulated partner performs the licensed activity. Programme agreements, responsibility matrices, complaints data and regulatory correspondence are needed.\n\n**Credit and lending.** Lending introduces underwriting, affordability, credit-loss, collections, capital and fair-treatment questions. These are general product-specific risk implications; the supplied research provides no default, loss, provisioning, funding or recovery data. Evidence required includes vintage performance, approval criteria, loss curves, funding arrangements, servicing and responsibility for customer outcomes.\n\n**Insurance.** Embedded insurance introduces distribution, product-governance, suitability, claims, pricing and insurer-capacity questions. The supplied research identifies insurance as an embedded-finance category [S14][S19] but provides no claims, loss-ratio, conduct, licensing or insurer-partner data.\n\n**Investments.** Embedded investment products introduce suitability, appropriateness, disclosure, best execution, custody, market-abuse and investor-protection questions. The supplied research identifies investments as a category and presents BeMyBond as a company success story [S11][S14], but provides no evidence on permissions, customer outcomes or assets.\n\n**Operational, cyber and partner dependency.** API-led products may depend on regulated partners, processors, banks, networks and technology vendors. (Q's inference) This creates potential concentration, resilience, termination and substitution risks, but the supplied research provides no outage, incident, recovery, concentration or contract data. Evidence required includes service-level agreements, incident history, resilience testing, critical-vendor inventories and termination plans.\n\n**Market-wide regulatory perimeter.** Requirements vary by product and jurisdiction. A jurisdiction-by-jurisdiction review using official regulator guidance and registers is required before relying on any company-specific regulatory conclusion."
+       },
+       {
+        "heading": "Our position",
+        "body": "No company-specific position or pipeline is recorded. The available evidence supports a market-screening position only.\n\n(Q's inference) The strongest initial screening fit is payments and B2B or cross-border infrastructure, because these areas are repeatedly represented in the supplied research through reported fintech adoption, provider functionality and stated B2B interest [S2][S4][S11][S14]. The exposure is that the evidence is concentrated in secondary commentary and provider claims, with little independent evidence on scale, economics, regulation or customer outcomes.\n\n(Q's inference) Lending, insurance and investments should not be grouped into the same underwriting bucket as payments. They may offer greater product depth and revenue per customer, but their risk analysis requires separate credit, claims, conduct, suitability, capital and licensing evidence.\n\nThis is a provisional screening view for a generic institutional investor, not a recommendation tailored to an identified mandate. The view would change with a defined geography, target stage, time horizon, preferred segment or company pipeline."
+       },
+       {
+        "heading": "Implications for your thesis",
+        "body": "No investor mandate, preferred sectors, target stage, time horizon, geography or decision context is recorded. The following are therefore conditional implications for a generic institutional investor.\n\n1. (Q's inference) A narrow infrastructure thesis is more supportable than a broad embedded-finance thesis. The evidence repeatedly shows API-led distribution, account and payment infrastructure, and platform workflows [S4][S11][S17]. The thesis remains unproven until durable customer ownership, net economics, regulatory permissions and partner dependence are evidenced.\n\n2. (Q's inference) Payments and B2B or cross-border infrastructure should be the first screening areas, not because the evidence proves superior returns, but because they have the clearest current product and demand signals [S2][S4][S11][S14]. Lending, insurance and investments should proceed only through separate product-specific underwriting.\n\n3. (Q's inference) Value capture is the central commercial question. Platforms may own distribution and customer relationships [S19], while providers and regulated partners may supply infrastructure and permissions. The evidence does not establish where sustainable margins accrue.\n\n4. (Q's inference) Three scenarios are relevant: an upside case in which platforms adopt multiple products and providers retain adequate net economics; a base case in which payments, accounts and FX grow but economics are shared or compressed; and a downside case in which pricing pressure, partner dependence, regulatory constraints or product losses reduce returns. No probabilities are supported by the supplied evidence.\n\n5. (Q's inference) The market headline estimates should not substitute for company-level underwriting. The decision should depend on verified segment volumes, net revenue, contribution margin, retention, concentration, losses, permissions and partner contracts."
+       },
+       {
+        "heading": "Gaps and next actions",
+        "body": "Sequencing is provisional because the investor mandate and decision timing are not recorded.\n\n1. **Confirm the investment lens.** The investor or investment-team lead should specify geography, preferred segments, company stage, time horizon and decision to inform. Timing: before company prioritisation. This determines whether the provisional payments and B2B/cross-border screen is relevant.\n\n2. **Reconcile market estimates.** The investment research lead should request the methodology, inclusion criteria, geography, revenue basis and underlying dataset for the USD 85.8 billion-to-USD 370.9 billion forecast [S12] and the greater-than-USD 7 trillion projection [S14]. Timing: before using any TAM in an investment paper.\n\n3. **Verify adoption evidence.** The research lead should obtain the PYMNTS survey population, sample, question wording and denominator behind the 90% figure [S2], then compare it with an independent adoption dataset. Timing: during market-screening validation.\n\n4. **Build the regulatory map.** Legal or compliance should check official regulator guidance and licence registers for payments, e-money, banking, lending, insurance, investments, safeguarding, outsourcing, resilience and data obligations. Timing: before advancing any company assessment.\n\n5. **Test economics.** The investment team should request transaction volume, gross processing revenue, pass-through costs, partner fees, fraud losses, customer-acquisition cost, retention, take rate and contribution margin. Rainforest identifies relevant margin mechanics but does not provide market-wide benchmarks [S16]. Timing: at initial company diligence.\n\n6. **Verify competitive scale.** The research lead should check filings, audited accounts, investor materials and credible databases for active customers, platforms, volume, revenue, growth, market share, funding and profitability for named providers. Timing: before comparative ranking.\n\n7. **Test product-specific risk.** Legal, risk and sector specialists should request underwriting and loss data for lending, claims and capacity data for insurance, and permissions, suitability and customer-outcome data for investments. Timing: before treating any adjacent segment as investable."
+       }
+      ],
+      "topRecommendations": [
+       "Use payments and B2B or cross-border infrastructure as the provisional first-pass screening focus for a generic institutional investor, because these areas have the clearest supplied evidence of adoption, product breadth and provider activity [S2][S4][S11][S14]; treat this as a conditional screen, not a mandate-specific recommendation.",
+       "Require segment-level underwriting rather than relying on the embedded-finance label: compare net revenue, processing and partner costs, contribution margin, retention, customer concentration and value capture, because margins depend on revenue-recognition treatment, processing costs and selling price [S16].",
+       "Make primary regulatory, licence and partner-risk diligence a gating step before advancing any company, with separate workstreams for payments, lending, insurance and investments; the supplied research identifies these products but does not establish permissions, losses, claims, suitability or customer outcomes [S11][S14][S19]."
+      ],
+      "gaps": [
+       "The intended investor geography, preferred sectors, company stage, time horizon and decision context are not recorded.",
+       "The methodologies, definitions, revenue bases and geographic coverage behind the USD 85.8 billion, USD 370.9 billion and greater-than-USD 7 trillion estimates are unavailable [S12][S14].",
+       "The PYMNTS 90% adoption statistic lacks the supplied survey denominator, sample and methodology [S2].",
+       "No primary regulator sources, licence-register checks or jurisdiction-specific regulatory analysis are included.",
+       "The research does not establish provider revenue, transaction volume, market share, profitability, funding, customer scale or comparative unit economics.",
+       "The evidence does not establish how revenue, compliance, fraud, credit, claims, safeguarding or operational risks are allocated among platforms, infrastructure providers, regulated partners and networks."
+      ]
+     }
+    }
+   },
+   "failure": null
+  },
+  {
+   "hash": "80fb6275ac62354b3bf74bfa11a970ced427fee6a98c38b5bf116755d560f927",
+   "taskClass": "STRUCTURED_EXTRACTION",
+   "schemaName": "AnalysisCritiqueResult",
+   "result": {
+    "providerCode": "openai",
+    "modelCode": "gpt-5.6-luna",
+    "taskClass": "STRUCTURED_EXTRACTION",
+    "routingPolicyCode": "structured_extraction.v1",
+    "usage": {
+     "inputTokens": 7902,
+     "outputTokens": 887,
+     "cachedInputTokens": 1454
+    },
+    "latencyMs": 10880,
+    "finish": "COMPLETE",
+    "cost": {
+     "currency": "USD",
+     "amount": 0.00238308,
+     "basis": "PRICE_SNAPSHOT",
+     "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+    },
+    "attempts": [
+     {
+      "attempt": 1,
+      "providerCode": "openai",
+      "modelCode": "gpt-5.6-luna",
+      "outcome": "SUCCESS",
+      "latencyMs": 10880,
+      "usage": {
+       "inputTokens": 7902,
+       "outputTokens": 887,
+       "cachedInputTokens": 1454
+      },
+      "cost": {
+       "currency": "USD",
+       "amount": 0.00238308,
+       "basis": "PRICE_SNAPSHOT",
+       "priceSnapshotId": "a3000000-0000-4000-8000-000000000009"
+      },
+      "candidateIndex": 0
+     }
+    ],
+    "fallbackUsed": false,
+    "providerReference": "resp_04fdbe45c6399b51016ae3d59e966c87d2ba0a2421b626eaee",
+    "route": {
+     "routingPolicyCode": "structured_extraction.v1",
+     "routingPolicyVersion": 1,
+     "candidates": [
+      {
+       "providerCode": "openai",
+       "modelCode": "gpt-5.6-luna",
+       "candidateIndex": 0,
+       "reason": "ELIGIBLE"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash-lite",
+       "candidateIndex": 1,
+       "reason": "PROVIDER_UNCONFIGURED"
+      },
+      {
+       "providerCode": "google",
+       "modelCode": "gemini-3.5-flash",
+       "candidateIndex": 2,
+       "reason": "PROVIDER_UNCONFIGURED"
+      }
+     ],
+     "selectedCandidateIndex": 0,
+     "fallbackUsed": false
+    },
+    "completedAt": "2026-10-29T23:24:24.952Z",
+    "output": {
+     "kind": "STRUCTURED",
+     "value": {
+      "passes": false,
+      "score": 68,
+      "issues": [
+       {
+        "kind": "MISSING_SECTION",
+        "section": "Top recommendations",
+        "problem": "The final three recommendations are visibly truncated with ellipses, so the report does not deliver complete actionable conclusions.",
+        "fix": "Replace each truncated item with complete recommendations stating the action, rationale, owner or accountable party, evidence required, and gating criterion."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Key developments",
+        "problem": "The report labels developments as October, September and August 2026, but the record does not provide those dates for Airwallex, ConnectPay, SDK.finance or FinTechtris evidence.",
+        "fix": "Remove the unsupported month labels or cite only the dates explicitly recorded in the research facts."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Executive summary; Our position; Implications for your thesis",
+        "problem": "The recommendation that payments and B2B or cross-border infrastructure are the strongest or clearest initial screening areas is more decisive than the evidence supports: the evidence is mostly provider marketing and one uncontextualised fintech statistic, not comparative demand, economics or investability evidence.",
+        "fix": "State this only as a narrow research-prioritisation hypothesis, explicitly noting that the available evidence does not establish superior opportunity, returns, defensibility or market attractiveness."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Business models",
+        "problem": "The report presents account or platform fees, FX revenue and revenue-sharing as indicated business models, although the supplied facts directly support processing, interchange-related income and margin mechanics but do not establish those specific pricing models for the market.",
+        "fix": "Separate observed examples from general possibilities and label account fees, FX revenue and revenue-sharing as hypotheses requiring company-level verification."
+       },
+       {
+        "kind": "UNSUPPORTED",
+        "section": "Regulatory risks",
+        "problem": "The report introduces a broad list of regulatory obligations and risks, including safeguarding, AML, sanctions, fraud, complaints, data, outsourcing, suitability and best execution, without jurisdiction-specific evidence in the record.",
+        "fix": "Retain them as diligence questions or generic risk hypotheses, not findings; make clear that no conclusion about applicable obligations can be drawn without jurisdiction and product scope."
+       },
+       {
+        "kind": "MISSING_RISK",
+        "section": "Regulatory risks; Implications for your thesis",
+        "problem": "The report does not sufficiently address the risk that embedded-finance market estimates and category boundaries are inflated by inconsistent definitions or double counting across providers, platforms and products, despite identifying materially incompatible forecasts.",
+        "fix": "Add definition and double-counting risk as a central market-level risk and require a consistent revenue basis before using TAM or growth figures."
+       },
+       {
+        "kind": "WEAK_SIZING",
+        "section": "Market and sizing",
+        "problem": "Although the report appropriately rejects the supplied estimates as comparable, it still describes them as the principal published estimates without giving even the limited forecast assumptions available, such as the implied growth rate or forecast horizon relationship.",
+        "fix": "Label both as source-reported forecasts, preserve their stated dates and bases, calculate no derived market range, and explain that assumptions and methodology are unavailable; optionally state the implied nominal CAGR only if clearly marked as a mechanical calculation, not an evidence-backed forecast."
+       },
+       {
+        "kind": "GENERIC",
+        "section": "Competitive landscape",
+        "problem": "The participant landscape is largely a list of provider descriptions and omits the other principal participant classes requested by the brief—regulated banks, payment networks, processors, specialist lenders, insurers, investment firms and regulators—as identifiable roles in the ecosystem.",
+        "fix": "Add an ecosystem map by participant type and clearly distinguish named evidence-backed examples from participant categories that require further research."
+       },
+       {
+        "kind": "CONTRADICTION",
+        "section": "Key developments",
+        "problem": "The report calls the December 2024 Rainforest evidence 'current structural information' while the record marks it as current only in the research dataset; this wording may imply present market currency that the source date does not establish.",
+        "fix": "Call it a December 2024 source observation and state that its continued applicability has not been independently revalidated."
+       }
+      ],
+      "strengths": [
+       "It correctly refuses to present the incompatible USD 85.8 billion, USD 370.9 billion and greater-than-USD 7 trillion figures as a defensible market size.",
+       "It consistently distinguishes provider self-description from independent market evidence and flags the missing methodology behind the 90% adoption statistic.",
+       "It covers product, business-model, regulatory and operational risks and identifies concrete diligence evidence needed before company-level underwriting."
+      ]
+     }
+    }
+   },
+   "failure": null
+  }
+ ]
+}
