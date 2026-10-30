@@ -209,8 +209,11 @@ describe("the plan job hands the reviewers' points on whole", () => {
     expect(redraft?.fixes).toContain(S1_FIX_R1);
     expect(redraft?.fixes).toContain(S1_FIX_R2);
     expect(redraft?.fixes).toContain(S3_FIX);
-    // Once: step 1's point is one numbered point carrying both fixes.
-    expect(redraft?.fixes?.split(S1_PROBLEM).length).toBe(2);
+    // Once: step 1's point is one numbered point carrying both fixes,
+    // lean: the problem stays out of the redraft (job 32e70db7).
+    expect(redraft?.fixes?.split(S1_FIX_R1).length).toBe(2);
+    expect(redraft?.fixes).toContain(`[s1] ${S1_FIX_R1} Also: ${S1_FIX_R2}`);
+    expect(redraft?.fixes).not.toContain(S1_PROBLEM);
 
     const plan = plans.latest(outcome.planId);
     const open = plan?.review?.openPoints ?? [];

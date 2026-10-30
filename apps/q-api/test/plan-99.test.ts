@@ -8,7 +8,6 @@ import {
   anotherRedraft,
   cappedPoints,
   codeChecks,
-  consistencyChecks,
   mergedPoints,
   personPoint,
   plainFactName,
@@ -17,6 +16,7 @@ import {
   reviewPoints,
   runPlanJob,
   secondPerson,
+  waitingPoint,
   type PlanJobPayload,
 } from "../src/composition/workforce/plan-job.js";
 import {
@@ -284,21 +284,30 @@ describe("1. an integrity verdict must name what it found (job 37655270)", () =>
 });
 
 describe("2. code checks what is structural of the writer's gaps", () => {
-  const fixes = consistencyChecks(steps, LIVE_37655270_SITUATION);
+  const point = waitingPoint(steps, LIVE_37655270_SITUATION);
 
   it("(a) the two messages to Aster waiting for approval (F28, F29) and the profile change (F30) are not decided first", () => {
-    const waiting = fixes.find((fix) =>
-      fix.startsWith("Already waiting for your approval"),
-    );
-    expect(waiting).toContain("F29, F30");
-    expect(waiting).toContain("approve, change or decline");
+    expect(point).toMatchObject({
+      reviewer: "CODE",
+      stepKey: null,
+      refs: ["F28", "F29", "F30"].filter((ref) => ref !== "F28"),
+    });
+    expect(point?.fix).toContain("approve, change or decline F29, F30");
   });
 
   it("only the structural check runs: no rule reads the step's words", () => {
-    // Wording (b), cite support (c) and filing order (d) are judged by the
-    // writer's v4 rules and the reviewers; a share action carries no
-    // document id to check filing order by.
-    expect(fixes).toHaveLength(1);
+    // Wording, cite support and filing order are judged by the writer's v4
+    // rules and the reviewers; a share action carries no document id.
+    const all = codeChecks(
+      {
+        steps,
+        situationRefs: steps.flatMap((step) => step.cites),
+        openQuestions: [],
+      },
+      LIVE_37655270_SITUATION,
+      { droppedCites: 0, droppedSteps: 0 },
+    );
+    expect(all).toEqual([]);
   });
 
   it("a plan that decides the waiting items first passes", () => {
@@ -320,39 +329,8 @@ describe("2. code checks what is structural of the writer's gaps", () => {
       evidenceNeeded: ["Your decision on each card"],
       cites: ["F28", "F29", "F30"],
     };
-    const s1: QPlanStep = {
-      ...take("s1"),
-      title: "Q drafts a revised Aster Africa Ventures update",
-      cites: ["F31", "F40"],
-    };
-    const file: QPlanStep = {
-      ...take("s7"),
-      key: "s8b",
-      title: "File the revised LedgerBridge seed deck in the data room",
-      why: "Step 9 shares it; it has to be in the data room first.",
-      evidenceNeeded: ["The revised deck filed in the data room"],
-    };
-    const fixed = [
-      decide,
-      s1,
-      ...["s2", "s3", "s4", "s5", "s6", "s7"].map(take),
-      file,
-      take("s9"),
-    ];
-    expect(consistencyChecks(fixed, LIVE_37655270_SITUATION)).toEqual([]);
-  });
-
-  it("the checks ride with the rest of code's points", () => {
-    const all = codeChecks(
-      {
-        steps,
-        situationRefs: steps.flatMap((step) => step.cites),
-        openQuestions: [],
-      },
-      LIVE_37655270_SITUATION,
-      { droppedCites: 0, droppedSteps: 0 },
-    );
-    expect(all[0]).toBe(fixes[0]);
+    const fixed = [decide, ...["s1", "s2", "s3"].map(take)];
+    expect(waitingPoint(fixed, LIVE_37655270_SITUATION)).toBeNull();
   });
 });
 
@@ -446,7 +424,9 @@ describe("4. the points the person reads (job 37655270)", () => {
   it("fact labels are whole or plain names, never cut with an ellipsis", () => {
     const step1 = said.find((point) => point.startsWith("Step 1: Remove"));
     expect(step1).toBe(
-      "Step 1: Remove “You created an evidence item (11 times; latest 2026-10-30)” and “You registered a source (9 times; latest 2026-10-30)” from step 1, or add a specific explanation of how those activities affect the update; retain what Q remembers of “LedgerBridge 12-month financial model”.",
+      // Its five full names do not fit in 300 with the fix: each is said
+      // briefly, whole, and none is cut (job 32e70db7's rule).
+      "Step 1: Remove your recent activity and “You registered a source (9 times; latest 2026-10-30)” from step 1, or add a specific explanation of how those activities affect the update; retain what Q remembers, the waiting approval and the interest from “Aster Africa Ventures” as the supporting facts.",
     );
     for (const point of said) expect(point).not.toContain("…");
     // Live it read "…retain “Remembered: 2026-10-30 LedgerBridge 12-month
@@ -457,7 +437,7 @@ describe("4. the points the person reads (job 37655270)", () => {
   it("a range like F28-F29 is said once, meaningfully", () => {
     const step10 = said.find((point) => point.includes("Add an initial step"));
     expect(step10).toContain(
-      "in both approvals waiting for you, “Message Aster Africa Ventures”",
+      "in both approvals “Message Aster Africa Ventures” waiting for you;",
     );
     expect(step10).not.toMatch(/”[-–]“/u);
     // Live: "...in “Waiting for your approval, not approved yet (nothing…”-“Waiting for…”".
@@ -472,16 +452,18 @@ describe("4. the points the person reads (job 37655270)", () => {
     );
     expect(step12).toHaveLength(1);
     expect(step12[0]?.alsoFixes).toHaveLength(1);
-    // 17 raised (as live); step 12 twice under feasibility (R1) and once
-    // under specificity by each reviewer: 15 points.
-    expect(merged).toHaveLength(15);
+    // 17 raised (as live). Merged: R1's two on step 12's feasibility, and
+    // (job 32e70db7's rule) R2's points on steps 1, 6 and 12, which R1
+    // also raised: 12 points.
+    expect(merged).toHaveLength(12);
   });
 
   it("nothing is dropped silently: past 12, the last place says how many more", () => {
-    const capped = cappedPoints([...new Set(said)]);
+    const many = [...new Set(said), "One more.", "And another."];
+    const capped = cappedPoints(many);
     expect(capped).toHaveLength(12);
     expect(capped[11]).toBe(
-      `And ${String(said.length - 11)} more points the reviews raised.`,
+      `And ${String(many.length - 11)} more points the reviews raised.`,
     );
     expect(cappedPoints(["a", "b"])).toEqual(["a", "b"]);
   });
@@ -491,10 +473,23 @@ describe("4. the points the person reads (job 37655270)", () => {
     expect(said).toContain(
       "Step 10: Decide on the existing pending proposal first; prepare a new proposal only if it is declined, expires or is otherwise no longer usable.",
     );
-    expect(said.find((point) => point.includes("draft-only"))).toContain(
-      "so you must approve the revised Aster update",
-    );
-    expect(said.find((point) => point.startsWith("Step 6: State"))).toBe(
+    // R2's step 1 point is merged into R1's; said alone, it is "you".
+    expect(
+      personPoint(
+        "[s1] x Fix: Make this step explicitly draft-only and add a subsequent approval step, or change the action and approval status so Tunde must approve the revised Aster update before it is used or sent.",
+        steps,
+        facts,
+        "Tunde Bello",
+      ),
+    ).toContain("so you must approve the revised Aster update");
+    expect(
+      personPoint(
+        "[s6] x Fix: State that Tunde should add verified figures where available and label each unavailable metric as unknown or an estimate, with a specific source or calculation method for any estimate.",
+        steps,
+        facts,
+        "Tunde Bello",
+      ),
+    ).toBe(
       "Step 6: State that you should add verified figures where available and label each unavailable metric as unknown or an estimate, with a specific source or calculation method for any estimate.",
     );
     expect(
@@ -505,7 +500,7 @@ describe("4. the points the person reads (job 37655270)", () => {
   it("plain names for the situation's kinds of fact", () => {
     const name = (ref: string) => plainFactName(facts.get(ref) ?? "").one;
     expect(name("F28")).toBe(
-      "the approval waiting for you, “Message Aster Africa Ventures”",
+      "the approval “Message Aster Africa Ventures” waiting for you",
     );
     expect(name("F42")).toBe("your document “LedgerBridge seed deck”");
     expect(name("F16")).toBe(

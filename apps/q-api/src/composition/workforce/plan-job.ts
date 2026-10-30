@@ -786,7 +786,6 @@ export function codeChecks(
       );
     }
   }
-  fixes.push(...consistencyChecks(plan.steps, dossier));
   for (const section of dossier.sections) {
     if (section.status !== "READ" || section.facts.length === 0) continue;
     if (section.source === "MEMORY" || section.source === "Q_DAILY") continue;
@@ -816,32 +815,30 @@ export function codeChecks(
  * the writer's rules (PLAN_WRITE v4) and the reviewers. (A share's action
  * carries no document id, so filing order cannot be checked structurally.)
  */
-export function consistencyChecks(
+export function waitingPoint(
   steps: readonly QPlanStep[],
   dossier: QSituationDossier,
-): readonly string[] {
-  const fixes: string[] = [];
-  const facts = situationFacts(dossier);
-  const waiting = facts
+): ReviewPoint | null {
+  const waiting = situationFacts(dossier)
     .filter((fact) => fact.provenance.tool === SITUATION_TOOLS.approvals)
     .map((fact) => fact.ref);
-  if (waiting.length > 0 && steps.length > 0) {
-    const decidesWaiting = (step: QPlanStep) =>
-      step.cites.some((cite) => waiting.includes(cite));
-    let lead = 0;
-    for (const step of steps) {
-      if (!decidesWaiting(step)) break;
-      lead += 1;
-    }
-    const decided = new Set(steps.slice(0, lead).flatMap((step) => step.cites));
-    const left = waiting.filter((ref) => !decided.has(ref));
-    if (left.length > 0) {
-      fixes.push(
-        `Already waiting for your approval and not decided first: ${left.join(", ")}. Open the plan with a step that asks you to approve, change or decline each waiting item on its card, citing it, before any new draft of the same thing (a replacement only after you decline or change it).`,
-      );
-    }
+  if (waiting.length === 0 || steps.length === 0) return null;
+  let lead = 0;
+  for (const step of steps) {
+    if (!step.cites.some((cite) => waiting.includes(cite))) break;
+    lead += 1;
   }
-  return fixes;
+  const decided = new Set(steps.slice(0, lead).flatMap((step) => step.cites));
+  const left = waiting.filter((ref) => !decided.has(ref));
+  if (left.length === 0) return null;
+  return {
+    reviewer: "CODE",
+    item: "situationCoverage",
+    stepKey: null,
+    refs: left,
+    problem: `Already waiting for your approval and not decided first: ${left.join(", ")}.`,
+    fix: `Open the plan with a step that asks you to approve, change or decline ${left.join(", ")} on its card, before any new draft of the same thing.`,
+  };
 }
 
 // --- reviews ---------------------------------------------------------------------
@@ -920,13 +917,31 @@ export function reviewOf(
 
 /** What a reviewer still wants, kept whole: the problem and its fix apart. */
 export type ReviewPoint = {
-  readonly reviewer: "R1" | "R2";
+  /** CODE: code's own structural check (waiting approvals first). */
+  readonly reviewer: "R1" | "R2" | "CODE";
   /** The rubric item it was deducted under ("firewall" for a breach). */
   readonly item: keyof typeof PLAN_RUBRIC_V1 | "firewall";
   readonly stepKey: string | null;
   readonly problem: string;
   readonly fix: string;
+  /**
+   * The situation refs it concerns (PLAN_REVIEW v5's refs, with any ref
+   * code its words carry); absent: read from its words' ref codes.
+   */
+  readonly refs?: readonly string[];
 };
+
+/** Ref codes (F12, P3) a text carries: codes, never the prose around them. */
+const refCodes = (text: string): string[] =>
+  [...text.matchAll(/\b[FP][1-9]\d{0,3}\b/gu)].map((match) => match[0]);
+
+/** A point's refs: its own, else the codes its words carry. */
+export function pointRefs(point: ReviewPoint): ReadonlySet<string> {
+  return new Set([
+    ...(point.refs ?? []),
+    ...refCodes(`${point.problem} ${point.fix}`),
+  ]);
+}
 
 /** Integrity first, then the items a redraft most often misses. */
 const REVIEW_ORDER: readonly (keyof typeof PLAN_RUBRIC_V1)[] = [
@@ -968,14 +983,16 @@ export function reviewPoints(
     item: ReviewPoint["item"],
     defect: Pick<ReviewPoint, "problem" | "fix"> & {
       readonly stepKey: string | null;
+      readonly refs?: readonly string[];
     },
   ) => {
-    const point = {
+    const point: ReviewPoint = {
       reviewer,
       item,
       stepKey: defect.stepKey,
       problem: defect.problem.trim(),
       fix: defect.fix.trim(),
+      ...(defect.refs === undefined ? {} : { refs: [...defect.refs] }),
     };
     if (!points.some((one) => samePoint(one, point))) points.push(point);
   };
@@ -1020,34 +1037,60 @@ function samePoint(a: ReviewPoint, b: ReviewPoint): boolean {
 }
 
 /**
- * Both reviewers' points as one list: the same step's deduction under the
- * same rubric item is one point, whoever raised it (the first words, every
- * other distinct fix kept for the redraft). Structural only: the step and
- * the rubric item each reviewer chose, never the wording. Live 2026-10-30
- * (job 37655270): R1 asked twice under feasibility for step 12, and the
- * person read both.
+ * Both reviewers' points (and code's) as one list, merged by structure,
+ * never by wording:
+ *   - on the same step: one point when the rubric item is the same, or
+ *     when the other reviewer raised it (live 2026-10-30, job 32e70db7: both
+ *     asked for step 7's finishing action under different items);
+ *   - on no step: one point when they share a situation ref (both asked
+ *     for the waiting profile update, F30, and for organisation
+ *     verification).
+ * A firewall point merges only with a firewall point. The first words are
+ * kept; every other distinct fix rides along for the redraft.
  */
 export function mergedPoints(
   points: readonly ReviewPoint[],
 ): readonly (ReviewPoint & { readonly alsoFixes: readonly string[] })[] {
   const merged: (ReviewPoint & { alsoFixes: string[] })[] = [];
-  for (const point of points) {
-    const same = merged.find(
-      (one) =>
-        one.stepKey !== null &&
+  const sameThing = (one: ReviewPoint, point: ReviewPoint) => {
+    if ((one.item === "firewall") !== (point.item === "firewall")) return false;
+    if (one.stepKey !== null || point.stepKey !== null) {
+      return (
         one.stepKey === point.stepKey &&
-        one.item === point.item,
-    );
+        (one.item === point.item || one.reviewer !== point.reviewer)
+      );
+    }
+    const theirs = pointRefs(point);
+    return [...pointRefs(one)].some((ref) => theirs.has(ref));
+  };
+  for (const point of points) {
+    if (merged.some((one) => samePoint(one, point))) continue;
+    const same = merged.find((one) => sameThing(one, point));
     if (same === undefined) {
-      if (!merged.some((one) => samePoint(one, point))) {
-        merged.push({ ...point, alsoFixes: [] });
-      }
+      merged.push({ ...point, alsoFixes: [] });
       continue;
     }
     const fixes = [same.fix, ...same.alsoFixes].map(plainKey);
     if (!fixes.includes(plainKey(point.fix))) same.alsoFixes.push(point.fix);
   }
   return merged;
+}
+
+/**
+ * A point as the redraft reads it, lean: the step and the change wanted
+ * (and the other fixes merged into it); the problem only for a firewall
+ * point, whose exposed words the writer must see. Live 2026-10-30 (job
+ * 32e70db7): problem and fix together filled the 6,000-character fixes and
+ * the redraft ran past its 90 s limit.
+ */
+export function redraftLine(
+  point: Pick<ReviewPoint, "stepKey" | "problem" | "fix" | "item"> & {
+    readonly alsoFixes?: readonly string[];
+  },
+): string {
+  const also = (point.alsoFixes ?? []).map((fix) => ` Also: ${fix}`).join("");
+  const why = point.item === "firewall" ? `${point.problem} Fix: ` : "";
+  return `${point.stepKey === null ? "" : `[${point.stepKey}] `}${why}${point.fix}${also}`;
 }
 
 /** "[s2] problem Fix: fix" -- whole, never cut (the redraft reads it). */
@@ -1554,6 +1597,8 @@ export async function runPlanJob(
   /** A passing review's unnamed integrity flag: said, never passed over. */
   let unnamedPassing: ReviewPoint[] = [];
   let lastRedraftMs: number | null = null;
+  /** The last redraft did not come back: the draft shown is the reviewed one. */
+  let redraftFailed = false;
   const rounds: {
     round: number;
     scores: number[];
@@ -1664,7 +1709,11 @@ export async function runPlanJob(
       ...said
         .filter((text) => !heard.includes(text))
         .map((text) => `The person asked for this change: ${text}`),
-      ...mergedPoints([...failing, ...unnamedPassing]).map(pointText),
+      ...mergedPoints([
+        ...optional(waitingPoint(grounded.steps, dossier)),
+        ...failing,
+        ...unnamedPassing,
+      ]).map(redraftLine),
       ...code,
     ];
     if (fixes.length === 0) break;
@@ -1692,15 +1741,32 @@ export async function runPlanJob(
     });
     lastRedraftMs = clock() - stepStart;
     timings.push({ step: `redraft${String(round)}`, ms: lastRedraftMs });
-    if (again === null) break;
-    const regrounded = groundPlan({
-      written: again,
-      dossier,
-      roster,
-      priorKeys: keysOfGrounded(grounded),
-      eligibleTools,
-    });
-    if (regrounded.steps.length === 0) break;
+    const regrounded =
+      again === null
+        ? null
+        : groundPlan({
+            written: again,
+            dossier,
+            roster,
+            priorKeys: keysOfGrounded(grounded),
+            eligibleTools,
+          });
+    if (regrounded === null || regrounded.steps.length === 0) {
+      // Live 2026-10-30 (job 32e70db7): the redraft hit its time limit and
+      // the reviewed draft was filed while the card said "Draft 2". It
+      // never existed: the count and the card say the draft shown, which
+      // is the one the reviews are of. No retry: after write, review and a
+      // timed-out redraft (72 + 38 + 120 s), another attempt and its
+      // review (about 73 + 38 s) would pass the ~330 s budget.
+      redrafts -= 1;
+      redraftFailed = true;
+      dependencies.logger?.warn(
+        { jobId: input.jobId, round, ms: lastRedraftMs },
+        "plan redraft did not finish; the reviewed draft is offered",
+      );
+      progress({ stage: "PLANNING", draft: round, drafts: round });
+      break;
+    }
     grounded = regrounded;
   }
 
@@ -1708,14 +1774,18 @@ export async function runPlanJob(
     reviews.length === 2 && reviews.every((review) => review.passed);
   const remainingCode = codeChecks(grounded, dossier, grounded);
   const openPoints = [
+    ...(redraftFailed ? [FIRST_DRAFT_ONLY] : []),
     ...(reviews.length < 2
       ? ["One of the two reviews could not be completed."]
       : []),
-    // Whole points, one per step and rubric item across both reviewers
-    // (live 2026-10-30: the same "add F55 to step 1" twice, once each).
-    ...mergedPoints([...failing, ...unnamedPassing]).map((point) =>
-      pointText({ ...point, alsoFixes: [] }),
-    ),
+    // Merged by structure (step, rubric item, shared refs); a waiting
+    // approval no step decides comes first, so a cap never hides it (live
+    // 2026-10-30: F30 was left to a redraft that timed out).
+    ...mergedPoints([
+      ...(fullyReviewed ? [] : optional(waitingPoint(grounded.steps, dossier))),
+      ...failing,
+      ...unnamedPassing,
+    ]).map((point) => pointText({ ...point, alsoFixes: [] })),
     ...remainingCode,
   ];
   // What the reviewers still want, in the person's words: "Step 2: …",
@@ -1964,20 +2034,125 @@ export function personPoint(
   const key = match?.[1] ?? null;
   const body = match?.[2] ?? point.trim();
   const [problem = "", fix] = body.split(/\s*Fix:\s*/u);
-  const wanted = withoutRefs(
-    namedFacts(
-      plainReviewWords(
-        secondPerson((fix ?? problem).trim(), personName),
-        steps,
-      ),
-      facts,
-    ),
-  ).replace(/^./u, (letter) => letter.toUpperCase());
   const index = key === null ? -1 : steps.findIndex((one) => one.key === key);
-  return sentenceClip(
-    index === -1 ? wanted : `Step ${String(index + 1)}: ${wanted}`,
-    300,
+  const prefix = index === -1 ? "" : `Step ${String(index + 1)}: `;
+  const raw = plainReviewWords(
+    secondPerson((fix ?? problem).trim(), personName),
+    steps,
   );
+  // Fact names go in whole; when the note would pass 300, the reviewer's
+  // own prose is shortened, never a name (live 2026-10-30, job 32e70db7:
+  // cut after the names were put in, a note kept F40 of F40, F53 and F34).
+  const room = 300 - prefix.length;
+  const size = (pieces: readonly { text: string }[]) =>
+    pieces.reduce((sum, part) => sum + part.text.length, 0);
+  // Full names when they fit; else the longest names said briefly (no
+  // quotation), one at a time; only then the reviewer's own prose is
+  // shortened. A name is never cut.
+  const brief = new Set<string>();
+  const byLength = [...new Set(refCodes(raw))]
+    .map((ref) => {
+      const statement = facts?.get(ref);
+      return {
+        ref,
+        length:
+          statement === undefined ? 0 : plainFactName(statement).one.length,
+      };
+    })
+    .sort((a, b) => b.length - a.length);
+  let parts = withNames(raw, facts, brief);
+  for (const { ref } of byLength) {
+    if (size(parts) <= room) break;
+    brief.add(ref);
+    parts = withNames(raw, facts, brief);
+  }
+  for (let tries = 0; tries < 4; tries += 1) {
+    const length = parts.reduce((sum, part) => sum + part.text.length, 0);
+    if (length <= room) break;
+    const longest = parts
+      .filter((part) => !part.name)
+      .reduce<{ text: string; name: boolean } | null>(
+        (best, part) =>
+          best === null || part.text.length > best.text.length ? part : best,
+        null,
+      );
+    if (longest === null) break;
+    longest.text = shortened(
+      longest.text,
+      longest.text.length - (length - room) - 2,
+    );
+  }
+  const wanted = withoutRefs(parts.map((part) => part.text).join("")).replace(
+    /^./u,
+    (letter) => letter.toUpperCase(),
+  );
+  return quoteSafeClip(`${prefix}${wanted}`, 300);
+}
+
+/** The text in pieces: the reviewer's prose, and each ref run as its plain names. */
+function withNames(
+  text: string,
+  facts: ReadonlyMap<string, string> | undefined,
+  brief: ReadonlySet<string>,
+): { text: string; name: boolean }[] {
+  if (facts === undefined) return [{ text, name: false }];
+  const parts: { text: string; name: boolean }[] = [];
+  let at = 0;
+  for (const match of text.matchAll(REF_RUN)) {
+    parts.push({ text: text.slice(at, match.index), name: false });
+    parts.push({ text: namedFacts(match[0], facts, brief), name: true });
+    at = match.index + match[0].length;
+  }
+  parts.push({ text: text.slice(at), name: false });
+  return parts;
+}
+
+/**
+ * Prose cut to about `max`: its own lead-in to a name (", citing ") is
+ * kept; the rest is cut at a clause, else word, break and marked as cut.
+ */
+function shortened(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const lead = /,?\s+\S+\s+$/u.exec(text)?.[0] ?? "";
+  const body = text.slice(0, text.length - lead.length);
+  const room = body.slice(0, Math.max(0, max - lead.length - 1));
+  const clause = Math.max(room.lastIndexOf(", "), room.lastIndexOf("; "));
+  const space = room.lastIndexOf(" ");
+  const cut =
+    clause > room.length / 2 ? clause : space > 0 ? space : room.length;
+  return `${room.slice(0, cut).replace(/[\s,;:]+$/u, "")}\u2026${lead}`;
+}
+
+/**
+ * Cut to `max` at the last sentence end, else clause or word break, that
+ * lies outside a quotation, closed with a full stop -- never inside a
+ * quoted name (live 2026-10-30: a note lost its closing quote and the
+ * facts after it when it was cut at 300 after the names were put in).
+ */
+export function quoteSafeClip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let depth = 0;
+  let sentence = -1;
+  let clause = -1;
+  let word = -1;
+  for (let at = 0; at < max; at += 1) {
+    const char = text[at];
+    if (char === "\u201C") depth += 1;
+    else if (char === "\u201D") depth = Math.max(0, depth - 1);
+    if (depth > 0) continue;
+    const next = text[at + 1];
+    if ((char === "." || char === "!" || char === "?") && next === " ") {
+      sentence = at + 1;
+    } else if ((char === ";" || char === ",") && at < max - 1) {
+      clause = at;
+    } else if (char === " ") {
+      word = at;
+    }
+  }
+  if (sentence >= max / 3) return text.slice(0, sentence).trim();
+  const cut = clause > max / 2 ? clause : word > 0 ? word : -1;
+  if (cut === -1) return text.slice(0, max - 1).trim();
+  return `${text.slice(0, cut).replace(/[\s,;:]+$/u, "")}.`;
 }
 
 const REF = "[FP][1-9]\\d{0,3}";
@@ -2018,6 +2193,8 @@ function refsOf(run: string): readonly string[] {
 type PlainName = {
   readonly one: string;
   readonly many: (count: number) => string;
+  /** No quotation: what a note says when its full names do not fit. */
+  readonly brief: string;
 };
 
 const both = (count: number) => (count === 2 ? "both" : `all ${String(count)}`);
@@ -2038,42 +2215,108 @@ export function plainFactName(statement: string): PlainName {
   const text = statement.replace(/\s+/gu, " ").trim();
   const quote = (label: string) =>
     `\u201C${label.replace(/[.\s]+$/u, "")}\u201D`;
-  const named = (one: string, plural: string, label: string): PlainName => ({
-    one: `${one} ${quote(label)}`,
-    many: (count) => `${both(count)} ${plural} ${quote(label)}`,
+  const named = (
+    one: string,
+    plural: string,
+    label: string,
+    brief: string,
+    after = "",
+  ): PlainName => ({
+    one: `${one} ${quote(label)}${after}`,
+    many: (count) => `${both(count)} ${plural} ${quote(label)}${after}`,
+    brief,
+  });
+  const fixed = (one: string, brief = one): PlainName => ({
+    one,
+    many: () => one,
+    brief,
   });
   const waiting = /^Waiting for your approval[^:]*\):\s*(.+)$/u.exec(text);
   if (waiting?.[1] !== undefined) {
     return named(
-      "the approval waiting for you,",
-      "approvals waiting for you,",
+      "the approval",
+      "approvals",
       waiting[1],
+      "the waiting approval",
+      " waiting for you",
     );
   }
   const reminder = /^Reminder "([^"]+)"/u.exec(text);
   if (reminder?.[1] !== undefined) {
-    return named("your reminder", "of your reminders", reminder[1]);
+    return named(
+      "your reminder",
+      "of your reminders",
+      reminder[1],
+      "your reminder",
+    );
   }
   const board = /^On your board[^"]*"([^"]+)"/u.exec(text);
   if (board?.[1] !== undefined) {
-    return named("your board task", "of your board tasks", board[1]);
+    return named(
+      "your board task",
+      "of your board tasks",
+      board[1],
+      "your board task",
+    );
   }
   const document = /^(?:Data room document|Your document) "([^"]+)"/u.exec(
     text,
   );
   if (document?.[1] !== undefined) {
-    return named("your document", "of your documents", document[1]);
+    return named(
+      "your document",
+      "of your documents",
+      document[1],
+      "your document",
+    );
+  }
+  // Their own recent acts (ACTIVITY): "You created an evidence item (11 times; ...)".
+  if (/^You \S+ .{2,60} \(\d+ times?;/u.test(text) && text.length <= 80) {
+    return fixed(quote(text), "your recent activity");
+  }
+  // "Remembered: They said (2026-10-29): ..." is what they told Q that day.
+  const told = /^Remembered:\s*They said \((\d{4}-\d{2}-\d{2})\)/u.exec(text);
+  if (told?.[1] !== undefined) {
+    return fixed(`what you told Q on ${told[1]}`, "what you told Q");
   }
   const memory = /^Remembered:\s*(?:\d{4}-\d{2}-\d{2}\s+)?([^:]{3,80}):/u.exec(
     text,
   );
-  if (memory?.[1] !== undefined && !/^They said/u.test(memory[1])) {
-    return named("what Q remembers of", "notes Q remembers of", memory[1]);
+  if (memory?.[1] !== undefined) {
+    return named(
+      "what Q remembers of",
+      "notes Q remembers of",
+      memory[1],
+      "what Q remembers",
+    );
+  }
+  if (/^Remembered:/u.test(text)) return fixed("what Q remembers");
+  const interest =
+    /^(.{2,80}?) \([^)]{1,40}\) expressed interest on \d{4}-\d{2}-\d{2}/u.exec(
+      text,
+    );
+  if (interest?.[1] !== undefined) {
+    return named(
+      "the interest from",
+      "notes of interest from",
+      interest[1],
+      "the investor's interest",
+    );
+  }
+  if (/^Current raise \(/u.test(text)) return fixed("your current raise");
+  const toldQ = /^You told Q:\s*(.+)$/u.exec(text);
+  if (toldQ?.[1] !== undefined) {
+    return fixed(
+      toldQ[1].length <= 60
+        ? `what you told Q, ${quote(toldQ[1])}`
+        : "what you told Q",
+      "what you told Q",
+    );
   }
   const deck = /^Your deck's ([^:]{2,40}):/u.exec(text);
   if (deck?.[1] !== undefined) {
-    const one = `your deck's ${deck[1]} section`;
-    return { one, many: () => one };
+    // "Your deck's the ask: ..." is the deck's ask section.
+    return fixed(`your deck's ${deck[1].replace(/^the\s+/iu, "")} section`);
   }
   const reading = /^(Readiness|Action plan step):\s*(.{3,80}?)\s+\u2014/u.exec(
     text,
@@ -2083,27 +2326,29 @@ export function plainFactName(statement: string): PlainName {
       reading[1] === "Readiness"
         ? "the readiness reading"
         : "the action plan step";
-    return named(kind, `${kind.replace(/^the /u, "of the ")}s`, reading[2]);
+    return named(
+      kind,
+      `${kind.replace(/^the /u, "of the ")}s`,
+      reading[2],
+      kind,
+    );
   }
-  if (text.length <= 140) {
-    const whole = quote(text);
-    return { one: whole, many: () => whole };
-  }
-  const sentence = /^(.{20,140}?[.!?])(?:\s|$)/u.exec(text)?.[1];
-  if (sentence !== undefined) {
-    const whole = quote(sentence);
-    return { one: whole, many: () => whole };
-  }
-  const head = /^([^:;(]{3,80})[:;(]/u.exec(text)?.[1];
-  const one =
-    head === undefined ? "the record it rests on" : `the record ${quote(head)}`;
-  return { one, many: () => one };
+  // Short: whole. Longer: a short plain name, never the fact's full text.
+  if (text.length <= 80) return fixed(quote(text), "the record");
+  const sentence = /^(.{20,80}?[.!?])(?:\s|$)/u.exec(text)?.[1];
+  if (sentence !== undefined) return fixed(quote(sentence), "the record");
+  const head = /^([^:;(]{3,60})[:;(]/u.exec(text)?.[1];
+  return fixed(
+    head === undefined ? "the record it rests on" : `the record ${quote(head)}`,
+    "the record",
+  );
 }
 
 /** Fact refs said by their plain names; a run said once; an unknown ref is "the record". */
 function namedFacts(
   text: string,
   facts: ReadonlyMap<string, string> | undefined,
+  brief: ReadonlySet<string> = new Set(),
 ): string {
   if (facts === undefined) return text;
   return text.replace(REF_RUN, (run) => {
@@ -2112,17 +2357,28 @@ function namedFacts(
       const statement = facts.get(ref);
       const name: PlainName =
         statement === undefined
-          ? { one: "the record", many: () => "the records" }
+          ? {
+              one: "the record",
+              many: () => "the records",
+              brief: "the record",
+            }
           : plainFactName(statement);
-      const seen = names.get(name.one);
-      names.set(name.one, { name, count: (seen?.count ?? 0) + 1 });
+      const short = brief.has(ref);
+      const key = short ? `\u0000${name.brief}` : name.one;
+      const seen = names.get(key);
+      names.set(key, {
+        name: short
+          ? { ...name, one: name.brief, many: () => name.brief }
+          : name,
+        count: (seen?.count ?? 0) + 1,
+      });
     }
     const said = [...names.values()].map(({ name, count }) =>
       count > 1 ? name.many(count) : name.one,
     );
     return said.length <= 1
       ? (said[0] ?? "the record")
-      : `${said.slice(0, -1).join("; ")} and ${said.at(-1) ?? ""}`;
+      : `${said.slice(0, -1).join(", ")} and ${said.at(-1) ?? ""}`;
   });
 }
 
@@ -2215,12 +2471,19 @@ export function cappedPoints(points: readonly string[], max = 12): string[] {
   const kept = points.filter((point) => point.length > 0);
   if (kept.length <= max) return kept;
   const shown = kept.slice(0, max - 1);
-  const more = kept.length - shown.length;
-  return [
-    ...shown,
-    `And ${String(more)} more point${more === 1 ? "" : "s"} the reviews raised.`,
-  ];
+  return [...shown, morePoints(kept.length - shown.length)];
 }
+
+const morePoints = (more: number) =>
+  `And ${String(more)} more point${more === 1 ? "" : "s"} the reviews raised.`;
+/** The count code's own cap line (morePoints) stands for; 0 for any other. */
+const MORE_POINTS = /^And (\d+) more points? the reviews raised\.$/u;
+
+/** Said first when the redraft did not come back (live 2026-10-30, job 32e70db7). */
+export const FIRST_DRAFT_ONLY =
+  "This is the first draft: its revision could not finish in time, so the reviews below are of this draft.";
+
+const optional = <T>(value: T | null): T[] => (value === null ? [] : [value]);
 
 /** The plan card: a reference the client reads under the person's authority. */
 export function planBlockOf(plan: QPlan): QPlanBlock {
@@ -2253,16 +2516,29 @@ export function planReadyLine(
   ];
   if (first !== undefined) lines.push(`First: ${first.title}`);
   if (plan.review?.fullyReviewed !== true) {
-    const open = plan.review?.openPoints ?? [];
+    const all = plan.review?.openPoints ?? [];
+    const firstOnly = all[0] === FIRST_DRAFT_ONLY;
+    const listed = all.filter(
+      (point) => point !== FIRST_DRAFT_ONLY && !MORE_POINTS.test(point),
+    );
+    // The card's own count: what it lists plus what its cap line stands
+    // for (live 2026-10-30: chat "and 10 more", card "And 5 more").
+    const capped = all
+      .map((point) => Number(MORE_POINTS.exec(point)?.[1] ?? 0))
+      .reduce((sum, count) => sum + count, 0);
+    const more = listed.length - 2 + capped;
+    const lead = firstOnly
+      ? "It's the first draft: its revision couldn't finish in time, so the reviews are of this draft and didn't pass it yet."
+      : "It's a draft: the two reviews didn't pass it yet.";
     lines.push(
-      open.length === 0
-        ? "It's a draft: the two reviews didn't pass it yet."
-        : `It's a draft: the two reviews didn't pass it yet. What they still want: ${open
+      listed.length === 0
+        ? lead
+        : `${lead} What they still want: ${listed
             .slice(0, 2)
             .map((point) => point.replace(/[.\s]+$/u, ""))
             .join(
               "; ",
-            )}${open.length > 2 ? `; and ${String(open.length - 2)} more on the card` : ""}.`,
+            )}${more > 0 ? `; and ${String(more)} more on the card` : ""}.`,
     );
   }
   if (clarification !== null) {
