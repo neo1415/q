@@ -944,9 +944,25 @@ export function reviewLines(
   const byStep = new Map(
     view.responses.map((response) => [response.stepKey, response.value]),
   );
+  const notes = new Map(
+    view.responses.map((response) => [response.stepKey, response.note]),
+  );
   const eligible = new Set(
     view.progress.eligibleSteps.map((step) => step.stepKey),
   );
+  /**
+   * Sweep D8 (2026-10-29): "Based in · Somewhere else" hid what they said.
+   * An answer kept in their words beside the catch-all shows those words.
+   */
+  const shown = (key: string, value: OnboardingResponseValue): string => {
+    const note = notes.get(key) ?? null;
+    return value.type === "SINGLE_SELECT" &&
+      value.optionKey === "other" &&
+      note !== null &&
+      note.trim().length > 0
+      ? note.trim()
+      : vocabulary.describe(key, value, labels);
+  };
   return vocabulary.reviewGroups
     .map((group) => ({
       label: group.label,
@@ -957,10 +973,7 @@ export function reviewLines(
           return {
             stepKey: key,
             title: vocabulary.stepTitle(key),
-            value:
-              value === undefined
-                ? null
-                : vocabulary.describe(key, value, labels),
+            value: value === undefined ? null : shown(key, value),
             editorId: vocabulary.editorFor(key),
           };
         }),

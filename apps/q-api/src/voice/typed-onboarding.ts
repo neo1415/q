@@ -91,6 +91,13 @@ export function createTypedOnboarding(dependencies: {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   /** Sessions whose whole record code read back for their yes. */
   const readBackShown = new Set<string>();
+  /**
+   * Sessions whose person asked to finish while essentials were still
+   * open (sweep D1, 2026-10-29: "please finish", Q asked the last
+   * essential, they answered, and Q went on to an optional question).
+   * Their next answers go on toward finishing until the read-back.
+   */
+  const finishAsked = new Set<string>();
 
   return {
     turn: async (input) => {
@@ -278,6 +285,7 @@ export function createTypedOnboarding(dependencies: {
       const agreedToReadBack =
         readBackReview !== null &&
         authority?.stated.has(readBackReview) === true;
+      const stillFinishing = finishAsked.has(input.onboardingSessionId);
 
       let text: string;
       let asking: string | null = null;
@@ -295,7 +303,11 @@ export function createTypedOnboarding(dependencies: {
         navigate = destination(false);
         pausing = true;
         path = "PAUSING";
-      } else if (authority?.finishing === true || agreedToReadBack) {
+      } else if (
+        authority?.finishing === true ||
+        agreedToReadBack ||
+        stillFinishing
+      ) {
         await conversation.flush?.(line);
         const finishing = portOf(true);
         const finished = await finishing.finish();
@@ -311,6 +323,13 @@ export function createTypedOnboarding(dependencies: {
         });
         if (review !== undefined && said !== null) {
           readBackShown.add(input.onboardingSessionId);
+        }
+        // Still open essentials: their next answer goes on toward the
+        // finish. Finished, or read back for their yes: that yes decides.
+        if (!finished.completed && finished.missing.length > 0) {
+          finishAsked.add(input.onboardingSessionId);
+        } else {
+          finishAsked.delete(input.onboardingSessionId);
         }
         text =
           said?.reply ??
@@ -351,7 +370,8 @@ export function createTypedOnboarding(dependencies: {
         navigate,
         pausing,
         path,
-        finishing: authority?.finishing === true || agreedToReadBack,
+        finishing:
+          authority?.finishing === true || agreedToReadBack || stillFinishing,
       });
 
       /** Q's line kept with the step it asks, and the screen's outcome. */

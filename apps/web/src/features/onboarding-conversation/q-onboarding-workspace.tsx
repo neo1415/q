@@ -156,6 +156,9 @@ import { WorkingLine } from "@/components/working/working-line";
  * rebuilt from the session on every load, and the session is the runtime's.
  */
 
+/** When the session is read again after a typed turn, for its reading. */
+const SETTLE_REFRESH_MS = [4_000, 10_000] as const;
+
 export type QOnboardingWorkspaceActions = {
   /**
    * One turn of the interview, held by the one Q interviewer (QX-004 core
@@ -989,6 +992,20 @@ export function QOnboardingWorkspace({
     [push, qSubject, answerOf, view?.session.id],
   );
 
+  /**
+   * Sweep D8 (2026-10-29): what a typed line said is saved by a reading
+   * that lands just after Q replies, so the progress counter showed the
+   * turn before. The session is read again as that reading usually lands
+   * (bounded: two reads), so the counter and the review catch up.
+   */
+  const settleAfterReading = useCallback(() => {
+    for (const ms of SETTLE_REFRESH_MS) {
+      window.setTimeout(() => {
+        void actions.refresh();
+      }, ms);
+    }
+  }, [actions]);
+
   /** The Continue later leaving, declared below; a pausing typed turn uses it. */
   const leaveLaterRef = useRef<(() => void) | null>(null);
   const sayOne = useCallback(
@@ -1061,6 +1078,7 @@ export function QOnboardingWorkspace({
       if (turn !== null && draftId !== undefined) {
         confirmSent(draftId, trimmed);
       }
+      if (turn !== null) settleAfterReading();
       if (turn === null) {
         // Q never answered (a failure, a timeout, a lost connection). The
         // line says so and can be sent again; it is never left looking
@@ -1207,6 +1225,7 @@ export function QOnboardingWorkspace({
       journeyName,
       view?.session.id,
       onFinished,
+      settleAfterReading,
     ],
   );
 

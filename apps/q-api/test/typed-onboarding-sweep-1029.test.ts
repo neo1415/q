@@ -339,3 +339,35 @@ describe("sweep D2: a listed option named with more detail", () => {
     expect(offered[0]).not.toContain("other");
   });
 });
+
+describe("sweep D1: asked to finish, the last essential answered", () => {
+  it("goes on to the finish's read-back, never to an optional question", async () => {
+    const recorded = everyEssential();
+    delete recorded["I10.inbound_preference"];
+    const world = investorSession({
+      currentStepKey: "I10.inbound_preference",
+      subject: FIRM,
+      recorded,
+    });
+    let calls = 0;
+    const say = typedWorld({
+      world,
+      // Only their first line reads as finishing; the answer after it
+      // reads as nothing in particular.
+      authority: () =>
+        (calls += 1) === 1 ? reading({ finishing: true }) : reading({}),
+    });
+    const first = await say("That's everything, please finish my setup.");
+    expect(first.reply).toMatch(/^Before I can finish/u);
+    // Their answer, saved as the background reading would.
+    world.record("I10.inbound_preference", {
+      type: "SINGLE_SELECT",
+      optionKey: "qualified",
+    });
+    const second = await say("Only well-matched founders.");
+    expect(second.reply).toMatch(/^Here's what I have saved:/u);
+    expect(second.reply).not.toMatch(/team/u);
+    // The read-back waits for their yes: nothing confirmed yet.
+    expect(world.recordedValue("I11.review")).toBeUndefined();
+  });
+});

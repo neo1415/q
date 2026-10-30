@@ -49,7 +49,7 @@ export type TaxonomyClassificationRunId = z.infer<
 export const TAXONOMY_CLASSIFIER_PROVIDER = "capital_q" as const;
 export const TAXONOMY_CLASSIFIER_MODEL = "deterministic_lexical" as const;
 /** The versioned algorithm identifier recorded on every run and response. */
-export const TAXONOMY_CLASSIFIER_VERSION = "taxonomy-lexical-v4" as const;
+export const TAXONOMY_CLASSIFIER_VERSION = "taxonomy-lexical-v5" as const;
 
 export const TAXONOMY_CLASSIFIER_IDENTITY: TaxonomyClassifierIdentity = {
   provider: TAXONOMY_CLASSIFIER_PROVIDER,

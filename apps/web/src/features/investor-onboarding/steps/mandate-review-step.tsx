@@ -12,6 +12,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 import type { AskedQuestionView, QReadingItem } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
 import { useT } from "@/features/i18n/language";
+import { investorTypeLabel } from "@/features/investors/investor-labels";
 
 type Row = {
   readonly id: string;
@@ -121,7 +122,8 @@ function rows(review: InvestorReviewContext): readonly Row[] {
     {
       id: "investor",
       label: "Investing as",
-      value: `${review.investor.displayName} (${review.investor.investorType})${
+      // Sweep D8: the type's plain word, never its code ("SYNDICATE").
+      value: `${review.investor.displayName} (${investorTypeLabel(review.investor.investorType)})${
         review.investor.representativeTitle === null
           ? ""
           : `, ${review.investor.representativeTitle}`

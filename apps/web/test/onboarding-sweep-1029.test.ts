@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { uploadAnswer } from "../src/features/onboarding-conversation/conversation";
+import {
+  reviewLines,
+  uploadAnswer,
+} from "../src/features/onboarding-conversation/conversation";
+import { investorTypeLabel } from "../src/features/investors/investor-labels";
 
 /**
  * Live onboarding sweep 2026-10-29 (production ed9be6cc4): the screen's
@@ -158,5 +162,39 @@ describe("D5: a document uploaded while talking to Q", () => {
     expect(uploadAnswer(view([DECK]) as never, stepTypeOf, DECK)).toBeNull();
     expect(uploadAnswer(view() as never, () => "text", DECK)).toBeNull();
     expect(uploadAnswer(undefined, stepTypeOf, DECK)).toBeNull();
+  });
+});
+
+describe("D8: the review says what was saved, in plain words", () => {
+  it('"Based in" shows their own words, not "Somewhere else"', () => {
+    const lines = reviewLines(
+      {
+        progress: { eligibleSteps: [{ stepKey: "F1.country" }] },
+        responses: [
+          {
+            stepKey: "F1.country",
+            value: { type: "SINGLE_SELECT", optionKey: "other" },
+            note: "Kampala, Uganda",
+          },
+        ],
+      } as never,
+      {
+        reviewGroups: [{ label: "Company", stepKeys: ["F1.country"] }],
+        stepTitle: () => "Based in",
+        describe: () => "Somewhere else",
+        editorFor: () => undefined,
+        finalStepKeys: [],
+        subject: "founder",
+      },
+    );
+    expect(lines[0]?.items[0]?.value).toBe("Kampala, Uganda");
+  });
+
+  it("the investor review names the type in words, never its code", () => {
+    expect(investorTypeLabel("SYNDICATE")).toBe("Syndicate");
+    const source = read(
+      "../src/features/investor-onboarding/steps/mandate-review-step.tsx",
+    );
+    expect(source).toContain("investorTypeLabel(review.investor.investorType)");
   });
 });

@@ -219,7 +219,7 @@ describe("contracts (§181)", () => {
     ).toBe(false);
     expect(TAXONOMY_CLASSIFIER_PROVIDER).toBe("capital_q");
     expect(TAXONOMY_CLASSIFIER_MODEL).toBe("deterministic_lexical");
-    expect(TAXONOMY_CLASSIFIER_VERSION).toBe("taxonomy-lexical-v4");
+    expect(TAXONOMY_CLASSIFIER_VERSION).toBe("taxonomy-lexical-v5");
     expect(policy.version).toBe(TAXONOMY_CLASSIFIER_VERSION);
   });
 

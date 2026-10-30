@@ -203,7 +203,7 @@ async function suggest(
   return result.candidates.map((c) => c.displayName);
 }
 
-describe("onboarding category suggestions stay relevant (taxonomy-lexical-v4)", () => {
+describe("onboarding category suggestions stay relevant (taxonomy-lexical-v5)", () => {
   it("KUUZA AI's live one-liner is not offered Hardware Sales or Identity Verification", async () => {
     const offered = await suggest(
       "AI simulator and coach for practising sales, customer-service and other workplace conversations.",
@@ -273,5 +273,25 @@ describe("onboarding category suggestions stay relevant (taxonomy-lexical-v4)", 
       [TaxonomyVocabularyCodeSchema.parse("technology")],
     );
     expect(offered).toContain("Artificial Intelligence");
+  });
+});
+
+describe("taxonomy-lexical-v5 (live onboarding sweep 2026-10-29)", () => {
+  it("a water leak-detection company is not offered Nonprofit & NGO or Gambling & Betting", async () => {
+    const offered = await suggest(
+      "We make acoustic sensors and analytics software that detect water leaks in utility pipe networks, cutting non-revenue water.",
+    );
+    expect(offered).not.toContain("Nonprofit & NGO");
+    expect(offered).not.toContain("Gambling & Betting");
+  });
+
+  it("a one-word search inside a label finds it", async () => {
+    expect(await suggest("analytics")).toContain("Data & Analytics Platform");
+  });
+
+  it("a misspelt short search still stands on similarity", async () => {
+    expect(await suggest("paymnt infrastucture")).toContain(
+      "Payment Infrastructure",
+    );
   });
 });

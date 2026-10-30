@@ -54,6 +54,17 @@ export type TaxonomyClassificationPolicy = {
      * already inflate the similarity.
      */
     readonly partialMatchSimilarityFloor: number;
+    /**
+     * v5 (live onboarding sweep 2026-10-29): similarity with no query word
+     * in the candidate stands only for a query this short (a search phrase,
+     * where a misspelt label is likely). In a description a label's
+     * trigrams turn up by coincidence: a water leak-detection company was
+     * offered "Nonprofit & NGO" ("non-revenue") and "Gambling & Betting"
+     * ("cutting"). The same short query wholly inside a longer label
+     * ("analytics" in "Data & Analytics Platform") is a search hit, which
+     * v4's partial rule refused.
+     */
+    readonly shortQueryMaxTokens: number;
     /** Below this score a lexical hit is not offered (LOW_CONFIDENCE). */
     readonly candidateMinimumScore: number;
     /** Two same-vocabulary hits at/above this and within the margin are AMBIGUOUS. */
@@ -85,6 +96,7 @@ export const TAXONOMY_CLASSIFICATION_POLICY_V1: TaxonomyClassificationPolicy = {
     similarityMinCandidateLength: 6,
     unmatchedSimilarityFloor: 0.5,
     partialMatchSimilarityFloor: 0.75,
+    shortQueryMaxTokens: 3,
     candidateMinimumScore: 0.35,
     strongScore: 0.6,
     ambiguityMargin: 0.02,

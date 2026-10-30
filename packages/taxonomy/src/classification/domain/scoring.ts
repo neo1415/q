@@ -1,9 +1,11 @@
 import type { TaxonomyClassificationPolicy } from "./policy.js";
 
 /**
- * The lexical scoring formula of taxonomy-lexical-v2 to v4 (v3 adds stop
+ * The lexical scoring formula of taxonomy-lexical-v2 to v5 (v3 adds stop
  * words only; v4 zeroes a partial word match below
- * partialMatchSimilarityFloor), in one place.
+ * partialMatchSimilarityFloor; v5 lets similarity alone stand only for a
+ * short query, and a short query wholly inside a label match it), in one
+ * place.
  *
  *   coverage = credited candidate tokens / candidate tokens
  *              (exact token = 1; prefix of length >= minPrefixLength either
@@ -41,6 +43,13 @@ export function tokenCoverage(
   queryTokens: readonly string[],
   candidateTokens: readonly string[],
   policy: TaxonomyClassificationPolicy,
+  /**
+   * v5: in a description, a prefix credits only an inflection of the word
+   * ("api"/"apis", "insurer"/"insurers"), never a short stem of a longer
+   * one ("non" of "non-revenue" is not "nonprofit"). A short search query
+   * keeps the open prefix, so a word being typed still finds its label.
+   */
+  inflectionOnly = false,
 ): { readonly coverage: number; readonly matched: number } {
   if (candidateTokens.length === 0) {
     return { coverage: 0, matched: 0 };
@@ -58,7 +67,9 @@ export function tokenCoverage(
       const longer = shorter === query ? candidate : query;
       if (
         shorter.length >= policy.lexical.minPrefixLength &&
-        longer.startsWith(shorter)
+        longer.startsWith(shorter) &&
+        (!inflectionOnly ||
+          longer.length - shorter.length <= INFLECTION_MAX_EXTRA)
       ) {
         best = Math.max(best, policy.lexical.prefixTokenCredit);
       }
@@ -71,14 +82,21 @@ export function tokenCoverage(
   return { coverage: credit / candidateTokens.length, matched };
 }
 
+/** The most letters an inflection adds to a word ("-ies", "-ing", "-ers"). */
+const INFLECTION_MAX_EXTRA = 3;
+
 export function lexicalScore(
   input: LexicalScoreInput,
   policy: TaxonomyClassificationPolicy,
 ): LexicalScore {
+  const short =
+    input.queryTokens.length > 0 &&
+    input.queryTokens.length <= policy.lexical.shortQueryMaxTokens;
   const { coverage, matched } = tokenCoverage(
     input.queryTokens,
     input.candidateTokens,
     policy,
+    !short,
   );
   const similarity =
     input.candidateText.length >= policy.lexical.similarityMinCandidateLength
@@ -90,14 +108,22 @@ export function lexicalScore(
     policy.lexical.tokenWeight * coverage +
     policy.lexical.similarityWeight * similarity;
   // v2 (F1): with no query token in the candidate, similarity stands on its
-  // own only when strong; otherwise only the blend counts.
+  // own only when strong; otherwise only the blend counts. v5: and only
+  // for a short query; in a description it is coincidence.
   const standalone =
-    matched > 0 || similarity >= policy.lexical.unmatchedSimilarityFloor
+    matched > 0 ||
+    (short && similarity >= policy.lexical.unmatchedSimilarityFloor)
       ? similarity
       : 0;
   // v4: some but not all of a multi-word label's words is no match unless
-  // the whole label is (typo-tolerantly) present.
-  const partial = matched > 0 && matched < input.candidateTokens.length;
+  // the whole label is (typo-tolerantly) present. v5: a short query whose
+  // every word is in the label is a search hit ("analytics").
+  const queryInside =
+    short &&
+    tokenCoverage(input.candidateTokens, input.queryTokens, policy).coverage ===
+      1;
+  const partial =
+    matched > 0 && matched < input.candidateTokens.length && !queryInside;
   const score =
     partial && similarity < policy.lexical.partialMatchSimilarityFloor
       ? 0
