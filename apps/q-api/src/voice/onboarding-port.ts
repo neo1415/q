@@ -8,6 +8,7 @@ import {
   getTaxonomyNode,
   resolveOnboardingSuggestion,
   listInvestorMandates,
+  listTaxonomyNodes,
   submitOnboardingResponse,
   submitOnboardingResponses,
   withdrawOnboardingResponse,
@@ -163,6 +164,16 @@ const FIRST_NAMED_KEPT_STEPS: ReadonlySet<string> = new Set([
 
 /** How a note of options also named on a one-choice step begins. */
 export const ALSO_NAMED_NOTE = "Also named:";
+
+/**
+ * How a note begins that says how their words were read into categories
+ * the list has (sweep D2, 2026-10-29: "Benelux" as the Netherlands): the
+ * read-back shows it beside the categories, so they can correct it.
+ */
+export const READ_AS_NOTE = "Read as:";
+
+/** The most categories a field may have for its whole list to be offered. */
+const WHOLE_VOCABULARY_MAX = 80;
 
 /** The note kept beside the first-named option, saying what to ask. */
 export function alsoNamedNote(labels: readonly string[]): string {
@@ -909,6 +920,51 @@ export function createOnboardingPort(input: {
 
   /** Category names the classifier gave this turn, by node id. */
   const nodeNames = new Map<string, string>();
+  /**
+   * A small field's whole category list (geography), by vocabulary codes,
+   * for words the lookup found nothing for; null when it is too large to
+   * offer (sectors), or could not be read.
+   */
+  const wholeLists = new Map<
+    string,
+    Promise<
+      | readonly {
+          readonly nodeId: string;
+          readonly displayName: string;
+          readonly vocabularyCode: string;
+        }[]
+      | null
+    >
+  >();
+  const wholeVocabulary = (codes: readonly string[]) => {
+    const key = [...codes].sort().join(",");
+    const cached = wholeLists.get(key);
+    if (cached !== undefined) return cached;
+    const loading = (async () => {
+      const nodes: {
+        readonly nodeId: string;
+        readonly displayName: string;
+        readonly vocabularyCode: string;
+      }[] = [];
+      for (const code of codes) {
+        const page = await listTaxonomyNodes(input.session, code, {
+          limit: 100,
+        });
+        if (page.nextCursor !== undefined) return null;
+        for (const node of page.items) {
+          nodes.push({
+            nodeId: node.id,
+            displayName: node.displayName,
+            vocabularyCode: node.vocabularyCode,
+          });
+        }
+        if (nodes.length > WHOLE_VOCABULARY_MAX) return null;
+      }
+      return nodes.length === 0 ? null : nodes;
+    })().catch(() => null);
+    wholeLists.set(key, loading);
+    return loading;
+  };
   const spoken = async (
     step: OnboardingStepManifest,
     value: OnboardingResponseValue,
@@ -959,7 +1015,7 @@ export function createOnboardingPort(input: {
     view: OnboardingSessionView,
   ): Promise<string> => {
     if (note === undefined) return spoken(step, value, view);
-    if (note.startsWith(ALSO_NAMED_NOTE)) {
+    if (note.startsWith(ALSO_NAMED_NOTE) || note.startsWith(READ_AS_NOTE)) {
       return `${await spoken(step, value, view)} (${note})`;
     }
     if (value.type === "RESOURCE_REFERENCE" && value.resourceIds.length > 0) {
@@ -1062,7 +1118,8 @@ export function createOnboardingPort(input: {
                   stored.note !== null &&
                   stored.note.length > 0
                     ? `${stored.note} (in their words)`
-                    : stored.note?.startsWith(ALSO_NAMED_NOTE) === true
+                    : stored.note?.startsWith(ALSO_NAMED_NOTE) === true ||
+                        stored.note?.startsWith(READ_AS_NOTE) === true
                       ? `${await spoken(step, stored.value, view)} (${stored.note})`
                       : await spoken(step, stored.value, view)
                   ).slice(0, 600) || null,
@@ -1389,6 +1446,8 @@ export function createOnboardingPort(input: {
       ).slice(0, 8);
       const ids: string[] = [];
       const unmatched: string[] = [];
+      /** Words read as listed categories they did not name as such. */
+      const readAs: string[] = [];
       for (const phrase of phrases) {
         const found: TaxonomyCandidateResponse = await findTaxonomyCandidates(
           input.session,
@@ -1399,6 +1458,41 @@ export function createOnboardingPort(input: {
         );
         const best = found.candidates[0];
         if (best === undefined) {
+          // Sweep D2 (2026-10-29): "Benelux and the Nordics" matched no
+          // category and was kept as plain words. A small field's whole
+          // list is offered to the reader, which reads, by meaning, which
+          // listed categories the words name (a region: its listed
+          // members only). Nothing listed: kept in their words, as before.
+          const whole =
+            input.chooseCategories === undefined
+              ? null
+              : await wholeVocabulary(c.vocabularyCodes);
+          const chosen =
+            whole === null || input.chooseCategories === undefined
+              ? null
+              : await input
+                  .chooseCategories({
+                    field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(
+                      0,
+                      200,
+                    ),
+                    phrase,
+                    sentence: answer.quote ?? phrase,
+                    candidates: whole,
+                  })
+                  .catch(() => null);
+          const names: string[] = [];
+          for (const id of chosen ?? []) {
+            const node = whole?.find((candidate) => candidate.nodeId === id);
+            if (node === undefined) continue;
+            if (!ids.includes(id)) ids.push(id);
+            nodeNames.set(id, node.displayName);
+            names.push(node.displayName);
+          }
+          if (names.length > 0) {
+            readAs.push(`“${phrase}” as ${names.join(", ")}`);
+            continue;
+          }
           unmatched.push(phrase);
           continue;
         }
@@ -1536,6 +1630,12 @@ export function createOnboardingPort(input: {
           c.maxItems,
         ),
       };
+      if (readAs.length > 0) {
+        // Capital Q's words, not theirs (so not checked as theirs), kept
+        // beside the categories and said in the read-back, so they can
+        // correct it.
+        aside = `${READ_AS_NOTE} ${readAs.join("; ")}.`.slice(0, 300);
+      }
     } else if (
       c.stepType === "single_select" ||
       c.stepType === "multi_select"
@@ -1582,6 +1682,42 @@ export function createOnboardingPort(input: {
         const key = named(phrase);
         if (key !== undefined) keys.push(key);
         else if (phrase.trim().length > 0) unnamed.push(phrase.trim());
+      }
+      // Sweep D2 (2026-10-29): "Eindhoven, the Netherlands" named no option
+      // by key or label and was saved as "Somewhere else", though the
+      // Netherlands is one. Which of this step's own options their words
+      // name is read by meaning (the same reader as for categories, given
+      // the options); never a catch-all, never outside the options.
+      if (unnamed.length > 0 && input.chooseCategories !== undefined) {
+        const choices = options
+          .filter((o) => o.key !== "other")
+          .map((o) => ({
+            nodeId: o.key,
+            displayName: o.label,
+            vocabularyCode: step.stepKey,
+          }));
+        const still: string[] = [];
+        for (const phrase of unnamed) {
+          const chosen = await input
+            .chooseCategories({
+              field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(0, 200),
+              phrase: phrase.slice(0, 200),
+              sentence: answer.quote ?? phrase,
+              candidates: choices,
+            })
+            .catch(() => null);
+          const picked = (chosen ?? []).filter((key) =>
+            choices.some((choice) => choice.nodeId === key),
+          );
+          if (picked.length === 0) {
+            still.push(phrase);
+            continue;
+          }
+          keys.push(
+            ...(c.stepType === "single_select" ? picked.slice(0, 1) : picked),
+          );
+        }
+        unnamed.splice(0, unnamed.length, ...still);
       }
       // Founder direction 2026-09-30: an answer outside the options is
       // kept in their words ("Uzbekistan", "Founder"), on the step's own
@@ -2748,7 +2884,12 @@ export function createOnboardingPort(input: {
       kind: "WRITE",
       step: resolved.step,
       value,
-      note: note ?? resolved.aside,
+      // A reading of their words (READ_AS_NOTE) is kept with their own
+      // words beside it, when there are both.
+      note:
+        note !== undefined && resolved.aside?.startsWith(READ_AS_NOTE) === true
+          ? `${resolved.aside} Kept as they said it: ${note}.`.slice(0, 500)
+          : (note ?? resolved.aside),
       quote: answer.quote,
     };
   };

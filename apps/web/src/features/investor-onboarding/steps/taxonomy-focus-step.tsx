@@ -31,6 +31,9 @@ export function TaxonomyFocusStep({
     readonly TaxonomyCandidateView[]
   >([]);
   const [searching, setSearching] = useState(false);
+  // The words a search found nothing for (sweep D2, 2026-10-29: "Benelux"
+  // and "Nordics" returned nothing and the screen said nothing).
+  const [noMatch, setNoMatch] = useState<string | null>(null);
   const [focus, setFocus] = useState<readonly TaxonomyCandidateView[]>(
     step.selected,
   );
@@ -48,7 +51,9 @@ export function TaxonomyFocusStep({
     if (text.length === 0) return;
     setSearching(true);
     try {
-      setCandidates(await findTaxonomyCandidates(text));
+      const found = await findTaxonomyCandidates(text);
+      setCandidates(found);
+      setNoMatch(found.length === 0 ? text : null);
       setError(undefined);
     } catch (cause: unknown) {
       setError(
@@ -143,6 +148,15 @@ export function TaxonomyFocusStep({
           {t("Suggest")}
         </Button>
       </div>
+      {noMatch === null ? null : (
+        <p
+          role="status"
+          className="cq-body-sm text-(--cq-text-secondary)"
+          data-no-match
+        >
+          {noMatchLine(noMatch)}
+        </p>
+      )}
       {offered.length > 0 ? (
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label text-(--cq-text-primary)">
@@ -267,4 +281,9 @@ export function TaxonomyFocusStep({
       ) : null}
     </form>
   );
+}
+
+/** What the screen says when a search found no category for their words. */
+export function noMatchLine(words: string): string {
+  return `Nothing here matches “${words}”. Try another word for it, or a broader one (a country's region, a wider sector).`;
 }

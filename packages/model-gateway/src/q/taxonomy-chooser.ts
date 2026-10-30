@@ -6,10 +6,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TaxonomyChoiceResultSchema,
+  TaxonomyChoiceV2ResultSchema,
   type PromptRegistry,
-  type TaxonomyChoiceResult,
-  type TaxonomyChoiceVariables,
+  type TaxonomyChoiceV2Result,
+  type TaxonomyChoiceV2Variables,
 } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../gateway.js";
@@ -36,10 +36,14 @@ export type TaxonomyChooser = (input: {
   }[];
 }) => Promise<readonly string[] | null>;
 
+/** The most categories one reading is offered (a small field's whole list). */
+export const TAXONOMY_CHOICE_CANDIDATES_MAX = 80;
+const CANDIDATES_MAX = TAXONOMY_CHOICE_CANDIDATES_MAX;
+
 const CHOOSE = {
   maxAttempts: 1,
-  maxEstimatedCostUsd: 0.003,
-  maxOutputTokens: 200,
+  maxEstimatedCostUsd: 0.006,
+  maxOutputTokens: 600,
   attemptTimeoutMs: 6_000,
 } as const;
 
@@ -51,12 +55,14 @@ export function createTaxonomyChooser(dependencies: {
 }): TaxonomyChooser {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   return async (input) => {
-    const candidates = input.candidates.slice(0, 12);
+    // The lookup's candidates, or a small field's whole list when the
+    // lookup found none (sweep 2026-10-29: "Benelux"): bounded either way.
+    const candidates = input.candidates.slice(0, CANDIDATES_MAX);
     const phrase = input.phrase.trim().slice(0, 200);
     if (candidates.length === 0 || phrase.length === 0) return null;
     const sentence = (input.sentence.trim() || phrase).slice(0, 1_000);
     try {
-      const rendered = renderPrompt<TaxonomyChoiceVariables>(registry, {
+      const rendered = renderPrompt<TaxonomyChoiceV2Variables>(registry, {
         task: "TAXONOMY_CHOICE",
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -74,26 +80,29 @@ export function createTaxonomyChooser(dependencies: {
           sentence,
         },
       });
-      const response = await dependencies.gateway.execute<TaxonomyChoiceResult>(
-        {
-          taskClass: "TAXONOMY_MAPPING",
-          sensitivity: "CONFIDENTIAL",
-          ...(dependencies.dataPosture === undefined
-            ? {}
-            : { dataPosture: dependencies.dataPosture }),
-          budget: CHOOSE,
-          messages: [...rendered.messages],
-          output: rendered.output,
-          attribution: {
-            tenantId: input.who.tenantId,
-            ...(input.who.userId === null ? {} : { userId: input.who.userId }),
-            correlationId: `cor_${randomUUID()}`,
+      const response =
+        await dependencies.gateway.execute<TaxonomyChoiceV2Result>(
+          {
+            taskClass: "TAXONOMY_MAPPING",
+            sensitivity: "CONFIDENTIAL",
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+            budget: CHOOSE,
+            messages: [...rendered.messages],
+            output: rendered.output,
+            attribution: {
+              tenantId: input.who.tenantId,
+              ...(input.who.userId === null
+                ? {}
+                : { userId: input.who.userId }),
+              correlationId: `cor_${randomUUID()}`,
+            },
           },
-        },
-        { schema: TaxonomyChoiceResultSchema },
-      );
+          { schema: TaxonomyChoiceV2ResultSchema },
+        );
       if (response.output.kind !== "STRUCTURED") return null;
-      const parsed = TaxonomyChoiceResultSchema.safeParse(
+      const parsed = TaxonomyChoiceV2ResultSchema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
       if (!parsed.success) return null;

@@ -99,6 +99,8 @@ export function createOnboardingTranscriptReader(dependencies: {
   readonly registry?: PromptRegistry | undefined;
   readonly sensitivity?: ModelSensitivity | undefined;
   readonly dataPosture?: "REAL_CUSTOMER" | "SYNTHETIC_DEMO" | undefined;
+  /** Today, for times they name ("close in Q1"); the clock by default. */
+  readonly now?: (() => Date) | undefined;
 }): OnboardingTranscriptReader {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const { gateway, logger } = dependencies;
@@ -129,8 +131,9 @@ export function createOnboardingTranscriptReader(dependencies: {
             charter: "Q_SYSTEM",
             operatingMode: "ASSESSMENT",
             communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-            environmentNotes:
-              "You read one conversation and nothing else; Capital Q checks and saves what you find.",
+            // Sweep D5 (2026-10-29): "hoping to close in Q1" needs today to
+            // name the option whose span holds it.
+            environmentNotes: `You read one conversation and nothing else; Capital Q checks and saves what you find. Today's date is ${(dependencies.now ?? (() => new Date()))().toISOString().slice(0, 10)}.`,
             variables: { journey: input.journey, steps, transcript },
           },
         );

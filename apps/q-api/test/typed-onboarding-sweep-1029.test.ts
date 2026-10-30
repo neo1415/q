@@ -5,6 +5,7 @@ import type { ModelGateway } from "@capital-q/model-gateway";
 import type {
   OnboardingTranscriptReader,
   QTurnAuthority,
+  TaxonomyChooser,
 } from "@capital-q/model-gateway/q";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
@@ -56,12 +57,17 @@ function replies(): ModelGateway {
   } as unknown as ModelGateway;
 }
 
+type Reading = Awaited<ReturnType<OnboardingTranscriptReader["read"]>>;
+
 function typedWorld(options: {
   readonly world: ReturnType<typeof investorSession>;
   readonly authority: () => QTurnAuthority;
+  readonly reading?: Reading;
+  readonly categories?: TaxonomyChooser;
 }) {
   const reader: OnboardingTranscriptReader = {
-    read: () => Promise.resolve({ answers: [], declined: [] }),
+    read: () =>
+      Promise.resolve(options.reading ?? { answers: [], declined: [] }),
   };
   const conversation = createOnboardingConversation({
     apiBaseUrl: "http://api.test",
@@ -69,6 +75,7 @@ function typedWorld(options: {
     logger,
     readAfterMs: 5,
     reader,
+    categories: options.categories,
   });
   const typed = createTypedOnboarding({
     conversation,
@@ -224,5 +231,111 @@ describe("sweep D7: what is saved so far, read back", () => {
     expect(said).toMatch(/^Here's what I have saved so far:\n\n/u);
     expect(said).toContain("Company: Ferrowick");
     expect(said).toMatch(/\n\nStill to cover: team size\.$/u);
+  });
+});
+
+describe("sweep D2: a region that is not a category", () => {
+  const NETHERLANDS = "a1000000-0000-4000-8000-000000000001";
+  const GERMANY = "a1000000-0000-4000-8000-000000000002";
+  it('"Benelux and the Nordics": the field\'s whole list goes to the reader, Benelux is read as its listed member, and the read-back says so', async () => {
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      subject: FIRM,
+      recorded: {
+        "I0.investor_type": "angel",
+        "I0.organisation_name": "Harmattan Angels",
+      },
+      // The lookup finds nothing for either; the field lists two countries.
+      taxonomyRoots: { Netherlands: NETHERLANDS, Germany: GERMANY },
+    });
+    const offered: { phrase: string; ids: string[] }[] = [];
+    const say = typedWorld({
+      world,
+      authority: () => reading({}),
+      categories: (input) => {
+        offered.push({
+          phrase: input.phrase,
+          ids: input.candidates.map((c) => c.nodeId),
+        });
+        // The reader's own reading: Benelux holds the Netherlands; no
+        // Nordic country is listed.
+        return Promise.resolve(input.phrase === "Benelux" ? [NETHERLANDS] : []);
+      },
+      reading: {
+        answers: [
+          {
+            stepKey: "I3.geography",
+            value: ["Benelux", "the Nordics"],
+            quote: "Benelux and the Nordics",
+            ownWords: false,
+          },
+        ],
+        declined: [],
+      },
+    });
+    await say("Benelux and the Nordics");
+    for (let i = 0; i < 200; i += 1) {
+      if (world.recordedValue("I3.geography") !== undefined) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(world.recordedValue("I3.geography")).toEqual({
+      type: "RESOURCE_REFERENCE",
+      resourceType: "TAXONOMY_NODE",
+      resourceIds: [NETHERLANDS],
+    });
+    expect(world.recordedNote("I3.geography")).toBe(
+      "Read as: “Benelux” as Netherlands. Kept as they said it: the Nordics.",
+    );
+    // The reader chose among the field's own list, never outside it.
+    expect([...new Set(offered.map((o) => o.phrase))].sort()).toEqual([
+      "Benelux",
+      "the Nordics",
+    ]);
+    for (const one of offered) expect(one.ids).toEqual([NETHERLANDS, GERMANY]);
+  });
+});
+
+describe("sweep D2: a listed option named with more detail", () => {
+  it('"Eindhoven, the Netherlands" is the Netherlands, read among the step\'s own options, never "Somewhere else"', async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.country",
+      subject: { type: "COMPANY", id: "e0000000-0000-4000-8000-000000000002" },
+      recorded: { "F0.intent": "raising_now", "F1.company_name": "Ferrowick" },
+    });
+    const offered: string[][] = [];
+    const say = typedWorld({
+      world,
+      authority: () => reading({}),
+      categories: (input) => {
+        offered.push(input.candidates.map((c) => c.nodeId));
+        return Promise.resolve(
+          input.phrase === "Eindhoven, the Netherlands" ? ["nl"] : [],
+        );
+      },
+      reading: {
+        answers: [
+          {
+            stepKey: "F1.country",
+            value: "Eindhoven, the Netherlands",
+            quote: "Eindhoven, the Netherlands",
+            ownWords: true,
+          },
+        ],
+        declined: [],
+      },
+    });
+    await say("We're based in Eindhoven, the Netherlands");
+    for (let i = 0; i < 200; i += 1) {
+      if (world.recordedValue("F1.country") !== undefined) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(world.recordedValue("F1.country")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "nl",
+    });
+    // Offered the step's options, never its catch-all.
+    expect(offered[0]).toContain("nl");
+    expect(offered[0]).not.toContain("other");
   });
 });

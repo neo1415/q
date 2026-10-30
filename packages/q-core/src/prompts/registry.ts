@@ -327,7 +327,9 @@ import { DELEGATION_READER_V7 } from "./tasks/delegation-reader.v7.js";
 import { ONBOARDING_TRANSCRIPT_READER_V1 } from "./tasks/onboarding-transcript-reader.v1.js";
 import { ONBOARDING_TRANSCRIPT_READER_V2 } from "./tasks/onboarding-transcript-reader.v2.js";
 import { ONBOARDING_TRANSCRIPT_READER_V3 } from "./tasks/onboarding-transcript-reader.v3.js";
+import { ONBOARDING_TRANSCRIPT_READER_V4 } from "./tasks/onboarding-transcript-reader.v4.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
+import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
 import { ONBOARDING_TYPED_REPLY_V2 } from "./tasks/onboarding-typed-reply.v2.js";
 import { ONBOARDING_TYPED_REPLY_V3 } from "./tasks/onboarding-typed-reply.v3.js";
@@ -499,9 +501,13 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V1, status: "DEPRECATED" },
     { ...ONBOARDING_TRANSCRIPT_READER_V2, status: "DEPRECATED" },
     // Production re-test 2026-10-28: what they mainly do is the answer.
-    ONBOARDING_TRANSCRIPT_READER_V3,
+    { ...ONBOARDING_TRANSCRIPT_READER_V3, status: "DEPRECATED" },
+    // Onboarding sweep 2026-10-29: option keys by meaning, detail included.
+    ONBOARDING_TRANSCRIPT_READER_V4,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
-    TAXONOMY_CHOICE_V1,
+    { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
+    // Onboarding sweep 2026-10-29: a region read as its listed members.
+    TAXONOMY_CHOICE_V2,
     { ...ONBOARDING_TYPED_REPLY_V1, status: "DEPRECATED" },
     // Production re-test 2026-10-28: their own words count before saving.
     { ...ONBOARDING_TYPED_REPLY_V2, status: "DEPRECATED" },

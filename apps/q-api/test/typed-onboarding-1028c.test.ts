@@ -293,9 +293,9 @@ describe('defect 2: "we like to lead sometimes but mostly follow" is follow', ()
     const active = createDefaultPromptRegistry().getActive(
       "ONBOARDING_TRANSCRIPT_READER",
     );
-    expect(active.definition.version).toBe(3);
+    expect(active.definition.version).toBeGreaterThanOrEqual(3);
     expect(active.definition.template).toMatch(
-      /what they mainly do: the exception is not one of their choices/u,
+      /what they mainly do: an occasional exception they mention is not one of their choices/u,
     );
   });
 
