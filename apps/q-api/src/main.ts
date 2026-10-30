@@ -4139,6 +4139,8 @@ const plans = createPlans({
     },
     publicProfile: situationPublicProfile,
     tools: qTools.port,
+    // Their own name, so a reviewer's point says "you", never "Tunde".
+    personName: (actor) => workforceDisplayName(actor.userId),
     logger,
   },
   board: qBoard,

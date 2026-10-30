@@ -203,10 +203,10 @@ describe("defect 2: PLAN_WRITE's output is accepted the way the model writes it"
     expect(done.modelCalls).toBeLessThanOrEqual(6);
   });
 
-  it("v2 prompts (and v3, built on them) are reasoning work, not extraction", () => {
+  it("v2 prompts (and v3, v4, built on them) are reasoning work, not extraction", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("PLAN_WRITE").definition.version).toBe(3);
-    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(3);
+    expect(registry.getActive("PLAN_WRITE").definition.version).toBe(4);
+    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(4);
     expect(PLAN_WRITE_V2.taskClass).toBe("EVIDENCE_SYNTHESIS");
     expect(PLAN_REVIEW_V2.taskClass).toBe("EVIDENCE_SYNTHESIS");
     for (const limit of [
@@ -378,6 +378,10 @@ describe("code checks before the reviewers spend points", () => {
         steps: [
           {
             key: "s1",
+            title: "A step",
+            why: "Its reason.",
+            evidenceNeeded: [],
+            owner: "YOU",
             due: "2026-11-05",
             waitsFor: [],
             cites: [],
@@ -386,6 +390,10 @@ describe("code checks before the reviewers spend points", () => {
           },
           {
             key: "s2",
+            title: "A step",
+            why: "Its reason.",
+            evidenceNeeded: [],
+            owner: "YOU",
             due: "2026-11-01",
             waitsFor: [{ kind: "STEP_DONE", stepKey: "s1" }],
             cites: [],

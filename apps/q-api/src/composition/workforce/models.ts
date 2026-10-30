@@ -50,9 +50,10 @@ import {
   type DiligenceQuestionsShortenResultV2,
   type DiligenceQuestionsShortenVariables,
   ReplyReaderResultSchema,
-  PlanReviewResultSchema,
+  PlanReviewResultV2Schema,
   PlanWriteResultV2Schema,
   type PlanReviewResult,
+  type PlanReviewResultV2,
   type PlanReviewVariables,
   type PlanWriteResult,
   type PlanWriteVariables,
@@ -806,13 +807,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     reviewPlan: (who, trace, input) =>
-      call<PlanReviewInput, PlanReviewResult>({
+      call<PlanReviewInput, PlanReviewResultV2>({
         task: "PLAN_REVIEW",
         taskClass: PLAN_TASK_CLASS,
         who,
         trace,
         variables: input,
-        schema: PlanReviewResultSchema,
+        schema: PlanReviewResultV2Schema,
         budget: PLAN_REVIEW_BUDGET,
         reasoning: PLAN_REVIEW_REASONING,
         dropListItems: true,
