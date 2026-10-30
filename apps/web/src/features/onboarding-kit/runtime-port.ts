@@ -732,8 +732,36 @@ export function createRuntimeClient<
         return present(await advance(view, group));
       }),
 
-    skipStep: ({ stepId }) =>
+    skipStep: ({ stepId, stepKey: shown }) =>
       guarded(async () => {
+        if (shown !== undefined) {
+          // The one question on screen, wherever the pointer is: skipping
+          // the pointer's screen instead set aside the wrong step, and a
+          // required one (the review) was refused every time.
+          const view = await session();
+          const status = eligibleStatus(view, shown);
+          if (status === "SKIPPED" || status === "COMPLETED") {
+            return present(view);
+          }
+          if (status === undefined) {
+            throw new OnboardingClientError(
+              "REJECTED",
+              "That question isn't open any more.",
+            );
+          }
+          const skipped = remember(
+            await port.skip({
+              sessionId: view.session.id,
+              stepKey: shown,
+              expectedSessionVersion: view.session.version,
+              idempotencyKey: crypto.randomUUID(),
+            }),
+          );
+          const owner = model.groups.find((g) => g.stepKeys.includes(shown));
+          return present(
+            owner === undefined ? skipped : await advance(skipped, owner),
+          );
+        }
         const group = requireGroup(stepId);
         let view = await session();
         for (const stepKey of group.stepKeys) {

@@ -23,7 +23,16 @@ export type OnboardingClient<TView, TResponse> = {
     readonly response: TResponse;
   }) => Promise<TView>;
   readonly goBack: (input: { readonly stepId: string }) => Promise<TView>;
-  readonly skipStep: (input: { readonly stepId: string }) => Promise<TView>;
+  /**
+   * Set a screen aside, or, with `stepKey`, the one question the person
+   * is looking at. The conversation asks steps the session pointer has
+   * not reached (live 2026-10-30: Q asked the revenue trend while the
+   * pointer sat on the review), so its Skip names the step it shows.
+   */
+  readonly skipStep: (input: {
+    readonly stepId: string;
+    readonly stepKey?: string | undefined;
+  }) => Promise<TView>;
   /** Reopen an already visited screen. */
   readonly openStep: (input: { readonly stepId: string }) => Promise<TView>;
   /** Journey completion only: not visibility, readiness or verification. */

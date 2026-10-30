@@ -183,7 +183,8 @@ export type QOnboardingWorkspaceActions = {
     /** The review step whose confirm button they tapped (sweep D1). */
     confirmReview?: string,
   ) => Promise<OnboardingTurn | null>;
-  readonly skip: () => Promise<void>;
+  /** Sets aside the one question shown: its step, not the pointer's. */
+  readonly skip: (stepKey: string) => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
   readonly submitValue: (input: {
     readonly stepKey: string;
@@ -2691,7 +2692,7 @@ export function QOnboardingWorkspace({
                   }
                   push("PERSON", "Skip this one");
                   settleReading();
-                  void actions.skip();
+                  void actions.skip(prompt.stepKey);
                 }}
               >
                 {t("Skip")}

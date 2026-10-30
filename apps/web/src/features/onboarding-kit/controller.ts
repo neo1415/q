@@ -80,7 +80,8 @@ export type OnboardingState<TView> = {
 
 export type OnboardingActions<TResponse> = {
   readonly submit: (response: TResponse) => Promise<void>;
-  readonly skip: () => Promise<void>;
+  /** With a step key, sets aside that one shown question (see skipStep). */
+  readonly skip: (stepKey?: string) => Promise<void>;
   readonly back: () => Promise<void>;
   readonly openStep: (stepId: string) => Promise<void>;
   /** Marks the journey complete; navigation is the screen's decision. */
@@ -309,8 +310,11 @@ export function useOnboardingJourney<
         true,
       );
     },
-    skip: async () => {
-      await run(() => requireClient().skipStep({ stepId: stepId() }), true);
+    skip: async (stepKey) => {
+      await run(
+        () => requireClient().skipStep({ stepId: stepId(), stepKey }),
+        true,
+      );
     },
     back: async () => {
       await run(() => requireClient().goBack({ stepId: stepId() }), false);
