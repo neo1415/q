@@ -420,6 +420,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly leadLines?: string | undefined;
   /**
+   * A line code composed to close this answer, after the model's own words
+   * (owner 2026-10-30: the offer to build a full plan that ends the answer
+   * to "What should I do today?"). Absent: none.
+   */
+  readonly closingLines?: string | undefined;
+  /**
    * U4/F8 (QA 24 Oct 2026): a screen move their words also asked for ("open
    * the data room and tell me what's missing"), carried by the answer to
    * the question so the move is made and the question still answered.

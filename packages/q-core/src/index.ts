@@ -1978,6 +1978,11 @@ export {
   TURN_READER_V72,
   V72_PLAN_ASK,
 } from "./prompts/tasks/turn-reader.v72.js";
+export {
+  TURN_READER_V73,
+  V73_PLAN_ASK,
+  V73_PLAN_OFFER_TAKEN,
+} from "./prompts/tasks/turn-reader.v73.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

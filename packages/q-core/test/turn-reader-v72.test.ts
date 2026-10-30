@@ -14,11 +14,10 @@ import {
  * now -- by meaning, with cases, never a phrase list in code.
  */
 describe("TURN_READER v72: a question about what to do now is not a plan", () => {
-  it("is the active reader: v71 with only its PLAN ASK rule replaced", () => {
+  it("is v71 with only its PLAN ASK rule replaced", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(72);
-    expect(active.output).toEqual(TURN_READER_V71.output);
+    const v72 = registry.get("TURN_READER", 72)?.definition;
+    expect(v72?.output).toEqual(TURN_READER_V71.output);
     expect(TURN_READER_V72.template.replace(V72_PLAN_ASK, V71_PLAN_ASK)).toBe(
       TURN_READER_V71.template,
     );

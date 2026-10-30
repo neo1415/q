@@ -379,6 +379,23 @@ export function readerScreenControls(
 export const TURN_READER_CORRECTION =
   "Your last reading did not match the required JSON schema, so it was refused. Answer again with exactly the schema's fields. A tool carries only its own kind's parameters (NAVIGATE: destination or unknownScreen; SET_VISIBILITY: visibility; PREPARE_DOCUMENT: documentType), the others null. A declared action such as a reminder, a meeting or a message goes in appAction or askedAction, never in tool. Use null for anything you are unsure of.";
 
+/** How much of each recent turn the reader sees (its prompt budget). */
+export const TURN_READER_TURN_TEXT_MAX = 400;
+const TURN_TEXT_TAIL = 140;
+
+/**
+ * A recent turn as the reader sees it: whole when short; otherwise its
+ * opening and its close. Q's offer or question ("…say so and I'll build
+ * it.") is its last line, and a bare "yes" means nothing without it
+ * (owner 2026-10-30: the head alone cut the offer that closes the answer
+ * to "What should I do today?").
+ */
+export function turnTextForReader(text: string): string {
+  if (text.length <= TURN_READER_TURN_TEXT_MAX) return text;
+  const head = TURN_READER_TURN_TEXT_MAX - TURN_TEXT_TAIL - 3;
+  return `${text.slice(0, head).trimEnd()} … ${text.slice(-TURN_TEXT_TAIL).trimStart()}`;
+}
+
 export function createQTurnReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly logger: Logger;
@@ -420,7 +437,7 @@ export function createQTurnReader(dependencies: {
       > = {
         recentTurns: input.recentTurns.slice(-6).map((turn) => ({
           role: turn.role,
-          text: turn.text.slice(0, 400),
+          text: turnTextForReader(turn.text),
         })),
         utterance,
         modality: input.modality,

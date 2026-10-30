@@ -361,7 +361,10 @@ export {
   type QAppActionRedirect,
   type TurnAppAction,
 } from "./app-action-turn.js";
-export { createToolReadinessLead } from "./readiness-lead.js";
+export {
+  createPlanOfferLine,
+  createToolReadinessLead,
+} from "./readiness-lead.js";
 export {
   readCoreSnapshot,
   type ConversationCoreScope,

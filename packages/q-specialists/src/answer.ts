@@ -860,6 +860,13 @@ export type SpecialistQAnswerDependencies = {
   readonly readinessLead?:
     ((request: QAnswerRequest) => Promise<string | null>) | undefined;
   /**
+   * Owner 2026-10-30: the line closing that answer, offering a full plan
+   * (readiness-lead.ts createPlanOfferLine). Used only when the plan job is
+   * composed, so Q never offers what it cannot start.
+   */
+  readonly planOffer?:
+    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
+  /**
    * ADR 0040: a declared app action the turn's reading names, done by code
    * through its generated tool (parity eval 2026-10-02).
    */
@@ -5242,6 +5249,10 @@ export function createSpecialistQAnswer(
     // whatever the reading decides; whom Q is looking into is named only
     // from a model's understanding (the skim's, below), which replaces it.
     if (ASKS_SOMETHING.test(latest.content.trim())) sayHolding(request, null);
+    // Owner 2026-10-30 (a conversational answer at 11-13 s): where the
+    // time before the answer goes, per stage, on every turn (counts and
+    // milliseconds only; nothing they said). See "q turn timing" below.
+    const turnStartedAt = Date.now();
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -5378,6 +5389,7 @@ export function createSpecialistQAnswer(
     // A request to make something must never be dropped because one model
     // was down (B1, 2026-09-25).
     let read = await readingFirst;
+    const readMs = Date.now() - turnStartedAt;
     // Owner's own conversation (2026-10-24): "just find me three Qatari
     // investors" after other talk was answered as a lookup of their own
     // company, and as a search built from earlier chatter. When the full
@@ -6703,14 +6715,31 @@ export function createSpecialistQAnswer(
     // or readiness (TURN_READER v52 nextSteps, by meaning); an ADVICE
     // question about anything else, such as what a SAFE is, was answered
     // under the readiness list.
-    const readinessLead =
+    const leadStartedAt = Date.now();
+    const asksNextSteps =
       !writingDocument &&
       read?.question?.kind === "ADVICE" &&
       read.nextSteps === true &&
-      read.aboutNamedOther !== true &&
-      dependencies.readinessLead !== undefined
-        ? await dependencies.readinessLead(request).catch(() => null)
-        : null;
+      read.aboutNamedOther !== true;
+    // Owner 2026-10-30: "What should I do today?" is answered in the
+    // conversation from what Q already holds (TURN_READER v72: planAsk
+    // null, nextSteps true). What Q is doing is said as it starts --
+    // reading where things stand for them -- beside the read, never
+    // holding it up. A full plan is offered in the answer's closing line,
+    // never started: building one is minutes of writing and two reviews,
+    // which they choose (a yes is read as the plan ask, TURN_READER v73).
+    const [readinessLead, planOffer] =
+      asksNextSteps && dependencies.readinessLead !== undefined
+        ? await Promise.all([
+            dependencies.readinessLead(request).catch(() => null),
+            dependencies.plan === undefined ||
+            dependencies.planOffer === undefined
+              ? null
+              : dependencies.planOffer(request).catch(() => null),
+            showStage(request, "GATHERING_SITUATION"),
+          ])
+        : [null, null];
+    const readinessLeadMs = Date.now() - leadStartedAt;
     const ownRecords =
       readinessLead !== null ||
       (!writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS");
@@ -6856,6 +6885,10 @@ export function createSpecialistQAnswer(
           }
         : {}),
       ...(readinessLead === null ? {} : { leadLines: readinessLead }),
+      // Only beside code's own priorities: the offer closes that answer.
+      ...(readinessLead === null || planOffer === null
+        ? {}
+        : { closingLines: planOffer }),
       // Only a name the reader was given counts (ADR 0040 parity).
       ...(redirectedTo !== null
         ? { askedAction: redirectedTo }
@@ -6897,6 +6930,22 @@ export function createSpecialistQAnswer(
             speculativeResearch,
           });
     if (misfit !== null) speculation?.cancel(misfit);
+    {
+      const sentAt = Date.parse(latest.createdAt);
+      logger?.info(
+        {
+          qRunId: request.runId,
+          readMs,
+          readinessLeadMs,
+          lead: readinessLead !== null,
+          // The reading through the routing above, before the answer.
+          beforeAnswerMs: Date.now() - turnStartedAt,
+          sinceMessageMs: Number.isFinite(sentAt) ? Date.now() - sentAt : null,
+          speculationAdopted: speculation !== null && misfit === null,
+        },
+        "q turn timing",
+      );
+    }
     const outcome =
       speculation !== null && misfit === null
         ? await speculation.adopt()

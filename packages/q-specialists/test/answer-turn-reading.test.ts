@@ -156,6 +156,8 @@ function seam(options: {
   ) => Promise<string | null>;
   /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
   readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
+  /** The line offering a full plan that closes it (owner 2026-10-30). */
+  readonly planOffer?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
   readonly profileGaps?: QProfileGapsPort;
   /** ADR 0040: a declared app action the reading names. */
@@ -267,6 +269,7 @@ function seam(options: {
   const compares: unknown[] = [];
   const leadBlocks: unknown[] = [];
   const leads: (string | undefined)[] = [];
+  const closings: (string | undefined)[] = [];
   let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
@@ -295,6 +298,7 @@ function seam(options: {
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
+        closings.push(req.closingLines);
         focuses.push(req.toolFocus);
         namedOthers.push(req.aboutNamedOther);
         compares.push(req.compare);
@@ -399,6 +403,9 @@ function seam(options: {
     ...(options.readinessLead === undefined
       ? {}
       : { readinessLead: options.readinessLead }),
+    ...(options.planOffer === undefined
+      ? {}
+      : { planOffer: options.planOffer }),
     ...(options.appActionArguments === undefined
       ? {}
       : { appActionArguments: options.appActionArguments }),
@@ -450,6 +457,7 @@ function seam(options: {
     },
     probes,
     leads,
+    closings,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -5636,6 +5644,77 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     await ready.answer.answer(request());
     expect(ready.leads).toEqual([undefined]);
   });
+  it("owner 2026-10-30: 'What should I do today?' is answered here, says what Q is doing, and closes by offering -- never starting -- a full plan", async () => {
+    const OFFER =
+      "If you'd like a full plan for the weeks ahead, say so and I'll build it.";
+    const started: unknown[] = [];
+    const lines: [string, unknown][] = [];
+    const record = (fields: unknown, message?: string) => {
+      lines.push([message ?? "", fields]);
+    };
+    const logger = {
+      info: record,
+      warn: record,
+      error: record,
+      debug: record,
+      child: () => logger,
+    } as unknown as Logger;
+    const run = seam({
+      logger,
+      said: "What should I do today?",
+      // TURN_READER v72/v73: planAsk null, nextSteps true.
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      planOffer: () => Promise.resolve(OFFER),
+      plan: {
+        start: (_request, input) => {
+          started.push(input);
+          return Promise.resolve({ status: "FAILED" as const });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(started).toEqual([]);
+    expect(run.leads).toEqual([LEAD]);
+    expect(run.closings).toEqual([OFFER]);
+    expect(run.events).toContainEqual({
+      type: "q.stage.changed",
+      data: { stage: "GATHERING_SITUATION" },
+    });
+    // Where the time before the answer went, without their words.
+    const timing = lines.find(([message]) => message === "q turn timing");
+    const fields = (timing?.[1] ?? {}) as Record<string, unknown>;
+    expect(fields["lead"]).toBe(true);
+    for (const key of ["readMs", "readinessLeadMs", "beforeAnswerMs"]) {
+      expect(typeof fields[key]).toBe("number");
+    }
+    expect(JSON.stringify(timing?.[1])).not.toContain("today");
+  });
+
+  it("offers no plan when the plan job is not composed, nor beside a turn with no lead", async () => {
+    const OFFER = "If you'd like a full plan, say so.";
+    const noJob = seam({
+      said: "What should I do today?",
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      planOffer: () => Promise.resolve(OFFER),
+    });
+    await noJob.answer.answer(request());
+    expect(noJob.closings).toEqual([undefined]);
+    const noLead = seam({
+      said: "What should I do today?",
+      reading: advice(),
+      outcomes: [],
+      readinessLead: () => Promise.resolve(null),
+      planOffer: () => Promise.resolve(OFFER),
+      plan: { start: () => Promise.resolve({ status: "FAILED" as const }) },
+    });
+    await noLead.answer.answer(request());
+    expect(noLead.closings).toEqual([undefined]);
+  });
+
   it("not on advice that does not ask for next steps (live 2026-10-16: explain a SAFE)", async () => {
     let asked = 0;
     const safe = seam({
