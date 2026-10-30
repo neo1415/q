@@ -161,12 +161,13 @@ describe("the plan job: the founder example end to end", () => {
       "COVERAGE_AND_SPECIFICITY",
       "FEASIBILITY_AND_INVENTED_FACTS",
     ]);
-    // The redraft carries the reviewer's numbered defect.
+    // The redraft carries the reviewer's numbered fix, lean (no problem).
     const redraft = h.calls[3];
     expect(redraft?.mode).toBe("REDRAFT");
     expect(redraft?.fixes).toContain(
-      "1. [s2] The slide's step does not say which figures",
+      "1. [s2] Name revenue per clinic and gross margin per clinic.",
     );
+    expect(redraft?.fixes).not.toContain("The slide's step does not say");
 
     const plan = h.plans.latest(outcome.planId);
     expect(plan).toBeDefined();

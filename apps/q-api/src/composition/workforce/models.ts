@@ -255,7 +255,14 @@ export const PLAN_WRITE_BUDGET = {
   maxEstimatedCostUsd: 0.2,
   // Room for the reasoning beside a 12-step plan.
   maxOutputTokens: 9_000,
-  attemptTimeoutMs: 90_000,
+  // Sized from ai_ops.model_usage (EVIDENCE_SYNTHESIS, 2026-10-29/30): a
+  // write or redraft is about 10-14k tokens in and 3-5k out, served in
+  // 34-73 s, the latest writes at 72-73 s and climbing; the 90 s limit was
+  // 1.2x that, and redraft 1 of job 32e70db7 hit it (the baseline redraft
+  // of job 37655270: 13,855 in, 4,966 out, 57 s). 120 s is 1.6x the
+  // slowest served. The first attempt is the only one (a timeout is not
+  // retried by the gateway, nor by the job: see runPlanJob).
+  attemptTimeoutMs: 120_000,
 } as const;
 export const PLAN_REVIEW_BUDGET = {
   maxAttempts: 2,

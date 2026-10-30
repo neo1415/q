@@ -42,7 +42,7 @@ describe("writer and reviewers hold one cite rule and one owner rule (v3)", () =
   it("v3 built on v2 (v4 now active), built on v2 with the rubric and bar unchanged", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("PLAN_WRITE").definition.version).toBe(4);
-    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(4);
+    expect(registry.getActive("PLAN_REVIEW").definition.version).toBe(5);
     expect(PLAN_WRITE_V3.output).toEqual(PLAN_WRITE_V2.output);
     expect(PLAN_REVIEW_V3.output).toEqual(PLAN_REVIEW_V2.output);
     for (const kept of ["99/100", "plan-rubric/v1", "citesFacts (0-15)"]) {
