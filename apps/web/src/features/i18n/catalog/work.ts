@@ -674,5 +674,6 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "{n} facts": "{n} حقائق",
   "Two reviews": "مراجعتان",
   "What the reviews still want": "ما لا تزال المراجعتان تطلبانه",
+  "Show all {n} points": "اعرض كل النقاط ({n})",
   "Set up for your plans": "أُعدّت لخططك",
 };

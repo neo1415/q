@@ -4206,6 +4206,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Show again",
   "Show all",
   "Show all relationships",
+  "Show all {n} points",
   "Show as",
   "Show companies",
   "Show everything",

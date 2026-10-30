@@ -39,6 +39,22 @@ export type PlanCardBlock = QPlanBlock;
 
 type Decision = Awaited<ReturnType<typeof decidePlanAction>>;
 
+/** Open points listed before "Show all N points". */
+export const PLAN_POINTS_SHOWN = 3;
+
+/**
+ * The open points the card lists: every one when opened, the first few
+ * otherwise -- never a silent cap. Live 2026-10-30 (plan 01f706cf): the
+ * card listed 5 of 12 with no way to the rest, while the chat said "and
+ * 10 more on the card". The chat counts the same list (planReadyLine).
+ */
+export function shownPoints(
+  points: readonly string[],
+  all: boolean,
+): readonly string[] {
+  return all ? points : points.slice(0, PLAN_POINTS_SHOWN);
+}
+
 /** Who does a step, in plain words for the person. */
 export function ownerWords(step: Pick<QPlanStep, "owner">): string {
   switch (step.owner) {
@@ -228,6 +244,8 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   // Until when the card watches for its plan to start after an approval.
   const [approvedUntil, setApprovedUntil] = useState(0);
   const [clock, setClock] = useState(0);
+  const [allPoints, setAllPoints] = useState(false);
+  const pointsId = useId();
 
   useEffect(() => {
     let live = true;
@@ -385,8 +403,11 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
               <h4 className="cq-caption m-0 text-(--cq-text-tertiary)">
                 {t("What the reviews still want")}
               </h4>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {stillWanted.slice(0, 5).map((point) => (
+              <ul
+                id={pointsId}
+                className="m-0 flex list-none flex-col gap-1 p-0"
+              >
+                {shownPoints(stillWanted, allPoints).map((point) => (
                   <li
                     key={point}
                     className="cq-body-sm text-(--cq-text-secondary)"
@@ -395,6 +416,20 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                   </li>
                 ))}
               </ul>
+              {stillWanted.length <= PLAN_POINTS_SHOWN ? null : (
+                <button
+                  type="button"
+                  className={buttonClassName("quiet", "compact", "self-start")}
+                  aria-expanded={allPoints}
+                  aria-controls={pointsId}
+                  data-q-plan-wanted-all
+                  onClick={() => setAllPoints((open) => !open)}
+                >
+                  {allPoints
+                    ? t("Show fewer")
+                    : t(`Show all ${String(stillWanted.length)} points`)}
+                </button>
+              )}
             </section>
           )}
           <ol
