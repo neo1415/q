@@ -18,6 +18,8 @@ import { COUNTRY_OTHER_OPTION } from "./founder-v1.js";
  *   stored option maps to its geography node; "other" with a note that is
  *   a country's name ("Uzbekistan") maps to that country, and any other
  *   note stays their words only.
+ * - Their own words on any version (TEXT): a country only when they are
+ *   exactly its name.
  *
  * Browser-safe: the web, q-api and the write target read answers the same
  * way, and an older session's answer stays valid without rewriting it.
@@ -32,6 +34,11 @@ export function founderCountryOf(
       value.resourceIds.length === 1
       ? countryOfNodeId(value.resourceIds[0])
       : null;
+  }
+  if (value.type === "TEXT") {
+    // Their own words on the v8 step: a country only when they are exactly
+    // its name ("Uzbekistan"); "Based in Uganda" stays their words.
+    return countryOfName(value.text);
   }
   if (value.type === "SINGLE_SELECT") {
     return value.optionKey === COUNTRY_OTHER_OPTION

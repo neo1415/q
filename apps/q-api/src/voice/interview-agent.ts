@@ -14,11 +14,12 @@ import {
   type QInterviewStage,
 } from "@capital-q/contracts";
 import {
-  COUNTRY_OPTIONS_V5,
+  founderCountryOf,
   FOUNDER_STEPS,
   FOUNDER_PROFILE_SECTIONS,
 } from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
+import { countryOfName } from "@capital-q/taxonomy/countries";
 import {
   acceptStructuredOutput,
   type ModelGateway,
@@ -592,15 +593,12 @@ export type JourneyOpenings = {
 
 /** The company's country on the record, in words: a research anchor (lane ob1). */
 function countryLabelOf(view: OnboardingSessionView | null): string | null {
-  const value = view?.responses.find(
+  const response = view?.responses.find(
     (r) => r.stepKey === FOUNDER_STEPS.country,
-  )?.value;
-  if (value?.type !== "SINGLE_SELECT" || value.optionKey === "other") {
-    return null;
-  }
+  );
+  // Any version's answer, named from the one canonical country list.
   return (
-    COUNTRY_OPTIONS_V5.find((o) => o.optionKey === value.optionKey)?.label ??
-    null
+    founderCountryOf(response?.value, response?.note ?? null)?.name ?? null
   );
 }
 
@@ -2073,6 +2071,15 @@ export function createInterviewAgent(
       const configuration = journeySteps.find(
         (step) => step.stepKey === stepKey,
       )?.configuration;
+      // A country (founder v8: chosen from the geography taxonomy) is
+      // product copy like an option label: its canonical name, translated.
+      if (
+        configuration?.stepType === "reference_select" &&
+        stepKey === FOUNDER_STEPS.country &&
+        countryOfName(value)?.name === value
+      ) {
+        return [value];
+      }
       if (configuration === undefined || !("options" in configuration)) {
         return null;
       }
