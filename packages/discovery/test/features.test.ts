@@ -846,6 +846,48 @@ describe("declared_fit.geography v2: geography taxonomy nodes carry country inte
     expect(d?.version).toBe("v2");
   });
 
+  it("final check 2026-10-30: a Benelux-and-Nordics mandate saved as BE, LU, NL and the Nordics REGION node matches a Danish company; the region node covers its countries", () => {
+    const NORDICS = "12d66413-ed86-5883-8b9d-3032a8d58dc5";
+    const NETHERLANDS = "44444444-0000-4000-8000-000000000528";
+    const nordic: FeatureInputs["hierarchy"] = {
+      sourceClass: "TAXONOMY_REFERENCE_HIERARCHY",
+      nodes: [
+        {
+          preferredNodeId: NETHERLANDS,
+          vocabularyCode: "geography",
+          unrestricted: false,
+          descendantNodeIds: [],
+          countryCode: "NL",
+          descendantCountryCodes: [],
+        },
+        {
+          preferredNodeId: NORDICS,
+          vocabularyCode: "geography",
+          unrestricted: false,
+          descendantNodeIds: [],
+          countryCode: null,
+          descendantCountryCodes: ["DK", "FI", "IS", "NO", "SE"],
+        },
+      ],
+    };
+    const benelux = geoMandate([positive(NETHERLANDS), positive(NORDICS)]);
+    const read = (country: string) =>
+      valueOf(
+        computeFeatureValues(
+          ALL,
+          inputs({ mandate: benelux, country, hierarchy: nordic }),
+        ).values,
+        "declared_fit.geography",
+      );
+    expect(read("DK")).toMatchObject({
+      status: "PRESENT",
+      value: "REGION_MATCH",
+      provenance: { preferredNodeId: NORDICS, headquartersCountry: "DK" },
+    });
+    expect(read("NL")).toMatchObject({ value: "COUNTRY_MATCH" });
+    expect(read("DE")).toMatchObject({ status: "PRESENT", value: "NO_MATCH" });
+  });
+
   it("a Nigeria node matches a company headquartered in NG as COUNTRY_MATCH, with no geography classification", () => {
     expect(geography(geoMandate([positive(NIGERIA)]), "NG")).toMatchObject({
       featureVersion: "v2",

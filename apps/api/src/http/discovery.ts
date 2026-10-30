@@ -371,6 +371,12 @@ export function registerDiscoveryRoutes(
         unverifiableExclusions: served.unverifiableExclusions,
         excludingRules: served.excludingRules,
         discoverableCount: served.discoverableCount,
+        ...(served.declaredGeographyWithoutPitch === undefined
+          ? {}
+          : {
+              declaredGeographyWithoutPitch:
+                served.declaredGeographyWithoutPitch,
+            }),
       });
     },
   );

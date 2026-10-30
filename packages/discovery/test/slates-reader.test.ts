@@ -24,6 +24,7 @@ import type {
 } from "../src/slates/ports.js";
 import {
   createSlateReadService,
+  outsideDeclaredGeography,
   SlateCursorRejectedError,
   type SlateReadServiceDependencies,
 } from "../src/slates/reader.js";
@@ -87,6 +88,14 @@ async function publish(
     readonly publishedAt?: string;
     /** The candidate rotation's window this slate read, of how many. */
     readonly window?: { readonly index: number; readonly of: number };
+    /** Every item's stored codes; STAGE_ALIGNED + FACTOR_MISSING otherwise. */
+    readonly reasonCodes?: readonly string[];
+    /** The build's geography counts (final check 2026-10-30). */
+    readonly geography?: {
+      readonly aligned: number;
+      readonly mismatched: number;
+      readonly withheld: number;
+    };
   } = {},
 ) {
   const slate = await store.repo.beginBuild({
@@ -103,7 +112,9 @@ async function publish(
       companyTenantId: COMPANY_TENANT,
       rank: index + 1,
       internalScore: 0.9 - index * 0.1,
-      reasonCodes: ["STAGE_ALIGNED", "FACTOR_MISSING"],
+      reasonCodes: [
+        ...(options.reasonCodes ?? ["STAGE_ALIGNED", "FACTOR_MISSING"]),
+      ],
       featureSnapshotId: "66666666-0000-4000-8000-000000000001",
       featureSnapshotFingerprint: "a".repeat(64),
       candidateProvenance: {
@@ -134,6 +145,13 @@ async function publish(
           : {
               candidateWindow: options.window.index,
               candidateWindows: options.window.of,
+            }),
+        ...(options.geography === undefined
+          ? {}
+          : {
+              geographyAlignedItems: options.geography.aligned,
+              geographyMismatchedItems: options.geography.mismatched,
+              feedWithheldInDeclaredGeography: options.geography.withheld,
             }),
         buildDurationMs: 1,
       },
@@ -689,6 +707,68 @@ describe("slate reader (CQ-REC-006)", () => {
  * reachable, so demotion alone was ordering rather than suppression. These
  * cases are about the difference.
  */
+describe("a feed outside the declared geography says so (final check 2026-10-30)", () => {
+  it("a mismatch reaches the card beside the match; missingness still does not", async () => {
+    const h = harness();
+    await publish(h.store, KEY, 2, {
+      reasonCodes: [
+        "STAGE_ALIGNED",
+        "GEOGRAPHY_MISMATCH",
+        "TAXONOMY_MISMATCH",
+        "FACTOR_MISSING",
+      ],
+    });
+    const page = await h.reader.pageCompanies({ actor, limit: 2 });
+    expect(page.items[0]?.reasonCodes).toEqual([
+      "STAGE_ALIGNED",
+      "GEOGRAPHY_MISMATCH",
+      "TAXONOMY_MISMATCH",
+    ]);
+    // No geography counts on this slate: nothing is claimed about the feed.
+    expect(page.notes).toEqual([]);
+    expect(page.declaredGeographyWithoutPitch).toBeUndefined();
+  });
+
+  it("none in the declared geography: the page says so, with how many there have no pitch", async () => {
+    const h = harness();
+    await publish(h.store, KEY, 3, {
+      reasonCodes: ["STAGE_ALIGNED", "GEOGRAPHY_MISMATCH"],
+      geography: { aligned: 0, mismatched: 3, withheld: 12 },
+    });
+    const first = await h.reader.pageCompanies({ actor, limit: 2 });
+    expect(first.notes).toEqual(["NONE_IN_DECLARED_GEOGRAPHY"]);
+    expect(first.declaredGeographyWithoutPitch).toBe(12);
+    const second = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      cursor: first.nextCursor,
+    });
+    expect(second.notes).toEqual(["NONE_IN_DECLARED_GEOGRAPHY"]);
+  });
+
+  it("one company in the declared geography, or a mandate naming none: no such note", async () => {
+    const some = harness();
+    await publish(some.store, KEY, 3, {
+      geography: { aligned: 1, mismatched: 2, withheld: 12 },
+    });
+    const page = await some.reader.pageCompanies({ actor, limit: 2 });
+    expect(page.notes).toEqual([]);
+    expect(page.declaredGeographyWithoutPitch).toBeUndefined();
+
+    const open = harness();
+    await publish(open.store, KEY, 3, {
+      geography: { aligned: 0, mismatched: 0, withheld: 0 },
+    });
+    expect(
+      (await open.reader.pageCompanies({ actor, limit: 2 })).notes,
+    ).toEqual([]);
+  });
+
+  it("outsideDeclaredGeography reads only the slate's own counts", () => {
+    expect(outsideDeclaredGeography({ diagnostics: null })).toBeNull();
+  });
+});
+
 describe("the feed goes on past one slate (owner 2026-10-23: Discover must not hard-cap)", () => {
   it("at the end of a window it asks for the next and scrolls on into it, appended, never a restart", async () => {
     const h = harness();

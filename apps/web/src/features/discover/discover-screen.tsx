@@ -76,6 +76,8 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
   NONE_WITH_PLAYABLE_PITCH:
     "Companies pass your hard rules, but none has a pitch video yet. Search and Explore still show them.",
   NONE_MATCH_FILTERS: "No companies match these filters.",
+  NONE_IN_DECLARED_GEOGRAPHY:
+    "No companies with a pitch in your regions yet. Showing others outside your regions.",
 };
 
 function Reasons({

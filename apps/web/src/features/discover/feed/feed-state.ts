@@ -205,6 +205,11 @@ export type FeedState = {
   readonly excludingRules: readonly string[];
   /** How many companies are discoverable, when an empty page counted them. */
   readonly discoverableCount: number | null;
+  /**
+   * With NONE_IN_DECLARED_GEOGRAPHY: companies in the declared geography
+   * held out of the feed for want of a pitch video.
+   */
+  readonly declaredGeographyWithoutPitch: number | null;
   readonly nextCursor: string | null;
   readonly index: number;
   readonly decisions: Readonly<Record<string, FeedDecision>>;
@@ -226,6 +231,7 @@ export const INITIAL_FEED_STATE: FeedState = {
   unverifiableExclusions: [],
   excludingRules: [],
   discoverableCount: null,
+  declaredGeographyWithoutPitch: null,
   nextCursor: null,
   index: 0,
   decisions: {},
@@ -335,6 +341,9 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
         unverifiableExclusions: slate.unverifiableExclusions ?? [],
         excludingRules: slate.excludingRules ?? [],
         discoverableCount: slate.discoverableCount ?? null,
+        declaredGeographyWithoutPitch:
+          slate.declaredGeographyWithoutPitch ??
+          (restarted ? null : state.declaredGeographyWithoutPitch),
         nextCursor: slate.nextCursor,
         index: restarted
           ? 0

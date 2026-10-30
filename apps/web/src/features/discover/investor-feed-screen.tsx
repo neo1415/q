@@ -108,7 +108,32 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
   NONE_WITH_PLAYABLE_PITCH:
     "Companies pass your hard rules, but none has a pitch video yet. Search and Explore still show them.",
   NONE_MATCH_FILTERS: "No companies match these filters.",
+  NONE_IN_DECLARED_GEOGRAPHY: "No companies with a pitch in your regions yet.",
 };
+
+/**
+ * Final check 2026-10-30: every card in a Benelux-and-Nordics feed was
+ * outside those regions, twelve Dutch companies were held out for want of
+ * a pitch, and nothing said so. The sentences, in order: none here is in
+ * your regions; how many there have no pitch; what is shown instead.
+ */
+export function outsideGeographySentences(
+  withoutPitch: number | null,
+): readonly string[] {
+  const held =
+    withoutPitch === null || withoutPitch === 0
+      ? []
+      : [
+          withoutPitch === 1
+            ? "1 company in your regions is on Capital Q without a pitch."
+            : `${String(withoutPitch)} companies in your regions are on Capital Q without a pitch.`,
+        ];
+  return [
+    NOTE_TEXT.NONE_IN_DECLARED_GEOGRAPHY,
+    ...held,
+    "Showing others outside your regions.",
+  ];
+}
 
 /** "12 companies are", "1 company is": the count is the market, not a score. */
 function discoverableCompanies(count: number | null): string {
@@ -864,7 +889,12 @@ function InvestorFeed({
               controls.notice === null &&
               feed.decisionNotice === null ? null : (
                 <div className="flex flex-col gap-1">
-                  <Notes notes={notes} />
+                  <Notes
+                    notes={notes}
+                    geographyWithoutPitch={
+                      feed.state.declaredGeographyWithoutPitch
+                    }
+                  />
                   {unverifiableLine}
                   {controls.notice === null ? null : (
                     <p className="cq-status-line">{controls.notice}</p>
@@ -896,7 +926,13 @@ function InvestorFeed({
   );
 }
 
-function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
+function Notes({
+  notes,
+  geographyWithoutPitch = null,
+}: {
+  readonly notes: readonly DiscoveryNoteDto[];
+  readonly geographyWithoutPitch?: number | null | undefined;
+}) {
   const t = useT();
   if (notes.length === 0) return null;
   return (
@@ -904,8 +940,18 @@ function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
       {notes.map((note) => (
         // A status line, not an error: none of these is a fault, and a
         // warning tone would tell the reader something untrue.
-        <p key={note} className="cq-status-line">
-          {t(NOTE_TEXT[note])}
+        <p
+          key={note}
+          className="cq-status-line"
+          {...(note === "NONE_IN_DECLARED_GEOGRAPHY"
+            ? { "data-feed-outside-geography": true }
+            : {})}
+        >
+          {note === "NONE_IN_DECLARED_GEOGRAPHY"
+            ? outsideGeographySentences(geographyWithoutPitch)
+                .map((sentence) => t(sentence))
+                .join(" ")
+            : t(NOTE_TEXT[note])}
         </p>
       ))}
     </div>

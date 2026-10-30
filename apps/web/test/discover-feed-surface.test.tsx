@@ -93,7 +93,8 @@ vi.mock("@/features/q/q-subject", () => ({
 
 const { InvestorFeedScreen } =
   await import("../src/features/discover/investor-feed-screen");
-const { FeedCard } = await import("../src/features/discover/feed-card");
+const { FeedCard, slateMismatches } =
+  await import("../src/features/discover/feed-card");
 
 /**
  * This suite runs on a shared machine alongside other agents' work, where
@@ -268,8 +269,58 @@ describe("a card", () => {
     expect(screen.getAllByText("Pre-seed · Nigeria").length).toBeGreaterThan(0);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/nothing in common with your mandate/i);
-    // Missingness and mismatch are never shown as a reason.
+    // Internal codes never reach the reader.
     expect(text).not.toMatch(/mismatch/i);
+  });
+
+  it("never says why a company is here without saying where it does not fit (final check 2026-10-30)", () => {
+    render(
+      <FeedCard
+        company={company(1, {
+          headquartersCountry: "DE",
+          currentStageCode: "seed",
+          reasons: [],
+          reasonCodes: [
+            "STAGE_ALIGNED",
+            "GEOGRAPHY_MISMATCH",
+            "FACTOR_MISSING",
+          ],
+        })}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    // The chip over the pitch carries the mismatch beside the match.
+    const chip = document.querySelector("[data-feed-details-toggle]");
+    expect(chip?.textContent).toContain("Seed, in your range");
+    expect(chip?.textContent).toContain("Germany, outside your regions");
+    openDetails();
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("Seed, in your range")).toBeTruthy();
+    expect(dialog.getByText("Germany, outside your regions")).toBeTruthy();
+  });
+
+  it("a company that fits nothing named says so, and still lists where it does not fit", () => {
+    expect(
+      slateMismatches({
+        headquartersCountry: null,
+        currentStageCode: "series_b",
+        reasonCodes: [
+          "STAGE_MISMATCH",
+          "GEOGRAPHY_MISMATCH",
+          "TAXONOMY_MISMATCH",
+        ],
+      }).map((m) => `${m.label}: ${m.detail}`),
+    ).toEqual([
+      "Stage: Series B, outside your stage range",
+      "Location: Outside your regions",
+      "Sector: Not a category you named",
+    ]);
   });
 
   it("says quietly which hard rule could not be checked for this company, and still shows it (ADR 0020)", () => {
@@ -1059,6 +1110,46 @@ describe("the founder view is untouched", () => {
 });
 
 describe("degraded and empty states", () => {
+  it("says plainly when nothing shown is in the declared regions, and how many there have no pitch (final check 2026-10-30)", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: "99999999-9999-4999-8999-999999999999",
+        rankingVersion: "declared.v1",
+        items: [
+          company(1, {
+            headquartersCountry: "US",
+            reasonCodes: ["STAGE_ALIGNED", "GEOGRAPHY_MISMATCH"],
+          }),
+        ],
+        notes: ["NONE_IN_DECLARED_GEOGRAPHY"],
+        nextCursor: null,
+        declaredGeographyWithoutPitch: 12,
+      },
+    });
+    render(<InvestorFeedScreen />);
+    await screen.findByRole("heading", { name: "Company 1" });
+    openDetails();
+    const line = document.querySelector("[data-feed-outside-geography]");
+    expect(line?.textContent).toBe(
+      "No companies with a pitch in your regions yet. 12 companies in your regions are on Capital Q without a pitch. Showing others outside your regions.",
+    );
+  });
+
+  it("the outside-the-regions sentences: one company, or none counted", async () => {
+    const { outsideGeographySentences } =
+      await import("../src/features/discover/investor-feed-screen");
+    expect(outsideGeographySentences(1)).toEqual([
+      "No companies with a pitch in your regions yet.",
+      "1 company in your regions is on Capital Q without a pitch.",
+      "Showing others outside your regions.",
+    ]);
+    expect(outsideGeographySentences(0)).toEqual([
+      "No companies with a pitch in your regions yet.",
+      "Showing others outside your regions.",
+    ]);
+  });
+
   it("states a refresh calmly, with no error tone", async () => {
     loadSlatePageAction.mockResolvedValue({
       ok: true,

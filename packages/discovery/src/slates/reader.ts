@@ -86,6 +86,15 @@ export const PUBLIC_REASON_CODES: readonly string[] = [
   "CUSTOMER_TYPE_ALIGNED",
   "TAXONOMY_OTHER_ALIGNED",
   "SEMANTIC_SIMILARITY_PRESENT",
+  // Final check 2026-10-30: a compared, declared fact that does not match
+  // is not missingness, and a card that says why a company is here must
+  // say where it does not fit too (doc 19 §57). Without these the card
+  // read "Seed, in your range" for a German company in front of a
+  // Benelux-and-Nordics mandate.
+  "STAGE_MISMATCH",
+  "GEOGRAPHY_MISMATCH",
+  "TAXONOMY_MISMATCH",
+  "CHEQUE_ABOVE_ROUND",
 ];
 
 export const SLATE_PAGE_NOTES = [
@@ -104,6 +113,12 @@ export const SLATE_PAGE_NOTES = [
   "SLATE_RESTARTED",
   /** The reader's Discover filters left nothing in the slate. */
   "NONE_MATCH_FILTERS",
+  /**
+   * Final check 2026-10-30: the mandate names a geography and no company
+   * in the slate is in it, so everything shown is outside it. Said once
+   * per page with `declaredGeographyWithoutPitch`, never left implicit.
+   */
+  "NONE_IN_DECLARED_GEOGRAPHY",
 ] as const;
 export type SlatePageNote = (typeof SLATE_PAGE_NOTES)[number];
 
@@ -150,7 +165,51 @@ export type SlatePage = {
   readonly excludingRules: readonly string[];
   /** How many companies are discoverable to this investor; null when not counted. */
   readonly discoverableCount: number | null;
+  /**
+   * With NONE_IN_DECLARED_GEOGRAPHY: how many companies in the declared
+   * geography the slate's build found and the feed held out for want of a
+   * playable pitch. Absent otherwise.
+   */
+  readonly declaredGeographyWithoutPitch?: number | undefined;
 };
+
+/**
+ * The slate's own record that nothing in it is in the mandate's declared
+ * geography: some items were compared on geography and none matched.
+ * Null when the mandate names no geography, something matched, or the
+ * slate predates the counts.
+ */
+export function outsideDeclaredGeography(
+  slate: Pick<RecommendationSlate, "diagnostics">,
+): { readonly withheldWithoutPitch: number } | null {
+  const d = slate.diagnostics;
+  if (
+    d === null ||
+    d.geographyAlignedItems === undefined ||
+    d.geographyMismatchedItems === undefined
+  ) {
+    return null;
+  }
+  if (d.geographyAlignedItems > 0 || d.geographyMismatchedItems === 0) {
+    return null;
+  }
+  return { withheldWithoutPitch: d.feedWithheldInDeclaredGeography ?? 0 };
+}
+
+/** The page, saying it when what it shows is all outside the declared geography. */
+function withGeographyNote(
+  page: SlatePage,
+  outside: { readonly withheldWithoutPitch: number } | null,
+): SlatePage {
+  if (outside === null || page.items.length === 0) return page;
+  return {
+    ...page,
+    notes: page.notes.includes("NONE_IN_DECLARED_GEOGRAPHY")
+      ? page.notes
+      : [...page.notes, "NONE_IN_DECLARED_GEOGRAPHY"],
+    declaredGeographyWithoutPitch: outside.withheldWithoutPitch,
+  };
+}
 
 export type PageCompaniesQuery = {
   readonly actor: ActorContext;
@@ -791,6 +850,7 @@ export function createSlateReadService(
           priority: "HIGH",
         });
       }
+      const outside = outsideDeclaredGeography(slate);
 
       if (premiumSelection && filters !== null && fingerprint !== undefined) {
         // Explicit selection only: never write this order back to the canonical slate.
@@ -877,46 +937,52 @@ export function createSlateReadService(
         )
           notes.push("SLATE_RESTARTED");
         const page = selected.slice(start, start + limit);
-        return {
-          slateId: slate.id,
-          rankingVersion: slate.rankingConfigVersion,
-          items: page.flatMap((item) => {
-            const kept = passed.get(item.companyId);
-            return kept === undefined ? [] : [kept];
-          }),
-          notes: page.length === 0 ? [...notes, "NONE_MATCH_FILTERS"] : notes,
-          nextCursor:
-            selected.length > start + limit
-              ? encodeSlateCursor({
-                  v: 1,
-                  slateId: slate.id,
-                  afterRank: page.at(-1)?.rank ?? 0,
-                  f: fingerprint,
-                  u: snapshot,
-                })
-              : null,
-          unverifiableExclusions: unverifiable,
-          excludingRules: [],
-          discoverableCount: null,
-        };
+        return withGeographyNote(
+          {
+            slateId: slate.id,
+            rankingVersion: slate.rankingConfigVersion,
+            items: page.flatMap((item) => {
+              const kept = passed.get(item.companyId);
+              return kept === undefined ? [] : [kept];
+            }),
+            notes: page.length === 0 ? [...notes, "NONE_MATCH_FILTERS"] : notes,
+            nextCursor:
+              selected.length > start + limit
+                ? encodeSlateCursor({
+                    v: 1,
+                    slateId: slate.id,
+                    afterRank: page.at(-1)?.rank ?? 0,
+                    f: fingerprint,
+                    u: snapshot,
+                  })
+                : null,
+            unverifiableExclusions: unverifiable,
+            excludingRules: [],
+            discoverableCount: null,
+          },
+          outside,
+        );
       }
 
       if (filters !== null && fingerprint !== undefined) {
-        return pageFiltered({
-          actor: query.actor,
-          key,
-          mandateVersion: lookup.mandate.version,
-          slate,
-          afterRank,
-          limit,
-          filters,
-          fingerprint,
-          notes,
-          unverifiable,
-          outdatedPolicy,
-          investorOrganisationId: subject.investorOrganisationId,
-          volume,
-        });
+        return withGeographyNote(
+          await pageFiltered({
+            actor: query.actor,
+            key,
+            mandateVersion: lookup.mandate.version,
+            slate,
+            afterRank,
+            limit,
+            filters,
+            fingerprint,
+            notes,
+            unverifiable,
+            outdatedPolicy,
+            investorOrganisationId: subject.investorOrganisationId,
+            volume,
+          }),
+          outside,
+        );
       }
 
       // One more than the page so the continuation is known without a count.
@@ -1007,17 +1073,20 @@ export function createSlateReadService(
         },
         "recommendation slate page served",
       );
-      return {
-        slateId: slate.id,
-        rankingVersion: slate.rankingConfigVersion,
-        items,
-        notes,
-        nextCursor,
-        ...(continuesFrom === undefined ? {} : { continuesFrom }),
-        unverifiableExclusions: unverifiable,
-        excludingRules: [],
-        discoverableCount: null,
-      };
+      return withGeographyNote(
+        {
+          slateId: slate.id,
+          rankingVersion: slate.rankingConfigVersion,
+          items,
+          notes,
+          nextCursor,
+          ...(continuesFrom === undefined ? {} : { continuesFrom }),
+          unverifiableExclusions: unverifiable,
+          excludingRules: [],
+          discoverableCount: null,
+        },
+        outside,
+      );
     },
   };
 }

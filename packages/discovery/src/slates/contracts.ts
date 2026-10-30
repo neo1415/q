@@ -137,6 +137,16 @@ export const SlateDiagnosticsSchema = z
      * because they have no pitch video. The count makes that visible.
      */
     feedWithheldNoPlayablePitch: z.number().int().min(0).optional(),
+    /**
+     * Final check 2026-10-30: how the slate's items compare with the
+     * mandate's declared geography (aligned, or compared and outside it),
+     * and how many withheld companies the structured generator found in
+     * it. With none aligned, the feed says plainly that what it shows is
+     * outside the regions named. Absent on slates built before.
+     */
+    geographyAlignedItems: z.number().int().min(0).optional(),
+    geographyMismatchedItems: z.number().int().min(0).optional(),
+    feedWithheldInDeclaredGeography: z.number().int().min(0).optional(),
     buildDurationMs: z.number().int().min(0),
   })
   .strict();

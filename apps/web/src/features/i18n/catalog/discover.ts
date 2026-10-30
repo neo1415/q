@@ -28,6 +28,22 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "A country you invest in": "دولة تستثمر فيها",
   "{country}, a country you invest in": "{country}، دولة تستثمر فيها",
   "In a region you invest in": "في منطقة تستثمر فيها",
+  // Where a company does not fit the mandate (final check 2026-10-30).
+  Cheque: "الشيك",
+  "Outside your stage range": "خارج نطاق مراحلك",
+  "{stage}, outside your stage range": "{stage}، خارج نطاق مراحلك",
+  "Outside your regions": "خارج مناطقك",
+  "{country}, outside your regions": "{country}، خارج مناطقك",
+  "Not a category you named": "ليست فئة حددتها",
+  "No companies with a pitch in your regions yet.":
+    "لا توجد شركات لديها عرض في مناطقك بعد.",
+  "1 company in your regions is on Capital Q without a pitch.":
+    "شركة واحدة في مناطقك موجودة على Capital Q دون عرض.",
+  "{count} companies in your regions are on Capital Q without a pitch.":
+    "{count} شركات في مناطقك موجودة على Capital Q دون عرض.",
+  "Showing others outside your regions.": "نعرض شركات أخرى خارج مناطقك.",
+  "No companies with a pitch in your regions yet. Showing others outside your regions.":
+    "لا توجد شركات لديها عرض في مناطقك بعد. نعرض شركات أخرى خارج مناطقك.",
   "A category you named": "فئة حددتها",
   "Close to a category you named": "قريبة من فئة حددتها",
   "A business model you named": "نموذج عمل حددته",

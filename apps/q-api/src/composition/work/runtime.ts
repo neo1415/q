@@ -311,7 +311,8 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
             : `In their words: ${item.shortDescription}`,
           item.reasonCodes.length === 0
             ? null
-            : `Why it is in the feed: ${item.reasonCodes.join(", ")}`,
+            : // Fit and misfit codes both (final check 2026-10-30).
+              `How it compares with the mandate: ${item.reasonCodes.join(", ")}`,
         ].filter((line): line is string => line !== null);
         for (const pitchId of await store.pitchIds(item.companyId)) {
           const transcript = await dependencies

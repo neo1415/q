@@ -40,6 +40,7 @@ import {
   type RerankService,
 } from "../src/rerank/service.js";
 import {
+  declaredGeographyCounts,
   createSlateBuilder,
   slateFingerprint,
   type SlateBuilderDependencies,
@@ -859,6 +860,42 @@ describe("Discover feed eligibility: only companies with a playable pitch (disco
     const result = await builder.build(query);
     if (result.kind !== "PUBLISHED") throw new Error(result.kind);
     expect(store.rows.get(result.slate.id)?.items ?? []).toEqual([]);
+  });
+
+  it("counts how the slate meets the declared geography, and the in-geography companies held out (final check 2026-10-30)", () => {
+    const structured = (dimensions: readonly string[]) => ({
+      matchedDimensions: dimensions,
+    });
+    expect(
+      declaredGeographyCounts({
+        items: [
+          { reasonCodes: ["STAGE_ALIGNED", "GEOGRAPHY_MISMATCH"] },
+          { reasonCodes: ["GEOGRAPHY_MISMATCH", "TAXONOMY_EXACT"] },
+          // Not compared on geography (unknown country): neither side.
+          { reasonCodes: ["STAGE_ALIGNED", "FACTOR_MISSING"] },
+        ],
+        withheld: [id(7), id(8), id(9)],
+        candidates: [
+          // In a Nordics region node through Denmark: the generator's own match.
+          { companyId: id(7), structured: structured(["GEOGRAPHY"]) },
+          { companyId: id(8), structured: structured(["STAGE"]) },
+          { companyId: id(9), structured: null },
+          // Admitted, so not counted as held out.
+          { companyId: id(1), structured: structured(["GEOGRAPHY"]) },
+        ],
+      }),
+    ).toEqual({
+      geographyAlignedItems: 0,
+      geographyMismatchedItems: 2,
+      feedWithheldInDeclaredGeography: 1,
+    });
+    expect(
+      declaredGeographyCounts({
+        items: [{ reasonCodes: ["GEOGRAPHY_REGION_ALIGNED"] }],
+        withheld: [],
+        candidates: [],
+      }).geographyAlignedItems,
+    ).toBe(1);
   });
 
   it("is a published, versioned policy that requires a playable pitch", () => {

@@ -27,6 +27,7 @@ import {
   Globe,
   ICON_SIZE,
   ICON_STROKE,
+  Minus,
   MoreHorizontal,
   Share2,
 } from "@capital-q/ui/icons";
@@ -151,20 +152,81 @@ function slateReasons(company: DiscoveredCompanyDto): DiscoveryReasonDto[] {
   return reasons;
 }
 
+/** A declared fact the mandate was compared on and that does not match. */
+export type FeedMismatch = {
+  readonly label: "Stage" | "Location" | "Sector" | "Cheque";
+  readonly detail: string;
+};
+
+/**
+ * Where the company does not fit the mandate, from the slate's own codes
+ * (final check 2026-10-30). A card read "Seed, in your range" for a German
+ * company in front of a Benelux-and-Nordics mandate: what it says is here
+ * for must never leave out where it is not a fit. Neutral words, never a
+ * verdict on the company: it is the mandate that differs.
+ */
+export function slateMismatches(
+  company: Pick<
+    DiscoveredCompanyDto,
+    "reasonCodes" | "currentStageCode" | "headquartersCountry"
+  >,
+): FeedMismatch[] {
+  const stage = stageLabel(company.currentStageCode);
+  const country = countryLabel(company.headquartersCountry);
+  const out: FeedMismatch[] = [];
+  for (const code of company.reasonCodes) {
+    switch (code) {
+      case "STAGE_MISMATCH":
+        out.push({
+          label: "Stage",
+          detail:
+            stage === null
+              ? "Outside your stage range"
+              : `${stage}, outside your stage range`,
+        });
+        break;
+      case "GEOGRAPHY_MISMATCH":
+        out.push({
+          label: "Location",
+          detail:
+            country === null
+              ? "Outside your regions"
+              : `${country}, outside your regions`,
+        });
+        break;
+      case "TAXONOMY_MISMATCH":
+        out.push({ label: "Sector", detail: "Not a category you named" });
+        break;
+      case "CHEQUE_ABOVE_ROUND":
+        out.push({
+          label: "Cheque",
+          detail:
+            "Your smallest cheque is larger than the round they are raising",
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
 function Reasons({
   reasons,
+  mismatches,
 }: {
   readonly reasons: readonly DiscoveryReasonDto[];
+  readonly mismatches: readonly FeedMismatch[];
 }) {
   const t = useT();
-  if (reasons.length === 0) {
+  if (reasons.length === 0 && mismatches.length === 0) {
     return (
       <p className="cq-status-line">
         {t("Nothing in common with your mandate yet.")}
       </p>
     );
   }
-  return (
+  const list = (
     <dl className="flex flex-col gap-1">
       {reasons.map((reason) => (
         <div
@@ -187,7 +249,38 @@ function Reasons({
           </dd>
         </div>
       ))}
+      {mismatches.map((mismatch) => (
+        <div
+          key={`${mismatch.label}-${mismatch.detail}`}
+          className="cq-feed-reason flex gap-2"
+          data-feed-mismatch
+        >
+          <dt className="cq-label flex items-center gap-1.5 text-(--cq-text-tertiary)">
+            {/* Not a fit on this: a dash beside the word, neutral, never
+                colour alone and never a warning. */}
+            <Minus
+              aria-hidden="true"
+              className="cq-feed-reason-mark"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
+            {t(mismatch.label)}
+          </dt>
+          <dd className="cq-body-sm text-(--cq-text-secondary)">
+            {t(mismatch.detail)}
+          </dd>
+        </div>
+      ))}
     </dl>
+  );
+  if (reasons.length > 0) return list;
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="cq-status-line">
+        {t("Nothing in common with your mandate yet.")}
+      </p>
+      {list}
+    </div>
   );
 }
 
@@ -362,7 +455,15 @@ export function FeedCard({
   };
   const reasons =
     company.reasons.length > 0 ? company.reasons : slateReasons(company);
+  const mismatches = slateMismatches(company);
   const firstReason = reasons[0];
+  const firstMismatch = mismatches[0];
+  // Lines the chip does not say itself: a mismatch is never folded into "+N".
+  const moreLines =
+    reasons.length +
+    mismatches.length -
+    (firstReason === undefined ? 0 : 1) -
+    (firstMismatch === undefined ? 0 : 1);
   const unverifiedLine =
     unverified.length === 0 ? null : (
       <p className="cq-feed-unverified" data-feed-unverified>
@@ -383,7 +484,7 @@ export function FeedCard({
       <h3 className="cq-label text-(--cq-text-primary)">
         {t("Why it's here")}
       </h3>
-      <Reasons reasons={reasons} />
+      <Reasons reasons={reasons} mismatches={mismatches} />
       {unverifiedLine}
     </div>
   );
@@ -516,19 +617,35 @@ export function FeedCard({
             onClick={() => openDetails(false)}
             data-feed-details-toggle
           >
-            {firstReason === undefined ? (
+            {firstReason === undefined && firstMismatch === undefined ? (
               t("Why it's here")
             ) : (
               <>
-                <Check
-                  aria-hidden="true"
-                  size={ICON_SIZE.compact}
-                  strokeWidth={ICON_STROKE}
-                />
-                {t(firstReason.detail)}
-                {reasons.length > 1 ? (
+                {firstReason === undefined ? null : (
+                  <>
+                    <Check
+                      aria-hidden="true"
+                      size={ICON_SIZE.compact}
+                      strokeWidth={ICON_STROKE}
+                    />
+                    {t(firstReason.detail)}
+                  </>
+                )}
+                {/* The first place it does not fit, beside the first place
+                    it does: the chip never reads as a clean match. */}
+                {firstMismatch === undefined ? null : (
+                  <span data-feed-chip-mismatch>
+                    <Minus
+                      aria-hidden="true"
+                      size={ICON_SIZE.compact}
+                      strokeWidth={ICON_STROKE}
+                    />
+                    {t(firstMismatch.detail)}
+                  </span>
+                )}
+                {moreLines > 0 ? (
                   <span className="cq-feed-reason-more">
-                    +{String(reasons.length - 1)}
+                    +{String(moreLines)}
                   </span>
                 ) : null}
               </>

@@ -108,6 +108,12 @@ export const DiscoveryNoteDtoSchema = z.enum([
    * no filter is applied.
    */
   "NONE_MATCH_FILTERS",
+  /**
+   * The mandate names a geography and no company in this slate is in it:
+   * everything shown is outside it. `declaredGeographyWithoutPitch` says
+   * how many in it were held out for want of a pitch video.
+   */
+  "NONE_IN_DECLARED_GEOGRAPHY",
 ]);
 export type DiscoveryNoteDto = z.infer<typeof DiscoveryNoteDtoSchema>;
 
@@ -572,6 +578,12 @@ export const DiscoveryCompanySlateDtoSchema = z
     excludingRules: z.array(MandateRuleCodeDtoSchema).max(16).optional(),
     /** How many companies are discoverable to this investor, when an empty page counted them. */
     discoverableCount: z.number().int().min(0).nullable().optional(),
+    /**
+     * With NONE_IN_DECLARED_GEOGRAPHY: companies in the mandate's declared
+     * geography that are on Capital Q but have no pitch video, so the feed
+     * could not show them. A count only, never who.
+     */
+    declaredGeographyWithoutPitch: z.number().int().min(0).optional(),
     /**
      * Owner 2026-10-23 (Discover must not hard-cap): this page opens the
      * slate built after the named one, from the candidate rotation's next

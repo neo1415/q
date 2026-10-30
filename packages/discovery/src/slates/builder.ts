@@ -228,6 +228,58 @@ function failureCodeOf(error: unknown): SlateBuildFailureCode {
   return "BUILD_ERROR";
 }
 
+/** The ranker's geography outcomes (ranking/config.ts), as the slate stores them. */
+const GEOGRAPHY_ALIGNED_CODES: ReadonlySet<string> = new Set([
+  "GEOGRAPHY_COUNTRY_ALIGNED",
+  "GEOGRAPHY_REGION_ALIGNED",
+]);
+
+/**
+ * Final check 2026-10-30: a Benelux-and-Nordics mandate was served 39
+ * companies, every one GEOGRAPHY_MISMATCH, while twelve Dutch companies
+ * were held out for want of a pitch, and nothing said so. Geography is a
+ * declared preference here, not a hard rule, so the slate is right to
+ * fill with others (doc 19: hard exclusions come only from declared
+ * rules); what was wrong was the silence. These counts let the reader say
+ * it. The withheld side reads the structured generator's own geography
+ * match (its region expansion included), never an inference.
+ */
+export function declaredGeographyCounts(input: {
+  readonly items: readonly { readonly reasonCodes: readonly string[] }[];
+  readonly withheld: readonly string[];
+  readonly candidates: readonly {
+    readonly companyId: string;
+    readonly structured: {
+      readonly matchedDimensions: readonly string[];
+    } | null;
+  }[];
+}): {
+  readonly geographyAlignedItems: number;
+  readonly geographyMismatchedItems: number;
+  readonly feedWithheldInDeclaredGeography: number;
+} {
+  let geographyAlignedItems = 0;
+  let geographyMismatchedItems = 0;
+  for (const item of input.items) {
+    if (item.reasonCodes.some((code) => GEOGRAPHY_ALIGNED_CODES.has(code))) {
+      geographyAlignedItems += 1;
+    } else if (item.reasonCodes.includes("GEOGRAPHY_MISMATCH")) {
+      geographyMismatchedItems += 1;
+    }
+  }
+  const withheld = new Set(input.withheld);
+  const feedWithheldInDeclaredGeography = input.candidates.filter(
+    (c) =>
+      withheld.has(c.companyId) &&
+      c.structured?.matchedDimensions.includes("GEOGRAPHY") === true,
+  ).length;
+  return {
+    geographyAlignedItems,
+    geographyMismatchedItems,
+    feedWithheldInDeclaredGeography,
+  };
+}
+
 export function createSlateBuilder(
   dependencies: SlateBuilderDependencies,
 ): SlateBuilder {
@@ -543,6 +595,11 @@ export function createSlateBuilder(
           candidateWindow: pool.diagnostics.structured.candidateWindow ?? 0,
           candidateWindows: pool.diagnostics.structured.candidateWindows ?? 1,
           feedWithheldNoPlayablePitch: feed.withheld.length,
+          ...declaredGeographyCounts({
+            items,
+            withheld: feed.withheld,
+            candidates: pool.candidates,
+          }),
           buildDurationMs,
         };
         const publishedAt = clock();

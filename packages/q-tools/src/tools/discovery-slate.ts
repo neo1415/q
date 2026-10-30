@@ -347,4 +347,14 @@ const REASON_DETAILS: Readonly<Record<string, string>> = {
     "It is in a category the mandate names, though not its sector.",
   SEMANTIC_SIMILARITY_PRESENT:
     "What it does reads close to what the mandate describes.",
+  // Final check 2026-10-30: where it does not fit is said as plainly as
+  // where it does, so Q never presents an out-of-mandate company as a fit.
+  STAGE_MISMATCH:
+    "Not a fit on stage: its stage is outside the mandate's range.",
+  GEOGRAPHY_MISMATCH:
+    "Not a fit on geography: it is based outside the places the mandate names.",
+  TAXONOMY_MISMATCH:
+    "Not a fit on sector: its sector is not one the mandate names.",
+  CHEQUE_ABOVE_ROUND:
+    "Not a fit on cheque size: the smallest cheque is larger than its round.",
 };
