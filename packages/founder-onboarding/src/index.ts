@@ -82,6 +82,10 @@ export {
   type FinancialKnowledgePort,
 } from "./integration/financial-claims.js";
 export {
+  founderRecordChecks,
+  type FounderRecordCheck,
+} from "./integration/raising-contradiction.js";
+export {
   createFounderFinancialCheck,
   deckFinancialFigures,
   FINANCIAL_CHECK_STEPS,

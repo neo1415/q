@@ -17,6 +17,7 @@ import {
   FOUNDER_COVERAGE_PROFILE,
   FOUNDER_STEPS,
   FOUNDER_UTTERANCE_ALIASES,
+  founderRecordChecks,
 } from "@capital-q/founder-onboarding";
 import {
   INVESTOR_CONCEPT_FAMILIES,
@@ -1181,9 +1182,14 @@ export function createOnboardingPort(input: {
 
   /** Checks on what is on the record that the person has not settled. */
   const openChecks = (view: OnboardingSessionView) => {
-    if (input.journeyType !== "investor") return [];
     const values = new Map(view.responses.map((r) => [r.stepKey, r.value]));
-    return investorPlausibility(values).filter(
+    // Final check 2026-10-30: a founder's "raising now" and "not right now"
+    // sat side by side unasked; the founder journey had no checks at all.
+    const found =
+      input.journeyType === "investor"
+        ? investorPlausibility(values)
+        : founderRecordChecks(values);
+    return found.filter(
       (check) =>
         !check.stepKeys.some((key) =>
           (view.responses.find((r) => r.stepKey === key)?.note ?? "").includes(

@@ -665,10 +665,17 @@ export function savedSoFar(
         row.savePending !== true,
     ),
   ).slice(0, 6);
+  // Final check 2026-10-30: two answers on the record that disagree are
+  // said in the read-back, both kept, until they settle it (the question
+  // itself is raised once by the conversation, from the same checks).
+  const toSettle = state.checks.map((check) => check.fact);
   return [
     saved.length === 0
       ? "Nothing is saved yet."
       : `Here's what I have saved so far:\n\n${saved.join("\n\n")}`,
+    toSettle.length === 0
+      ? ""
+      : `To settle, both kept until you say which is right: ${toSettle.join(" ")}`,
     saving.length === 0 ? "" : `Still saving: ${saving.join(", ")}.`,
     needed.length === 0 ? "" : `Still to cover: ${needed.join(", ")}.`,
   ]

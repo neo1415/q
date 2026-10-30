@@ -233,6 +233,33 @@ describe("sweep D7: what is saved so far, read back", () => {
     expect(said).toContain("Company: Ferrowick");
     expect(said).toMatch(/\n\nStill to cover: team size\.$/u);
   });
+
+  it("final check 2026-10-30: two answers that disagree are said in the read-back, both kept", () => {
+    const said = savedSoFar(
+      {
+        journey: "founder",
+        currentStepKey: null,
+        canComplete: false,
+        completed: false,
+        checks: [
+          {
+            checkId: "RAISING_INTENT_VS_STATUS:raising_now:not_now",
+            fact: 'On record, what brings you to Capital Q is "I\'m raising for a company", and whether you are raising now is "Not right now".',
+            stepKeys: ["F0.intent", "F6.raising"],
+            raised: true,
+          },
+        ],
+        steps: [
+          row("F1.company_name", "Company name?", "ANSWERED", "Grenhaven"),
+        ],
+      },
+      "founder",
+      (key) => labels[key],
+    );
+    expect(said).toContain(
+      'To settle, both kept until you say which is right: On record, what brings you to Capital Q is "I\'m raising for a company", and whether you are raising now is "Not right now".',
+    );
+  });
 });
 
 describe("sweep D2: a region that is not a category", () => {
