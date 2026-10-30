@@ -11,10 +11,11 @@ import {
 const item = (score: number) => ({ score, defects: [] });
 
 describe("PLAN_REVIEW v5 (plan job 32e70db7): every defect names its refs", () => {
-  it("is active; the rubric and bar are v4's", () => {
+  it("carries refs (v6 keeps them); the rubric and bar are v4's", () => {
     expect(
-      createDefaultPromptRegistry().getActive("PLAN_REVIEW").versionId,
-    ).toBe("plan-review/v5");
+      createDefaultPromptRegistry().getActive("PLAN_REVIEW").definition
+        .template,
+    ).toContain(REVIEW_REFS_V5);
     expect(PLAN_REVIEW_V5.template).toContain(REVIEW_REFS_V5);
     expect(PLAN_REVIEW_V5.template).toContain("99/100");
     expect(PLAN_REVIEW_V4.template).not.toContain("refs are the refs");

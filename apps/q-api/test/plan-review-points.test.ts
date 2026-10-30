@@ -217,7 +217,9 @@ describe("the plan job hands the reviewers' points on whole", () => {
 
     const plan = plans.latest(outcome.planId);
     const open = plan?.review?.openPoints ?? [];
-    expect(open.filter((point) => point.startsWith("Step 1:"))).toHaveLength(1);
+    // Each distinct fix is kept under its step (job ea7508c9: merged
+    // fixes were lost); the person reads both reviewers' asks for step 1.
+    expect(open.filter((point) => point.startsWith("Step 1:"))).toHaveLength(2);
     expect(open).toContain(`Step 3: ${S3_FIX}`);
     for (const point of open) {
       expect(point).not.toMatch(/\w-$|\bde$|\bLedge$|\bwh$/u);

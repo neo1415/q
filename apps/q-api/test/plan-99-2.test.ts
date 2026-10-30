@@ -189,7 +189,7 @@ describe("job 32e70db7: what the person reads", () => {
     );
     // Live point 9: "the record “Remembered” and what Q remembers of…".
     expect(said[8]).toBe(
-      "State whether the prepared Aster update and LedgerBridge positioning between payment gateways and accounting tools are inputs to the revised materials, citing what Q remembers of “LedgerBridge 12-month financial model”, what you told Q on 2026-10-29 and what Q remembers of “LedgerBridge runway”.",
+      "State whether the prepared Aster update and LedgerBridge positioning between payment gateways and accounting tools are inputs to the revised materials, citing what Q remembers of “LedgerBridge 12-month financial model” and “LedgerBridge runway” and what you told Q on 2026-10-29.",
     );
     for (const point of said) {
       expect(point.length).toBeLessThanOrEqual(300);

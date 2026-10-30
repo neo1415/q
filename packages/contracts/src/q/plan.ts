@@ -170,6 +170,12 @@ export const Q_PLAN_RUBRIC_VERSION = "plan-rubric/v1" as const;
 /** The bar a plan must reach in every review to be offered as reviewed. */
 export const Q_PLAN_REVIEW_THRESHOLD = 99;
 export const Q_PLAN_MAX_REDRAFTS = 2;
+/**
+ * At most this many open points on a draft. 20 since 2026-10-30 (plan job
+ * ea7508c9): with each reviewer's distinct fix kept under its step, a
+ * second-round draft held 15; at 12 the last were folded into a count.
+ */
+export const Q_PLAN_OPEN_POINTS_MAX = 20;
 
 /**
  * plan-rubric/v1, weighted to 100. NO_INVENTED_FACTS is integrity: any
@@ -275,7 +281,9 @@ export const QPlanReviewSummarySchema = z
     /** Both reviewers passed the same version. Otherwise offered as a draft. */
     fullyReviewed: z.boolean(),
     /** What is still open when it is not fully reviewed, in plain words. */
-    openPoints: z.array(z.string().trim().min(1).max(300)).max(12),
+    openPoints: z
+      .array(z.string().trim().min(1).max(300))
+      .max(Q_PLAN_OPEN_POINTS_MAX),
   })
   .strict()
   .refine(

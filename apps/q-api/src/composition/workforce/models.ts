@@ -54,7 +54,7 @@ import {
   PlanWriteResultV2Schema,
   type PlanReviewResult,
   type PlanReviewResultV3,
-  type PlanReviewVariables,
+  type PlanReviewVariablesV6,
   type PlanWriteResult,
   type PlanWriteVariables,
   type DraftRedraftResult,
@@ -127,7 +127,8 @@ export type AnalysisWriteInput = Omit<AnalysisWriteVariables, Frame>;
 export type AnalysisCritiqueInput = Omit<AnalysisCritiqueVariables, Frame>;
 /** Situation-first planning (S4): PLAN_WRITE v1 and PLAN_REVIEW v1. */
 export type PlanWriteInput = Omit<PlanWriteVariables, Frame>;
-export type PlanReviewInput = Omit<PlanReviewVariables, Frame>;
+/** PLAN_REVIEW v6: the reviewers are told today's date. */
+export type PlanReviewInput = Omit<PlanReviewVariablesV6, Frame>;
 
 /** A deep-work call's result and what it cost (null cost: unpriced). */
 export type Priced<O> = {
@@ -820,7 +821,7 @@ export function createWorkforceModels(dependencies: {
         who,
         trace,
         variables: input,
-        // PLAN_REVIEW v5's own schema (live 2026-10-30, 0050ac002: the v5
+        // PLAN_REVIEW v6's own schema, v5's (live 2026-10-30, 0050ac002: the v5
         // prompt asked for refs, the call checked v2, and both reviews were
         // refused with unrecognized_keys(refs)).
         schema: PlanReviewResultV3Schema,
