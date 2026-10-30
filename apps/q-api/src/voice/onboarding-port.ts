@@ -1,17 +1,9 @@
-import { randomUUID } from "node:crypto";
-
 import {
-  completeOnboardingSession,
   findTaxonomyCandidates,
-  skipOnboardingStep,
   getOnboardingSession,
   getTaxonomyNode,
-  resolveOnboardingSuggestion,
   listInvestorMandates,
   listTaxonomyNodes,
-  submitOnboardingResponse,
-  submitOnboardingResponses,
-  withdrawOnboardingResponse,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
@@ -49,6 +41,7 @@ import {
   type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+import type { Logger } from "@capital-q/observability";
 import { turnIsEnglish } from "./reply-language.js";
 
 import {
@@ -88,6 +81,11 @@ import {
   REVIEW_NOT_SHOWN_REASON,
   STILL_SAVING_FINISH_REASON,
 } from "./onboarding-flow.js";
+import {
+  writeSession,
+  type SessionWrite,
+  type SessionWriteContext,
+} from "./session-writes.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 import {
   heardBack,
@@ -548,22 +546,26 @@ export async function settleMandateStep(
     });
     const mandateId = preselectedMandate(page.items);
     if (mandateId === null) return view;
-    return await submitOnboardingResponse(
-      session,
-      onboardingSessionId,
+    return await writeSession(
       {
-        stepKey: INVESTOR_STEPS.mandateContext,
-        response: {
-          value: {
-            type: "RESOURCE_REFERENCE",
-            resourceType: "INVESTOR_MANDATE",
-            resourceIds: [mandateId],
-          },
-          channel: "CONVERSATION",
-        },
-        expectedSessionVersion: view.session.version,
+        session,
+        onboardingSessionId,
+        version: () => Promise.resolve(view.session.version),
       },
-      randomUUID(),
+      {
+        kind: "SUBMIT",
+        request: {
+          stepKey: INVESTOR_STEPS.mandateContext,
+          response: {
+            value: {
+              type: "RESOURCE_REFERENCE",
+              resourceType: "INVESTOR_MANDATE",
+              resourceIds: [mandateId],
+            },
+            channel: "CONVERSATION",
+          },
+        },
+      },
     );
   } catch {
     return view;
@@ -632,6 +634,12 @@ export function settleFamilies(
 }
 
 export function createOnboardingPort(input: {
+  /**
+   * Where a failure on the save or reading path is reported with its
+   * reason (live recheck 2026-10-30: failures hidden by catch-all handlers
+   * were invisible). Absent: not reported.
+   */
+  readonly logger?: Pick<Logger, "info" | "warn"> | undefined;
   /**
    * One closed question about their words, read by meaning (J7). Absent:
    * nothing is read, and lists they gave before are kept (QO-27).
@@ -741,6 +749,20 @@ export function createOnboardingPort(input: {
    */
   readonly reviewShown?: ((stepKey: string) => boolean) | undefined;
 }): BoundOnboardingPort {
+  /**
+   * A failure on a save or reading path, reported with its reason (live
+   * recheck 2026-10-30: a reading that failed behind a catch-all left no
+   * trace). The caller goes on with `fallback`, which never claims a save.
+   */
+  const reported =
+    <T>(what: string, fallback: T) =>
+    (error: unknown): T => {
+      input.logger?.warn(
+        { err: error, onboardingSessionId: input.onboardingSessionId, what },
+        "onboarding step failed; went on without it",
+      );
+      return fallback;
+    };
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
       (step) => [step.stepKey, step] as const,
@@ -777,7 +799,9 @@ export function createOnboardingPort(input: {
   ): Promise<"YES" | "NO" | "UNSURE" | null> =>
     quote.trim().length === 0 || input.wordsCheck === undefined
       ? null
-      : input.wordsCheck(REPLACES_QUESTION, quote).catch(() => null);
+      : input
+          .wordsCheck(REPLACES_QUESTION, quote)
+          .catch(reported("replaces check", null));
   /** The steps this turn's answers are for, so a sibling in it counts. */
   const turnSteps = new Set<string>();
   /**
@@ -813,7 +837,7 @@ export function createOnboardingPort(input: {
     .then((list) =>
       list.filter((r) => input.unheardSteps?.has(r.stepKey) !== true),
     )
-    .catch(() => []);
+    .catch(reported("held writes read", []));
   /**
    * A reading from their own document that Q's last turn read back to
    * them word for word (QA F-134, 25 Oct): their plain yes to it is their
@@ -882,24 +906,25 @@ export function createOnboardingPort(input: {
     const suggested = step.context?.["suggestedMandateId"];
     if (typeof suggested !== "string" || suggested.length === 0) return view;
     try {
-      return await submitOnboardingResponse(
-        input.session,
-        input.onboardingSessionId,
+      return await sessionWrite(
         {
-          stepKey: step.stepKey,
-          response: {
-            value: {
-              type: "RESOURCE_REFERENCE",
-              resourceType,
-              resourceIds: [suggested],
+          kind: "SUBMIT",
+          request: {
+            stepKey: step.stepKey,
+            response: {
+              value: {
+                type: "RESOURCE_REFERENCE",
+                resourceType,
+                resourceIds: [suggested],
+              },
+              channel: "CONVERSATION",
             },
-            channel: "CONVERSATION",
           },
-          expectedSessionVersion: view.session.version,
         },
-        randomUUID(),
+        { version: () => Promise.resolve(view.session.version) },
       );
-    } catch {
+    } catch (caught: unknown) {
+      reported("mandate preselection", undefined)(caught);
       return view;
     }
   };
@@ -961,7 +986,7 @@ export function createOnboardingPort(input: {
         if (nodes.length > WHOLE_VOCABULARY_MAX) return null;
       }
       return nodes.length === 0 ? null : nodes;
-    })().catch(() => null);
+    })().catch(reported("category list read", null));
     wholeLists.set(key, loading);
     return loading;
   };
@@ -986,7 +1011,8 @@ export function createOnboardingPort(input: {
             const name = (await getTaxonomyNode(input.session, id)).displayName;
             nodeNames.set(id, name);
             return name;
-          } catch {
+          } catch (caught: unknown) {
+            reported("category name read", undefined)(caught);
             // A name that cannot be read is left out, never guessed.
             return null;
           }
@@ -1054,10 +1080,12 @@ export function createOnboardingPort(input: {
       (trusted || (readAt !== null && Date.now() - readAt < READ_REUSE_MS))
         ? latest
         : fresh(),
-      pendingNow().catch(() => []),
+      pendingNow().catch(reported("held writes read", [])),
       input.held === undefined
         ? new Set<string>()
-        : input.held.pendingSteps().catch(() => new Set<string>()),
+        : input.held
+            .pendingSteps()
+            .catch(reported("held steps read", new Set<string>())),
     ]);
     // The canonical coverage picture (lane ob1): the same projection the
     // form reads, so Q never re-asks what is known, saved or held.
@@ -1250,24 +1278,27 @@ export function createOnboardingPort(input: {
    * against the fresh version at once, never held as a "temporary fault"
    * (live 2026-10-16: "monthly revenue 180k AED" held three times).
    */
-  const onFreshVersion = async <T>(
-    attempt: (version: number) => Promise<T>,
-  ): Promise<T> => {
-    const view = await current();
-    try {
-      return await attempt(view.session.version);
-    } catch (error: unknown) {
-      const failed = error as {
-        readonly status?: unknown;
-        readonly code?: unknown;
-      };
-      if (failed.status !== 409 || failed.code !== "VERSION_CONFLICT") {
-        throw error;
-      }
-      const again = await fresh();
-      return attempt(again.session.version);
-    }
-  };
+  /**
+   * Every write of this port's goes through the one per-session chain
+   * (session-writes.ts): in order with this process's other writes to the
+   * session, made again on the fresh version after a conflict.
+   */
+  const sessionWrite = <W extends SessionWrite>(
+    write: W,
+    options: Pick<SessionWriteContext, "version" | "idempotencyKey"> = {},
+  ) =>
+    writeSession(
+      {
+        session: input.session,
+        onboardingSessionId: input.onboardingSessionId,
+        version:
+          options.version ?? (async () => (await current()).session.version),
+        fresh: async () => (await fresh()).session.version,
+        idempotencyKey: options.idempotencyKey,
+        logger: input.logger,
+      },
+      write,
+    );
 
   const submit = async (
     stepKey: string,
@@ -1277,23 +1308,18 @@ export function createOnboardingPort(input: {
     trusted = false;
     readAt = null;
     latest = await settle(
-      await onFreshVersion((version) =>
-        submitOnboardingResponse(
-          input.session,
-          input.onboardingSessionId,
-          {
-            stepKey,
-            response: {
-              value,
-              ...(note === undefined ? {} : { note }),
-              // Given in the conversation with Q, not the form (lane ob1).
-              channel: "CONVERSATION",
-            },
-            expectedSessionVersion: version,
+      await sessionWrite({
+        kind: "SUBMIT",
+        request: {
+          stepKey,
+          response: {
+            value,
+            ...(note === undefined ? {} : { note }),
+            // Given in the conversation with Q, not the form (lane ob1).
+            channel: "CONVERSATION",
           },
-          randomUUID(),
-        ),
-      ),
+        },
+      }),
     );
     trusted = true;
   };
@@ -1403,15 +1429,16 @@ export function createOnboardingPort(input: {
         stepKey: step.stepKey,
         outcome: "UNMATCHED",
         reason: OPTION_ONLY_STEPS.has(step.stepKey)
-          ? "That names none of this step's options, and this step is saved only as one of them (it sets them up). Choose the option below that means what they said and record it by its key; if their words leave it open, ask them which."
+          ? "That names none of this step's options, and this step is saved only as one of them (it sets them up). Choose the option below that means what they said and record it by its label exactly; if their words leave it open, ask them which."
           : options.some((o) => o.key === "other")
-            ? "That names none of this step's options. Choose the option below that means what they said and record it by its key. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them."
+            ? "That names none of this step's options. Choose the option below that means what they said and record it by its label exactly. If none fits and their words are a real answer, record their own words with ownWords true; they are kept as they said them. If their words are unclear, ask them."
             : // No catch-all to keep their words in (live 2026-10-01:
               // "a few paying customers" asked for six turns running).
-              "That names none of this step's options, and this step cannot keep other words. If one option plainly means what they said, record it by its key. Otherwise say so once in a few words, recommend the closest option with recommend and ask if it will do; never put the same choice to them again after that.",
-        candidates: options
-          .slice(0, 40)
-          .map((o) => `${o.label} (${o.key})`.slice(0, 160)),
+              "That names none of this step's options, and this step cannot keep other words. If one option plainly means what they said, record it by its label exactly. Otherwise say so once in a few words, recommend the closest option with recommend and ask if it will do; never put the same choice to them again after that.",
+        // Labels only: a key that is a word they used pulls a model to it
+        // (live recheck 2026-10-30: "follow a lead" saved as `follow`).
+        // A label given back exactly names its option.
+        candidates: options.slice(0, 40).map((o) => o.label.slice(0, 160)),
       };
     };
     const step = steps.get(answer.stepKey);
@@ -1480,7 +1507,7 @@ export function createOnboardingPort(input: {
                     sentence: answer.quote ?? phrase,
                     candidates: whole,
                   })
-                  .catch(() => null);
+                  .catch(reported("category reading (whole list)", null));
           const names: string[] = [];
           for (const id of chosen ?? []) {
             const node = whole?.find((candidate) => candidate.nodeId === id);
@@ -1514,7 +1541,9 @@ export function createOnboardingPort(input: {
                     sentence: answer.quote ?? phrase,
                     candidates: found.candidates.slice(0, 12),
                   })
-                  .catch(() => null);
+                  .catch(
+                    reported("category reading (lookup candidates)", null),
+                  );
           if (chosen !== null && chosen.length > 0) {
             for (const id of chosen) {
               const node = found.candidates.find((cand) => cand.nodeId === id);
@@ -1705,7 +1734,7 @@ export function createOnboardingPort(input: {
               sentence: answer.quote ?? phrase,
               candidates: choices,
             })
-            .catch(() => null);
+            .catch(reported("option reading", null));
           const picked = (chosen ?? []).filter((key) =>
             choices.some((choice) => choice.nodeId === key),
           );
@@ -1865,17 +1894,10 @@ export function createOnboardingPort(input: {
   };
 
   const withdraw = async (stepKey: string): Promise<void> => {
-    const view = await current();
     trusted = false;
     readAt = null;
     latest = await settle(
-      await withdrawOnboardingResponse(
-        input.session,
-        input.onboardingSessionId,
-        stepKey,
-        { expectedSessionVersion: view.session.version },
-        randomUUID(),
-      ),
+      await sessionWrite({ kind: "WITHDRAW", stepKey, request: {} }),
     );
   };
 
@@ -2054,7 +2076,8 @@ export function createOnboardingPort(input: {
             600,
           ),
       };
-    } catch {
+    } catch (caught: unknown) {
+      reported("answer reading", undefined)(caught);
       return null;
     }
   };
@@ -2075,7 +2098,7 @@ export function createOnboardingPort(input: {
   ): Promise<void> => {
     await input.held
       ?.hold(stepKey, { value, ...(note === undefined ? {} : { note }) })
-      .catch(() => undefined);
+      .catch(reported("hold until step opens", undefined));
   };
 
   const write = async (
@@ -2131,7 +2154,8 @@ export function createOnboardingPort(input: {
               ? HELD_FOR_FIRM_REASON
               : STILL_SAVING_REASON,
           };
-        } catch {
+        } catch (caught: unknown) {
+          reported("hold after a failed save", undefined)(caught);
           // The hold itself failed: report the original failure honestly.
         }
       }
@@ -2494,10 +2518,10 @@ export function createOnboardingPort(input: {
         if (view.progress.canComplete) {
           trusted = false;
           readAt = null;
-          latest = await completeOnboardingSession(
-            input.session,
-            input.onboardingSessionId,
-            { expectedSessionVersion: view.session.version },
+          const before = view;
+          latest = await sessionWrite(
+            { kind: "COMPLETE", request: {} },
+            { version: () => Promise.resolve(before.session.version) },
           );
           view = latest;
         }
@@ -2752,7 +2776,8 @@ export function createOnboardingPort(input: {
             reason:
               "Held for their confirmation, not recorded yet: it is your reading of something they said earlier. Read it back with any others in one short line; when they agree, accept_recommendation records it.",
           });
-        } catch {
+        } catch (caught: unknown) {
+          reported("recommendation hold", undefined)(caught);
           // Falls through to asking them.
         }
       }
@@ -2945,24 +2970,19 @@ export function createOnboardingPort(input: {
           readonly note?: string | undefined;
         };
         const submitBatch = (items: readonly BatchItem[]) =>
-          onFreshVersion((version) =>
-            submitOnboardingResponses(
-              input.session,
-              input.onboardingSessionId,
-              {
-                responses: items.map((item) => ({
-                  stepKey: item.stepKey,
-                  response: {
-                    value: item.value,
-                    ...(item.note === undefined ? {} : { note: item.note }),
-                    channel: "CONVERSATION" as const,
-                  },
-                })),
-                expectedSessionVersion: version,
-              },
-              randomUUID(),
-            ),
-          );
+          sessionWrite({
+            kind: "SUBMIT_MANY",
+            request: {
+              responses: items.map((item) => ({
+                stepKey: item.stepKey,
+                response: {
+                  value: item.value,
+                  ...(item.note === undefined ? {} : { note: item.note }),
+                  channel: "CONVERSATION" as const,
+                },
+              })),
+            },
+          });
         const asItem = (item: (typeof ready)[number]): BatchItem => ({
           stepKey: item.plan.step.stepKey,
           value: item.value,
@@ -3028,7 +3048,8 @@ export function createOnboardingPort(input: {
                   question: questionOf(item.plan.step),
                   reason: HELD_FOR_FIRM_REASON,
                 };
-              } catch {
+              } catch (caught: unknown) {
+                reported("hold after a failed save", undefined)(caught);
                 // The hold itself failed: refused below, honestly.
               }
             }
@@ -3074,7 +3095,9 @@ export function createOnboardingPort(input: {
         // lands this turn, not the next: what the batch held is replayed
         // once now that the batch is on the record.
         if (waitingOnStep.size > 0 && written.length > 0) {
-          const drained = await replayHeldWrites().catch(() => null);
+          const drained = await replayHeldWrites().catch(
+            reported("held writes replay", null),
+          );
           if (drained !== null && drained.applied.length > 0) {
             const now = await current();
             for (const index of waitingOnStep) {
@@ -3124,7 +3147,8 @@ export function createOnboardingPort(input: {
                 reason: STILL_SAVING_REASON,
               });
               continue;
-            } catch {
+            } catch (caught: unknown) {
+              reported("hold after a failed save", undefined)(caught);
               // The hold itself failed: report the original failure.
             }
           }
@@ -3136,7 +3160,9 @@ export function createOnboardingPort(input: {
         // (live 2026-10-28: nine mandate answers queued behind a website).
         const heldNow = settled.filter((r) => r.outcome === "HELD_FOR_RETRY");
         if (heldNow.length > 1) {
-          const drained = await replayHeldWrites().catch(() => null);
+          const drained = await replayHeldWrites().catch(
+            reported("held writes replay", null),
+          );
           if (drained !== null && drained.applied.length > 0) {
             const now = await current();
             for (const [index, item] of ready.entries()) {
@@ -3205,7 +3231,8 @@ export function createOnboardingPort(input: {
       await submit(stepKey, value);
       written.push(stepKey);
       return true;
-    } catch {
+    } catch (caught: unknown) {
+      reported("save", undefined)(caught);
       // Not recordable yet (another step first): Q asks as before.
       return false;
     }
@@ -3241,7 +3268,7 @@ export function createOnboardingPort(input: {
     >();
     const listed = input.held?.pendingValues;
     if (listed === undefined) return originals;
-    const pending = await listed().catch(() => []);
+    const pending = await listed().catch(reported("held originals read", []));
     if (pending.length === 0) return originals;
     const onRecord = new Set(
       (latest ?? (await current())).responses.map((r) => r.stepKey),
@@ -3292,19 +3319,13 @@ export function createOnboardingPort(input: {
         trusted = false;
         readAt = null;
         latest = await settle(
-          await onFreshVersion((version) =>
-            submitOnboardingResponse(
-              input.session,
-              input.onboardingSessionId,
-              {
-                stepKey: write.stepKey,
-                response,
-                expectedSessionVersion: version,
-              },
+          await sessionWrite(
+            { kind: "SUBMIT", request: { stepKey: write.stepKey, response } },
+            {
               // Derived from the held row and the version it targets: a
               // retried replay of the same version replays, not repeats.
-              pendingReplayKey(write.id, version),
-            ),
+              idempotencyKey: (version) => pendingReplayKey(write.id, version),
+            },
           ),
         );
         written.push(write.stepKey);
@@ -3381,7 +3402,9 @@ export function createOnboardingPort(input: {
         }));
       }
       const view = await current();
-      const waiting = await pendingNow().catch(() => []);
+      const waiting = await pendingNow().catch(
+        reported("held writes read", []),
+      );
       const setAside = new Set(
         view.progress.eligibleSteps
           .filter((row) => row.status === "SKIPPED")
@@ -3469,7 +3492,8 @@ export function createOnboardingPort(input: {
             outcome:
               answered === undefined ? "RECOMMENDED" : "DIFFERS_FROM_ANSWER",
           });
-        } catch {
+        } catch (caught: unknown) {
+          reported("recommendation", undefined)(caught);
           results.push({ stepKey: step.stepKey, outcome: "REJECTED" });
         }
       }
@@ -3558,20 +3582,14 @@ export function createOnboardingPort(input: {
           continue;
         }
         try {
-          const view = await current();
           trusted = false;
           readAt = null;
           latest = await settle(
-            await resolveOnboardingSuggestion(
-              input.session,
-              input.onboardingSessionId,
-              held.id,
-              {
-                resolution: "ACCEPT",
-                expectedSessionVersion: view.session.version,
-              },
-              randomUUID(),
-            ),
+            await sessionWrite({
+              kind: "RESOLVE",
+              suggestionId: held.id,
+              request: { resolution: "ACCEPT" },
+            }),
           );
           written.push(stepKey);
           results.push({
@@ -3747,13 +3765,11 @@ export function createOnboardingPort(input: {
           } else {
             trusted = false;
             readAt = null;
+            const before = view;
             latest = await settle(
-              await skipOnboardingStep(
-                input.session,
-                input.onboardingSessionId,
-                step.stepKey,
-                { expectedSessionVersion: view.session.version },
-                randomUUID(),
+              await sessionWrite(
+                { kind: "SKIP", stepKey: step.stepKey, request: {} },
+                { version: () => Promise.resolve(before.session.version) },
               ),
             );
           }
@@ -3849,17 +3865,16 @@ export function createOnboardingPort(input: {
         try {
           trusted = false;
           readAt = null;
+          const before = view;
           latest = await settle(
-            await skipOnboardingStep(
-              input.session,
-              input.onboardingSessionId,
-              waitingStep.stepKey,
-              { expectedSessionVersion: view.session.version },
-              randomUUID(),
+            await sessionWrite(
+              { kind: "SKIP", stepKey: waitingStep.stepKey, request: {} },
+              { version: () => Promise.resolve(before.session.version) },
             ),
           );
           view = latest;
-        } catch {
+        } catch (caught: unknown) {
+          reported("set aside", undefined)(caught);
           break;
         }
       }
@@ -3868,7 +3883,9 @@ export function createOnboardingPort(input: {
       const saving =
         input.held === undefined
           ? new Set<string>()
-          : await input.held.pendingSteps().catch(() => new Set<string>());
+          : await input.held
+              .pendingSteps()
+              .catch(reported("held steps read", new Set<string>()));
       const open = missing(view);
       const gaps = open.filter((gap) => !saving.has(gap.stepKey));
       if (gaps.length > 0) return { completed: false, missing: gaps };
@@ -3929,10 +3946,10 @@ export function createOnboardingPort(input: {
       try {
         trusted = false;
         readAt = null;
-        latest = await completeOnboardingSession(
-          input.session,
-          input.onboardingSessionId,
-          { expectedSessionVersion: view.session.version },
+        const before = view;
+        latest = await sessionWrite(
+          { kind: "COMPLETE", request: {} },
+          { version: () => Promise.resolve(before.session.version) },
         );
         return { completed: true, missing: [] };
       } catch (error: unknown) {
@@ -4006,7 +4023,7 @@ export function createOnboardingPort(input: {
           (
             await heldOriginals([
               { stepKey: only.step.stepKey, value: only.value },
-            ]).catch(() => new Map())
+            ]).catch(reported("held originals read", new Map()))
           ).size > 0
         );
       };
@@ -4073,7 +4090,7 @@ export function createOnboardingPort(input: {
       // than an answer this turn saved directly are settled, never written
       // over it (the drain compares when each was given).
       if (input.held !== undefined && written.length > writtenBefore) {
-        await replayHeldWrites().catch(() => null);
+        await replayHeldWrites().catch(reported("held writes replay", null));
       }
       return results;
     },
@@ -4135,7 +4152,8 @@ export function createOnboardingPort(input: {
           });
           written.push(stepKey);
           return { stepKey, optionKey: named.optionKey, quote: named.quote };
-        } catch {
+        } catch (caught: unknown) {
+          reported("stated option save", undefined)(caught);
           return null;
         }
       }
@@ -4163,7 +4181,7 @@ export function createOnboardingPort(input: {
     },
     pendingRecommendations: async () => {
       const view = await current();
-      const list = await pendingNow().catch(() => []);
+      const list = await pendingNow().catch(reported("held writes read", []));
       const out: {
         stepKey: string;
         value: string;

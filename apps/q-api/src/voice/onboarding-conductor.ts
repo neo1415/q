@@ -45,7 +45,7 @@ import type { PresenceFound, PresenceTrigger } from "./presence-trigger.js";
 import { languageInfo } from "@capital-q/q-core/language";
 
 import { replyLanguageOf } from "./reply-language.js";
-import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
 import { firstNameOf } from "./onboarding-flow.js";
 import type { TypedOnboarding } from "./typed-onboarding.js";
 import type { OnboardingConversation } from "./onboarding-conversation.js";
@@ -222,9 +222,7 @@ export function confirmedContent(
     .flatMap((s) => {
       const value = answers.get(s.stepKey);
       if (value === undefined) return [];
-      const label = (labels[s.stepKey]?.label ?? s.configuration.prompt)
-        .replace(/[?:]$/u, "")
-        .trim();
+      const label = labels[s.stepKey]?.label ?? plainStepLabel(s.stepKey);
       return [`${label}: ${confirmedValue(s, value, currency, names)}`];
     })
     .slice(0, CONFIRMED_ITEMS);
@@ -820,6 +818,20 @@ export function createOnboardingConductor(
   dependencies: OnboardingConductorDependencies,
 ): OnboardingConductor {
   const { agent, logger } = dependencies;
+  /**
+   * A failure on the onboarding path, reported with its reason (live
+   * recheck 2026-10-30: catch-all handlers left no trace); the caller goes
+   * on with `fallback`, which never claims a save.
+   */
+  const reported =
+    <T>(what: string, fallback: T) =>
+    (error: unknown): T => {
+      logger.warn(
+        { err: error, what },
+        "onboarding step failed; went on without it",
+      );
+      return fallback;
+    };
   const queue = dependencies.queue ?? createConfirmationQueue();
   const serializer = dependencies.serializer ?? createTurnSerializer();
 
@@ -917,7 +929,9 @@ export function createOnboardingConductor(
     const chosen =
       actor === undefined || dependencies.languageOf === undefined
         ? null
-        : await dependencies.languageOf(actor).catch(() => null);
+        : await dependencies
+            .languageOf(actor)
+            .catch(reported("language read", null));
     const language = replyLanguageOf(chosen, turnText);
     if (language.kind === "ENGLISH") return lines.map((line) => line.text);
     if (language.kind === "THEIRS") return null;
@@ -935,7 +949,7 @@ export function createOnboardingConductor(
               language.tag,
               lines.map((line) => line.text),
             )
-            .catch(() => []);
+            .catch(reported("opening localised", []));
     return lines.map((line, i) => handOf(line) ?? machine[i] ?? line.text);
   };
 
@@ -947,7 +961,7 @@ export function createOnboardingConductor(
     const kept = await listOnboardingInterviewTurnSteps(
       input.session,
       input.onboardingSessionId,
-    ).catch(() => null);
+    ).catch(reported("kept steps read", null));
     const underway =
       kept === null
         ? input.recentTurns.length > 0
@@ -970,7 +984,9 @@ export function createOnboardingConductor(
       // details (F3.review) instead of the founders' full-time question
       // the conversation had open. Coverage's own next is that question.
       // Only a question: a confirmation is still reached by order below.
-      coverageNext = (await port.state?.().catch(() => null))?.next?.find(
+      coverageNext = (
+        await port.state?.().catch(reported("coverage read", null))
+      )?.next?.find(
         (one) =>
           one.reason === "CONTRADICTION" ||
           one.reason === "ESSENTIAL_MISSING" ||
@@ -1112,7 +1128,9 @@ export function createOnboardingConductor(
       onboardingSessionId: input.onboardingSessionId,
       journeyType: input.journeyType,
     });
-    await port.recommendFound?.([item.recommendation]).catch(() => []);
+    await port
+      .recommendFound?.([item.recommendation])
+      .catch(reported("found recommendation held", []));
   };
 
   /** A conversation nobody has spoken in yet: Q introduces itself, by code. */
@@ -1125,7 +1143,7 @@ export function createOnboardingConductor(
     const kept = await listOnboardingInterviewTurns(
       input.session,
       input.onboardingSessionId,
-    ).catch(() => null);
+    ).catch(reported("thread read", null));
     if (
       kept === null ||
       kept.items.length > 0 ||
@@ -1153,7 +1171,7 @@ export function createOnboardingConductor(
             : INVESTOR_STEPS.organisationName,
           signupName,
         )
-        .catch(() => false);
+        .catch(reported("signup name saved", false));
     }
     const view =
       port.view() ??

@@ -5,8 +5,6 @@ import { randomUUID } from "node:crypto";
 
 import {
   getOnboardingSession,
-  resolveOnboardingSuggestion,
-  sayToOnboarding,
   type ApiSession,
   updateMe,
 } from "@capital-q/api-client";
@@ -49,6 +47,7 @@ import {
 import type { ApprovedContinuation } from "../composition/approved-continuation.js";
 import { keepsItsCard } from "../composition/conversation-approvals.js";
 import type { VoiceSessionBinding } from "./bindings.js";
+import { writeSession } from "./session-writes.js";
 import {
   signupContextFromToken,
   type InterviewTurnInput,
@@ -1940,15 +1939,18 @@ export function createVoiceTurnHandler(
       keep.remainder === null
     ) {
       // "Keep these": the same ACCEPT the tap performs (B §19), spoken.
-      const view = await resolveOnboardingSuggestion(
-        session,
-        onboarding.sessionId,
-        proposal,
+      const view = await writeSession(
         {
-          resolution: "ACCEPT",
-          expectedSessionVersion: before.session.version,
+          session,
+          onboardingSessionId: onboarding.sessionId,
+          version: () => Promise.resolve(before.session.version),
+          logger,
         },
-        randomUUID(),
+        {
+          kind: "RESOLVE",
+          suggestionId: proposal,
+          request: { resolution: "ACCEPT" },
+        },
       );
       const next = nextQuestion(before, view);
       const line = next.length === 0 ? "Noted." : `Noted. ${next}`;
@@ -1965,15 +1967,20 @@ export function createVoiceTurnHandler(
     // one the API delegates to (QX-004 core gate: one Q). Q's own words
     // come back and are spoken as written; the composed acknowledgement
     // below is only for a build where nothing answered at all.
-    const outcome = await sayToOnboarding(
-      session,
-      onboarding.sessionId,
+    const outcome = await writeSession(
       {
-        text,
-        expectedSessionVersion: before.session.version,
-        recentTurns: transcriptOf(binding).slice(0, -1),
+        session,
+        onboardingSessionId: onboarding.sessionId,
+        version: () => Promise.resolve(before.session.version),
+        logger,
       },
-      randomUUID(),
+      {
+        kind: "SAY",
+        request: {
+          text,
+          recentTurns: transcriptOf(binding).slice(0, -1),
+        },
+      },
     );
     const line =
       outcome.reply ??

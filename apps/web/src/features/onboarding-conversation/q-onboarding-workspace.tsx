@@ -106,6 +106,7 @@ import {
   publicFindingsNote,
   uploadFindingsNote,
   uploadAnswer,
+  UPLOAD_STEP_MAX,
   publicSourceOf,
   progressLines,
   promptFor,
@@ -187,6 +188,12 @@ export type QOnboardingWorkspaceActions = {
   readonly submitValue: (input: {
     readonly stepKey: string;
     readonly value: OnboardingResponseValue;
+    /**
+     * A list of references this adds to (an upload): on whatever version
+     * it lands on, merged with what the step holds there, keeping at most
+     * `max` (the newest).
+     */
+    readonly adds?: { readonly max: number } | undefined;
   }) => Promise<boolean>;
   readonly resolveSuggestion: (input: {
     readonly suggestionId: string;
@@ -1860,15 +1867,36 @@ export function QOnboardingWorkspace({
         return;
       }
       // The upload is their answer to the journey's own upload step, as the
-      // form's is (sweep D5). Failing to note it loses nothing: the
-      // document and its reading stand either way.
+      // form's is (sweep D5). Awaited, in the session's write order, so Q
+      // never asks for documents it holds (live recheck 2026-10-30: sent
+      // without waiting, it lost a version race with Q's own save, the
+      // failure was swallowed, and Q asked the documents question twice).
+      // A failure is said, never hidden; the document stands either way.
       const answered = uploadAnswer(
         viewRef.current,
         vocabulary.stepType,
         done.value.documentId,
       );
       if (answered !== null) {
-        void actions.submitValue(answered).catch(() => false);
+        const noted = await actions
+          // Merged with the step's documents on the version it lands on.
+          .submitValue({ ...answered, adds: { max: UPLOAD_STEP_MAX } })
+          .catch((error: unknown) => {
+            console.warn("[onboarding] upload answer failed", {
+              stepKey: answered.stepKey,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            return false;
+          });
+        if (!noted) {
+          console.warn("[onboarding] upload answer not saved", {
+            stepKey: answered.stepKey,
+          });
+          push(
+            "Q",
+            `I have ${file.name}, but I couldn't mark your documents as added. You can tick it on the form.`,
+          );
+        }
       }
       setUploadNote(`Reading ${file.name}`);
       setUploadCard({ fileName: file.name, stage: "READING", found: [] });

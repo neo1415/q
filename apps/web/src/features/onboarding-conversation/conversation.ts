@@ -1296,7 +1296,7 @@ export function readBackBlocks(text: string): string[][] {
 }
 
 /** The most documents one upload step holds (the definition's maxItems). */
-const UPLOAD_STEP_MAX = 6;
+export const UPLOAD_STEP_MAX = 6;
 
 /**
  * A document uploaded in the conversation, as the answer of the journey's

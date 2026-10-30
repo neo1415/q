@@ -1,5 +1,6 @@
 import type { OnboardingResponseValue } from "@capital-q/contracts";
 import {
+  INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DEFINITION_CURRENT,
   INVESTOR_STEPS,
 } from "@capital-q/investor-onboarding";
@@ -15,6 +16,9 @@ import { groupOf } from "./models/journey";
  */
 
 const S = INVESTOR_STEPS;
+
+/** A step with no title of its own: never its question, never its key. */
+const UNTITLED_STEP = "Detail";
 
 const TITLES: Readonly<Record<string, string>> = {
   [S.investorType]: "Investor type",
@@ -109,8 +113,13 @@ function describe(
 
 export const INVESTOR_VOCABULARY: JourneyVocabulary = {
   subject: "investor",
+  // A step's plain label, never its question (live recheck 2026-10-30:
+  // "What is your long-term vision for the company? · ..." on a card): the
+  // journey's own title, else the coverage profile's label for the field.
   stepTitle: (stepKey) =>
-    TITLES[stepKey] ?? STEPS.get(stepKey)?.configuration.prompt ?? stepKey,
+    TITLES[stepKey] ??
+    INVESTOR_COVERAGE_PROFILE.fields[stepKey]?.label ??
+    UNTITLED_STEP,
   describe,
   stepType: (stepKey) => STEPS.get(stepKey)?.configuration.stepType,
   optionsFor,

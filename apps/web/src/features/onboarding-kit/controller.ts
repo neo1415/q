@@ -126,6 +126,12 @@ export type OnboardingActions<TResponse> = {
   readonly submitValue: (input: {
     readonly stepKey: string;
     readonly value: OnboardingResponseValue;
+    /**
+     * A list of references this adds to (an upload): on whatever version
+     * it lands on, merged with what the step holds there, keeping at most
+     * `max` (the newest).
+     */
+    readonly adds?: { readonly max: number } | undefined;
   }) => Promise<boolean>;
   /**
    * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21),

@@ -8,6 +8,7 @@ import {
   CURRENCY_OPTIONS,
   CUSTOMER_TYPE_VOCABULARIES,
   GEOGRAPHY_VOCABULARIES,
+  INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DEFINITION_CURRENT,
   INVESTOR_DEFINITION_V2_VERSION,
   INVESTOR_DEFINITION_VERSION,
@@ -532,7 +533,10 @@ function readingItems(
     if (rendered === null) {
       return [];
     }
-    const stepLabel = config(suggestion.stepKey).configuration.prompt;
+    // The field's plain label, never its question (live recheck 2026-10-30).
+    const stepLabel =
+      INVESTOR_COVERAGE_PROFILE.fields[suggestion.stepKey]?.label ??
+      config(suggestion.stepKey).configuration.prompt;
     return [
       {
         id: suggestion.id,
