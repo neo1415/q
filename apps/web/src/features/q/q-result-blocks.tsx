@@ -327,6 +327,7 @@ const DESTINATION_LABELS: Readonly<
   CRM_PIPELINE: "Open your pipeline",
   Q_PITCH: "Start Q Pitch",
   BOARD: "Open your board",
+  MANDATE: "Open your mandate",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

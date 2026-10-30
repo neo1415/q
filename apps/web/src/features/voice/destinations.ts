@@ -63,6 +63,9 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   Q_PITCH: "/q-pitch?start=1",
   // Work-board lane: their own work board, a Work tab.
   BOARD: "/board",
+  // Sweep 2026-10-29: the bare /mandate is resolved on the server (their
+  // profile's mandate, or the setup that creates one).
+  MANDATE: "/mandate",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

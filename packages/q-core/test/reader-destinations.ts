@@ -37,6 +37,9 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   // rule beside BOARD ASK, read by meaning; "open my board" is also opened
   // by code (page-request.ts).
   "BOARD",
+  // Sweep 2026-10-29: "take me to my mandate" is opened by code
+  // (page-request.ts); no reader version names it.
+  "MANDATE",
 ]);
 
 export const READER_DESTINATIONS = Q_NAVIGATE_DESTINATIONS.filter(

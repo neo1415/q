@@ -1690,6 +1690,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "CRM_PIPELINE",
           "Q_PITCH",
           "BOARD",
+          "MANDATE",
         ],
         documents: [],
         visibilityChange: false,

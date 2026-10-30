@@ -183,6 +183,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   // Work-board lane (2026-10-23): their own work board (/board), a Work
   // tab ("open my board").
   "BOARD",
+  // Sweep 2026-10-29: the investor's mandate, by its own name.
+  "MANDATE",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

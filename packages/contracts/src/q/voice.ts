@@ -791,6 +791,10 @@ export const Q_VOICE_DESTINATIONS = [
   "Q_PITCH",
   // Work-board lane (2026-10-23): their own work board, a Work tab.
   "BOARD",
+  // Sweep 2026-10-29 ("take me to my mandate" landed on Settings after
+  // 18 s): an investor's mandate (/mandate, resolved on the server to their
+  // profile's mandate, or the setup that creates one).
+  "MANDATE",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

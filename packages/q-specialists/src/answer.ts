@@ -1542,6 +1542,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   CRM_PIPELINE: "Opening your pipeline.",
   Q_PITCH: "Let me show you Capital Q.",
   BOARD: "Opening your board.",
+  MANDATE: "Opening your mandate.",
 };
 
 /**
@@ -1602,6 +1603,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   CRM_PIPELINE: "CRM (Pipeline)",
   Q_PITCH: "Q Pitch",
   BOARD: "Work (Board)",
+  MANDATE: "your mandate",
 };
 
 /**
