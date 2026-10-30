@@ -21,12 +21,23 @@ import type { ModelGateway } from "../gateway.js";
  * it cannot be had: the full reading answers, as before.
  */
 
-/** One quick attempt: a slow skim is no faster than the full reading. */
-const TURN_SKIM_BUDGET = {
+/**
+ * One quick attempt: a slow skim is no faster than the full reading.
+ *
+ * Sized from production (ai_ops.model_usage, 7 days to 2026-10-30, 1,431
+ * skims): successful skims wrote p99 110 output tokens, and all 9 refused
+ * as invalid JSON stopped at exactly the old 160-token ceiling -- cut off,
+ * not wrong. 320 is three times p99 (at most ~USD 0.0004 a skim). 63 skims
+ * (4.4%) timed out at 2.5 s while successful ones answered p99 2.4 s: the
+ * ceiling sat on the tail. Since the full reading's prompt grew (10-26) it
+ * answers p50 3.1 s, so a skim that lands by 3 s still decides first;
+ * after that the full reading answers, as before.
+ */
+export const TURN_SKIM_BUDGET = {
   maxAttempts: 1,
   maxEstimatedCostUsd: 0.01,
-  maxOutputTokens: 160,
-  attemptTimeoutMs: 2_500,
+  maxOutputTokens: 320,
+  attemptTimeoutMs: 3_000,
 } as const;
 
 /** The suffix that marks a skim's usage rows (correlation_id ≤ 128). */

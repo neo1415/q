@@ -102,11 +102,13 @@ describe("the turn skim (K)", () => {
     const skimChars = characters(skim.requests[0]);
     const readChars = characters(read.requests[0]);
     // Measured: well under half of the reader's prompt, and an output
-    // budget a seventh of its (four fields, not the whole reading).
+    // budget well under the reader's (four fields, not the whole reading):
+    // three times the skim's production p99 of 110 tokens (2026-10-30;
+    // at 160, 9 skims were cut off mid-object).
     expect(skimChars * 2).toBeLessThan(readChars);
-    expect(skim.requests[0]?.budget?.maxOutputTokens).toBeLessThanOrEqual(160);
+    expect(skim.requests[0]?.budget?.maxOutputTokens).toBe(320);
     expect(
-      (skim.requests[0]?.budget?.maxOutputTokens ?? 0) * 7,
+      (skim.requests[0]?.budget?.maxOutputTokens ?? 0) * 3,
     ).toBeLessThanOrEqual(read.requests[0]?.budget?.maxOutputTokens ?? 0);
   });
 
