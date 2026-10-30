@@ -13,6 +13,7 @@ import {
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "../ports.js";
+import { webText } from "./web-text.js";
 
 /**
  * Brave Search (api.search.brave.com) behind the research ports (owner
@@ -63,11 +64,7 @@ const text = (value: unknown): string | null =>
 
 /** Brave marks the matched words with <strong>; a snippet is plain text. */
 const plain = (value: string): string =>
-  value
-    .replace(/<[^>]*>/gu, "")
-    .replace(/&quot;/gu, '"')
-    .replace(/&#x27;|&#39;/gu, "'")
-    .replace(/&amp;/gu, "&")
+  webText(value.replace(/<[^>]*>/gu, ""))
     .replace(/\s+/gu, " ")
     .trim();
 

@@ -9,6 +9,7 @@ import {
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "../ports.js";
+import { webText } from "./web-text.js";
 
 /**
  * ScrapingBee behind the PublicWebResearchProvider port: its Google search
@@ -57,16 +58,13 @@ export function htmlToText(html: string): {
   readonly text: string;
 } {
   const title = /<title[^>]*>([\s\S]*?)<\/title>/iu.exec(html)?.[1];
-  const text = html
-    .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/giu, " ")
-    .replace(/<!--[\s\S]*?-->/gu, " ")
-    .replace(/<\/(p|div|li|h[1-6]|tr|br|section|article)>/giu, "\n")
-    .replace(/<[^>]+>/gu, " ")
-    .replace(/&nbsp;/gu, " ")
-    .replace(/&amp;/gu, "&")
-    .replace(/&lt;/gu, "<")
-    .replace(/&gt;/gu, ">")
-    .replace(/&quot;|&#39;/gu, "'")
+  const text = webText(
+    html
+      .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/giu, " ")
+      .replace(/<!--[\s\S]*?-->/gu, " ")
+      .replace(/<\/(p|div|li|h[1-6]|tr|br|section|article)>/giu, "\n")
+      .replace(/<[^>]+>/gu, " "),
+  )
     .replace(/[ \t\f\v\u00a0]+/gu, " ")
     .replace(/\s*\n\s*/gu, "\n")
     .trim();
@@ -74,7 +72,7 @@ export function htmlToText(html: string): {
     title:
       title === undefined
         ? null
-        : title.replace(/\s+/gu, " ").trim().slice(0, 300) || null,
+        : webText(title).replace(/\s+/gu, " ").trim().slice(0, 300) || null,
     text: text.slice(0, MAX_PAGE_CHARS),
   };
 }

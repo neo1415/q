@@ -819,10 +819,12 @@ export function reviewOf(
   const verdict = planReviewScore(result);
   const asks = result.asksNothingKnown.score;
   const note = (...items: (keyof typeof PLAN_RUBRIC_V1)[]) =>
-    items
-      .flatMap((item) => result[item].defects.map((defect) => defect.problem))
-      .join(" ")
-      .slice(0, 300);
+    wordClip(
+      items
+        .flatMap((item) => result[item].defects.map((defect) => defect.problem))
+        .join(" "),
+      300,
+    );
   const items: QPlanReview["items"] = [
     {
       item: "SITUATION_COVERAGE",
@@ -873,28 +875,198 @@ export function reviewOf(
   };
 }
 
-/** A reviewer's defects as numbered-able fixes, most important item first. */
+/** What a reviewer still wants, kept whole: the problem and its fix apart. */
+export type ReviewPoint = {
+  readonly reviewer: "R1" | "R2";
+  /** The rubric item it was deducted under ("firewall" for a breach). */
+  readonly item: keyof typeof PLAN_RUBRIC_V1 | "firewall";
+  readonly stepKey: string | null;
+  readonly problem: string;
+  readonly fix: string;
+};
+
+/** Integrity first, then the items a redraft most often misses. */
+const REVIEW_ORDER: readonly (keyof typeof PLAN_RUBRIC_V1)[] = [
+  "noInventedFacts",
+  "citesFacts",
+  "asksNothingKnown",
+  "specificity",
+  "situationCoverage",
+  "ownerClassification",
+  "feasibility",
+  "roleCorrectWording",
+];
+
+/**
+ * An integrity verdict with no defect named. Live 2026-10-30 (plan job
+ * dd352104): R1 scored 97 with noInventedFacts full, so its fatal verdict
+ * could only be firewall.held false -- with no defect listed, the redraft
+ * and the person were told nothing about it. Code says so in its own
+ * words; the verdict stays fatal.
+ */
+export const FIREWALL_UNNAMED: Pick<ReviewPoint, "problem" | "fix"> = {
+  problem:
+    "A reviewer judged that the plan may carry private material it should not, without naming the step.",
+  fix: "Make sure no step states or shares an investor's private notes or decisions, and that your own private or held-back documents are only named as held back, never quoted, and shared only through their own approval step.",
+};
+export const INVENTED_UNNAMED: Pick<ReviewPoint, "problem" | "fix"> = {
+  problem:
+    "A reviewer judged that the plan states something the situation does not hold, without naming it.",
+  fix: "Check every name, figure, date and status against the situation, and say a pending approval or open task as pending, never as done.",
+};
+
+/** A reviewer's defects, whole and in order: integrity first. */
+export function reviewPoints(
+  result: PlanReviewResult,
+  reviewer: "R1" | "R2",
+): readonly ReviewPoint[] {
+  const points: ReviewPoint[] = [];
+  const add = (
+    item: ReviewPoint["item"],
+    defect: Pick<ReviewPoint, "problem" | "fix"> & {
+      readonly stepKey: string | null;
+    },
+  ) => {
+    const point = {
+      reviewer,
+      item,
+      stepKey: defect.stepKey,
+      problem: defect.problem.trim(),
+      fix: defect.fix.trim(),
+    };
+    if (!points.some((one) => samePoint(one, point))) points.push(point);
+  };
+  for (const defect of result.firewall.defects) add("firewall", defect);
+  if (!result.firewall.held && result.firewall.defects.length === 0) {
+    add("firewall", { stepKey: null, ...FIREWALL_UNNAMED });
+  }
+  for (const item of REVIEW_ORDER) {
+    for (const defect of result[item].defects) add(item, defect);
+    if (
+      item === "noInventedFacts" &&
+      result[item].score < PLAN_RUBRIC_V1[item] &&
+      result[item].defects.length === 0
+    ) {
+      add(item, { stepKey: null, ...INVENTED_UNNAMED });
+    }
+  }
+  return points;
+}
+
+const plainKey = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[‘’]/gu, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, " ")
+    .trim();
+
+function samePoint(a: ReviewPoint, b: ReviewPoint): boolean {
+  return (
+    a.stepKey === b.stepKey &&
+    plainKey(a.problem) === plainKey(b.problem) &&
+    plainKey(a.fix) === plainKey(b.fix)
+  );
+}
+
+/**
+ * Both reviewers' points as one list: the same step's deduction under the
+ * same rubric item, raised by both, is one point (the first reviewer's
+ * words, the other's fix kept as well when it differs). Structural only:
+ * the step and the rubric item each reviewer chose, never the wording.
+ */
+export function mergedPoints(
+  points: readonly ReviewPoint[],
+): readonly (ReviewPoint & { readonly alsoFix: string | null })[] {
+  const merged: (ReviewPoint & { alsoFix: string | null })[] = [];
+  for (const point of points) {
+    const same = merged.find(
+      (one) =>
+        one.reviewer !== point.reviewer &&
+        one.stepKey !== null &&
+        one.stepKey === point.stepKey &&
+        one.item === point.item,
+    );
+    if (same === undefined) {
+      if (!merged.some((one) => samePoint(one, point))) {
+        merged.push({ ...point, alsoFix: null });
+      }
+      continue;
+    }
+    if (same.alsoFix === null && plainKey(same.fix) !== plainKey(point.fix)) {
+      same.alsoFix = point.fix;
+    }
+  }
+  return merged;
+}
+
+/** "[s2] problem Fix: fix" -- whole, never cut (the redraft reads it). */
+export function pointText(
+  point: Pick<ReviewPoint, "stepKey" | "problem" | "fix"> & {
+    readonly alsoFix?: string | null;
+  },
+): string {
+  const also =
+    point.alsoFix === null || point.alsoFix === undefined
+      ? ""
+      : ` The other reviewer's fix: ${point.alsoFix}`;
+  return `${point.stepKey === null ? "" : `[${point.stepKey}] `}${point.problem} Fix: ${point.fix}${also}`;
+}
+
+/**
+ * Cut at a word boundary, never mid-word: the last whole sentence that
+ * fits, else the last whole word with an ellipsis. Live 2026-10-30: the
+ * reviewers' fixes reached the person as "source-", "Ledge", "wh".
+ */
+export function wordClip(text: string, max: number): string {
+  const clean = text.replace(/\s+/gu, " ").trim();
+  if (clean.length <= max) return clean;
+  const room = clean.slice(0, max - 1);
+  let end = -1;
+  for (const match of room.matchAll(/[.!?](?=\s|$)/gu)) {
+    end = match.index + 1;
+  }
+  if (end >= Math.floor(max / 2)) return room.slice(0, end);
+  const space = room.lastIndexOf(" ");
+  const cut = space > 0 ? space : room.length;
+  return `${room.slice(0, cut).replace(/[\s,;:\-–—]+$/u, "")}…`;
+}
+
+/**
+ * A reviewer's fixes as the stored review keeps them (300 characters
+ * each): the step and the change wanted, split from the problem first and
+ * cut only at a word boundary.
+ */
 export function reviewFixes(result: PlanReviewResult): readonly string[] {
-  const order: readonly (keyof typeof PLAN_RUBRIC_V1)[] = [
-    "noInventedFacts",
-    "citesFacts",
-    "asksNothingKnown",
-    "specificity",
-    "situationCoverage",
-    "ownerClassification",
-    "feasibility",
-    "roleCorrectWording",
-  ];
-  const fixes = [
-    ...result.firewall.defects,
-    ...order.flatMap((item) => result[item].defects),
-  ].map((defect) =>
-    `${defect.stepKey === null ? "" : `[${defect.stepKey}] `}${defect.problem} Fix: ${defect.fix}`.slice(
-      0,
+  return reviewPoints(result, "R1").map((point) =>
+    wordClip(
+      `${point.stepKey === null ? "" : `[${point.stepKey}] `}${point.fix}`,
       300,
     ),
   );
-  return [...new Set(fixes)];
+}
+
+/**
+ * The redraft's FIXES: every point whole, numbered, within the variable's
+ * 6,000 characters -- a point that does not fit is left out whole (and
+ * counted), never cut mid-way.
+ */
+export function redraftFixes(
+  lines: readonly string[],
+  max = 6_000,
+): { readonly text: string; readonly left: number } {
+  const kept: string[] = [];
+  let used = 0;
+  let left = 0;
+  for (const line of [...new Set(lines)]) {
+    const numbered = `${String(kept.length + 1)}. ${line}`;
+    if (used + numbered.length + 1 > max) {
+      left += 1;
+      continue;
+    }
+    kept.push(numbered);
+    used += numbered.length + 1;
+  }
+  return { text: kept.join("\n"), left };
 }
 
 // --- the job -----------------------------------------------------------------------
@@ -1006,6 +1178,10 @@ export async function runPlanJob(
   const { payload, actor, owner } = input;
   const now = dependencies.now ?? (() => new Date());
   const progress = safeReport(input.progress);
+  // Where the job's time goes, per stage (logged with the outcome).
+  const clock = () => Date.now();
+  const timings: { step: string; ms: number }[] = [];
+  let stepStart = clock();
   const writePlan = dependencies.models.writePlan;
   const reviewPlan = dependencies.models.reviewPlan;
   let modelCalls = 0;
@@ -1132,6 +1308,7 @@ export async function runPlanJob(
     "CAPITAL",
     figureFacts,
   );
+  timings.push({ step: "gather", ms: clock() - stepStart });
   if (hook !== undefined) {
     const publicSection = dossier.sections.find(
       (section) => section.source === "PUBLIC",
@@ -1205,6 +1382,7 @@ export async function runPlanJob(
         : `1. The person asked for this change: ${direction}`.slice(0, 6_000),
   };
   modelCalls += 1;
+  stepStart = clock();
   let refused: readonly string[] = [];
   let first = await writePlan(who, trace, firstInput, (paths) => {
     refused = paths;
@@ -1229,6 +1407,7 @@ export async function runPlanJob(
         .slice(0, 6_000),
     });
   }
+  timings.push({ step: "write", ms: clock() - stepStart });
   if (first === null || first.steps.length === 0) {
     return {
       status: "ANSWERED",
@@ -1250,7 +1429,15 @@ export async function runPlanJob(
   }
 
   // --- REVIEWING_PLAN: two in parallel, one redraft at most ------------------
-  let reviews: QPlanReview[];
+  let reviews: QPlanReview[] = [];
+  /** The failing reviewers' points of the latest round, whole. */
+  let failing: ReviewPoint[] = [];
+  const rounds: {
+    round: number;
+    scores: number[];
+    integrity: boolean[];
+    points: number;
+  }[] = [];
   let redrafts = 0;
   for (let round = 1; ; round += 1) {
     progress({
@@ -1271,6 +1458,7 @@ export async function runPlanJob(
       16_000,
     );
     modelCalls += 2;
+    stepStart = clock();
     const results = await Promise.all(
       PLAN_REVIEW_FOCI.map((focus) =>
         reviewPlan(who, trace, {
@@ -1284,18 +1472,23 @@ export async function runPlanJob(
         }).catch(() => null),
       ),
     );
-    reviews = results.flatMap((result, index) =>
-      result === null
-        ? []
-        : [
-            reviewOf(
-              result,
-              index === 0 ? "R1" : "R2",
-              round,
-              PLAN_PROMPT_VERSION,
-            ),
-          ],
-    );
+    timings.push({ step: `review${String(round)}`, ms: clock() - stepStart });
+    reviews = [];
+    failing = [];
+    results.forEach((result, index) => {
+      if (result === null) return;
+      const reviewer = index === 0 ? "R1" : "R2";
+      const mapped = reviewOf(result, reviewer, round, PLAN_PROMPT_VERSION);
+      reviews.push(mapped);
+      // A passing reviewer's remarks are not what keeps the plan a draft.
+      if (!mapped.passed) failing.push(...reviewPoints(result, reviewer));
+    });
+    rounds.push({
+      round,
+      scores: reviews.map((review) => review.score),
+      integrity: reviews.map((review) => review.integrityFailed),
+      points: failing.length,
+    });
     const code = codeChecks(grounded, dossier, grounded);
     const passed =
       reviews.length === 2 && reviews.every((review) => review.passed);
@@ -1307,17 +1500,27 @@ export async function runPlanJob(
       modelCalls + 3 > PLAN_JOB_MODEL_CALLS_MAX
     )
       break;
-    // A redraft with the numbered defects (the reviewers' and code's).
+    // A redraft with the numbered defects (the reviewers' and code's),
+    // each whole: live 2026-10-30, every fix was cut at 300 characters
+    // with its problem ("... after the revised de"), so the writer was
+    // never told the end of what to change.
     const said = await directionsNow();
     const fixes = [
       ...said
         .filter((text) => !heard.includes(text))
         .map((text) => `The person asked for this change: ${text}`),
-      ...reviews.flatMap((review) => review.fixes),
+      ...mergedPoints(failing).map(pointText),
       ...code,
     ];
     if (fixes.length === 0) break;
     redrafts += 1;
+    const numbered = redraftFixes(fixes);
+    if (numbered.left > 0) {
+      dependencies.logger?.warn(
+        { jobId: input.jobId, round, left: numbered.left },
+        "plan redraft: points left out to fit the fixes limit",
+      );
+    }
     progress({
       stage: "PLANNING",
       draft: round + 1,
@@ -1325,16 +1528,14 @@ export async function runPlanJob(
       openPoints: fixes.length,
     });
     modelCalls += 1;
+    stepStart = clock();
     const again = await writePlan(who, trace, {
       ...base,
       mode: "REDRAFT",
       priorPlan: planJson,
-      fixes: [...new Set(fixes)]
-        .slice(0, 20)
-        .map((fix, index) => `${String(index + 1)}. ${fix}`)
-        .join("\n")
-        .slice(0, 6_000),
+      fixes: numbered.text,
     });
+    timings.push({ step: `redraft${String(round)}`, ms: clock() - stepStart });
     if (again === null) break;
     const regrounded = groundPlan({
       written: again,
@@ -1354,7 +1555,11 @@ export async function runPlanJob(
     ...(reviews.length < 2
       ? ["One of the two reviews could not be completed."]
       : []),
-    ...reviews.flatMap((review) => (review.passed ? [] : review.fixes)),
+    // Whole points, one per step and rubric item across both reviewers
+    // (live 2026-10-30: the same "add F55 to step 1" twice, once each).
+    ...mergedPoints(failing).map((point) =>
+      pointText({ ...point, alsoFix: null }),
+    ),
     ...remainingCode,
   ];
   // What the reviewers still want, in the person's words: "Step 2: …",
@@ -1466,6 +1671,9 @@ export async function runPlanJob(
       scores: reviews.map((one) => one.score),
       droppedCites: grounded.droppedCites,
       droppedSteps: grounded.droppedSteps,
+      // Per round: both scores, integrity, and how many points were open.
+      rounds,
+      timings,
     },
     "plan written and reviewed",
   );

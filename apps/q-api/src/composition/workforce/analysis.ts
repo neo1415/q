@@ -573,6 +573,55 @@ const CRITIQUE_CEILING_USD = 0.1;
  * until a draft passes or the drafts, the budget or the continuation run
  * out. Null: not even a first draft could be written.
  */
+/**
+ * The writer's own name for its inputs is not the reader's: live
+ * 2026-10-30 an investor's report summary said "the supplied evidence
+ * does not establish ...", Capital Q's internal framing of what the
+ * writer was handed. ANALYSIS_WRITE never says "supplied" (it says "the
+ * evidence below"); the model coins it. Said as "the evidence" here,
+ * after the last model call of the loop, so no prompt -- and no recorded
+ * research case, whose hashes rest on these prompts -- changes. A later
+ * ANALYSIS_WRITE version can ask for it directly when the cases are
+ * re-recorded.
+ */
+const SUPPLIED_NOUN =
+  "(?=(?:evidence|research|records?|sources?|facts?|material|primary)\\b)";
+const SUPPLIED_AFTER = new RegExp(
+  `\\b(from|in|by|on|with|of|under|beyond) supplied ${SUPPLIED_NOUN}`,
+  "giu",
+);
+const SUPPLIED_ANY = new RegExp(
+  `\\b([Ss])upplied ${SUPPLIED_NOUN}(\\p{L})`,
+  "gu",
+);
+
+export function readersWords(text: string): string {
+  if (!text.includes("upplied")) return text;
+  return text
+    .replace(SUPPLIED_AFTER, "$1 the ")
+    .replace(SUPPLIED_ANY, (_whole, s: string, first: string) =>
+      s === "S" ? first.toUpperCase() : first,
+    );
+}
+
+/** The draft in the reader's words (readersWords), every part of it. */
+export function readersDraft(
+  draft: AnalysisDocumentResult,
+): AnalysisDocumentResult {
+  return {
+    ...draft,
+    title: readersWords(draft.title),
+    summary: readersWords(draft.summary),
+    sections: draft.sections.map((section) => ({
+      ...section,
+      heading: readersWords(section.heading),
+      body: readersWords(section.body),
+    })),
+    topRecommendations: draft.topRecommendations.map(readersWords),
+    gaps: draft.gaps.map(readersWords),
+  };
+}
+
 export async function writeAnalysisWithReview(dependencies: {
   readonly models: Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis">;
   readonly who: Who;
@@ -675,7 +724,11 @@ export async function writeAnalysisWithReview(dependencies: {
     ].join("\n");
   }
   if (draft === null) return null;
-  const apart = keepRecordsApart(draft, open, inputs.recordNames ?? []);
+  const apart = keepRecordsApart(
+    readersDraft(draft),
+    open,
+    inputs.recordNames ?? [],
+  );
   report({ stage: "FILING", openPoints: passes ? 0 : apart.open.length });
   return {
     draft: apart.draft,
@@ -837,7 +890,7 @@ export function analysisContent(input: {
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>
-      `${REVIEWER_OPEN_POINT} (${issue.section}): ${issue.problem}`.slice(
+      `${REVIEWER_OPEN_POINT} (${issue.section}): ${readersWords(issue.problem)}`.slice(
         0,
         300,
       ),

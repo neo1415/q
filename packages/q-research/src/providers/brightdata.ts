@@ -15,6 +15,7 @@ import {
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "../ports.js";
+import { webText } from "./web-text.js";
 
 /**
  * Bright Data as a research provider (CQ-Q-RESEARCH-001, rework):
@@ -196,9 +197,9 @@ export function createBrightDataResearchProvider(
           url: verdict.url,
           title:
             typeof result.title === "string" && result.title.length > 0
-              ? result.title.slice(0, 300)
+              ? webText(result.title).slice(0, 300)
               : null,
-          snippet: (result.description ?? "").slice(
+          snippet: webText(result.description ?? "").slice(
             0,
             RESEARCH_BOUNDS.maxSnippetChars,
           ),
@@ -239,7 +240,10 @@ export function createBrightDataResearchProvider(
           const heading = /^#\s+(.+)$/m.exec(text);
           pages.push({
             url: verdict.url,
-            title: heading?.[1]?.trim().slice(0, 300) ?? null,
+            title:
+              heading?.[1] === undefined
+                ? null
+                : webText(heading[1].trim()).slice(0, 300),
             text: text.slice(0, 200_000),
           });
         } catch (error: unknown) {

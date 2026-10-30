@@ -585,6 +585,14 @@ describe("situation assembler", () => {
     expect(text).toContain("Deck section traction scores 1/5");
     expect(text).toContain("USD 1500000");
     expect(text).toContain("recorded a $1M commitment from Zino Aviation");
+    // Open and pending said as such (live 2026-10-30: an open board task
+    // "Approve sharing ..." was read as an approval already given).
+    expect(text).toContain(
+      'On your board, not done yet (todo): task "Collect cohort churn", due 2026-11-02.',
+    );
+    expect(text).toContain(
+      "Waiting for your approval, not approved yet (nothing is sent or changed until you approve, change or decline it on its card; asked 2026-10-27): Reply to Lagos Ventures",
+    );
     const contradiction = facts.find((fact) =>
       fact.statement.includes("TechCabal"),
     );
