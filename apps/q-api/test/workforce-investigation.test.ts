@@ -1006,10 +1006,11 @@ describe("a research plan that fails (live 2026-10-29)", () => {
       query: "x",
       budgetUsd: 2,
     });
-    // Past the retry window: round one's plan is asked once, not again.
+    // Asked again inside round one's share (57 s), and failed again: by
+    // then (114 s) round one's share of the deadline was spent.
     expect(
       inputs.filter((input) => input.gaps === FIRST_ROUND_GAPS),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     // The request's own words were still searched, and it says it ran reduced.
     expect(sent.length).toBeGreaterThanOrEqual(1);
     expect(found.status).toBe("OK");

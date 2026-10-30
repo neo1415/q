@@ -161,11 +161,12 @@ const RETRIED_PLAN_FAILURES: ReadonlySet<string> = new Set([
 /**
  * Live 2026-10-29 (case D, the IC-memo run): a truncated plan, a 45 s
  * timeout and a retry took round one's whole share of the deadline, so no
- * search ran and the person got no dossier at all. The plan is asked again
- * only early enough to leave the search its time, and round one always
- * keeps a window to search in, inside the job's deadline.
+ * search ran and the person got no dossier at all. A round one whose plan
+ * failed always keeps a window to search in (reduced, and said so), inside
+ * the job's deadline. The plan is still asked again within round one's
+ * share (recorded case E: its retry at 63 s planned the investigation).
  */
-const PLAN_RETRY_BEFORE = 0.2;
+const PLAN_RETRY_BEFORE = 0.45;
 export const ROUND_ONE_MIN_SEARCH_MS = 25_000;
 /** When round one's searches must end: its share, or its least window. */
 export function roundOneDeadline(
@@ -1505,10 +1506,14 @@ export function workforceDeepResearch(dependencies: {
           ],
           earlierUserText: context.earlier,
           known: state.sources,
+          // A round one whose plan failed keeps its least window (the
+          // clock is read only then: a planned round's schedule is as it was).
           deadlineAt:
-            state.round === 1
-              ? roundOneDeadline(started, deadlineMs, now())
-              : started + deadlineMs * 0.75,
+            state.round !== 1
+              ? started + deadlineMs * 0.75
+              : state.reduced === undefined
+                ? started + deadlineMs * 0.45
+                : roundOneDeadline(started, deadlineMs, now()),
           pagesPerQuestion: state.round === 1 ? PAGES_PER_LANE : 3,
           searchBudget: budget,
         });
