@@ -120,7 +120,7 @@ import {
 } from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
-import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
 import {
   FOLLOW_THEIR_LANGUAGE_NOTE,
   replyLanguageOf,
@@ -2994,7 +2994,7 @@ export function createInterviewAgent(
         ? withStillSaving(
             categoryBackedReply,
             [...savingKeys].map(
-              (key) => profileFields[key]?.label ?? questionOf(key),
+              (key) => profileFields[key]?.label ?? plainStepLabel(key),
             ),
           )
         : categoryBackedReply;

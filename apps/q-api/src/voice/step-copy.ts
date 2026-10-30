@@ -11,6 +11,9 @@
  * a reading of anything the person said.
  */
 
+import { FOUNDER_COVERAGE_PROFILE } from "@capital-q/founder-onboarding";
+import { INVESTOR_COVERAGE_PROFILE } from "@capital-q/investor-onboarding";
+
 export { SPOKEN_QUESTIONS } from "@capital-q/onboarding/spoken-questions";
 
 /** The step as a noun: "your {noun}". */
@@ -99,3 +102,23 @@ export const EVIDENCE_QUESTIONS: Readonly<Record<string, string>> = {
 /** For any other answer a document would support. */
 export const EVIDENCE_QUESTION_FALLBACK =
   "Do you have a document that backs that up, such as your accounts?";
+
+/** A step with no label of its own: never its question, never its key. */
+export const UNLABELLED_STEP = "Detail";
+
+/**
+ * A step's plain label for anything the person reads or hears as a label
+ * (a card, a read-back line, "still open: ..."): the coverage profile's
+ * label, else the step's noun. Never its question (live recheck
+ * 2026-10-30: "What is your long-term vision for the company? · ..." on
+ * the cards after an upload and in the read-back's pending card).
+ */
+export function plainStepLabel(stepKey: string): string {
+  const label =
+    FOUNDER_COVERAGE_PROFILE.fields[stepKey]?.label ??
+    INVESTOR_COVERAGE_PROFILE.fields[stepKey]?.label;
+  if (label !== undefined) return label;
+  const noun = STEP_NOUNS[stepKey];
+  if (noun !== undefined) return noun.charAt(0).toUpperCase() + noun.slice(1);
+  return UNLABELLED_STEP;
+}

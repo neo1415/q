@@ -3,6 +3,7 @@ import type { OnboardingState } from "@capital-q/q-tools";
 import {
   EVIDENCE_QUESTION_FALLBACK,
   EVIDENCE_QUESTIONS,
+  plainStepLabel,
   SPOKEN_QUESTIONS,
 } from "./step-copy.js";
 
@@ -555,7 +556,9 @@ export function pausingLine(
   const saved = state.steps.filter((s) => s.status === "ANSWERED").length;
   const open = state.steps
     .filter((s) => s.status === "OPEN" && s.required && s.kind !== "YES_NO")
-    .map((s) => labelOf(s.stepKey)?.toLowerCase() ?? s.question);
+    .map((s) =>
+      (labelOf(s.stepKey) ?? plainStepLabel(s.stepKey)).toLowerCase(),
+    );
   const named = open.slice(0, 4);
   const more = open.length - named.length;
   const stillOpen =

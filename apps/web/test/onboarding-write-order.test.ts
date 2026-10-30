@@ -18,9 +18,14 @@ import { createRuntimeFounderClient } from "../src/features/founder-onboarding/a
  */
 const SOURCE = { adapter: "fixture", synthetic: true } as const;
 
-function sharedStorage() {
+function sharedStorage(): Storage {
   const items = new Map<string, string>();
   return {
+    get length() {
+      return items.size;
+    },
+    clear: () => items.clear(),
+    key: (index: number) => [...items.keys()][index] ?? null,
     getItem: (key: string) => items.get(key) ?? null,
     setItem: (key: string, value: string) => void items.set(key, value),
     removeItem: (key: string) => void items.delete(key),
@@ -88,7 +93,7 @@ describe("one session's writes are sequenced", () => {
     };
     expect(stored.responses["F1.company_name"]).toEqual(UPLOAD_ANSWER.value);
     expect(stored.responses["F0.intent"]).toEqual(READER_SAVE.value);
-    expect(browserWrite.raw.responses.map((r) => r.stepKey)).toContain(
+    expect(browserWrite.raw?.responses.map((r) => r.stepKey)).toContain(
       "F1.company_name",
     );
   });

@@ -1,5 +1,6 @@
 import type { OnboardingResponseValue } from "@capital-q/contracts";
 import {
+  FOUNDER_COVERAGE_PROFILE,
   FOUNDER_DEFINITION_CURRENT,
   FOUNDER_STEPS,
 } from "@capital-q/founder-onboarding";
@@ -15,6 +16,9 @@ import { groupOf } from "./models/journey";
  */
 
 const S = FOUNDER_STEPS;
+
+/** A step with no title of its own: never its question, never its key. */
+const UNTITLED_STEP = "Detail";
 
 const TITLES: Readonly<Record<string, string>> = {
   [S.intent]: "Why you're here",
@@ -104,8 +108,13 @@ function describe(
 
 export const FOUNDER_VOCABULARY: JourneyVocabulary = {
   subject: "founder",
+  // A step's plain label, never its question (live recheck 2026-10-30:
+  // "What is your long-term vision for the company? · ..." on a card): the
+  // journey's own title, else the coverage profile's label for the field.
   stepTitle: (stepKey) =>
-    TITLES[stepKey] ?? STEPS.get(stepKey)?.configuration.prompt ?? stepKey,
+    TITLES[stepKey] ??
+    FOUNDER_COVERAGE_PROFILE.fields[stepKey]?.label ??
+    UNTITLED_STEP,
   describe,
   stepType: (stepKey) => STEPS.get(stepKey)?.configuration.stepType,
   optionsFor,

@@ -45,7 +45,7 @@ import type { PresenceFound, PresenceTrigger } from "./presence-trigger.js";
 import { languageInfo } from "@capital-q/q-core/language";
 
 import { replyLanguageOf } from "./reply-language.js";
-import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
 import { firstNameOf } from "./onboarding-flow.js";
 import type { TypedOnboarding } from "./typed-onboarding.js";
 import type { OnboardingConversation } from "./onboarding-conversation.js";
@@ -222,9 +222,7 @@ export function confirmedContent(
     .flatMap((s) => {
       const value = answers.get(s.stepKey);
       if (value === undefined) return [];
-      const label = (labels[s.stepKey]?.label ?? s.configuration.prompt)
-        .replace(/[?:]$/u, "")
-        .trim();
+      const label = labels[s.stepKey]?.label ?? plainStepLabel(s.stepKey);
       return [`${label}: ${confirmedValue(s, value, currency, names)}`];
     })
     .slice(0, CONFIRMED_ITEMS);
