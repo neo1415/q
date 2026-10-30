@@ -8,6 +8,7 @@ import {
   type QualificationResult,
   type QualificationSubjectProjection,
 } from "@capital-q/gateq/engine";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 
 /**
  * The landing page's "Am I a fit?" demo: the real GateQ engine, run in the
@@ -67,15 +68,6 @@ export const STAGE_OPTIONS = [
   { value: "seed", label: "Seed" },
   { value: "series_a", label: "Series A" },
   { value: "series_b", label: "Series B" },
-] as const;
-
-export const COUNTRY_OPTIONS = [
-  { value: "NG", label: "Nigeria" },
-  { value: "KE", label: "Kenya" },
-  { value: "GH", label: "Ghana" },
-  { value: "ZA", label: "South Africa" },
-  { value: "GB", label: "United Kingdom" },
-  { value: "US", label: "United States" },
 ] as const;
 
 export const CURRENCY_OPTIONS = ["USD", "GBP", "EUR", "NGN"] as const;
@@ -226,7 +218,8 @@ export function projectionFor(
 ): QualificationSubjectProjection {
   const sector = SECTOR_OPTIONS.find((o) => o.value === answers.sector);
   const stage = STAGE_OPTIONS.find((o) => o.value === answers.stage);
-  const country = COUNTRY_OPTIONS.find((o) => o.value === answers.country);
+  // Any country of the one canonical list; the gateway's rule decides.
+  const country = countryOfIso(answers.country);
   const amount = normaliseAmount(answers.amount);
   const currency = (CURRENCY_OPTIONS as readonly string[]).includes(
     answers.currency,
@@ -249,7 +242,7 @@ export function projectionFor(
               ancestorNodeIds: [...sector.ancestors],
             },
           ],
-    headquartersCountry: country?.value ?? null,
+    headquartersCountry: country?.iso ?? null,
     currentStageCode: stage?.value ?? null,
     raise: amount === null || currency === null ? null : { amount, currency },
   };

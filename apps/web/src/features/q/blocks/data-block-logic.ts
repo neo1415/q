@@ -1,4 +1,5 @@
 import type { QMapPlace, QSubjectRef } from "@capital-q/contracts";
+import { countryName as canonicalCountryName } from "@capital-q/taxonomy/countries";
 
 /**
  * The pure half of the data blocks (RECOVERY-2026-10 E4): where a subject
@@ -40,15 +41,8 @@ export function splitPlaces(places: readonly QMapPlace[]): {
 
 /** A country's name in the reader's language, else its code. */
 export function countryName(code: string, locale?: string): string {
-  try {
-    return (
-      new Intl.DisplayNames(locale === undefined ? [] : [locale], {
-        type: "region",
-      }).of(code) ?? code
-    );
-  } catch {
-    return code;
-  }
+  // The one canonical country list; its English name, ICU's otherwise.
+  return canonicalCountryName(code, locale ?? "en") ?? code;
 }
 
 /**

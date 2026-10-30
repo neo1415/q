@@ -1,3 +1,5 @@
+import { ISO_COUNTRIES, countryName } from "@capital-q/taxonomy/countries";
+
 /**
  * Arabic display names for Capital Q's taxonomy (multilingual Q), keyed by
  * vocabulary and canonical code. Display only: the stored values, codes and
@@ -5,6 +7,28 @@
  * on 2026-10-16 (152 nodes); a node added later shows its English name
  * until it is given one here.
  */
+/**
+ * Countries are not listed here by hand: every country of the one
+ * canonical list (@capital-q/taxonomy/countries) has its Arabic name from
+ * the platform's ICU region names (owner 2026-10-30: no hand-made country
+ * lists). Regions, which ICU does not name, stay below.
+ */
+const COUNTRY_AR_BY_CODE: Readonly<Record<string, string>> = Object.fromEntries(
+  ISO_COUNTRIES.flatMap((country) => {
+    const arabic = countryName(country.iso, "ar");
+    return arabic === null || arabic === country.name
+      ? []
+      : [[`geography:${country.canonicalCode}`, arabic] as const];
+  }),
+);
+const COUNTRY_ENGLISH_NAMES: Readonly<Record<string, string>> =
+  Object.fromEntries(
+    ISO_COUNTRIES.map(
+      (country) =>
+        [country.name, `geography:${country.canonicalCode}`] as const,
+    ),
+  );
+
 export const TAXONOMY_AR_BY_CODE: Readonly<Record<string, string>> = {
   "business_model:advertising": "الإعلانات",
   "business_model:b2b_saas": "برمجيات خدمية للشركات (B2B SaaS)",
@@ -33,51 +57,17 @@ export const TAXONOMY_AR_BY_CODE: Readonly<Record<string, string>> = {
   "customer_type:small_business": "الشركات الصغيرة والمتوسطة",
   "geography:africa": "أفريقيا",
   "geography:asia": "آسيا",
-  "geography:bahrain": "البحرين",
-  "geography:benin": "بنين",
-  "geography:botswana": "بوتسوانا",
-  "geography:brazil": "البرازيل",
-  "geography:cameroon": "الكاميرون",
-  "geography:canada": "كندا",
   "geography:central_africa": "وسط أفريقيا",
-  "geography:cote_divoire": "ساحل العاج",
-  "geography:dr_congo": "جمهورية الكونغو الديمقراطية",
   "geography:east_africa": "شرق أفريقيا",
-  "geography:egypt": "مصر",
-  "geography:ethiopia": "إثيوبيا",
   "geography:europe": "أوروبا",
-  "geography:france": "فرنسا",
-  "geography:germany": "ألمانيا",
-  "geography:ghana": "غانا",
   "geography:global": "عالمي",
-  "geography:india": "الهند",
-  "geography:kenya": "كينيا",
-  "geography:kuwait": "الكويت",
   "geography:latin_america": "أمريكا اللاتينية",
   "geography:middle_east": "الشرق الأوسط",
   "geography:gcc": "الخليج (دول مجلس التعاون)",
-  "geography:morocco": "المغرب",
-  "geography:netherlands": "هولندا",
-  "geography:nigeria": "نيجيريا",
   "geography:north_africa": "شمال أفريقيا",
   "geography:north_america": "أمريكا الشمالية",
-  "geography:oman": "عُمان",
-  "geography:qatar": "قطر",
-  "geography:rwanda": "رواندا",
-  "geography:saudi_arabia": "المملكة العربية السعودية",
-  "geography:senegal": "السنغال",
-  "geography:singapore": "سنغافورة",
-  "geography:south_africa": "جنوب أفريقيا",
   "geography:southern_africa": "الجنوب الأفريقي",
-  "geography:tanzania": "تنزانيا",
-  "geography:togo": "توغو",
-  "geography:tunisia": "تونس",
-  "geography:uganda": "أوغندا",
-  "geography:united_arab_emirates": "الإمارات العربية المتحدة",
-  "geography:united_kingdom": "المملكة المتحدة",
-  "geography:united_states": "الولايات المتحدة",
   "geography:west_africa": "غرب أفريقيا",
-  "geography:zambia": "زامبيا",
   "impact_theme:climate": "المناخ والاستدامة",
   "impact_theme:economic_opportunity": "الوظائف والفرص الاقتصادية",
   "impact_theme:financial_inclusion": "الشمول المالي",
@@ -164,6 +154,8 @@ export const TAXONOMY_AR_BY_CODE: Readonly<Record<string, string>> = {
   "technology:mobile_technology": "الأجهزة المحمولة",
   "technology:natural_language_processing": "معالجة اللغة الطبيعية",
   "technology:robotics": "الروبوتات والأتمتة",
+  // Every country: the one canonical list, Arabic from the platform's ICU.
+  ...COUNTRY_AR_BY_CODE,
 };
 
 /** English display name → canonical "vocabulary:code", for screens that hold the name. */
@@ -195,51 +187,17 @@ const ENGLISH_NAMES: Readonly<Record<string, string>> = {
   "Small & Medium Business": "customer_type:small_business",
   Africa: "geography:africa",
   Asia: "geography:asia",
-  Bahrain: "geography:bahrain",
-  Benin: "geography:benin",
-  Botswana: "geography:botswana",
-  Brazil: "geography:brazil",
-  Cameroon: "geography:cameroon",
-  Canada: "geography:canada",
   "Central Africa": "geography:central_africa",
-  "C\u00f4te d'Ivoire": "geography:cote_divoire",
-  "Democratic Republic of the Congo": "geography:dr_congo",
   "East Africa": "geography:east_africa",
-  Egypt: "geography:egypt",
-  Ethiopia: "geography:ethiopia",
   Europe: "geography:europe",
-  France: "geography:france",
-  Germany: "geography:germany",
-  Ghana: "geography:ghana",
   Global: "geography:global",
-  India: "geography:india",
-  Kenya: "geography:kenya",
-  Kuwait: "geography:kuwait",
   "Latin America": "geography:latin_america",
   "Middle East": "geography:middle_east",
   "Gulf (GCC)": "geography:gcc",
-  Morocco: "geography:morocco",
-  Netherlands: "geography:netherlands",
-  Nigeria: "geography:nigeria",
   "North Africa": "geography:north_africa",
   "North America": "geography:north_america",
-  Oman: "geography:oman",
-  Qatar: "geography:qatar",
-  Rwanda: "geography:rwanda",
-  "Saudi Arabia": "geography:saudi_arabia",
-  Senegal: "geography:senegal",
-  Singapore: "geography:singapore",
-  "South Africa": "geography:south_africa",
   "Southern Africa": "geography:southern_africa",
-  Tanzania: "geography:tanzania",
-  Togo: "geography:togo",
-  Tunisia: "geography:tunisia",
-  Uganda: "geography:uganda",
-  "United Arab Emirates": "geography:united_arab_emirates",
-  "United Kingdom": "geography:united_kingdom",
-  "United States": "geography:united_states",
   "West Africa": "geography:west_africa",
-  Zambia: "geography:zambia",
   "Climate & Sustainability": "impact_theme:climate",
   "Jobs & Economic Opportunity": "impact_theme:economic_opportunity",
   "Financial Inclusion": "impact_theme:financial_inclusion",
@@ -323,6 +281,7 @@ const ENGLISH_NAMES: Readonly<Record<string, string>> = {
   Mobile: "technology:mobile_technology",
   "Natural Language Processing": "technology:natural_language_processing",
   "Robotics & Automation": "technology:robotics",
+  ...COUNTRY_ENGLISH_NAMES,
 };
 
 /**

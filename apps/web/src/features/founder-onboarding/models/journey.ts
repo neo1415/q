@@ -4,11 +4,13 @@ import type {
   OnboardingStepProgressStatus,
 } from "@capital-q/contracts";
 import {
+  COUNTRY_OPTIONS_V5,
   COUNTRY_OTHER_OPTION,
   CURRENCY_OPTIONS,
   FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2_VERSION,
   FOUNDER_DEFINITION_V4_VERSION,
+  FOUNDER_DEFINITION_V8_VERSION,
   FOUNDER_FINANCIAL_STEPS,
   FOUNDER_PROFILE_SECTION_STEPS,
   FOUNDER_PROFILE_SECTIONS,
@@ -16,10 +18,13 @@ import {
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
+  founderCountryAnswer,
+  founderCountryOf,
   instrumentLabel,
   RAISING_ACTIVE_OPTIONS,
   type FounderSnapshotContext,
 } from "@capital-q/founder-onboarding/definition";
+import { ISO_COUNTRIES } from "@capital-q/taxonomy/countries";
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
 
 import {
@@ -661,10 +666,10 @@ function buildStep(
     case "company_basics": {
       const name = text(state, S.companyName);
       const website = text(state, S.website);
-      const country = single(state, S.country);
+      const country = founderCountryOf(state.responses.get(S.country))?.iso;
       return {
         ...base(group, "company_basics", state),
-        countries: optionsOf(S.country),
+        countries: countryChoices(state.view.session.definitionVersion),
         ...(website === undefined
           ? suggestedWebsiteOf(extras.suggestions ?? [])
           : {}),
@@ -1141,6 +1146,7 @@ export function planSubmissions(
   response: StepResponse,
   /** The session the screen was drawn from: which questions it showed. */
   view?: {
+    readonly session?: { readonly definitionVersion: number };
     readonly progress: {
       readonly eligibleSteps: readonly { readonly stepKey: string }[];
     };
@@ -1179,11 +1185,9 @@ export function planSubmissions(
       return [
         submit(S.companyName, { type: "TEXT", text: response.name.trim() }),
         textOrSkip(S.website, response.website),
-        selectOrSkip(
-          S.country,
-          response.countryCode === undefined
-            ? undefined
-            : response.countryCode.toLowerCase(),
+        countryOrSkip(
+          response.countryCode,
+          view?.session?.definitionVersion ?? FOUNDER_DEFINITION_V8_VERSION,
         ),
       ];
     case "taxonomy_select":
@@ -1277,15 +1281,38 @@ export function planSubmissions(
   }
 }
 
-/** Country keys are lowercase option keys in the definition; the UI shows ISO codes. */
-export function countryOptionsForSelect(): readonly ChoiceOption[] {
-  return optionsOf(S.country).map((option) => ({
-    ...option,
-    value:
-      option.value === COUNTRY_OTHER_OPTION
-        ? option.value
-        : option.value.toUpperCase(),
+/**
+ * The countries the company-basics screen offers, as ISO codes: every
+ * country of the one canonical list from v8 (the step is a geography
+ * node); a session pinned to v1-v7 keeps its own option list (lowercase
+ * ISO keys), since that version's step accepts nothing else.
+ */
+export function countryChoices(
+  definitionVersion: number = FOUNDER_DEFINITION_V8_VERSION,
+): readonly ChoiceOption[] {
+  if (definitionVersion >= FOUNDER_DEFINITION_V8_VERSION) {
+    return ISO_COUNTRIES.map((country) => ({
+      value: country.iso,
+      label: country.name,
+    }));
+  }
+  return COUNTRY_OPTIONS_V5.filter(
+    (option) => option.optionKey !== COUNTRY_OTHER_OPTION,
+  ).map((option) => ({
+    value: option.optionKey.toUpperCase(),
+    label: option.label,
   }));
+}
+
+/** The country answer in the shape the session's version takes. */
+function countryOrSkip(
+  iso: string | undefined,
+  definitionVersion: number,
+): Submission {
+  if (iso === undefined) return skip(S.country);
+  return definitionVersion >= FOUNDER_DEFINITION_V8_VERSION
+    ? submit(S.country, founderCountryAnswer(iso))
+    : selectOrSkip(S.country, iso.toLowerCase());
 }
 
 export { labelOf as optionLabel };

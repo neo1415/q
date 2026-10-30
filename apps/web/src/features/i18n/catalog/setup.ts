@@ -28,6 +28,7 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   "Back to Q": "العودة إلى Q",
   "Based on what you've told Capital Q and the material you shared. Nothing here has been independently verified.":
     "بناءً على ما أخبرت به Capital Q والمواد التي شاركتها. لم يُتحقق من أي شيء هنا بشكل مستقل.",
+  "Add a country": "أضف دولة",
   "Black and gold or blue, for everyone · admins only":
     "أسود وذهبي أو أزرق، للجميع · للمسؤولين فقط",
   Brand: "الهوية البصرية",
@@ -39,6 +40,7 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   "Change plan": "تغيير الخطة",
   "Checking what Q has…": "جارٍ التحقق مما لدى Q…",
   "Choose a country": "اختر دولة",
+  "Choose a country from the list.": "اختر دولة من القائمة.",
   "Choose a file": "اختر ملفاً",
   "Choose a plan": "اختر خطة",
   "Choose files": "اختر ملفات",
@@ -147,6 +149,7 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
     "لن يُحصَّل أي مبلغ حتى توافق على سعر",
   "Nothing to review yet": "لا شيء للمراجعة بعد",
   "Notifications on this device": "الإشعارات على هذا الجهاز",
+  "Optional for now. Search for the country.": "اختياري الآن. ابحث عن الدولة.",
   "On live voice: small reactions while you talk, and a short line while an answer takes a moment.":
     "في الصوت المباشر: تفاعلات صغيرة أثناء حديثك، وجملة قصيرة حين تستغرق الإجابة لحظة.",
   "Once your firm is named you can add a fund deck, thesis or LP letter here. Optional.":

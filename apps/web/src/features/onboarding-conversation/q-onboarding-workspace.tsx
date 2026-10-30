@@ -697,6 +697,15 @@ export function QOnboardingWorkspace({
     if (!taxonomyControl || query.length < TAXONOMY_SEARCH_MIN) {
       return;
     }
+    // A step with its own list (the founder's country) searches it here.
+    const local =
+      prompt === null
+        ? undefined
+        : vocabulary.searchFor?.(prompt.stepKey, query);
+    if (local !== undefined) {
+      setTaxonomyResults(local);
+      return;
+    }
     let cancelled = false;
     const timer = setTimeout(() => {
       actions
@@ -716,7 +725,14 @@ export function QOnboardingWorkspace({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [taxonomyQuery, taxonomyControl, actions, setTaxonomyResults]);
+  }, [
+    taxonomyQuery,
+    taxonomyControl,
+    actions,
+    setTaxonomyResults,
+    prompt,
+    vocabulary,
+  ]);
 
   useEffect(
     () => () => {

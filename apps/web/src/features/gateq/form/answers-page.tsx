@@ -33,7 +33,8 @@ import {
   type StepErrors,
   type Verdict,
 } from "./form-model";
-import { useT } from "@/features/i18n/language";
+import { useT, useUiLanguage } from "@/features/i18n/language";
+import { countryName } from "@capital-q/taxonomy/countries";
 
 /**
  * Design gatepub-1 (2026-10-21), "Form with live rule standing": every
@@ -232,6 +233,7 @@ export function AnswersPage({
   readonly onContinue: () => void;
 }) {
   const t = useT();
+  const language = useUiLanguage();
   const fund = gateway.organisationDisplayName;
   const sectors = answers.sectors === DECLINED ? [] : answers.sectors;
   const [other, setOther] = useState(answers.otherSector !== "");
@@ -472,7 +474,7 @@ export function AnswersPage({
                     set("country", choice.value);
                   }}
                 >
-                  {t(choice.label)}
+                  {countryName(choice.value, language) ?? t(choice.label)}
                 </button>
               ))}
               <button
@@ -513,7 +515,7 @@ export function AnswersPage({
                 <option value="">{t("Choose a country")}</option>
                 {MORE_COUNTRIES.map((choice) => (
                   <option key={choice.value} value={choice.value}>
-                    {t(choice.label)}
+                    {countryName(choice.value, language) ?? t(choice.label)}
                   </option>
                 ))}
               </select>

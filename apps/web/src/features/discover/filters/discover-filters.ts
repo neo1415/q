@@ -9,7 +9,8 @@ import {
   type DiscoverFilters,
   type QSetDiscoverFiltersIntent,
 } from "@capital-q/contracts";
-import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
+import { STAGE_OPTIONS } from "@capital-q/founder-onboarding";
+import { ISO_COUNTRIES } from "@capital-q/taxonomy/countries";
 
 /**
  * Discover filters in the browser (ux/discover-filters).
@@ -43,14 +44,12 @@ export const STAGE_FILTER_OPTIONS: readonly LabelledOption[] =
     (option) => ({ value: option.optionKey, label: option.label }),
   );
 
-/** Companies store countries uppercase; "somewhere else" is not a filter. */
+/** Every country of the one canonical list, as the ISO codes companies store. */
 export const COUNTRY_FILTER_OPTIONS: readonly LabelledOption[] =
-  COUNTRY_OPTIONS.filter((option) => option.optionKey !== "other").map(
-    (option) => ({
-      value: option.optionKey.toUpperCase(),
-      label: option.label,
-    }),
-  );
+  ISO_COUNTRIES.map((country) => ({
+    value: country.iso,
+    label: country.name,
+  }));
 
 /** The currencies a raise range can be stated in; no conversion is made. */
 export const RAISE_CURRENCIES = [

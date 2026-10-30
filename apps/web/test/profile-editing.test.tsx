@@ -357,9 +357,11 @@ describe("editing a profile field", () => {
 });
 
 describe("company country", () => {
-  it("offers every country, the setup's short list first, and only ISO codes", () => {
+  it("offers every country of the one canonical list, by name, as ISO codes", () => {
     const values = COUNTRIES.map((c) => c.value);
-    expect(values[0]).toBe("NG");
+    // Alphabetical by name: no hand-made short list ahead of the rest.
+    expect(values[0]).toBe("AF");
+    expect(values).toContain("DK");
     expect(values).toContain("VN");
     expect(values).toContain("MX");
     expect(COUNTRIES.find((c) => c.value === "VN")?.label).toBe("Vietnam");
