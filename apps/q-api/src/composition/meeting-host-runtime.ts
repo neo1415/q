@@ -37,6 +37,8 @@ import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  orEmptyCase,
+  PROMPT_EMPTY_CASES,
   renderPrompt,
   MEETING_HOST_KINDS_V3,
   type MeetingHostResultV3 as MeetingHostResult,
@@ -2147,9 +2149,20 @@ export function createMeetingHostComposer(dependencies: {
       const etiquette = await etiquetteOf(who);
       const variables = {
         ...input,
-        seen: input.seen ?? "",
-        prepared: input.prepared ?? "",
-        memory: input.memory ?? "",
+        // Each "empty when ..." section says so in words; the host's rule
+        // "If nothing is shown, say ..." keys on WHAT IS SHOWN.
+        seen: orEmptyCase(
+          input.seen,
+          PROMPT_EMPTY_CASES.MEETING_HOST_TURN.seen,
+        ),
+        prepared: orEmptyCase(
+          input.prepared,
+          PROMPT_EMPTY_CASES.MEETING_HOST_TURN.prepared,
+        ),
+        memory: orEmptyCase(
+          input.memory,
+          PROMPT_EMPTY_CASES.MEETING_HOST_TURN.memory,
+        ),
       };
       const rendered = renderPrompt<typeof variables>(registry, {
         task: "MEETING_HOST_TURN",

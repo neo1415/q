@@ -15,6 +15,7 @@ import type {
 } from "@capital-q/communication";
 import type { InterestService } from "@capital-q/network";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
+import { orEmptyCase, PROMPT_EMPTY_CASES } from "@capital-q/q-core";
 import {
   createQWorkEngine,
   laneThreadId,
@@ -453,8 +454,15 @@ export function createWorkRuntime(dependencies: WorkRuntimeDependencies) {
         {
           principalName: input.principalName,
           counterpartName: input.counterpartName,
-          brief: input.brief ?? "",
-          topicsOpen: input.topicsOpen.join("\n"),
+          // "empty means nothing", said in those words (PROMPT_EMPTY_CASES).
+          brief: orEmptyCase(
+            input.brief,
+            PROMPT_EMPTY_CASES.WORK_CONVERSE.brief,
+          ),
+          topicsOpen: orEmptyCase(
+            input.topicsOpen.join("\n"),
+            PROMPT_EMPTY_CASES.WORK_CONVERSE.topicsOpen,
+          ),
           otherSideIsQ: input.otherSideIsQ,
           thread: input.thread,
         },

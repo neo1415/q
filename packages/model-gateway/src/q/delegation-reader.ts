@@ -4,6 +4,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   DelegationReaderV3ResultSchema,
+  PROMPT_EMPTY_CASES,
   renderPrompt,
   type DelegationReaderV3Result,
   type DelegationReaderV4Variables,
@@ -132,9 +133,11 @@ export function createQDelegationReader(dependencies: {
             pending,
             lastQ: input.lastQ.slice(0, 2_000),
             utterance,
+            // "null when none", said as the section's rule says it, never
+            // the renderer's "(not provided)".
             askedStep:
               input.askedStep === undefined || input.askedStep === null
-                ? null
+                ? PROMPT_EMPTY_CASES.DELEGATION_READER.askedStep
                 : input.askedStep.slice(0, 80),
           },
         });

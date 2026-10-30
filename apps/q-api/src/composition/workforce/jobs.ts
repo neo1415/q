@@ -1206,7 +1206,10 @@ export function createWorkforceJobs(dependencies: {
         roster: executorRosterText(executors, permitted),
         allowed: `${allowed}${feedback}`.slice(0, 2_000),
         situation: situationText(situation).slice(0, 8_000),
-        ...(input.priorAnswer === undefined
+        // A blank earlier answer is no earlier answer: left out, the
+        // section reads "(none)" as its rule names, never "(not provided)".
+        ...(input.priorAnswer === undefined ||
+        input.priorAnswer.trim().length === 0
           ? {}
           : { priorAnswer: input.priorAnswer.slice(0, 4_000) }),
       });

@@ -20,6 +20,8 @@ import {
   writtenLanguageNote,
   GateQInterviewerResultSchema,
   GateQTurnIntentSchema,
+  orEmptyCase,
+  PROMPT_EMPTY_CASES,
   type GateQInterviewerResult,
   type GateQInterviewerVariables,
   type GateQTurnIntent,
@@ -577,7 +579,12 @@ export function createGateQInterviewer(
                 .slice(-8)
                 .map((t) => `${t.role}: ${t.text}`)
                 .join("\n"),
-        utterance: input.utterance.slice(0, 4000),
+        // The first turn says it is the first turn, as the prompt's rule
+        // does ("WHAT THEY JUST SAID is empty on the first turn").
+        utterance: orEmptyCase(
+          input.utterance.slice(0, 4000),
+          PROMPT_EMPTY_CASES.GATEQ_INTERVIEWER.utterance,
+        ),
         tangents: Math.min(99, Math.max(0, input.tangents)),
         contextAvailable: contextAvailableFor(input),
       };

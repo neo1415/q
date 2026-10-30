@@ -31,6 +31,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   PLAN_RUBRIC_V1,
   PLAN_REVIEW_FOCI,
+  PROMPT_EMPTY_CASES,
   planReviewScore,
   type PlanReviewResult,
   type PlanStepAction,
@@ -1192,13 +1193,15 @@ export async function runPlanJob(
   const firstInput: PlanWriteInput = {
     ...base,
     mode: prior === null ? "NEW" : "REDRAFT",
+    // Said, never left empty: MODE NEW has no prior plan, and no fixes
+    // means none (PROMPT_EMPTY_CASES), not "(not provided)".
     priorPlan:
       prior === null
-        ? ""
+        ? PROMPT_EMPTY_CASES.PLAN_WRITE.priorPlan
         : JSON.stringify(writtenOf(prior.plan)).slice(0, 16_000),
     fixes:
       direction === null
-        ? ""
+        ? PROMPT_EMPTY_CASES.PLAN_WRITE.fixes
         : `1. The person asked for this change: ${direction}`.slice(0, 6_000),
   };
   modelCalls += 1;

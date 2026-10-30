@@ -5,6 +5,7 @@ import {
   type QSituationDossier,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
+import { PROMPT_EMPTY_CASES } from "@capital-q/q-core";
 import {
   createDeepResearch,
   createSearchBudget,
@@ -124,8 +125,7 @@ const FACT_CALLS_AT_ONCE = 4;
 const PAGES_PER_LANE = 4;
 const PAGE_CHARS = 2_200;
 /** Round one's OPEN QUESTIONS, said plainly (see planOnce). */
-export const FIRST_ROUND_GAPS =
-  "None yet: this is the first round. Plan the full investigation the request needs.";
+export const FIRST_ROUND_GAPS = PROMPT_EMPTY_CASES.RESEARCH_PLAN.gaps;
 /**
  * Live case E (2026-10-29): the first plan came back with no questions
  * and the retry, byte-identical, was refused by the provider (a 400 on a

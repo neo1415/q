@@ -41,6 +41,8 @@ import {
   type ConversationState,
   InterviewAgentV16ResultSchema,
   gesturesForReply,
+  orEmptyCase,
+  PROMPT_EMPTY_CASES,
   renderPrompt,
   type InterviewAgentV16Result,
   type InterviewAgentVariables,
@@ -267,6 +269,9 @@ function decisionsOf(
   }
   return out.slice(0, 40);
 }
+
+/** What each section says when it holds nothing this turn. */
+const EMPTY = PROMPT_EMPTY_CASES.INTERVIEW_AGENT;
 
 /**
  * QA F-49: the workspace's own message about a file (written by the web
@@ -1935,17 +1940,22 @@ export function createInterviewAgent(
           utterance,
           memory: loop.memory.slice(0, 4_000),
           earlier: (compacted.summary ?? "").slice(0, 2_200),
-          thisTurn: thisTurnText(actions),
+          // An empty section is said in the words its rule uses, never
+          // left to render as "(not provided)" (PROMPT_EMPTY_CASES).
+          thisTurn: orEmptyCase(thisTurnText(actions), EMPTY.thisTurn),
           delegated: current().delegated,
           approved: current().approved,
           declined: current().declined,
-          turnNotes: current().turnNotes(state),
+          turnNotes: orEmptyCase(current().turnNotes(state), EMPTY.turnNotes),
           personality: [PERSONALITY_NOTES[personality], languageNote]
             .filter((note) => note.length > 0)
             .join(" ")
             .slice(0, 1_200),
-          conduct: conductText.slice(0, 600),
-          openings: openingsOf(thread).slice(0, 600),
+          conduct: orEmptyCase(conductText.slice(0, 600), EMPTY.conduct),
+          openings: orEmptyCase(
+            openingsOf(thread).slice(0, 600),
+            EMPTY.openings,
+          ),
         },
       });
 

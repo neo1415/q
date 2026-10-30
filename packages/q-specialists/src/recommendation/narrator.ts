@@ -3,6 +3,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   FitExplanationResultSchema,
+  PROMPT_EMPTY_CASES,
   renderPrompt,
   type FitExplanationResult,
   type FitExplanationVariables,
@@ -162,12 +163,15 @@ export function createRecommendationNarrator(
           variables: {
             factors,
             // REC-005 assigns no overall label, so there is none to restate.
-            // A model that invents one is caught below.
-            overallFit: null,
+            // A model that invents one is caught below. Said as the rule
+            // says it ("null if none was supplied"), not "(not provided)",
+            // which a model can restate as if it were a label.
+            overallFit: PROMPT_EMPTY_CASES.FIT_EXPLANATION.overallFit,
             audience: "INVESTOR",
             companyDescription: request.companyDescription.slice(0, 400),
             investorDescription: request.investorDescription.slice(0, 400),
-            relationshipState: null,
+            relationshipState:
+              PROMPT_EMPTY_CASES.FIT_EXPLANATION.relationshipState,
           },
         });
       } catch (error: unknown) {

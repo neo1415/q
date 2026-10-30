@@ -1,5 +1,6 @@
 import type { CallPrepWriter } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
+import { orEmptyCase, PROMPT_EMPTY_CASES } from "@capital-q/q-core";
 import type { QCallPrepPort } from "@capital-q/q-specialists";
 import type { ActorContext } from "@capital-q/security";
 
@@ -131,7 +132,9 @@ export function createCallPrepPort(
           counterpartProfile: [them?.profile ?? "", theirs.text]
             .filter((part) => part.trim().length > 0)
             .join("\n\n"),
-          soFar,
+          // "If nothing is given, say this is the first contact": an empty
+          // history says it is empty in those words (PROMPT_EMPTY_CASES).
+          soFar: orEmptyCase(soFar, PROMPT_EMPTY_CASES.CALL_PREP.soFar),
           ownRecord: own.text,
           said: input.said,
         });

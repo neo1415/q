@@ -3,6 +3,8 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  orEmptyCase,
+  PROMPT_EMPTY_CASES,
   renderPrompt,
   TurnReaderV70ResultSchema,
   compareOverFromShown,
@@ -429,7 +431,12 @@ export function createQTurnReader(dependencies: {
         actionGroups: listed.groups,
         screenControls: readerScreenControls(input.screenControls),
         // Bounded by the schema; the newest turns are kept by its builder.
-        shown: (input.shown ?? "").slice(0, 9_000),
+        // Nothing shown yet is said so: the rules about SHOWN ("when
+        // nothing was shown yet") key on it (PROMPT_EMPTY_CASES).
+        shown: orEmptyCase(
+          (input.shown ?? "").slice(0, 9_000),
+          PROMPT_EMPTY_CASES.TURN_READER.shown,
+        ),
       };
       try {
         const rendered = renderPrompt<TurnReaderV55Variables>(registry, {

@@ -2,7 +2,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  orEmptyCase,
   personalityOf,
+  PROMPT_EMPTY_CASES,
   renderPrompt,
   WelcomeConductorResultSchema,
   type PromptRegistry,
@@ -93,8 +95,16 @@ export function createWelcomeHost(dependencies: WelcomeHostDependencies) {
         personality: personality.manner,
         expressive,
         opening,
-        knownName: input.knownName,
-        knownOrganisation: input.knownOrganisation ?? null,
+        // "if it is null": said as null, as the rule says, never as
+        // "(not provided)" (PROMPT_EMPTY_CASES).
+        knownName: orEmptyCase(
+          input.knownName,
+          PROMPT_EMPTY_CASES.WELCOME_CONDUCTOR.knownName,
+        ),
+        knownOrganisation: orEmptyCase(
+          input.knownOrganisation,
+          PROMPT_EMPTY_CASES.WELCOME_CONDUCTOR.knownOrganisation,
+        ),
         recentTurns: input.recentTurns.slice(-12).map((t) => ({
           role: t.role,
           text: t.text.slice(0, 600),

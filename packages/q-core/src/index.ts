@@ -59,6 +59,8 @@ export {
   type RenderRequest,
 } from "./prompts/renderer.js";
 
+export { orEmptyCase, PROMPT_EMPTY_CASES } from "./prompts/empty-cases.js";
+
 export {
   Q_SYSTEM_V1,
   QSystemVariablesSchema,
@@ -1617,7 +1619,10 @@ export {
   type DiligenceQuestionsDraftResult,
   DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_NAME,
   DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION,
+  DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION_V2,
   DiligenceQuestionsShortenResultSchema,
+  DiligenceQuestionsShortenResultV2Schema,
+  type DiligenceQuestionsShortenResultV2,
   DiligenceQuestionsShortenVariablesSchema,
   type DiligenceQuestionsShortenResult,
   type DiligenceQuestionsShortenVariables,
