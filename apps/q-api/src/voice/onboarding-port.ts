@@ -3,6 +3,7 @@ import {
   getOnboardingSession,
   getTaxonomyNode,
   listInvestorMandates,
+  listOnboardingInterviewTurnSteps,
   listTaxonomyNodes,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -415,6 +416,11 @@ export type FoundRecommendationPort = {
   >;
   /** The session as it stands, for which findings are ready to offer. */
   readonly answeredSteps: () => Promise<ReadonlySet<string>>;
+  /**
+   * The step Q's latest kept line asked, if any: the one the person is
+   * answering. A finding for it waits until their words are read.
+   */
+  readonly askingStep?: (() => Promise<string | null>) | undefined;
 };
 
 /** One value, whatever order a list was given in. */
@@ -3626,6 +3632,14 @@ export function createOnboardingPort(input: {
     },
     answeredSteps: async () =>
       new Set((await current()).responses.map((r) => r.stepKey)),
+    askingStep: async () => {
+      const kept = await listOnboardingInterviewTurnSteps(
+        input.session,
+        input.onboardingSessionId,
+        6,
+      );
+      return kept.items.findLast((t) => t.role === "Q")?.stepKey ?? null;
+    },
     accept: async (stepKeys) => {
       const results: OnboardingRecordResult[] = [];
       const heardList = await heard;

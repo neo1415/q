@@ -352,6 +352,7 @@ function researchFor(
   world: InvestorWorld,
   pages: readonly ResearchPage[],
   result: InvestorResearchReaderResult | null,
+  asking: () => string | null = () => null,
 ): { research: InvestorResearch; done: Promise<void> } {
   let finish: () => void = () => undefined;
   const done = new Promise<void>((resolve) => {
@@ -372,6 +373,7 @@ function researchFor(
       });
       return {
         answeredSteps: port.answeredSteps,
+        askingStep: () => Promise.resolve(asking()),
         recommendFound: async (items) => {
           const out = await port.recommendFound(items);
           finish();
@@ -501,6 +503,59 @@ describe("findings are held as recommendations with their source, never as answe
     });
     // What they already said is not offered back to them.
     expect(pending.some((p) => p.stepKey === "I0.investor_type")).toBe(false);
+  });
+
+  it("final check 2026-10-30: a finding for the question they are answering waits for their words, and is never put back to them as research", async () => {
+    const world = worldWith({});
+    let asking: string | null = "I0.investor_type";
+    const { research, done } = researchFor(
+      world,
+      [HOME, PORTFOLIO],
+      FULL,
+      () => asking,
+    );
+    research.consider({
+      actor,
+      session: turn(world, "").session,
+      onboardingSessionId: SESSION,
+      identity: {
+        firmName: "Kestrel Ridge Capital",
+        websiteUrl: SITE,
+        profileUrls: [],
+      },
+    });
+    await done;
+    // Landed while "Through a venture capital fund" was being read: held.
+    let pending = await pendingOf(world);
+    expect(pending.some((p) => p.stepKey === "I0.investor_type")).toBe(false);
+    expect(pending.some((p) => p.stepKey === "I8.portfolio")).toBe(true);
+
+    // Their words read and saved as theirs; Q asks the next question.
+    world.record("I0.investor_type", {
+      type: "SINGLE_SELECT",
+      optionKey: "vc",
+    });
+    asking = "I0.organisation_name";
+    const port = createOnboardingPort({
+      session: turn(world, "").session,
+      onboardingSessionId: SESSION,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [],
+      recommendations: world.recommendations,
+    });
+    await research.offerReady(SESSION, {
+      answeredSteps: port.answeredSteps,
+      askingStep: () => Promise.resolve(asking),
+      recommendFound: port.recommendFound,
+    });
+    pending = await pendingOf(world);
+    // The same as their answer: never offered back with a public source.
+    expect(pending.some((p) => p.stepKey === "I0.investor_type")).toBe(false);
+    expect(world.recordedValue("I0.investor_type")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "vc",
+    });
   });
 
   it("a phrase no category names is left out, and the rest still offered", async () => {

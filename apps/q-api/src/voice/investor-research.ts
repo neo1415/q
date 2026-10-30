@@ -441,9 +441,17 @@ export function createInvestorResearch(
     port: FoundRecommendationPort,
   ): Promise<number> => {
     const answered = await port.answeredSteps();
+    // Final check 2026-10-30: "Through a venture capital fund" was shown
+    // back as "From a public page (pitchbook.com)". The finding landed
+    // while their answer to that very question was being read, and was
+    // put to them as research. The step Q last asked, while unanswered,
+    // waits: once their words are read, a finding the same as their answer
+    // is never offered, and one that differs is held beside it.
+    const asking = (await port.askingStep?.().catch(() => null)) ?? null;
     const ready = research.findings.filter(
       (f) =>
         !research.offered.has(f.stepKey) &&
+        !(f.stepKey === asking && !answered.has(f.stepKey)) &&
         (f.after === null || answered.has(f.after)),
     );
     if (ready.length === 0) return 0;
