@@ -8,7 +8,6 @@ import {
 } from "@capital-q/contracts";
 import {
   clipAtWord,
-  cutAtWord,
   type AnalysisCritiqueResult,
   type AnalysisDocumentResult,
 } from "@capital-q/q-core";
