@@ -1,5 +1,33 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED 891425cbe — 30 October 2026, 06:15 UTC (Claude coordinator, overnight clean-up, owner's standing permission)
+
+- **Railway:** api, q-api, web, workers SUCCESS at `891425cbe` (`build/int-rc` = `recovery/2026-09-12` = `fix/resume-asking`). CI 41009711911 green. No migrations overnight (hosted 264).
+- **Overnight deploys (all CI green):** `ed9be6cc4` → `d64b9da7a` → `4d71bcf74` (q-api needed one redeploy: first start failed with no logs) → `e442748a3` → `841f413d8` → `891425cbe`.
+- **Live-verified on production overnight (fictional accounts):**
+  - Deep research end to end: Nigeria B2B payments report saved and opens, 16/16 citations resolve, sector scope, 26 searches, 6 primary sources, no `agent_work_queue` constraint error (the results-cap bug).
+  - Founder 12-month financial model .xlsx: Model/Assumptions/Sources, own figures, projections labelled ESTIMATE.
+  - "What should I do today?" answered in about 11 s, no plan job.
+  - "Take me to my mandate" in about 1.8 s; IC memo uses the declared mandate.
+  - "Update my investors" goes to the single connected investor and stops at approval; the new approval card is last on screen.
+  - Onboarding: tap-to-finish, Eindhoven→NL, traction blanks, finish → /verification → profile (owner direction 2026-10-02), read-back built from the record.
+- **Research acceptance gate:** cases A, B, C, E and F recorded and committed (all checks pass, replay green in CI). D (Lagos) and G (Kenya) are not committed: D's planner was truncated (fixed since) and G drifts on replay (needs a capture-enabled record). Recording is PAUSED: Serper 402 (credits), Tavily 432, ScrapingBee 401; only Brave works.
+- **Systemic fixes:**
+  - empty prompt fields have one table (`packages/q-core/src/prompts/empty-cases.ts`), and a test fails on a new empty-case rule without an entry;
+  - output ceilings sized from production usage; a cut-off answer is retried with 2× room;
+  - onboarding session writes go through one chain (`apps/q-api/src/voice/session-writes.ts`, with a no-bypass test);
+  - readers see option labels with opaque ids;
+  - swallowed onboarding errors are now logged.
+- **Open:**
+  - plans reach 92/92, not 99 (fix lane `fix/plan-99`);
+  - the onboarding recheck on 891425cbe is in progress;
+  - profile answer editor writes are outside the session chain;
+  - no Food/Water/Utilities taxonomy entries;
+  - "the supplied evidence" is replaced in code, pending a recorded ANALYSIS_WRITE change;
+  - ANALYSIS_WRITE first draft still renders the review as "(not provided)" (recorded prompt).
+- **Owner decisions parked (owner 2026-10-30: "for now, I don't care"):** a revenue question for pilot-stage founders (needs a migration); offering deck burn/cash back in onboarding.
+- **Test accounts created overnight:** about 10 `@maxxspace.com` (mail.tm) fictional accounts from the onboarding sweeps, plus `founder.resume-1029@fictional.capitalq.local`.
+
 ## DEPLOYED ee1f98792 — 29 October 2026, 20:40 UTC (Claude coordinator, owner's standing permission)
 
 - **Railway:** api, q-api, web, workers SUCCESS at `ee1f98792` (`build/int-rc` = `recovery/2026-09-12`). CI run 40941548864 green. No migration in this deploy (hosted 264).

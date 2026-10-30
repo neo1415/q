@@ -1310,3 +1310,21 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Planning: TOGETHER steps wait on the person's part (`qPartDone`/`verifiedDone(…, owner)` in `plans.ts`); Execute announces `cq:q-approval-prepared` and the conversation reads its thread (`use-q-conversation.ts`).
 - Deep research case A (Nigeria B2B payments, investor): live 13/18 → 18/18 after fixes (brief selected a private board card and the report became a LedgerBridge memo; planner saw private facts; records cited as web; snippet facts cited as pages; CBN queries without Nigeria). Recorder fix: a read the caller abandoned is recorded as TIMEOUT. Remaining: replay non-determinism (deadline/time-dependent control flow), gate holes (a degraded one-query run passed; PRIMARY_FROM_PLACE dropped instead of failing), and a transient PLAN failure silently degrading research to one query — lane `fix/research-replay`. Searches spent on case A today: ~73 (four recordings; one degraded by OpenAI TRANSIENT failures).
 - Next: merge `fix/research-replay`, record all 7 cases once (≤280 searches), CI + deploy `dfb93de82`+, one live research run; then plans to 99 and voice onboarding on a real device. Owner deferred: domain purchase, Google consent screen publishing, Turnstile, integrations.
+
+## 2026-10-30 overnight — clean-up to "everything that exists works" (Claude coordinator)
+
+- **Method:** live sweeps on production (Q page, about 36 asks for founder and investor; onboarding with 7 + 3 + 3 fresh accounts), root-cause fix lanes, CI, deploy, live recheck. The owner flagged patch cycles. Recurring classes were then fixed once:
+  - empty prompt fields;
+  - output-token ceilings;
+  - swallowed errors;
+  - unsequenced onboarding writes;
+  - option keys biasing readers;
+  - internal question text reaching people.
+- **Deep research:** situation brief; founder country codes; first-round planner wording; reduced runs say so; skipped lines re-asked; results cap (checkpoint dropped at recordStep); records never cited as web; emails redacted in recordings; deterministic replay (ResearchTime schedule, per-request page reads, full hit lists).
+- **Credits:** about 315 searches overnight, mostly acceptance recordings. Serper and Tavily are now out; only Brave works. Model spend stayed low (about $1–4/day in production plus recordings).
+- **Disk:** filled up once; 31 merged worker worktrees removed (about 20 GB freed).
+- **Next:**
+  - merge `fix/plan-99` → CI → deploy → live plan run;
+  - finish the onboarding recheck on 891425cbe;
+  - re-record D and G when search credits allow (about 46 searches);
+  - owner: domain, sender domain (SPF/DKIM/DMARC), Brevo click tracking off, Google consent screen to production, rotate Railway/Supabase tokens, top up or replace Serper/Tavily/ScrapingBee.
