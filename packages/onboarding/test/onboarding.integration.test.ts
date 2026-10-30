@@ -1536,6 +1536,8 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
           rationale: "Payments fit better.",
           // No public source was cited for this recommendation.
           sources: [],
+          // Q's recommendation from the conversation, not a document read.
+          fromDocument: false,
           payloadSha256: second.payloadSha256,
         },
       ]);
