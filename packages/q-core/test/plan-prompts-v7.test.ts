@@ -50,7 +50,8 @@ const review = {
 describe("PLAN_REVIEW v7 / PLAN_WRITE v5 (plan job 3a4aa98d)", () => {
   it("are active, on v4's review output schema; rubric and bar unchanged", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("PLAN_REVIEW").versionId).toBe("plan-review/v7");
+    // PLAN_REVIEW v8 (plan job 0823a533) supersedes v7's note wording.
+    expect(registry.getActive("PLAN_REVIEW").versionId).toBe("plan-review/v8");
     expect(registry.getActive("PLAN_WRITE").versionId).toBe("plan-write/v5");
     expect(PLAN_REVIEW_V7.output).toMatchObject({
       schemaVersion: 4,

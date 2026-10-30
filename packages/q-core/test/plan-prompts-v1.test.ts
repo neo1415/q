@@ -324,7 +324,7 @@ describe("PLAN_REVIEW v1", () => {
   it("is registered and active, independent, and never rewrites the plan", () => {
     expect(
       createDefaultPromptRegistry().getActive("PLAN_REVIEW").versionId,
-    ).toBe("plan-review/v7");
+    ).toBe("plan-review/v8");
     const t = PLAN_REVIEW_V1.template;
     expect(t).toMatch(/independent reviewer/u);
     expect(t).toMatch(/you must not rewrite it/u);

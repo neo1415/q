@@ -20,9 +20,13 @@ import {
 } from "../src/app-action-turn.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
 import {
+  createQTurnReader,
+  TURN_READER_ATTEMPT_TIMEOUT_MS,
   TURN_READER_SAME_MODEL_HEDGE_MS,
   type QTurnReader,
 } from "@capital-q/model-gateway/q";
+import { ModelGatewayError } from "@capital-q/model-gateway";
+import { createLogger, type Logger } from "@capital-q/observability";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 import type {
   TurnReaderV24Result,
@@ -40,7 +44,6 @@ import type {
   QResearchDirective,
   QRuntimeRepositories,
 } from "@capital-q/q-runtime";
-import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -48,6 +51,7 @@ import {
   createSpecialistQAnswer,
   namedInWords,
   TURN_REREAD_DEADLINE_MS,
+  TURN_UNREAD_REPLY,
   unknownScreenLine,
 } from "../src/answer.js";
 import {
@@ -991,7 +995,15 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     });
     const run = seam({
       said: "Tell me about the third company on the list.",
-      reading: null,
+      // Read (an unread turn is told so, never answered: run 8bc5116c).
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
       outcomes: [],
       earlier: [
         { role: "USER", content: "Show me the top three companies." },
@@ -1275,14 +1287,15 @@ describe("a general turn is read before it is answered", () => {
     expect(directives[0]?.mode).toBe("EXPLICIT");
   });
 
-  it("treats a turn it could not read as not asking for research", async () => {
-    const { answer, directives } = seam({
+  it("never researches a turn it could not read", async () => {
+    const { answer, directives, delegated } = seam({
       said: "Any news on Acme?",
       reading: null,
       outcomes: [],
     });
     await answer.answer(request());
-    expect(directives[0]?.mode).toBe("NEVER");
+    expect(directives).toEqual([]);
+    expect(delegated()).toBe(0);
   });
 });
 
@@ -1519,15 +1532,60 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     expect(run.stored[0]?.blocks?.[0]).toMatchObject({ kind: "UI_INTENT" });
   });
 
-  it("tells the answer the turn was not read when both tries fail", async () => {
+  // Live 2026-10-30 (run 8bc5116c): "Plan my raise over 8 weeks", unread
+  // twice, was answered by the general answer as a chat memo and the plan
+  // never started. Not knowing what the turn asks, Q guesses no path: it
+  // says it could not read it and that nothing was started.
+  it("says it could not read the turn, and answers nothing else, when both tries fail", async () => {
     const run = seam({
-      said: "make me a pdf of my thesis",
+      said: "Plan my raise over 8 weeks",
       reading: null,
       outcomes: [],
     });
     await run.answer.answer(request());
     expect(run.reads()).toBe(2);
-    expect(run.unread).toEqual([true]);
+    expect(run.delegated()).toBe(0);
+    expect(run.unread).toEqual([]);
+    expect(run.stored.map((message) => message.content)).toEqual([
+      TURN_UNREAD_REPLY,
+    ]);
+    expect(TURN_UNREAD_REPLY).toMatch(/haven't started anything/u);
+  });
+
+  it("a reader whose gateway times out twice is the same unread turn: told, not guessed (fake gateway timeouts)", async () => {
+    let attempts = 0;
+    // The real turn reader over a gateway whose attempts all time out, as
+    // run 8bc5116c's did (three TIMEOUTs on the only eligible model).
+    const reader = createQTurnReader({
+      gateway: {
+        execute: () => {
+          attempts += 1;
+          return Promise.reject(
+            new ModelGatewayError(
+              "model request failed after bounded attempts",
+              { failureClass: "TIMEOUT", attempts: 2, candidates: [] },
+            ),
+          );
+        },
+      },
+      logger: createLogger(
+        { serviceName: "q-specialists-test", environment: "test" },
+        { level: "silent" },
+      ),
+    });
+    const run = seam({
+      said: "Plan my raise over 8 weeks",
+      reading: null,
+      outcomes: [],
+      read: (input) => reader.read(input),
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(2);
+    expect(attempts).toBe(2);
+    expect(run.delegated()).toBe(0);
+    expect(run.stored.map((message) => message.content)).toEqual([
+      TURN_UNREAD_REPLY,
+    ]);
   });
 
   it("the extra reading is cut off at its deadline: one extra try, the turn answered as unread", async () => {
@@ -1555,7 +1613,19 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     expect(run.reads()).toBe(2);
     expect(signals[1]?.aborted).toBe(true);
     expect(Date.now() - started).toBeLessThan(2_000);
-    expect(run.unread).toEqual([true]);
+    expect(run.delegated()).toBe(0);
+    expect(run.stored.map((message) => message.content)).toEqual([
+      TURN_UNREAD_REPLY,
+    ]);
+  });
+
+  // Live 2026-10-30 (run 8bc5116c): the re-read's model answered at
+  // 5,986 ms and the 6,000 ms deadline, equal to the attempt's own
+  // timeout, threw the answer away.
+  it("the extra reading outlasts the reader's own attempt, so an answer inside it is kept", () => {
+    expect(TURN_REREAD_DEADLINE_MS).toBeGreaterThan(
+      TURN_READER_ATTEMPT_TIMEOUT_MS,
+    );
   });
 
   it("the extra reading has the reader's own time: a slow second read (2.8 s) still reads the turn (live 2026-10-29, run B)", async () => {
@@ -2104,7 +2174,10 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
     });
     await answer.answer(request());
     expect(declined).toEqual([]);
-    expect(delegated()).toBe(1);
+    // Unread (run 8bc5116c): no answer is guessed; Q says so, and the card
+    // is still said to be waiting after it.
+    expect(delegated()).toBe(0);
+    expect(stored[0]?.content).toBe(TURN_UNREAD_REPLY);
     expect(stored.at(-1)?.content).toMatch(
       /^Still waiting for your approval: Reminder/,
     );

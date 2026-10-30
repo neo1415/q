@@ -410,6 +410,7 @@ import {
   analystResultBlocks,
   askedSubjects,
   provenanceLine,
+  TURN_READER_ATTEMPT_TIMEOUT_MS,
   type QTurnReader,
   type QTurnSkim,
   type QTurnSkimmer,
@@ -1678,10 +1679,30 @@ const ANSWER_LIMIT_CHARS = 32_000;
  * and the 2.5 s re-read was cancelled before its model answered (p50
  * 2.0 s, p90 4.2 s, p99 5.5 s) -- shorter than the reader's own hedge
  * (3.5 s), so it could never get a second chance. One fresh reading gets
- * the reader's whole attempt (6 s): its hedge can fire, and an unread
- * request costs at most this, never a silent downgrade.
+ * the reader's whole attempt: its hedge can fire.
+ *
+ * Live 2026-10-30 (run 8bc5116c): this deadline equalled the attempt's
+ * own timeout (6 s), so the re-read's model answered at 5,986 ms and was
+ * thrown away by this cut-off a few milliseconds later, paid for. It now
+ * covers the attempt plus the gateway's own work around it (prompt,
+ * validation, the usage record), so an attempt that answers in time is
+ * never discarded here.
  */
-export const TURN_REREAD_DEADLINE_MS = 6_000;
+export const TURN_REREAD_DEADLINE_MS = TURN_READER_ATTEMPT_TIMEOUT_MS + 1_000;
+
+/**
+ * What Q says when its turn could not be read even on the extra try
+ * (live 2026-10-30, run 8bc5116c): "Plan my raise over 8 weeks" was
+ * answered by the general answer as a chat memo about the raise, told in
+ * a prompt note that it could not start anything; it wrote around that
+ * note, the plan was never started and nothing said so. Not knowing what
+ * kind of request a turn is, Q does not guess one: no answer path is
+ * chosen for it, nothing is started, and it says so in code's own words.
+ * Sent again, the turn is read afresh (the same ask in a new chat started
+ * the plan). Localised to the turn's language like any recorded answer.
+ */
+export const TURN_UNREAD_REPLY =
+  "Sorry, I couldn't read that request just now, so I haven't started anything. Please send it again in a moment.";
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).
@@ -6930,6 +6951,16 @@ export function createSpecialistQAnswer(
             speculativeResearch,
           });
     if (misfit !== null) speculation?.cancel(misfit);
+    // Still unread after the extra try: no answer path is guessed for it
+    // (TURN_UNREAD_REPLY). Whatever it asked for is not started and not
+    // answered as something else; Q says so and they send it again.
+    if (finalRequest.turnUnread === true) {
+      logger?.warn(
+        { qRunId: request.runId },
+        "a turn to Q was not read; nothing started, asked to send it again",
+      );
+      return recordAnswer(request, conversationId, TURN_UNREAD_REPLY);
+    }
     {
       const sentAt = Date.parse(latest.createdAt);
       logger?.info(

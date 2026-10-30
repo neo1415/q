@@ -58,9 +58,9 @@ const render = (variables: Record<string, unknown>) =>
   });
 
 describe("PLAN_REVIEW v6: today's date, fixes read alone, one change each", () => {
-  it("was active (v7 now), on v5's output schema and rubric", () => {
+  it("was active (v8 now), on v5's output schema and rubric", () => {
     const active = createDefaultPromptRegistry().getActive("PLAN_REVIEW");
-    expect(active.versionId).toBe("plan-review/v7");
+    expect(active.versionId).toBe("plan-review/v8");
     expect(PLAN_REVIEW_V6.output).toBe(PLAN_REVIEW_V5.output);
     expect(PLAN_REVIEW_V6.output).toMatchObject({
       schemaVersion: 3,

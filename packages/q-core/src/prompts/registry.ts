@@ -221,6 +221,7 @@ import { PLAN_REVIEW_V4, PLAN_WRITE_V4 } from "./tasks/plan.v4.js";
 import { PLAN_REVIEW_V5 } from "./tasks/plan.v5.js";
 import { PLAN_REVIEW_V6 } from "./tasks/plan.v6.js";
 import { PLAN_REVIEW_V7, PLAN_WRITE_V5 } from "./tasks/plan.v7.js";
+import { PLAN_REVIEW_V8 } from "./tasks/plan.v8.js";
 import { CONVERSATION_RECALL_V1 } from "./tasks/conversation-recall.v1.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
@@ -807,7 +808,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...PLAN_REVIEW_V5, status: "DEPRECATED" },
     { ...PLAN_REVIEW_V6, status: "DEPRECATED" },
     PLAN_WRITE_V5,
-    PLAN_REVIEW_V7,
+    { ...PLAN_REVIEW_V7, status: "DEPRECATED" },
+    PLAN_REVIEW_V8,
     CONVERSATION_RECALL_V1,
     TURN_SKIM_V1,
     TURN_SKIM_V2,

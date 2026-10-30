@@ -542,6 +542,7 @@ export {
   createQTurnReader,
   readerActions,
   TURN_READER_ACTIONS_MAX,
+  TURN_READER_ATTEMPT_TIMEOUT_MS,
   TURN_READER_SAME_MODEL_HEDGE_MS,
   type QTurnReader,
   type QTurnReading,

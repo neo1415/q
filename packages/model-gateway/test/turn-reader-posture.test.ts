@@ -5,6 +5,7 @@ import { createLogger } from "@capital-q/observability";
 import type { ModelGateway } from "../src/index.js";
 import { createQTurnReader } from "../src/q/index.js";
 import {
+  TURN_READER_ATTEMPT_TIMEOUT_MS,
   TURN_READER_FAST_FIRST_ATTEMPT_MS,
   TURN_READER_SAME_MODEL_HEDGE_MS,
 } from "../src/q/turn-reader.js";
@@ -93,7 +94,7 @@ describe("the turn reader's data posture", () => {
     expect(
       (fast.requests[0]?.budget as { attemptTimeoutMs: number })
         .attemptTimeoutMs,
-    ).toBe(6_000);
+    ).toBe(TURN_READER_ATTEMPT_TIMEOUT_MS);
 
     const real = recording();
     await createQTurnReader({
@@ -112,6 +113,14 @@ describe("the turn reader's data posture", () => {
     expect(options[0]?.sameModelHedgeAfterMs).toBe(
       TURN_READER_SAME_MODEL_HEDGE_MS,
     );
-    expect(TURN_READER_SAME_MODEL_HEDGE_MS).toBeLessThan(6_000);
+    expect(TURN_READER_SAME_MODEL_HEDGE_MS).toBeLessThan(
+      TURN_READER_ATTEMPT_TIMEOUT_MS,
+    );
+  });
+
+  // Live 2026-10-30 (run 8bc5116c): reads of ~17k tokens answered at p90
+  // 5.7 s that day, so a 6 s cut-off left a planning ask unread.
+  it("gives each reading attempt room past the reader's measured p90", () => {
+    expect(TURN_READER_ATTEMPT_TIMEOUT_MS).toBeGreaterThanOrEqual(9_000);
   });
 });

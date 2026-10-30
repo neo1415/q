@@ -186,11 +186,25 @@ export type QTurnReading = Omit<
  * JSON: at 300 tokens gpt-oss spent it all thinking and returned nothing,
  * which the provider refused as invalid JSON (local, 2026-09-24).
  */
+/**
+ * How long one reading attempt may take. Live 2026-10-30 (run 8bc5116c,
+ * "Plan my raise over 8 weeks"): both attempts timed out at 6.0 s and the
+ * re-read answered at 5,986 ms. ai_ops.model_usage, reads of 12k+ input
+ * tokens on gpt-5.6-luna: p90 4.5 s on 23 Oct rising to 5.7 s on 30 Oct,
+ * with 6 s cut-offs 0-4 a day before and 8-9 a day since. Latency follows
+ * the output (r 0.77; ~9 ms a token over ~270 tokens) on a fixed start
+ * that grew from ~0.7 s to ~2.4 s as the input grew 13k -> 17k tokens. At
+ * 6 s the cut-off sat at the day's p95, so a slow spell left turns unread;
+ * 9 s is ~1.5x today's p90. A stall is still cut short by the hedge
+ * (TURN_READER_SAME_MODEL_HEDGE_MS), not by this.
+ */
+export const TURN_READER_ATTEMPT_TIMEOUT_MS = 9_000;
+
 const TURN_READER_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.01,
   maxOutputTokens: 1_200,
-  attemptTimeoutMs: 6_000,
+  attemptTimeoutMs: TURN_READER_ATTEMPT_TIMEOUT_MS,
 } as const;
 
 /**

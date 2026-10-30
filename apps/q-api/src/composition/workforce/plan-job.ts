@@ -1444,16 +1444,39 @@ export function personLines(input: {
     const note = personNote(point.note, input.vocabulary, keys);
     return note === null ? null : secondPerson(note, input.personName);
   };
+  // One note per rubric item in a step (or a whole-plan group): live
+  // 2026-10-30 (plan 93bfe2e4), step 3 read three sentences saying the
+  // same meeting was waiting, the two reviewers' notes on the same item
+  // joined. Which item a point is under is structured, so the first
+  // reviewer's usable note on an item stands for it and a later one on the
+  // same item is not said again; nothing compares their words. Code's own
+  // points are each their own.
   const said = (points: readonly ReviewPoint[], whole: boolean): string[] => {
     const notes: string[] = [];
     const seen = new Set<string>();
     const unsaid: ReviewPoint["item"][] = [];
+    const items: ReviewPoint["item"][] = [];
     for (const point of points) {
-      const note = noteOf(point);
-      if (note === null) {
-        unsaid.push(point.item);
-        continue;
+      if (point.reviewer !== "CODE" && !items.includes(point.item)) {
+        items.push(point.item);
       }
+    }
+    const chosen: (string | null)[] = [
+      ...points
+        .filter((point) => point.reviewer === "CODE")
+        .map((point) => noteOf(point)),
+      ...items.map((item) => {
+        for (const point of points) {
+          if (point.reviewer === "CODE" || point.item !== item) continue;
+          const note = noteOf(point);
+          if (note !== null) return note;
+        }
+        unsaid.push(item);
+        return null;
+      }),
+    ];
+    for (const note of chosen) {
+      if (note === null) continue;
       const key = plainKey(note);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -1465,21 +1488,33 @@ export function personLines(input: {
     }
     return notes;
   };
-  const fit = (prefix: string, notes: readonly string[]): string => {
-    const room = max - prefix.length;
+  // A step's notes in as many lines as they need, each within the line's
+  // room: the first under the step's title, the rest under a short
+  // "continued" prefix. Live 2026-10-30 (plan 93bfe2e4): lines ended "And
+  // 4 more." and the expanded card had nowhere to show them; nothing here
+  // promises a note the card does not hold.
+  const fit = (
+    prefix: string,
+    notes: readonly string[],
+    continued: string,
+  ): string[] => {
+    const out: string[] = [];
+    let head = prefix;
     let body = "";
-    let used = 0;
     for (const note of notes) {
       const next = body === "" ? note : `${body} ${note}`;
-      const left = notes.length - used - 1;
-      const tail = left > 0 ? ` And ${String(left)} more.` : "";
-      if (next.length + tail.length > room) break;
-      body = next;
-      used += 1;
+      if (head.length + next.length <= max) {
+        body = next;
+        continue;
+      }
+      if (body !== "") {
+        out.push(`${head}${body}`);
+        head = continued;
+      }
+      body = wordClip(note, max - head.length);
     }
-    if (used === 0) body = wordClip(notes[0] ?? "", room);
-    const left = notes.length - Math.max(used, 1);
-    return `${prefix}${body}${left > 0 ? ` And ${String(left)} more.` : ""}`;
+    if (body !== "") out.push(`${head}${body}`);
+    return out;
   };
 
   const lines: string[] = [];
@@ -1503,14 +1538,21 @@ export function personLines(input: {
   }
   for (const group of groups) {
     const notes = said(group, true);
-    if (notes.length > 0) lines.push(fit("", notes));
+    if (notes.length > 0) lines.push(...fit("", notes, ""));
   }
   input.steps.forEach((step, index) => {
     const mine = input.points.filter((point) => point.stepKey === step.key);
     if (mine.length === 0) return;
     const notes = said(mine, false);
     if (notes.length === 0) return;
-    lines.push(fit(`Step ${String(index + 1)}, “${step.title}”: `, notes));
+    const number = String(index + 1);
+    lines.push(
+      ...fit(
+        `Step ${number}, “${step.title}”: `,
+        notes,
+        `Step ${number}, continued: `,
+      ),
+    );
   });
   return [...new Set(lines)];
 }

@@ -16,7 +16,11 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { createSpecialistQAnswer, type BoardKeeper } from "../src/answer.js";
+import {
+  createSpecialistQAnswer,
+  TURN_UNREAD_REPLY,
+  type BoardKeeper,
+} from "../src/answer.js";
 import type { QSpeculationEvent } from "../src/speculation.js";
 
 /**
@@ -293,14 +297,17 @@ describe("a spoken question answered speculatively (latency2)", () => {
     expect(run.stored).toEqual(["Answer 2."]);
   });
 
-  it("cancels it when the turn could not be read, and the normal path answers", async () => {
+  // Live 2026-10-30 (run 8bc5116c): an unread turn is not answered as
+  // something else; Q says it could not read it, once, and nothing more.
+  it("cancels it when the turn could not be read, and says so instead of answering", async () => {
     const run = seam({ said: "What can you do?", reading: null });
     await run.answer.answer(request());
     expect(run.events).toMatchObject([
       { outcome: "CANCELLED", reason: "UNREAD" },
     ]);
-    expect(run.calls[1]?.turnUnread).toBe(true);
-    expect(run.heard.map((h) => h.text)).toEqual(["Answer 2."]);
+    expect(run.calls).toHaveLength(1);
+    expect(run.heard).toEqual([]);
+    expect(run.stored).toEqual([TURN_UNREAD_REPLY]);
   });
 
   it("never speculates a typed turn, a turn about a company, or a web address", async () => {

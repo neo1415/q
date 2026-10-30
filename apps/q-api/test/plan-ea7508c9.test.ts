@@ -439,7 +439,7 @@ describe("5. the stored prompt version is the registry's", () => {
     expect(PLAN_PROMPT_VERSION).toBe(
       `PLAN_WRITE@${String(registry.getActive("PLAN_WRITE").definition.version)}+PLAN_REVIEW@${String(registry.getActive("PLAN_REVIEW").definition.version)}`,
     );
-    expect(PLAN_PROMPT_VERSION).toBe("PLAN_WRITE@5+PLAN_REVIEW@7");
+    expect(PLAN_PROMPT_VERSION).toBe("PLAN_WRITE@5+PLAN_REVIEW@8");
   });
 });
 
