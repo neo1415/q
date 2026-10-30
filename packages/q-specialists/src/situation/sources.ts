@@ -685,11 +685,14 @@ function formatBoard(data: readonly unknown[]): SituationRawFact[] | null {
   const tool = SITUATION_TOOLS.board;
   const base: FactBase = { ...PLATFORM, label: "personal_private" };
   const open = read.items.filter((item) => item.status !== "DONE");
+  // The record's state said plainly: live 2026-10-30, a plan read the
+  // open task "Your part: Approve sharing ..." as an approval already
+  // given, and a reviewer scored it invented.
   return open.map((item) =>
     fact(
       tool,
       base,
-      `On your board (${words(item.status)}): ${words(item.kind)} "${item.title}"${
+      `On your board, not done yet (${words(item.status)}): ${words(item.kind)} "${item.title}"${
         item.dueOn === null ? "" : `, due ${item.dueOn}`
       }${item.workJobId === null ? "" : "; Q is working on it"}.`,
       { asOf: item.dueOn, record: { kind: "BOARD_ITEM", id: item.itemId } },
@@ -735,7 +738,11 @@ function formatWork(data: readonly unknown[]): SituationRawFact[] | null {
       fact(
         SITUATION_TOOLS.approvals,
         base,
-        `Waiting for your approval: ${item.summary}`,
+        // Pending, not given: nothing goes out or changes until they
+        // approve, change or decline it on its card (live 2026-10-30).
+        `Waiting for your approval, not approved yet (nothing is sent or changed until you approve, change or decline it on its card; asked ${
+          day(item.requestedAt) ?? "date unknown"
+        }): ${item.summary}`,
         {
           asOf: item.requestedAt,
         },
