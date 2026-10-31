@@ -1357,3 +1357,18 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   5. Founder finish lands on /verification (skippable) before profile.
 - **In-flight branches at stop:** `fix/onb-8`, `fix/memo-10` (workers' reports pending; verify gates yourself before merging).
 - **Lesson for the next agent:** run live checks on fresh accounts after every deploy, but bound the loop: fix release-blocking defects (data loss, wrong data, evidence honesty) first and batch cosmetic ones. Check every gate's exit code directly (a piped `tail` hid a tsc failure once) and run research replays locally before pushing.
+
+## 2026-10-31 20:50 UTC — final round (Claude coordinator)
+
+- **Production:** `857aa249a` on all four services (CI run 1724 green). Railway failed web/api/q-api at 19:54 with empty logs and refused `deploymentRedeploy` ("still building"); `serviceInstanceDeployV2` with the commit SHA deployed them (SUCCESS 20:16–20:17). Railway flags region `europe-west4` as deprecated (→ `europe-west4-drams3a`); check against ADR 0014 before it bites.
+- **Live (fresh fictional accounts):** investor sectors incl. industrial automation, geography and three hard exclusions saved in full; B2B recurring revenue no longer Consumer Subscription.
+- **Owner rule for the last round:** fix only data loss/corruption or evidence dishonesty. In flight: `fix/onb-integrity` (Q's category choice saved as `user_selected` in the mandate; founder traction detail claimed by Q but not saved; a past Q line rewritten in the transcript) and `fix/memo-honesty` (namesake domain labelled as the company's own and cited; reduced research not disclosed when search categories failed; investor's mandate fact labelled "(company record)"; internal source id in Q's chat line).
+- **Handoff list (not blocking, not being fixed now):**
+  - "skip the rest" stops on the documents step and re-asks required raise fields (about 14 s plus three actions to finish);
+  - founder read-back has no Yes/Finish button;
+  - investor re-asked "actively investing" right after saying it; one "strong preference" reply re-asked once;
+  - founder finish lands on /verification before profile;
+  - one-pager first text about 6.8 s (turn reader 3.1 s; the first reply promises the document without calling the tool);
+  - onboarding firm lookup can pick up a similarly named firm (no identity judgement there);
+  - research replay cases D and G unrecorded (search credits);
+  - two search parsers still read countries their own way.
