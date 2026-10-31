@@ -142,6 +142,30 @@ function looksLikeRow(line: string): boolean {
   return line.includes("|") && !isBlank(line);
 }
 
+/**
+ * The writers' plain table (q-core analyst.v1: "Name | What they offer |
+ * …", a header line, then one row per line, no separator line) starting at
+ * `index`: its width, or null. Live 2026-10-31 (IC memo viewer): it showed
+ * as lines of pipes. A second line of the same width is required, so
+ * prose with a stray pipe stays prose.
+ */
+function plainTableAt(lines: readonly string[], index: number): number | null {
+  const line = lines[index] ?? "";
+  const next = lines[index + 1] ?? "";
+  if (!looksLikeRow(line) || !looksLikeRow(next)) return null;
+  if (separatorAlign(line) !== null || separatorAlign(next) !== null) {
+    return null;
+  }
+  const width = splitRow(line).length;
+  return width >= 2 && splitRow(next).length === width ? width : null;
+}
+
+/** A row at the table's width: extra cells are kept in the last one. */
+function fitRow(cells: readonly string[], width: number): string[] {
+  if (cells.length <= width) return [...cells];
+  return [...cells.slice(0, width - 1), cells.slice(width - 1).join(" | ")];
+}
+
 function startsBlock(line: string): boolean {
   return (
     HEADING.test(line) ||
@@ -254,6 +278,36 @@ function parseLines(lines: readonly string[], streaming: boolean): MdBlock[] {
         blocks.push({ kind: "table", header, align, rows });
         continue;
       }
+      const plainWidth = plainTableAt(lines, index);
+      if (plainWidth !== null) {
+        const rows: string[][] = [];
+        while (
+          index < lines.length &&
+          looksLikeRow(lines[index] ?? "") &&
+          separatorAlign(lines[index] ?? "") === null
+        ) {
+          rows.push(fitRow(splitRow(lines[index] ?? ""), plainWidth));
+          index += 1;
+        }
+        const [first, ...rest] = rows;
+        blocks.push({
+          kind: "table",
+          header: first ?? [],
+          align: Array.from({ length: plainWidth }, () => null),
+          rows: rest,
+        });
+        continue;
+      }
+      // A plain table's header line still arriving alone: held back
+      // rather than flashed as pipes.
+      if (
+        streaming &&
+        index === lines.length - 1 &&
+        line.includes(" | ") &&
+        splitRow(line).length >= 2
+      ) {
+        break;
+      }
       // A table still arriving: its header is here, its separator is not
       // (or is half-written). Held back rather than shown as pipes.
       if (
@@ -274,6 +328,7 @@ function parseLines(lines: readonly string[], streaming: boolean): MdBlock[] {
       if (isBlank(next) || startsBlock(next)) break;
       if (looksLikeRow(next) && separatorAlign(lines[index + 1] ?? "") !== null)
         break;
+      if (plainTableAt(lines, index) !== null) break;
       body.push(next.trim());
       index += 1;
     }

@@ -1952,6 +1952,10 @@
     color: var(--cq-stage-text);
     font-size: 12px;
     font-weight: 500;
+    /* One line, always (live 2026-10-31, 390 px: in the 44px-wide controls
+       column it wrapped to "Tap / for / sound", three lines tall, down
+       over the regions line below it). */
+    white-space: nowrap;
     /* A 28px chip on the video; the hit area is the 44px WCAG target. */
     position: relative;
   }
@@ -2383,7 +2387,9 @@
      the VIDEO). It is over the pitch, from the layer scale, in the band
      between the sound control and Previous/Next, below the sound button
      and its "Tap for sound" hint (56px controls row + 44px button + 8px),
-     so it never covers a control and never takes a tap. */
+     so it never covers a control and never takes a tap. The hint is one
+     line (.cq-feed-chip nowrap): 8px + 28px from the row's top, its hit
+     area to 44px, so it ends above this line at every phone width. */
   .cq-feed-regions-line {
     position: absolute;
     top: calc(56px + 44px + 8px + var(--cq-safe-top));

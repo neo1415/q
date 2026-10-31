@@ -362,9 +362,79 @@ describe("live 2026-10-31 · the IC memo PDF prints the writer's markdown as str
     expect(text).not.toMatch(/(^|\s)- /u);
     expect(text).toContain("Recommendation: do not proceed yet.");
     expect(text).toContain("Stage:");
-    expect(text).toContain("Ada · CEO");
+    expect(text).toContain("Ada");
+    expect(text).toContain("CEO");
+    expect(text).not.toContain("|");
     expect(text).not.toContain("---");
     expect(text).toContain('e.g. "Cheque and role: Potential fit…"');
+  });
+});
+
+/** The live competitor table (IC memo, Clearwater Assurance, 2026-10-31). */
+const LIVE_COMPETITOR_TABLE = [
+  "Name | What they offer | Where | Price or scale | Source",
+  "Cylera | Healthcare IoT asset intelligence and security | Not established in the available research | Not provided | [S7]",
+  "Cynerio | Healthcare cybersecurity, including network detection and response | Not established in the available research | Not provided | [S7]",
+  "Intraprise Health | Named by CB Insights as a Clearwater alternative; offering not established in the available research | Not established | Not provided | [S7]",
+  "Kroll Cyber Risk | Cyber-risk preparedness, resilience, detection and response; handled over 3,000 incidents per year according to Kroll’s cited profile | Not established in the available research | Over 3,000 incidents per year stated in source | [S25]",
+  "Vulcan Cyber | Vulnerability-remediation orchestration for IT-security teams | Not established in the available research | Not provided | [S25]",
+].join("\n");
+
+describe("live 2026-10-31 · the IC memo's competitor table prints as a table", () => {
+  it("lays the writer's pipe lines out in columns, with no pipes on the page", async () => {
+    const document = documentFromArtifact({
+      type: "MEMO",
+      version: brief({
+        sections: [
+          {
+            heading: "Competition",
+            body: `The relevant alternative categories are internal teams (Q's inference).\n${LIVE_COMPETITOR_TABLE}`,
+            findings: [],
+          },
+        ],
+      }),
+    });
+    const bytes = await documentToPdf(document, { title: "t" });
+    const text = (await pdfText(bytes)).join(" ");
+    expect(text).not.toContain("|");
+    expect(text).toContain("What they offer");
+    const task = getDocument({
+      data: bytes.slice(),
+      disableFontFace: true,
+      useSystemFonts: false,
+      verbosity: 0,
+    });
+    const pdf = await task.promise;
+    const items = (await (await pdf.getPage(1)).getTextContent()).items.flatMap(
+      (item) =>
+        "str" in item && item.str.trim().length > 0
+          ? [
+              {
+                text: item.str,
+                x: item.transform[4] as number,
+                y: item.transform[5] as number,
+              },
+            ]
+          : [],
+    );
+    await task.destroy();
+    const at = (words: string) =>
+      items.find((item) => item.text.startsWith(words));
+    const name = at("Name");
+    const offer = at("What they offer");
+    const cylera = at("Cylera");
+    const vulcan = at("Vulcan");
+    const source = at("Source");
+    // A column: every row's first cell starts where the header's does.
+    expect(cylera?.x).toBeCloseTo(name?.x ?? -1, 1);
+    expect(vulcan?.x).toBeCloseTo(name?.x ?? -1, 1);
+    // The second column is to the right of the first, on the header's line.
+    expect(offer?.x ?? 0).toBeGreaterThan((name?.x ?? 0) + 20);
+    expect(offer?.y).toBeCloseTo(name?.y ?? -1, 1);
+    expect(source?.y).toBeCloseTo(name?.y ?? -1, 1);
+    // Each row below the one before.
+    expect(cylera?.y ?? 0).toBeLessThan(name?.y ?? 0);
+    expect(vulcan?.y ?? 0).toBeLessThan(cylera?.y ?? 0);
   });
 });
 

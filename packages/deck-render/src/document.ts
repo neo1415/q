@@ -306,6 +306,59 @@ function wrapRuns(
   return lines;
 }
 
+/** A table column: where it starts from the left margin, and how wide. */
+type TableColumn = { readonly x: number; readonly width: number };
+
+/** Space inside a table cell, each side. */
+const TABLE_PAD = 4;
+
+function tableRowHeight(
+  cells: readonly (readonly StyledLine[])[],
+  options: { readonly size: number; readonly leading: number },
+): number {
+  const lineHeight = Math.round(options.size * options.leading * 10) / 10;
+  const most = Math.max(1, ...cells.map((lines) => lines.length));
+  return TABLE_PAD * 2 + most * lineHeight;
+}
+
+/**
+ * Column widths for a table within `width`: each column its natural width
+ * when they all fit; otherwise each keeps room for its longest word (or a
+ * fair share, if that is less) and the rest goes where the text is longest.
+ */
+function tableColumns(
+  natural: readonly number[],
+  longestWord: readonly number[],
+  width: number,
+): readonly TableColumn[] {
+  const count = Math.max(1, natural.length);
+  const total = natural.reduce((sum, one) => sum + one, 0);
+  let widths: number[];
+  if (total <= width) {
+    // Spare room spread evenly, so the table spans the measure.
+    widths = natural.map((one) => one + (width - total) / count);
+  } else {
+    const floors = natural.map((one, index) =>
+      Math.min(one, Math.max(longestWord[index] ?? 0, 0), width / count),
+    );
+    const floorTotal = floors.reduce((sum, one) => sum + one, 0);
+    const demand = natural.map((one, index) => one - (floors[index] ?? 0));
+    const demandTotal = demand.reduce((sum, one) => sum + one, 0);
+    const spare = Math.max(0, width - floorTotal);
+    widths = floors.map(
+      (floor, index) =>
+        floor +
+        (demandTotal === 0 ? 0 : (spare * (demand[index] ?? 0)) / demandTotal),
+    );
+  }
+  let x = 0;
+  return widths.map((one) => {
+    const column = { x, width: one };
+    x += one;
+    return column;
+  });
+}
+
 /**
  * A cursor down a sequence of pages.
  *
@@ -347,8 +400,13 @@ class Flow {
     return PAGE.width - PAGE.left - PAGE.right;
   }
 
+  /** Whether `height` more would cross the bottom margin of this page. */
+  wouldBreak(height: number): boolean {
+    return this.y + height > PAGE.height - PAGE.bottom && this.y > PAGE.top;
+  }
+
   ensure(height: number): void {
-    if (this.y + height > PAGE.height - PAGE.bottom && this.y > PAGE.top) {
+    if (this.wouldBreak(height)) {
       this.page = this.addPage();
       this.y = PAGE.top;
     }
@@ -427,32 +485,104 @@ class Flow {
           maxWidth: Math.max(1, indent - options.first.at),
         });
       }
-      // Runs of one face drawn together, so a copied line reads as words.
-      const segments: { text: string; bold: boolean }[] = [];
-      for (const word of line) {
-        const last = segments.at(-1);
-        if (last !== undefined && last.bold === word.bold) {
-          last.text = `${last.text} ${word.text}`;
-        } else {
-          segments.push({ text: word.text, bold: word.bold });
-        }
-      }
-      let x = PAGE.left + indent;
-      const right = PAGE.left + this.width;
-      for (const segment of segments) {
-        const face = segment.bold ? fonts.bold : fonts.regular;
-        const wide = face.width(segment.text, options.size);
-        drawLine(this.page, face, segment.text, {
-          x,
-          y,
-          size: options.size,
-          colour: colour(options.colour),
-          maxWidth: Math.max(1, Math.min(wide, right - x)),
-        });
-        x += wide + space;
-      }
+      this.drawStyled(fonts, line, {
+        x: PAGE.left + indent,
+        y,
+        right: PAGE.left + this.width,
+        size: options.size,
+        colour: options.colour,
+        space,
+      });
       this.y += lineHeight;
     });
+  }
+
+  /** One styled line at a place, never past `right`. */
+  private drawStyled(
+    fonts: EmbeddedFonts,
+    line: StyledLine,
+    at: {
+      readonly x: number;
+      readonly y: number;
+      readonly right: number;
+      readonly size: number;
+      readonly colour: string;
+      readonly space: number;
+    },
+  ): void {
+    // Runs of one face drawn together, so a copied line reads as words.
+    const segments: { text: string; bold: boolean }[] = [];
+    for (const word of line) {
+      const last = segments.at(-1);
+      if (last !== undefined && last.bold === word.bold) {
+        last.text = `${last.text} ${word.text}`;
+      } else {
+        segments.push({ text: word.text, bold: word.bold });
+      }
+    }
+    let x = at.x;
+    for (const segment of segments) {
+      const face = segment.bold ? fonts.bold : fonts.regular;
+      const wide = face.width(segment.text, at.size);
+      drawLine(this.page, face, segment.text, {
+        x,
+        y: at.y,
+        size: at.size,
+        colour: colour(at.colour),
+        maxWidth: Math.max(1, Math.min(wide, at.right - x)),
+      });
+      x += wide + at.space;
+    }
+  }
+
+  /**
+   * One table row: each cell's wrapped lines in its column, a hairline
+   * under the row. The caller has already asked for its height.
+   */
+  tableRow(
+    fonts: EmbeddedFonts,
+    cells: readonly (readonly StyledLine[])[],
+    columns: readonly TableColumn[],
+    options: {
+      readonly size: number;
+      readonly leading: number;
+      readonly colour: string;
+      readonly rule: string;
+      readonly ruleWeight: number;
+    },
+  ): void {
+    const height = tableRowHeight(cells, options);
+    this.ensure(height);
+    const lineHeight = Math.round(options.size * options.leading * 10) / 10;
+    const space = fonts.regular.width(" ", options.size);
+    cells.forEach((lines, column) => {
+      const place = columns[column];
+      if (place === undefined) return;
+      lines.forEach((line, index) => {
+        this.drawStyled(fonts, line, {
+          x: PAGE.left + place.x + TABLE_PAD,
+          y:
+            PAGE.height -
+            this.y -
+            TABLE_PAD -
+            index * lineHeight -
+            options.size,
+          right: PAGE.left + place.x + place.width - TABLE_PAD,
+          size: options.size,
+          colour: options.colour,
+          space,
+        });
+      });
+    });
+    const last = columns.at(-1);
+    this.page.drawRectangle({
+      x: PAGE.left,
+      y: PAGE.height - this.y - height,
+      width: last === undefined ? this.width : last.x + last.width,
+      height: options.ruleWeight,
+      color: colour(options.rule),
+    });
+    this.y += height;
   }
 
   rule(width: number, height: number, hex: string): void {
@@ -547,6 +677,82 @@ export async function documentToPdf(
     flow.gap(6);
   };
 
+  // Live 2026-10-31 (IC memo PDF, page 4): the competitor table printed
+  // as a paragraph of pipes. It prints as a table: a bold header row over
+  // an accent rule, the header again at the top of a new page.
+  const TABLE_SIZE = 9;
+  const TABLE_LEADING = 1.4;
+  const table = (
+    header: readonly (readonly InlineRun[])[],
+    rows: readonly (readonly (readonly InlineRun[])[])[],
+  ) => {
+    const boldHeader = header.map((runs) =>
+      runs.map((run) => ({ ...run, bold: true })),
+    );
+    const all = [boldHeader, ...rows];
+    const measure = (runs: readonly InlineRun[]) => {
+      let wide = 0;
+      let word = 0;
+      for (const run of runs) {
+        const face = run.bold ? fonts.bold : fonts.regular;
+        const text = face.text(run.text);
+        wide += face.width(text, TABLE_SIZE);
+        for (const one of text.split(/\s+/u)) {
+          word = Math.max(word, face.width(one, TABLE_SIZE));
+        }
+      }
+      return { wide, word };
+    };
+    const columnCount = Math.max(1, ...all.map((row) => row.length));
+    const natural: number[] = Array.from({ length: columnCount }, () => 0);
+    const longest: number[] = Array.from({ length: columnCount }, () => 0);
+    for (const row of all) {
+      row.forEach((cell, column) => {
+        const { wide, word } = measure(cell);
+        natural[column] = Math.max(natural[column] ?? 0, wide + TABLE_PAD * 2);
+        longest[column] = Math.max(longest[column] ?? 0, word + TABLE_PAD * 2);
+      });
+    }
+    const columns = tableColumns(natural, longest, width);
+    const wrapRow = (row: readonly (readonly InlineRun[])[]) =>
+      row.map((cell, column) =>
+        wrapRuns(
+          fonts,
+          cell,
+          TABLE_SIZE,
+          Math.max(1, (columns[column]?.width ?? width) - TABLE_PAD * 2),
+        ),
+      );
+    const options = { size: TABLE_SIZE, leading: TABLE_LEADING, colour: INK };
+    const headerCells = wrapRow(boldHeader);
+    const headerHeight = tableRowHeight(headerCells, options);
+    const drawHeader = () =>
+      flow.tableRow(fonts, headerCells, columns, {
+        ...options,
+        rule: accent,
+        ruleWeight: 1,
+      });
+    const bodyRows = rows.map(wrapRow);
+    // The header stays with at least its first row.
+    flow.ensure(
+      headerHeight +
+        (bodyRows[0] === undefined ? 0 : tableRowHeight(bodyRows[0], options)),
+    );
+    drawHeader();
+    for (const cells of bodyRows) {
+      const height = tableRowHeight(cells, options);
+      if (flow.wouldBreak(height)) {
+        flow.ensure(headerHeight + height);
+        drawHeader();
+      }
+      flow.tableRow(fonts, cells, columns, {
+        ...options,
+        rule: MUTED,
+        ruleWeight: 0.4,
+      });
+    }
+  };
+
   const body = (blocks: readonly PrintBlock[]) => {
     blocks.forEach((block, index) => {
       if (index > 0) flow.gap(block.kind === "item" ? 2 : 6);
@@ -570,6 +776,10 @@ export async function documentToPdf(
           leading: 1.5,
           colour: INK,
         });
+        return;
+      }
+      if (block.kind === "table") {
+        table(block.header, block.rows);
         return;
       }
       const at = 14 * block.depth;

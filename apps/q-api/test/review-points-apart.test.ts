@@ -6,7 +6,13 @@ import {
 } from "@capital-q/deck-render";
 import { clipAtWord, cutAtWord } from "@capital-q/q-core";
 
-import { REVIEWER_OPEN_POINT } from "../src/composition/workforce/analysis.js";
+import { QArtifactContentSchema } from "@capital-q/contracts";
+
+import {
+  REVIEWER_OPEN_POINT,
+  reviewOpenPoint,
+  wholeSentences,
+} from "../src/composition/workforce/analysis.js";
 import {
   NOT_KNOWN_HEADING,
   diligenceContent,
@@ -83,5 +89,42 @@ describe("shown text is never cut mid-word", () => {
     const cut = clipAtWord(long, 100);
     expect(cut.endsWith("…")).toBe(true);
     expect(cut).not.toMatch(/Luxem…$/u);
+  });
+});
+
+describe("live 2026-10-31 · a review's open point is filed whole (IC memo PDF, page 13)", () => {
+  // The live point, cut at 300 characters to "…the implications of the
+  // stated…"; its end is the problem's own sentence.
+  const LIVE_PROBLEM =
+    "The market section is appropriately cautious but does not deliver a sufficiently company-specific market assessment for an IC memo: it lists required inputs without analysing the seven claimed UK financial-institution customers or the implications of the stated focus on banks and building societies for the reachable market.";
+
+  it("keeps the whole point, ending at its sentence, never a dangling clause", () => {
+    const filed = reviewOpenPoint({ section: "Market", problem: LIVE_PROBLEM });
+    expect(filed).toBe(`${REVIEWER_OPEN_POINT} (Market): ${LIVE_PROBLEM}`);
+    expect(filed).not.toContain("…");
+    // It is storable as an artifact's gap.
+    expect(() =>
+      QArtifactContentSchema.parse({
+        sections: [{ heading: "Market", body: "Text.", findings: [] }],
+        gaps: [filed],
+      }),
+    ).not.toThrow();
+  });
+
+  it("the longest point the review can raise still fits whole", () => {
+    const problem = `${"word ".repeat(79)}end.`.slice(0, 400);
+    const filed = reviewOpenPoint({ section: "S".repeat(120), problem });
+    expect(filed.endsWith(problem)).toBe(true);
+  });
+
+  it("anything longer keeps whole sentences, else is cut at a word", () => {
+    expect(wholeSentences("One whole. Two whole. Three is long", 25)).toBe(
+      "One whole. Two whole.",
+    );
+    expect(wholeSentences('He said "fine." Then more', 18)).toBe(
+      'He said "fine."',
+    );
+    const cut = wholeSentences(`${"word ".repeat(40)}`, 50);
+    expect(cut.endsWith("…")).toBe(true);
   });
 });

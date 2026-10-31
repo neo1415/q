@@ -119,6 +119,39 @@ describe("Q markdown structure", () => {
     expect(table?.querySelector("td")?.className).toContain("text-end");
   });
 
+  it("renders the writers' plain pipe table as a table (live 2026-10-31 IC memo)", () => {
+    const root = html(
+      [
+        "The relevant alternative categories are internal teams (Q's inference).",
+        "Name | What they offer | Where | Price or scale | Source",
+        "Cylera | Healthcare IoT asset intelligence and security | Not established in the available research | Not provided | [S7]",
+        "Cynerio | Healthcare cybersecurity, including network detection and response | Not established in the available research | Not provided | [S7]",
+        "Intraprise Health | Named by CB Insights as a Clearwater alternative; offering not established in the available research | Not established | Not provided | [S7]",
+        "Kroll Cyber Risk | Cyber-risk preparedness, resilience, detection and response; handled over 3,000 incidents per year according to Kroll’s cited profile | Not established in the available research | Over 3,000 incidents per year stated in source | [S25]",
+        "Vulcan Cyber | Vulnerability-remediation orchestration for IT-security teams | Not established in the available research | Not provided | [S25]",
+      ].join("\n"),
+    );
+    expect(root.querySelector("p")?.textContent).toBe(
+      "The relevant alternative categories are internal teams (Q's inference).",
+    );
+    const table = root.querySelector("table");
+    expect(
+      [...(table?.querySelectorAll("thead th") ?? [])].map(
+        (th) => th.textContent,
+      ),
+    ).toEqual(["Name", "What they offer", "Where", "Price or scale", "Source"]);
+    expect(table?.querySelectorAll("tbody tr")).toHaveLength(5);
+    expect(
+      table?.querySelector("tbody tr:nth-child(4) td:nth-child(4)")
+        ?.textContent,
+    ).toBe("Over 3,000 incidents per year stated in source");
+    expect(root.textContent).not.toContain("|");
+    // A stray pipe in prose stays prose.
+    expect(
+      html("Revenue | burn is unclear.\nNext line.").querySelector("table"),
+    ).toBeNull();
+  });
+
   it("lays a list of labelled values out as a key-value card", () => {
     const root = html(
       "- **Stage:** Seed\n- **Raise:** $2m\n- **Runway:** 14 months",

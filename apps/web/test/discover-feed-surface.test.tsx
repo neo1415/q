@@ -1178,6 +1178,16 @@ describe("degraded and empty states", () => {
     expect(rule).toContain("z-index: var(--cq-z-sticky);");
     expect(rule).toContain("pointer-events: none;");
     expect(rule).toContain("inset-inline: 56px 64px;");
+    // Live 2026-10-31 (390 px): "Tap for sound" wrapped to three lines in
+    // the 44px controls column and ran down over this line. It is one
+    // line, ending (8px + 28px, hit area 44px) above this line's top
+    // (56px + 44px + 8px).
+    const chip = /\.cq-feed-chip \{([^}]*)\}/u.exec(css)?.[1] ?? "";
+    expect(chip).toContain("white-space: nowrap;");
+    expect(chip).toContain("min-height: 28px;");
+    expect(rule).toContain(
+      "top: calc(56px + 44px + 8px + var(--cq-safe-top));",
+    );
     // The stage is the positioned box it sits in, over the media.
     expect(top?.closest(".cq-feed-stage")).not.toBeNull();
   });

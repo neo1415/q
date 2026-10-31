@@ -23,12 +23,20 @@ export type PrintBlock =
       /** Nesting depth, from 0. */
       readonly depth: number;
       readonly runs: readonly InlineRun[];
+    }
+  | {
+      /**
+       * A table: its header row, then its rows, each cell's inline runs.
+       * Every row has the header's number of cells.
+       */
+      readonly kind: "table";
+      readonly header: readonly (readonly InlineRun[])[];
+      readonly rows: readonly (readonly (readonly InlineRun[])[])[];
     };
 
 const HEADING = /^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/u;
 const BULLET = /^(\s*)[-*+•]\s+(.*)$/u;
 const NUMBERED = /^(\s*)(\d{1,9})[.)]\s+(.*)$/u;
-const TABLE_ROW = /^\s*\|(.*)\|?\s*$/u;
 const TABLE_SEPARATOR = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/u;
 const RULE = /^ {0,3}([-*_])(\s*\1){2,}\s*$/u;
 const FENCE = /^ {0,3}(```|~~~)/u;
@@ -79,11 +87,55 @@ export function plainInline(text: string): string {
     .join("");
 }
 
-const cellsOf = (row: string): readonly string[] =>
-  row
-    .split("|")
-    .map((cell) => cell.trim())
-    .filter((cell) => cell.length > 0);
+/**
+ * A row's cells: outer pipes dropped, split at each unescaped pipe. Empty
+ * cells are kept, so a column stays a column.
+ */
+function splitRow(line: string): string[] {
+  let body = line.trim();
+  if (body.startsWith("|")) body = body.slice(1);
+  if (body.endsWith("|") && !body.endsWith("\\|")) body = body.slice(0, -1);
+  return body
+    .split(/(?<!\\)\|/u)
+    .map((cell) => cell.replace(/\\\|/gu, "|").trim());
+}
+
+const isSeparator = (line: string): boolean =>
+  line.includes("-") && TABLE_SEPARATOR.test(line);
+
+/**
+ * How many columns a table starting at `at` has, or null when none
+ * starts there. Two shapes are read (live 2026-10-31, IC memo: the
+ * competitor table printed as one paragraph of pipes): Markdown's own,
+ * "| a | b |" with or without a separator line, and the writers' plain
+ * one (analyst.v1: "Name | What they offer | …", a header line, then one
+ * row per line, no outer pipes, no separator). The plain one needs a
+ * second line of the same width, so prose with a stray pipe stays prose.
+ */
+function tableAt(lines: readonly string[], at: number): number | null {
+  const line = lines[at] ?? "";
+  if (!line.includes("|") || isSeparator(line)) return null;
+  const width = splitRow(line).length;
+  if (width < 2) return null;
+  if (line.trim().startsWith("|")) return width;
+  let next = at + 1;
+  if (isSeparator(lines[next] ?? "")) next += 1;
+  const row = lines[next] ?? "";
+  if (!row.includes("|") || isSeparator(row)) return null;
+  return splitRow(row).length === width ? width : null;
+}
+
+/** A row at the table's width: short rows padded, extra cells kept in the last. */
+function fitRow(cells: readonly string[], width: number): readonly string[] {
+  if (cells.length === width) return cells;
+  if (cells.length < width) {
+    return [
+      ...cells,
+      ...Array.from({ length: width - cells.length }, () => ""),
+    ];
+  }
+  return [...cells.slice(0, width - 1), cells.slice(width - 1).join(" | ")];
+}
 
 /** Markdown as blocks to print, in order. Plain prose is one paragraph. */
 export function printBlocks(source: string): readonly PrintBlock[] {
@@ -108,8 +160,12 @@ export function printBlocks(source: string): readonly PrintBlock[] {
     });
     paragraph = [];
   };
-  for (const raw of source.replace(/\r\n?/gu, "\n").split("\n")) {
-    const line = raw.replace(/\s+$/u, "");
+  const lines = source
+    .replace(/\r\n?/gu, "\n")
+    .split("\n")
+    .map((raw) => raw.replace(/\s+$/u, ""));
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
     if (line.trim().length === 0 || FENCE.test(line) || RULE.test(line)) {
       flush();
       continue;
@@ -120,20 +176,23 @@ export function printBlocks(source: string): readonly PrintBlock[] {
       blocks.push({ kind: "heading", runs: inlineRuns(heading[1] ?? "") });
       continue;
     }
-    if (TABLE_SEPARATOR.test(line) && line.includes("-")) {
+    const width = tableAt(lines, index);
+    if (width !== null) {
       flush();
+      const rows: (readonly InlineRun[])[][] = [];
+      for (; index < lines.length; index += 1) {
+        const row = lines[index] ?? "";
+        if (isSeparator(row)) continue;
+        if (!row.includes("|") || splitRow(row).length < 2) break;
+        rows.push(fitRow(splitRow(row), width).map((cell) => inlineRuns(cell)));
+      }
+      index -= 1;
+      const [header, ...body] = rows;
+      blocks.push({ kind: "table", header: header ?? [], rows: body });
       continue;
     }
-    const row = TABLE_ROW.exec(line);
-    if (row !== null && line.trim().startsWith("|")) {
+    if (isSeparator(line)) {
       flush();
-      // A table row prints as one item: its cells in order.
-      blocks.push({
-        kind: "item",
-        marker: "•",
-        depth: 0,
-        runs: inlineRuns(cellsOf(row[1] ?? "").join(" · ")),
-      });
       continue;
     }
     const bullet = BULLET.exec(line);
@@ -176,6 +235,12 @@ export function printBlocks(source: string): readonly PrintBlock[] {
   return blocks;
 }
 
+const runsText = (runs: readonly InlineRun[]): string =>
+  runs
+    .map((run) => run.text)
+    .join("")
+    .trim();
+
 /**
  * Markdown as plain words on one line: for a quoted point, a summary or a
  * finding that prints as a sentence. A list marker that opens a quote
@@ -183,11 +248,15 @@ export function printBlocks(source: string): readonly PrintBlock[] {
  */
 export function plainMarkdown(source: string): string {
   return printBlocks(source)
-    .map((block) =>
-      block.runs
-        .map((run) => run.text)
-        .join("")
-        .trim(),
+    .flatMap((block) =>
+      block.kind === "table"
+        ? [block.header, ...block.rows].map((row) =>
+            row
+              .map(runsText)
+              .filter((cell) => cell.length > 0)
+              .join(" · "),
+          )
+        : [runsText(block.runs)],
     )
     .filter((line) => line.length > 0)
     .join(" ")

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   QFindingIdSchema,
+  Q_ARTIFACT_GAP_MAX,
   Q_ARTIFACT_SECTION_BODY_MAX,
   type QArtifactContent,
   type QArtifactFinding,
@@ -247,16 +248,36 @@ export function personProse(text: string): string {
 }
 
 /**
+ * Text within `max`, ending where a sentence does: whole when it fits,
+ * else its whole sentences that fit. Only text with no sentence end in
+ * reach is cut at a word.
+ */
+export function wholeSentences(text: string, max: number): string {
+  const clean = text.replace(/\s+/gu, " ").trim();
+  if (clean.length <= max) return clean;
+  const room = clean.slice(0, max);
+  let end = -1;
+  for (const match of room.matchAll(/[.!?]["”’)]?(?=\s|$)/gu)) {
+    end = match.index + match[0].length;
+  }
+  return end > 0 ? room.slice(0, end) : clipAtWord(clean, max);
+}
+
+/**
  * A review's open point as filed in the document's gaps, for the person:
  * words, never the memo's own markdown it quotes (live 2026-10-31: a
- * quoted "- **Cheque and role:** …"), cut at a word.
+ * quoted "- **Cheque and role:** …"), and in full. Live 2026-10-31 (IC
+ * memo PDF, page 13): cut at 300 characters, a point ended "…the
+ * implications of the stated…". A gap now holds a whole point (a section
+ * of at most 120 and a problem of at most 400, schemas/analyst.ts), and
+ * anything longer keeps its whole sentences.
  */
 export function reviewOpenPoint(
   issue: Pick<AnalysisIssue, "section" | "problem">,
 ): string {
-  return clipAtWord(
+  return wholeSentences(
     `${REVIEWER_OPEN_POINT} (${plainMarkdown(issue.section)}): ${readersWords(plainMarkdown(issue.problem))}`,
-    300,
+    Q_ARTIFACT_GAP_MAX,
   );
 }
 
@@ -926,8 +947,11 @@ export function analysisContent(input: {
         ? [PUBLIC_NONE_FOUND_GAP]
         : []),
     // Cut at a word, never mid-word (live 2026-10-30, deep research:
-    // "risks soundin", "contracts with cust").
-    ...(input.codeGaps ?? []).map((gap) => clipAtWord(gap, 300)),
+    // "risks soundin", "contracts with cust"), and at a sentence's end
+    // when one is in reach (live 2026-10-31, a dangling clause).
+    ...(input.codeGaps ?? []).map((gap) =>
+      wholeSentences(gap, Q_ARTIFACT_GAP_MAX),
+    ),
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map(reviewOpenPoint),

@@ -26,15 +26,51 @@ describe("the writers' markdown, read for print (live 2026-10-31)", () => {
       "item",
       "item",
       "item",
-      "item",
-      "item",
+      "table",
     ]);
     expect(blocks[1]).toMatchObject({
       runs: [{ text: "One line continued.", bold: false }],
     });
     expect(blocks[3]).toMatchObject({ depth: 1, marker: "•" });
     expect(blocks[4]).toMatchObject({ marker: "3." });
-    expect(blocks[6]).toMatchObject({ runs: [{ text: "1 · 2" }] });
+    expect(blocks[5]).toMatchObject({
+      kind: "table",
+      header: [[{ text: "x" }], [{ text: "y" }]],
+      rows: [[[{ text: "1" }], [{ text: "2" }]]],
+    });
+  });
+
+  it("reads the writers' plain pipe table (live 2026-10-31 IC memo)", () => {
+    const blocks = printBlocks(
+      [
+        "The categories are internal teams.",
+        "Name | What they offer | Where | Price or scale | Source",
+        "Cylera | Healthcare IoT asset intelligence and security | Not established in the available research | Not provided | [S7]",
+        "Intraprise Health | Named by CB Insights as a Clearwater alternative; offering not established | Not established | Not provided | [S7]",
+        "Kroll Cyber Risk | Cyber-risk preparedness | Not established | Over 3,000 incidents per year stated in source | [S25]",
+        "",
+        "After the table.",
+      ].join("\n"),
+    );
+    expect(blocks.map((block) => block.kind)).toEqual([
+      "paragraph",
+      "table",
+      "paragraph",
+    ]);
+    const table = blocks[1];
+    if (table?.kind !== "table") throw new Error("no table");
+    expect(table.header).toHaveLength(5);
+    expect(table.rows).toHaveLength(3);
+    expect(table.rows[2]?.[3]).toEqual([
+      { text: "Over 3,000 incidents per year stated in source", bold: false },
+    ]);
+    expect(plainMarkdown("Name | Role\nAda | CEO")).toBe(
+      "Name · Role Ada · CEO",
+    );
+    // A stray pipe in prose stays prose.
+    expect(printBlocks("Revenue | burn is unclear.\nNext line.")[0]?.kind).toBe(
+      "paragraph",
+    );
   });
 
   it("a quoted review point loses the quote's list marker and bold", () => {

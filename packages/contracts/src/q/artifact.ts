@@ -70,6 +70,12 @@ export const Q_ARTIFACT_TITLE_MAX = 160;
 export const Q_ARTIFACT_SUMMARY_MAX = 600;
 export const Q_ARTIFACT_SECTION_BODY_MAX = 6_000;
 export const Q_ARTIFACT_SECTIONS_MAX = 24;
+/**
+ * One gap's length. Room for a review's open point in full, its section
+ * and its one-sentence problem (live 2026-10-31, IC memo PDF: cut at 300
+ * to "…the implications of the stated…").
+ */
+export const Q_ARTIFACT_GAP_MAX = 600;
 export const Q_ARTIFACT_FINDINGS_PER_SECTION_MAX = 12;
 /** What a person may say when they ask Q to change one. */
 export const Q_ARTIFACT_INSTRUCTION_MAX = 2_000;
@@ -600,7 +606,10 @@ export const QArtifactContentSchema = z
      * sections so it cannot be mistaken for content and so a reader can
      * see the shape of the gap at a glance. Unknown stays unknown.
      */
-    gaps: z.array(z.string().trim().min(1).max(300)).max(24).default([]),
+    gaps: z
+      .array(z.string().trim().min(1).max(Q_ARTIFACT_GAP_MAX))
+      .max(24)
+      .default([]),
     /**
      * Present when this artifact is a deck. The sections stay where they
      * are and stay authoritative for grounding: every slide names the
