@@ -4,6 +4,7 @@ import type { AnalysisDocumentResult } from "@capital-q/q-core";
 
 import {
   analysisContent,
+  SET_ASIDE_HEADING,
   type AnalysisFact,
   type AnalysisSource,
 } from "../src/composition/workforce/analysis.js";
@@ -173,7 +174,10 @@ const filed = () =>
 
 const bodyOf = (content: ReturnType<typeof analysisContent>) =>
   content.sections
-    .filter((section) => section.heading !== "Sources")
+    .filter(
+      (section) =>
+        section.heading !== "Sources" && section.heading !== SET_ASIDE_HEADING,
+    )
     .map((section) => section.body)
     .join("\n");
 

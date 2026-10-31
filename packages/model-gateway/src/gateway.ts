@@ -46,6 +46,7 @@ import {
   type EligibleCandidate,
 } from "./policy/eligibility.js";
 import { alwaysHealthy } from "./policy/health.js";
+import { salvageCutOff } from "./policy/cut-off-salvage.js";
 import type { ModelSpendCap } from "./policy/spend-cap.js";
 import {
   acceptStructuredOutput,
@@ -172,6 +173,14 @@ export type ModelGatewayExecuteOptions<T> = {
   readonly enumFallbacks?: Readonly<Record<string, string>> | undefined;
   /** STRUCTURED output only: drop (and count) root keys the schema does not know. */
   readonly unknownRootKeys?: "REFUSE" | "DROP" | undefined;
+  /**
+   * STRUCTURED output only: when the answer was cut off at its output
+   * ceiling, keep the list elements it finished (at most keepItems of any
+   * one list) instead of refusing it, provided the schema accepts that.
+   * For callers whose lists are independent readings and whose answer is
+   * useful with fewer of them. "(cut-off)" rides on the result's dropped.
+   */
+  readonly cutOffLists?: { readonly keepItems: number } | undefined;
 };
 
 type AcceptOptions = {
@@ -179,6 +188,7 @@ type AcceptOptions = {
   readonly lenientFields: readonly string[] | undefined;
   readonly enumFallbacks: Readonly<Record<string, string>> | undefined;
   readonly unknownRootKeys: "REFUSE" | "DROP" | undefined;
+  readonly cutOffLists: { readonly keepItems: number } | undefined;
 };
 
 export type ModelGateway = {
@@ -483,12 +493,40 @@ export function createModelGateway(
                 },
               );
             }
-            const accepted = acceptStructuredOutput(result.text, schema, {
+            const acceptOptions = {
               invalidListItems: accept.invalidListItems,
               lenientFields: accept.lenientFields,
               enumFallbacks: accept.enumFallbacks,
               unknownRootKeys: accept.unknownRootKeys,
-            });
+            };
+            const whole = acceptStructuredOutput(
+              result.text,
+              schema,
+              acceptOptions,
+            );
+            // A cut-off answer's finished list elements, when the caller
+            // takes them (see cutOffLists): more room does not finish a
+            // runaway, and what it wrote before running away is whole.
+            const salvage =
+              !whole.ok &&
+              result.finish === "MAX_OUTPUT_TOKENS" &&
+              accept.cutOffLists !== undefined
+                ? salvageCutOff(result.text, accept.cutOffLists)
+                : null;
+            const kept =
+              salvage === null
+                ? null
+                : acceptStructuredOutput(salvage.text, schema, acceptOptions);
+            const accepted =
+              kept !== null && kept.ok && salvage !== null
+                ? {
+                    ...kept,
+                    dropped: [
+                      `(cut-off):kept_${String(salvage.items)}_items`,
+                      ...(kept.dropped ?? []),
+                    ],
+                  }
+                : whole;
             if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
               metrics.structuredRepairs.add(1, {
                 ...labels,
@@ -793,6 +831,7 @@ export function createModelGateway(
               lenientFields: options.lenientFields,
               enumFallbacks: options.enumFallbacks,
               unknownRootKeys: options.unknownRootKeys,
+              cutOffLists: options.cutOffLists,
             },
           );
         } finally {

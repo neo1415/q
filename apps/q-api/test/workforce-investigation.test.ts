@@ -965,7 +965,9 @@ describe("a research plan that fails (live 2026-10-29)", () => {
     expect(researchStepSummary(found)).toMatch(
       /^Ran in a reduced form: no research plan could be made, so it searched the request as one query\. Read /u,
     );
-    // The delivery card says it, after the summary.
+    // The delivery says it first: the ready line, then why, before the
+    // summary (live 2026-10-31: "is ready — here it is" read as a full
+    // investigation).
     const text = deliveryText({
       artifactId: randomUUID(),
       delivery: {
@@ -978,7 +980,11 @@ describe("a research plan that fails (live 2026-10-29)", () => {
         reducedResearch: reduced,
       },
     });
-    expect(text.split("\n\n")[2]).toBe(reduced);
+    expect(text.split("\n\n")[0]).toBe(
+      "Your Zedland widget payments is ready, from reduced research rather than a full investigation — here it is.",
+    );
+    expect(text.split("\n\n")[1]).toBe(reduced);
+    expect(text.split("\n\n")[2]).toBe("A summary.");
   });
 
   // Live case D (2026-10-29): a truncated plan and a 45 s timeout spent

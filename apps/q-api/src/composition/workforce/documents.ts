@@ -466,6 +466,7 @@ export function createWorkforceDocuments(dependencies: {
           codeGaps,
           sourcesAlways: true,
           subject: identity,
+          reducedResearch: reduced,
         }),
         claims: {
           heading: section.heading,
@@ -483,6 +484,7 @@ export function createWorkforceDocuments(dependencies: {
         publicSources: input.publicSources ?? null,
         codeGaps,
         subject: identity,
+        reducedResearch: reduced,
         codeSections: investigationSections({
           facts: merged.facts,
           investigations: merged.investigations,

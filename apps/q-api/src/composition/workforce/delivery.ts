@@ -113,17 +113,26 @@ export function failedPlanAnswer(
  * Owner 2026-10-28: "it's done, here it is" -- the line that opens the
  * delivery says so, and the screen opens the document beside it.
  */
-export function readyLine(title: string): string {
-  return `Your ${title.replace(/[.\s]+$/u, "")} is ready — here it is.`;
+export function readyLine(title: string, reduced = false): string {
+  const name = title.replace(/[.\s]+$/u, "");
+  // Live 2026-10-31 (Clearwater IC memo): research that ran reduced was
+  // delivered as "is ready — here it is", read as a fully researched memo.
+  return reduced
+    ? `Your ${name} is ready, from reduced research rather than a full investigation — here it is.`
+    : `Your ${name} is ready — here it is.`;
 }
 
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
-  const lines = [readyLine(delivery.title), delivery.summary.trim()];
-  // Said before the conclusion is read as a full investigation.
-  if (delivery.reducedResearch !== undefined)
-    lines.push(delivery.reducedResearch.trim());
+  const reduced = delivery.reducedResearch?.trim();
+  const lines = [
+    readyLine(delivery.title, reduced !== undefined),
+    // Said before the summary, so the conclusion is never read as resting
+    // on a full investigation.
+    ...(reduced === undefined ? [] : [reduced]),
+    delivery.summary.trim(),
+  ];
   if (delivery.topRecommendations.length > 0) {
     lines.push(
       `What I'd do first:\n${delivery.topRecommendations

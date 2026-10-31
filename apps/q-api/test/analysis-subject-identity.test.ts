@@ -4,6 +4,7 @@ import type { AnalysisDocumentResult } from "@capital-q/q-core";
 
 import {
   analysisContent,
+  SET_ASIDE_HEADING,
   type AnalysisFact,
   type AnalysisSource,
 } from "../src/composition/workforce/analysis.js";
@@ -281,15 +282,20 @@ describe("an IC memo on Silo Credit (live 2026-10-31)", () => {
     });
   });
 
-  it("names a namesake's page as not about the subject in Sources", () => {
+  it("lists a namesake's page apart from Sources, under its own heading", () => {
     const content = filed({ name: "Silo Credit" });
     const sources =
       content.sections.find((section) => section.heading === "Sources")?.body ??
       "";
-    expect(sources).toMatch(
-      /\[S3\][^\n]*not about Silo Credit: a different organisation/u,
-    );
-    expect(sources).toMatch(/\[S36\][^\n]*not about Silo Credit/u);
+    // Live 2026-10-31 (Clearwater memo): never under "sources this
+    // document cites", even labelled not used.
+    expect(sources).not.toMatch(/\[S(?:3|36)\]/u);
+    const setAside =
+      content.sections.find((section) => section.heading === SET_ASIDE_HEADING)
+        ?.body ?? "";
+    expect(setAside).toMatch(/not evidence about Silo Credit/u);
+    expect(setAside).toMatch(/\[S3\]/u);
+    expect(setAside).toMatch(/\[S36\]/u);
     expect(sources).toMatch(/\[S40\][^\n]*Silo Credit's own disclosure/u);
     expect(sources).toMatch(
       /\[S41\][^\n]*the publisher's own disclosure, its claim about itself/u,
@@ -428,7 +434,7 @@ describe("an IC memo on Karoo Gridworks (live 2026-10-31)", () => {
     ).toBe(0);
   });
 
-  it("files no citation of a namesake's page; the Sources list names it as not used", () => {
+  it("files no citation of a namesake's page; it is listed apart from Sources", () => {
     const content = analysisContent({
       draft: {
         title: "Investment Committee Memo: Karoo Gridworks",
@@ -474,13 +480,25 @@ describe("an IC memo on Karoo Gridworks (live 2026-10-31)", () => {
     expect(content.gaps[0]).toMatch(
       /^Q removed 6 statements that rested on pages about a different organisation named like Karoo Gridworks \(S4, S9, S15\)/u,
     );
+    // Live 2026-10-31 (Clearwater memo): a namesake's page never sits
+    // under "sources this document cites"; it is listed apart, plainly.
     const sources = body("Sources");
-    expect(sources).toMatch(
-      /\[S4\][^\n]*not about Karoo Gridworks[^\n]*not used as evidence/u,
-    );
-    expect(sources).toMatch(/\[S9\][^\n]*not about Karoo Gridworks/u);
-    expect(sources).toMatch(/\[S15\][^\n]*not about Karoo Gridworks/u);
     expect(sources).toMatch(/\[S12\]/u);
+    expect(sources).not.toMatch(/\[S(?:4|9|15)\]/u);
+    const setAside = body(SET_ASIDE_HEADING);
+    expect(SET_ASIDE_HEADING).toBe(
+      "Looked at and set aside: different organisations with similar names",
+    );
+    expect(setAside).toMatch(
+      /^Pages Q read about other organisations with names like Karoo Gridworks\. They are not evidence about Karoo Gridworks/u,
+    );
+    for (const index of [4, 9, 15])
+      expect(setAside).toMatch(new RegExp(`\\[S${String(index)}\\]`, "u"));
+    expect(setAside).not.toMatch(/\[S12\]/u);
+    const headings = content.sections.map((section) => section.heading);
+    expect(headings.indexOf(SET_ASIDE_HEADING)).toBe(
+      headings.indexOf("Sources") + 1,
+    );
     // No finding rests on a namesake's page.
     for (const finding of content.sections.flatMap((one) => one.findings))
       expect(finding.statement).toMatch(/\[S12\]$/u);
