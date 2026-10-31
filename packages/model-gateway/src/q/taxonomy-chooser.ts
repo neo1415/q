@@ -6,10 +6,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TaxonomyChoiceV2ResultSchema,
+  TaxonomyChoiceV3ResultSchema,
   type PromptRegistry,
-  type TaxonomyChoiceV2Result,
-  type TaxonomyChoiceV2Variables,
+  type TaxonomyChoiceV3Result,
+  type TaxonomyChoiceV3Variables,
 } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../gateway.js";
@@ -29,12 +29,28 @@ export type TaxonomyChooser = (input: {
   readonly field: string;
   readonly phrase: string;
   readonly sentence: string;
+  /**
+   * What else they said for the profile, one "field: their words" a line
+   * (live check 2026-10-31: "recurring revenue" from a B2B investor read
+   * as Consumer Subscription). Their words: read, never obeyed.
+   */
+  readonly context?: string | undefined;
   readonly candidates: readonly {
     readonly nodeId: string;
     readonly displayName: string;
     readonly vocabularyCode: string;
   }[];
-}) => Promise<readonly string[] | null>;
+}) => Promise<TaxonomyChoice | null>;
+
+/**
+ * The ids chosen, with `beyond`: their own words about the field that the
+ * chosen ones do not hold (live check 2026-10-31: "40 lockers live in 12
+ * towns" lost when read as "Paying customers"). The caller keeps `beyond`
+ * only where it is their words as said.
+ */
+export type TaxonomyChoice = readonly string[] & {
+  readonly beyond?: string | undefined;
+};
 
 /** The most categories one reading is offered (a small field's whole list). */
 export const TAXONOMY_CHOICE_CANDIDATES_MAX = 80;
@@ -67,7 +83,7 @@ export function createTaxonomyChooser(dependencies: {
     if (candidates.length === 0 || phrase.length === 0) return null;
     const sentence = (input.sentence.trim() || phrase).slice(0, 1_000);
     try {
-      const rendered = renderPrompt<TaxonomyChoiceV2Variables>(registry, {
+      const rendered = renderPrompt<TaxonomyChoiceV3Variables>(registry, {
         task: "TAXONOMY_CHOICE",
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -87,10 +103,12 @@ export function createTaxonomyChooser(dependencies: {
             .join("\n"),
           phrase,
           sentence,
+          context:
+            (input.context ?? "").trim().slice(0, 1_200) || "Nothing else yet.",
         },
       });
       const response =
-        await dependencies.gateway.execute<TaxonomyChoiceV2Result>(
+        await dependencies.gateway.execute<TaxonomyChoiceV3Result>(
           {
             taskClass: "TAXONOMY_MAPPING",
             sensitivity: "CONFIDENTIAL",
@@ -108,7 +126,7 @@ export function createTaxonomyChooser(dependencies: {
               correlationId: `cor_${randomUUID()}`,
             },
           },
-          { schema: TaxonomyChoiceV2ResultSchema },
+          { schema: TaxonomyChoiceV3ResultSchema },
         );
       if (response.output.kind !== "STRUCTURED") {
         dependencies.logger?.warn(
@@ -117,7 +135,7 @@ export function createTaxonomyChooser(dependencies: {
         );
         return null;
       }
-      const parsed = TaxonomyChoiceV2ResultSchema.safeParse(
+      const parsed = TaxonomyChoiceV3ResultSchema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
       if (!parsed.success) {
@@ -146,6 +164,10 @@ export function createTaxonomyChooser(dependencies: {
           offered: candidates.length,
           named: said.length,
           kept: chosen.length,
+          // Whether words beyond the chosen ones came back, and context was
+          // given; never the words themselves.
+          beyond: (parsed.data.beyond ?? "").trim().length > 0,
+          withContext: (input.context ?? "").trim().length > 0,
           namedIds: said.slice(0, 16).map((id) => id.slice(0, 64)),
           keptIds: said
             .map((id) => id.trim().toLowerCase())
@@ -156,7 +178,10 @@ export function createTaxonomyChooser(dependencies: {
           ? "category reading named ids that were not offered"
           : "category words read",
       );
-      return chosen;
+      const beyond = parsed.data.beyond?.trim() ?? "";
+      return beyond.length > 0 && chosen.length > 0
+        ? Object.assign(chosen, { beyond: beyond.slice(0, 300) })
+        : chosen;
     } catch (error: unknown) {
       dependencies.logger?.warn(
         { err: error, task: "TAXONOMY_CHOICE" },

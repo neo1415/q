@@ -357,6 +357,13 @@ export function createOnboardingConversation(dependencies: {
       done: Promise.resolve(),
       settled: () => true,
     },
+    /**
+     * A reading again of the same words for the steps the last one's
+     * saves opened: only those are read (live check 2026-10-31, founder
+     * "skip the rest": the reread of every step took 14.7 s, and the
+     * answer to their latest words waited behind it; 26.5 s in all).
+     */
+    only?: ReadonlySet<string>,
   ): Promise<void> => {
     // Everything heard so far is in the thread before it is read.
     await (writes.get(line.voiceSessionId) ?? Promise.resolve());
@@ -398,9 +405,13 @@ export function createOnboardingConversation(dependencies: {
     let state = await portFor(line, personTurns).state();
     if (state.completed) return;
     const optionIds = optionIdsOf(state);
+    const steps = readableSteps(state, optionIds).filter(
+      (step) => only === undefined || only.has(step.stepKey),
+    );
+    if (steps.length === 0) return;
     const read = await dependencies.reader.read({
       journey: line.onboarding.journeyType,
-      steps: readableSteps(state, optionIds),
+      steps,
       turns,
       attribution: {
         tenantId: line.actor.tenantId,
@@ -734,12 +745,17 @@ export function createOnboardingConversation(dependencies: {
     // opens its amount and currency): the same words are read once more
     // against them, so what they said is saved now, never asked again.
     const answeredState = await port.state();
-    const opened = answeredState.steps.some(
-      (step) =>
-        isConversational(step) &&
-        step.status === "OPEN" &&
-        !state.steps.some((before) => before.stepKey === step.stepKey),
+    const openedSteps = new Set(
+      answeredState.steps
+        .filter(
+          (step) =>
+            isConversational(step) &&
+            step.status === "OPEN" &&
+            !state.steps.some((before) => before.stepKey === step.stepKey),
+        )
+        .map((step) => step.stepKey),
     );
+    const opened = openedSteps.size > 0;
     const savedNow = recorded.some(
       (r) => r.outcome === "COMMITTED" && r.alreadyRecorded !== true,
     );
@@ -782,7 +798,9 @@ export function createOnboardingConversation(dependencies: {
     );
     const after = setAside.length === 0 ? answeredState : await port.state();
     considerResearch(line, identityOf(after));
-    if (rereading) await readAndSave(line, rereads + 1, answeredNow);
+    if (rereading) {
+      await readAndSave(line, rereads + 1, answeredNow, undefined, openedSteps);
+    }
     await researchFor(line.onboarding.journeyType)
       ?.offerReady(line.onboarding.sessionId, port)
       .catch((error: unknown) => {

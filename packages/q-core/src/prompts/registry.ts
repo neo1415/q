@@ -351,6 +351,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V12 } from "./tasks/onboarding-transcript-
 import { ONBOARDING_TRANSCRIPT_READER_V13 } from "./tasks/onboarding-transcript-reader.v13.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
+import { TAXONOMY_CHOICE_V3 } from "./tasks/taxonomy-choice.v3.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
 import { ONBOARDING_TYPED_REPLY_V2 } from "./tasks/onboarding-typed-reply.v2.js";
 import { ONBOARDING_TYPED_REPLY_V3 } from "./tasks/onboarding-typed-reply.v3.js";
@@ -558,7 +559,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.
-    TAXONOMY_CHOICE_V2,
+    { ...TAXONOMY_CHOICE_V2, status: "DEPRECATED" },
+    // Live check 2026-10-31 (656719a90): a narrower kind names its broader
+    // category; what else they said is context; what is beyond is kept.
+    TAXONOMY_CHOICE_V3,
     { ...ONBOARDING_TYPED_REPLY_V1, status: "DEPRECATED" },
     // Production re-test 2026-10-28: their own words count before saving.
     { ...ONBOARDING_TYPED_REPLY_V2, status: "DEPRECATED" },

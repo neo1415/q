@@ -63,7 +63,8 @@ describe("ONBOARDING_TRANSCRIPT_READER v6 (keeps v4's and v5's rules)", () => {
 describe("TAXONOMY_CHOICE v2", () => {
   const active = registry.getActive("TAXONOMY_CHOICE");
   it("reads a region the list lacks as its listed members only, and a city as its country", () => {
-    expect(active.definition.version).toBe(2);
+    // v3 (live check 2026-10-31) keeps v2's rules.
+    expect(active.definition.version).toBeGreaterThanOrEqual(2);
     expect(active.definition.template).toMatch(
       /choose each member that is listed, and only those/u,
     );
