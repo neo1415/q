@@ -210,9 +210,11 @@ export function createOnboardingConversation(dependencies: {
     addsTo: ReadonlySet<string> = new Set(),
     place?: ReturnType<typeof placeOfQuote>,
     affirmed: ReadonlySet<string> = new Set(),
+    replaces: ReadonlySet<string> = new Set(),
   ) =>
     createOnboardingPort({
       addsTo,
+      replaces,
       affirmed,
       logger,
       // Owner 2026-10-17, re-agreed 2026-10-30: a narrative answer is
@@ -661,12 +663,21 @@ export function createOnboardingConversation(dependencies: {
       return;
     }
     // A list they add to keeps what is on record, unless the reading found
-    // they meant this as the whole list (owner 2026-10-28).
+    // they meant this as the whole list (owner 2026-10-28). The reading's
+    // items for one list step are one answer (the port writes them as one,
+    // live 2026-10-31): any of them saying it is the whole list makes the
+    // merged list replace what is there.
+    const replacing = new Set(
+      stated
+        .filter((answer) => answer.replaces === true)
+        .map((answer) => answer.stepKey),
+    );
     const addsTo = new Set(
       stated
         .filter(
           (answer) =>
-            answer.replaces !== true && isList(stepOf(state, answer.stepKey)),
+            !replacing.has(answer.stepKey) &&
+            isList(stepOf(state, answer.stepKey)),
         )
         .map((answer) => answer.stepKey),
     );
@@ -686,6 +697,7 @@ export function createOnboardingConversation(dependencies: {
           .filter((answer) => answer.affirms === true)
           .map((answer) => answer.stepKey),
       ),
+      replacing,
     );
     const recorded =
       stated.length === 0

@@ -474,6 +474,22 @@ export type FoundRecommendationPort = {
   readonly askingStep?: (() => Promise<string | null>) | undefined;
 };
 
+/** Notes joined, each piece once (pieces are split on ";"). */
+function joinedNotes(
+  ...all: (string | null | undefined)[]
+): string | undefined {
+  const pieces = all
+    .flatMap((n) => (n ?? "").split(/\s*;\s*/u))
+    .map((n) => n.trim())
+    .filter((n) => n.length > 0);
+  const kept = pieces.filter(
+    (piece, index) =>
+      pieces.findIndex((p) => p.toLowerCase() === piece.toLowerCase()) ===
+      index,
+  );
+  return kept.length === 0 ? undefined : kept.join("; ").slice(0, 500);
+}
+
 /** One value, whatever order a list was given in. */
 /**
  * A list answer added to what is on the record (owner 2026-10-28): the
@@ -491,18 +507,7 @@ export function addedTo(
   readonly value: OnboardingResponseValue;
   readonly note: string | undefined;
 } | null {
-  const notes = (...all: (string | null | undefined)[]) => {
-    const pieces = all
-      .flatMap((n) => (n ?? "").split(/\s*;\s*/u))
-      .map((n) => n.trim())
-      .filter((n) => n.length > 0);
-    const kept = pieces.filter(
-      (piece, index) =>
-        pieces.findIndex((p) => p.toLowerCase() === piece.toLowerCase()) ===
-        index,
-    );
-    return kept.length === 0 ? undefined : kept.join("; ").slice(0, 500);
-  };
+  const notes = joinedNotes;
   if (onRecord.value.type === "MULTI_SELECT" && value.type === "MULTI_SELECT") {
     return {
       value: {
@@ -541,6 +546,62 @@ export function addedTo(
     };
   }
   return null;
+}
+
+/** A list step's value as on the record or planned, with its note. */
+type OnRecordList = {
+  readonly value: OnboardingResponseValue;
+  readonly note?: string | undefined;
+};
+
+/** A step that holds several values: a many-of list, or categories. */
+function holdsMany(step: OnboardingStepManifest): boolean {
+  const c = step.configuration;
+  return (
+    (c.stepType === "multi_select" && c.maxSelections > 1) ||
+    (c.stepType === "reference_select" && c.maxItems > 1)
+  );
+}
+
+/**
+ * Several values for one list step as one: every item and every note
+ * kept (lists first, so words said beside a list join its note). Null
+ * when they cannot be one value (different kinds of list).
+ */
+export function mergeListValues(
+  values: readonly OnRecordList[],
+): OnRecordList | null {
+  const isList = (value: OnboardingResponseValue) =>
+    value.type === "MULTI_SELECT" || value.type === "RESOURCE_REFERENCE";
+  const ordered = [...values].sort(
+    (a, b) => Number(isList(b.value)) - Number(isList(a.value)),
+  );
+  const [head, ...rest] = ordered;
+  if (head === undefined) return null;
+  let merged: OnRecordList = head;
+  for (const next of rest) {
+    if (merged.value.type === "TEXT" && next.value.type === "TEXT") {
+      const pieces = [merged.value.text, next.value.text].map((t) => t.trim());
+      merged = {
+        value: {
+          ...merged.value,
+          text: [...new Set(pieces.filter((t) => t.length > 0))]
+            .join("; ")
+            .slice(0, 2000),
+        },
+        note: joinedNotes(merged.note, next.note),
+      };
+      continue;
+    }
+    const added = addedTo(
+      { value: merged.value, note: merged.note ?? null },
+      next.value,
+      next.note,
+    );
+    if (added === null) return null;
+    merged = added;
+  }
+  return merged;
 }
 
 export function sameValue(
@@ -950,6 +1011,12 @@ export function createOnboardingPort(input: {
    * the whole list. Absent: an answer replaces, as a typed one does.
    */
   readonly addsTo?: ReadonlySet<string> | undefined;
+  /**
+   * List steps whose new answer the transcript reading found to be the
+   * whole list (its `replaces`): what is on the record is not kept beside
+   * it, whatever a check of the words alone would say.
+   */
+  readonly replaces?: ReadonlySet<string> | undefined;
   /**
    * Steps whose answer only agrees to what Q offered (the transcript
    * reading's `affirms`): saved as the value Q offered, or not at all;
@@ -1983,6 +2050,7 @@ export function createOnboardingPort(input: {
       const keepEarlier =
         earlier.length > 0 &&
         c.maxItems > 1 &&
+        input.replaces?.has(step.stepKey) !== true &&
         (await replacesEarlier(answer.quote ?? "")) !== "YES";
       value = {
         type: "RESOURCE_REFERENCE",
@@ -2956,6 +3024,106 @@ export function createOnboardingPort(input: {
     kind: "DONE",
     result,
   });
+  /**
+   * Steps written in the current `record` call: a later item for one of
+   * them in the same call (a retry, planned after the batch) adds to what
+   * the call just wrote, never replaces it.
+   */
+  const addingNow = new Set<string>();
+  /** What the record holds for each list step an already-saved item names. */
+  const onRecordFor = async (
+    plans: readonly Planned[],
+  ): Promise<ReadonlyMap<string, OnRecordList>> => {
+    const wanted = new Set(
+      plans.flatMap((plan) =>
+        plan.kind === "DONE" && plan.result.alreadyRecorded === true
+          ? [plan.result.stepKey]
+          : [],
+      ),
+    );
+    if (wanted.size === 0) return new Map();
+    const view = latest ?? (await current());
+    return new Map(
+      view.responses
+        .filter((r) => wanted.has(r.stepKey))
+        .map(
+          (r) =>
+            [r.stepKey, { value: r.value, note: r.note ?? undefined }] as const,
+        ),
+    );
+  };
+  /**
+   * Every write a call planned for one list step, merged into ONE write
+   * (live 2026-10-31, "Fjordwerk": "Nordics and Germany" came from the
+   * reader as two items; both went in one batch, the second superseding
+   * the first, and only Germany stayed). Each item was checked on its own
+   * words when it was planned; this only joins what those checks allowed.
+   * An item already on the record (planned as nothing to write) is kept
+   * in the merged list too, or a list restated whole would drop it. The
+   * other items' outcomes are the merged write's (`followers`).
+   */
+  const mergeListPlans = (
+    plans: readonly Planned[],
+    onRecord: ReadonlyMap<string, OnRecordList>,
+  ): {
+    readonly plans: readonly Planned[];
+    readonly leaders: ReadonlySet<number>;
+    readonly followers: ReadonlyMap<number, number>;
+  } => {
+    const out = [...plans];
+    const leaders = new Set<number>();
+    const followers = new Map<number, number>();
+    const groups = new Map<string, number[]>();
+    for (const [index, plan] of plans.entries()) {
+      if (plan.kind !== "WRITE" || !holdsMany(plan.step)) continue;
+      const group = groups.get(plan.step.stepKey) ?? [];
+      group.push(index);
+      groups.set(plan.step.stepKey, group);
+    }
+    for (const [stepKey, indices] of groups) {
+      const saved = plans.flatMap((plan, index) =>
+        plan.kind === "DONE" &&
+        plan.result.alreadyRecorded === true &&
+        plan.result.stepKey === stepKey
+          ? [index]
+          : [],
+      );
+      const record = saved.length > 0 ? onRecord.get(stepKey) : undefined;
+      const writes = indices.flatMap((index) => {
+        const plan = plans[index];
+        return plan?.kind === "WRITE" ? [plan] : [];
+      });
+      const first = writes[0];
+      const leader = indices[0];
+      if (
+        first === undefined ||
+        leader === undefined ||
+        writes.length + (record === undefined ? 0 : 1) < 2
+      ) {
+        continue;
+      }
+      const joined = mergeListValues([
+        ...(record === undefined ? [] : [record]),
+        ...writes.map((plan) => ({ value: plan.value, note: plan.note })),
+      ]);
+      if (joined === null) continue;
+      const quotes = [...new Set(writes.map((plan) => plan.quote.trim()))];
+      out[leader] = {
+        kind: "WRITE",
+        step: first.step,
+        value: joined.value,
+        note: joined.note,
+        quote: quotes.join(" … ").slice(0, 400),
+      };
+      leaders.add(leader);
+      for (const index of [...indices.slice(1), ...saved]) {
+        // Its outcome is the leader's, filled in once that is written.
+        out[index] = done({ stepKey, outcome: "COMMITTED" });
+        followers.set(index, leader);
+      }
+    }
+    return { plans: out, leaders, followers };
+  };
   const recordOne = async (answer: Answer): Promise<OnboardingRecordResult> => {
     const plan = await planOne(answer);
     if (plan.kind === "DONE") return plan.result;
@@ -3288,7 +3456,9 @@ export function createOnboardingPort(input: {
     // The same answer already on the record, with nothing new beside it:
     // nothing to write (live AP: the same early signal saved three times
     // in one turn, each a revision and a round trip).
-    const adding = input.addsTo?.has(resolved.step.stepKey) === true;
+    const adding =
+      input.addsTo?.has(resolved.step.stepKey) === true ||
+      addingNow.has(resolved.step.stepKey);
     const onRecord = (
       adding || resolved.value.type === "TEXT"
         ? (latest ?? (await current()))
@@ -4400,6 +4570,7 @@ export function createOnboardingPort(input: {
     record: async (answers) => {
       const results: OnboardingRecordResult[] = [];
       turnSteps.clear();
+      addingNow.clear();
       for (const answer of answers) turnSteps.add(answer.stepKey);
       // One answer that cannot be processed never loses the others (bench
       // 2026-09-30: a category lookup's 400 threw out an investor's whole
@@ -4442,6 +4613,24 @@ export function createOnboardingPort(input: {
         plans.push(plan);
       }
       warmed.clear();
+      const writeMerged = (
+        plan: Extract<Planned, { kind: "WRITE" }>,
+        stepKey: string,
+      ): Promise<OnboardingRecordResult> =>
+        write(plan.step, plan.value, plan.note, plan.quote)
+          .then((result) => {
+            if (result.outcome === "COMMITTED") {
+              noteFigure(plan.step, plan.value, plan.quote);
+            }
+            return result;
+          })
+          .catch((error: unknown) => refused(stepKey, error));
+      // One write per list step (live 2026-10-31, "Fjordwerk": the reader
+      // gave "Nordics" and "Germany" as two items; each was written over
+      // the other in the same batch and only Germany stayed). Every item
+      // is checked on its own words above; what they allow is merged here.
+      const merged = mergeListPlans(plans, await onRecordFor(plans));
+      for (const [index, plan] of merged.plans.entries()) plans[index] = plan;
       const writes = plans.flatMap((plan, index) =>
         plan.kind === "WRITE" ? [{ plan, index }] : [],
       );
@@ -4490,34 +4679,88 @@ export function createOnboardingPort(input: {
             continue;
           }
         }
+        // Several items merged into this write: written as merged, never
+        // re-planned from one of them.
+        if (plan.kind === "WRITE" && merged.leaders.has(index)) {
+          results.push(await writeMerged(plan, answer.stepKey));
+          continue;
+        }
         // One write, a confirmation, or a batch the service could not
         // take as one: the single path, in the order they spoke.
         results.push(await safely(answer));
       }
+      // Items merged into another's write share its outcome.
+      for (const [index, leader] of merged.followers) {
+        const result = results[leader];
+        if (result !== undefined) results[index] = result;
+      }
+      /**
+       * Answers tried again after the batch, planned together and merged
+       * as the batch was: one write per list step, adding to what this
+       * call already wrote for it (never replacing it).
+       */
+      const retry = async (indices: readonly number[]): Promise<void> => {
+        for (const result of results) {
+          if (result.outcome === "COMMITTED") addingNow.add(result.stepKey);
+        }
+        const again: Planned[] = [];
+        for (const index of indices) {
+          const answer = answers[index];
+          if (answer === undefined) continue;
+          again.push(
+            await planOne(answer).catch((error: unknown): Planned =>
+              done(refused(answer.stepKey, error)),
+            ),
+          );
+        }
+        const joined = mergeListPlans(again, await onRecordFor(again));
+        for (const [at, plan] of joined.plans.entries()) {
+          const index = indices[at];
+          const answer = index === undefined ? undefined : answers[index];
+          if (index === undefined || answer === undefined) continue;
+          results[index] =
+            plan.kind === "DONE"
+              ? plan.result
+              : plan.kind === "WRITE"
+                ? await writeMerged(plan, answer.stepKey)
+                : await safely(answer);
+        }
+        for (const [at, leader] of joined.followers) {
+          const index = indices[at];
+          const result = results[indices[leader] ?? -1];
+          if (index !== undefined && result !== undefined) {
+            results[index] = result;
+          }
+        }
+      };
       // Live AI 2026-10-16: a new investor's first answer set up their
       // profile in this batch, and the category look-ups planned before it
       // were refused (no organisation context yet), so geography and
       // sectors were lost. Once anything committed, they are planned again.
       if (written.length > writtenBefore) {
-        for (const index of failedToPlan) {
-          const answer = answers[index];
-          if (answer !== undefined && results[index]?.outcome !== "COMMITTED") {
-            results[index] = await safely(answer);
-          }
-        }
+        await retry(
+          [...failedToPlan].filter(
+            (index) => results[index]?.outcome !== "COMMITTED",
+          ),
+        );
       }
       // A refused step whose prerequisite landed later in the batch gets
-      // one more try, so the order they spoke in does not matter.
-      for (const [index, result] of results.entries()) {
-        const answer = answers[index];
-        if (
+      // one more try, so the order they spoke in does not matter (each
+      // round's writes may let another's prerequisite land).
+      const triedAgain = new Set<number>();
+      for (;;) {
+        const round = results.flatMap((result, index) =>
+          !triedAgain.has(index) &&
           result.outcome === "NEEDS_FIRST" &&
-          answer !== undefined &&
+          answers[index] !== undefined &&
           result.needsStepKey !== undefined &&
           written.includes(result.needsStepKey)
-        ) {
-          results[index] = await safely(answer);
-        }
+            ? [index]
+            : [],
+        );
+        if (round.length === 0) break;
+        for (const index of round) triedAgain.add(index);
+        await retry(round);
       }
       // QA F-52: what was kept until the firm or company existed is saved
       // the turn it comes to exist, not one turn later. Held rows older
@@ -4633,6 +4876,8 @@ export function createOnboardingPort(input: {
         return fieldWordsOf(answer.quote, `${label} ${value}`).slice(0, 160);
       };
       const results: OnboardingRecordResult[] = [];
+      /** What this call holds for each step so far. */
+      const heldHere = new Map<string, OnRecordList>();
       for (const answer of answers) {
         try {
           if (!said(answer.quote)) {
@@ -4704,12 +4949,21 @@ export function createOnboardingPort(input: {
             });
             continue;
           }
+          // Items of one list step held together are one suggestion with
+          // them all (live 2026-10-31: each item held over the one before).
+          const before = heldHere.get(resolved.step.stepKey);
+          const value =
+            before === undefined || !holdsMany(resolved.step)
+              ? resolved.value
+              : (mergeListValues([before, { value: resolved.value }])?.value ??
+                resolved.value);
+          heldHere.set(resolved.step.stepKey, { value });
           try {
             await store.recommend({
               userId,
               sessionId: input.onboardingSessionId,
               stepKey: resolved.step.stepKey,
-              value: resolved.value,
+              value,
               // The words that gave it, not the head of a long line (live
               // 2026-10-31: "a bit under a year of runway" was held as 12
               // months under a quote cut before it, and kept as a bare 12).
@@ -4719,8 +4973,10 @@ export function createOnboardingPort(input: {
               )}"`,
               runId: input.runId ?? null,
               // A re-reading of the same words keeps the suggestion already
-              // waiting rather than replacing it (as holdParaphrase).
-              keepPendingSince: input.saidAt?.(answer.quote),
+              // waiting rather than replacing it (as holdParaphrase); the
+              // merged one replaces this call's own first item.
+              keepPendingSince:
+                before === undefined ? input.saidAt?.(answer.quote) : undefined,
             });
           } catch (error: unknown) {
             if (
