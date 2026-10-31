@@ -1169,7 +1169,10 @@ describe("degraded and empty states", () => {
     // from the token scale, and takes no tap from the controls.
     expect(top?.classList.contains("cq-feed-regions-line")).toBe(true);
     expect(top?.classList.contains("cq-status-line")).toBe(false);
-    const css = readFileSync(resolve(import.meta.dirname, "../app/globals.css"), "utf8");
+    const css = readFileSync(
+      resolve(import.meta.dirname, "../app/globals.css"),
+      "utf8",
+    );
     const rule = /\.cq-feed-regions-line \{([^}]*)\}/u.exec(css)?.[1] ?? "";
     expect(rule).toContain("position: absolute;");
     expect(rule).toContain("z-index: var(--cq-z-sticky);");

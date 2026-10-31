@@ -11,9 +11,9 @@ describe("the writers' markdown, read for print (live 2026-10-31)", () => {
     expect(inlineRuns("half **open")).toEqual([
       { text: "half open", bold: false },
     ]);
-    expect(inlineRuns("a [link](https://x.test) and `code` and *it*")).toEqual(
-      [{ text: "a link and code and it", bold: false }],
-    );
+    expect(inlineRuns("a [link](https://x.test) and `code` and *it*")).toEqual([
+      { text: "a link and code and it", bold: false },
+    ]);
   });
 
   it("reads headings, bullets, numbers, tables and paragraphs", () => {
@@ -42,7 +42,9 @@ describe("the writers' markdown, read for print (live 2026-10-31)", () => {
       plainMarkdown(
         'Summary: 2 figures without a basis, e.g. "- **Cheque and role:** Potential fit…"',
       ),
-    ).toBe('Summary: 2 figures without a basis, e.g. "Cheque and role: Potential fit…"');
+    ).toBe(
+      'Summary: 2 figures without a basis, e.g. "Cheque and role: Potential fit…"',
+    );
     expect(plainMarkdown("2 * 3 * 4 = 24")).toBe("2 * 3 * 4 = 24");
   });
 });

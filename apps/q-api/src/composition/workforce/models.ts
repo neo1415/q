@@ -753,11 +753,9 @@ export function createWorkforceModels(dependencies: {
             heading: prose(section.heading, 120),
             body: section.body,
           })),
-          // Live 2026-10-31: a recommendation is kept to the writer's own
-          // bound (800), so the review never reads one cut at its owner.
           topRecommendations: draft.topRecommendations
             .slice(0, 3)
-            .map((one) => prose(one, 800)),
+            .map((one) => prose(one, 300)),
           gaps: draft.gaps.slice(0, 12).map((gap) => prose(gap, 300)),
         },
       };
@@ -869,23 +867,16 @@ export function createWorkforceModels(dependencies: {
 }
 
 /**
- * Prose a person reads, within its stored bound: whole sentences where
- * they fit, else cut at a word with an ellipsis, never mid-word (live
- * 2026-10-24: "…a month-12 decision, not a committed rollou"). Live
- * 2026-10-31 (IC memo PDF): the lead ended "…(company record,
- * self-reported),…" mid-clause, and a recommendation cut at its owner was
- * what the review then quoted back as truncated.
+ * Prose a person reads, within its stored bound: cut at a word, with an
+ * ellipsis, never mid-word (live 2026-10-24: "…a month-12 decision, not a
+ * committed rollou"). Model input too (the critic and the redraft read
+ * it), so it stays byte-identical for the recorded research replays; what
+ * the person reads is re-cut at a whole sentence where the document is
+ * filed (analysis.ts personProse, live 2026-10-31).
  */
 export function prose(text: string, max: number): string {
   if (text.length <= max) return text;
-  const room = text.slice(0, max);
-  let end = -1;
-  for (const match of room.matchAll(/[.!?](?=\s|$)/gu)) {
-    end = match.index + 1;
-  }
-  if (end >= max * 0.4) return room.slice(0, end).trimEnd();
   const cut = text.slice(0, max - 1);
   const space = cut.lastIndexOf(" ");
-  const kept = (space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd();
-  return `${kept.replace(/[\s,;:\-–—]+$/u, "")}…`;
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }

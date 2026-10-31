@@ -6060,13 +6060,13 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     });
     const asked = line("USER", "r1", "What should I do today?");
     const offered = line("Q", "r1", `Do this. ${PLAN_OFFER_LINES[1] ?? ""}`);
-    expect(storedPlanOffer([asked, offered], offered as never)).toEqual({
+    expect(storedPlanOffer([asked, offered], offered)).toEqual({
       kind: "PLAN",
       runId: "r1",
       ask: "What should I do today?",
     });
     const plain = line("Q", "r1", "Do this. Want a plan?");
-    expect(storedPlanOffer([asked, plain], plain as never)).toBeNull();
+    expect(storedPlanOffer([asked, plain], plain)).toBeNull();
   });
 
   it("live 2026-10-30: a yes to an offer code did not record moves nothing -- the answer is told so, never a guessed page", async () => {

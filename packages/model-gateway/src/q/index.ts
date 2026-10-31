@@ -8739,6 +8739,25 @@ export function createModelGatewayQAnswer(
               said: string,
               note: ModelMessage = SAY_DO_NOTE,
             ): void => {
+              // Live 2026-10-31 ("What should I do today?", run 50326c66):
+              // a round that began answering was asked again (5.5 s, then
+              // 3.8 s more) and nothing said why. Which check asked it.
+              logger?.info(
+                {
+                  qRunId: request.runId,
+                  rounds,
+                  calls,
+                  reason:
+                    note === SAY_DO_NOTE
+                      ? "SAID_NOT_DONE"
+                      : note === DO_IT_NOW_NOTE
+                        ? "DEFERRED"
+                        : note === screenNote
+                          ? "SCREEN_SUBJECT"
+                          : "NOT_PREPARED",
+                },
+                "q round asked again",
+              );
               sayDoRounds = 1;
               rounds += 1;
               messages = [

@@ -338,7 +338,10 @@ export function qPlanReviewPoints(openPoints: readonly string[]): {
   let more = 0;
   const points: string[] = [];
   for (const point of openPoints) {
-    if (point === Q_PLAN_EARLIER_DRAFT_KEPT || point === Q_PLAN_FIRST_DRAFT_ONLY) {
+    if (
+      point === Q_PLAN_EARLIER_DRAFT_KEPT ||
+      point === Q_PLAN_FIRST_DRAFT_ONLY
+    ) {
       notice ??= point;
       continue;
     }

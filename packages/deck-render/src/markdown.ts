@@ -40,10 +40,7 @@ function unwrapInline(text: string): string {
       .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, "$1")
       .replace(/`([^`]*)`/gu, "$1")
       // Italics (single * or _ around words), never a bold pair.
-      .replace(
-        /(^|[^\w*])\*(?!\*)(\S(?:.*?\S)?)\*(?!\*)(?=[^\w*]|$)/gu,
-        "$1$2",
-      )
+      .replace(/(^|[^\w*])\*(?!\*)(\S(?:.*?\S)?)\*(?!\*)(?=[^\w*]|$)/gu, "$1$2")
       .replace(/(^|[^\w_])_(?!_)(\S(?:.*?\S)?)_(?!_)(?=[^\w_]|$)/gu, "$1$2")
   );
 }

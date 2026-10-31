@@ -9,7 +9,7 @@ vi.mock("../src/features/q/context", () => ({
   resolveOwnContext: vi.fn(),
 }));
 
-import { splitGaps } from "../src/features/q/artifact-viewer";
+import { pointWords, splitGaps } from "../src/features/q/artifact-viewer";
 import { followWork, type QTurn } from "../src/features/q/conversation";
 import { composeBriefing } from "../src/features/home/briefing";
 import { draftLabel, foldedPoints } from "../src/features/q/plan-card";
@@ -106,6 +106,31 @@ describe("a document's review points are apart from its evidence gaps", () => {
       evidence: ["Revenue for 2025 is not stated."],
       review: ["Risks: The customer concentration is not quantified."],
     });
+  });
+});
+
+describe("live 2026-10-31: a quoted point reads as words", () => {
+  it("drops the memo's bold and the list marker opening a quote", () => {
+    expect(
+      splitGaps([
+        'Reviewer\'s open point (Summary & recommendation): 2 figures without a basis, e.g. "- **Cheque and role:** Potential fit only as a co-investment."',
+      ]).review,
+    ).toEqual([
+      'Summary & recommendation: 2 figures without a basis, e.g. "Cheque and role: Potential fit only as a co-investment."',
+    ]);
+    expect(pointWords("Revenue for **2025** is not stated.")).toBe(
+      "Revenue for 2025 is not stated.",
+    );
+  });
+});
+
+describe("live 2026-10-31: the plan card's points are the chat's list", () => {
+  it("the draft notice is apart, never counted as a point", () => {
+    const notice =
+      "This is the earlier draft: its revision scored lower in review, so this draft is shown, with the reviews of this draft.";
+    expect(
+      foldedPoints([notice, "Step 1, “A”: x.", "Step 2, “B”: y."]),
+    ).toEqual(["Step 1, “A”: x.", "Step 2, “B”: y."]);
   });
 });
 

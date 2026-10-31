@@ -233,6 +233,13 @@ export type RecordedOffer = {
   readonly ask: string;
 };
 
+/** A stored line of the conversation, as the plan offer reads it. */
+type StoredLine = {
+  readonly role: string;
+  readonly runId: string;
+  readonly content: string;
+};
+
 /**
  * The plan offer Q's last stored answer closed with, read from history:
  * the answer ends with code's own offer copy (PLAN_OFFER_LINES, any
@@ -240,8 +247,8 @@ export type RecordedOffer = {
  * own copy is matched; what the person said is never read for meaning.
  */
 export function storedPlanOffer(
-  history: readonly Pick<QConversationMessage, "role" | "runId" | "content">[],
-  lastQ: Pick<QConversationMessage, "role" | "runId" | "content">,
+  history: readonly StoredLine[],
+  lastQ: StoredLine,
 ): RecordedOffer | null {
   const said = lastQ.content.trimEnd();
   if (!PLAN_OFFER_LINES.some((line) => said.endsWith(line))) return null;

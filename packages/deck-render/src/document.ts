@@ -512,11 +512,15 @@ export async function documentToPdf(
   flow.gap(6);
   // Live 2026-10-31 (IC memo PDF): the writer's markdown printed as
   // "**" and "- "; every part prints as words, a body as its structure.
-  flow.lines(fonts.bold, wrapWith(fonts.bold, plainMarkdown(document.title), 22, width), {
-    size: 22,
-    leading: 1.25,
-    colour: INK,
-  });
+  flow.lines(
+    fonts.bold,
+    wrapWith(fonts.bold, plainMarkdown(document.title), 22, width),
+    {
+      size: 22,
+      leading: 1.25,
+      colour: INK,
+    },
+  );
   flow.gap(10);
   flow.rule(64, 2.5, accent);
   flow.gap(14);

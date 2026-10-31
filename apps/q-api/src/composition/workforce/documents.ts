@@ -30,6 +30,7 @@ import type {
 import {
   REVIEWER_OPEN_POINT,
   analysisContent,
+  personProse,
   investigationGaps,
   reducedResearchText,
   investigationSections,
@@ -489,7 +490,7 @@ export function createWorkforceDocuments(dependencies: {
       artifactType: WORKFORCE_ANALYSIS_KIND,
       content: {
         title: written.draft.title,
-        summary: written.draft.summary,
+        summary: personProse(written.draft.summary),
         content,
       },
       workforce,
@@ -530,8 +531,10 @@ export function createWorkforceDocuments(dependencies: {
       delivery: {
         title: written.draft.title,
         artifactType: WORKFORCE_ANALYSIS_KIND,
-        summary: written.draft.summary,
-        topRecommendations: written.draft.topRecommendations.slice(0, 3),
+        summary: personProse(written.draft.summary),
+        topRecommendations: written.draft.topRecommendations
+          .slice(0, 3)
+          .map(personProse),
         passed: written.review.passes,
         openIssues: written.review.open.length,
         ...(reduced === undefined ? {} : { reducedResearch: reduced }),
