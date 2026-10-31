@@ -242,6 +242,8 @@ describe("ob1 evals · one long answer fills many non-consecutive fields", () =>
       journey: "founder",
       currentStepKey: "F1.company_name",
       recorded: { "F0.intent": "raising_now" },
+      // Founder v8: the country is a geography node, found by its name.
+      taxonomy: { nigeria: countryOfIso("NG")?.nodeId ?? "" },
     });
     const answers = [
       {
@@ -250,7 +252,7 @@ describe("ob1 evals · one long answer fills many non-consecutive fields", () =>
         quote: "We're Harbourline Cargo",
       },
       { stepKey: "F1.stage", value: "seed", quote: "a seed-stage" },
-      { stepKey: "F1.country", value: "ng", quote: "based in Nigeria" },
+      { stepKey: "F1.country", value: "Nigeria", quote: "based in Nigeria" },
       { stepKey: "F4.founder_role", value: "ceo", quote: "I'm the CEO" },
       {
         stepKey: "F4.founder_count",

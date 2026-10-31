@@ -345,6 +345,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V7 } from "./tasks/onboarding-transcript-r
 import { ONBOARDING_TRANSCRIPT_READER_V8 } from "./tasks/onboarding-transcript-reader.v8.js";
 import { ONBOARDING_TRANSCRIPT_READER_V9 } from "./tasks/onboarding-transcript-reader.v9.js";
 import { ONBOARDING_TRANSCRIPT_READER_V10 } from "./tasks/onboarding-transcript-reader.v10.js";
+import { ONBOARDING_TRANSCRIPT_READER_V11 } from "./tasks/onboarding-transcript-reader.v11.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
@@ -539,7 +540,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V9, status: "DEPRECATED" },
     // Live final re-check 2026-10-31 (68ab54317): a yes is Q's offered
     // value, never their words; a decline or not-known is said so.
-    ONBOARDING_TRANSCRIPT_READER_V10,
+    { ...ONBOARDING_TRANSCRIPT_READER_V10, status: "DEPRECATED" },
+    // Live check 2026-10-31 (2e79954fd): one yes settles every field its
+    // summary covered; a firm no is outright; a thesis is said back.
+    ONBOARDING_TRANSCRIPT_READER_V11,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.

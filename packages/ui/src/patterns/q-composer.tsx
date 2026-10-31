@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -137,6 +138,9 @@ export function QComposer({
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
   const [value, setValue] = useState(initialValue);
+  /** The field as it is now, for a send that finishes after more typing. */
+  const latestValue = useRef(initialValue);
+  latestValue.current = value;
   const [notice, setNotice] = useState<"unavailable" | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -153,6 +157,16 @@ export function QComposer({
   const ready = attached.some((entry) => entry.state === "ready");
   const canSubmit =
     (trimmed.length > 0 || ready) && !uploading && !disabled && !submitting;
+  /**
+   * Enter or Send pressed while the composer is held (Q still working, a
+   * send in flight, a document uploading): the words wait in the field and
+   * go the moment it is free (live 2026-10-31: an Enter right as Q's reply
+   * landed did nothing for two minutes, the text left in the box). A
+   * message they typed is never silently dropped.
+   */
+  const [queued, setQueued] = useState(false);
+  const held = disabled || submitting || uploading;
+  const submitRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   const attachFiles = (files: FileList | null | undefined) => {
     if (onAttach === undefined || files === null || files === undefined) {
@@ -169,18 +183,35 @@ export function QComposer({
   }
 
   async function submit() {
-    if (!canSubmit) {
+    if (trimmed.length === 0 && !ready) {
+      setQueued(false);
       return;
     }
+    if (held) {
+      setQueued(true);
+      return;
+    }
+    setQueued(false);
     if (onSubmit === undefined) {
       setNotice("unavailable");
       return;
     }
     setSubmitting(true);
+    const sent = value;
     try {
       await onSubmit(trimmed);
-      setValue("");
-      onValueChange?.("");
+      // Only what was sent leaves the field: words typed while it was
+      // sending stay, to go next (never wiped with it).
+      const rest = (
+        latestValue.current.startsWith(sent)
+          ? latestValue.current.slice(sent.length)
+          : latestValue.current === sent
+            ? ""
+            : latestValue.current
+      ).replace(/^\s+/u, "");
+      latestValue.current = rest;
+      setValue(rest);
+      onValueChange?.(rest);
       setNotice(null);
       const element = textareaRef.current;
       if (element !== null) {
@@ -190,6 +221,11 @@ export function QComposer({
       setSubmitting(false);
     }
   }
+
+  submitRef.current = submit;
+  useEffect(() => {
+    if (queued && !held) void submitRef.current();
+  }, [queued, held]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -263,11 +299,16 @@ export function QComposer({
             rows={1}
             value={value}
             autoFocus={autoFocus}
-            disabled={disabled}
+            // Never `disabled`: a disabled field loses focus mid-typing and
+            // the next Enter goes nowhere. While held it still takes their
+            // words, and Enter queues them (above).
+            aria-disabled={disabled ? true : undefined}
+            data-q-composer-held={held ? "" : undefined}
             placeholder={t(placeholder)}
             enterKeyHint="send"
             autoComplete="off"
             onChange={(event) => {
+              latestValue.current = event.target.value;
               setValue(event.target.value);
               onValueChange?.(event.target.value);
               resize(event.target);

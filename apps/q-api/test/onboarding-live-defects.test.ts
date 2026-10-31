@@ -257,7 +257,7 @@ describe("live acceptance on AF (2026-10-16)", () => {
     });
   });
 
-  it("a place no country holds keeps their words, never a made-up country", async () => {
+  it("a place no country holds is never a made-up country, nor their words as the country (live 2026-10-31)", async () => {
     const world = investorSession({
       journey: "founder",
       currentStepKey: "F1.country",
@@ -272,7 +272,7 @@ describe("live acceptance on AF (2026-10-16)", () => {
       personTurns: [said],
       authority: () => Promise.resolve(reading({ stated: ["F1.country"] })),
     });
-    await port.record([
+    const [result] = await port.record([
       {
         stepKey: "F1.country",
         value: "the moon",
@@ -281,7 +281,10 @@ describe("live acceptance on AF (2026-10-16)", () => {
         ownWords: false,
       },
     ]);
-    expect(world.recordedValue("F1.country")).toMatchObject({ type: "TEXT" });
+    // A category field holds categories only: nothing saved, and Q asks
+    // them to choose from the list.
+    expect(world.recordedValue("F1.country")).toBeUndefined();
+    expect(result?.outcome).toBe("UNMATCHED");
   });
 
   it("a long answer of thirteen facts, with a two-letter quote, is a valid call", () => {

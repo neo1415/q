@@ -6,12 +6,15 @@ import type { QDelegationReader } from "@capital-q/model-gateway/q";
 import { createLogger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 import type { RecommendationStore } from "../src/voice/onboarding-port.js";
 
 import { reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
+
+const KENYA = countryOfIso("KE")?.nodeId ?? "";
 
 /**
  * Typed-turn latency with fakes (owner 2026-10-16: live p50 6.3 s, max
@@ -91,7 +94,7 @@ const TURNS: readonly {
     said: "We're seed stage, based in Kenya.",
     answers: [
       { stepKey: "F1.stage", value: "seed", quote: "seed stage" },
-      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+      { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
     ],
   },
   {
@@ -230,6 +233,7 @@ async function runBench(): Promise<Turn[]> {
       "F0.intent": "raising_now",
       "F1.company_name": "Quillmark Health",
     },
+    taxonomy: { kenya: KENYA },
   });
   let apiCalls = 0;
   let writes = 0;
@@ -247,6 +251,23 @@ async function runBench(): Promise<Turn[]> {
       );
     if ((init?.method ?? "GET") === "POST") writes += 1;
     await wait(MODELLED.apiRoundTripMs);
+    // The country on record is a category whose name the service gives,
+    // as it does in production (read once a turn, then kept).
+    const url = input instanceof Request ? input.url : input.toString();
+    if (url.includes(`/taxonomy/nodes/${KENYA}`)) {
+      return Response.json({
+        id: KENYA,
+        vocabularyCode: "geography",
+        canonicalCode: "ke",
+        displayName: "Kenya",
+        description: null,
+        parentNodeId: null,
+        depth: 0,
+        status: "ACTIVE",
+        ancestors: [],
+        aliases: [],
+      });
+    }
     return world.fetch(input, init);
   };
   const store = world.recommendations;
@@ -378,7 +399,10 @@ describe("typed interview turn latency, with fakes", () => {
         // A fact kept with their notes is one more write. One more for
         // their words, kept on the thread before the model runs (a write
         // beside the turn's first reads, not a wait of its own).
-        single ? 6 + (spec?.offPath ?? 0) + (spec?.savedByCode ?? 0) : 9,
+        // And from turn 2, one read of the name of the country saved in
+        // turn 1: a category, never their words (live 2026-10-31).
+        (single ? 6 + (spec?.offPath ?? 0) + (spec?.savedByCode ?? 0) : 9) +
+          (index > 0 ? 1 : 0),
       );
     }
     // Wall-clock targets only when benchmarking on purpose: timers on a

@@ -94,7 +94,7 @@ export const SPOKEN_QUESTIONS_AR: Readonly<Record<string, string>> = {
   "I8.portfolio": "هل يمكنك ذكر بعض الشركات الممثلة لمحفظتك؟",
   "I9.discovery_mode": "إلى أي حد تريد أن يكون الاستكشاف جريئاً؟",
   "I10.inbound_preference": "كيف تفضّل أن يتواصل معك المؤسسون؟",
-  "I11.additional_context": "هل فاتنا شيء؟",
+  "I11.additional_context": "هل فاتنا شيء، مثل أطروحتك الاستثمارية؟",
   "I11.review": "هذا هو التفويض الذي حددته. هل يبدو صحيحاً؟",
   "I12.handoff": "تفويضك جاهز. هل أنقلك إلى Discover؟",
 };
