@@ -79,7 +79,7 @@ select pg_temp.act_as_privileged();
 -- Investor Definition v1 -----------------------------------------------------------
 select is(
   (select current_version from onboarding.definitions where journey_type = 'investor'),
-  2, 'investor definition points new sessions at version 2 (20261231090000: the firm''s website); v1 stays published for sessions pinned to it');
+  3, 'investor definition points new sessions at version 3 (20261231210000: "Not sure yet" on deploying; 20261231090000 added the firm''s website); v1 stays published for sessions pinned to it');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v

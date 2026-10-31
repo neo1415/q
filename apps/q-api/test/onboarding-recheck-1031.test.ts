@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -154,7 +154,13 @@ describe("1. only what the person stated is saved; Q's inference waits for their
     await conversation.said?.(line, "Q", PACE_Q, "I1.deployment_status");
     await conversation.said?.(line, "PERSON", DONT_KNOW);
     await conversation.flush?.(line);
+    // Investor v3 (live final re-check 2026-10-31): the step's own "Not
+    // sure yet" option; NOT_KNOWN_TEXT is for a step without one.
     expect(world.recordedValue("I1.deployment_status")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "not_sure",
+    });
+    expect(world.recordedValue("I1.deployment_status")).not.toEqual({
       type: "TEXT",
       text: NOT_KNOWN_TEXT,
     });
@@ -247,7 +253,15 @@ describe("1. only what the person stated is saved; Q's inference waits for their
       },
     };
     expect(await reader.read(input)).toBeNull();
-    value.answers[0] = { ...value.answers[0], source: "INFERRED" } as never;
+    // v10 (schema v5): each answer also says whether it only agrees.
+    const first = value.answers[0];
+    value.answers[0] = { ...first, source: "INFERRED" } as never;
+    expect(await reader.read(input)).toBeNull();
+    value.answers[0] = {
+      ...first,
+      source: "INFERRED",
+      affirms: false,
+    } as never;
     expect((await reader.read(input))?.answers[0]?.source).toBe("INFERRED");
   });
 });
@@ -405,8 +419,8 @@ describe("2. a reply binds to the one thing Q just asked", () => {
   });
 });
 
-describe("3. Q's next question is chosen after what they said is read", () => {
-  it("a question about something the reading just saved is written again from the record", async () => {
+describe("3. Q's next question never waits for the reading (superseded 2026-10-31 final re-check)", () => {
+  it("the reply goes out at once; when the reading lands, Q follows up rather than leaving the answered question", async () => {
     const world = investorSession({
       currentStepKey: "I2.currency",
       subject: FIRM,
@@ -436,13 +450,19 @@ describe("3. Q's next question is chosen after what they said is read", () => {
       ],
     });
     const outcome = await say("Typically 1.5 million euros a cheque");
-    expect(world.recordedValue("I2.currency")).toEqual({
-      type: "SINGLE_SELECT",
-      optionKey: "eur",
-    });
-    expect(outcome.reply).toBe("Which sectors do you focus on?");
-    expect(seen).toHaveLength(2);
-    // The second reply saw the currency saved.
-    expect(seen[1]).toMatch(/already saved: [^\]]*Euro/iu);
+    // One reply, never written again after the reading (the blocking wait
+    // made typed turns 12 s at the median).
+    expect(seen).toHaveLength(1);
+    expect(outcome.reply).toBe("Which currency do you invest in?");
+    await vi.waitFor(
+      () => {
+        expect(world.recordedValue("I2.currency")).toEqual({
+          type: "SINGLE_SELECT",
+          optionKey: "eur",
+        });
+        expect(world.thread().at(-1)?.text).toMatch(/^No need to answer/u);
+      },
+      { timeout: 3_000, interval: 20 },
+    );
   });
 });

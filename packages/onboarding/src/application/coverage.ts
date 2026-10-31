@@ -55,6 +55,16 @@ export type OnboardingCoverageFieldProfile = {
   readonly askable?: boolean | undefined;
   /** Rough seconds to answer it in conversation; for the time estimate. */
   readonly seconds?: number | undefined;
+  /**
+   * True: the value is a judgement about the person's current state
+   * (whether they are deploying or raising now, how open they are), so it
+   * is theirs only when they give it in answer to Q's own question about
+   * it, or confirm a suggestion of it. A reading of other words never
+   * writes it, whatever the reading calls its source (live re-check
+   * 2026-10-31: "we write cheques of EUR 750k to 3 million" was saved as
+   * "actively investing", never asked).
+   */
+  readonly askOnly?: boolean | undefined;
 };
 
 export type OnboardingCoverageProfile = {

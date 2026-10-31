@@ -344,12 +344,14 @@ import { ONBOARDING_TRANSCRIPT_READER_V6 } from "./tasks/onboarding-transcript-r
 import { ONBOARDING_TRANSCRIPT_READER_V7 } from "./tasks/onboarding-transcript-reader.v7.js";
 import { ONBOARDING_TRANSCRIPT_READER_V8 } from "./tasks/onboarding-transcript-reader.v8.js";
 import { ONBOARDING_TRANSCRIPT_READER_V9 } from "./tasks/onboarding-transcript-reader.v9.js";
+import { ONBOARDING_TRANSCRIPT_READER_V10 } from "./tasks/onboarding-transcript-reader.v10.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
 import { ONBOARDING_TYPED_REPLY_V2 } from "./tasks/onboarding-typed-reply.v2.js";
 import { ONBOARDING_TYPED_REPLY_V3 } from "./tasks/onboarding-typed-reply.v3.js";
 import { ONBOARDING_TYPED_REPLY_V4 } from "./tasks/onboarding-typed-reply.v4.js";
+import { ONBOARDING_TYPED_REPLY_V5 } from "./tasks/onboarding-typed-reply.v5.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 // DAILY block
@@ -534,7 +536,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V8, status: "DEPRECATED" },
     // Live re-check 2026-10-31 (91b19d615): each value says STATED or
     // INFERRED (only stated is saved); not knowing is never a value.
-    ONBOARDING_TRANSCRIPT_READER_V9,
+    { ...ONBOARDING_TRANSCRIPT_READER_V9, status: "DEPRECATED" },
+    // Live final re-check 2026-10-31 (68ab54317): a yes is Q's offered
+    // value, never their words; a decline or not-known is said so.
+    ONBOARDING_TRANSCRIPT_READER_V10,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.
@@ -544,7 +549,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TYPED_REPLY_V2, status: "DEPRECATED" },
     { ...ONBOARDING_TYPED_REPLY_V3, status: "DEPRECATED" },
     // Live 2026-10-30 (Granary): a long answer is said back for their yes.
-    ONBOARDING_TYPED_REPLY_V4,
+    { ...ONBOARDING_TYPED_REPLY_V4, status: "DEPRECATED" },
+    // Live final re-check 2026-10-31: Q replies before the reading lands;
+    // what their latest message answered is never asked.
+    ONBOARDING_TYPED_REPLY_V5,
     WELCOME_CONDUCTOR_V1,
     WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,

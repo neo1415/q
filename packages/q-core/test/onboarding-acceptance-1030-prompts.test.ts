@@ -48,9 +48,9 @@ describe("ONBOARDING_TRANSCRIPT_READER v9 (live re-check 2026-10-31)", () => {
   const active = registry.getActive("ONBOARDING_TRANSCRIPT_READER");
   const template = active.definition.template;
 
-  it("is the active version, on the v4 output schema", () => {
-    expect(active.definition.version).toBe(9);
-    expect(active.definition.output).toMatchObject({ schemaVersion: 4 });
+  it("v10 is active (on the v5 output schema) and keeps v9's rules", () => {
+    expect(active.definition.version).toBe(10);
+    expect(active.definition.output).toMatchObject({ schemaVersion: 5 });
   });
 
   it("each value says whether they stated it or Q inferred it", () => {
@@ -68,6 +68,34 @@ describe("ONBOARDING_TRANSCRIPT_READER v9 (live re-check 2026-10-31)", () => {
     );
     expect(template).not.toMatch(
       /do not know the answer to an optional step Q asked them, put it under declined/u,
+    );
+  });
+});
+
+describe("ONBOARDING_TRANSCRIPT_READER v10 and ONBOARDING_TYPED_REPLY v5 (live final re-check 2026-10-31)", () => {
+  const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
+  const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
+
+  it("an agreement carries Q's offered value, never their agreeing words", () => {
+    expect(reader.template).toMatch(/affirms: true when their words/u);
+    expect(reader.template).toMatch(/never their agreeing words/u);
+    expect(reader.template).toMatch(/"affirms": false/u);
+  });
+
+  it("an unanswered part of Q's question is neither declined nor not known", () => {
+    expect(reader.template).toMatch(
+      /Not answering part of what Q asked is neither declining it nor not knowing it/u,
+    );
+    expect(reader.template).toMatch(/"saidSo": true/u);
+  });
+
+  it("the reply never asks what their latest message answered (it no longer waits for the reading)", () => {
+    expect(reply.version).toBe(5);
+    expect(reply.template).toMatch(
+      /The checklist is the record from before their latest message/u,
+    );
+    expect(reply.template).toMatch(
+      /A topic their latest message answered is answered: never ask it/u,
     );
   });
 });

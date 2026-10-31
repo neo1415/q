@@ -86,7 +86,8 @@ describe("investor journey over the runtime contract", () => {
     });
     const view = await port.start("00000000-0000-4000-8000-000000000001");
     expect(() => OnboardingSessionViewSchema.parse(view)).not.toThrow();
-    expect(view.session.definitionVersion).toBe(2);
+    // v3 (live final re-check 2026-10-31): "Not sure yet" on deploying.
+    expect(view.session.definitionVersion).toBe(3);
     expect(view.session.currentStepKey).toBe(INVESTOR_STEPS.investorType);
     const presented = toPresentation(view, SOURCE);
     expect(presented.sections.map((s) => s.id)).toEqual([
@@ -585,17 +586,17 @@ describe("investor journey over the runtime contract", () => {
       storage: null,
       seed: "reset",
     });
-    const v3: RuntimePort = {
+    const v4: RuntimePort = {
       ...port,
       current: async () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 3 } };
+          : { ...view, session: { ...view.session, definitionVersion: 4 } };
       },
     };
     await expect(
-      createRuntimeInvestorClient(v3, SOURCE).getSession(),
+      createRuntimeInvestorClient(v4, SOURCE).getSession(),
     ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
   });
 });

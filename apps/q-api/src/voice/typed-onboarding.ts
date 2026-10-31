@@ -102,6 +102,11 @@ export function createTypedOnboarding(dependencies: {
    * and taken as finishing. The reading is told what was asked.
    */
   const lastAsked = new Map<string, string>();
+  /**
+   * Turns taken, per session: a follow-up to a reply is written only while
+   * that reply is still Q's last line (nothing said since).
+   */
+  const turnsTaken = new Map<string, number>();
 
   return {
     turn: async (input) => {
@@ -125,6 +130,14 @@ export function createTypedOnboarding(dependencies: {
       );
       if (status !== "ACTIVE") return null;
       const startedAt = Date.now();
+      const turnNumber = (turnsTaken.get(input.onboardingSessionId) ?? 0) + 1;
+      turnsTaken.delete(input.onboardingSessionId);
+      turnsTaken.set(input.onboardingSessionId, turnNumber);
+      // Bounded: the oldest session's count goes first.
+      if (turnsTaken.size > 2_000) {
+        const oldest = turnsTaken.keys().next().value;
+        if (oldest !== undefined) turnsTaken.delete(oldest);
+      }
       const line: ConversationLine = {
         voiceSessionId: `typed:${input.onboardingSessionId}`,
         actor,
@@ -235,9 +248,11 @@ export function createTypedOnboarding(dependencies: {
         port.state(),
         conversation.said(line, "PERSON", utterance),
       ]);
-      // Read now, beside the reply (live re-check 2026-10-31: "1.5 million
-      // euros" was saved two seconds after Q asked which currency). Q's
-      // next question is settled once this reading is applied.
+      // Read now, beside the reply. Only finishing waits for it (what is
+      // missing is decided from the record); Q's ordinary reply never does
+      // (live final re-check 2026-10-31: waiting made typed turns 12 s at
+      // the median). If the reading lands after a reply that asked what the
+      // same words answered, Q follows up (followUpIfAnswered).
       const reading: Promise<boolean | void> =
         conversation.flush?.(line).catch((error: unknown) => {
           logger.warn({ err: error }, "typed onboarding words not read");
@@ -311,7 +326,7 @@ export function createTypedOnboarding(dependencies: {
         }),
       ]);
 
-      let written = firstReply;
+      const written = firstReply;
       const agreedToReadBack =
         readBackReview !== null &&
         authority?.stated.has(readBackReview) === true;
@@ -409,32 +424,9 @@ export function createTypedOnboarding(dependencies: {
         );
         path = "READ_BACK";
       } else if (written !== null) {
-        // The reading of their words, applied before Q's question stands:
-        // a question about what they just said is written again from the
-        // record as it is now (one more reply, only then).
-        await reading;
-        const asked = written.asking;
-        const before = state.steps.find((step) => step.stepKey === asked);
-        const now =
-          asked === null || before?.status !== "OPEN"
-            ? null
-            : await portOf(false)
-                .state()
-                .catch(() => null);
-        const after = now?.steps.find((step) => step.stepKey === asked);
-        if (
-          now !== null &&
-          after !== undefined &&
-          (after.status !== "OPEN" || after.savePending === true)
-        ) {
-          const again = await reply(input, now, turns).catch(
-            (error: unknown) => {
-              logger.warn({ err: error }, "typed onboarding reply unavailable");
-              return null;
-            },
-          );
-          if (again !== null) written = again;
-        }
+        // Q's reply now, never after the reading (ONBOARDING_TYPED_REPLY v5
+        // reads their latest message itself and does not ask what it
+        // answered; the follow-up below covers a reply that still did).
         text = withoutStepIds(written.reply, input.journeyType).trim();
         asking = written.asking;
         path = "REPLY";
@@ -449,7 +441,7 @@ export function createTypedOnboarding(dependencies: {
         path = "DEGRADED";
       }
 
-      return await outcomeOf({
+      const outcome = await outcomeOf({
         text,
         asking,
         navigate,
@@ -459,6 +451,55 @@ export function createTypedOnboarding(dependencies: {
           authority?.finishing === true || agreedToReadBack || stillFinishing,
         readBack: showedReadBack,
       });
+      // The step the reply asked, as written: when the reading landed
+      // before the screen's view was read, the outcome no longer names it,
+      // and the line still asks it.
+      const askedOpen = keptStepOf(input.journeyType, asking) ?? undefined;
+      if (
+        path === "REPLY" &&
+        askedOpen !== undefined &&
+        state.steps.some(
+          (step) =>
+            step.stepKey === askedOpen &&
+            step.status === "OPEN" &&
+            step.savePending !== true,
+        )
+      ) {
+        // In the background: the person already has Q's reply.
+        void reading
+          .then(() =>
+            followUpIfAnswered({
+              asked: askedOpen,
+              stillLast: () =>
+                turnsTaken.get(input.onboardingSessionId) === turnNumber,
+              state: () => portOf(false).state(),
+              say: async (said) => {
+                await conversation.said?.(
+                  line,
+                  "Q",
+                  said.text,
+                  keptStepOf(input.journeyType, said.asking),
+                );
+                lastAsked.delete(input.onboardingSessionId);
+                if (said.asking !== null) {
+                  lastAsked.set(input.onboardingSessionId, said.asking);
+                }
+              },
+            }),
+          )
+          .then((followed) => {
+            if (followed) {
+              logger.info(
+                { asked: askedOpen, ms: Date.now() - startedAt },
+                "typed onboarding followed up a question their words had answered",
+              );
+            }
+          })
+          .catch((error: unknown) => {
+            logger.warn({ err: error }, "typed onboarding follow-up failed");
+          });
+      }
+      return outcome;
 
       /** Q's line kept with the step it asks, and the screen's outcome. */
       async function outcomeOf(said: {
@@ -880,4 +921,58 @@ export function waitingOnYes(
     seen.add(item.stepKey);
     return [`${label}: ${item.value}`];
   });
+}
+
+/** What Q says when a question it just asked turns out to be answered. */
+export const ALREADY_ANSWERED_LINE =
+  "No need to answer that one: your last message already covered it.";
+
+/**
+ * Q's reply went out before the reading of their words landed (the reply
+ * never waits for it: live final re-check 2026-10-31). When that reading
+ * shows the step the reply asked was answered by those same words, and
+ * the reply is still Q's last line, Q follows up at once: it says so and
+ * asks what is actually next, kept in the thread with that step, so the
+ * screen (which re-reads the session as the reading lands) and a reopened
+ * setup show the follow-up, never the stale question. Code-written; no
+ * model call. True when a follow-up was said.
+ */
+export async function followUpIfAnswered(input: {
+  readonly asked: string;
+  /** False once they said anything after the reply. */
+  readonly stillLast: () => boolean;
+  readonly state: () => Promise<OnboardingState>;
+  readonly say: (said: {
+    readonly text: string;
+    readonly asking: string | null;
+  }) => Promise<void>;
+}): Promise<boolean> {
+  if (!input.stillLast()) return false;
+  const now = await input.state();
+  const row = now.steps.find((step) => step.stepKey === input.asked);
+  if (row === undefined) return false;
+  if (row.status === "OPEN" && row.savePending !== true) return false;
+  if (!input.stillLast()) return false;
+  const next =
+    now.next?.find(
+      (item) =>
+        item.stepKey !== input.asked &&
+        now.steps.some(
+          (step) =>
+            step.stepKey === item.stepKey &&
+            step.status === "OPEN" &&
+            step.savePending !== true,
+        ),
+    )?.stepKey ?? null;
+  const question =
+    next === null
+      ? ""
+      : (SPOKEN_QUESTIONS[next] ??
+        now.steps.find((step) => step.stepKey === next)?.question ??
+        "");
+  await input.say({
+    text: `${ALREADY_ANSWERED_LINE}${question.length === 0 ? "" : ` ${question}`}`,
+    asking: question.length === 0 ? null : next,
+  });
+  return true;
 }

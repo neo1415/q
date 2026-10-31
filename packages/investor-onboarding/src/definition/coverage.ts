@@ -104,6 +104,8 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       concept: "investor.deployment_status",
       priority: "ESSENTIAL",
       label: "Deploying now",
+      // A judgement about their current state: asked, never read in.
+      askOnly: true,
       seconds: 10,
     },
     [INVESTOR_STEPS.stages]: {
@@ -272,6 +274,8 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       concept: "discovery.inbound_preference",
       priority: "ESSENTIAL",
       label: "Inbound",
+      // A judgement about their current state: asked, never read in.
+      askOnly: true,
       seconds: 10,
     },
     [INVESTOR_STEPS.additionalContext]: {

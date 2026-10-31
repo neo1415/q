@@ -10,7 +10,7 @@ import {
   GEOGRAPHY_VOCABULARIES,
   INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DEFINITION_CURRENT,
-  INVESTOR_DEFINITION_V2_VERSION,
+  INVESTOR_DEFINITION_V3_VERSION,
   INVESTOR_DEFINITION_VERSION,
   INVESTOR_WEBSITE_STEP,
   INVESTOR_STEPS,
@@ -276,12 +276,14 @@ function runtimeState(view: OnboardingSessionView): RuntimeState {
 }
 
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  // v1, and v2 (the firm's website on the role screen). A later version
-  // may add a step this build has no screen for, so it is refused honestly.
+  // v1, v2 (the firm's website on the role screen) and v3 ("Not sure yet"
+  // on the deployment status, an option the step's own list carries). A
+  // later version may add a step this build has no screen for, so it is
+  // refused honestly.
   const version = view.session.definitionVersion;
   return (
     version >= INVESTOR_DEFINITION_VERSION &&
-    version <= INVESTOR_DEFINITION_V2_VERSION
+    version <= INVESTOR_DEFINITION_V3_VERSION
   );
 }
 
