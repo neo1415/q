@@ -66,3 +66,50 @@ export const TaxonomyChoiceV2ResultSchema = z
 export type TaxonomyChoiceV2Result = z.infer<
   typeof TaxonomyChoiceV2ResultSchema
 >;
+
+/**
+ * v3 (live check 2026-10-31, production 656719a90): "recurring revenue"
+ * from an investor backing businesses that sell to businesses was read as
+ * Consumer Subscription (nothing told the reading who their customers are);
+ * "industrial automation" named nothing, though it is a kind of the listed
+ * Manufacturing & Industrial; and a founder's "40 lockers live in 12 towns"
+ * was lost when their words were read as "Paying customers". The reading
+ * is given what else they said for the profile (untrusted, their words),
+ * and gives back, in their exact words, what the chosen ones do not hold.
+ */
+export const TAXONOMY_CHOICE_V3_SCHEMA_VERSION = 3;
+
+export const TaxonomyChoiceV3VariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    field: z.string().trim().min(1).max(200),
+    /** One per line: "id | name | vocabulary". Trusted. */
+    candidates: z.string().trim().min(1).max(8_000),
+    phrase: z.string().trim().min(1).max(200),
+    sentence: z.string().trim().min(1).max(1_000),
+    /** What else they said for this profile, one "field: words" a line. UNTRUSTED. */
+    context: z.string().trim().min(1).max(1_200),
+  })
+  .strict();
+export type TaxonomyChoiceV3Variables = z.infer<
+  typeof TaxonomyChoiceV3VariablesSchema
+>;
+export const TAXONOMY_CHOICE_V3_UNTRUSTED = [
+  "phrase",
+  "sentence",
+  "context",
+] as const;
+
+export const TaxonomyChoiceV3ResultSchema = z
+  .object({
+    chosen: z.array(z.string().max(64)).max(16),
+    /**
+     * Their own words, copied exactly from the sentence, that say something
+     * the chosen ones do not hold (a count, a place, a name); null if none.
+     */
+    beyond: z.string().max(300).nullable().default(null),
+  })
+  .strict();
+export type TaxonomyChoiceV3Result = z.infer<
+  typeof TaxonomyChoiceV3ResultSchema
+>;

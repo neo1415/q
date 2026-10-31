@@ -583,6 +583,7 @@ export {
 } from "./words-readers.js";
 export {
   createTaxonomyChooser,
+  type TaxonomyChoice,
   type TaxonomyChooser,
 } from "./taxonomy-chooser.js";
 export {

@@ -178,7 +178,12 @@ function theirWordsBesideList(
   note: string | null | undefined,
 ): boolean {
   return (
-    (value.type === "MULTI_SELECT" || value.type === "RESOURCE_REFERENCE") &&
+    (value.type === "MULTI_SELECT" ||
+      value.type === "RESOURCE_REFERENCE" ||
+      // Their words beyond the one option they were read as (live check
+      // 2026-10-31: "40 lockers live in 12 towns" beside "Paying
+      // customers"); "other" with their words is said as their words.
+      (value.type === "SINGLE_SELECT" && value.optionKey !== "other")) &&
     note !== null &&
     note !== undefined &&
     note.trim().length > 0 &&
@@ -1033,12 +1038,16 @@ export function createOnboardingPort(input: {
         readonly field: string;
         readonly phrase: string;
         readonly sentence: string;
+        /** What else they said for the profile; see TaxonomyChooser. */
+        readonly context?: string | undefined;
         readonly candidates: readonly {
           readonly nodeId: string;
           readonly displayName: string;
           readonly vocabularyCode: string;
         }[];
-      }) => Promise<readonly string[] | null>)
+      }) => Promise<
+        (readonly string[] & { readonly beyond?: string | undefined }) | null
+      >)
     | undefined;
   /**
    * Whether the person has been shown what this review step confirms (Q
@@ -1069,6 +1078,15 @@ export function createOnboardingPort(input: {
     ),
   );
   let latest: OnboardingSessionView | null = null;
+  /**
+   * The answers the current `record` call was given: what else they said,
+   * as context for reading one of them by meaning (live check 2026-10-31:
+   * "recurring revenue" beside "mostly B2B" read as Consumer Subscription).
+   */
+  let batchAnswers: readonly {
+    readonly stepKey: string;
+    readonly value: string | readonly string[] | number | boolean;
+  }[] = [];
   /**
    * Whether `latest` is the view this port's own write just committed, so
    * a state read right after it needs no second round trip (owner
@@ -1352,6 +1370,9 @@ export function createOnboardingPort(input: {
       if (names.length > 0) {
         return `${names}, with “${note}” kept as you said it (no category matched it)`;
       }
+    }
+    if (theirWordsBesideList(value, note) && value.type === "SINGLE_SELECT") {
+      return `${await spoken(step, value, view)}. ${ALSO_SAID_NOTE} ${note}`;
     }
     return `${note} (in their words)`;
   };
@@ -1702,6 +1723,13 @@ export function createOnboardingPort(input: {
          * first (ALSO_NAMED_NOTE): Capital Q's words, not theirs.
          */
         readonly aside?: string | undefined;
+        /**
+         * Their own words about the field that the option read from them
+         * by meaning does not hold (live check 2026-10-31: "40 lockers live
+         * in 12 towns" lost when read as "Paying customers"). Kept as the
+         * note only after every check on the choice itself.
+         */
+        readonly told?: string | undefined;
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
@@ -1723,6 +1751,65 @@ export function createOnboardingPort(input: {
       inTurn ?? fieldClausesOf(quote, reading) ?? fieldPartOf(quote, reading)
     );
   };
+
+  /**
+   * What else they said for this profile, one "field: their words" a line,
+   * for reading one answer by meaning: the other answers given with it,
+   * and who their customers are on the record (a customer-type field, by
+   * its vocabulary). Their words: context, never instructions.
+   */
+  const contextFor = async (stepKey: string): Promise<string> => {
+    const labelOf = (key: string): string =>
+      (
+        coverageProfileFor(input.journeyType).fields[key]?.label ??
+        SPOKEN_QUESTIONS[key] ??
+        steps.get(key)?.configuration.prompt ??
+        key
+      ).slice(0, 80);
+    const lines: string[] = [];
+    for (const other of batchAnswers) {
+      const step = steps.get(other.stepKey);
+      if (other.stepKey === stepKey || step === undefined) continue;
+      const options = optionsOf(step);
+      const words = (
+        typeof other.value === "object" ? other.value : [String(other.value)]
+      )
+        // An option the reading named by its key is said by its label.
+        .map((said) => options.find((o) => o.key === said)?.label ?? said)
+        .join(", ");
+      if (words.trim().length > 0) {
+        lines.push(`${labelOf(other.stepKey)}: ${words.slice(0, 200)}`);
+      }
+    }
+    const view = latest ?? (await current());
+    for (const response of view.responses) {
+      const step = steps.get(response.stepKey);
+      const c = step?.configuration;
+      if (
+        step === undefined ||
+        response.stepKey === stepKey ||
+        batchAnswers.some((other) => other.stepKey === response.stepKey) ||
+        c?.stepType !== "reference_select" ||
+        c.resourceType !== "TAXONOMY_NODE" ||
+        !c.vocabularyCodes.includes("customer_type")
+      ) {
+        continue;
+      }
+      const names = await spoken(step, response.value, view);
+      if (names.length > 0) {
+        lines.push(`${labelOf(response.stepKey)}: ${names.slice(0, 200)}`);
+      }
+    }
+    return lines.slice(0, 12).join("\n").slice(0, 1_200);
+  };
+  /**
+   * Category words no listed category holds, for a list step, by the
+   * answer they came in: kept beside the categories another item of the
+   * same call names (record), never lost (live check 2026-10-31: the
+   * reading gave "industrial automation" as its own item, which named no
+   * category, and it was refused while "Fintech" saved alone).
+   */
+  const wordsOnly = new WeakMap<object, string>();
 
   /** What the words resolve to for this step, validated; nothing written. */
   const resolve = async (answer: {
@@ -1793,6 +1880,7 @@ export function createOnboardingPort(input: {
     let value: OnboardingResponseValue | null;
     let otherWords: string | undefined;
     let aside: string | undefined;
+    let told: string | undefined;
     // Their own words where they hold the answer; the model's reading of
     // them otherwise. Bounded as the runtime keeps them.
     const ownWordsFor = (reading: string): string => {
@@ -1817,6 +1905,12 @@ export function createOnboardingPort(input: {
       return theirs ? words.slice(0, 500) : ownWordsFor(reading);
     };
     const c = step.configuration;
+    // Read once, only when a reading by meaning needs it.
+    let context: Promise<string> | undefined;
+    const contextNow = (): Promise<string> =>
+      (context ??= contextFor(step.stepKey).catch(
+        reported("answer context", ""),
+      ));
     if (
       c.stepType === "reference_select" &&
       c.resourceType === "TAXONOMY_NODE"
@@ -1864,6 +1958,7 @@ export function createOnboardingPort(input: {
                     ),
                     phrase,
                     sentence: answer.quote ?? phrase,
+                    context: await contextNow(),
                     candidates: found.candidates.slice(0, 12),
                   })
                   .catch(
@@ -1921,6 +2016,8 @@ export function createOnboardingPort(input: {
                 )
                 .filter((part) => part.length > 0);
         const choose = input.chooseCategories;
+        const known =
+          parts === null || choose === undefined ? "" : await contextNow();
         const chosen =
           parts === null || choose === undefined
             ? null
@@ -1934,6 +2031,7 @@ export function createOnboardingPort(input: {
                       ),
                       phrase,
                       sentence: answer.quote ?? phrase,
+                      context: known,
                       candidates: part,
                     }).catch(reported("category reading (whole list)", null)),
                   ),
@@ -2034,7 +2132,21 @@ export function createOnboardingPort(input: {
         // categories only (live 2026-10-31, "Tidevand": a rambling
         // sentence was saved as the sector and read back as "Sector:
         // basically fishing boats…"; the runtime now refuses it too):
-        // nothing is saved and the person chooses from the list.
+        // nothing is saved and the person chooses from the list. Their
+        // words are remembered for this answer: an item of the same call
+        // that names categories keeps them beside those (record).
+        if (!affirmed) {
+          // Their phrase where it is theirs as said, else the part of their
+          // words it stands for (as beside matched categories, above).
+          const quote = answer.quote ?? "";
+          const theirs = unmatched.map((phrase) =>
+            textStatedIn(phrase, quote) ||
+            input.personTurns.some((said) => textStatedIn(phrase, said))
+              ? phrase
+              : ownWordsFor(phrase),
+          );
+          wordsOnly.set(answer, [...new Set(theirs)].join("; ").slice(0, 200));
+        }
         return refuse(noCategoryResult(step));
       }
       // QA QO-27 (23 Oct): "West Africa" said after "the UK" replaced the
@@ -2108,6 +2220,8 @@ export function createOnboardingPort(input: {
           : [String(answer.value)];
       const keys: string[] = [];
       const unnamed: string[] = [];
+      /** Their words beyond an option read from them by meaning. */
+      const toldBeyond: string[] = [];
       for (const phrase of phrases) {
         const key = named(phrase);
         if (key !== undefined) keys.push(key);
@@ -2144,6 +2258,7 @@ export function createOnboardingPort(input: {
               field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(0, 200),
               phrase: phrase.slice(0, 200),
               sentence: answer.quote ?? phrase,
+              context: await contextNow(),
               candidates: choices,
             })
             .catch(reported("option reading", null));
@@ -2153,6 +2268,15 @@ export function createOnboardingPort(input: {
           if (picked.length === 0) {
             still.push(phrase);
             continue;
+          }
+          // What their words say beyond the option, as they said it.
+          const beyond = chosen?.beyond?.trim() ?? "";
+          if (
+            beyond.length > 0 &&
+            (textStatedIn(beyond, answer.quote ?? "") ||
+              input.personTurns.some((said) => textStatedIn(beyond, said)))
+          ) {
+            toldBeyond.push(beyond);
           }
           keys.push(
             ...(c.stepType === "single_select" ? picked.slice(0, 1) : picked),
@@ -2246,6 +2370,9 @@ export function createOnboardingPort(input: {
               ? toResponseValue(step, only)
               : null
             : toResponseValue(step, distinct);
+      if (!affirmed && otherWords === undefined && toldBeyond.length > 0) {
+        told = [...new Set(toldBeyond)].join("; ").slice(0, 200);
+      }
     } else {
       const raw =
         typeof answer.value === "number" ? String(answer.value) : answer.value;
@@ -2314,6 +2441,7 @@ export function createOnboardingPort(input: {
       value,
       ...(otherWords === undefined ? {} : { note: otherWords }),
       ...(aside === undefined ? {} : { aside }),
+      ...(told === undefined ? {} : { told }),
     };
   };
 
@@ -3124,6 +3252,108 @@ export function createOnboardingPort(input: {
     }
     return { plans: out, leaders, followers };
   };
+  /**
+   * Category words an item named no category for, kept beside the
+   * categories another item of the same call names for that step (live
+   * check 2026-10-31, "Skerry Lantern": "fintech and industrial automation"
+   * came as two items; "industrial automation" named none and was refused,
+   * and only Fintech saved). Planned as a write of the other item's
+   * categories with their words as its note; merged with it below.
+   */
+  const foldWordsOnly = (
+    plans: readonly Planned[],
+    items: readonly (Answer | undefined)[],
+  ): Planned[] =>
+    plans.map((plan, index) => {
+      const item = items[index];
+      const words = item === undefined ? undefined : wordsOnly.get(item);
+      if (
+        plan.kind !== "DONE" ||
+        plan.result.outcome !== "UNMATCHED" ||
+        words === undefined ||
+        words.trim().length === 0
+      ) {
+        return plan;
+      }
+      const sibling = plans.find(
+        (other): other is Extract<Planned, { kind: "WRITE" }> =>
+          other.kind === "WRITE" &&
+          other.step.stepKey === plan.result.stepKey &&
+          holdsMany(other.step) &&
+          other.value.type === "RESOURCE_REFERENCE" &&
+          other.value.resourceIds.length > 0,
+      );
+      if (sibling === undefined || item === undefined) return plan;
+      return {
+        kind: "WRITE",
+        step: sibling.step,
+        value: sibling.value,
+        note: words,
+        quote: item.quote,
+      };
+    });
+  /**
+   * Category words no listed category holds, and nothing else of theirs
+   * for the step to sit beside: kept with the journey's notes under the
+   * field's label, so they are never lost (live check 2026-10-31:
+   * "recurring revenue" for business models). The step stays open; the
+   * result still says no category holds them, and that their words are
+   * kept.
+   */
+  const keepUnplacedWords = async (
+    results: OnboardingRecordResult[],
+    items: readonly (Answer | undefined)[],
+  ): Promise<void> => {
+    for (const [index, result] of results.entries()) {
+      const item = items[index];
+      const words = item === undefined ? undefined : wordsOnly.get(item);
+      const step = steps.get(result.stepKey);
+      if (
+        result.outcome !== "UNMATCHED" ||
+        words === undefined ||
+        words.trim().length === 0 ||
+        step === undefined
+      ) {
+        continue;
+      }
+      const notes = steps.get(OFF_PATH_NOTES);
+      if (notes === undefined) continue;
+      const label = (
+        coverageProfileFor(input.journeyType).fields[step.stepKey]?.label ??
+        (SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt).replace(
+          /\?$/u,
+          "",
+        )
+      ).slice(0, 80);
+      const line = `${label}: ${words.trim()}`.slice(0, 300);
+      const view = latest ?? (await current());
+      const before = view.responses.find((r) => r.stepKey === OFF_PATH_NOTES);
+      const existing =
+        before?.value.type === "TEXT" ? before.value.text.trim() : "";
+      let kept = existing.includes(line);
+      if (!kept) {
+        try {
+          await submit(OFF_PATH_NOTES, {
+            type: "TEXT",
+            text: (existing.length > 0 ? `${existing}\n${line}` : line).slice(
+              -2000,
+            ),
+          });
+          written.push(OFF_PATH_NOTES);
+          kept = true;
+        } catch (caught: unknown) {
+          // Not on their path yet: the refusal stands as before.
+          reported("unplaced category words", undefined)(caught);
+        }
+      }
+      if (kept) {
+        results[index] = {
+          ...result,
+          reason: `None of Capital Q's listed categories holds those words, so this field was not saved; their words are kept in their notes as "${line}". Ask them to choose from the category list on screen, or put the closest listed categories to them and ask if they fit.`,
+        };
+      }
+    }
+  };
   const recordOne = async (answer: Answer): Promise<OnboardingRecordResult> => {
     const plan = await planOne(answer);
     if (plan.kind === "DONE") return plan.result;
@@ -3479,12 +3709,19 @@ export function createOnboardingPort(input: {
         : null;
     const value = added?.value ?? resolved.value;
     const note = added === null ? resolved.note : added.note;
+    // Their words beyond the option they were read as: the note, where
+    // nothing else is (checked as theirs when it was read).
+    const told =
+      note === undefined && resolved.aside === undefined
+        ? resolved.told
+        : undefined;
     if (
       onRecord !== undefined &&
       (added === null
         ? resolved.note === undefined &&
           (resolved.aside === undefined ||
-            (onRecord.note ?? undefined) === resolved.aside)
+            (onRecord.note ?? undefined) === resolved.aside) &&
+          (told === undefined || (onRecord.note ?? undefined) === told)
         : (onRecord.note ?? undefined) === note) &&
       sameValue(onRecord.value, value)
     ) {
@@ -3510,7 +3747,7 @@ export function createOnboardingPort(input: {
       note:
         note !== undefined && resolved.aside?.startsWith(READ_AS_NOTE) === true
           ? `${resolved.aside} Kept as they said it: ${note}.`.slice(0, 500)
-          : (note ?? resolved.aside),
+          : (note ?? resolved.aside ?? told),
       quote: answer.quote,
     };
   };
@@ -4571,6 +4808,7 @@ export function createOnboardingPort(input: {
       const results: OnboardingRecordResult[] = [];
       turnSteps.clear();
       addingNow.clear();
+      batchAnswers = answers;
       for (const answer of answers) turnSteps.add(answer.stepKey);
       // One answer that cannot be processed never loses the others (bench
       // 2026-09-30: a category lookup's 400 threw out an investor's whole
@@ -4629,6 +4867,9 @@ export function createOnboardingPort(input: {
       // gave "Nordics" and "Germany" as two items; each was written over
       // the other in the same batch and only Germany stayed). Every item
       // is checked on its own words above; what they allow is merged here.
+      for (const [index, plan] of foldWordsOnly(plans, answers).entries()) {
+        plans[index] = plan;
+      }
       const merged = mergeListPlans(plans, await onRecordFor(plans));
       for (const [index, plan] of merged.plans.entries()) plans[index] = plan;
       const writes = plans.flatMap((plan, index) =>
@@ -4713,7 +4954,11 @@ export function createOnboardingPort(input: {
             ),
           );
         }
-        const joined = mergeListPlans(again, await onRecordFor(again));
+        const folded = foldWordsOnly(
+          again,
+          indices.map((index) => answers[index]),
+        );
+        const joined = mergeListPlans(folded, await onRecordFor(folded));
         for (const [at, plan] of joined.plans.entries()) {
           const index = indices[at];
           const answer = index === undefined ? undefined : answers[index];
@@ -4769,6 +5014,10 @@ export function createOnboardingPort(input: {
       if (input.held !== undefined && written.length > writtenBefore) {
         await replayHeldWrites().catch(reported("held writes replay", null));
       }
+      // Words no category holds, with nothing to sit beside: never lost.
+      await keepUnplacedWords(results, answers).catch(
+        reported("unplaced category words", undefined),
+      );
       return results;
     },
     view: () => latest,

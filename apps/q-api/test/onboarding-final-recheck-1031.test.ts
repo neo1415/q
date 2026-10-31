@@ -263,15 +263,20 @@ describe("2. every step the turn's words answer is written, even one their answe
           const keys = input.steps.map((s) => s.stepKey);
           seen.push(keys);
           const quote = "We are raising 1.5 million euros";
-          const answers: NonNullable<Reading>["answers"][number][] = [
-            {
-              stepKey: "F6.raising",
-              value: idOf(input, "F6.raising", "Yes, actively"),
-              quote,
-              ownWords: false,
-              source: "STATED",
-            },
-          ];
+          // The reread for what the save opened is shown only those steps
+          // (live check 2026-10-31, onb-8), so it answers only them.
+          const answers: NonNullable<Reading>["answers"][number][] =
+            keys.includes("F6.raising")
+              ? [
+                  {
+                    stepKey: "F6.raising",
+                    value: idOf(input, "F6.raising", "Yes, actively"),
+                    quote,
+                    ownWords: false,
+                    source: "STATED",
+                  },
+                ]
+              : [];
           if (keys.includes("F6.currency")) {
             answers.push(
               {
