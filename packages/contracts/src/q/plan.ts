@@ -302,6 +302,69 @@ export const QPlanReviewSummarySchema = z
   });
 export type QPlanReviewSummary = z.infer<typeof QPlanReviewSummarySchema>;
 
+/**
+ * The notices a plan's open points open with (plan-job.ts): which draft is
+ * shown and why. They say what the card holds, not a point to fix.
+ */
+export const Q_PLAN_EARLIER_DRAFT_KEPT =
+  "This is the earlier draft: its revision scored lower in review, so this draft is shown, with the reviews of this draft.";
+export const Q_PLAN_FIRST_DRAFT_ONLY =
+  "This is the first draft: its revision could not finish in time, so the reviews below are of this draft.";
+
+/** Code's own cap line for points past the stored maximum. */
+export function qPlanMorePointsLine(more: number): string {
+  return `And ${String(more)} more point${more === 1 ? "" : "s"} the reviews raised.`;
+}
+const MORE_POINTS_LINE = /^And (\d+) more points? the reviews raised\.$/u;
+const STEP_CONTINUED_LINE = /^Step (\d+), continued: (.*)$/su;
+const STEP_HEAD_LINE = /^Step (\d+), /u;
+
+/**
+ * The open points as one list, for the card and for Q's line alike (live
+ * 2026-10-31: chat "and 6 more on the card", card "Show all 9 points" --
+ * the card counted the draft notice as a point, the chat did not). A
+ * step's "continued" point folds into its step's line; the draft notice
+ * is apart; code's cap line is a count, not a point. `count` is every
+ * point the reviews raised: the listed ones and those the cap stands for.
+ * Code's own stored lines only: nothing a person wrote is read here.
+ */
+export function qPlanReviewPoints(openPoints: readonly string[]): {
+  readonly notice: string | null;
+  readonly points: readonly string[];
+  readonly more: number;
+  readonly count: number;
+} {
+  let notice: string | null = null;
+  let more = 0;
+  const points: string[] = [];
+  for (const point of openPoints) {
+    if (
+      point === Q_PLAN_EARLIER_DRAFT_KEPT ||
+      point === Q_PLAN_FIRST_DRAFT_ONLY
+    ) {
+      notice ??= point;
+      continue;
+    }
+    const capped = MORE_POINTS_LINE.exec(point);
+    if (capped !== null) {
+      more += Number(capped[1] ?? 0);
+      continue;
+    }
+    const continued = STEP_CONTINUED_LINE.exec(point);
+    const previous = points.at(-1);
+    if (
+      continued !== null &&
+      previous !== undefined &&
+      STEP_HEAD_LINE.exec(previous)?.[1] === continued[1]
+    ) {
+      points[points.length - 1] = `${previous} ${continued[2] ?? ""}`.trim();
+      continue;
+    }
+    points.push(point);
+  }
+  return { notice, points, more, count: points.length + more };
+}
+
 // --- dynamic specialists (addendum 1) ------------------------------------------
 
 /**

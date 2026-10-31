@@ -267,7 +267,12 @@ export function createPlans(dependencies: PlansDependencies) {
   const start = async (
     actor: ActorContext,
     runId: string,
-    input: { readonly ask: string; readonly planAsk: PlanAskReading },
+    input: {
+      readonly ask: string;
+      readonly planAsk: PlanAskReading;
+      /** What the title quotes; absent: the ask; null: none. */
+      readonly quote?: string | null | undefined;
+    },
   ): Promise<PlanStartOutcome> => {
     if (actor.actorType !== "HUMAN") return { status: "NOT_OWN" };
     if (input.planAsk.subject === "NAMED") return { status: "NOT_OWN" };
@@ -279,7 +284,10 @@ export function createPlans(dependencies: PlansDependencies) {
       kind: PLAN_JOB_KIND,
       ownerUserId: actor.userId,
       ask,
-      summary: summaryOf(ask, input.planAsk.deliverable),
+      summary: summaryOf(
+        input.quote === undefined ? ask : input.quote,
+        input.planAsk.deliverable,
+      ),
       subject,
       research: input.planAsk.research,
       deliverable: input.planAsk.deliverable,
@@ -1483,14 +1491,15 @@ export function boardMessage(board: BoardPlacement): string {
 }
 
 function summaryOf(
-  ask: string,
+  quote: string | null,
   deliverable: PlanAskReading["deliverable"],
 ): string {
-  const clean = ask.replace(/\s+/gu, " ").trim();
   const head =
     deliverable === "DOCUMENT_REVIEW"
       ? "Review of your documents"
       : "Your plan";
+  const clean = (quote ?? "").replace(/\s+/gu, " ").trim();
+  if (clean.length === 0) return head;
   const words = clipAtWord(clean, 120);
   return `${head}: ${words}`.slice(0, 400);
 }

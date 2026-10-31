@@ -34,7 +34,7 @@ import {
   type SlidePicture,
 } from "./slide-pictures";
 import { slideSource } from "./slide-source";
-import { QMarkdown } from "./markdown";
+import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { SpreadsheetPreview } from "./spreadsheet-preview";
 import { useT } from "@/features/i18n/language";
 
@@ -749,10 +749,22 @@ export function splitGaps(gaps: readonly string[]): {
   const review: string[] = [];
   for (const gap of gaps) {
     const point = REVIEW_POINT.exec(gap);
-    if (point === null) evidence.push(gap);
-    else review.push(`${point[1] ?? ""}: ${point[2] ?? ""}`);
+    if (point === null) evidence.push(pointWords(gap));
+    else review.push(pointWords(`${point[1] ?? ""}: ${point[2] ?? ""}`));
   }
   return { evidence, review };
+}
+
+/**
+ * Live 2026-10-31 (IC memo): a point quoted the memo's own markdown, read
+ * as "- **Cheque and role:** …". A point is shown as words: no bold
+ * markers, and no list marker opening a quote. Q's stored text only.
+ */
+export function pointWords(point: string): string {
+  return plainFromMarkdown(point)
+    .replace(/(["“'‘])\s*(?:[-*+•]|\d{1,9}[.)])\s+/gu, "$1")
+    .replace(/\s+/gu, " ")
+    .trim();
 }
 
 function DocumentSection({

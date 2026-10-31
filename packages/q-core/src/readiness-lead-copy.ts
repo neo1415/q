@@ -156,6 +156,16 @@ export function readinessLeadCopy(
 }
 
 /**
+ * Every hand-written plan offer, in every language. Q's stored answer that
+ * ends with one of these closed with code's own plan offer: a conversation
+ * read back after a restart still knows its last turn offered a plan.
+ * Code's own copy is matched here, never anything a person said.
+ */
+export const PLAN_OFFER_LINES: readonly string[] = Object.values(COPIES).map(
+  (copy) => copy.planOffer,
+);
+
+/**
  * Whether code may lead an answer with this copy: English, or a language
  * with a hand-written copy. Any other language gets no code-written lead,
  * so an answer in French never opens with an English list (lane ml's live

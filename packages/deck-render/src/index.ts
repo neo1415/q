@@ -100,3 +100,13 @@ export {
   overflowingBoxes,
   NEWSPAPER_PAGE,
 } from "./newspaper.js";
+// Live 2026-10-31: the writers' markdown subset, read for print and as
+// plain words for a quoted point.
+export {
+  inlineRuns,
+  plainInline,
+  plainMarkdown,
+  printBlocks,
+  type InlineRun,
+  type PrintBlock,
+} from "./markdown.js";

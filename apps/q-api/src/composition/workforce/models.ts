@@ -869,7 +869,10 @@ export function createWorkforceModels(dependencies: {
 /**
  * Prose a person reads, within its stored bound: cut at a word, with an
  * ellipsis, never mid-word (live 2026-10-24: "…a month-12 decision, not a
- * committed rollou").
+ * committed rollou"). Model input too (the critic and the redraft read
+ * it), so it stays byte-identical for the recorded research replays; what
+ * the person reads is re-cut at a whole sentence where the document is
+ * filed (analysis.ts personProse, live 2026-10-31).
  */
 export function prose(text: string, max: number): string {
   if (text.length <= max) return text;

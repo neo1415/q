@@ -9,6 +9,9 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DiscoveredCompanyDto } from "@capital-q/contracts";
@@ -1161,6 +1164,22 @@ describe("degraded and empty states", () => {
     );
     // Shown below the desktop breakpoint, where the dossier is not.
     expect(top?.closest(".lg\\:hidden")).not.toBeNull();
+    // Live 2026-10-31 (390 px): in the stage's flow it lay under the
+    // full-bleed pitch. It is its own positioned layer over the pitch,
+    // from the token scale, and takes no tap from the controls.
+    expect(top?.classList.contains("cq-feed-regions-line")).toBe(true);
+    expect(top?.classList.contains("cq-status-line")).toBe(false);
+    const css = readFileSync(
+      resolve(import.meta.dirname, "../app/globals.css"),
+      "utf8",
+    );
+    const rule = /\.cq-feed-regions-line \{([^}]*)\}/u.exec(css)?.[1] ?? "";
+    expect(rule).toContain("position: absolute;");
+    expect(rule).toContain("z-index: var(--cq-z-sticky);");
+    expect(rule).toContain("pointer-events: none;");
+    expect(rule).toContain("inset-inline: 56px 64px;");
+    // The stage is the positioned box it sits in, over the media.
+    expect(top?.closest(".cq-feed-stage")).not.toBeNull();
   });
 
   it("the outside-the-regions sentences: one company, or none counted", async () => {

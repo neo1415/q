@@ -3,7 +3,18 @@ import { PDFDocument, type PDFPage } from "pdf-lib";
 import type { QArtifactVersion } from "@capital-q/contracts";
 
 import { contrastRatio } from "./contrast.js";
-import { drawLine, embedFonts, type EmbeddedFont } from "./fonts.js";
+import {
+  drawLine,
+  embedFonts,
+  type EmbeddedFont,
+  type EmbeddedFonts,
+} from "./fonts.js";
+import {
+  plainMarkdown,
+  printBlocks,
+  type InlineRun,
+  type PrintBlock,
+} from "./markdown.js";
 import { colour } from "./pdf.js";
 import { themeFor, type BrandInput } from "./theme.js";
 
@@ -250,6 +261,51 @@ function wrapWith(
   return lines;
 }
 
+/** A word of a styled line, with whether it is bold. */
+type StyledWord = { readonly text: string; readonly bold: boolean };
+/** A line of styled words, already within its width. */
+type StyledLine = readonly StyledWord[];
+
+/**
+ * Inline runs (plain and bold) broken into lines no wider than `width`,
+ * each word measured in its own face. A word longer than a line is left
+ * to `drawLine`'s squeeze, as the plain wrap's character split would cut
+ * a bold figure in two.
+ */
+function wrapRuns(
+  fonts: EmbeddedFonts,
+  runs: readonly InlineRun[],
+  size: number,
+  width: number,
+): readonly StyledLine[] {
+  const words: StyledWord[] = [];
+  for (const run of runs) {
+    const face = run.bold ? fonts.bold : fonts.regular;
+    for (const word of face.text(run.text).split(/\s+/u)) {
+      if (word.length > 0) words.push({ text: word, bold: run.bold });
+    }
+  }
+  const lines: StyledWord[][] = [];
+  let line: StyledWord[] = [];
+  let used = 0;
+  const space = fonts.regular.width(" ", size);
+  for (const word of words) {
+    const face = word.bold ? fonts.bold : fonts.regular;
+    const wide = face.width(word.text, size);
+    const next = line.length === 0 ? wide : used + space + wide;
+    if (line.length > 0 && next > width) {
+      lines.push(line);
+      line = [word];
+      used = wide;
+    } else {
+      line.push(word);
+      used = next;
+    }
+  }
+  if (line.length > 0) lines.push(line);
+  return lines;
+}
+
 /**
  * A cursor down a sequence of pages.
  *
@@ -340,6 +396,65 @@ class Flow {
     }
   }
 
+  /**
+   * Styled lines (plain and bold words), each on whichever page has room;
+   * `first` is drawn before the first line only (a list marker), in the
+   * hanging indent's room.
+   */
+  styled(
+    fonts: EmbeddedFonts,
+    lines: readonly StyledLine[],
+    options: {
+      readonly size: number;
+      readonly leading: number;
+      readonly colour: string;
+      readonly indent?: number;
+      readonly first?: { readonly text: string; readonly at: number };
+    },
+  ): void {
+    const indent = options.indent ?? 0;
+    const lineHeight = Math.round(options.size * options.leading * 10) / 10;
+    const space = fonts.regular.width(" ", options.size);
+    lines.forEach((line, index) => {
+      this.ensure(lineHeight);
+      const y = PAGE.height - this.y - options.size;
+      if (index === 0 && options.first !== undefined) {
+        drawLine(this.page, fonts.regular, options.first.text, {
+          x: PAGE.left + options.first.at,
+          y,
+          size: options.size,
+          colour: colour(options.colour),
+          maxWidth: Math.max(1, indent - options.first.at),
+        });
+      }
+      // Runs of one face drawn together, so a copied line reads as words.
+      const segments: { text: string; bold: boolean }[] = [];
+      for (const word of line) {
+        const last = segments.at(-1);
+        if (last !== undefined && last.bold === word.bold) {
+          last.text = `${last.text} ${word.text}`;
+        } else {
+          segments.push({ text: word.text, bold: word.bold });
+        }
+      }
+      let x = PAGE.left + indent;
+      const right = PAGE.left + this.width;
+      for (const segment of segments) {
+        const face = segment.bold ? fonts.bold : fonts.regular;
+        const wide = face.width(segment.text, options.size);
+        drawLine(this.page, face, segment.text, {
+          x,
+          y,
+          size: options.size,
+          colour: colour(options.colour),
+          maxWidth: Math.max(1, Math.min(wide, right - x)),
+        });
+        x += wide + space;
+      }
+      this.y += lineHeight;
+    });
+  }
+
   rule(width: number, height: number, hex: string): void {
     this.ensure(height);
     this.page.drawRectangle({
@@ -395,18 +510,24 @@ export async function documentToPdf(
     colour: MUTED,
   });
   flow.gap(6);
-  flow.lines(fonts.bold, wrapWith(fonts.bold, document.title, 22, width), {
-    size: 22,
-    leading: 1.25,
-    colour: INK,
-  });
+  // Live 2026-10-31 (IC memo PDF): the writer's markdown printed as
+  // "**" and "- "; every part prints as words, a body as its structure.
+  flow.lines(
+    fonts.bold,
+    wrapWith(fonts.bold, plainMarkdown(document.title), 22, width),
+    {
+      size: 22,
+      leading: 1.25,
+      colour: INK,
+    },
+  );
   flow.gap(10);
   flow.rule(64, 2.5, accent);
   flow.gap(14);
   if (document.summary !== undefined && document.summary.length > 0) {
     flow.lines(
       fonts.regular,
-      wrapWith(fonts.regular, document.summary, 12, width),
+      wrapWith(fonts.regular, plainMarkdown(document.summary), 12, width),
       { size: 12, leading: 1.45, colour: SECONDARY },
     );
     flow.gap(8);
@@ -426,19 +547,57 @@ export async function documentToPdf(
     flow.gap(6);
   };
 
+  const body = (blocks: readonly PrintBlock[]) => {
+    blocks.forEach((block, index) => {
+      if (index > 0) flow.gap(block.kind === "item" ? 2 : 6);
+      if (block.kind === "heading") {
+        flow.ensure(11.5 * 1.4 + 2 * 10.5 * 1.5);
+        flow.styled(
+          fonts,
+          wrapRuns(
+            fonts,
+            block.runs.map((run) => ({ ...run, bold: true })),
+            11.5,
+            width,
+          ),
+          { size: 11.5, leading: 1.4, colour: INK },
+        );
+        return;
+      }
+      if (block.kind === "paragraph") {
+        flow.styled(fonts, wrapRuns(fonts, block.runs, 10.5, width), {
+          size: 10.5,
+          leading: 1.5,
+          colour: INK,
+        });
+        return;
+      }
+      const at = 14 * block.depth;
+      const indent = at + (block.marker === "•" ? 13 : 18);
+      flow.styled(fonts, wrapRuns(fonts, block.runs, 10.5, width - indent), {
+        size: 10.5,
+        leading: 1.5,
+        colour: INK,
+        indent,
+        first: { text: block.marker, at },
+      });
+    });
+  };
+
   for (const section of document.sections) {
-    heading(section.heading);
-    flow.lines(
-      fonts.regular,
-      wrapWith(fonts.regular, section.body, 10.5, width),
-      { size: 10.5, leading: 1.5, colour: INK },
-    );
+    heading(plainMarkdown(section.heading));
+    body(printBlocks(section.body));
     if (section.findings.length > 0) {
       flow.gap(8);
       for (const finding of section.findings) {
         flow.lines(
           fonts.regular,
-          wrapWith(fonts.regular, finding.statement, 9.5, width - 14),
+          wrapWith(
+            fonts.regular,
+            plainMarkdown(finding.statement),
+            9.5,
+            width - 14,
+          ),
           {
             size: 9.5,
             leading: 1.45,
@@ -466,7 +625,12 @@ export async function documentToPdf(
     if (items.length === 0) continue;
     heading(label);
     for (const gap of items) {
-      const lines = wrapWith(fonts.regular, gap, 10.5, width - 16);
+      const lines = wrapWith(
+        fonts.regular,
+        plainMarkdown(gap),
+        10.5,
+        width - 16,
+      );
       lines.forEach((line, index) => {
         flow.lines(fonts.regular, [index === 0 ? `•  ${line}` : line], {
           size: 10.5,

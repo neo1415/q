@@ -6,6 +6,7 @@ import {
   analysisContent,
   basisProblems,
   foundedIssues,
+  reviewOpenPoint,
   writeAnalysisWithReview,
   type AnalysisIssue,
 } from "../src/composition/workforce/analysis.js";
@@ -120,5 +121,31 @@ describe("every [S n] in a filed report resolves", () => {
       seed: "s",
     });
     expect(JSON.stringify(content)).not.toMatch(/\[S(47|55)\]/u);
+  });
+});
+
+describe("live 2026-10-31: a quoted figure reads as words", () => {
+  it("files the review's point without the writer's markdown, the model's input unchanged", () => {
+    const problems = basisProblems(
+      draft({
+        sections: [
+          {
+            heading: "Summary & recommendation",
+            body: "**Mandate fit:**\n- **Cheque and role:** Potential fit only if the financing accommodates a €750k–€3m co-investment.",
+          },
+        ],
+      }),
+      SOURCES,
+    );
+    const quoted = problems.find((one) => one.problem.includes("e.g."));
+    // The model reads the sentence as it was (recorded replays).
+    expect(quoted?.problem).toContain('e.g. "- **Cheque and role:**');
+    if (quoted === undefined) throw new Error("no point");
+    const filed = reviewOpenPoint(quoted);
+    expect(filed).toContain(
+      "Reviewer's open point (Summary & recommendation): 1 figure without a basis, e.g. \"Cheque and role: Potential fit",
+    );
+    expect(filed).not.toContain("**");
+    expect(filed).not.toContain('"- ');
   });
 });

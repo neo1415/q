@@ -273,6 +273,48 @@ describe("S4: a plan ask starts a durable plan job and its card lands in the thr
     );
   });
 
+  it("live 2026-10-31: a plan taken up from Q's offer is filed, queued and titled from the offered question; a reply is never the title", async () => {
+    const planAsk = {
+      kind: "GOAL",
+      research: "NONE",
+      side: null,
+      subject: "OWN",
+      deliverable: "PLAN",
+    } as const;
+    const w = world();
+    // Taken up: the answer passes the offered question as the ask.
+    const taken = await w.plans.start(founder, RUN, {
+      ask: "What should I do today?",
+      planAsk,
+    });
+    if (taken.status !== "STARTED") throw new Error("not started");
+    expect(taken.title).toBe("Your plan: What should I do today?");
+    const [row] = await w.queue.forOwner(owner, [taken.jobId]);
+    expect(row?.plan).toMatchObject({
+      ask: "What should I do today?",
+      summary: "Your plan: What should I do today?",
+    });
+    // Offered but not read as taken up: both words planned, none quoted.
+    const other = world();
+    const standing = await other.plans.start(founder, RUN, {
+      ask: "What should I do today?\nyes",
+      planAsk,
+      quote: null,
+    });
+    if (standing.status !== "STARTED") throw new Error("not started");
+    expect(standing.title).toBe("Your plan");
+    const [kept] = await other.queue.forOwner(owner, [standing.jobId]);
+    expect(kept?.plan).toMatchObject({
+      ask: "What should I do today?\nyes",
+      summary: "Your plan",
+    });
+    // The finished plan's card and line carry the same title.
+    await other.runner.pass();
+    expect(JSON.stringify(other.delivered.at(-1))).not.toContain(
+      "Your plan: yes",
+    );
+  });
+
   it("an ask about a company they name stays with the team job that writes documents", async () => {
     const w = world();
     const started = await w.plans.start(founder, RUN, {

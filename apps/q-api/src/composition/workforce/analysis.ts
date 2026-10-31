@@ -6,6 +6,7 @@ import {
   type QArtifactContent,
   type QArtifactFinding,
 } from "@capital-q/contracts";
+import { plainMarkdown } from "@capital-q/deck-render";
 import {
   clipAtWord,
   type AnalysisCritiqueResult,
@@ -224,6 +225,39 @@ export function sourcesText(sources: readonly AnalysisSource[]): string {
     )
     .join("\n")
     .slice(0, 10_000);
+}
+
+/**
+ * Live 2026-10-31 (IC memo PDF lead: "…raising £9m (company record,
+ * self-reported),…"): text code cut for its stored bound (models.ts prose,
+ * an ellipsis at the end) as the person reads it -- back to its last whole
+ * sentence when that keeps most of it, else the cut without a dangling
+ * comma. Only code's own cut is touched; the model's input is not (the
+ * recorded research replays read it unchanged).
+ */
+export function personProse(text: string): string {
+  if (!text.endsWith("…")) return text;
+  const room = text.slice(0, -1);
+  let end = -1;
+  for (const match of room.matchAll(/[.!?](?=\s|$)/gu)) {
+    end = match.index + 1;
+  }
+  if (end >= room.length * 0.4) return room.slice(0, end).trimEnd();
+  return `${room.replace(/[\s,;:\-–—]+$/u, "")}…`;
+}
+
+/**
+ * A review's open point as filed in the document's gaps, for the person:
+ * words, never the memo's own markdown it quotes (live 2026-10-31: a
+ * quoted "- **Cheque and role:** …"), cut at a word.
+ */
+export function reviewOpenPoint(
+  issue: Pick<AnalysisIssue, "section" | "problem">,
+): string {
+  return clipAtWord(
+    `${REVIEWER_OPEN_POINT} (${plainMarkdown(issue.section)}): ${readersWords(plainMarkdown(issue.problem))}`,
+    300,
+  );
 }
 
 /** The document as the critic reads it. */
@@ -896,12 +930,7 @@ export function analysisContent(input: {
     ...(input.codeGaps ?? []).map((gap) => clipAtWord(gap, 300)),
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
-    ...review.open.map((issue) =>
-      clipAtWord(
-        `${REVIEWER_OPEN_POINT} (${issue.section}): ${readersWords(issue.problem)}`,
-        300,
-      ),
-    ),
+    ...review.open.map(reviewOpenPoint),
   ].slice(0, 24);
   return {
     sections: [

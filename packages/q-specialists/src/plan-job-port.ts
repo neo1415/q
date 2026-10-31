@@ -36,7 +36,16 @@ export type QPlanStartOutcome =
 export type QPlanJobPort = {
   readonly start: (
     request: QAnswerRequest,
-    input: { readonly ask: string; readonly planAsk: QPlanAskReading },
+    input: {
+      readonly ask: string;
+      readonly planAsk: QPlanAskReading;
+      /**
+       * The words the plan's title quotes ("Your plan: …"); absent: the
+       * ask; null: none ("Your plan"). Live 2026-10-31: a reply to Q's
+       * plan offer is never what the title quotes.
+       */
+      readonly quote?: string | null | undefined;
+    },
   ) => Promise<QPlanStartOutcome>;
   /** Their words to work under way; NONE when nothing of theirs runs. */
   readonly direct?:

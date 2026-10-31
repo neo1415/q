@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { QPlanSchema, situationFacts } from "@capital-q/contracts";
+import {
+  QPlanSchema,
+  qPlanReviewPoints,
+  situationFacts,
+} from "@capital-q/contracts";
 
 import {
+  EARLIER_DRAFT_KEPT,
   FIRST_DRAFT_ONLY,
   cappedPoints,
   mergedPoints,
@@ -221,6 +226,32 @@ describe("job 32e70db7: what the person reads", () => {
     });
     // Card: 11 listed and "And 5 more" = 16; the line shows 2: 14 more.
     expect(planReadyLine(plan, null)).toContain("; and 14 more on the card.");
+    expect(qPlanReviewPoints(plan.review?.openPoints ?? []).count).toBe(16);
+  });
+
+  it("live 2026-10-31: the earlier-draft notice is no point -- chat '6 more' and card 'Show all 8'", () => {
+    const points = Array.from(
+      { length: 8 },
+      (_, index) =>
+        `Step ${String(index + 1)}, “Do ${String(index + 1)}”: Yours.`,
+    );
+    const openPoints = [
+      EARLIER_DRAFT_KEPT,
+      points[0] ?? "",
+      "Step 1, continued: More of it.",
+      ...points.slice(1),
+    ];
+    const plan = {
+      steps,
+      review: { fullyReviewed: false, openPoints },
+    } as unknown as Parameters<typeof planReadyLine>[0];
+    const line = planReadyLine(plan, null);
+    expect(line).toContain("It's the earlier draft");
+    expect(line).toContain("; and 6 more on the card.");
+    const card = qPlanReviewPoints(openPoints);
+    expect(card.notice).toBe(EARLIER_DRAFT_KEPT);
+    expect(card.count).toBe(8);
+    expect(card.points[0]).toBe("Step 1, “Do 1”: Yours. More of it.");
   });
 });
 
