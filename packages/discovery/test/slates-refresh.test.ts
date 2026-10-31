@@ -451,7 +451,7 @@ function collectingQueue(): RefreshQueue & {
 
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v5" as const,
-  structuredGeneratorVersion: "structured-mandate.v6" as const,
+  structuredGeneratorVersion: "structured-mandate.v7" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
@@ -775,7 +775,7 @@ describe("a deploy with newer pipeline versions rebuilds the slates the old one 
 
     const bumped = {
       ...same,
-      structuredGeneratorVersion: "structured-mandate.v7",
+      rankingConfigVersion: "ranking-config.v2",
     };
     expect(
       await requestRebuildsForVersionDrift({
