@@ -347,6 +347,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V9 } from "./tasks/onboarding-transcript-r
 import { ONBOARDING_TRANSCRIPT_READER_V10 } from "./tasks/onboarding-transcript-reader.v10.js";
 import { ONBOARDING_TRANSCRIPT_READER_V11 } from "./tasks/onboarding-transcript-reader.v11.js";
 import { ONBOARDING_TRANSCRIPT_READER_V12 } from "./tasks/onboarding-transcript-reader.v12.js";
+import { ONBOARDING_TRANSCRIPT_READER_V13 } from "./tasks/onboarding-transcript-reader.v13.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { ONBOARDING_TYPED_REPLY_V1 } from "./tasks/onboarding-typed-reply.v1.js";
@@ -355,6 +356,7 @@ import { ONBOARDING_TYPED_REPLY_V3 } from "./tasks/onboarding-typed-reply.v3.js"
 import { ONBOARDING_TYPED_REPLY_V4 } from "./tasks/onboarding-typed-reply.v4.js";
 import { ONBOARDING_TYPED_REPLY_V5 } from "./tasks/onboarding-typed-reply.v5.js";
 import { ONBOARDING_TYPED_REPLY_V6 } from "./tasks/onboarding-typed-reply.v6.js";
+import { ONBOARDING_TYPED_REPLY_V7 } from "./tasks/onboarding-typed-reply.v7.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 // DAILY block
@@ -548,7 +550,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V11, status: "DEPRECATED" },
     // Live check 2026-10-31 (84d8ede07): a summary is its content (no
     // lead-in); a list's unmatched part kept; an approximation is an answer.
-    ONBOARDING_TRANSCRIPT_READER_V12,
+    { ...ONBOARDING_TRANSCRIPT_READER_V12, status: "DEPRECATED" },
+    // Live check 2026-10-31 (d6f606053): words saying outright what a step
+    // asks answer it; every named category an item; a per-field quote.
+    ONBOARDING_TRANSCRIPT_READER_V13,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.
@@ -564,7 +569,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TYPED_REPLY_V5, status: "DEPRECATED" },
     // Live check 2026-10-31 (84d8ede07): one say-back covers every
     // told-at-length topic, as its content; an approximation is answered.
-    ONBOARDING_TYPED_REPLY_V6,
+    { ...ONBOARDING_TYPED_REPLY_V6, status: "DEPRECATED" },
+    // Live check 2026-10-31 (d6f606053): told anywhere is answered, the
+    // checklist lagging or not; a held value is put to them, never re-asked.
+    ONBOARDING_TYPED_REPLY_V7,
     WELCOME_CONDUCTOR_V1,
     WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,

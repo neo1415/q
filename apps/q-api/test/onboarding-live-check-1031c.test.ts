@@ -329,7 +329,8 @@ describe("3. the part of a list no option holds is kept and read back", () => {
     const state = await port.state();
     const row = state.steps.find((s) => s.stepKey === "I7.hard_exclusions");
     expect(row?.value).toMatch(/Gambling/u);
-    expect(row?.value).toMatch(/consumer apps \(in their words\)/u);
+    // Said apart from the list (live check 2026-10-31, d6f606053).
+    expect(row?.value).toMatch(/\. Also said: consumer apps$/u);
   });
 });
 

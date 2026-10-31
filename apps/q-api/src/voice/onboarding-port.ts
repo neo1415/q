@@ -188,6 +188,9 @@ function theirWordsBesideList(
   );
 }
 
+/** How their own words kept beside a list are shown with it. */
+export const ALSO_SAID_NOTE = "Also said:";
+
 /** How a note of options also named on a one-choice step begins. */
 export const ALSO_NAMED_NOTE = "Also named:";
 
@@ -1388,8 +1391,12 @@ export function createOnboardingPort(input: {
                       : stored.note?.startsWith(ALSO_NAMED_NOTE) === true ||
                           stored.note?.startsWith(READ_AS_NOTE) === true
                         ? `${await spoken(step, stored.value, view)} (${stored.note})`
-                        : theirWordsBesideList(stored.value, stored.note)
-                          ? `${await spoken(step, stored.value, view)}; ${stored.note ?? ""} (in their words)`
+                        : // Their other words, said apart from the list
+                          // (live check 2026-10-31, "Nordlicht": "Never
+                          // show: Gambling, Speculative crypto; consumer apps
+                          // (in their words)" read as a listed exclusion).
+                          theirWordsBesideList(stored.value, stored.note)
+                          ? `${await spoken(step, stored.value, view)}. ${ALSO_SAID_NOTE} ${stored.note ?? ""}`
                           : await spoken(step, stored.value, view),
                     600,
                   ) || null,
@@ -1728,6 +1735,19 @@ export function createOnboardingPort(input: {
       return (
         quote.length > 0 ? fieldWordsOf(quote, reading) : reading.trim()
       ).slice(0, 500);
+    };
+    // An approximate answer to a number step (live check 2026-10-31,
+    // "Lobbykylm": runway saved as "Burn is about 40k euros a month and we
+    // have a bit under a year of runway"): the reading's words for this
+    // field, when they are theirs as said, are the field's part; their
+    // whole sentence can carry other fields. Otherwise the field's clauses.
+    const approximateWordsFor = (reading: string): string => {
+      const words = reading.trim().replace(/\s+/gu, " ");
+      const theirs =
+        words.length > 0 &&
+        (textStatedIn(words, answer.quote ?? "") ||
+          input.personTurns.some((said) => textStatedIn(words, said)));
+      return theirs ? words.slice(0, 500) : ownWordsFor(reading);
     };
     const c = step.configuration;
     if (
@@ -2174,7 +2194,7 @@ export function createOnboardingPort(input: {
         return {
           ok: true,
           step,
-          value: { type: "TEXT", text: ownWordsFor(String(raw)) },
+          value: { type: "TEXT", text: approximateWordsFor(String(raw)) },
         };
       }
     }

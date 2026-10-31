@@ -163,6 +163,7 @@ export { ONBOARDING_TRANSCRIPT_READER_V9 } from "./prompts/tasks/onboarding-tran
 export { ONBOARDING_TRANSCRIPT_READER_V10 } from "./prompts/tasks/onboarding-transcript-reader.v10.js";
 export { ONBOARDING_TRANSCRIPT_READER_V11 } from "./prompts/tasks/onboarding-transcript-reader.v11.js";
 export { ONBOARDING_TRANSCRIPT_READER_V12 } from "./prompts/tasks/onboarding-transcript-reader.v12.js";
+export { ONBOARDING_TRANSCRIPT_READER_V13 } from "./prompts/tasks/onboarding-transcript-reader.v13.js";
 export { TAXONOMY_CHOICE_V1 } from "./prompts/tasks/taxonomy-choice.v1.js";
 export { TAXONOMY_CHOICE_V2 } from "./prompts/tasks/taxonomy-choice.v2.js";
 export * from "./prompts/schemas/taxonomy-choice.js";
@@ -172,6 +173,7 @@ export { ONBOARDING_TYPED_REPLY_V3 } from "./prompts/tasks/onboarding-typed-repl
 export { ONBOARDING_TYPED_REPLY_V4 } from "./prompts/tasks/onboarding-typed-reply.v4.js";
 export { ONBOARDING_TYPED_REPLY_V5 } from "./prompts/tasks/onboarding-typed-reply.v5.js";
 export { ONBOARDING_TYPED_REPLY_V6 } from "./prompts/tasks/onboarding-typed-reply.v6.js";
+export { ONBOARDING_TYPED_REPLY_V7 } from "./prompts/tasks/onboarding-typed-reply.v7.js";
 export {
   ONBOARDING_TYPED_REPLY_SCHEMA_NAME,
   OnboardingTypedReplyResultSchema,

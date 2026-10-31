@@ -163,7 +163,10 @@ export function createTypedOnboarding(dependencies: {
           journeyType: input.journeyType,
         },
       };
-      const portOf = (finishing: boolean) =>
+      const portOf = (
+        finishing: boolean,
+        approved: ReadonlySet<string> = new Set<string>(),
+      ) =>
         createOnboardingPort({
           logger,
           session: input.session,
@@ -178,7 +181,9 @@ export function createTypedOnboarding(dependencies: {
               stated: new Set<string>(),
               declined: new Set<string>(),
               handed: new Set<string>(),
-              approved: new Set<string>(),
+              // A suggestion of Q's they approved, as the reading of their
+              // latest words beside the reply found (never a phrase).
+              approved,
               finishing,
               lookup: null,
             }),
@@ -308,6 +313,30 @@ export function createTypedOnboarding(dependencies: {
       const readBackReview = readBackShown.has(input.onboardingSessionId)
         ? (reviewOf(state, input.journeyType, labelOf)?.stepKey ?? null)
         : null;
+      // Live check 2026-10-31 ("Nordlicht"): "only well-matched inbound"
+      // was held for their yes (a judgement, said unasked); Q then asked
+      // the inbound question from scratch, and their answer waited 23 s on
+      // readings. Q's last line put that held suggestion to them: whether
+      // they approve it is read with their words, and it is accepted at
+      // once, as it was put to them.
+      const heldAsked = heldAskedOf(
+        state,
+        lastAsked.get(input.onboardingSessionId),
+      );
+      const heldOffer =
+        heldAsked === null
+          ? []
+          : (
+              await port.pendingRecommendations().catch((error: unknown) => {
+                logger.warn(
+                  { err: error },
+                  "typed onboarding suggestions not read",
+                );
+                return [];
+              })
+            )
+              .filter((item) => item.stepKey === heldAsked)
+              .slice(0, 1);
       // The reply and the reading of whether they pause or finish run side
       // by side: the person waits for one model, not two in a row.
       const [authority, firstReply] = await Promise.all([
@@ -328,7 +357,10 @@ export function createTypedOnboarding(dependencies: {
                   about: step.question,
                   required: step.required,
                 })),
-                pending: [],
+                pending: heldOffer.map((item) => ({
+                  stepKey: item.stepKey,
+                  recommended: item.value,
+                })),
                 attribution,
                 ...(input.signal === undefined ? {} : { signal: input.signal }),
               })
@@ -343,6 +375,30 @@ export function createTypedOnboarding(dependencies: {
       ]);
 
       const written = firstReply;
+      // The held suggestion Q put to them, approved: accepted now, exactly
+      // as it was put to them (the port checks it is still pending and
+      // was said), so nothing waits on a reading of "yes" for it.
+      const acceptedNow = new Set<string>();
+      const approvedOffer = heldOffer.filter(
+        (item) => authority?.approved.has(item.stepKey) === true,
+      );
+      if (approvedOffer.length > 0) {
+        const accepted = await portOf(
+          false,
+          new Set(approvedOffer.map((item) => item.stepKey)),
+        )
+          .accept(approvedOffer.map((item) => item.stepKey))
+          .catch((error: unknown) => {
+            logger.warn(
+              { err: error },
+              "typed onboarding suggestion not accepted",
+            );
+            return [];
+          });
+        for (const result of accepted) {
+          if (result.outcome === "COMMITTED") acceptedNow.add(result.stepKey);
+        }
+      }
       const agreedToReadBack =
         readBackReview !== null &&
         authority?.stated.has(readBackReview) === true;
@@ -386,7 +442,10 @@ export function createTypedOnboarding(dependencies: {
         // only their answers are waited for: setting aside what they
         // declined is never waited on (it was twelve writes one by one).
         const through =
-          statesMore(authority, input.journeyType) ||
+          statesMore(
+            withoutAccepted(authority, acceptedNow),
+            input.journeyType,
+          ) ||
           (agreedToReadBack && readBackWaiting.has(input.onboardingSessionId))
             ? "LATEST"
             : "EARLIER";
@@ -402,24 +461,27 @@ export function createTypedOnboarding(dependencies: {
           finished.reason === REVIEW_NOT_SHOWN_REASON
             ? reviewOf(now, input.journeyType, labelOf)
             : undefined;
+        // Q's suggestions waiting on their yes: listed in a read-back, and
+        // a needed step still missing that has one is put to them as that
+        // suggestion, never asked from scratch (live 2026-10-31).
+        const suggestions =
+          shown !== undefined || finished.missing.length > 0
+            ? await finishing
+                .pendingRecommendations()
+                .catch((error: unknown) => {
+                  logger.warn(
+                    { err: error },
+                    "typed onboarding suggestions not read",
+                  );
+                  return [];
+                })
+            : [];
         const review =
           shown === undefined
             ? undefined
             : {
                 ...shown,
-                pending: waitingOnYes(
-                  now,
-                  await finishing
-                    .pendingRecommendations()
-                    .catch((error: unknown) => {
-                      logger.warn(
-                        { err: error },
-                        "typed onboarding suggestions not read",
-                      );
-                      return [];
-                    }),
-                  labelOf,
-                ),
+                pending: waitingOnYes(now, suggestions, labelOf),
               };
         // Already finishing, Q's last line asked a needed step, and their
         // answer left it open: it is not put again word for word.
@@ -429,6 +491,8 @@ export function createTypedOnboarding(dependencies: {
         const said = finishingLine(input.journeyType, finished, {
           labelOf,
           questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,
+          heldFor: (stepKey) =>
+            suggestions.find((item) => item.stepKey === stepKey)?.value ?? null,
           ...(review === undefined ? {} : { review }),
           ...(unsettled === undefined ? {} : { unsettled }),
         });
@@ -682,6 +746,42 @@ export function createTypedOnboarding(dependencies: {
     );
     return parsed.success ? parsed.data : null;
   }
+}
+
+/**
+ * The step Q's last line asked, when what is waiting on it is a suggestion
+ * of Q's held for their yes (an open step with one pending): their reply
+ * may approve it. Null otherwise.
+ */
+export function heldAskedOf(
+  state: OnboardingState,
+  asked: string | undefined,
+): string | null {
+  if (asked === undefined) return null;
+  const row = state.steps.find((step) => step.stepKey === asked);
+  return row !== undefined &&
+    row.status === "OPEN" &&
+    row.pendingRecommendation !== undefined
+    ? asked
+    : null;
+}
+
+/** The reading of their words, less what code already accepted from it. */
+export function withoutAccepted<
+  T extends {
+    readonly stated: ReadonlySet<string>;
+    readonly handed: ReadonlySet<string>;
+    readonly approved: ReadonlySet<string>;
+  },
+>(authority: T | null, accepted: ReadonlySet<string>): T | null {
+  if (authority === null || accepted.size === 0) return authority;
+  const less = (keys: ReadonlySet<string>) =>
+    new Set([...keys].filter((key) => !accepted.has(key)));
+  return {
+    ...authority,
+    stated: less(authority.stated),
+    approved: less(authority.approved),
+  };
 }
 
 /**

@@ -139,8 +139,8 @@ describe("ONBOARDING_TRANSCRIPT_READER v12 and ONBOARDING_TYPED_REPLY v6 (live c
   const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
 
   it("are the active versions and keep the rules before them", () => {
-    expect(reader.version).toBe(12);
-    expect(reply.version).toBe(6);
+    expect(reader.version).toBeGreaterThanOrEqual(12);
+    expect(reply.version).toBeGreaterThanOrEqual(6);
     expect(reader.template).toMatch(/\(their thesis\) is LONG_TEXT/u);
     expect(reply.template).toMatch(
       /The checklist is the record from before their latest message/u,
@@ -180,6 +180,55 @@ describe("ONBOARDING_TRANSCRIPT_READER v12 and ONBOARDING_TYPED_REPLY v6 (live c
     expect(reader.template).toMatch(/never turn it into a figure/u);
     expect(reply.template).toMatch(
       /An approximate answer \("a bit under a year", "around a dozen"\) answers its topic/u,
+    );
+  });
+});
+
+describe("ONBOARDING_TRANSCRIPT_READER v13 and ONBOARDING_TYPED_REPLY v7 (live check 2026-10-31, d6f606053)", () => {
+  const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
+  const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
+
+  it("are the active versions and keep the rules before them", () => {
+    expect(reader.version).toBe(13);
+    expect(reply.version).toBe(7);
+    expect(reader.template).toMatch(
+      /An approximate answer to a number step is an answer/u,
+    );
+    expect(reply.template).toMatch(
+      /says back what you understood for EVERY such topic/u,
+    );
+    // The rule against working one step out from another stays.
+    expect(reader.template).toMatch(
+      /Never work one step out from words about another/u,
+    );
+  });
+
+  it('1. "we are raising 1.2 million euros", said to another question, answers whether they are raising now', () => {
+    expect(reader.template).toMatch(
+      /Words that say outright what a step asks do answer it, whichever question they were said to/u,
+    );
+    expect(reader.template).toMatch(/says they are raising now/u);
+    expect(reply.template).toMatch(
+      /The checklist can lag a message or two behind the conversation/u,
+    );
+    expect(reply.template).toMatch(/even in answer to a different question/u);
+  });
+
+  it("2. a value held from their own words is put to them for their yes, never asked from scratch", () => {
+    expect(reply.template).toMatch(
+      /a value not confirmed yet that Q found in their own words, never ask that topic from scratch/u,
+    );
+  });
+
+  it("4. every category they name is its own item, listed or not", () => {
+    expect(reader.template).toMatch(
+      /give every category they name, each its own item in their words, even one you think may not be listed/u,
+    );
+  });
+
+  it("5. a quote is the part of the line about that step", () => {
+    expect(reader.template).toMatch(
+      /only the part of that line about this step when the line also answers other steps/u,
     );
   });
 });

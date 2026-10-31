@@ -627,6 +627,13 @@ export function finishingLine(
      * needed, with the question once more.
      */
     readonly unsettled?: string | undefined;
+    /**
+     * A suggestion of Q's held for their yes on a needed step, as Q would
+     * say it (live check 2026-10-31, "Nordlicht": "only well-matched
+     * inbound" sat as a card while "skip the rest" asked the inbound
+     * question from scratch): that step is put to them as the suggestion.
+     */
+    readonly heldFor?: ((stepKey: string) => string | null) | undefined;
   },
 ): { readonly reply: string; readonly asking: string | null } | null {
   if (
@@ -698,6 +705,22 @@ export function finishingLine(
       : `${String(finished.missing.length)} more answers from you, starting with this one`;
   const question = (copy.questionOf(first.stepKey) ?? first.question).trim();
   const asked = question.endsWith("?") ? question : `${question}?`;
+  const held =
+    first.stepKey === copy.unsettled
+      ? null
+      : (copy.heldFor?.(first.stepKey)?.trim() ?? null);
+  if (held !== null && held.length > 0) {
+    // What they said is put back to them for their yes, never asked again.
+    const label = copy.labelOf(first.stepKey) ?? question.replace(/\?$/u, "");
+    const which =
+      finished.missing.length === 1
+        ? "I need your yes on one thing"
+        : `I still need ${String(finished.missing.length)} more answers from you, starting with your yes on this one`;
+    return {
+      reply: `Before I can finish, ${which}. From what you said:\n\n${label}: ${held.replace(/[.;\s]+$/u, "")}\n\nShall I keep that? Say yes, or tell me what it should be.`,
+      asking: first.stepKey,
+    };
+  }
   if (again && first.stepKey === copy.unsettled) {
     // The only one left, and they could not say: it is needed, so it is
     // put once more with why it is asked, never word for word.

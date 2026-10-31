@@ -142,13 +142,23 @@ type Buffer = { role: "PERSON" | "Q"; parts: string[] };
 
 type Reading = {
   timer: ReturnType<typeof setTimeout> | null;
-  running: Promise<void> | null;
-  again: boolean;
+  /**
+   * Every reading started, settled in order: the last one's writes, its
+   * set-asides included, are done. A reading's model call never waits for
+   * this; only its writes do (live check 2026-10-31, "Nordlicht": the
+   * reading of "only well-matched ones" waited behind ten set-asides of
+   * the reading before, then read for 13 s; the read-back took 23 s).
+   */
+  tail: Promise<void>;
+  /** Whether `tail` has settled (a reading after it reads a fresh record). */
+  tailSettled: boolean;
+  /** Readings started and not settled yet. */
+  inFlight: number;
   line: ConversationLine;
   /** Things they said, counted; a new line starts at 1 (unread backlog). */
   heard: number;
-  /** The count the last finished reading started from: read up to there. */
-  readThrough: number;
+  /** The count the latest reading started from: read, or being read, to there. */
+  startedThrough: number;
   /** The count whose words' answers are on the record (before set-asides). */
   answeredThrough: number;
   /** Waiting for answeredThrough to move. */
@@ -340,6 +350,11 @@ export function createOnboardingConversation(dependencies: {
     rereads = 0,
     /** Called once what this reading gives is recorded, before set-asides. */
     answeredNow: () => void = () => undefined,
+    /** The reading before this one: its writes come first. */
+    prior: { readonly done: Promise<void>; readonly settled: () => boolean } = {
+      done: Promise.resolve(),
+      settled: () => true,
+    },
   ): Promise<void> => {
     // Everything heard so far is in the thread before it is read.
     await (writes.get(line.voiceSessionId) ?? Promise.resolve());
@@ -378,7 +393,7 @@ export function createOnboardingConversation(dependencies: {
       .map((turn) => turn.text)
       .reverse();
     if (personTurns.length === 0) return;
-    const state = await portFor(line, personTurns).state();
+    let state = await portFor(line, personTurns).state();
     if (state.completed) return;
     const optionIds = optionIdsOf(state);
     const read = await dependencies.reader.read({
@@ -392,6 +407,15 @@ export function createOnboardingConversation(dependencies: {
       },
     });
     if (read === null) return;
+    // Writes go in the order things were said: the reading before this one
+    // writes everything first (its set-asides included), and what is
+    // decided below is decided on the record as it then stands. Only the
+    // model call ran beside it.
+    if (!prior.settled()) {
+      await prior.done;
+      state = await portFor(line, personTurns).state();
+      if (state.completed) return;
+    }
     // The reader named options by their ids; back to the journey's keys.
     const reading = {
       ...read,
@@ -767,11 +791,12 @@ export function createOnboardingConversation(dependencies: {
     }
     const created: Reading = {
       timer: null,
-      running: null,
-      again: false,
+      tail: Promise.resolve(),
+      tailSettled: true,
+      inFlight: 0,
       line,
       heard: 1,
-      readThrough: 0,
+      startedThrough: 0,
       answeredThrough: 0,
       waiters: new Set(),
     };
@@ -779,22 +804,34 @@ export function createOnboardingConversation(dependencies: {
     return created;
   };
 
+  /**
+   * Read everything heard so far, unless a reading of it has already
+   * started. Readings run side by side; each one's writes wait for the
+   * one before (readAndSave's `prior`), so they land in order.
+   */
   const run = (reading: Reading): Promise<void> => {
-    if (reading.running !== null) {
-      reading.again = true;
-      return reading.running;
-    }
     // Everything heard by now is in the thread before it is read.
     const upTo = reading.heard;
+    if (reading.startedThrough >= upTo) return reading.tail;
+    reading.startedThrough = upTo;
     const answeredNow = () => {
       if (reading.answeredThrough >= upTo) return;
       reading.answeredThrough = upTo;
       for (const wake of [...reading.waiters]) wake();
     };
-    reading.running = readAndSave(reading.line, 0, answeredNow)
-      .then(() => {
-        reading.readThrough = Math.max(reading.readThrough, upTo);
-      })
+    const before = reading.tail;
+    let beforeSettled = reading.tailSettled;
+    if (!beforeSettled) {
+      void before.then(() => {
+        beforeSettled = true;
+      });
+    }
+    reading.inFlight += 1;
+    reading.tailSettled = false;
+    const done = readAndSave(reading.line, 0, answeredNow, {
+      done: before,
+      settled: () => beforeSettled,
+    })
       .catch((error: unknown) => {
         logger.warn(
           {
@@ -804,16 +841,17 @@ export function createOnboardingConversation(dependencies: {
           "onboarding conversation could not be read and saved",
         );
       })
+      // Never settled before the reading it follows, even when it wrote
+      // nothing (an early return): "settled" means everything before too.
+      .then(() => before)
       .finally(() => {
-        reading.running = null;
+        reading.inFlight -= 1;
         // Done or failed: nothing more of these words is coming.
         answeredNow();
-        if (reading.again) {
-          reading.again = false;
-          void run(reading);
-        }
+        if (reading.tail === done) reading.tailSettled = true;
       });
-    return reading.running;
+    reading.tail = done;
+    return done;
   };
 
   const schedule = (line: ConversationLine) => {
@@ -835,23 +873,20 @@ export function createOnboardingConversation(dependencies: {
       clearTimeout(reading.timer);
       reading.timer = null;
     }
-    /** Every reading under way, and any it queued, finished. */
-    const quiet = async (): Promise<void> => {
-      for (;;) {
-        const running: Promise<void> | null = reading.running;
-        if (running === null) return;
-        await running;
-      }
-    };
     const done = (async () => {
-      await quiet();
-      // Read again only when they said something after the last reading
-      // began (live re-check 2026-10-31: every flush read the whole thread
-      // a second time, the finish waited out its bound, and Q asked for a
-      // currency saved two seconds later).
-      if (reading.readThrough < reading.heard) await run(reading);
-      await quiet();
-      return true;
+      // Read only what no reading has started on (live re-check
+      // 2026-10-31: every flush read the whole thread a second time, the
+      // finish waited out its bound, and Q asked for a currency saved two
+      // seconds later); then every reading under way, and any started
+      // meanwhile, is settled.
+      for (;;) {
+        if (reading.startedThrough < reading.heard) void run(reading);
+        const tail = reading.tail;
+        await tail;
+        if (reading.tail === tail && reading.startedThrough >= reading.heard) {
+          return true;
+        }
+      }
     })();
     return Promise.race([
       done,
@@ -871,11 +906,8 @@ export function createOnboardingConversation(dependencies: {
     const wanted =
       through === "LATEST" ? reading.heard : Math.max(0, reading.heard - 1);
     if (reading.answeredThrough >= wanted) return true;
-    // Words not being read yet are read now (as flush would).
-    if (
-      reading.running === null ||
-      (through === "LATEST" && reading.timer !== null)
-    ) {
+    // Words no reading has started on are read now (as flush would).
+    if (reading.startedThrough < wanted) {
       if (reading.timer !== null) {
         clearTimeout(reading.timer);
         reading.timer = null;
@@ -936,7 +968,7 @@ export function createOnboardingConversation(dependencies: {
         reading !== undefined &&
         reading.line.voiceSessionId === line.voiceSessionId &&
         reading.timer === null &&
-        reading.running === null &&
+        reading.inFlight === 0 &&
         !buffers.has(line.voiceSessionId)
       ) {
         readings.delete(line.onboarding.sessionId);
