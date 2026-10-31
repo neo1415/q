@@ -161,9 +161,29 @@ function mentionsWhole(text: string, subject: readonly string[]): boolean {
   return false;
 }
 
+/**
+ * Whether `domain` is the subject's own site. Live 2026-10-31 (IC memo on
+ * Ferrolith, whose record names ferrolith.example): ferrolith.org, a
+ * software library's page, was filed as "primary: Ferrolith's own
+ * disclosure, its claim" and cited in Team, because a domain spelling the
+ * company's name was taken for its own. When the record names a site,
+ * only that site is the subject's own; any other domain is a third party
+ * and is judged like any other page (strangerSites). Without a recorded
+ * site, the name is all there is to go on.
+ */
+export function isSubjectSite(
+  domain: string,
+  identity: SubjectIdentity,
+): boolean {
+  const site = identity.site?.trim() ?? "";
+  if (site.length > 0)
+    return registrableDomain(domain) === registrableDomain(hostOf(site));
+  return isOwnSiteOf(domain, identity.name);
+}
+
 /** Whether this page is on the subject's own site. */
 function onSubjectSite(fact: FactLike, identity: SubjectIdentity): boolean {
-  return isOwnSiteOf(fact.domain, identity.name);
+  return isSubjectSite(fact.domain, identity);
 }
 
 /**
@@ -208,6 +228,7 @@ export function namesakeSources(
     ...[...namesake].filter((source) => !tied.has(source)),
     ...strangerSites(facts, identity, subject),
     ...strangerPages(facts, identity, subject),
+    ...nameLikePages(facts, identity, subject),
   ]);
 }
 
@@ -309,6 +330,13 @@ function strangerSites(
       page.flatMap((fact) => [
         ...describingWords(fact.title ?? "", subject),
         ...describingWords(fact.entity ?? "", subject),
+        // Live 2026-10-31 (ferrolith.org, titled "Ferrolith | ferrolith"):
+        // a bare title says nothing, yet its facts described a C++/CUDA
+        // library while the record describes sodium-ion cells. What its
+        // facts say counts too, past page furniture.
+        ...describingWords(fact.statement, subject).filter(
+          (word) => !FURNITURE.has(word),
+        ),
       ]),
     );
     if (says.size < 2) continue;
@@ -317,6 +345,72 @@ function strangerSites(
     strangers.add(source);
   }
   return strangers;
+}
+
+/**
+ * NAME-LIKE TOPIC pages (live 2026-10-31, an IC memo on Ferrolith, a
+ * sodium-ion cell maker): a search for its name found "Europe Ferroalloys
+ * Market" (S11) and "Germany Ferro Manganese Market Outlook" (S16), and
+ * the memo cited their figures in its Market section and Risks. They are
+ * about a different subject whose name merely starts like the company's.
+ * A page is such a page when, from stored fields only:
+ *
+ *  - its title or entity fields carry a word like the subject's name (its
+ *    first five letters, or a part of it at least five long) that is not
+ *    a word of the subject's name; and
+ *  - that word shares no stem with the subject's own description (a
+ *    "solar" market for a solar company's "Solarix" stays); and
+ *  - nothing on it names the subject's whole name or recorded site, and
+ *    no other source corroborates any of its facts.
+ *
+ * Without a recorded site or description nothing is judged: unknown stays
+ * unknown.
+ */
+function nameLikePages(
+  facts: readonly FactLike[],
+  identity: SubjectIdentity,
+  subject: readonly string[],
+): ReadonlySet<number> {
+  const pages = new Set<number>();
+  const site = identity.site?.trim() ?? "";
+  const profile = identity.profile?.trim() ?? "";
+  const compact = subject.join("");
+  if (site.length === 0 || profile.length === 0 || compact.length < 6)
+    return pages;
+  const own = registrableDomain(hostOf(site));
+  // The subject's own name is not what it does ("ferroalloys" shares
+  // "ferro" with "Ferrolith" itself).
+  const theirs = describingWords(profile, subject);
+  const stem = compact.slice(0, 5);
+  const like = (word: string) =>
+    !subject.includes(word) &&
+    word !== compact &&
+    (word.startsWith(stem) || (word.length >= 5 && compact.startsWith(word)));
+  const bySource = new Map<number, FactLike[]>();
+  for (const fact of facts)
+    bySource.set(fact.source, [...(bySource.get(fact.source) ?? []), fact]);
+  for (const [source, page] of bySource) {
+    const first = page[0];
+    if (first === undefined) continue;
+    if (registrableDomain(first.domain) === own) continue;
+    if (page.some((fact) => (fact.corroboratedBy ?? []).length > 0)) continue;
+    const named = [first.title ?? "", ...page.map((fact) => fact.entity ?? "")];
+    const everything = [...named, ...page.map((fact) => fact.statement)];
+    if (
+      everything.some(
+        (text) => mentionsWhole(text, subject) || fold(text).includes(own),
+      )
+    )
+      continue;
+    const words = [...new Set(named.flatMap((text) => nameWords(text)))].filter(
+      like,
+    );
+    if (words.length === 0) continue;
+    if (words.some((word) => theirs.some((mine) => sameStem(word, mine))))
+      continue;
+    pages.add(source);
+  }
+  return pages;
 }
 
 /**

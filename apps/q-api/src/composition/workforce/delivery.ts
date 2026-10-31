@@ -122,6 +122,27 @@ export function readyLine(title: string, reduced = false): string {
     : `Your ${name} is ready — here it is.`;
 }
 
+/**
+ * A document's own words as Q's chat line says them: without its source
+ * ids. Live 2026-10-31 (IC memo on Ferrolith): Q's line said "…ownership
+ * and S9 source-association verification" -- an id that means something
+ * only beside the document's Sources list, which the chat line does not
+ * carry. Citation groups ("[S9]", "[S11][S16]", "[S3, S4]") go whole; a
+ * bare id goes with the preposition that points at it ("at S9").
+ */
+export function withoutSourceIds(text: string): string {
+  return text
+    .replace(/\s*\[S\d{1,3}(?:\s*[,;–-]\s*S?\d{1,3})*\]/gu, "")
+    .replace(
+      /(?:\b(?:at|in|from|per|via|see|of)\s+)?\bS\d{1,3}(?:'s)?(?:\s*(?:,|and|&|or)\s*S\d{1,3}(?:'s)?)*\b\s*/gu,
+      "",
+    )
+    .replace(/\(\s*\)/gu, "")
+    .replace(/[ \t]{2,}/gu, " ")
+    .replace(/\s+([.,;:!?)])/gu, "$1")
+    .trim();
+}
+
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
@@ -131,12 +152,15 @@ export function deliveryText(document: DeliveredDocument): string {
     // Said before the summary, so the conclusion is never read as resting
     // on a full investigation.
     ...(reduced === undefined ? [] : [reduced]),
-    delivery.summary.trim(),
+    withoutSourceIds(delivery.summary.trim()),
   ];
   if (delivery.topRecommendations.length > 0) {
     lines.push(
       `What I'd do first:\n${delivery.topRecommendations
-        .map((one, index) => `${String(index + 1)}. ${one.trim()}`)
+        .map(
+          (one, index) =>
+            `${String(index + 1)}. ${withoutSourceIds(one.trim())}`,
+        )
         .join("\n")}`,
     );
   }

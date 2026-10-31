@@ -65,6 +65,33 @@ export function relationshipsInFocus(
     .slice(0, HISTORY_MAX);
 }
 
+/** How the mandate in force is handed to the writer (mandateAmounts reads it). */
+export const MANDATES_LINE = "Their mandates (declared): ";
+
+/**
+ * The money amounts of the person's own declared mandate (cheques, ticket
+ * sizes, fund amounts), read back from its line: what a document may label
+ * "(your mandate)", never "(company record)" (analysis.ts mandateLabels).
+ */
+export function mandateAmounts(context: string | null): readonly number[] {
+  if (context === null) return [];
+  const amounts = new Set<number>();
+  for (const line of context.split("\n")) {
+    if (!line.startsWith(MANDATES_LINE)) continue;
+    // A cheque is held as {"cheque":{"min":…,"max":…,"currency":…}}
+    // (own-records.ts declaredCriteria); a flat "minCheque": … reads too.
+    for (const match of line.matchAll(
+      /"[A-Za-z_]*(?:cheque|ticket|amount|aum|fund_?size|commitment)[A-Za-z_]*"\s*:\s*(\{[^{}]*\}|"?\d+(?:\.\d+)?)/giu,
+    )) {
+      for (const number of (match[1] ?? "").matchAll(/\d+(?:\.\d+)?/gu)) {
+        const value = Number(number[0]);
+        if (Number.isFinite(value) && value >= 1_000) amounts.add(value);
+      }
+    }
+  }
+  return [...amounts];
+}
+
 function compact(data: unknown): string | null {
   if (data === null || data === undefined) return null;
   const text = JSON.stringify(data);
@@ -125,7 +152,7 @@ export function createOwnContextReader(dependencies: {
           : `Their investor organisation (their own record, as declared): ${org}`,
         mandate === null
           ? "Their mandates: none on record or not readable (unknown)."
-          : `Their mandates (declared): ${mandate}`,
+          : `${MANDATES_LINE}${mandate}`,
       );
     }
     const own =

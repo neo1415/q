@@ -153,7 +153,7 @@ describe("namesake pages listed apart from the sources a document cites", () => 
     expect(body("Sources")).not.toContain("this document cites");
     const setAside = body(SET_ASIDE_HEADING);
     expect(setAside).toMatch(
-      /^Pages Q read about other organisations with names like Clearwater Assurance\. They are not evidence about Clearwater Assurance, and nothing in this document rests on them\./u,
+      /^Pages Q read about other organisations or subjects with names like Clearwater Assurance\. They are not evidence about Clearwater Assurance, and nothing in this document rests on them\./u,
     );
     expect(setAside).toContain("[S1] CLEARWATER UW LIMITED overview");
     expect(setAside).toContain("[S2] Clearwater Underwriting: how to trade");
