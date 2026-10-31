@@ -44,6 +44,8 @@ export type CompanyCanonicalPort = {
      * with — never the conversational reply (CQ-QX-007 deck content).
      */
     readonly description?: string | null | undefined;
+    /** The website the company recorded on its canonical profile, if any. */
+    readonly website?: string | null | undefined;
   }>;
 };
 

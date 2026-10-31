@@ -54,7 +54,7 @@ const structured = (n: number): StructuredCandidate => ({
   companyId: id(n),
   provenance: {
     generatorId: "STRUCTURED_MANDATE",
-    generatorVersion: "structured-mandate.v6",
+    generatorVersion: "structured-mandate.v7",
     matchedDimensions: ["STAGE"],
     reasonCodes: ["STAGE_OVERLAP"],
     matchedNodes: [],
@@ -149,7 +149,7 @@ describe("hybrid candidate service", () => {
       Promise.resolve({
         kind: "GENERATED",
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v6",
+        generatorVersion: "structured-mandate.v7",
         eligibilityPolicyVersion: "eligibility.v5",
         context,
         candidates: [structured(1), structured(2)],

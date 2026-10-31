@@ -72,7 +72,7 @@ const KEY: SlateKey = {
 
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v5" as const,
-  structuredGeneratorVersion: "structured-mandate.v6" as const,
+  structuredGeneratorVersion: "structured-mandate.v7" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
@@ -121,7 +121,7 @@ async function publish(
       featureSnapshotFingerprint: "a".repeat(64),
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v6",
+          generatorVersion: "structured-mandate.v7",
           reasonCodes: ["STAGE_OVERLAP"],
         },
         semantic: null,

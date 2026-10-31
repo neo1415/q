@@ -1306,6 +1306,9 @@
     --cq-feed-halo:
       0 0 2px color-mix(in oklch, var(--cq-stage-canvas) 70%, transparent),
       0 1px 3px color-mix(in oklch, var(--cq-stage-canvas) 60%, transparent);
+    /* The height an AI presenter's burned-in lower third takes from the
+       stage's foot (its top at 78% of the height), with a margin. */
+    --cq-feed-burned-band: 23%;
     height: calc(100svh - var(--cq-bottom-nav-height) - var(--cq-safe-bottom));
     overflow: hidden;
     /* A long press opens the options, not the browser's own menu. */
@@ -1706,6 +1709,14 @@
     }
     .cq-feed-video::cue {
       font-size: 15px;
+    }
+    /* Live 2026-10-31 (Discover at 390 and 360): an AI-presented pitch
+       carries its own lower third (its label, its name, a subtitle) from
+       78% to 90% of the stage's height, measured on Maji Loop and Karoo
+       Gridworks; the company's words sat on it. On such a pitch they sit
+       above that band, which stays the video's own. */
+    .cq-feed-overlay:has([data-ai-presenter]) {
+      bottom: var(--cq-feed-burned-band);
     }
   }
 

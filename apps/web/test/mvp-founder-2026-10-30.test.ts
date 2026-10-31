@@ -171,9 +171,12 @@ describe("investor briefing: honest about regions", () => {
     const item = briefing?.items.find((one) => one.href === "/discover");
     expect(item?.title).toBe("A pitch from Kycana Hub, in your regions");
     expect(item?.title).not.toMatch(/match your mandate/u);
+    // Live 2026-10-31 (Nordlicht): no count of the rest; this read sees
+    // only the slate's first page, the feed holds more.
     expect(item?.description).toBe(
-      "Kycana Hub. 3 more are outside your regions.",
+      "Kycana Hub. Pitches outside your regions follow in Discover.",
     );
+    expect(item?.description).not.toMatch(/\d+ more/u);
     expect(item?.description).not.toMatch(/Karoo|Kivu/u);
   });
 });

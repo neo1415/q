@@ -81,6 +81,10 @@ export function nameWords(name: string): readonly string[] {
 export type SubjectIdentity = {
   /** The company the document is about, as Capital Q holds its name. */
   readonly name: string;
+  /** The website on its canonical record, when it has one. */
+  readonly site?: string | null | undefined;
+  /** Its own description on its canonical record, when it has one. */
+  readonly profile?: string | null | undefined;
 };
 
 type FactLike = {
@@ -90,6 +94,7 @@ type FactLike = {
   readonly title: string | null;
   readonly entity?: string | null | undefined;
   readonly tierKind?: string | null | undefined;
+  readonly corroboratedBy?: readonly string[] | undefined;
 };
 
 /** The subject itself: its whole name, or that name with more after it. */
@@ -199,7 +204,118 @@ export function namesakeSources(
     if (isNamesakeName(entity, subject) || namesakeSite)
       namesake.add(fact.source);
   }
-  return new Set([...namesake].filter((source) => !tied.has(source)));
+  return new Set([
+    ...[...namesake].filter((source) => !tied.has(source)),
+    ...strangerSites(facts, identity, subject),
+  ]);
+}
+
+/** Words a page title carries whatever the organisation does. */
+const PAGE_WORDS = new Set([
+  "official",
+  "site",
+  "website",
+  "home",
+  "homepage",
+  "welcome",
+  "about",
+  "page",
+  "login",
+  "sign",
+  "contact",
+  "shop",
+  "store",
+  "online",
+  "and",
+  "for",
+  "with",
+  "your",
+  "our",
+]);
+
+/** A name's words that say what it does: no digits, no page furniture. */
+function describingWords(text: string, without: readonly string[]): string[] {
+  return nameWords(text).filter(
+    (word) =>
+      word.length >= 3 &&
+      !/^\p{N}+$/u.test(word) &&
+      !PAGE_WORDS.has(word) &&
+      !without.includes(word),
+  );
+}
+
+/** The same word, or one sharing its stem ("operations", "operational"). */
+function sameStem(a: string, b: string): boolean {
+  if (a === b) return true;
+  return a.length >= 5 && b.length >= 5 && a.slice(0, 5) === b.slice(0, 5);
+}
+
+function hostOf(site: string): string {
+  try {
+    return new URL(
+      /^[a-z][a-z0-9+.-]*:\/\//iu.test(site) ? site : `https://${site}`,
+    ).hostname;
+  } catch {
+    return site;
+  }
+}
+
+/**
+ * EXACT-NAME strangers (live 2026-10-31, an IC memo on "Nixo"): the page
+ * "Nixo | 24/7 Pest Protection" on nixo-official.com was cited three times
+ * as Nixo's traction (a 4.8/5 rating from 117,243+ reviews) although Nixo
+ * is B2B software whose record names withnixo.com. Its name is the
+ * subject's whole name, so the namesake rule above tied it. A page is
+ * another organisation's when, from stored fields only:
+ *
+ *  - it is styled as the own site of an organisation of the subject's name
+ *    (its domain's first label holds the name run together), yet it is
+ *    not the site the subject's record names; and
+ *  - what it calls itself (its title and its facts' entity fields, past
+ *    the name) shares no word with the subject's own description, and
+ *    says at least two things (a bare "Nixo | Home" is unknown, never a
+ *    contradiction); and
+ *  - no other source corroborates any of its facts.
+ *
+ * Without a recorded site or description nothing is judged: unknown stays
+ * unknown.
+ */
+function strangerSites(
+  facts: readonly FactLike[],
+  identity: SubjectIdentity,
+  subject: readonly string[],
+): ReadonlySet<number> {
+  const strangers = new Set<number>();
+  const site = identity.site?.trim() ?? "";
+  const profile = identity.profile?.trim() ?? "";
+  const compact = subject.join("");
+  if (site.length === 0 || profile.length === 0 || compact.length < 3)
+    return strangers;
+  const own = registrableDomain(hostOf(site));
+  const theirs = describingWords(`${profile} ${identity.name}`, []);
+  const bySource = new Map<number, FactLike[]>();
+  for (const fact of facts)
+    bySource.set(fact.source, [...(bySource.get(fact.source) ?? []), fact]);
+  for (const [source, page] of bySource) {
+    const first = page[0];
+    if (first === undefined) continue;
+    const domain = registrableDomain(first.domain);
+    if (domain === own) continue;
+    const label = fold((domain.split(".")[0] ?? "").replace(/-/gu, ""));
+    if (!label.includes(compact)) continue;
+    if (page.some((fact) => (fact.corroboratedBy ?? []).length > 0)) continue;
+    const says = new Set(
+      page.flatMap((fact) => [
+        ...describingWords(fact.title ?? "", subject),
+        ...describingWords(fact.entity ?? "", subject),
+      ]),
+    );
+    if (says.size < 2) continue;
+    if ([...says].some((word) => theirs.some((mine) => sameStem(word, mine))))
+      continue;
+    strangers.add(source);
+  }
+  return strangers;
 }
 
 type CheckedFact = FactLike & {
