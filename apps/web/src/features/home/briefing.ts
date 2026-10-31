@@ -61,6 +61,11 @@ export type ReadinessGapFact = {
 export type PitchFact = {
   readonly companyId: string;
   readonly name: string;
+  /**
+   * The slate's own reason: its location is known and outside the
+   * geography the investor declared. Absent or false: not known to be.
+   */
+  readonly outsideRegions?: boolean | undefined;
 };
 
 /**
@@ -332,6 +337,33 @@ function pitchItems(facts: InvestorBriefingFacts): BriefingItem[] {
   const fresh = (facts.pitches ?? []).filter((p) => !touched.has(p.companyId));
   const first = fresh[0];
   if (first === undefined) return [];
+  // Live 2026-10-31 (Halvmåne Partners): "12 pitches that match your
+  // mandate · Karoo Gridworks, Kivu Traceworks…", both outside their
+  // declared regions. Only pitches not known to be outside are said to
+  // be in them, and none is said to match the whole mandate.
+  const outside = fresh.filter((p) => p.outsideRegions === true);
+  const inside = fresh.filter((p) => p.outsideRegions !== true);
+  const head = inside[0];
+  if (
+    facts.pitchesOutsideRegions !== true &&
+    outside.length > 0 &&
+    head !== undefined
+  ) {
+    return [
+      {
+        id: `pitches:${[...inside, ...outside].map((p) => p.companyId).join(",")}`,
+        title:
+          inside.length === 1
+            ? `A pitch from ${head.name}, in your regions`
+            : `${String(inside.length)} pitches in your regions`,
+        description:
+          outside.length === 1
+            ? `${names(inside.map((p) => p.name))}. One more is outside your regions.`
+            : `${names(inside.map((p) => p.name))}. ${String(outside.length)} more are outside your regions.`,
+        href: "/discover",
+      },
+    ];
+  }
   return [
     {
       id: `pitches:${fresh.map((p) => p.companyId).join(",")}`,

@@ -26,6 +26,12 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "{n} pitches outside your regions": "{n} عروض خارج مناطقك",
   "None in your regions has a pitch yet; showing {list}.":
     "لا يوجد عرض في مناطقك بعد؛ نعرض {list}.",
+  // Live 2026-10-31: in-region pitches named apart from the rest.
+  "A pitch from {name}, in your regions": "عرض من {name}، في مناطقك",
+  "{n} pitches in your regions": "{n} عروض في مناطقك",
+  "{list}. One more is outside your regions.": "{list}. وعرض آخر خارج مناطقك.",
+  "{list}. {n} more are outside your regions.":
+    "{list}. و{n} عروض أخرى خارج مناطقك.",
   "Setup: {n} of {n2} done — {minutes}":
     "الإعداد: اكتمل {n} من {n2} — {minutes}",
   "about a minute left": "تبقّت دقيقة تقريباً",

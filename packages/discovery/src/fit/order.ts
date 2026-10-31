@@ -81,7 +81,51 @@ export const FIT_ORDER_V2 = Object.freeze({
   description:
     "Discover order: candidates the fit can score are ordered by 0.75 × Suitability (fit out of 10 × 10) + 0.25 × Investability (InvestIQ, when scored), then the fit tie-break, then the base rank; unscored candidates keep their base positions; unknown Investability is left out, never read as low; exploration and diversity moves are labelled.",
 } as const);
-export const FIT_ORDER_CURRENT = FIT_ORDER_V2;
+/**
+ * `fit-order.v3` (live 2026-10-31, fresh investor "Halvmåne Partners",
+ * geography Nordics and Germany declared "Strong"): v2's order put Karoo
+ * Gridworks (South Africa) first and Kycana Hub, the one company in their
+ * region, fourth -- geography is one weighted parameter (0.14, below
+ * sector's 0.18) and how firmly it was declared was never read, so a
+ * sector match outweighed the investor's declared region.
+ *
+ * v3 keeps v2's weights and rules and adds one declared-only tier: when
+ * the investor declared their geography "Must" or "Strong", a scored
+ * candidate whose location MISMATCHES it is ordered after every scored
+ * candidate that does not (in region, partly in region, or location not
+ * known -- unknown is never read as out of region). Within each tier the
+ * v2 order holds. Not an exclusion: out-of-region companies stay in the
+ * feed. "Nice to have" adds no tier. Unscored candidates keep their base
+ * positions, as before.
+ */
+export const FIT_ORDER_V3 = Object.freeze({
+  version: "fit-order.v3",
+  fitConfigVersion: FIT_CONFIG_CURRENT.version,
+  baseRankingConfigVersion: RANKING_CONFIG_CURRENT.version,
+  weights: FIT_ORDER_V2.weights,
+  /** Declared geography strengths that order out-of-region companies last. */
+  geographyFirst: Object.freeze(["MUST", "STRONG"] as const),
+  description:
+    "Discover order: v2's order (0.75 × Suitability + 0.25 × Investability, then the fit tie-break, then the base rank), with one declared tier first: when the investor declared their geography Must or Strong, scored companies outside it follow those that are not (an unknown location is not outside); unscored candidates keep their base positions; exploration and diversity moves are labelled.",
+} as const);
+export const FIT_ORDER_CURRENT = FIT_ORDER_V3;
+
+/**
+ * Whether a candidate falls outside a geography the investor declared at
+ * a strength that orders it last (fit-order.v3). Only a known MISMATCH
+ * counts; an unknown location never does.
+ */
+export function outsideDeclaredGeography(
+  geographyOutcome: string,
+  declaredStrength: string | undefined,
+  geographyFirst: readonly string[] = FIT_ORDER_V3.geographyFirst,
+): boolean {
+  return (
+    geographyOutcome === "MISMATCH" &&
+    declaredStrength !== undefined &&
+    geographyFirst.includes(declaredStrength)
+  );
+}
 
 export type FitOrderWeights = {
   readonly suitability: number;
@@ -122,6 +166,11 @@ export type FitOrderKey = {
    * the fit score alone orders (Q's side-by-side top N).
    */
   readonly orderValue?: number | null | undefined;
+  /**
+   * fit-order.v3: outside a geography the investor declared Must or
+   * Strong (outsideDeclaredGeography). Absent: no such tier.
+   */
+  readonly outsideDeclaredGeography?: boolean | undefined;
 };
 
 export type FitOrderedCandidate = {
@@ -158,6 +207,10 @@ export function compareFitOrder(a: FitOrderKey, b: FitOrderKey): number {
   return (a.assessment === null ? 1 : 0) - (b.assessment === null ? 1 : 0);
 }
 
+/** fit-order.v3's declared tier: 0 first, 1 after. */
+const tierOf = (key: FitOrderKey) =>
+  key.outsideDeclaredGeography === true ? 1 : 0;
+
 /** Pure: the fit order of a base-ranked list (see step 3 above). */
 export function orderByFit(
   base: readonly FitOrderEntry[],
@@ -170,6 +223,7 @@ export function orderByFit(
     .filter((entry) => keyOf(entry.companyId).score !== null)
     .sort(
       (a, b) =>
+        tierOf(keyOf(a.companyId)) - tierOf(keyOf(b.companyId)) ||
         compareFitOrder(keyOf(a.companyId), keyOf(b.companyId)) ||
         a.baseRank - b.baseRank,
     );
@@ -260,25 +314,31 @@ export function createFitOrdering(dependencies: {
       const keys = new Map<string, FitOrderKey>();
       for (const candidate of input.candidates) {
         const found = inputs.get(candidate.companyId);
-        const assessment =
+        const observed =
           found === undefined
             ? null
-            : assessFit(
-                observeFit({
-                  companyId: candidate.companyId,
-                  snapshot: found.snapshot,
-                  declared: found.declared,
-                  eligibilityReasons: candidate.eligibilityReasons,
-                  config,
-                  now,
-                }),
+            : observeFit({
+                companyId: candidate.companyId,
+                snapshot: found.snapshot,
+                declared: found.declared,
+                eligibilityReasons: candidate.eligibilityReasons,
                 config,
-                now.toISOString(),
-              );
+                now,
+              });
+        const assessment =
+          observed === null
+            ? null
+            : assessFit(observed, config, now.toISOString());
         const score = fitOrderScore(assessment);
         keys.set(candidate.companyId, {
           assessment,
           score,
+          outsideDeclaredGeography:
+            observed !== null &&
+            outsideDeclaredGeography(
+              observed.observations.GEOGRAPHY.outcome,
+              found?.declared.geographyStrength,
+            ),
           orderValue: discoverOrderValue(
             score,
             investability.get(candidate.companyId) ?? null,

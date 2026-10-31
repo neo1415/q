@@ -2077,7 +2077,10 @@
     background: linear-gradient(
       to top,
       var(--cq-feed-scrim-deep) 0%,
-      var(--cq-feed-scrim-floor) calc(100% - 40px),
+      /* Deep behind every caption line, fading only in the padding above
+         the first (live 2026-10-31: a pitch's burned-in lower third ran
+         through the company's name where the scrim was still fading). */
+        var(--cq-feed-scrim-deep) calc(100% - 40px),
       transparent 100%
     );
     transition: opacity var(--cq-motion-base) var(--cq-ease);
@@ -2756,7 +2759,10 @@
     background: linear-gradient(
       to top,
       var(--cq-feed-scrim-deep) 0%,
-      var(--cq-feed-scrim-floor) calc(100% - 40px),
+      /* Deep behind every caption line, fading only in the padding above
+         the first (live 2026-10-31: a pitch's burned-in lower third ran
+         through the company's name where the scrim was still fading). */
+        var(--cq-feed-scrim-deep) calc(100% - 40px),
       transparent 100%
     );
     text-shadow: var(--cq-feed-halo);

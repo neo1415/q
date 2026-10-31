@@ -349,3 +349,140 @@ describe("namesakes are told apart by code, from the facts' typed fields", () =>
     ).toBe(0);
   });
 });
+
+/**
+ * Live 2026-10-31 (production 84d8ede07, fresh investor "Halvmåne
+ * Partners", IC memo on "Karoo Gridworks"): Sources said [S15] (Karoo
+ * Bioscience) was "not about Karoo Gridworks ... not used as evidence", yet
+ * the Competition table and Risks cited it; [S4]/[S9] are pages about
+ * Gridworks, a different African grid investor whose name is a PART of the
+ * subject's, labelled "(other)" and filed as a competitor row. Entities and
+ * domains as stored on the live job.
+ */
+describe("an IC memo on Karoo Gridworks (live 2026-10-31)", () => {
+  const K4 = source(4, "get-invest.eu", "Gridworks - GET.invest", "OTHER");
+  const K9 = source(9, "gridworkspartners.com", "Home - Gridworks", "OTHER");
+  const K12 = source(12, "nersa.org.za", "Tariff decision", "PRIMARY");
+  const K15 = source(
+    15,
+    "forum.solarmd.com",
+    "Case Study: Karoo Bioscience Project EPC",
+    "OTHER",
+  );
+  const facts = [
+    fact(
+      K4,
+      "Gridworks",
+      "Gridworks lists ticket sizes per transaction of > 10 million EUR.",
+      "COMPETITORS",
+    ),
+    fact(
+      K9,
+      "Gridworks",
+      "Gridworks invests in and develops electricity networks across Africa.",
+      "COMPETITORS",
+    ),
+    fact(K12, "Eskom", "Eskom's peak tariff rose 12% in 2026.", "MARKET"),
+    fact(
+      K15,
+      "Karoo Bioscience",
+      "The Karoo Bioscience project used 1.5 MWh of lithium-ion storage.",
+      "TRACTION",
+    ),
+  ];
+  const subject = { name: "Karoo Gridworks" };
+
+  it("a namesake whose name is part of the subject's is told from the entity field", () => {
+    expect([...namesakeSources(facts, subject)].sort((a, b) => a - b)).toEqual([
+      4, 9, 15,
+    ]);
+    // The subject's whole name, or a page naming it in full, is the subject.
+    expect(
+      namesakeSources(
+        [
+          {
+            source: 2,
+            statement: "Karoo Gridworks installs batteries at cold stores.",
+            domain: "news.example",
+            title: null,
+            entity: "Gridworks",
+          },
+        ],
+        subject,
+      ).size,
+    ).toBe(0);
+    // A short shared word is not a name.
+    expect(
+      namesakeSources(
+        [
+          {
+            source: 3,
+            statement: "Grid prices rose.",
+            domain: "news.example",
+            title: null,
+            entity: "Grid",
+          },
+        ],
+        { name: "Karoo Grid Storage" },
+      ).size,
+    ).toBe(0);
+  });
+
+  it("files no citation of a namesake's page; the Sources list names it as not used", () => {
+    const content = analysisContent({
+      draft: {
+        title: "Investment Committee Memo: Karoo Gridworks",
+        summary:
+          "Public research does not substantiate Karoo Gridworks [S15]. Peak tariffs rose [S12].",
+        sections: [
+          {
+            heading: "Competition",
+            body: [
+              "| Company | Offer | Source |",
+              "| --- | --- | --- |",
+              "| Solar MD | Storage for the Karoo Bioscience Project | [S15] |",
+              "| Gridworks | Equity in African networks | [S4][S9] |",
+              "Gridworks is not a direct competitor [S4][S9]. Peak tariffs drive demand [S12, S15].",
+            ].join("\n"),
+          },
+          {
+            heading: "Risks",
+            body: "- Traction risk: the Karoo Bioscience case names Solar MD [S15].\n- Tariff risk: tariffs rose 12% [S12].",
+          },
+        ],
+        topRecommendations: ["Verify the entity."],
+        gaps: ["Nothing ties the company to Gridworks [S4]."],
+      },
+      review: REVIEW,
+      sources: [K4, K9, K12, K15],
+      facts,
+      seed: "job:karoo",
+      sourcesAlways: true,
+      subject,
+    });
+    const body = (heading: string) =>
+      content.sections.find((section) => section.heading === heading)?.body ??
+      "";
+    for (const heading of ["Competition", "Risks"]) {
+      expect(body(heading)).not.toMatch(/S(?:4|9|15)\b/u);
+    }
+    expect(body("Competition")).toContain("| Company | Offer | Source |");
+    expect(body("Competition")).not.toContain("Gridworks |");
+    expect(body("Competition")).toContain("Peak tariffs drive demand [S12].");
+    expect(body("Risks")).toBe("- Tariff risk: tariffs rose 12% [S12].");
+    expect(content.gaps.join("\n")).not.toMatch(/\[S(?:4|9|15)\]/u);
+    expect(content.gaps[0]).toMatch(
+      /^Q removed 6 statements that rested on pages about a different organisation named like Karoo Gridworks \(S4, S9, S15\)/u,
+    );
+    const sources = body("Sources");
+    expect(sources).toMatch(
+      /\[S4\][^\n]*not about Karoo Gridworks[^\n]*not used as evidence/u,
+    );
+    expect(sources).toMatch(/\[S9\][^\n]*not about Karoo Gridworks/u);
+    expect(sources).toMatch(/\[S15\][^\n]*not about Karoo Gridworks/u);
+    expect(sources).toMatch(/\[S12\]/u);
+    // No finding rests on a namesake's page.
+    for (const finding of content.sections.flatMap((one) => one.findings))
+      expect(finding.statement).toMatch(/\[S12\]$/u);
+  });
+});

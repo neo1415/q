@@ -33,6 +33,9 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Outside your stage range": "خارج نطاق مراحلك",
   "{stage}, outside your stage range": "{stage}، خارج نطاق مراحلك",
   "Outside your regions": "خارج مناطقك",
+  // Live 2026-10-31: an AI-presented pitch's label, said by the app.
+  "AI presenter · AI-generated":
+    "مقدّم بالذكاء الاصطناعي · مُنشأ بالذكاء الاصطناعي",
   "{country}, outside your regions": "{country}، خارج مناطقك",
   "Not a category you named": "ليست فئة حددتها",
   "No companies with a pitch in your regions yet.":

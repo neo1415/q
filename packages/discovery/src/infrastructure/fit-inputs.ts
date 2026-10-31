@@ -351,6 +351,24 @@ function mandateFacts(mandate: {
         c.importance === "MUST" &&
         !c.isHardExclusion,
     );
+  // The firmest positive geography the investor declared (fit-order.v3).
+  const geographyStrengths = new Set(
+    (mandate.taxonomyPreferences ?? [])
+      .filter(
+        (p) =>
+          p.vocabularyCode === "geography" &&
+          !p.isExclusion &&
+          (DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(p.source),
+      )
+      .map((p) => p.preferenceStrength),
+  );
+  const geographyStrength = mustGeography
+    ? ("MUST" as const)
+    : geographyStrengths.has("STRONG")
+      ? ("STRONG" as const)
+      : geographyStrengths.has("NICE")
+        ? ("NICE" as const)
+        : undefined;
   const mustStage = mandate.constraints.some(
     (c) =>
       c.dimension === "stage" && c.importance === "MUST" && !c.isHardExclusion,
@@ -360,6 +378,7 @@ function mandateFacts(mandate: {
     ...(mustGeography || mustStage
       ? { mustMatch: { geography: mustGeography, stage: mustStage } }
       : {}),
+    ...(geographyStrength === undefined ? {} : { geographyStrength }),
     cheque,
     leadPolicy,
     businessModelPreferences:

@@ -334,6 +334,7 @@ export async function readBriefingFacts(
           .map((item) => ({
             companyId: item.companyId,
             name: item.canonicalName,
+            outsideRegions: item.reasonCodes.includes("GEOGRAPHY_MISMATCH"),
           })),
         // None in their declared regions: the slate shows others, and the
         // briefing says so rather than "match your mandate".

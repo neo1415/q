@@ -153,4 +153,27 @@ describe("investor briefing: honest about regions", () => {
     expect(item?.title).not.toMatch(/match your mandate/u);
     expect(item?.description).toMatch(/^None in your regions has a pitch yet/u);
   });
+
+  it("live 2026-10-31: in-region pitches are named apart; out-of-region ones never 'match your mandate'", () => {
+    const briefing = composeBriefing({
+      role: "INVESTOR",
+      since: "2026-10-23T00:00:00.000Z",
+      approvals: [],
+      relationships: [],
+      pitches: [
+        { companyId: "c1", name: "Karoo Gridworks", outsideRegions: true },
+        { companyId: "c2", name: "Kivu Traceworks", outsideRegions: true },
+        { companyId: "c3", name: "Kycana Hub", outsideRegions: false },
+        { companyId: "c4", name: "Portside", outsideRegions: true },
+      ],
+      mandate: "ACTIVE",
+    });
+    const item = briefing?.items.find((one) => one.href === "/discover");
+    expect(item?.title).toBe("A pitch from Kycana Hub, in your regions");
+    expect(item?.title).not.toMatch(/match your mandate/u);
+    expect(item?.description).toBe(
+      "Kycana Hub. 3 more are outside your regions.",
+    );
+    expect(item?.description).not.toMatch(/Karoo|Kivu/u);
+  });
 });

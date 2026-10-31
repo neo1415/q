@@ -548,6 +548,13 @@ export function FeedCard({
             {exploringLine(company.reasonCodes)}
           </p>
         )}
+        {company.pitch === null ||
+        !showMedia ||
+        aiPresenterLine(company.pitch.title) === null ? null : (
+          <p className="cq-caption cq-feed-muted" data-ai-presenter>
+            {t(aiPresenterLine(company.pitch.title) ?? "")}
+          </p>
+        )}
         <div className="cq-feed-company">
           {/* On a desktop the panel names the company with its mark; the
               rail's avatar is the way into the profile on a phone. */}
@@ -1310,6 +1317,22 @@ const EXPLORING_CODES: ReadonlySet<string> = new Set([
 export function exploringLine(reasonCodes: readonly string[]): string | null {
   return reasonCodes.some((code) => EXPLORING_CODES.has(code))
     ? "Exploring: placed here to widen your view, not by fit."
+    : null;
+}
+
+/**
+ * Live 2026-10-31 (Discover at 390): an AI-presented pitch carries its
+ * label burned into the video's own lower third, which sits where the
+ * caption does, so the label ran through the company's name. The label
+ * is said by the app, in the caption's flow above the name, from the
+ * provenance recorded with the video (its title names the AI presenter);
+ * the caption's scrim then holds the frame's own text beneath it.
+ */
+export function aiPresenterLine(
+  pitchTitle: string | null | undefined,
+): string | null {
+  return pitchTitle != null && /\bAI[- ]present(?:er|ed)\b/iu.test(pitchTitle)
+    ? "AI presenter · AI-generated"
     : null;
 }
 

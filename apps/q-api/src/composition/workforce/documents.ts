@@ -61,6 +61,7 @@ import {
 import { safeReport } from "./live.js";
 import type { OwnContextFocus } from "./own-context.js";
 import type { WorkforceModels } from "./models.js";
+import { namesakeSources } from "./subject-identity.js";
 
 /** The marker a reviewer's revision carries, so a retry never revises twice. */
 export const REVIEWER_REVISION_PREFIX = "Second-specialist review:";
@@ -426,15 +427,23 @@ export function createWorkforceDocuments(dependencies: {
     let claimRows: readonly ClaimRow[] = [];
     if (diligence) {
       const ordered = orderDiligenceDraft(written.draft);
+      // A namesake's page is no evidence for or against the company's
+      // claims (subject-identity.ts, live 2026-10-31).
+      const namesakes = namesakeSources(
+        merged.facts,
+        companyName === null ? null : { name: companyName },
+      );
       claimRows = matchClaims({
         companyName,
         claims,
-        evidence: merged.facts.map((fact) => ({
-          statement: fact.statement,
-          sourceIndex: fact.source,
-          domain: fact.domain,
-          asOf: fact.asOf,
-        })),
+        evidence: merged.facts
+          .filter((fact) => !namesakes.has(fact.source))
+          .map((fact) => ({
+            statement: fact.statement,
+            sourceIndex: fact.source,
+            domain: fact.domain,
+            asOf: fact.asOf,
+          })),
         recordContradictions,
       });
       const section = claimsSection(claimRows, seed);

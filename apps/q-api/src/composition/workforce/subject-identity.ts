@@ -120,7 +120,31 @@ function isNamesakeName(
   if (first === undefined || theirs === undefined || first.length < 3)
     return false;
   if (isSubjectName(entity, subject)) return false;
-  return theirs === first || (first.length >= 4 && theirs.startsWith(first));
+  return (
+    theirs === first ||
+    (first.length >= 4 && theirs.startsWith(first)) ||
+    isPartOfName(entity, subject)
+  );
+}
+
+/**
+ * A name that is a part of the subject's ("Gridworks", a British-owned
+ * African grid investor, beside "Karoo Gridworks", live 2026-10-31): its
+ * words run, in order, inside the subject's, and it is shorter. Read from
+ * the fact's stored entity, never from the writer's prose.
+ */
+function isPartOfName(
+  entity: readonly string[],
+  subject: readonly string[],
+): boolean {
+  if (entity.length === 0 || entity.length >= subject.length) return false;
+  // A short common word ("Grid") is not a name.
+  if (entity.join("").length < 6) return false;
+  for (let at = 0; at + entity.length <= subject.length; at += 1) {
+    if (entity.every((word, index) => subject[at + index] === word))
+      return true;
+  }
+  return false;
 }
 
 function mentionsWhole(text: string, subject: readonly string[]): boolean {

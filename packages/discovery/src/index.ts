@@ -846,6 +846,8 @@ export {
   FIT_ORDER_CURRENT,
   FIT_ORDER_V1,
   FIT_ORDER_V2,
+  FIT_ORDER_V3,
+  outsideDeclaredGeography,
   discoverOrderValue,
   type FitOrderWeights,
   type SuitabilityRecord,

@@ -59,6 +59,13 @@ export type DeclaredFitFacts = {
     | undefined;
 
   /**
+   * How firmly the investor declared their geography ("Must", "Strong",
+   * "Nice"), from their own positive geography selection; absent when
+   * they declared none. Read by fit-order.v3 only; never scored here.
+   */
+  readonly geographyStrength?: "MUST" | "STRONG" | "NICE" | undefined;
+
+  /**
    * What the company has STATED about its round where this reader may see
    * it -- said in a pitch they may play, or in a deck section the founder
    * confirmed -- but not formally shared as its raise. Context for the

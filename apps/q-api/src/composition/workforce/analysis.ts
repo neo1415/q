@@ -526,6 +526,81 @@ export function keepRecordsApart(
   };
 }
 
+const CITATION_GROUP = /\[S\d{1,3}(?:\s*[,;]\s*S?\d{1,3})*\]/gu;
+const LIST_MARKER = /^\s*(?:[-*•]|\d+[.)])\s+/u;
+
+/** The [S n] numbers one citation mark names ("[S4]", "[S4, S9]"). */
+const markNumbers = (mark: string) =>
+  [...mark.matchAll(/\d{1,3}/gu)].map((match) => Number(match[0]));
+
+/**
+ * Live 2026-10-31 (IC memo on "Karoo Gridworks"): the Sources list said
+ * [S15] was "not about Karoo Gridworks ... not used as evidence", yet the
+ * Competition table and Risks cited it, and [S4]/[S9] (Gridworks, a
+ * different investor) filled a competitor row. A page judged by code to be
+ * about a namesake (subject-identity.ts) is not cited in the filed
+ * document: a sentence, or table row, that cites only such pages is
+ * removed; one that also cites other pages keeps those citations only.
+ *
+ * Removed after the writing loop, never sent back to be redrafted: this
+ * runs on code's decision alone, after the last model call, so no model's
+ * input changes (the recorded research replays rest on those inputs), and
+ * it holds for the last draft too, which a redraft could not promise.
+ */
+export function withoutNamesakeCitations(
+  text: string,
+  namesakes: ReadonlySet<number>,
+): {
+  readonly text: string;
+  readonly removed: number;
+  readonly cut: ReadonlySet<number>;
+} {
+  const cut = new Set<number>();
+  if (namesakes.size === 0 || !ANY_CITATION.test(text))
+    return { text, removed: 0, cut };
+  let removed = 0;
+  const unit = (part: string): string | null => {
+    const numbers = [...part.matchAll(CITATION_GROUP)].flatMap((match) =>
+      markNumbers(match[0]),
+    );
+    const theirs = numbers.filter((number) => namesakes.has(number));
+    if (theirs.length === 0) return part;
+    for (const number of theirs) cut.add(number);
+    if (theirs.length === numbers.length) {
+      removed += 1;
+      return null;
+    }
+    return part
+      .replace(CITATION_GROUP, (mark) => {
+        const kept = markNumbers(mark).filter(
+          (number) => !namesakes.has(number),
+        );
+        return kept.length === 0
+          ? ""
+          : `[${kept.map((number) => `S${String(number)}`).join(", ")}]`;
+      })
+      .replace(/\s+([.,;:])/gu, "$1");
+  };
+  const lines = text.split("\n").flatMap((line) => {
+    if (!ANY_CITATION.test(line)) return [line];
+    // A table row is one unit: its cells are not sentences.
+    if (/^\s*\|/u.test(line)) {
+      const kept = unit(line);
+      return kept === null ? [] : [kept];
+    }
+    const marker = LIST_MARKER.exec(line)?.[0] ?? "";
+    const kept = line
+      .slice(marker.length)
+      .split(/(?<=[.!?])\s+/u)
+      .map(unit)
+      .filter(
+        (part): part is string => part !== null && part.trim().length > 0,
+      );
+    return kept.length === 0 ? [] : [`${marker}${kept.join(" ")}`];
+  });
+  return { text: lines.join("\n"), removed, cut };
+}
+
 /** Code's own checks: figures without a basis, sources that do not exist. */
 export function basisProblems(
   draft: AnalysisDocumentResult,
@@ -923,9 +998,44 @@ export function analysisContent(input: {
    */
   readonly subject?: SubjectIdentity | null | undefined;
 }): QArtifactContent {
-  const { draft, review } = input;
+  const { review } = input;
   const identity = input.subject ?? null;
   const namesakes = namesakeSources(input.facts, identity);
+  // A namesake's page is not cited as evidence (withoutNamesakeCitations).
+  let namesakeRemoved = 0;
+  const namesakeCut = new Set<number>();
+  const apart = (text: string) => {
+    const out = withoutNamesakeCitations(text, namesakes);
+    namesakeRemoved += out.removed;
+    for (const index of out.cut) namesakeCut.add(index);
+    return out.text;
+  };
+  const draft: AnalysisDocumentResult = {
+    ...input.draft,
+    summary: apart(input.draft.summary),
+    sections: input.draft.sections
+      .map((section) => ({ ...section, body: apart(section.body) }))
+      .filter((section) => section.body.trim().length > 0),
+    gaps: input.draft.gaps.map(apart).filter((gap) => gap.trim().length > 0),
+  };
+  const openPoints = review.open
+    .map(reviewOpenPoint)
+    .map(apart)
+    .filter((point) => point.trim().length > 0);
+  const namesakeGap =
+    identity === null || namesakeCut.size === 0
+      ? []
+      : [
+          wholeSentences(
+            `Q removed ${namesakeRemoved === 0 ? "the citations" : `${String(namesakeRemoved)} statement${namesakeRemoved === 1 ? "" : "s"}`} that rested on pages about a different organisation named like ${identity.name} (${[
+              ...namesakeCut,
+            ]
+              .sort((a, b) => a - b)
+              .map((index) => `S${String(index)}`)
+              .join(", ")}); they are not evidence about ${identity.name}.`,
+            Q_ARTIFACT_GAP_MAX,
+          ),
+        ];
   const sections = draft.sections.map((section, index) => ({
     heading: section.heading,
     body: section.body,
@@ -949,7 +1059,10 @@ export function analysisContent(input: {
       [...body.matchAll(CITED)].map((match) => Number(match[1])),
     ),
   );
-  const listed = input.sources.filter((source) => cited.has(source.index));
+  // A namesake page the writer cited stays listed, named as not used.
+  const listed = input.sources.filter(
+    (source) => cited.has(source.index) || namesakeCut.has(source.index),
+  );
   const sourceLines = listed.map((source) => {
     const standing = filedTierText(source, identity, namesakes);
     return `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${standing === null ? "" : ` (${standing})`}. ${source.url}`;
@@ -981,9 +1094,10 @@ export function analysisContent(input: {
     ...(input.codeGaps ?? []).map((gap) =>
       wholeSentences(gap, Q_ARTIFACT_GAP_MAX),
     ),
+    ...namesakeGap,
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
-    ...review.open.map(reviewOpenPoint),
+    ...openPoints,
   ].slice(0, 24);
   return {
     sections: [
