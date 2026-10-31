@@ -1,5 +1,11 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED 656719a90 — 31 October 2026, 17:11 UTC (Claude coordinator)
+
+- **All four services** on `656719a90` (`recovery/2026-09-12`, `build/int-rc`); CI green (run 1722). Integration branch `fix/resume-asking`. Hosted migrations 268/268 (latest `20261231210000` investor onboarding v3, "Not sure yet").
+- **Live-verified on this deploy (fresh fictional accounts):** investor geography/exclusions saved in full and merged on later additions; founder onboarding MVP 1–6 (paraphrase→confirm→save, skips, read-back), typed reply median ~3.6 s; "IC memo on X" runs the researched job with stages (~3.5 min); founder one-pager stays quick; Discover captions clear of the name at 390/360; AI presenter label shown; in-region pitches first when geography is strong.
+- **Known open (not fixed at handoff):** see HANDOFF-LOG 2026-10-31 evening. Two worker branches were in flight: `fix/onb-8` (sector "industrial automation" dropped — TAXONOMY_CHOICE named 0; B2B "recurring revenue" → Consumer Subscription; traction missing from founder read-back; "skip the rest" completes at ~26 s) and `fix/memo-10` (research plan output truncated → degraded research with no competitors; set-aside namesake pages listed under "sources this document cites"; a risk line with a removed name; one-pager first text 6.8 s). Neither is merged or deployed unless a later entry says so.
+
 ## DEPLOYED 68ab54317 — 31 October 2026, 03:45 UTC (Claude coordinator, owner's standing permission)
 
 - **All four services** pushed on `68ab54317` (`recovery/2026-09-12`, `build/int-rc`); CI green (run 1710). Integration branch `fix/resume-asking`.

@@ -1344,3 +1344,16 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Process notes:** CI caught a research-replay drift (model-input quotes changed) and an unused import after a container restart; run app tsc, eslint and the research replay locally before pushing.
 - **Not live-verified yet:** the 68ab54317 re-check (in progress at writing).
 - **Next:** finish the re-check; deploy any fixes; re-record research cases D and G when search credits allow; owner: domain, sender domain, Google consent screen, rotate Railway/Supabase tokens, top up Serper/Tavily/ScrapingBee, "Not sure yet" option.
+
+## 2026-10-31 evening — status at owner stop (Claude coordinator)
+
+- **Production:** `656719a90` (see STATE). Overnight heartbeat deleted at owner's request to stop the loop.
+- **Rounds since 68ab54317:** onboarding latency regression from blocking on the reading (ours) reverted; ask-only steps (investor deployment status, inbound); investor v3 "Not sure yet"; one summary + one yes for narrative fields; stated vs inferred; list items merged per step (regression from `fe894ec7b` reader v13 fixed in `a015597c4`); memo namesake judgement + removal of their citations; citations missing from Sources removed; markdown tables in PDF/viewer; declared-geography tier across the feed (`fit-order.v4`, `structured-mandate.v7`); AI presenter app label; captions placement; IC memo always researched (TURN_READER v75 `investmentMemo`); owner's 2026-10-16 Home redirect kept.
+- **Open defects (live 656719a90):**
+  1. Investor sector "industrial automation" dropped (chooser named none; note fallback didn't fire) — regression vs f42b28f7b.
+  2. Research plan output truncated twice on gpt-5.6-luna → research degraded to one search (no competitors). Output-budget class again.
+  3. Memo: set-aside namesake pages listed under "sources this document cites"; a risk sentence left with a hole after name removal.
+  4. "recurring revenue" (B2B) → Consumer Subscription; founder traction "40 lockers in 12 towns" missing from read-back; "skip the rest" completes ~26 s; one-pager first text 6.8 s.
+  5. Founder finish lands on /verification (skippable) before profile.
+- **In-flight branches at stop:** `fix/onb-8`, `fix/memo-10` (workers' reports pending; verify gates yourself before merging).
+- **Lesson for the next agent:** run live checks on fresh accounts after every deploy, but bound the loop: fix release-blocking defects (data loss, wrong data, evidence honesty) first and batch cosmetic ones. Check every gate's exit code directly (a piped `tail` hid a tsc failure once) and run research replays locally before pushing.
