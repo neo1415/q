@@ -615,7 +615,39 @@ export type BoundOnboardingPort = OnboardingToolPort &
      * words. Code accepts these without waiting on a model.
      */
     readonly affirmedParaphrases: () => Promise<ReadonlySet<string>>;
+    /**
+     * Values Q inferred from their words (the reading's `source`, live
+     * re-check 2026-10-31: "we write cheques of EUR 750k to 3 million"
+     * saved as "actively investing"): each held as a suggestion for their
+     * yes, never written. CLAUDE.md: material Q-extracted facts require
+     * confirmation before they are authoritative.
+     */
+    readonly holdInferred: (
+      answers: readonly {
+        readonly stepKey: string;
+        readonly value: string | readonly string[] | number | boolean;
+        readonly quote: string;
+        readonly ownWords?: boolean | undefined;
+      }[],
+    ) => Promise<readonly OnboardingRecordResult[]>;
+    /**
+     * A needed step they said they do not know (live re-check 2026-10-31):
+     * recorded as not known (NOT_KNOWN_TEXT), never their sentence and
+     * never a value read into it, and still answerable later. Optional
+     * steps are set aside instead (setAside).
+     */
+    readonly recordNotKnown: (
+      items: readonly { readonly stepKey: string; readonly quote: string }[],
+    ) => Promise<readonly OnboardingRecordResult[]>;
   };
+
+/**
+ * What a needed step holds when they said they do not know (owner's "Not
+ * sure yet" option is pending, 2026-10-31): the same words the discovery
+ * style kept live ("Discovery style · I don't know"), so the read-back says
+ * it plainly and a later answer replaces it.
+ */
+export const NOT_KNOWN_TEXT = "I don't know";
 
 /** Text compared for "already says this": case, quotes and spacing aside. */
 function normalisedText(text: string): string {
@@ -4414,6 +4446,170 @@ export function createOnboardingPort(input: {
         }
       }
       return affirmed;
+    },
+    holdInferred: async (answers) => {
+      const results: OnboardingRecordResult[] = [];
+      for (const answer of answers) {
+        try {
+          if (!said(answer.quote)) {
+            results.push(unsaid(answer.stepKey));
+            continue;
+          }
+          const resolved = await resolve(answer);
+          if (!resolved.ok) {
+            results.push(resolved.result);
+            continue;
+          }
+          // Already what the record holds: nothing to put to them.
+          const onRecord = (await current()).responses.find(
+            (r) => r.stepKey === resolved.step.stepKey,
+          );
+          if (
+            onRecord !== undefined &&
+            sameValue(onRecord.value, resolved.value)
+          ) {
+            continue;
+          }
+          if (
+            resolved.value.type === "TEXT" &&
+            PARAPHRASABLE.has(resolved.step.configuration.stepType)
+          ) {
+            results.push(
+              await holdParaphrase(resolved.step, resolved.value, answer.quote),
+            );
+            continue;
+          }
+          const question = (
+            SPOKEN_QUESTIONS[resolved.step.stepKey] ??
+            resolved.step.configuration.prompt
+          ).slice(0, 400);
+          if (store === undefined) {
+            results.push({
+              stepKey: resolved.step.stepKey,
+              outcome: "REJECTED",
+              question,
+              reason:
+                "That would be your inference, so nothing was recorded. Ask them.",
+            });
+            continue;
+          }
+          try {
+            await store.recommend({
+              userId,
+              sessionId: input.onboardingSessionId,
+              stepKey: resolved.step.stepKey,
+              value: resolved.value,
+              rationale: `From what you said earlier: "${answer.quote.slice(0, 120)}"`,
+              runId: input.runId ?? null,
+              // A re-reading of the same words keeps the suggestion already
+              // waiting rather than replacing it (as holdParaphrase).
+              keepPendingSince: input.saidAt?.(answer.quote),
+            });
+          } catch (error: unknown) {
+            if (
+              typeof error === "object" &&
+              error !== null &&
+              "reason" in error &&
+              error.reason === "SUGGESTION_REJECTED_BEFORE"
+            ) {
+              // They turned exactly this down: never put to them again.
+              results.push({
+                stepKey: resolved.step.stepKey,
+                outcome: "REJECTED",
+                question,
+                reason: "They turned that suggestion down before.",
+              });
+              continue;
+            }
+            throw error;
+          }
+          results.push({
+            stepKey: resolved.step.stepKey,
+            outcome: "REJECTED",
+            question,
+            reason:
+              "Held for their confirmation, not recorded: it is your reading of something they said. Put it to them; their yes records it.",
+          });
+        } catch (error: unknown) {
+          results.push(refused(answer.stepKey, error));
+        }
+      }
+      return results;
+    },
+    recordNotKnown: async (items) => {
+      const results: OnboardingRecordResult[] = [];
+      for (const item of items) {
+        const step = steps.get(item.stepKey);
+        if (step === undefined) {
+          results.push({
+            stepKey: item.stepKey.slice(0, 80),
+            outcome: "REJECTED",
+            reason: "There is no such step in this onboarding.",
+          });
+          continue;
+        }
+        const question = (
+          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+        ).slice(0, 400);
+        if (!step.required) {
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "REJECTED",
+            question,
+            reason: "An optional step they do not know is set aside.",
+          });
+          continue;
+        }
+        if (!said(item.quote)) {
+          results.push(unsaid(step.stepKey));
+          continue;
+        }
+        // Theirs only when the reading of their words found it (declined
+        // carries what they do not know, by meaning).
+        if (input.authority !== undefined) {
+          const authority = await input.authority();
+          if (authority?.declined.has(step.stepKey) !== true) {
+            results.push({
+              stepKey: step.stepKey,
+              outcome: "REJECTED",
+              question,
+              reason: "Their words do not say they do not know this one.",
+            });
+            continue;
+          }
+        }
+        try {
+          const onRecord = (await current()).responses.find(
+            (r) => r.stepKey === step.stepKey,
+          );
+          if (
+            onRecord?.value.type === "TEXT" &&
+            onRecord.value.text === NOT_KNOWN_TEXT
+          ) {
+            results.push({
+              stepKey: step.stepKey,
+              outcome: "COMMITTED",
+              question,
+              recorded: NOT_KNOWN_TEXT,
+              alreadyRecorded: true,
+            });
+            continue;
+          }
+          // A new version over whatever was there (history kept): what was
+          // on record is no longer known, by their own word.
+          await submit(step.stepKey, { type: "TEXT", text: NOT_KNOWN_TEXT });
+          written.push(step.stepKey);
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "COMMITTED",
+            question,
+            recorded: NOT_KNOWN_TEXT,
+          });
+        } catch (error: unknown) {
+          results.push(refused(step.stepKey, error));
+        }
+      }
+      return results;
     },
     pendingRecommendations: async () => {
       const view = await current();

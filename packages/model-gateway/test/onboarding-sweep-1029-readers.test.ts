@@ -34,7 +34,11 @@ function recording(value: unknown) {
 
 describe("the transcript reader", () => {
   it("is told today's date, for the times they name", async () => {
-    const { gateway, seen } = recording({ answers: [], declined: [] });
+    const { gateway, seen } = recording({
+      answers: [],
+      declined: [],
+      notKnown: [],
+    });
     const reader = createOnboardingTranscriptReader({
       gateway,
       logger,

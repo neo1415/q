@@ -224,6 +224,7 @@ export function createTypedOnboarding(dependencies: {
           pausing: false,
           path: done.completed ? "FINISHED_BY_TAP" : "CONFIRMED_BY_TAP",
           finishing: true,
+          readBack: false,
         });
       }
 
@@ -234,6 +235,14 @@ export function createTypedOnboarding(dependencies: {
         port.state(),
         conversation.said(line, "PERSON", utterance),
       ]);
+      // Read now, beside the reply (live re-check 2026-10-31: "1.5 million
+      // euros" was saved two seconds after Q asked which currency). Q's
+      // next question is settled once this reading is applied.
+      const reading: Promise<boolean | void> =
+        conversation.flush?.(line).catch((error: unknown) => {
+          logger.warn({ err: error }, "typed onboarding words not read");
+          return false;
+        }) ?? Promise.resolve(true);
       const thread = await listOnboardingInterviewTurns(
         input.session,
         input.onboardingSessionId,
@@ -260,12 +269,17 @@ export function createTypedOnboarding(dependencies: {
       // The record review Q read back, when it did: their yes to it is
       // finishing (sweep D1: "yes" read as the review alone, and Q went on
       // to an optional question after "Say yes and I'll finish").
+      // Only while the read-back is Q's last line: a reply binds to the one
+      // thing Q just asked (live re-check 2026-10-31: after the read-back
+      // Q put a summary to them, their "yes" to it was also read as the
+      // read-back's yes, and the setup finished with four suggestions
+      // never said). readBackShown is cleared by any other line of Q's.
       const readBackReview = readBackShown.has(input.onboardingSessionId)
         ? (reviewOf(state, input.journeyType, labelOf)?.stepKey ?? null)
         : null;
       // The reply and the reading of whether they pause or finish run side
       // by side: the person waits for one model, not two in a row.
-      const [authority, written] = await Promise.all([
+      const [authority, firstReply] = await Promise.all([
         dependencies.delegation === undefined
           ? Promise.resolve(null)
           : dependencies.delegation
@@ -297,6 +311,7 @@ export function createTypedOnboarding(dependencies: {
         }),
       ]);
 
+      let written = firstReply;
       const agreedToReadBack =
         readBackReview !== null &&
         authority?.stated.has(readBackReview) === true;
@@ -306,6 +321,7 @@ export function createTypedOnboarding(dependencies: {
       let asking: string | null = null;
       let navigate: InterviewTurnOutcome["navigate"] = null;
       let pausing = false;
+      let showedReadBack = false;
       let path: string;
       if (authority?.pausing === true) {
         // What they said is saved first; the line says what is saved.
@@ -323,14 +339,35 @@ export function createTypedOnboarding(dependencies: {
         agreedToReadBack ||
         stillFinishing
       ) {
-        await conversation.flush?.(line);
+        // What they just said is in before anything is called missing; a
+        // reading still under way after the bound gets one more.
+        if ((await reading) === false) await conversation.flush?.(line);
         const finishing = portOf(true);
         const finished = await finishing.finish();
         const now = await finishing.state();
-        const review =
+        const shown =
           finished.reason === REVIEW_NOT_SHOWN_REASON
             ? reviewOf(now, input.journeyType, labelOf)
             : undefined;
+        const review =
+          shown === undefined
+            ? undefined
+            : {
+                ...shown,
+                pending: waitingOnYes(
+                  now,
+                  await finishing
+                    .pendingRecommendations()
+                    .catch((error: unknown) => {
+                      logger.warn(
+                        { err: error },
+                        "typed onboarding suggestions not read",
+                      );
+                      return [];
+                    }),
+                  labelOf,
+                ),
+              };
         // Already finishing, Q's last line asked a needed step, and their
         // answer left it open: it is not put again word for word.
         const unsettled = stillFinishing
@@ -344,6 +381,7 @@ export function createTypedOnboarding(dependencies: {
         });
         if (review !== undefined && said !== null) {
           readBackShown.add(input.onboardingSessionId);
+          showedReadBack = true;
         }
         // Still open essentials: their next answer goes on toward the
         // finish. Finished, or read back for their yes: that yes decides.
@@ -371,6 +409,32 @@ export function createTypedOnboarding(dependencies: {
         );
         path = "READ_BACK";
       } else if (written !== null) {
+        // The reading of their words, applied before Q's question stands:
+        // a question about what they just said is written again from the
+        // record as it is now (one more reply, only then).
+        await reading;
+        const asked = written.asking;
+        const before = state.steps.find((step) => step.stepKey === asked);
+        const now =
+          asked === null || before?.status !== "OPEN"
+            ? null
+            : await portOf(false)
+                .state()
+                .catch(() => null);
+        const after = now?.steps.find((step) => step.stepKey === asked);
+        if (
+          now !== null &&
+          after !== undefined &&
+          (after.status !== "OPEN" || after.savePending === true)
+        ) {
+          const again = await reply(input, now, turns).catch(
+            (error: unknown) => {
+              logger.warn({ err: error }, "typed onboarding reply unavailable");
+              return null;
+            },
+          );
+          if (again !== null) written = again;
+        }
         text = withoutStepIds(written.reply, input.journeyType).trim();
         asking = written.asking;
         path = "REPLY";
@@ -393,6 +457,7 @@ export function createTypedOnboarding(dependencies: {
         path,
         finishing:
           authority?.finishing === true || agreedToReadBack || stillFinishing,
+        readBack: showedReadBack,
       });
 
       /** Q's line kept with the step it asks, and the screen's outcome. */
@@ -403,7 +468,12 @@ export function createTypedOnboarding(dependencies: {
         readonly pausing: boolean;
         readonly path: string;
         readonly finishing: boolean;
+        /** This line is the record's read-back, put to them for their yes. */
+        readonly readBack: boolean;
       }): Promise<InterviewTurnOutcome> {
+        // The read-back is "what Q just asked" only while it is Q's last
+        // line; any other line of Q's asks something else.
+        if (!said.readBack) readBackShown.delete(input.onboardingSessionId);
         // Live e11: the step this line asks is kept with it, so a reopening
         // asks the question the conversation had open (the line asked about
         // full-time founders; kept with no step, the resume asked team
@@ -780,4 +850,34 @@ export async function confirmTapped(input: {
     asking: said?.asking ?? null,
     completed: finished.completed,
   };
+}
+
+/**
+ * Q's suggestions still waiting on the person's yes, "Label: value" each,
+ * for the read-back (live re-check 2026-10-31): never the ones the record
+ * already holds as they are, and only steps with a plain label.
+ */
+export function waitingOnYes(
+  state: OnboardingState,
+  pending: readonly { readonly stepKey: string; readonly value: string }[],
+  labelOf: (stepKey: string) => string | undefined,
+): string[] {
+  const plain = (value: string) =>
+    value.trim().replace(/\s+/gu, " ").toLocaleLowerCase();
+  const seen = new Set<string>();
+  return pending.flatMap((item) => {
+    const label = labelOf(item.stepKey);
+    if (label === undefined || seen.has(item.stepKey)) return [];
+    const row = state.steps.find((step) => step.stepKey === item.stepKey);
+    if (
+      row?.status === "ANSWERED" &&
+      row.value !== null &&
+      row.value !== undefined &&
+      plain(row.value) === plain(item.value)
+    ) {
+      return [];
+    }
+    seen.add(item.stepKey);
+    return [`${label}: ${item.value}`];
+  });
 }

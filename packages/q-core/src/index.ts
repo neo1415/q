@@ -158,6 +158,7 @@ export { ONBOARDING_TRANSCRIPT_READER_V5 } from "./prompts/tasks/onboarding-tran
 export { ONBOARDING_TRANSCRIPT_READER_V6 } from "./prompts/tasks/onboarding-transcript-reader.v6.js";
 export { ONBOARDING_TRANSCRIPT_READER_V7 } from "./prompts/tasks/onboarding-transcript-reader.v7.js";
 export { ONBOARDING_TRANSCRIPT_READER_V8 } from "./prompts/tasks/onboarding-transcript-reader.v8.js";
+export { ONBOARDING_TRANSCRIPT_READER_V9 } from "./prompts/tasks/onboarding-transcript-reader.v9.js";
 export { TAXONOMY_CHOICE_V1 } from "./prompts/tasks/taxonomy-choice.v1.js";
 export { TAXONOMY_CHOICE_V2 } from "./prompts/tasks/taxonomy-choice.v2.js";
 export * from "./prompts/schemas/taxonomy-choice.js";
@@ -177,13 +178,16 @@ export {
   ONBOARDING_TRANSCRIPT_READER_SCHEMA_VERSION,
   ONBOARDING_TRANSCRIPT_READER_V2_SCHEMA_VERSION,
   ONBOARDING_TRANSCRIPT_READER_V3_SCHEMA_VERSION,
+  ONBOARDING_TRANSCRIPT_READER_V4_SCHEMA_VERSION,
   OnboardingTranscriptReaderResultSchema,
   OnboardingTranscriptReaderV2ResultSchema,
   OnboardingTranscriptReaderV3ResultSchema,
+  OnboardingTranscriptReaderV4ResultSchema,
   OnboardingTranscriptReaderVariablesSchema,
   type OnboardingTranscriptReaderResult,
   type OnboardingTranscriptReaderV2Result,
   type OnboardingTranscriptReaderV3Result,
+  type OnboardingTranscriptReaderV4Result,
   type OnboardingTranscriptReaderVariables,
 } from "./prompts/schemas/onboarding-transcript-reader.js";
 export {

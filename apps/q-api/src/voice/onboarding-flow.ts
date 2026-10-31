@@ -608,7 +608,16 @@ export function finishingLine(
      * review not shown yet, the read-back the person says yes to.
      */
     readonly review?:
-      | { readonly saved: readonly string[]; readonly stepKey: string }
+      | {
+          readonly saved: readonly string[];
+          readonly stepKey: string;
+          /**
+           * Q's suggestions still waiting on their yes, "Label: value"
+           * each (live re-check 2026-10-31: a finish left four of them
+           * pending, never said): listed in the read-back as not saved.
+           */
+          readonly pending?: readonly string[] | undefined;
+        }
       | undefined;
     /**
      * The needed step Q's last line asked, still open after their answer
@@ -640,11 +649,19 @@ export function finishingLine(
           .join("\n"),
       )
       .filter((block) => block.length > 0);
+    const pending = (copy.review.pending ?? [])
+      .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
+      .filter((line) => line.length > 0)
+      .slice(0, 12);
+    const waiting =
+      pending.length === 0
+        ? ""
+        : `\n\nNot saved, waiting for your yes (tell me which to keep):\n${pending.join("\n")}`;
     return {
       reply:
         saved.length === 0
-          ? "Here's what I have saved: nothing yet. Is that all right? Say yes and I'll finish, or tell me what to change."
-          : `Here's what I have saved:\n\n${saved.join("\n\n")}\n\nIs that all right? Say yes and I'll finish, or tell me what to change.`,
+          ? `Here's what I have saved: nothing yet.${waiting}${waiting.length === 0 ? " " : "\n\n"}Is that all right? Say yes and I'll finish, or tell me what to change.`
+          : `Here's what I have saved:\n\n${saved.join("\n\n")}${waiting}\n\nIs that all right? Say yes and I'll finish, or tell me what to change.`,
       asking: copy.review.stepKey,
     };
   }

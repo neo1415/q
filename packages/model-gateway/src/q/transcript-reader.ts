@@ -3,9 +3,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  OnboardingTranscriptReaderV3ResultSchema,
+  OnboardingTranscriptReaderV4ResultSchema,
   renderPrompt,
-  type OnboardingTranscriptReaderV3Result,
+  type OnboardingTranscriptReaderV4Result,
   type OnboardingTranscriptReaderVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -21,8 +21,8 @@ import type { ModelGateway } from "../gateway.js";
  */
 export type OnboardingTranscriptReading = {
   readonly answers: readonly (Omit<
-    OnboardingTranscriptReaderV3Result["answers"][number],
-    "replaces" | "aboutStep"
+    OnboardingTranscriptReaderV4Result["answers"][number],
+    "replaces" | "aboutStep" | "source"
   > & {
     /**
      * A list step: true when they meant it as the whole list (read by
@@ -35,8 +35,22 @@ export type OnboardingTranscriptReading = {
      * false: not.
      */
     readonly aboutStep?: boolean | undefined;
+    /**
+     * STATED: their words give this value (saved through the checked
+     * path). INFERRED: Q's reading of words about something else, held as
+     * a suggestion for their yes, never saved as theirs. The model reader
+     * always says (its schema requires it); absent only in a hand-built
+     * reading, which is then a statement.
+     */
+    readonly source?: "STATED" | "INFERRED" | undefined;
   })[];
-  readonly declined: OnboardingTranscriptReaderV3Result["declined"];
+  readonly declined: OnboardingTranscriptReaderV4Result["declined"];
+  /**
+   * Steps they said they do not know or have not decided (never a value):
+   * an optional one is declined, a needed one is recorded as not known.
+   */
+  readonly notKnown?:
+    OnboardingTranscriptReaderV4Result["notKnown"] | undefined;
 };
 
 export type OnboardingTranscriptReader = {
@@ -115,7 +129,7 @@ export function createOnboardingTranscriptReader(dependencies: {
     read: async (input) => {
       const transcript = transcriptText(input.turns);
       if (!input.turns.some((turn) => turn.role === "PERSON")) {
-        return { answers: [], declined: [] };
+        return { answers: [], declined: [], notKnown: [] };
       }
       const steps = input.steps.slice(0, 80).map((step) => ({
         stepKey: step.stepKey.slice(0, 80),
@@ -157,12 +171,12 @@ export function createOnboardingTranscriptReader(dependencies: {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: OnboardingTranscriptReaderV3ResultSchema,
+            schema: OnboardingTranscriptReaderV4ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = OnboardingTranscriptReaderV3ResultSchema.safeParse(
+        const parsed = OnboardingTranscriptReaderV4ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) {
@@ -195,6 +209,7 @@ export function createOnboardingTranscriptReader(dependencies: {
           // Only the setup's own steps; a required step is never declined.
           answers: parsed.data.answers.filter((a) => known.has(a.stepKey)),
           declined: parsed.data.declined.filter((d) => optional.has(d.stepKey)),
+          notKnown: parsed.data.notKnown.filter((n) => known.has(n.stepKey)),
         };
       } catch (error: unknown) {
         if (!(

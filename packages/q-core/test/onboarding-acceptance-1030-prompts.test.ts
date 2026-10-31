@@ -34,12 +34,40 @@ describe("ONBOARDING_TRANSCRIPT_READER v8", () => {
   });
 
   it("not knowing declines an optional step; skipping the rest declines every remaining optional step, never a required one", () => {
-    expect(template).toMatch(
-      /they do not know the answer to an optional step/u,
-    );
+    // v9 (2026-10-31): not knowing any step goes under notKnown; code
+    // sets an optional one aside.
+    expect(template).toMatch(/they do not know the answer to a step/u);
     expect(template).toMatch(
       /put every optional step that has nothing on record and was not skipped under declined/u,
     );
     expect(template).toMatch(/Never a required step\./u);
+  });
+});
+
+describe("ONBOARDING_TRANSCRIPT_READER v9 (live re-check 2026-10-31)", () => {
+  const active = registry.getActive("ONBOARDING_TRANSCRIPT_READER");
+  const template = active.definition.template;
+
+  it("is the active version, on the v4 output schema", () => {
+    expect(active.definition.version).toBe(9);
+    expect(active.definition.output).toMatchObject({ schemaVersion: 4 });
+  });
+
+  it("each value says whether they stated it or Q inferred it", () => {
+    expect(template).toMatch(/source: STATED when their words say this value/u);
+    expect(template).toMatch(/When in doubt, INFERRED/u);
+    expect(template).toMatch(/"source": "STATED"/u);
+  });
+
+  it("not knowing is never a value or their own words, for any step", () => {
+    expect(template).toMatch(
+      /put it under notKnown with those words, needed or optional/u,
+    );
+    expect(template).toMatch(
+      /is not an answer and never their own words for a step/u,
+    );
+    expect(template).not.toMatch(
+      /do not know the answer to an optional step Q asked them, put it under declined/u,
+    );
   });
 });

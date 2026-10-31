@@ -104,8 +104,11 @@ export type OnboardingConversation = {
      */
     stepKey?: string | null,
   ) => Promise<void>;
-  /** Everything said is read and saved now, waited for (bounded). */
-  readonly flush?: (line: ConversationLine) => Promise<void>;
+  /**
+   * Everything said is read and saved now, waited for (bounded). False
+   * when the wait ran out with a reading still under way.
+   */
+  readonly flush?: (line: ConversationLine) => Promise<boolean | void>;
 };
 
 /** Quiet after something they said before it is read (coalesced). */
@@ -121,6 +124,10 @@ type Reading = {
   running: Promise<void> | null;
   again: boolean;
   line: ConversationLine;
+  /** Things they said, counted; a new line starts at 1 (unread backlog). */
+  heard: number;
+  /** The count the last finished reading started from: read up to there. */
+  readThrough: number;
 };
 
 export function createOnboardingConversation(dependencies: {
@@ -462,9 +469,25 @@ export function createOnboardingConversation(dependencies: {
         ? "CHANGE"
         : "OTHER_QUESTION";
     };
+    // Live re-check 2026-10-31: "I don't know honestly, the partners
+    // haven't decided" left an inferred value on record, then was saved as
+    // the step's text. Not knowing is never a value: an optional step is
+    // set aside, a needed one recorded as not known (the port), whatever
+    // the same reading also gave for it.
+    const notKnownNow = (reading.notKnown ?? []).filter((item) => {
+      const status = stepOf(state, item.stepKey)?.status;
+      if (status === "OPEN") return true;
+      if (status !== "ANSWERED") return false;
+      return changesRecord({ ...item, aboutStep: false }) === "CHANGE";
+    });
+    const notKnownSteps = new Set(notKnownNow.map((item) => item.stepKey));
     /** What the reading gave that is not saved, by reason: step keys only. */
     const dropped: string[] = [];
     const answers = reading.answers.filter((answer) => {
+      if (notKnownSteps.has(answer.stepKey)) {
+        dropped.push(`${answer.stepKey}:not_known`);
+        return false;
+      }
       const why = !isAnswerable(state, answer.stepKey)
         ? "not_answerable"
         : unchanged(answer.stepKey, answer.value)
@@ -492,17 +515,36 @@ export function createOnboardingConversation(dependencies: {
     // an answered step takes it back when said, since it was saved, to
     // Q's question for it (the port withdraws it; a required step is
     // refused there and stays).
-    const declined = reading.declined.filter((item) => {
+    const declined = [
+      ...reading.declined.filter((item) => !notKnownSteps.has(item.stepKey)),
+      ...notKnownNow.filter(
+        (item) => stepOf(state, item.stepKey)?.required !== true,
+      ),
+    ].filter((item) => {
       const status = stepOf(state, item.stepKey)?.status;
       if (status === "OPEN") return true;
       if (status !== "ANSWERED") return false;
       return changesRecord({ ...item, aboutStep: false }) === "CHANGE";
     });
-    if (answers.length === 0 && declined.length === 0) return;
+    const notKnownNeeded = notKnownNow.filter(
+      (item) => stepOf(state, item.stepKey)?.required === true,
+    );
+    // Live re-check 2026-10-31: a value the reading says Q worked out from
+    // other words (source INFERRED) is held for their yes, never saved as
+    // theirs; only what they stated goes the checked way to the record.
+    const stated = answers.filter((answer) => answer.source !== "INFERRED");
+    const inferred = answers.filter((answer) => answer.source === "INFERRED");
+    if (
+      answers.length === 0 &&
+      declined.length === 0 &&
+      notKnownNeeded.length === 0
+    ) {
+      return;
+    }
     // A list they add to keeps what is on record, unless the reading found
     // they meant this as the whole list (owner 2026-10-28).
     const addsTo = new Set(
-      answers
+      stated
         .filter(
           (answer) =>
             answer.replaces !== true && isList(stepOf(state, answer.stepKey)),
@@ -512,23 +554,45 @@ export function createOnboardingConversation(dependencies: {
     const port = portFor(
       line,
       personTurns,
-      new Set(answers.map((answer) => answer.stepKey)),
-      new Set(declined.map((item) => item.stepKey)),
+      new Set(stated.map((answer) => answer.stepKey)),
+      new Set([
+        ...declined.map((item) => item.stepKey),
+        ...notKnownNeeded.map((item) => item.stepKey),
+      ]),
       false,
       addsTo,
       placeOfQuote(thread.items),
     );
     const recorded =
-      answers.length === 0
+      stated.length === 0
         ? []
         : await port.record(
-            answers.map((answer) => ({
+            stated.map((answer) => ({
               stepKey: answer.stepKey,
               value: answer.value,
               quote: answer.quote,
               basis: "STATED" as const,
               ownWords: answer.ownWords,
             })),
+          );
+    const held =
+      inferred.length === 0
+        ? []
+        : await port.holdInferred(
+            inferred.map((answer) => ({
+              stepKey: answer.stepKey,
+              value: answer.value,
+              quote: answer.quote,
+              ownWords: answer.ownWords,
+            })),
+          );
+    const notKnownSaved =
+      notKnownNeeded.length === 0
+        ? []
+        : await port.recordNotKnown(
+            notKnownNeeded
+              .slice(0, 12)
+              .map((item) => ({ stepKey: item.stepKey, quote: item.quote })),
           );
     const setAside =
       declined.length === 0
@@ -557,6 +621,10 @@ export function createOnboardingConversation(dependencies: {
           )
           .map((r) => `${r.stepKey}:${r.outcome}`),
         setAside: setAside.map((r) => r.stepKey),
+        heldForYes: held.map((r) => r.stepKey),
+        notKnown: notKnownSaved
+          .filter((r) => r.outcome === "COMMITTED")
+          .map((r) => r.stepKey),
       },
       "onboarding conversation read and saved",
     );
@@ -580,7 +648,14 @@ export function createOnboardingConversation(dependencies: {
       existing.line = line;
       return existing;
     }
-    const created: Reading = { timer: null, running: null, again: false, line };
+    const created: Reading = {
+      timer: null,
+      running: null,
+      again: false,
+      line,
+      heard: 1,
+      readThrough: 0,
+    };
     readings.set(key, created);
     return created;
   };
@@ -590,7 +665,12 @@ export function createOnboardingConversation(dependencies: {
       reading.again = true;
       return reading.running;
     }
+    // Everything heard by now is in the thread before it is read.
+    const upTo = reading.heard;
     reading.running = readAndSave(reading.line)
+      .then(() => {
+        reading.readThrough = Math.max(reading.readThrough, upTo);
+      })
       .catch((error: unknown) => {
         logger.warn(
           {
@@ -612,6 +692,7 @@ export function createOnboardingConversation(dependencies: {
 
   const schedule = (line: ConversationLine) => {
     const reading = readingFor(line);
+    reading.heard += 1;
     if (reading.timer !== null) clearTimeout(reading.timer);
     reading.timer = setTimeout(() => {
       reading.timer = null;
@@ -621,23 +702,35 @@ export function createOnboardingConversation(dependencies: {
   };
 
   /** Save everything heard now and wait for it (bounded). */
-  const flush = async (line: ConversationLine): Promise<void> => {
+  const flush = async (line: ConversationLine): Promise<boolean> => {
     finishUtterance(line);
     const reading = readingFor(line);
     if (reading.timer !== null) {
       clearTimeout(reading.timer);
       reading.timer = null;
     }
+    /** Every reading under way, and any it queued, finished. */
+    const quiet = async (): Promise<void> => {
+      for (;;) {
+        const running: Promise<void> | null = reading.running;
+        if (running === null) return;
+        await running;
+      }
+    };
     const done = (async () => {
-      // A reading already under way may predate the last words: read again.
-      if (reading.running !== null) await reading.running;
-      await run(reading);
-      while (reading.running !== null) await reading.running;
+      await quiet();
+      // Read again only when they said something after the last reading
+      // began (live re-check 2026-10-31: every flush read the whole thread
+      // a second time, the finish waited out its bound, and Q asked for a
+      // currency saved two seconds later).
+      if (reading.readThrough < reading.heard) await run(reading);
+      await quiet();
+      return true;
     })();
-    await Promise.race([
+    return Promise.race([
       done,
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, SETTLE_WAIT_MS).unref?.();
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), SETTLE_WAIT_MS).unref?.();
       }),
     ]);
   };

@@ -172,3 +172,67 @@ export const OnboardingTranscriptReaderV3ResultSchema = z
 export type OnboardingTranscriptReaderV3Result = z.infer<
   typeof OnboardingTranscriptReaderV3ResultSchema
 >;
+
+/**
+ * v4 (live re-check 2026-10-31, production 91b19d615): "we write cheques of
+ * EUR 750k to 3 million" was read as "actively investing" before Q asked,
+ * and saved; the prompt's rule against it did not hold the model. Each
+ * answer now says whether the person STATED that value or it is Q's
+ * INFERENCE from their words, and code saves only a stated value directly:
+ * an inferred one is held as a suggestion for their yes (CLAUDE.md:
+ * material Q-extracted facts are confirmed before they are authoritative).
+ * And "I don't know" is its own list, never a value: the step stays
+ * unknown (live: "I don't know honestly, the partners haven't decided" was
+ * saved as the deployment status's text).
+ */
+export const ONBOARDING_TRANSCRIPT_READER_V4_SCHEMA_VERSION = 4;
+
+export const OnboardingTranscriptReaderV4ResultSchema = z
+  .object({
+    answers: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            value: ValueSchema,
+            quote: z.string().trim().min(1).max(400),
+            ownWords: z.boolean(),
+            replaces: z.boolean().default(false),
+            aboutStep: z.boolean().default(false),
+            /**
+             * STATED: their words give this value for this step (or they
+             * agreed to it when Q put it to them). INFERRED: Q worked it
+             * out from words about something else. Required: a reading
+             * that does not say is not saved.
+             */
+            source: z.enum(["STATED", "INFERRED"]),
+          })
+          .strict(),
+      )
+      .max(60),
+    declined: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            quote: z.string().trim().min(1).max(400),
+          })
+          .strict(),
+      )
+      .max(30),
+    /** Steps they said they do not know, or have not decided, with their words. */
+    notKnown: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            quote: z.string().trim().min(1).max(400),
+          })
+          .strict(),
+      )
+      .max(30),
+  })
+  .strict();
+export type OnboardingTranscriptReaderV4Result = z.infer<
+  typeof OnboardingTranscriptReaderV4ResultSchema
+>;
