@@ -338,43 +338,57 @@ export function createTypedOnboarding(dependencies: {
               .filter((item) => item.stepKey === heldAsked)
               .slice(0, 1);
       // The reply and the reading of whether they pause or finish run side
-      // by side: the person waits for one model, not two in a row.
-      const [authority, firstReply] = await Promise.all([
-        dependencies.delegation === undefined
-          ? Promise.resolve(null)
-          : dependencies.delegation
-              .read({
-                utterance,
-                lastQ,
-                ...(readBackReview === null
-                  ? lastAsked.has(input.onboardingSessionId)
-                    ? { askedStep: lastAsked.get(input.onboardingSessionId) }
-                    : {}
-                  : { askedStep: readBackReview }),
-                steps: state.steps.map((step) => ({
-                  stepKey: step.stepKey,
-                  question: step.question,
-                  about: step.question,
-                  required: step.required,
-                })),
-                pending: heldOffer.map((item) => ({
-                  stepKey: item.stepKey,
-                  recommended: item.value,
-                })),
-                attribution,
-                ...(input.signal === undefined ? {} : { signal: input.signal }),
-              })
-              .catch((error: unknown) => {
-                logger.warn({ err: error }, "typed onboarding intent not read");
-                return null;
-              }),
-        reply(input, state, turns).catch((error: unknown) => {
-          logger.warn({ err: error }, "typed onboarding reply unavailable");
+      // by side: the person waits for one model, not two in a row. A turn
+      // that pauses or finishes never uses the reply, so it is not waited
+      // for there (live 2026-10-31: "skip the rest" 15.8-19.5 s, the final
+      // yes 16.8 s, against ~4 s for a normal turn): it is stopped.
+      const replyStop = new AbortController();
+      const stopReply = () => replyStop.abort();
+      if (input.signal?.aborted === true) stopReply();
+      input.signal?.addEventListener("abort", stopReply, { once: true });
+      const replying = reply(input, state, turns, replyStop.signal)
+        .catch((error: unknown) => {
+          if (!replyStop.signal.aborted)
+            logger.warn({ err: error }, "typed onboarding reply unavailable");
           return null;
-        }),
-      ]);
-
-      const written = firstReply;
+        })
+        .finally(() => input.signal?.removeEventListener("abort", stopReply));
+      const authority = await (dependencies.delegation === undefined
+        ? Promise.resolve(null)
+        : dependencies.delegation
+            .read({
+              utterance,
+              lastQ,
+              ...(readBackReview === null
+                ? lastAsked.has(input.onboardingSessionId)
+                  ? { askedStep: lastAsked.get(input.onboardingSessionId) }
+                  : {}
+                : { askedStep: readBackReview }),
+              steps: state.steps.map((step) => ({
+                stepKey: step.stepKey,
+                question: step.question,
+                about: step.question,
+                required: step.required,
+              })),
+              pending: heldOffer.map((item) => ({
+                stepKey: item.stepKey,
+                recommended: item.value,
+              })),
+              attribution,
+              ...(input.signal === undefined ? {} : { signal: input.signal }),
+            })
+            .catch((error: unknown) => {
+              logger.warn({ err: error }, "typed onboarding intent not read");
+              return null;
+            }));
+      const endsHere =
+        authority?.pausing === true ||
+        authority?.finishing === true ||
+        finishAsked.has(input.onboardingSessionId) ||
+        (readBackReview !== null &&
+          authority?.stated.has(readBackReview) === true);
+      if (endsHere) replyStop.abort();
+      const written = endsHere ? null : await replying;
       // The held suggestion Q put to them, approved: accepted now, exactly
       // as it was put to them (the port checks it is still pending and
       // was said), so nothing waits on a reading of "yes" for it.
@@ -427,12 +441,28 @@ export function createTypedOnboarding(dependencies: {
         stillFinishing
       ) {
         // Said at once (live check 2026-10-31: "skip the rest" and the
-        // final yes left the person looking at nothing for 12-23 s).
+        // final yes left the person looking at nothing for 12-23 s): the
+        // stage, and on a streamed turn Q's first line, go out the moment
+        // the reading of their words decided this, before any wait on
+        // what is saved; the read-back follows as soon as it is ready.
         stage(
           agreedToReadBack
             ? "Finishing your setup"
             : "Checking what I have saved for you",
         );
+        const firstLine =
+          input.onSentence === undefined
+            ? null
+            : agreedToReadBack
+              ? "Thank you, finishing your setup now."
+              : "Understood. I'll check what I have saved and read it back to you.";
+        if (firstLine !== null) {
+          try {
+            input.onSentence?.(firstLine);
+          } catch {
+            // Display only.
+          }
+        }
         // What they said is in before anything is called missing. Their
         // latest words are waited for only when the reading of them beside
         // the reply found they state something to save (or a yes to a
@@ -456,7 +486,19 @@ export function createTypedOnboarding(dependencies: {
         if (answeredIn === false) await conversation.flush?.(line);
         const finishing = portOf(true);
         const finished = await finishing.finish();
-        const now = await finishing.state();
+        // Read side by side: the record and Q's suggestions on it.
+        const [now, pendingNow] = await Promise.all([
+          finishing.state(),
+          finished.completed
+            ? Promise.resolve([])
+            : finishing.pendingRecommendations().catch((error: unknown) => {
+                logger.warn(
+                  { err: error },
+                  "typed onboarding suggestions not read",
+                );
+                return [];
+              }),
+        ]);
         const shown =
           finished.reason === REVIEW_NOT_SHOWN_REASON
             ? reviewOf(now, input.journeyType, labelOf)
@@ -465,17 +507,7 @@ export function createTypedOnboarding(dependencies: {
         // a needed step still missing that has one is put to them as that
         // suggestion, never asked from scratch (live 2026-10-31).
         const suggestions =
-          shown !== undefined || finished.missing.length > 0
-            ? await finishing
-                .pendingRecommendations()
-                .catch((error: unknown) => {
-                  logger.warn(
-                    { err: error },
-                    "typed onboarding suggestions not read",
-                  );
-                  return [];
-                })
-            : [];
+          shown !== undefined || finished.missing.length > 0 ? pendingNow : [];
         const review =
           shown === undefined
             ? undefined
@@ -512,9 +544,11 @@ export function createTypedOnboarding(dependencies: {
         } else {
           finishAsked.delete(input.onboardingSessionId);
         }
-        text =
+        const rest =
           said?.reply ??
           "Before I can finish, a few things are still open. Shall we go through them?";
+        // The streamed first line stays part of the whole reply.
+        text = firstLine === null ? rest : `${firstLine} ${rest}`;
         asking = said?.asking ?? null;
         if (finished.completed) navigate = destination(true);
         path = finished.completed ? "FINISHED" : "FINISHING";
@@ -699,6 +733,8 @@ export function createTypedOnboarding(dependencies: {
     input: InterviewAgentTurnInput,
     state: OnboardingState,
     turns: readonly { readonly role: string; readonly text: string }[],
+    /** The turn's own signal, and stopped when the turn ends without it. */
+    signal: AbortSignal,
   ): Promise<OnboardingTypedReplyResult | null> {
     const transcript = turns
       .map((turn) => `${turn.role}: ${turn.text.replace(/\s+/g, " ").trim()}`)
@@ -737,7 +773,7 @@ export function createTypedOnboarding(dependencies: {
       },
       {
         schema: OnboardingTypedReplyResultSchema,
-        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        signal,
       },
     );
     if (response.output.kind !== "STRUCTURED") return null;

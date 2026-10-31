@@ -550,6 +550,13 @@ const markNumbers = (mark: string) =>
 export function withoutCitationsOf(
   text: string,
   namesakes: ReadonlySet<number>,
+  /**
+   * A statement that also cites other pages yet matches this is a note
+   * about the removed pages themselves ("unrelated entities named Nexo,
+   * Nixo Pest ... [S2][S13]"): it stays as a plain note, uncited, because
+   * no remaining source is evidence for what it says.
+   */
+  aboutRemoved?: RegExp,
 ): {
   readonly text: string;
   readonly removed: number;
@@ -570,11 +577,12 @@ export function withoutCitationsOf(
       removed += 1;
       return null;
     }
+    const uncited = aboutRemoved?.test(part) === true;
     return part
       .replace(CITATION_GROUP, (mark) => {
-        const kept = markNumbers(mark).filter(
-          (number) => !namesakes.has(number),
-        );
+        const kept = uncited
+          ? []
+          : markNumbers(mark).filter((number) => !namesakes.has(number));
         return kept.length === 0
           ? ""
           : `[${kept.map((number) => `S${String(number)}`).join(", ")}]`;
@@ -601,8 +609,17 @@ export function withoutCitationsOf(
   return { text: lines.join("\n"), removed, cut };
 }
 
+/** How a writer says pages are about another organisation. */
+const ABOUT_NAMESAKES =
+  /\b(?:unrelated|namesakes?|different (?:organi[sz]ations?|compan(?:y|ies)|entit(?:y|ies)|businesse?s?)|(?:similarly|same|similar)[ -]named|(?:a |the )?same name|similar names?)\b/iu;
+
 /** The same removal, named for the namesake pages it was written for. */
-export const withoutNamesakeCitations = withoutCitationsOf;
+export function withoutNamesakeCitations(
+  text: string,
+  namesakes: ReadonlySet<number>,
+): ReturnType<typeof withoutCitationsOf> {
+  return withoutCitationsOf(text, namesakes, ABOUT_NAMESAKES);
+}
 
 /** How basisProblems names a citation of a source that does not exist. */
 const NOT_A_SOURCE = "Cites sources that do not exist";
@@ -1047,6 +1064,14 @@ export function analysisContent(input: {
       .filter((section) => section.body.trim().length > 0),
     gaps: input.draft.gaps.map(clean).filter((gap) => gap.trim().length > 0),
   };
+  // Code's own sections and gaps (a contradiction table built from every
+  // fact) cite no namesake page either: nothing filed cites one.
+  const codeSections = (input.codeSections ?? [])
+    .map((section) => ({ ...section, body: apart(section.body) }))
+    .filter((section) => section.body.trim().length > 0);
+  const codeGaps = (input.codeGaps ?? [])
+    .map(apart)
+    .filter((gap) => gap.trim().length > 0);
   const openPoints = review.open
     // Code removed every such citation above: the point no longer holds.
     .filter(
@@ -1101,7 +1126,7 @@ export function analysisContent(input: {
       draft.summary,
       ...draft.sections.map((section) => section.body),
       ...(input.alsoCites ?? []),
-      ...(input.codeSections ?? []).map((section) => section.body),
+      ...codeSections.map((section) => section.body),
     ].flatMap((body) =>
       [...body.matchAll(CITED)].map((match) => Number(match[1])),
     ),
@@ -1138,9 +1163,7 @@ export function analysisContent(input: {
     // Cut at a word, never mid-word (live 2026-10-30, deep research:
     // "risks soundin", "contracts with cust"), and at a sentence's end
     // when one is in reach (live 2026-10-31, a dangling clause).
-    ...(input.codeGaps ?? []).map((gap) =>
-      wholeSentences(gap, Q_ARTIFACT_GAP_MAX),
-    ),
+    ...codeGaps.map((gap) => wholeSentences(gap, Q_ARTIFACT_GAP_MAX)),
     ...namesakeGap,
     ...unlistedGap,
     ...draft.gaps,
@@ -1156,7 +1179,7 @@ export function analysisContent(input: {
           findings: index === 0 ? section.findings : [],
         })),
       ),
-      ...(input.codeSections ?? []).flatMap((section) =>
+      ...codeSections.flatMap((section) =>
         splitSection(section.heading, section.body).map((part) => ({
           heading: part.heading.slice(0, 160),
           body: part.body,
