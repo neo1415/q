@@ -42,7 +42,7 @@ const DeliverySchema = z.object({
     title: z.string().min(1).max(200),
     artifactType: z.string().min(1).max(48),
     summary: z.string().min(1).max(600),
-    topRecommendations: z.array(z.string().min(1).max(300)).max(3),
+    topRecommendations: z.array(z.string().min(1).max(800)).max(3),
     passed: z.boolean(),
     openIssues: z.number().int().min(0),
     reducedResearch: z.string().min(1).max(400).optional(),

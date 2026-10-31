@@ -122,3 +122,24 @@ describe("every [S n] in a filed report resolves", () => {
     expect(JSON.stringify(content)).not.toMatch(/\[S(47|55)\]/u);
   });
 });
+
+describe("live 2026-10-31: a quoted figure reads as words", () => {
+  it("quotes the sentence without the writer's markdown, never cut mid-word", () => {
+    const problems = basisProblems(
+      draft({
+        sections: [
+          {
+            heading: "Summary & recommendation",
+            body: "**Mandate fit:**\n- **Cheque and role:** Potential fit only if the financing accommodates a €750k–€3m co-investment; sole-investment capacity is not established and the syndicate, allocation and timing of any round remain open questions for the committee today.",
+          },
+        ],
+      }),
+      SOURCES,
+    );
+    const quoted = problems.find((one) => one.problem.includes("e.g."));
+    expect(quoted?.problem).toContain('e.g. "Cheque and role: Potential fit');
+    expect(quoted?.problem).not.toContain("**");
+    expect(quoted?.problem).not.toContain('"- ');
+    expect(quoted?.problem).toMatch(/\w…"$/u);
+  });
+});

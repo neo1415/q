@@ -6,8 +6,10 @@ import {
   type QArtifactContent,
   type QArtifactFinding,
 } from "@capital-q/contracts";
+import { plainMarkdown } from "@capital-q/deck-render";
 import {
   clipAtWord,
+  cutAtWord,
   type AnalysisCritiqueResult,
   type AnalysisDocumentResult,
 } from "@capital-q/q-core";
@@ -466,7 +468,9 @@ export function basisProblems(
         section: section.heading.slice(0, 120),
         // Model input only; see recordsCitedAsWeb.
         problem:
-          `${String(unlabelled.length)} figure${unlabelled.length === 1 ? "" : "s"} without a basis, e.g. "${(unlabelled[0] ?? "").slice(0, 200)}"`.slice(
+          // Live 2026-10-31: the quoted sentence is words, never the
+          // writer's "- **Cheque and role:**", and never cut mid-word.
+          `${String(unlabelled.length)} figure${unlabelled.length === 1 ? "" : "s"} without a basis, e.g. "${cutAtWord(plainMarkdown(unlabelled[0] ?? ""), 200)}"`.slice(
             0,
             400,
           ),
@@ -898,7 +902,7 @@ export function analysisContent(input: {
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>
       clipAtWord(
-        `${REVIEWER_OPEN_POINT} (${issue.section}): ${readersWords(issue.problem)}`,
+        `${REVIEWER_OPEN_POINT} (${plainMarkdown(issue.section)}): ${readersWords(plainMarkdown(issue.problem))}`,
         300,
       ),
     ),

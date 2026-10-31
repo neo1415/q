@@ -339,6 +339,35 @@ describe("BIZ-001 · a brief is a document you can download", () => {
   });
 });
 
+describe("live 2026-10-31 · the IC memo PDF prints the writer's markdown as structure", () => {
+  it("prints bold, bullets and quoted points as words: no '**', no '- ' markers", async () => {
+    const document = documentFromArtifact({
+      type: "MEMO",
+      version: brief({
+        sections: [
+          {
+            heading: "Summary & recommendation",
+            body: "**Recommendation: do not proceed yet.** Run only a narrow screen.\n\n**Mandate fit:**\n- **Stage:** Apparent fit (company record).\n- **Cheque and role:** Potential fit only as a co-investment.\n  - nested point\n1. First step\n\n| Name | Role |\n| --- | --- |\n| Ada | CEO |",
+            findings: [],
+          },
+        ],
+        gaps: [
+          'Reviewer\'s open point (Summary & recommendation): 2 figures without a basis, e.g. "- **Cheque and role:** Potential fit…"',
+        ],
+      }),
+    });
+    const bytes = await documentToPdf(document, { title: "t" });
+    const text = (await pdfText(bytes)).join(" ");
+    expect(text).not.toContain("**");
+    expect(text).not.toMatch(/(^|\s)- /u);
+    expect(text).toContain("Recommendation: do not proceed yet.");
+    expect(text).toContain("Stage:");
+    expect(text).toContain("Ada · CEO");
+    expect(text).not.toContain("---");
+    expect(text).toContain('e.g. "Cheque and role: Potential fit…"');
+  });
+});
+
 describe("BIZ-001 · a deck is slides, as PDF and as PowerPoint", () => {
   it("writes a PDF with one page per slide that keeps ₦ and €", async () => {
     const file = await renderArtifactFile({

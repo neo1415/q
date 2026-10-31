@@ -2,7 +2,13 @@
 
 import { useEffect, useId, useState, useTransition } from "react";
 
-import type { QPlanBlock, QPlanStep, QPlanView } from "@capital-q/contracts";
+import {
+  qPlanMorePointsLine,
+  qPlanReviewPoints,
+  type QPlanBlock,
+  type QPlanStep,
+  type QPlanView,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, ICON_STROKE, ListChecks } from "@capital-q/ui/icons";
 
@@ -55,33 +61,16 @@ export function shownPoints(
   return all ? points : points.slice(0, PLAN_POINTS_SHOWN);
 }
 
-/** A step's note continued past one line's room (plan-job personLines). */
-const CONTINUED = /^Step (\d+), continued: (.*)$/su;
-const STEP_HEAD = /^Step (\d+), /u;
-
 /**
  * One line per step (live 2026-10-30, founder.ledgerbridge: "Step 9" and
  * "Step 9, continued" as two points). The server keeps each stored point
  * within its 300-character room by continuing a step's notes on a second
  * point; the card folds that continuation back into its step's line, so a
- * step is one point (expandable, below), never two.
+ * step is one point (expandable, below), never two. The same list Q's
+ * line counts (qPlanReviewPoints, live 2026-10-31).
  */
 export function foldedPoints(points: readonly string[]): readonly string[] {
-  const out: string[] = [];
-  for (const point of points) {
-    const continued = CONTINUED.exec(point);
-    const previous = out.at(-1);
-    if (
-      continued !== null &&
-      previous !== undefined &&
-      STEP_HEAD.exec(previous)?.[1] === continued[1]
-    ) {
-      out[out.length - 1] = `${previous} ${continued[2] ?? ""}`.trim();
-      continue;
-    }
-    out.push(point);
-  }
-  return out;
+  return qPlanReviewPoints(points).points;
 }
 
 /** Shown on the card in place of the earlier-draft open point's wording. */
@@ -396,9 +385,12 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   const reviewed = plan?.review?.fullyReviewed ?? block.reviewed;
   const current = view?.current ?? true;
   const facts = new Map((view?.facts ?? []).map((fact) => [fact.ref, fact]));
-  const stillWanted = reviewed
-    ? []
-    : foldedPoints(plan?.review?.openPoints ?? []);
+  // One list with Q's line (live 2026-10-31: chat "and 6 more on the
+  // card", card "Show all 9 points" -- the draft notice was counted).
+  const review = qPlanReviewPoints(
+    reviewed ? [] : (plan?.review?.openPoints ?? []),
+  );
+  const stillWanted = review.points;
   const running = view !== null && planRunning(view.status);
   const runningJobs = current
     ? (plan?.steps ?? []).flatMap((step) =>
@@ -457,11 +449,19 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
             {withoutFactRefs(plan.situationSummary)}
           </p>
-          {stillWanted.length === 0 ? null : (
+          {review.count === 0 && review.notice === null ? null : (
             <section className="flex flex-col gap-1" data-q-plan-wanted>
               <h4 className="cq-caption m-0 text-(--cq-text-tertiary)">
                 {t("What the reviews still want")}
               </h4>
+              {review.notice === null ? null : (
+                <p
+                  className="cq-body-sm m-0 text-(--cq-text-secondary)"
+                  data-q-plan-draft-notice
+                >
+                  {review.notice}
+                </p>
+              )}
               <ul
                 id={pointsId}
                 className="m-0 flex list-none flex-col gap-1 p-0"
@@ -474,6 +474,12 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                     {withoutFactRefs(point)}
                   </li>
                 ))}
+                {review.more > 0 &&
+                (allPoints || stillWanted.length <= PLAN_POINTS_SHOWN) ? (
+                  <li className="cq-body-sm text-(--cq-text-secondary)">
+                    {qPlanMorePointsLine(review.more)}
+                  </li>
+                ) : null}
               </ul>
               {stillWanted.length <= PLAN_POINTS_SHOWN ? null : (
                 <button
@@ -486,7 +492,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
                 >
                   {allPoints
                     ? t("Show fewer")
-                    : t(`Show all ${String(stillWanted.length)} points`)}
+                    : t(`Show all ${String(review.count)} points`)}
                 </button>
               )}
             </section>

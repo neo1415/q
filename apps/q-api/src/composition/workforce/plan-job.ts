@@ -13,6 +13,10 @@ import {
   QPlanStepSchema,
   QSituationDossierSchema,
   situationFacts,
+  qPlanMorePointsLine,
+  qPlanReviewPoints,
+  Q_PLAN_EARLIER_DRAFT_KEPT,
+  Q_PLAN_FIRST_DRAFT_ONLY,
   type QPlan,
   type QPlanBlock,
   type QPlanReview,
@@ -1580,8 +1584,7 @@ export function betterRound<
 }
 
 /** Said first when an earlier draft scored better than its revision. */
-export const EARLIER_DRAFT_KEPT =
-  "This is the earlier draft: its revision scored lower in review, so this draft is shown, with the reviews of this draft.";
+export const EARLIER_DRAFT_KEPT = Q_PLAN_EARLIER_DRAFT_KEPT;
 
 /**
  * What a redraft changed, by structure only (keys and refs, never words),
@@ -3110,16 +3113,10 @@ export function cappedPoints(
   return [...shown, morePoints(kept.length - shown.length)];
 }
 
-const morePoints = (more: number) =>
-  `And ${String(more)} more point${more === 1 ? "" : "s"} the reviews raised.`;
-/** The count code's own cap line (morePoints) stands for; 0 for any other. */
-const MORE_POINTS = /^And (\d+) more points? the reviews raised\.$/u;
-/** personLines' continuation of a step's notes on a second point. */
-const STEP_CONTINUED = /^Step \d+, continued: /u;
+const morePoints = qPlanMorePointsLine;
 
 /** Said first when the redraft did not come back (live 2026-10-30, job 32e70db7). */
-export const FIRST_DRAFT_ONLY =
-  "This is the first draft: its revision could not finish in time, so the reviews below are of this draft.";
+export const FIRST_DRAFT_ONLY = Q_PLAN_FIRST_DRAFT_ONLY;
 
 const optional = <T>(value: T | null): T[] => (value === null ? [] : [value]);
 
@@ -3154,25 +3151,14 @@ export function planReadyLine(
   ];
   if (first !== undefined) lines.push(`First: ${first.title}`);
   if (plan.review?.fullyReviewed !== true) {
-    const all = plan.review?.openPoints ?? [];
-    const firstOnly = all.includes(FIRST_DRAFT_ONLY);
-    const earlier = all.includes(EARLIER_DRAFT_KEPT);
-    const listed = all.filter(
-      (point) =>
-        point !== FIRST_DRAFT_ONLY &&
-        point !== EARLIER_DRAFT_KEPT &&
-        !MORE_POINTS.test(point) &&
-        // A step's continued note is part of its step's line: the card
-        // folds it into that line (plan-card foldedPoints), so the count
-        // here does too.
-        !STEP_CONTINUED.test(point),
-    );
-    // The card's own count: what it lists plus what its cap line stands
-    // for (live 2026-10-30: chat "and 10 more", card "And 5 more").
-    const capped = all
-      .map((point) => Number(MORE_POINTS.exec(point)?.[1] ?? 0))
-      .reduce((sum, count) => sum + count, 0);
-    const more = listed.length - 2 + capped;
+    // One list with the card's (qPlanReviewPoints): the same points, the
+    // same count, the draft notice apart (live 2026-10-31: chat "and 6
+    // more", card "Show all 9").
+    const review = qPlanReviewPoints(plan.review?.openPoints ?? []);
+    const firstOnly = review.notice === FIRST_DRAFT_ONLY;
+    const earlier = review.notice === EARLIER_DRAFT_KEPT;
+    const listed = review.points;
+    const more = review.count - Math.min(2, listed.length);
     const lead = firstOnly
       ? "It's the first draft: its revision couldn't finish in time, so the reviews are of this draft and didn't pass it yet."
       : earlier

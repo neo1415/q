@@ -2378,6 +2378,29 @@
     opacity: 0.4;
     cursor: default;
   }
+  /* Live 2026-10-31 (390 px): the honest line about their regions sat in
+     the stage's flow, under the full-bleed pitch (elementFromPoint found
+     the VIDEO). It is over the pitch, from the layer scale, in the band
+     between the sound control and Previous/Next, below the sound button
+     and its "Tap for sound" hint (56px controls row + 44px button + 8px),
+     so it never covers a control and never takes a tap. */
+  .cq-feed-regions-line {
+    position: absolute;
+    top: calc(56px + 44px + 8px + var(--cq-safe-top));
+    inset-inline: 56px 64px;
+    z-index: var(--cq-z-sticky);
+    margin: 0;
+    color: var(--cq-stage-text);
+    font-size: 13px;
+    line-height: 1.35;
+    text-align: center;
+    text-shadow: var(--cq-feed-halo);
+    pointer-events: none;
+  }
+  .cq-feed[data-clear-display] .cq-feed-regions-line,
+  .cq-feed[data-scrubbing] .cq-feed-regions-line {
+    opacity: 0;
+  }
   /* Discover filters on a phone: one control top right, on stage tokens. */
   .cq-feed-filter {
     position: absolute;

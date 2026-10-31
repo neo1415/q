@@ -839,7 +839,11 @@ function InvestorFeed({
               details sheet, so a phone showed just "outside your regions"
               on the card. It is over the pitch here, at phone widths. */}
           {notes.includes("NONE_IN_DECLARED_GEOGRAPHY") ? (
-            <p className="cq-status-line" data-feed-outside-geography-top>
+            <p
+              className="cq-feed-regions-line"
+              role="note"
+              data-feed-outside-geography-top
+            >
               {t(NOTE_TEXT.NONE_IN_DECLARED_GEOGRAPHY)}
             </p>
           ) : null}
