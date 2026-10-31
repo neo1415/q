@@ -548,8 +548,10 @@ export function FeedCard({
             {exploringLine(company.reasonCodes)}
           </p>
         )}
+        {/* Live 2026-10-31 (Discover at 390): never rendered on the feed,
+            which draws the pitch on its stage and the card with
+            showMedia={false}. Said wherever the card carries a pitch. */}
         {company.pitch === null ||
-        !showMedia ||
         aiPresenterLine(company.pitch.title) === null ? null : (
           <p className="cq-caption cq-feed-muted" data-ai-presenter>
             {t(aiPresenterLine(company.pitch.title) ?? "")}

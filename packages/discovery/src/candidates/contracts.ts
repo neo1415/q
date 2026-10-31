@@ -70,8 +70,12 @@ export const STRUCTURED_GENERATOR_ID = "STRUCTURED_MANDATE" as const;
  * was never a candidate. The qualifying companies are divided into windows
  * of a rotation seeded by the investor organisation; one build reads one
  * window, and the feed walks them (candidates/window.ts).
+ *
+ * v7 (live 2026-10-31, fit-order.v4): when the investor declared their
+ * geography Must or Strong, the companies headquartered in it are read in
+ * every window, so every slate of the rotation can order them first.
  */
-export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v6" as const;
+export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v7" as const;
 
 /**
  * Every version a persisted artifact (a feature snapshot's provenance) may
@@ -87,6 +91,8 @@ export const STRUCTURED_GENERATOR_VERSIONS = [
   "structured-mandate.v4",
   // v5 stays readable: slates built before v6 name it.
   "structured-mandate.v5",
+  // v6 stays readable: slates built before v7 name it.
+  "structured-mandate.v6",
   STRUCTURED_GENERATOR_VERSION,
 ] as const;
 

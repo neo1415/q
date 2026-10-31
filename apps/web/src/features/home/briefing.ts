@@ -356,10 +356,10 @@ function pitchItems(facts: InvestorBriefingFacts): BriefingItem[] {
           inside.length === 1
             ? `A pitch from ${head.name}, in your regions`
             : `${String(inside.length)} pitches in your regions`,
-        description:
-          outside.length === 1
-            ? `${names(inside.map((p) => p.name))}. One more is outside your regions.`
-            : `${names(inside.map((p) => p.name))}. ${String(outside.length)} more are outside your regions.`,
+        // Live 2026-10-31 (Nordlicht): "10 more are outside your regions"
+        // counted the first page of the slate read here, while the feed
+        // held ~38. No count this read cannot stand behind.
+        description: `${names(inside.map((p) => p.name))}. Pitches outside your regions follow in Discover.`,
         href: "/discover",
       },
     ];

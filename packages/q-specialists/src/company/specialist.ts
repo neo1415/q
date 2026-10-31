@@ -517,6 +517,7 @@ export function createCompanyIntelligenceSpecialist(
               canonicalName:
                 subject.kind === "PUBLIC_COMPANY" ? subject.name : null,
               description: null,
+              website: null,
             }
           : await canonical.read(toolContext, companyId);
       telemetry = { ...telemetry, toolCalls: canonicalRead.toolCalls };
@@ -743,6 +744,7 @@ export function createCompanyIntelligenceSpecialist(
           companyId,
           companyName: canonicalRead.canonicalName,
           canonicalDescription: canonicalRead.description ?? null,
+          companyWebsite: canonicalRead.website ?? null,
           specialistVersion: `${COMPANY_INTELLIGENCE_ID}/${COMPANY_INTELLIGENCE_VERSION}`,
           asOf: asOfStamp,
           blocked: null,
@@ -1131,6 +1133,7 @@ export function createCompanyIntelligenceSpecialist(
         companyId,
         companyName: canonicalRead.canonicalName,
         canonicalDescription: canonicalRead.description ?? null,
+        companyWebsite: canonicalRead.website ?? null,
         specialistVersion: `${COMPANY_INTELLIGENCE_ID}/${COMPANY_INTELLIGENCE_VERSION}`,
         asOf: asOfStamp,
         blocked,

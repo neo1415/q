@@ -152,6 +152,12 @@ export type CompanyIntelligenceResult = {
    * record, never the reply Q wrote in the conversation.
    */
   readonly canonicalDescription?: string | null | undefined;
+  /**
+   * The website on the company's canonical profile, when it has one: the
+   * site a document about the company treats as its own (live 2026-10-31,
+   * a same-name stranger's site was read as the company's).
+   */
+  readonly companyWebsite?: string | null | undefined;
   readonly specialistVersion: string;
   /** The information state the findings describe. */
   readonly asOf: UtcTimestamp;

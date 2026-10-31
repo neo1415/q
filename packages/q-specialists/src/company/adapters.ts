@@ -63,6 +63,7 @@ export function createToolCanonicalPort(
       let available = false;
       let canonicalName: string | null = null;
       let description: string | null = null;
+      let website: string | null = null;
 
       if (names.has("get_company")) {
         toolCalls += 1;
@@ -87,6 +88,7 @@ export function createToolCanonicalPort(
           };
           available = true;
           canonicalName = company.canonicalName;
+          website = company.websiteUrl;
           const identity = [
             `Canonical name: ${company.canonicalName}.`,
             company.currentStageCode === null
@@ -262,7 +264,14 @@ export function createToolCanonicalPort(
         { companyId, toolCalls, available },
         "canonical company state read",
       );
-      return { facts, toolCalls, available, canonicalName, description };
+      return {
+        facts,
+        toolCalls,
+        available,
+        canonicalName,
+        description,
+        website,
+      };
     },
   };
 }

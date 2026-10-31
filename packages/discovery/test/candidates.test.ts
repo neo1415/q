@@ -1131,14 +1131,14 @@ describe("structured candidate service", () => {
     for (const c of r.candidates) {
       expect(c.provenance).toMatchObject({
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v6",
+        generatorVersion: "structured-mandate.v7",
         taxonomyVersion: { industry: 1, geography: 1 },
       });
       expect(c.provenance.reasonCodes.length).toBeGreaterThan(0);
       expect("score" in c).toBe(false);
       expect("rank" in c).toBe(false);
     }
-    expect(r.generatorVersion).toBe("structured-mandate.v6");
+    expect(r.generatorVersion).toBe("structured-mandate.v7");
     expect(r.eligibilityPolicyVersion).toBe("eligibility.v5");
   });
 });
@@ -1260,6 +1260,62 @@ describe("Discover must not hard-cap (owner 2026-10-23)", () => {
     );
     // Seeded per investor: another investor's rotation differs.
     expect(other).not.toEqual(placements);
+  });
+
+  it("structured-mandate.v7: a geography declared Must is read in every window; everything else still once", async () => {
+    const regional = (importance: "MUST" | "STRONG"): World => {
+      const w = world({
+        companies: Array.from({ length: 381 }, (_, i) =>
+          company(i + 1, {
+            stage: "seed",
+            country: (i + 1) % 20 === 0 ? "DE" : "GB",
+          }),
+        ),
+      });
+      w.mandates[0] = mandate({
+        constraints: [
+          {
+            dimension: "stage",
+            operator: "IN",
+            value: { kind: "codes", values: ["seed"] },
+            importance: "MUST",
+            isHardExclusion: false,
+            automatedUse: "ELIGIBLE",
+          },
+          {
+            dimension: "geography.country",
+            operator: "IN",
+            value: { kind: "codes", values: ["DE"] },
+            importance,
+            isHardExclusion: false,
+            automatedUse: "ELIGIBLE",
+          },
+        ],
+      });
+      return w;
+    };
+    const german = Array.from({ length: 19 }, (_, i) =>
+      companyId((i + 1) * 20),
+    );
+    const w = regional("MUST");
+    const windows = candidateWindowCount(381);
+    const seen = new Map<string, number>();
+    for (let index = 0; index < windows; index += 1) {
+      const found = ids(await windowOf(w, index));
+      for (const id of german) expect(found).toContain(id);
+      for (const id of found) seen.set(id, (seen.get(id) ?? 0) + 1);
+    }
+    expect(seen.size).toBe(381);
+    for (const [id, times] of seen)
+      expect(times).toBe(german.includes(id) ? windows : 1);
+    // A geography only preferred Strong as a constraint is not the
+    // declared tier (the fit reads the same): each company once.
+    const once = new Map<string, number>();
+    const s = regional("STRONG");
+    for (let index = 0; index < windows; index += 1)
+      for (const id of ids(await windowOf(s, index)))
+        once.set(id, (once.get(id) ?? 0) + 1);
+    expect([...once.values()].every((times) => times === 1)).toBe(true);
   });
 
   it("one window when few qualify: nothing changes for a small pool", async () => {

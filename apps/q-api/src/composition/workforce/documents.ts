@@ -61,7 +61,7 @@ import {
 import { safeReport } from "./live.js";
 import type { OwnContextFocus } from "./own-context.js";
 import type { WorkforceModels } from "./models.js";
-import { namesakeSources } from "./subject-identity.js";
+import { namesakeSources, type SubjectIdentity } from "./subject-identity.js";
 
 /** The marker a reviewer's revision carries, so a retry never revises twice. */
 export const REVIEWER_REVISION_PREFIX = "Second-specialist review:";
@@ -257,6 +257,8 @@ export function createWorkforceDocuments(dependencies: {
     let company =
       "No company record: this analysis is about a market or question, not one company.";
     let companyName: string | null = null;
+    let companySite: string | null = null;
+    let companyProfile: string | null = null;
     if (subject !== null) {
       if (!(await input.canContinue())) return unavailable();
       const read = await dependencies.investigate(
@@ -277,6 +279,8 @@ export function createWorkforceDocuments(dependencies: {
       if (read.blocked !== null || read.companyId !== companyId)
         return unavailable();
       companyName = read.companyName ?? null;
+      companySite = read.companyWebsite ?? null;
+      companyProfile = read.canonicalDescription ?? null;
       const lines = [
         ...(read.companyName == null ? [] : [`Company: ${read.companyName}`]),
         ...(read.canonicalDescription == null
@@ -423,16 +427,19 @@ export function createWorkforceDocuments(dependencies: {
     if (!(await input.canContinue())) return unavailable();
     safeReport(input.progress)({ stage: "FILING" });
     const seed = `${input.jobId}:${input.stepKey}`;
+    // Whose pages are the subject's (subject-identity.ts): its name, and
+    // the site and description its own record holds.
+    const identity: SubjectIdentity | null =
+      companyName === null
+        ? null
+        : { name: companyName, site: companySite, profile: companyProfile };
     let content: QArtifactContent;
     let claimRows: readonly ClaimRow[] = [];
     if (diligence) {
       const ordered = orderDiligenceDraft(written.draft);
       // A namesake's page is no evidence for or against the company's
       // claims (subject-identity.ts, live 2026-10-31).
-      const namesakes = namesakeSources(
-        merged.facts,
-        companyName === null ? null : { name: companyName },
-      );
+      const namesakes = namesakeSources(merged.facts, identity);
       claimRows = matchClaims({
         companyName,
         claims,
@@ -458,7 +465,7 @@ export function createWorkforceDocuments(dependencies: {
           alsoCites: [section.body],
           codeGaps,
           sourcesAlways: true,
-          subject: companyName === null ? null : { name: companyName },
+          subject: identity,
         }),
         claims: {
           heading: section.heading,
@@ -475,7 +482,7 @@ export function createWorkforceDocuments(dependencies: {
         seed,
         publicSources: input.publicSources ?? null,
         codeGaps,
-        subject: companyName === null ? null : { name: companyName },
+        subject: identity,
         codeSections: investigationSections({
           facts: merged.facts,
           investigations: merged.investigations,

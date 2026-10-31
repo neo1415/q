@@ -39,9 +39,9 @@ const base = (n: number) =>
     baseRank: i + 1,
   }));
 
-describe("discover order with a declared geography (fit-order.v3)", () => {
+describe("discover order with a declared geography (fit-order.v3, v4)", () => {
   it("is the current, versioned policy, with v2's weights", () => {
-    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v3");
+    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v4");
     expect(FIT_ORDER_V3.geographyFirst).toEqual(["MUST", "STRONG"]);
     expect(Object.isFrozen(FIT_ORDER_V3)).toBe(true);
   });
@@ -89,7 +89,7 @@ describe("discover order with a declared geography (fit-order.v3)", () => {
     }
   });
 
-  it("keeps unscored candidates at their base positions", () => {
+  it("fit-order.v4: the tier holds for unscored candidates too; within a tier they keep their places", () => {
     const keys = new Map([
       [ID(1), key(9, "MISMATCH", "STRONG")],
       [ID(2), key(null, "MISMATCH", "STRONG")],
@@ -97,8 +97,34 @@ describe("discover order with a declared geography (fit-order.v3)", () => {
     ]);
     expect(orderByFit(base(3), keys).map((o) => o.companyId)).toEqual([
       ID(3),
+      ID(1),
+      ID(2),
+    ]);
+    // Without a declared tier, an unscored candidate keeps its base place.
+    const plain = new Map([
+      [ID(1), key(5, "MISMATCH", "NICE")],
+      [ID(2), key(null, "MISMATCH", "NICE")],
+      [ID(3), key(9, "STRONG", "NICE")],
+    ]);
+    expect(orderByFit(base(3), plain).map((o) => o.companyId)).toEqual([
+      ID(3),
       ID(2),
       ID(1),
     ]);
+  });
+
+  it("fit-order.v4: an unscored in-region company is not left behind out-of-region ones (live 2026-10-31, Stackisk Hub 18th)", () => {
+    // Seventeen scored out-of-region companies, then Stackisk Hub (DE,
+    // unscored: stage mismatch) at base 18, then more out of region.
+    const keys = new Map<string, FitOrderKey>();
+    for (let n = 1; n <= 20; n += 1)
+      keys.set(ID(n), key(n === 18 ? null : 9 - n / 10, "MISMATCH", "STRONG"));
+    keys.set(ID(18), key(null, "STRONG", "STRONG"));
+    const order = orderByFit(base(20), keys);
+    expect(order[0]?.companyId).toBe(ID(18));
+    expect(order.map((o) => o.rank)).toEqual(
+      Array.from({ length: 20 }, (_v, i) => i + 1),
+    );
+    expect(new Set(order.map((o) => o.companyId)).size).toBe(20);
   });
 });

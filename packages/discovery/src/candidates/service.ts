@@ -14,6 +14,7 @@ import {
   type StructuredCandidateResult,
 } from "./contracts.js";
 import type { StructuredRetrievalPorts } from "./ports.js";
+import { FIT_ORDER_CURRENT } from "../fit/order.js";
 import {
   candidateWindow,
   candidateWindowCount,
@@ -166,6 +167,11 @@ export function createStructuredCandidateService(
                   }),
             ]);
       const windows = candidateWindowCount(Math.max(byStage, byCountry));
+      const geographyEveryWindow =
+        intent.geographyStrength !== undefined &&
+        (FIT_ORDER_CURRENT.geographyFirst as readonly string[]).includes(
+          intent.geographyStrength,
+        );
       const window: CandidateWindow | undefined =
         windows > 1
           ? candidateWindow(investorOrganisationId, query.window ?? 0, windows)
@@ -216,10 +222,14 @@ export function createStructuredCandidateService(
         reasonCode: "GEOGRAPHY_OVERLAP" | "GEOGRAPHY_REGION_OVERLAP",
       ) => {
         if (codes.length === 0) return;
+        // fit-order.v4 / structured-mandate.v7: a geography declared Must
+        // or Strong is read in every window, so whichever window a feed
+        // opens on starts with the companies in it (the order puts them
+        // first; the feed never repeats a company it holds).
         const refs = await retrieval.companies.byHeadquartersCountries(
           codes,
           CANDIDATE_DIMENSION_LIMIT,
-          window,
+          geographyEveryWindow ? undefined : window,
         );
         for (const ref of refs) {
           hits.push({ ...ref, dimension: "GEOGRAPHY", reasonCode });

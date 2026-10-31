@@ -547,7 +547,7 @@ const markNumbers = (mark: string) =>
  * input changes (the recorded research replays rest on those inputs), and
  * it holds for the last draft too, which a redraft could not promise.
  */
-export function withoutNamesakeCitations(
+export function withoutCitationsOf(
   text: string,
   namesakes: ReadonlySet<number>,
 ): {
@@ -601,6 +601,12 @@ export function withoutNamesakeCitations(
   return { text: lines.join("\n"), removed, cut };
 }
 
+/** The same removal, named for the namesake pages it was written for. */
+export const withoutNamesakeCitations = withoutCitationsOf;
+
+/** How basisProblems names a citation of a source that does not exist. */
+const NOT_A_SOURCE = "Cites sources that do not exist";
+
 /** Code's own checks: figures without a basis, sources that do not exist. */
 export function basisProblems(
   draft: AnalysisDocumentResult,
@@ -637,7 +643,7 @@ export function basisProblems(
       issues.push({
         kind: "UNSUPPORTED",
         section: section.heading.slice(0, 120),
-        problem: `Cites sources that do not exist: ${[...new Set(missing)]
+        problem: `${NOT_A_SOURCE}: ${[...new Set(missing)]
           .map((index) => `S${String(index)}`)
           .join(", ")}.`.slice(0, 400),
         fix: "Cite only the numbered sources given, or label the figure as an estimate or Q's inference.",
@@ -659,7 +665,7 @@ export function basisProblems(
       issues.push({
         kind: "UNSUPPORTED",
         section: part.heading,
-        problem: `Cites sources that do not exist: ${missing
+        problem: `${NOT_A_SOURCE}: ${missing
           .map((index) => `S${String(index)}`)
           .join(", ")}.`.slice(0, 400),
         fix: "Cite only the numbered sources given, or label the point as an estimate or Q's inference.",
@@ -1010,18 +1016,59 @@ export function analysisContent(input: {
     for (const index of out.cut) namesakeCut.add(index);
     return out.text;
   };
+  // A citation of a source the document does not list (live 2026-10-31,
+  // the Nixo memo cited [S57] with no S57 in its Sources, and its own
+  // review said so): removed the same way, after the last model call. A
+  // statement resting only on it goes; another source beside it stays.
+  const known = new Set(input.sources.map((source) => source.index));
+  const unlisted = new Set(
+    [
+      input.draft.summary,
+      ...input.draft.sections.map((section) => section.body),
+      ...input.draft.gaps,
+    ].flatMap((text) =>
+      [...text.matchAll(CITATION_GROUP)]
+        .flatMap((mark) => markNumbers(mark[0]))
+        .filter((index) => !known.has(index)),
+    ),
+  );
+  let unlistedRemoved = 0;
+  const listedOnly = (text: string) => {
+    const out = withoutCitationsOf(text, unlisted);
+    unlistedRemoved += out.removed;
+    return out.text;
+  };
+  const clean = (text: string) => listedOnly(apart(text));
   const draft: AnalysisDocumentResult = {
     ...input.draft,
-    summary: apart(input.draft.summary),
+    summary: clean(input.draft.summary),
     sections: input.draft.sections
-      .map((section) => ({ ...section, body: apart(section.body) }))
+      .map((section) => ({ ...section, body: clean(section.body) }))
       .filter((section) => section.body.trim().length > 0),
-    gaps: input.draft.gaps.map(apart).filter((gap) => gap.trim().length > 0),
+    gaps: input.draft.gaps.map(clean).filter((gap) => gap.trim().length > 0),
   };
   const openPoints = review.open
+    // Code removed every such citation above: the point no longer holds.
+    .filter(
+      (issue) => unlisted.size === 0 || !issue.problem.startsWith(NOT_A_SOURCE),
+    )
     .map(reviewOpenPoint)
     .map(apart)
     .filter((point) => point.trim().length > 0);
+  const unlistedGap =
+    unlisted.size === 0
+      ? []
+      : [
+          wholeSentences(
+            `Q removed citations of ${[...unlisted]
+              .sort((a, b) => a - b)
+              .map((index) => `S${String(index)}`)
+              .join(
+                ", ",
+              )}, which ${unlisted.size === 1 ? "is" : "are"} not among this document's sources${unlistedRemoved === 0 ? "" : `, and ${String(unlistedRemoved)} statement${unlistedRemoved === 1 ? "" : "s"} that rested only on ${unlisted.size === 1 ? "it" : "them"}`}; what ${unlisted.size === 1 ? "it was" : "they were"} cited for has no source here.`,
+            Q_ARTIFACT_GAP_MAX,
+          ),
+        ];
   const namesakeGap =
     identity === null || namesakeCut.size === 0
       ? []
@@ -1095,6 +1142,7 @@ export function analysisContent(input: {
       wholeSentences(gap, Q_ARTIFACT_GAP_MAX),
     ),
     ...namesakeGap,
+    ...unlistedGap,
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...openPoints,

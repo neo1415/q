@@ -64,6 +64,12 @@ export type StructuredIntent = {
   readonly countryCodes: readonly string[];
   /** Distinct, sorted declared positive taxonomy preference node ids (any vocabulary). */
   readonly taxonomyNodeIds: readonly string[];
+  /**
+   * The firmest positive geography the investor declared themselves (a
+   * `geography.country` rule at MUST, or a geography preference), as the
+   * fit reads it; absent when none was declared (structured-mandate.v7).
+   */
+  readonly geographyStrength?: "MUST" | "STRONG" | "NICE" | undefined;
   readonly cheque: {
     readonly minCheque: string | null;
     readonly maxCheque: string | null;
@@ -169,10 +175,37 @@ export function deriveStructuredIntent(
     nodes.add(preference.nodeId);
   }
 
+  // The same reading as the fit's (fit-inputs.ts): declared only.
+  const geography = mandate.taxonomyPreferences
+    .filter(
+      (preference) =>
+        preference.vocabularyCode === "geography" &&
+        !preference.isExclusion &&
+        (DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(
+          preference.source,
+        ),
+    )
+    .map((preference) => preference.preferenceStrength as string);
+  const geographyStrength =
+    geography.includes("MUST") ||
+    mandate.constraints.some(
+      (constraint) =>
+        constraint.dimension === "geography.country" &&
+        constraint.importance === "MUST" &&
+        !constraint.isHardExclusion,
+    )
+      ? ("MUST" as const)
+      : geography.includes("STRONG")
+        ? ("STRONG" as const)
+        : geography.includes("NICE")
+          ? ("NICE" as const)
+          : undefined;
+
   return {
     stageCodes: [...stages].sort(),
     countryCodes: [...countries].sort(),
     taxonomyNodeIds: [...nodes].sort(),
+    ...(geographyStrength === undefined ? {} : { geographyStrength }),
     cheque: {
       minCheque: mandate.cheque?.min ?? null,
       maxCheque: mandate.cheque?.max ?? null,

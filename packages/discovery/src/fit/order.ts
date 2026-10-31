@@ -108,7 +108,42 @@ export const FIT_ORDER_V3 = Object.freeze({
   description:
     "Discover order: v2's order (0.75 × Suitability + 0.25 × Investability, then the fit tie-break, then the base rank), with one declared tier first: when the investor declared their geography Must or Strong, scored companies outside it follow those that are not (an unknown location is not outside); unscored candidates keep their base positions; exploration and diversity moves are labelled.",
 } as const);
-export const FIT_ORDER_CURRENT = FIT_ORDER_V3;
+/**
+ * `fit-order.v4` (live 2026-10-31, fresh investor "Nordlicht Saatgut
+ * Capital", geography Germany and the Nordics declared "Strong"): v3's
+ * tier reordered only the scored candidates of one slate. Ferrolith (DE)
+ * came first, but Stackisk Hub (DE) was 45th -- unscored, it kept its
+ * base position 18 of its slate behind 17 out-of-region companies -- and
+ * Kycana Hub and Assayo Works (DE) were 61st and 62nd: they fell in later
+ * windows of the candidate rotation, behind every out-of-region company
+ * of the windows before.
+ *
+ * v4 keeps v3's weights, tie-breaks and tier, and applies the tier to the
+ * whole ranked feed:
+ *
+ *  - every candidate whose location MISMATCHES a geography declared Must
+ *    or Strong -- scored or not -- follows every candidate that does not
+ *    (unknown is never outside). Within each tier, v3's order holds:
+ *    scored candidates refill the tier's scored positions by fit,
+ *    unscored ones keep their places relative to the tier;
+ *  - candidate retrieval (structured-mandate.v7) reads the companies in
+ *    the declared geography in every window of the rotation, so whichever
+ *    window a feed opens or continues on starts with them (the feed never
+ *    repeats a company it already holds).
+ *
+ * Not an exclusion: out-of-region companies stay in the feed.
+ */
+export const FIT_ORDER_V4 = Object.freeze({
+  version: "fit-order.v4",
+  fitConfigVersion: FIT_CONFIG_CURRENT.version,
+  baseRankingConfigVersion: RANKING_CONFIG_CURRENT.version,
+  weights: FIT_ORDER_V2.weights,
+  /** Declared geography strengths that order out-of-region companies last. */
+  geographyFirst: FIT_ORDER_V3.geographyFirst,
+  description:
+    "Discover order: v3's order, with its declared tier over the whole feed: when the investor declared their geography Must or Strong, every company outside it (scored or not) follows those that are not (an unknown location is not outside), and companies in the declared geography are candidates in every window; within each tier, scored companies are ordered by 0.75 × Suitability + 0.25 × Investability, then the fit tie-break, then the base rank, and unscored ones keep their places; exploration and diversity moves are labelled.",
+} as const);
+export const FIT_ORDER_CURRENT = FIT_ORDER_V4;
 
 /**
  * Whether a candidate falls outside a geography the investor declared at
@@ -118,7 +153,7 @@ export const FIT_ORDER_CURRENT = FIT_ORDER_V3;
 export function outsideDeclaredGeography(
   geographyOutcome: string,
   declaredStrength: string | undefined,
-  geographyFirst: readonly string[] = FIT_ORDER_V3.geographyFirst,
+  geographyFirst: readonly string[] = FIT_ORDER_CURRENT.geographyFirst,
 ): boolean {
   return (
     geographyOutcome === "MISMATCH" &&
@@ -219,18 +254,25 @@ export function orderByFit(
   const ordered = [...base].sort((a, b) => a.baseRank - b.baseRank);
   const keyOf = (companyId: string): FitOrderKey =>
     keys.get(companyId) ?? { assessment: null, score: null };
-  const scored = ordered
-    .filter((entry) => keyOf(entry.companyId).score !== null)
-    .sort(
-      (a, b) =>
-        tierOf(keyOf(a.companyId)) - tierOf(keyOf(b.companyId)) ||
-        compareFitOrder(keyOf(a.companyId), keyOf(b.companyId)) ||
-        a.baseRank - b.baseRank,
+  // fit-order.v4: the declared tier over every candidate, then v2's
+  // refill within each tier (unscored keep their places in it).
+  const tiered = [0, 1].flatMap((tier) => {
+    const members = ordered.filter(
+      (entry) => tierOf(keyOf(entry.companyId)) === tier,
     );
-  let next = 0;
-  return ordered.map((entry, index) => {
-    const placed =
-      keyOf(entry.companyId).score === null ? entry : scored[next++];
+    const scored = members
+      .filter((entry) => keyOf(entry.companyId).score !== null)
+      .sort(
+        (a, b) =>
+          compareFitOrder(keyOf(a.companyId), keyOf(b.companyId)) ||
+          a.baseRank - b.baseRank,
+      );
+    let next = 0;
+    return members.map((entry) =>
+      keyOf(entry.companyId).score === null ? entry : scored[next++],
+    );
+  });
+  return tiered.map((placed, index) => {
     if (placed === undefined) {
       throw new Error("fit order lost a candidate");
     }

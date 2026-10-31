@@ -34,7 +34,7 @@ const base = (n: number) =>
 
 describe("discover order with Investability (fit-order.v2)", () => {
   it("is the current, versioned policy with explicit weights", () => {
-    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v3");
+    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v4");
     expect(FIT_ORDER_V2.weights.suitability).toBeGreaterThan(
       FIT_ORDER_V2.weights.investability,
     );
