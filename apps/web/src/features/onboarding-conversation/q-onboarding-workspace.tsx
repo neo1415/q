@@ -89,6 +89,7 @@ import type {
 import {
   acknowledgeValue,
   BRIDGE_LINE,
+  displacedQLine,
   liveQuestionShown,
   splitForQ,
   gapValue,
@@ -533,6 +534,21 @@ export function QOnboardingWorkspace({
   /** What is put on screen as Q's question; nothing at all on a silent step. */
   const liveQuestion: string | null =
     questionText ?? (silentStep ? null : (prompt?.text ?? null));
+  /**
+   * Q's sentence is never replaced in the conversation (append-only, live
+   * 2026-10-31 "Kivisild"): when the session moves past the step Q asked
+   * about before they answered, the screen asks the next step's question,
+   * and Q's sentence joins the thread first, as said.
+   */
+  const displaced = displacedQLine(qQuestion, liveQuestion, turns);
+  const [keptDisplaced, setKeptDisplaced] = useState<string | null>(null);
+  if (displaced !== null && displaced !== keptDisplaced) {
+    // Adjusted while rendering (not in an effect), once per line: the
+    // id is the line's own, and a line already in the thread is never
+    // returned again.
+    setKeptDisplaced(displaced);
+    push("Q", displaced, `q-kept:${displaced}`);
+  }
   /** The live line as shown: not the question just answered (live e11). */
   const shownQuestion = liveQuestionShown(
     liveQuestion,
