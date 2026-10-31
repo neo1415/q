@@ -7,6 +7,7 @@ import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
+import { createOnboardingPort } from "../src/voice/onboarding-port.js";
 
 import { readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
@@ -109,25 +110,46 @@ function worldFor(stepKey: string) {
   });
 }
 
-describe("words that name no category are saved as they said them (owner 2026-10-16)", () => {
-  it("saves their words at once, and a category named later supersedes them", async () => {
+describe("words that name no category are never the category field's value (live 2026-10-31)", () => {
+  // Owner 2026-10-16 kept such words as the answer; live 2026-10-31
+  // ("Tidevand") a rambling sentence became the sector. A category field
+  // holds listed categories only: Q is sent to the category list, and a
+  // category named after that is saved.
+  it("nothing is saved from them; Q is sent to the list, and the category named next is saved", async () => {
     const said =
       "we back companies that help smallholder farmers grow more food";
     const world = worldFor("I3.sectors");
-    const { gateway, seen } = twoTries("I3.sectors", said, said, [
-      "Agriculture",
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () => Promise.resolve(reading({ stated: ["I3.sectors"] })),
+    });
+    const [first] = await port.record([
+      {
+        stepKey: "I3.sectors",
+        value: [said],
+        quote: said,
+        basis: "STATED",
+        ownWords: false,
+      },
     ]);
-    await createInterviewAgent({
-      gateway,
-      firewall: firewall(),
-      logger,
-      recommendations: world.recommendations,
-      delegation: readerOf(reading({ stated: ["I3.sectors"] })),
-    }).turn({ ...turn(world, said), actor });
+    expect(first?.outcome).toBe("UNMATCHED");
+    expect(first?.reason).toContain("category list");
+    expect(world.recordedValue("I3.sectors")).toBeUndefined();
 
-    const afterFirst = seen[1] ?? "";
-    expect(afterFirst).toContain('"outcome":"COMMITTED"');
-    expect(afterFirst).not.toContain('"outcome":"UNMATCHED"');
+    const [second] = await port.record([
+      {
+        stepKey: "I3.sectors",
+        value: ["Agriculture"],
+        quote: said,
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(second?.outcome).toBe("COMMITTED");
     expect(world.recordedValue("I3.sectors")).toEqual({
       type: "RESOURCE_REFERENCE",
       resourceType: "TAXONOMY_NODE",
@@ -135,7 +157,7 @@ describe("words that name no category are saved as they said them (owner 2026-10
     });
   });
 
-  it("any phrasing without a named category is saved in their words, never refused or dropped", async () => {
+  it("any phrasing without a named category is never saved as their words", async () => {
     for (const said of [
       "helps smallholder farmers grow more food",
       "stuff that feeds people in rural areas",
@@ -152,11 +174,8 @@ describe("words that name no category are saved as they said them (owner 2026-10
       }).turn({ ...turn(world, said), actor });
 
       const after = seen[1] ?? "";
-      expect(after, said).not.toContain('"outcome":"REJECTED"');
-      expect(world.recordedValue("I3.sectors"), said).toEqual({
-        type: "TEXT",
-        text: said,
-      });
+      expect(after, said).toContain('"outcome":"UNMATCHED"');
+      expect(world.recordedValue("I3.sectors"), said).toBeUndefined();
     }
   });
 });

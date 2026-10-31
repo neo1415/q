@@ -173,4 +173,49 @@ describe("QComposer", () => {
     expect(onAttach).toHaveBeenCalledWith(file);
     expect(form.hasAttribute("data-dragging")).toBe(false);
   });
+
+  // Live 2026-10-31: an Enter right as Q's reply landed did nothing for two
+  // minutes, the words left in the box. A typed message is never dropped.
+  it("an Enter while Q is still working keeps the words and sends them once it is free", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const { rerender } = render(<QComposer onSubmit={onSubmit} disabled />);
+    const input = screen.getByRole("textbox", { name: "Ask Q" });
+    // Held, never `disabled`: it keeps focus and takes their words.
+    expect(input.hasAttribute("disabled")).toBe(false);
+    await user.type(input, "I'm the CEO");
+    await user.keyboard("{Enter}");
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect((input as HTMLTextAreaElement).value).toBe("I'm the CEO");
+    rerender(<QComposer onSubmit={onSubmit} disabled={false} />);
+    await vi.waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith("I'm the CEO");
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("an Enter while the last message is still sending is sent after it, not lost", async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => undefined;
+    const onSubmit = vi
+      .fn<(text: string) => Promise<void>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((done) => {
+            release = done;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    render(<QComposer onSubmit={onSubmit} />);
+    const input = screen.getByRole("textbox", { name: "Ask Q" });
+    await user.type(input, "yes{Enter}");
+    expect(onSubmit).toHaveBeenNthCalledWith(1, "yes");
+    await user.type(input, " and three founders");
+    await user.keyboard("{Enter}");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    release();
+    await vi.waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(2);
+    });
+  });
 });

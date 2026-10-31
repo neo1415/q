@@ -139,7 +139,7 @@ describe("several answers, one transactional save", () => {
     });
     const results = await port.record([
       stated("F1.stage", "seed", "Seed stage"),
-      stated("F1.country", "ke", "in Kenya"),
+      stated("F1.country", "Kenya", "in Kenya"),
       stated("F4.founder_count", 2, "two founders"),
       stated("F4.team_size", 14, "14 people"),
     ]);
@@ -165,6 +165,7 @@ describe("several answers, one transactional save", () => {
       recorded: { "F0.intent": "raising_now" },
       // The fake journey refuses the stage until the company name is in.
       refuseUntil: { "F1.stage": "F1.company_name" },
+      taxonomy: { kenya: countryOfIso("KE")?.nodeId ?? "" },
     });
     const said = "Seed stage, in Kenya.";
     const port = createOnboardingPort({
@@ -178,7 +179,7 @@ describe("several answers, one transactional save", () => {
     });
     const results = await port.record([
       stated("F1.stage", "seed", "Seed stage"),
-      stated("F1.country", "ke", "in Kenya"),
+      stated("F1.country", "Kenya", "in Kenya"),
     ]);
     expect(results[0]?.outcome).toBe("NEEDS_FIRST");
     expect(results[1]?.outcome).toBe("COMMITTED");
@@ -221,7 +222,7 @@ describe("several answers, one transactional save", () => {
     });
     const results = await port.record([
       stated("F1.stage", "seed", "Seed stage"),
-      stated("F1.country", "ke", "in Kenya"),
+      stated("F1.country", "Kenya", "in Kenya"),
     ]);
     expect(results.map((r) => r.outcome)).toEqual(["COMMITTED", "COMMITTED"]);
     expect(world.batches()).toEqual([]);
@@ -530,6 +531,7 @@ describe("a stated step off their path never holds the code reply (live 25 Oct e
         "F1.company_name": "Quillmark Health",
       },
       ineligible: ["F5.customers"],
+      taxonomy: { kenya: countryOfIso("KE")?.nodeId ?? "" },
     });
     const said = "Seed stage, based in Kenya, with 210 paying customers.";
     const model = recordingModel([

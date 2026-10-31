@@ -567,6 +567,43 @@ describe("response validation per step type (§40, §96-99, §210)", () => {
     ).toBe("VOICE_TRANSCRIPT");
   });
 
+  it("a taxonomy step holds categories only, never words (live 2026-10-31)", () => {
+    // "Tidevand": a rambling sentence was saved as the sector. Words beside
+    // the categories may be a note; they are never the step's value.
+    const docs = defStep("docs");
+    const sectors: OnboardingStepDefinition = {
+      ...docs,
+      stepKey: "categories",
+      stepType: "reference_select",
+      configuration: {
+        stepType: "reference_select",
+        prompt: "Which sector are you in?",
+        resourceType: "TAXONOMY_NODE",
+        vocabularyCodes: ["industry"],
+        minItems: 1,
+        maxItems: 5,
+      },
+    };
+    expect(() =>
+      validateOnboardingResponse(sectors, {
+        value: {
+          type: "TEXT",
+          text: "basically fishing boats and small seafood processors",
+        },
+      }),
+    ).toThrow(ContractValidationError);
+    expect(
+      validateOnboardingResponse(sectors, {
+        value: {
+          type: "RESOURCE_REFERENCE",
+          resourceType: "TAXONOMY_NODE",
+          resourceIds: ["00000000-0000-4000-8000-000000000001"],
+        },
+        note: "cold-chain monitoring",
+      }).responseType,
+    ).toBe("RESOURCE_REFERENCE");
+  });
+
   it("document references and confirmations", () => {
     expect(
       validateOnboardingResponse(defStep("docs"), {

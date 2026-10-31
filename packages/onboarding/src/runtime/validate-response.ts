@@ -127,6 +127,23 @@ export function validateOnboardingResponse(
   // a number or a category, as ticking "Other" and typing is on a form
   // (owner 2026-10-16: every fact a person gives is saved). Kept verbatim
   // as TEXT; nothing structured is inferred from it here.
+  // A taxonomy step holds taxonomy nodes only (live 2026-10-31,
+  // "Tidevand": a rambling sentence was saved as the sector and read back
+  // as "Sector: basically fishing boats…"). Words no category holds are
+  // never its value; they may sit beside the categories as a note.
+  if (
+    value.type === "TEXT" &&
+    step.configuration.stepType === "reference_select" &&
+    step.configuration.resourceType === "TAXONOMY_NODE"
+  ) {
+    throw new ContractValidationError("The onboarding response is not valid.", [
+      issue(
+        "value.type",
+        "taxonomy_nodes_only",
+        `Step ${step.stepKey} holds categories only; words are kept as a note beside them.`,
+      ),
+    ]);
+  }
   const ownWords =
     value.type === "TEXT" && OWN_WORDS_STEP_TYPES.has(step.stepType);
   const responseType: OnboardingResponseType = ownWords ? "TEXT" : expected;

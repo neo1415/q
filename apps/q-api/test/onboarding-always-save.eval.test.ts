@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { countryOfIso } from "@capital-q/taxonomy/countries";
+
 import { EXCLUSION_MEANING_REASON } from "../src/voice/interview-steps.js";
 import { createOnboardingPort } from "../src/voice/onboarding-port.js";
 
@@ -50,6 +52,12 @@ type Case = {
    * instead, and nothing is saved: that is this case's right outcome.
    */
   readonly firmExclusion?: true;
+  /**
+   * Words that name no listed category, for a category field (live
+   * 2026-10-31): never saved as the field's value; the person chooses from
+   * the category list. Nothing saved and Q told to ask is the right outcome.
+   */
+  readonly noCategory?: true;
 };
 
 const F = "founder" as const;
@@ -586,6 +594,7 @@ export const ALWAYS_SAVE_CASES: readonly Case[] = [
     stepKey: "I3.sectors",
     value: ["helps farmers sell more"],
     quote: "helps farmers sell more",
+    noCategory: true,
   },
 ];
 
@@ -611,6 +620,10 @@ async function persisted(c: Case): Promise<{
       "north africa": "a0000000-0000-4000-8000-0000000000e2",
       climate: "a0000000-0000-4000-8000-0000000000c1",
       logistics: "a0000000-0000-4000-8000-0000000000c2",
+      // Categories the reference taxonomy has (founder v8: every country).
+      uganda: countryOfIso("UG")?.nodeId ?? "",
+      health: "a0000000-0000-4000-8000-0000000000c3",
+      agritech: "a0000000-0000-4000-8000-0000000000c4",
     },
     ...(c.offPath === true ? { ineligible: [c.stepKey] } : {}),
   });
@@ -684,6 +697,18 @@ async function persisted(c: Case): Promise<{
   const tries = world.attempts().filter((key) => key === c.stepKey).length;
   if (process.env["CQ_EVAL_TRACE"] === "1" && !saved) {
     console.log(c.id, JSON.stringify(results), text);
+  }
+  if (c.noCategory === true) {
+    // A category field never holds their words: nothing saved, and the
+    // result routes Q to the category list.
+    const routed = results.some(
+      (r) =>
+        r !== null &&
+        "outcome" in r &&
+        r.stepKey === c.stepKey &&
+        r.outcome === "UNMATCHED",
+    );
+    return { saved: routed && held === undefined, duplicated: false };
   }
   // Unread, a firm exclusion is asked about, never saved silently.
   if (c.firmExclusion === true && process.env["CQ_EVAL_READER"] !== "1") {

@@ -1663,6 +1663,18 @@ export function createOnboardingPort(input: {
         candidates: options.slice(0, 40).map((o) => o.label.slice(0, 160)),
       };
     };
+    /**
+     * Words no listed category holds, for a field that keeps categories
+     * only: nothing saved; the person picks from the category list.
+     */
+    const noCategoryResult = (
+      step: OnboardingStepManifest,
+    ): OnboardingRecordResult => ({
+      stepKey: step.stepKey,
+      outcome: "UNMATCHED",
+      reason:
+        "None of Capital Q's listed categories holds those words, and this field keeps listed categories only, so nothing was saved and their words are not its value. Ask them to choose from the category list on screen, or put the closest listed categories to them and ask if they fit.",
+    });
     /** A yes to an offer that names none of the step's choices. */
     const affirmedUnmatched = (
       step: OnboardingStepManifest,
@@ -1706,6 +1718,8 @@ export function createOnboardingPort(input: {
       const unmatched: string[] = [];
       /** Words read as listed categories they did not name as such. */
       const readAs: string[] = [];
+      /** Phrases no lookup placed: read against the whole list after. */
+      const wholeListPhrases: string[] = [];
       for (const phrase of phrases) {
         const looked: TaxonomyCandidateResponse = await findTaxonomyCandidates(
           input.session,
@@ -1717,64 +1731,9 @@ export function createOnboardingPort(input: {
         const found = countryOnly ? onlyCountries(looked) : looked;
         const best = found.candidates[0];
         if (best === undefined) {
-          // Sweep D2 (2026-10-29): "Benelux and the Nordics" matched no
-          // category and was kept as plain words. A small field's whole
-          // list is offered to the reader, which reads, by meaning, which
-          // listed categories the words name (a region: its listed
-          // members only). Nothing listed: kept in their words, as before.
-          // A large list (every country) is read in parts of whole
-          // regions, side by side; what each part names is kept.
-          const listed =
-            input.chooseCategories === undefined
-              ? null
-              : await wholeVocabulary(c.vocabularyCodes);
-          // One country (founder v8): the whole list is its countries.
-          const parts =
-            listed === null || !countryOnly
-              ? listed
-              : listed
-                  .map((part) =>
-                    part.filter((n) => countryOfNodeId(n.nodeId) !== null),
-                  )
-                  .filter((part) => part.length > 0);
-          const choose = input.chooseCategories;
-          const chosen =
-            parts === null || choose === undefined
-              ? null
-              : (
-                  await Promise.all(
-                    parts.map((part) =>
-                      choose({
-                        field: (
-                          SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt
-                        ).slice(0, 200),
-                        phrase,
-                        sentence: answer.quote ?? phrase,
-                        candidates: part,
-                      }).catch(reported("category reading (whole list)", null)),
-                    ),
-                  )
-                ).flatMap((one) => one ?? []);
-          const whole = parts?.flat();
-          const names: { displayName: string; group: boolean }[] = [];
-          for (const id of chosen ?? []) {
-            const node = whole?.find((candidate) => candidate.nodeId === id);
-            if (node === undefined) continue;
-            if (!ids.includes(id)) ids.push(id);
-            nodeNames.set(id, node.displayName);
-            names.push({
-              displayName: node.displayName,
-              // "region" is a place's word (live final re-check 2026-10-31:
-              // "grain-storage analytics" read as "Agriculture region").
-              group:
-                groupNodeIds.has(id) && c.vocabularyCodes.includes("geography"),
-            });
-          }
-          if (names.length > 0) {
-            readAs.push(`“${phrase}” as ${savedPlacesInWords(names)}`);
-            continue;
-          }
-          unmatched.push(phrase);
+          // Read against the whole list once every other phrase of theirs
+          // is placed (below).
+          wholeListPhrases.push(phrase);
           continue;
         }
         if (found.resolution !== "EXACT" && found.candidates.length > 1) {
@@ -1818,6 +1777,76 @@ export function createOnboardingPort(input: {
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
         nodeNames.set(best.nodeId, best.displayName);
+      }
+      const namedByOthers = new Set(ids);
+      for (const phrase of wholeListPhrases) {
+        // Sweep D2 (2026-10-29): "Benelux and the Nordics" matched no
+        // category and was kept as plain words. A small field's whole
+        // list is offered to the reader, which reads, by meaning, which
+        // listed categories the words name (a region: its listed
+        // members only). Nothing listed: kept in their words, as before.
+        // A large list (every country) is read in parts of whole
+        // regions, side by side; what each part names is kept.
+        const listed =
+          input.chooseCategories === undefined
+            ? null
+            : await wholeVocabulary(c.vocabularyCodes);
+        // One country (founder v8): the whole list is its countries.
+        const parts =
+          listed === null
+            ? null
+            : listed
+                .map((part) =>
+                  part.filter(
+                    (n) =>
+                      (!countryOnly || countryOfNodeId(n.nodeId) !== null) &&
+                      // A category another phrase of theirs names is not
+                      // this phrase's reading (live 2026-10-31:
+                      // "consumer apps, gambling or crypto" read
+                      // "consumer apps" as Gambling and Crypto).
+                      !namedByOthers.has(n.nodeId),
+                  ),
+                )
+                .filter((part) => part.length > 0);
+        const choose = input.chooseCategories;
+        const chosen =
+          parts === null || choose === undefined
+            ? null
+            : (
+                await Promise.all(
+                  parts.map((part) =>
+                    choose({
+                      field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(
+                        0,
+                        200,
+                      ),
+                      phrase,
+                      sentence: answer.quote ?? phrase,
+                      candidates: part,
+                    }).catch(reported("category reading (whole list)", null)),
+                  ),
+                )
+              ).flatMap((one) => one ?? []);
+        const whole = parts?.flat();
+        const names: { displayName: string; group: boolean }[] = [];
+        for (const id of chosen ?? []) {
+          const node = whole?.find((candidate) => candidate.nodeId === id);
+          if (node === undefined || namedByOthers.has(id)) continue;
+          if (!ids.includes(id)) ids.push(id);
+          nodeNames.set(id, node.displayName);
+          names.push({
+            displayName: node.displayName,
+            // "region" is a place's word (live final re-check 2026-10-31:
+            // "grain-storage analytics" read as "Agriculture region").
+            group:
+              groupNodeIds.has(id) && c.vocabularyCodes.includes("geography"),
+          });
+        }
+        if (names.length > 0) {
+          readAs.push(`“${phrase}” as ${savedPlacesInWords(names)}`);
+          continue;
+        }
+        unmatched.push(phrase);
       }
       if (affirmed && unmatched.length > 0) {
         // A yes to what Q offered: what Q offered that names a category is
@@ -1889,13 +1918,12 @@ export function createOnboardingPort(input: {
             note: ownWordsFor(unmatched.join(", ")).slice(0, 200),
           };
         }
-        // No category holds their words: kept as they said them, like
-        // ticking "Other" and typing (owner 2026-10-16).
-        return {
-          ok: true,
-          step,
-          value: { type: "TEXT", text: ownWordsFor(unmatched.join(", ")) },
-        };
+        // No category holds their words. A category field holds listed
+        // categories only (live 2026-10-31, "Tidevand": a rambling
+        // sentence was saved as the sector and read back as "Sector:
+        // basically fishing boats…"; the runtime now refuses it too):
+        // nothing is saved and the person chooses from the list.
+        return refuse(noCategoryResult(step));
       }
       // QA QO-27 (23 Oct): "West Africa" said after "the UK" replaced the
       // UK. A list they already gave keeps what they said before unless
@@ -2922,6 +2950,19 @@ export function createOnboardingPort(input: {
           shortWholeLine(answer.value.trim())
         : textInTheirWords(answer.value.trim(), answer.quote))
     ) {
+      // Their yes agreed to Q's one summary line, and the reading found it
+      // covered this step too (live 2026-10-31, "Tidevand": one yes to a
+      // summary of the company, its solution and how it works saved only
+      // the description; the solution and how it works were each put to
+      // them again). What is saved is Q's own words for it from that line,
+      // never words Q did not say to them.
+      const fromSummary =
+        input.affirmed?.has(answer.stepKey) === true
+          ? summaryWordsFor(answer.value, input.qLineBefore?.(answer.quote))
+          : null;
+      if (fromSummary !== null && fromSummary !== answer.value.trim()) {
+        return planOne({ ...answer, value: fromSummary });
+      }
       const resolvedText = await (warmed.get(answer) ?? resolve(answer));
       if (!resolvedText.ok) return done(resolvedText.result);
       if (resolvedText.value.type === "TEXT") {
@@ -4490,6 +4531,24 @@ export function createOnboardingPort(input: {
       return affirmed;
     },
     holdInferred: async (answers) => {
+      /** The part of their words a held value was read from. */
+      const inferredFrom = (
+        step: OnboardingStepManifest,
+        answer: {
+          readonly quote: string;
+          readonly value: string | readonly string[] | number | boolean;
+        },
+      ): string => {
+        const label =
+          coverageProfileFor(input.journeyType).fields[step.stepKey]?.label ??
+          SPOKEN_QUESTIONS[step.stepKey] ??
+          step.configuration.prompt;
+        const value =
+          typeof answer.value === "object"
+            ? answer.value.join(" ")
+            : String(answer.value);
+        return fieldWordsOf(answer.quote, `${label} ${value}`).slice(0, 160);
+      };
       const results: OnboardingRecordResult[] = [];
       for (const answer of answers) {
         try {
@@ -4510,6 +4569,33 @@ export function createOnboardingPort(input: {
             onRecord !== undefined &&
             sameValue(onRecord.value, resolved.value)
           ) {
+            continue;
+          }
+          // A figure read from words that give none ("a bit under a year
+          // of runway" read as 12, live 2026-10-31): an approximation is
+          // kept as they said it, as "a dozen or so" is, never a bare
+          // figure put to them as theirs.
+          const approximately =
+            resolved.value.type === "RANGE" &&
+            onRecord === undefined &&
+            // An amount said in words ("half a million") is still a
+            // figure, put to them as before.
+            !MONEY_STEP.test(resolved.step.stepKey)
+              ? inferredFrom(resolved.step, answer)
+              : null;
+          if (
+            resolved.value.type === "RANGE" &&
+            approximately !== null &&
+            approximately.trim().length > 0 &&
+            figureStatedIn(resolved.value.value, approximately) === null &&
+            !impossibleFigure(resolved.value.value)
+          ) {
+            results.push(
+              await write(resolved.step, {
+                type: "TEXT",
+                text: approximately.slice(0, 500),
+              }),
+            );
             continue;
           }
           if (
@@ -4541,7 +4627,13 @@ export function createOnboardingPort(input: {
               sessionId: input.onboardingSessionId,
               stepKey: resolved.step.stepKey,
               value: resolved.value,
-              rationale: `From what you said earlier: "${answer.quote.slice(0, 120)}"`,
+              // The words that gave it, not the head of a long line (live
+              // 2026-10-31: "a bit under a year of runway" was held as 12
+              // months under a quote cut before it, and kept as a bare 12).
+              rationale: `From what you said earlier: "${inferredFrom(
+                resolved.step,
+                answer,
+              )}"`,
               runId: input.runId ?? null,
               // A re-reading of the same words keeps the suggestion already
               // waiting rather than replacing it (as holdParaphrase).
@@ -4924,6 +5016,60 @@ export function fieldPartOf(quote: string, reading: string): string {
   if (part !== null) return part;
   const read = reading.trim();
   return read.length > 0 && read.length <= 200 ? read : said.slice(0, 300);
+}
+
+/**
+ * Q's own words for one field, from a summary line of Q's they agreed to:
+ * the statements of that line (never its question) that the reading of
+ * the field mostly shares words with. Null when no part of the line does.
+ * Structure only, as `fieldClausesOf`: which field a line covered is the
+ * reading's, by meaning; this only finds where in Q's line it is.
+ */
+export function summaryWordsFor(
+  reading: string,
+  qLine: string | undefined,
+): string | null {
+  if (qLine === undefined) return null;
+  const wanted = new Set(contentWords(reading));
+  if (wanted.size === 0) return null;
+  const DECIMAL = "\u0000";
+  const statements = (
+    qLine
+      .replace(/(\d)\.(\d)/gu, `$1${DECIMAL}$2`)
+      .match(/[^.!?]+[.!?]*/gu) ?? [qLine]
+  )
+    .map((sentence) => sentence.replaceAll(DECIMAL, ".").trim())
+    // What Q asked is not what Q said back: a question is left out, and a
+    // short question tagged on a statement ("…rejected loads—is that
+    // right?") leaves the statement.
+    .map((sentence) => {
+      if (!sentence.endsWith("?")) return sentence;
+      const cut = Math.max(
+        sentence.lastIndexOf("—"),
+        sentence.lastIndexOf("–"),
+        sentence.lastIndexOf(" - "),
+        sentence.lastIndexOf(", "),
+      );
+      const tag = cut < 0 ? sentence : sentence.slice(cut);
+      return cut > 0 && tag.trim().split(/\s+/u).length <= 6
+        ? sentence.slice(0, cut)
+        : "";
+    })
+    .filter((sentence) => sentence.trim().length > 0);
+  const parts: string[] = [];
+  for (const statement of statements) {
+    for (const clause of statement.split(
+      /\s*[;:]\s+|\s*[—–]\s*|,\s+(?=\p{Ll})/u,
+    )) {
+      const words = contentWords(clause);
+      if (words.length === 0) continue;
+      const shared = words.filter((word) => wanted.has(word)).length;
+      if (shared / words.length >= 0.5) {
+        parts.push(clause.trim().replace(/[,;:\s.]+$/u, ""));
+      }
+    }
+  }
+  return parts.length > 0 ? parts.join("; ").slice(0, 600) : null;
 }
 
 /** The clauses of their words that carry the field's own words, or null. */

@@ -86,7 +86,9 @@ export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
   "I7.hard_exclusions": "Is there anything you never want to be shown?",
   "I7.sector_exclusions": "Are there sectors to exclude outright?",
   "I8.portfolio": "Could you name a few representative portfolio companies?",
-  "I11.additional_context": "Is there anything we missed?",
+  // Live check 2026-10-31: an investor's thesis told at length had no
+  // field of its own to be said back for, so it was never confirmed.
+  "I11.additional_context": "Anything we missed, like your thesis?",
   "I11.review":
     "That's your mandate. Shall I make it live, so Discover can match companies to it now?",
   "I12.handoff": "Your mandate is ready. Shall I take you to Discover?",

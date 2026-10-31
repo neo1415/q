@@ -94,6 +94,7 @@ import {
   gapValue,
   isTaxonomySuggestion,
   pickedUp,
+  pickedUpAfterAnswer,
   documentReading,
   documentReadingNote,
   sameFileAs,
@@ -164,7 +165,7 @@ import { WorkingLine } from "@/components/working/working-line";
  */
 
 /** When the session is read again after a typed turn, for its reading. */
-const SETTLE_REFRESH_MS = [4_000, 10_000] as const;
+const SETTLE_REFRESH_MS = [1_500, 4_000, 10_000] as const;
 
 export type QOnboardingWorkspaceActions = {
   /**
@@ -550,9 +551,22 @@ export function QOnboardingWorkspace({
   );
 
   const labels = session.labels;
+  /**
+   * The steps their latest typed line answered, until the session is read
+   * again after the reading of it (`pickedUpAfterAnswer`).
+   */
+  const [answeredSteps, setAnsweredSteps] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
   const proposals = useMemo(
-    () => (view === undefined ? [] : pickedUp(view, vocabulary, labels)),
-    [view, vocabulary, labels],
+    () =>
+      view === undefined
+        ? []
+        : pickedUpAfterAnswer(
+            pickedUp(view, vocabulary, labels),
+            answeredSteps,
+          ),
+    [view, vocabulary, labels, answeredSteps],
   );
   const gaps = useMemo(
     () => (view === undefined ? [] : stillNeeded(view, vocabulary)),
@@ -1038,6 +1052,11 @@ export function QOnboardingWorkspace({
       for (const ms of SETTLE_REFRESH_MS) {
         window.setTimeout(() => {
           void actions.refresh().then(async () => {
+            // Read again after their words were: what Q picked up shows as
+            // the record now has it.
+            setAnsweredSteps((current) =>
+              current.size === 0 ? current : new Set<string>(),
+            );
             // Live final re-check 2026-10-31: Q replies before the reading
             // lands; when the reading shows the reply asked what their words
             // had answered, Q's follow-up is kept after it. It replaces the
@@ -1106,6 +1125,12 @@ export function QOnboardingWorkspace({
       }
       const personLine = newId();
       push("PERSON", trimmed, personLine);
+      // What Q asked is answered in their words: its card is not left
+      // under Q's reply while the reading of them lands.
+      const answeredNow = [prompt?.stepKey, qAskedStep?.stepKey].filter(
+        (key): key is string => key !== undefined,
+      );
+      if (answeredNow.length > 0) setAnsweredSteps(new Set(answeredNow));
       if (journeyName !== undefined) {
         writeLastMode(journeyName, "conversation");
       }
@@ -1164,6 +1189,7 @@ export function QOnboardingWorkspace({
         // heard while nothing of it was taken in.
         markUnsent(personLine);
         setAnsweredLine(null);
+        setAnsweredSteps(new Set<string>());
         return;
       }
       // Only a reply Q is about to show replaces the answered question;
@@ -1305,6 +1331,7 @@ export function QOnboardingWorkspace({
       view?.session.id,
       onFinished,
       settleAfterReading,
+      qAskedStep,
     ],
   );
 

@@ -387,6 +387,21 @@ export function isSummaryOfTheirWords(
 }
 
 /**
+ * What Q picked up, less what Q's question was about when they answered it
+ * in their own words (live 2026-10-31: "Actively investing" stayed on the
+ * card under Q's reply to "I don't know"; the reading had already set it
+ * aside, a second after the reply). Hidden only until the session is read
+ * again after their words were read; a finding still waiting comes back.
+ */
+export function pickedUpAfterAnswer<
+  T extends { readonly suggestion: { readonly stepKey: string } },
+>(items: readonly T[], answered: ReadonlySet<string>): readonly T[] {
+  return answered.size === 0
+    ? items
+    : items.filter((item) => !answered.has(item.suggestion.stepKey));
+}
+
+/**
  * What Q picked up for the card: findings from their documents and public
  * pages. Q's summary of what they said is not here (live 2026-10-30,
  * Granary): it is said back in the conversation, where they said it, and
