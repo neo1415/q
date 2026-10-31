@@ -20,6 +20,7 @@ export {
   SITUATION_SOURCE_SPECS,
   mandateTopics,
   SITUATION_TOOLS,
+  situationSubjectRefs,
   type SituationRawFact,
   type SituationRead,
   type SituationSourceSpec,

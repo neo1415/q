@@ -11,8 +11,16 @@ import {
   withRoundTripCounter,
 } from "@capital-q/database";
 import { PLAN_F03_ASK } from "@capital-q/q-core";
+import {
+  actorWideScopeKinds,
+  candidateScopeKinds,
+} from "@capital-q/q-firewall";
 import type { QToolCallOutcome, QToolPort } from "@capital-q/q-runtime";
-import { createSituationAssembler } from "@capital-q/q-specialists";
+import {
+  createSituationAssembler,
+  situationSubjectRefs,
+  type SituationSubject,
+} from "@capital-q/q-specialists";
 
 import type { LivePatch } from "../src/composition/workforce/live.js";
 import {
@@ -486,6 +494,65 @@ describe("an investor's plan", () => {
     expect(planRoster("FOUNDER").map((entry) => entry.name)).not.toContain(
       "investor.mandate.change",
     );
+  });
+});
+
+describe("the situation's firewall plan names its subject (live 2026-10-31)", () => {
+  // An investor who had just declared a mandate heard "fit cannot yet be
+  // assessed because the mandate and thesis are unknown": the situation
+  // was read under a plan with no subjects, which holds no
+  // INVESTOR_MANDATE scope, so get_investor_mandate was refused
+  // TOOL_NOT_ELIGIBLE and the MANDATE section read as not known.
+  it("an investor's subject makes their mandate eligible; no subject never does", () => {
+    const scopes = situationSubjectRefs({
+      side: "INVESTOR",
+      investorOrganisationId: INVESTOR_ORG,
+    }).flatMap((ref) => candidateScopeKinds("ANSWER", ref.kind));
+    expect(scopes).toContain("INVESTOR_MANDATE");
+    expect(actorWideScopeKinds("ANSWER")).not.toContain("INVESTOR_MANDATE");
+    const founderScopes = situationSubjectRefs({
+      side: "FOUNDER",
+      companyId: COMPANY,
+    }).flatMap((ref) => candidateScopeKinds("ANSWER", ref.kind));
+    expect(founderScopes).toContain("COMPANY_CAPITAL_OBJECTIVE");
+  });
+
+  it("the plan job asks for its context with the dossier's subject", async () => {
+    const h = harness({
+      dossier: INVESTOR_DOSSIER,
+      writes: [INVESTOR_PLAN],
+      reviews: [review(0)],
+    });
+    const asked: SituationSubject[] = [];
+    await runPlanJob(
+      {
+        ...h.dependencies,
+        toolContext: (
+          actor: typeof founder,
+          _runId: string,
+          subject: SituationSubject,
+        ) => {
+          asked.push(subject);
+          return Promise.resolve(contextOf(actor));
+        },
+      },
+      {
+        actor: investor,
+        owner: { tenantId: TENANT, userId: investor.userId },
+        jobId: JOB,
+        leadRunId: LEAD_RUN,
+        runId: RUN,
+        payload: {
+          ...founderPayload("how do I get better deal flow"),
+          ownerUserId: investor.userId,
+          subject: { side: "INVESTOR", investorOrganisationId: INVESTOR_ORG },
+        },
+        progress: h.progress,
+      },
+    );
+    expect(asked).toEqual([
+      { side: "INVESTOR", investorOrganisationId: INVESTOR_ORG },
+    ]);
   });
 });
 

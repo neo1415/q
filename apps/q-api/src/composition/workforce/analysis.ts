@@ -20,15 +20,21 @@ import {
   type SourceTier,
 } from "@capital-q/q-research";
 
-import type {
-  CapitalQRecord,
-  InvestigationSummary,
-  ResearchDossier,
-  Spend,
+import {
+  isOwnSiteOf,
+  type CapitalQRecord,
+  type InvestigationSummary,
+  type ResearchDossier,
+  type Spend,
 } from "./deep-research.js";
 import type { PublicSourcesGap } from "./jobs.js";
 import { safeReport, type LiveReport } from "./live.js";
 import type { Trace, Who, WorkforceModels } from "./models.js";
+import {
+  namesakeSources,
+  publicFactStanding,
+  type SubjectIdentity,
+} from "./subject-identity.js";
 
 /**
  * An ANALYSIS document (owner 2026-10-23): written from the research
@@ -216,6 +222,27 @@ export function tierText(source: AnalysisSource): string | null {
     : source.tier === "SECONDARY"
       ? "secondary"
       : "other";
+}
+
+/**
+ * A source's standing as the filed Sources list states it. The writer's
+ * input keeps tierText (recorded research replays read it unchanged); the
+ * person reads whose page it is: a namesake's page is named as not about
+ * the subject, and another organisation's own site is its claim, never
+ * "the company's".
+ */
+export function filedTierText(
+  source: AnalysisSource,
+  identity: SubjectIdentity | null,
+  namesakes: ReadonlySet<number>,
+): string | null {
+  if (identity !== null && namesakes.has(source.index))
+    return `not about ${identity.name}: a different organisation with a similar name; not used as evidence`;
+  if (source.tier === "PRIMARY" && source.tierKind === "COMPANY_DISCLOSURE")
+    return identity !== null && isOwnSiteOf(source.domain, identity.name)
+      ? `primary: ${identity.name}'s own disclosure, its claim`
+      : "primary: the publisher's own disclosure, its claim about itself";
+  return tierText(source);
 }
 
 export function sourcesText(sources: readonly AnalysisSource[]): string {
@@ -803,17 +830,23 @@ function findingIdFor(seed: string) {
   );
 }
 
-/** The sourced facts a section cites, as findings with their truth axes. */
+/**
+ * The sourced facts a section cites, as findings with their truth axes.
+ * A namesake's page is never a finding about the subject, and only the
+ * subject's own site is its claim (subject-identity.ts, live 2026-10-31).
+ */
 function findingsFor(
   body: string,
   facts: readonly AnalysisFact[],
   seed: string,
+  identity: SubjectIdentity | null,
+  namesakes: ReadonlySet<number>,
 ): readonly QArtifactFinding[] {
   const cited = new Set(
     [...body.matchAll(CITED)].map((match) => Number(match[1])),
   );
   return facts
-    .filter((fact) => cited.has(fact.source))
+    .filter((fact) => cited.has(fact.source) && !namesakes.has(fact.source))
     .slice(0, 12)
     .map((fact) => ({
       findingId: findingIdFor(`${seed}:${fact.id}:${fact.url}`),
@@ -823,22 +856,9 @@ function findingsFor(
           0,
           2_000,
         ),
-      // What a public page says is its publisher's claim (ADR-001
-      // USER_CLAIM: a party's own statement, as the platform's other
-      // public findings label it -- live 2026-10-29, run A filed them
-      // UNKNOWN), supported by that document, by several independent
-      // ones, or only by the company's own word; never verified by
-      // Capital Q. Code's cross-check decided the evidence and status.
-      truthClass: "USER_CLAIM" as const,
-      evidenceStatus: fact.evidenceStatus ?? ("DOCUMENT_SUPPORTED" as const),
-      lifecycleStatus: fact.lifecycleStatus ?? ("CURRENT" as const),
-      confidence:
-        fact.lifecycleStatus === "CONTRADICTORY"
-          ? ("CONFLICTING_EVIDENCE" as const)
-          : fact.lifecycleStatus === "STALE" ||
-              fact.evidenceStatus === "SELF_REPORTED"
-            ? ("LOW" as const)
-            : ("MODERATE" as const),
+      // Never verified by Capital Q. Code's cross-check decided the
+      // support and status; whose page it is decides the truth class.
+      ...publicFactStanding(fact, identity),
       evidenceRefs: [],
       subjects: [],
     }));
@@ -897,8 +917,15 @@ export function analysisContent(input: {
    */
   readonly codeSections?:
     readonly { readonly heading: string; readonly body: string }[] | undefined;
+  /**
+   * The one company the document is about (diligence, a named or own
+   * company's analysis); null or absent: a market or general question.
+   */
+  readonly subject?: SubjectIdentity | null | undefined;
 }): QArtifactContent {
   const { draft, review } = input;
+  const identity = input.subject ?? null;
+  const namesakes = namesakeSources(input.facts, identity);
   const sections = draft.sections.map((section, index) => ({
     heading: section.heading,
     body: section.body,
@@ -907,6 +934,8 @@ export function analysisContent(input: {
         section.body,
         input.facts,
         `${input.seed}:${String(index)}`,
+        identity,
+        namesakes,
       ),
     ],
   }));
@@ -921,10 +950,10 @@ export function analysisContent(input: {
     ),
   );
   const listed = input.sources.filter((source) => cited.has(source.index));
-  const sourceLines = listed.map(
-    (source) =>
-      `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${tierText(source) === null ? "" : ` (${tierText(source) ?? ""})`}. ${source.url}`,
-  );
+  const sourceLines = listed.map((source) => {
+    const standing = filedTierText(source, identity, namesakes);
+    return `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${standing === null ? "" : ` (${standing})`}. ${source.url}`;
+  });
   const sourceSections =
     sourceLines.length === 0
       ? input.sourcesAlways === true

@@ -1740,6 +1740,7 @@ export type PlanJobDependencies = {
   readonly toolContext: (
     actor: ActorContext,
     runId: string,
+    subject: SituationSubject,
   ) => Promise<QToolExecutionContext | null>;
   readonly models: Pick<WorkforceModels, "writePlan" | "reviewPlan">;
   readonly store: PlanStore;
@@ -1892,8 +1893,17 @@ export async function runPlanJob(
     "Gathering your situation",
     "gathering",
   );
+  const subject: SituationSubject =
+    payload.subject.side === "FOUNDER"
+      ? { side: "FOUNDER", companyId: payload.subject.companyId }
+      : {
+          side: "INVESTOR",
+          investorOrganisationId: payload.subject.investorOrganisationId,
+        };
+  // The plan names the subject, so its reads (their mandate, capital
+  // objective, data room) are eligible under the firewall.
   const context = await dependencies
-    .toolContext(actor, input.runId)
+    .toolContext(actor, input.runId, subject)
     .catch(() => null);
   if (context === null) {
     return {
@@ -1902,13 +1912,6 @@ export async function runPlanJob(
       modelCalls,
     };
   }
-  const subject: SituationSubject =
-    payload.subject.side === "FOUNDER"
-      ? { side: "FOUNDER", companyId: payload.subject.companyId }
-      : {
-          side: "INVESTOR",
-          investorOrganisationId: payload.subject.investorOrganisationId,
-        };
   const publicProfile =
     (await dependencies.publicProfile?.(actor).catch(() => null)) ?? null;
   let dossier = await dependencies.assembler.assemble({

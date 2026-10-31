@@ -492,6 +492,8 @@ import {
   createRecommendationNarrator,
   createSituationAssembler,
   pipelineSummaryLine,
+  situationSubjectRefs,
+  type SituationSubject,
 } from "@capital-q/q-specialists";
 import {
   actorPrincipal,
@@ -1987,25 +1989,25 @@ const workforcePortsFor = createWorkforcePorts(
           .slice(-4);
       },
       situation: async (actor, runId, ask) => {
-        const context = await situationToolContext(actor, runId);
-        if (context === null) return null;
         const companyId = await runtimeDependencies.ownCompany(actor);
         const investorOrganisationId =
           companyId === null
             ? await runtimeDependencies.ownInvestorOrganisation(actor)
             : null;
-        if (companyId === null && investorOrganisationId === null) return null;
+        const subject: SituationSubject | null =
+          companyId !== null
+            ? { side: "FOUNDER", companyId }
+            : investorOrganisationId !== null
+              ? { side: "INVESTOR", investorOrganisationId }
+              : null;
+        if (subject === null) return null;
+        const context = await situationToolContext(actor, runId, subject);
+        if (context === null) return null;
         const publicProfile =
           companyId === null ? null : await situationPublicProfile(actor);
         return situationAssembler.assemble({
           context,
-          subject:
-            companyId !== null
-              ? { side: "FOUNDER", companyId }
-              : {
-                  side: "INVESTOR",
-                  investorOrganisationId: investorOrganisationId ?? "",
-                },
+          subject,
           ask,
           ...(publicProfile === null ? {} : { publicProfile }),
         });
@@ -2123,11 +2125,15 @@ const workforceJobBoard = createWorkforceJobBoard({
     const investorOrganisationId =
       await runtimeDependencies.ownInvestorOrganisation(actor);
     if (investorOrganisationId === null) return [];
-    const context = await situationToolContext(actor, runId);
+    const subject: SituationSubject = {
+      side: "INVESTOR",
+      investorOrganisationId,
+    };
+    const context = await situationToolContext(actor, runId, subject);
     if (context === null) return null;
     const dossier = await situationAssembler.assemble({
       context,
-      subject: { side: "INVESTOR", investorOrganisationId },
+      subject,
       ask: "",
     });
     const section = dossier.sections.find((one) => one.source === "MANDATE");
@@ -4015,8 +4021,16 @@ const situationAssembler = createSituationAssembler({
   // Addendum 2: what they did recently, from their own domain events.
   activity: createActivityRead(database.sql),
 });
-/** The asker's own run context for their situation, as planning reads it. */
-const situationToolContext = async (actor: ActorContext, runId: string) => {
+/**
+ * The asker's own run context for their situation, as planning reads it:
+ * a firewall plan naming the dossier's subject (their own company or
+ * investor organisation), so its reads are eligible (live 2026-10-31).
+ */
+const situationToolContext = async (
+  actor: ActorContext,
+  runId: string,
+  subject?: SituationSubject,
+) => {
   const run = QRunIdSchema.safeParse(runId);
   if (!run.success) return null;
   const correlationId = CorrelationIdSchema.parse(createCorrelationId());
@@ -4025,7 +4039,7 @@ const situationToolContext = async (actor: ActorContext, runId: string) => {
     runId: run.data,
     correlationId,
     capability: "ANSWER",
-    subjects: [],
+    subjects: subject === undefined ? [] : [...situationSubjectRefs(subject)],
   });
   return decision.outcome === "DENIED"
     ? null

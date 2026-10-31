@@ -449,6 +449,7 @@ export function createWorkforceDocuments(dependencies: {
           alsoCites: [section.body],
           codeGaps,
           sourcesAlways: true,
+          subject: companyName === null ? null : { name: companyName },
         }),
         claims: {
           heading: section.heading,
@@ -465,6 +466,7 @@ export function createWorkforceDocuments(dependencies: {
         seed,
         publicSources: input.publicSources ?? null,
         codeGaps,
+        subject: companyName === null ? null : { name: companyName },
         codeSections: investigationSections({
           facts: merged.facts,
           investigations: merged.investigations,

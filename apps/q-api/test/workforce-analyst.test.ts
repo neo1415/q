@@ -1358,12 +1358,14 @@ describe("the analysis is critiqued and really revised", () => {
     );
     expect(sources?.body).toContain("[S2] Water kiosks in Kenya");
     expect(sources?.body).toContain("Capital Q has not verified it");
-    // Sourced figures carry their truth axes as findings.
+    // Sourced figures carry their truth axes as findings: a third-party
+    // page is external, its truth not established (never the company's
+    // own claim; live 2026-10-31).
     const market = filed?.content.sections.find(
       (section) => section.heading === "Market and sizing",
     );
     expect(market?.findings[0]).toMatchObject({
-      truthClass: "USER_CLAIM",
+      truthClass: "UNKNOWN",
       evidenceStatus: "DOCUMENT_SUPPORTED",
     });
     expect(filed?.content.gaps).toEqual(MAJI_DRAFT_TWO.gaps);

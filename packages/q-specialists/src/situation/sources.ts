@@ -6,6 +6,7 @@ import {
   type QSituationFact,
   type QSituationSide,
   type QSituationSource,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import { cutAtWord } from "@capital-q/q-core";
 import {
@@ -44,6 +45,28 @@ export type SituationRead = {
 export type SituationSubject =
   | { readonly side: "FOUNDER"; readonly companyId: string }
   | { readonly side: "INVESTOR"; readonly investorOrganisationId: string };
+
+/**
+ * The subjects the asker's firewall plan must name for this dossier's
+ * reads. The firewall grants a scope only for a subject it was asked
+ * about: a plan with no subjects holds no INVESTOR_MANDATE (or company)
+ * scope, so `get_investor_mandate` was refused TOOL_NOT_ELIGIBLE and an
+ * investor who had just declared a mandate was told it was unknown (live
+ * 2026-10-31, an IC memo's first read). The firewall still resolves each
+ * subject for the actor; naming it grants nothing by itself.
+ */
+export function situationSubjectRefs(
+  subject: SituationSubject,
+): readonly QSubjectRef[] {
+  return subject.side === "FOUNDER"
+    ? [{ kind: "COMPANY", companyId: subject.companyId }]
+    : [
+        {
+          kind: "INVESTOR_ORGANISATION",
+          investorOrganisationId: subject.investorOrganisationId,
+        },
+      ];
+}
 
 /** A source's reads' data, in the order of its reads. */
 export type SituationFormat = (
