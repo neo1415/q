@@ -222,8 +222,6 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       concept: "capital.raising",
       priority: "ESSENTIAL",
       label: "Raising now",
-      // A judgement about their current state: asked, never read in.
-      askOnly: true,
       seconds: 10,
     },
     [FOUNDER_STEPS.currency]: {
