@@ -32,6 +32,8 @@ import {
   analysisContent,
   personProse,
   investigationGaps,
+  investigationReduced,
+  mandateLabels,
   reducedResearchText,
   investigationSections,
   mergeDossiers,
@@ -59,7 +61,7 @@ import {
   type DataRoomReads,
 } from "./diligence-memo.js";
 import { safeReport } from "./live.js";
-import type { OwnContextFocus } from "./own-context.js";
+import { mandateAmounts, type OwnContextFocus } from "./own-context.js";
 import type { WorkforceModels } from "./models.js";
 import { namesakeSources, type SubjectIdentity } from "./subject-identity.js";
 
@@ -383,9 +385,11 @@ export function createWorkforceDocuments(dependencies: {
     const records = recordsText(merged.records);
     if (records.length > 0) company = `${company}\n\n${records}`;
     codeGaps.push(...investigationGaps(merged.investigations));
-    const reduced = merged.investigations.find(
-      (one) => one.reduced !== undefined,
-    )?.reduced;
+    // Reduced when no plan could be made OR a planned line could not be
+    // searched (investigationReduced): said at the top and in Q's line.
+    const reduced = merged.investigations
+      .map(investigationReduced)
+      .find((one) => one !== undefined);
     if (reduced !== undefined)
       company = `${company}\n\n${reducedResearchText(reduced)}`;
     if (
@@ -427,6 +431,12 @@ export function createWorkforceDocuments(dependencies: {
     if (!(await input.canContinue())) return unavailable();
     safeReport(input.progress)({ stage: "FILING" });
     const seed = `${input.jobId}:${input.stepKey}`;
+    // The person's own mandate amounts: labelled theirs, never the
+    // company's record (analysis.ts mandateLabels).
+    const mandate = {
+      amounts: mandateAmounts(theirs ?? null),
+      subject: companyName,
+    };
     // Whose pages are the subject's (subject-identity.ts): its name, and
     // the site and description its own record holds.
     const identity: SubjectIdentity | null =
@@ -467,6 +477,7 @@ export function createWorkforceDocuments(dependencies: {
           sourcesAlways: true,
           subject: identity,
           reducedResearch: reduced,
+          mandateAmounts: mandate.amounts,
         }),
         claims: {
           heading: section.heading,
@@ -485,6 +496,7 @@ export function createWorkforceDocuments(dependencies: {
         codeGaps,
         subject: identity,
         reducedResearch: reduced,
+        mandateAmounts: mandate.amounts,
         codeSections: investigationSections({
           facts: merged.facts,
           investigations: merged.investigations,
@@ -510,7 +522,7 @@ export function createWorkforceDocuments(dependencies: {
       artifactType: WORKFORCE_ANALYSIS_KIND,
       content: {
         title: written.draft.title,
-        summary: personProse(written.draft.summary),
+        summary: mandateLabels(personProse(written.draft.summary), mandate),
         content,
       },
       workforce,
@@ -551,10 +563,10 @@ export function createWorkforceDocuments(dependencies: {
       delivery: {
         title: written.draft.title,
         artifactType: WORKFORCE_ANALYSIS_KIND,
-        summary: personProse(written.draft.summary),
+        summary: mandateLabels(personProse(written.draft.summary), mandate),
         topRecommendations: written.draft.topRecommendations
           .slice(0, 3)
-          .map(personProse),
+          .map((one) => mandateLabels(personProse(one), mandate)),
         passed: written.review.passes,
         openIssues: written.review.open.length,
         ...(reduced === undefined ? {} : { reducedResearch: reduced }),

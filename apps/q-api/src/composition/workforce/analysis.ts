@@ -21,7 +21,6 @@ import {
 } from "@capital-q/q-research";
 
 import {
-  isOwnSiteOf,
   type CapitalQRecord,
   type InvestigationSummary,
   type ResearchDossier,
@@ -31,6 +30,7 @@ import type { PublicSourcesGap } from "./jobs.js";
 import { safeReport, type LiveReport } from "./live.js";
 import type { Trace, Who, WorkforceModels } from "./models.js";
 import {
+  isSubjectSite,
   namesakeSources,
   publicFactStanding,
   type SubjectIdentity,
@@ -237,9 +237,9 @@ export function filedTierText(
   namesakes: ReadonlySet<number>,
 ): string | null {
   if (identity !== null && namesakes.has(source.index))
-    return `not about ${identity.name}: a different organisation with a similar name; not used as evidence`;
+    return `not about ${identity.name}: a different organisation or subject with a similar name; not used as evidence`;
   if (source.tier === "PRIMARY" && source.tierKind === "COMPANY_DISCLOSURE")
-    return identity !== null && isOwnSiteOf(source.domain, identity.name)
+    return identity !== null && isSubjectSite(source.domain, identity)
       ? `primary: ${identity.name}'s own disclosure, its claim`
       : "primary: the publisher's own disclosure, its claim about itself";
   return tierText(source);
@@ -272,6 +272,82 @@ export function personProse(text: string): string {
   }
   if (end >= room.length * 0.4) return room.slice(0, end).trimEnd();
   return `${room.replace(/[\s,;:\-–—]+$/u, "")}…`;
+}
+
+/** A money figure: a currency, a scale word, or both, around a number. */
+const MONEY =
+  /(?:([$£€])\s?|\b(USD|EUR|GBP|KES|NGN|ZAR)\s?)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s?(thousand|million|billion|mn|bn|k|m|b)\b)?/giu;
+const SCALE: Readonly<Record<string, number>> = {
+  thousand: 1e3,
+  k: 1e3,
+  million: 1e6,
+  mn: 1e6,
+  m: 1e6,
+  billion: 1e9,
+  bn: 1e9,
+  b: 1e9,
+};
+
+/** The money amounts a clause states (a bare number or a year is none). */
+function moneyIn(text: string): readonly number[] {
+  const amounts: number[] = [];
+  for (const match of text.matchAll(MONEY)) {
+    const [, symbol, code, digits, scale] = match;
+    if (symbol === undefined && code === undefined && scale === undefined)
+      continue;
+    const value = Number((digits ?? "").replace(/,/gu, ""));
+    if (!Number.isFinite(value)) continue;
+    amounts.push(
+      value * (scale === undefined ? 1 : (SCALE[scale.toLowerCase()] ?? 1)),
+    );
+  }
+  return amounts;
+}
+
+const RECORD_LABEL = /\(company record(?:, self-reported)?\)/gu;
+
+/**
+ * Live 2026-10-31 (IC memo on Ferrolith for Fjordlight Harbour Capital):
+ * "…versus Fjordlight's declared €300,000–€1.5 million cheque range and
+ * strong preference for co-investment (company record)" -- the investor's
+ * own mandate filed as the company's record. The writer's basis labels
+ * offer only "(company record)" for a record's figure. Code, from typed
+ * data: a "(company record)" label whose clause (back to the previous
+ * label or the sentence's start) states money, every amount of it one of
+ * the person's own mandate amounts, and does not name the subject, is
+ * theirs: "(your mandate)".
+ */
+export function mandateLabels(
+  text: string,
+  mandate: {
+    readonly amounts: readonly number[];
+    readonly subject: string | null;
+  },
+): string {
+  if (mandate.amounts.length === 0) return text;
+  const subject = mandate.subject?.trim().toLowerCase() ?? "";
+  const theirs = (value: number) =>
+    mandate.amounts.some(
+      (amount) => Math.abs(amount - value) <= Math.max(1, amount * 0.005),
+    );
+  let out = "";
+  let from = 0;
+  for (const match of text.matchAll(RECORD_LABEL)) {
+    const at = match.index;
+    const before = text.slice(from, at);
+    let lead = before.lastIndexOf(")") + 1;
+    for (const end of before.matchAll(/[.!?](?=\s)|\n/gu))
+      lead = Math.max(lead, end.index + 1);
+    const clause = before.slice(lead);
+    const amounts = moneyIn(clause);
+    const mine =
+      amounts.length > 0 &&
+      amounts.every(theirs) &&
+      (subject.length === 0 || !clause.toLowerCase().includes(subject));
+    out += `${before}${mine ? "(your mandate)" : match[0]}`;
+    from = at + match[0].length;
+  }
+  return `${out}${text.slice(from)}`;
 }
 
 /**
@@ -1018,7 +1094,7 @@ export const PUBLIC_NONE_FOUND_GAP =
 
 /** Pages about a namesake, listed apart from the sources a document cites. */
 export const SET_ASIDE_HEADING =
-  "Looked at and set aside: different organisations with similar names";
+  "Looked at and set aside: different organisations or subjects with similar names";
 
 export function analysisContent(input: {
   readonly draft: AnalysisDocumentResult;
@@ -1052,6 +1128,12 @@ export function analysisContent(input: {
    * "(company record)").
    */
   readonly reducedResearch?: string | undefined;
+  /**
+   * The money amounts of the person's own declared mandate
+   * (own-context.ts mandateAmounts): a figure of theirs is labelled
+   * "(your mandate)", never "(company record)" (mandateLabels).
+   */
+  readonly mandateAmounts?: readonly number[] | undefined;
 }): QArtifactContent {
   const { review } = input;
   const identity = input.subject ?? null;
@@ -1087,7 +1169,12 @@ export function analysisContent(input: {
     unlistedRemoved += out.removed;
     return out.text;
   };
-  const clean = (text: string) => listedOnly(apart(text));
+  const mandate = {
+    amounts: input.mandateAmounts ?? [],
+    subject: identity?.name ?? null,
+  };
+  const clean = (text: string) =>
+    mandateLabels(listedOnly(apart(text)), mandate);
   const draft: AnalysisDocumentResult = {
     ...input.draft,
     summary: clean(input.draft.summary),
@@ -1131,7 +1218,7 @@ export function analysisContent(input: {
       ? []
       : [
           wholeSentences(
-            `Q removed ${namesakeRemoved === 0 ? "the citations" : `${String(namesakeRemoved)} statement${namesakeRemoved === 1 ? "" : "s"}`} that rested on pages about a different organisation named like ${identity.name} (${[
+            `Q removed ${namesakeRemoved === 0 ? "the citations" : `${String(namesakeRemoved)} statement${namesakeRemoved === 1 ? "" : "s"}`} that rested on pages about a different organisation or subject named like ${identity.name} (${[
               ...namesakeCut,
             ]
               .sort((a, b) => a - b)
@@ -1206,7 +1293,7 @@ export function analysisContent(input: {
       ? []
       : splitSection(
           SET_ASIDE_HEADING,
-          `Pages Q read about other organisations with names like ${identity.name}. They are not evidence about ${identity.name}, and nothing in this document rests on them.\n${setAsideLines.join("\n")}`,
+          `Pages Q read about other organisations or subjects with names like ${identity.name}. They are not evidence about ${identity.name}, and nothing in this document rests on them.\n${setAsideLines.join("\n")}`,
         );
   const gaps = [
     // Stated by code, never left to the writer (2026-10-25).
@@ -1326,7 +1413,35 @@ export function investigationSections(input: {
   ];
 }
 
-/** What stayed open when the investigation stopped, for "not known". */
+/**
+ * Whether an investigation ran reduced, and why, in the person's words.
+ * Live 2026-10-31 (IC memo on Ferrolith): four of its eight planned lines
+ * of enquiry (traction, news, competitors, market size) could not be
+ * searched because the search provider did not answer; the memo said so
+ * only deep in "Not known", and neither its top nor Q's chat line said the
+ * research was reduced. The flag was raised only when no plan could be
+ * made. A planned line no search could run is reduced research too, read
+ * from the summary's typed field (couldNotRun), never from prose.
+ */
+export function investigationReduced(
+  one: InvestigationSummary,
+): string | undefined {
+  if (one.reduced !== undefined) return one.reduced;
+  const lanes = [...new Set(one.couldNotRun)];
+  if (lanes.length === 0) return undefined;
+  const named = lanes
+    .slice(0, 6)
+    .map((lane) => lane.toLowerCase().replace(/_+/gu, " ").trim());
+  const list =
+    named.length === 1
+      ? (named[0] ?? "")
+      : `${named.slice(0, -1).join(", ")} and ${named.at(-1) ?? ""}${lanes.length > named.length ? " among others" : ""}`;
+  return wholeSentences(
+    `This investigation ran in a reduced form: ${lanes.length === 1 ? "one line of enquiry" : `${String(lanes.length)} lines of enquiry`} (${list}) could not be searched, so what only ${lanes.length === 1 ? "it" : "they"} could tell is not known. Ask again for the full investigation.`,
+    400,
+  );
+}
+
 /** What the writer is told when the research under it ran reduced. */
 export function reducedResearchText(reduced: string): string {
   return `RESEARCH RAN REDUCED (code's finding; say so plainly in the summary, and never present this as a full investigation): ${reduced}`;
@@ -1338,9 +1453,10 @@ export function investigationGaps(
   return [
     ...new Set([
       // First: an investigation that ran reduced says so before anything.
-      ...investigations.flatMap((one) =>
-        one.reduced === undefined ? [] : [one.reduced],
-      ),
+      ...investigations.flatMap((one) => {
+        const reduced = investigationReduced(one);
+        return reduced === undefined ? [] : [reduced];
+      }),
       ...investigations.flatMap((one) =>
         one.open.map((gap) => `Still open after research: ${gap}.`),
       ),

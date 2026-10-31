@@ -478,7 +478,7 @@ describe("an IC memo on Karoo Gridworks (live 2026-10-31)", () => {
     expect(body("Risks")).toBe("- Tariff risk: tariffs rose 12% [S12].");
     expect(content.gaps.join("\n")).not.toMatch(/\[S(?:4|9|15)\]/u);
     expect(content.gaps[0]).toMatch(
-      /^Q removed 6 statements that rested on pages about a different organisation named like Karoo Gridworks \(S4, S9, S15\)/u,
+      /^Q removed 6 statements that rested on pages about a different organisation or subject named like Karoo Gridworks \(S4, S9, S15\)/u,
     );
     // Live 2026-10-31 (Clearwater memo): a namesake's page never sits
     // under "sources this document cites"; it is listed apart, plainly.
@@ -487,10 +487,10 @@ describe("an IC memo on Karoo Gridworks (live 2026-10-31)", () => {
     expect(sources).not.toMatch(/\[S(?:4|9|15)\]/u);
     const setAside = body(SET_ASIDE_HEADING);
     expect(SET_ASIDE_HEADING).toBe(
-      "Looked at and set aside: different organisations with similar names",
+      "Looked at and set aside: different organisations or subjects with similar names",
     );
     expect(setAside).toMatch(
-      /^Pages Q read about other organisations with names like Karoo Gridworks\. They are not evidence about Karoo Gridworks/u,
+      /^Pages Q read about other organisations or subjects with names like Karoo Gridworks\. They are not evidence about Karoo Gridworks/u,
     );
     for (const index of [4, 9, 15])
       expect(setAside).toMatch(new RegExp(`\\[S${String(index)}\\]`, "u"));
