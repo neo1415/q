@@ -87,12 +87,81 @@ export function pitchFrame(aspectRatio: string | null | undefined): {
 
 /** Where a stage cue's foot sits, in percent of the pitch's height. */
 const CUE_FOOT_MAX = 94;
-const CUE_FOOT_MIN = 55;
+/** The highest a cue's top goes: below the stage's top bar. */
+const CUE_TOP_MIN = 12;
+/** The gap kept between a cue and the company's words, in percent. */
+const CUE_GAP = 2;
+
+/**
+ * Where a stage cue's TOP goes, in percent of the pitch's height (live
+ * 2026-10-31, Discover at 390 and 360: the cue sat on the AI label, the
+ * company's name and its place line). Chromium has no VTTCue.lineAlign,
+ * so a percent `line` is always the cue's top there: a cue placed with
+ * its "foot" just above the words ran down over them. The top is set
+ * from the cue's measured height instead, so its foot ends clear of the
+ * words in every engine; the old 55% floor, which pushed a cue onto words
+ * that start higher, is gone.
+ */
+export function stageCueTop(input: {
+  readonly frameTop: number;
+  readonly frameHeight: number;
+  /** The top of the company's words where they lie over the pitch. */
+  readonly wordsTop: number | null;
+  /** The cue's rendered height, in pixels. */
+  readonly cueHeight: number;
+}): number {
+  if (input.frameHeight <= 0) return CUE_FOOT_MAX;
+  const foot =
+    input.wordsTop === null
+      ? CUE_FOOT_MAX
+      : Math.min(
+          CUE_FOOT_MAX,
+          ((input.wordsTop - input.frameTop) / input.frameHeight) * 100 -
+            CUE_GAP,
+        );
+  const height = (Math.max(0, input.cueHeight) / input.frameHeight) * 100;
+  return Math.max(CUE_TOP_MIN, foot - height);
+}
+
+/**
+ * A cue's height as the stage draws it: its words, wrapped at the cue's
+ * width, in the stage's cue type (--cq-feed-cue-size, globals.css).
+ */
+function cueHeight(
+  video: HTMLVideoElement,
+  text: string,
+  widthPx: number,
+): number {
+  const host = video.parentElement;
+  if (host === null) return 0;
+  const probe = document.createElement("div");
+  const style = getComputedStyle(video);
+  probe.setAttribute("aria-hidden", "true");
+  probe.style.cssText = [
+    "position:absolute",
+    "visibility:hidden",
+    "pointer-events:none",
+    "left:0",
+    "top:0",
+    `width:${String(Math.max(1, widthPx))}px`,
+    `font-family:${style.fontFamily}`,
+    `font-size:${style.getPropertyValue("--cq-feed-cue-size").trim() || "0.95em"}`,
+    "line-height:1.35",
+    "white-space:pre-line",
+    "overflow-wrap:break-word",
+    "text-align:center",
+  ].join(";");
+  probe.textContent = text.replace(/<[^>]*>/gu, "");
+  host.appendChild(probe);
+  const height = probe.getBoundingClientRect().height;
+  probe.remove();
+  return height;
+}
 
 /**
  * Places the showing cues of a stage pitch low, but clear of the company's
- * words where they lie over the pitch (a phone): the cue's foot sits just
- * above them; where they are beside it, at the pitch's foot.
+ * words where they lie over the pitch (a phone): the cue ends just above
+ * them; where they are beside it, at the pitch's foot.
  */
 function placeCues(video: HTMLVideoElement): void {
   const frame = video.getBoundingClientRect();
@@ -108,10 +177,6 @@ function placeCues(video: HTMLVideoElement): void {
     words.right > frame.left &&
     words.top < frame.bottom &&
     words.top > frame.top;
-  const foot = over
-    ? ((words.top - frame.top) / frame.height) * 100 - 3
-    : CUE_FOOT_MAX;
-  const line = Math.max(CUE_FOOT_MIN, Math.min(CUE_FOOT_MAX, foot));
   // The rail floats over a phone's pitch: the words stay to its left.
   const rail = video
     .closest(".cq-feed")
@@ -125,19 +190,28 @@ function placeCues(video: HTMLVideoElement): void {
       ? Math.max(50, ((rail.left - frame.left) / frame.width) * 100 - 4)
       : 100;
   const tracks = video.textTracks;
+  const widthPx = (frame.width * width) / 100;
   for (let i = 0; i < tracks.length; i += 1) {
-    const cues = tracks[i]?.cues;
+    // Only the cues on screen are measured: one layout read per cue shown.
+    const cues = tracks[i]?.activeCues;
     if (cues === null || cues === undefined) continue;
     for (let j = 0; j < cues.length; j += 1) {
       const cue = cues[j];
-      if (cue instanceof VTTCue && (cue.line !== line || cue.size !== width)) {
-        cue.snapToLines = false;
-        cue.lineAlign = "end";
-        cue.line = line;
-        cue.size = width;
-        cue.position = width / 2 + (100 - width > 0 ? 2 : 0);
-        cue.positionAlign = "center";
-      }
+      if (!(cue instanceof VTTCue)) continue;
+      const line = stageCueTop({
+        frameTop: frame.top,
+        frameHeight: frame.height,
+        wordsTop: over ? words.top : null,
+        cueHeight: cueHeight(video, cue.text, widthPx),
+      });
+      if (cue.line === line && cue.size === width) continue;
+      cue.snapToLines = false;
+      // The top, in every engine (Chromium ignores lineAlign).
+      cue.lineAlign = "start";
+      cue.line = line;
+      cue.size = width;
+      cue.position = width / 2 + (100 - width > 0 ? 2 : 0);
+      cue.positionAlign = "center";
     }
   }
 }

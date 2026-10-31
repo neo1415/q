@@ -25,6 +25,7 @@ import {
 import {
   PitchPlayer,
   pitchFrame,
+  stageCueTop,
 } from "../src/features/discover/player/pitch-player";
 
 // A poster is authorised asynchronously; under a full parallel run the
@@ -1077,5 +1078,39 @@ describe("starting, whatever the browser says first (ADR 0063)", () => {
     ).toBeTruthy();
     // Never the old "Slow connection" claim.
     expect(container.textContent ?? "").not.toMatch(/slow connection/i);
+  });
+});
+
+describe("stage cue placement (live 2026-10-31, Discover at 390 and 360)", () => {
+  // A 390 phone: the pitch fills 780px; the AI label, the company's name
+  // and its place line start at 390px. Chromium ignores lineAlign, so a
+  // percent line is the cue's top: its whole height must end above them.
+  const phone = { frameTop: 0, frameHeight: 780, wordsTop: 390 };
+
+  it("a three-line cue ends clear of the company's words", () => {
+    const cueHeight = 62;
+    const top = stageCueTop({ ...phone, cueHeight });
+    const footPx = (top / 100) * phone.frameHeight + cueHeight;
+    expect(footPx).toBeLessThanOrEqual(phone.wordsTop);
+    expect(footPx).toBeGreaterThan(phone.wordsTop - 30);
+  });
+
+  it("words high on the pitch are never covered by a floor (the old 55%)", () => {
+    const top = stageCueTop({ ...phone, wordsTop: 360, cueHeight: 40 });
+    expect((top / 100) * 780 + 40).toBeLessThanOrEqual(360);
+  });
+
+  it("with the words beside the pitch, the cue ends at its foot", () => {
+    const top = stageCueTop({
+      frameTop: 0,
+      frameHeight: 800,
+      wordsTop: null,
+      cueHeight: 40,
+    });
+    expect(top).toBeCloseTo(94 - 5, 5);
+  });
+
+  it("an outsized cue stays below the stage's top bar", () => {
+    expect(stageCueTop({ ...phone, cueHeight: 600 })).toBe(12);
   });
 });

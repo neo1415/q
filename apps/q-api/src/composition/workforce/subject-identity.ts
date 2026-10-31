@@ -207,6 +207,7 @@ export function namesakeSources(
   return new Set([
     ...[...namesake].filter((source) => !tied.has(source)),
     ...strangerSites(facts, identity, subject),
+    ...strangerPages(facts, identity, subject),
   ]);
 }
 
@@ -309,6 +310,193 @@ function strangerSites(
         ...describingWords(fact.title ?? "", subject),
         ...describingWords(fact.entity ?? "", subject),
       ]),
+    );
+    if (says.size < 2) continue;
+    if ([...says].some((word) => theirs.some((mine) => sameStem(word, mine))))
+      continue;
+    strangers.add(source);
+  }
+  return strangers;
+}
+
+/**
+ * Words a directory, review, news or scam-report page carries whatever
+ * organisation it is about, and words any description shares ("helps
+ * companies ... services"): never what tells two organisations apart.
+ */
+const FURNITURE = new Set([
+  "review",
+  "reviews",
+  "report",
+  "reports",
+  "profile",
+  "profiles",
+  "company",
+  "companies",
+  "competitors",
+  "funding",
+  "team",
+  "investors",
+  "news",
+  "blog",
+  "overview",
+  "guide",
+  "how",
+  "what",
+  "who",
+  "the",
+  "this",
+  "that",
+  "from",
+  "are",
+  "was",
+  "has",
+  "have",
+  "its",
+  "their",
+  "describes",
+  "described",
+  "says",
+  "lists",
+  "listed",
+  "founded",
+  "based",
+  "helps",
+  "help",
+  "improve",
+  "through",
+  "work",
+  "works",
+  "service",
+  "services",
+  "solution",
+  "solutions",
+  "product",
+  "products",
+  "business",
+  "businesses",
+  "customer",
+  "customers",
+  "platform",
+  "platforms",
+  "offers",
+  "provides",
+  "new",
+  "best",
+  "top",
+  "official",
+]);
+
+/** One letter apart, same length and first letter ("Nexo" for "Nixo"). */
+function nearSpelling(word: string, compact: string): boolean {
+  if (word.length !== compact.length || compact.length < 4) return false;
+  if (word === compact || word[0] !== compact[0]) return false;
+  let apart = 0;
+  for (let at = 0; at < word.length; at += 1)
+    if (word[at] !== compact[at]) apart += 1;
+  return apart === 1;
+}
+
+/**
+ * The names a page gives itself that are like the subject's yet another
+ * organisation's, read from its title and its facts' entity fields:
+ *  - a site of that name that is not the subject's recorded site
+ *    ("Nixo.top" in a scam report's title, the subject's being
+ *    withnixo.com);
+ *  - the name with a word after it the subject's own description never
+ *    uses ("Nixo Pest");
+ *  - a name one letter apart ("Nexo" beside "Nixo").
+ * Returns the words of those names (kept out of what the page "says").
+ */
+function otherNamesOn(
+  texts: readonly string[],
+  subject: readonly string[],
+  own: string,
+  theirs: readonly string[],
+): readonly string[] {
+  const compact = subject.join("");
+  const names: string[] = [];
+  const pattern = new RegExp(
+    `(?:^|[^\\p{L}\\p{N}])${subject.join("[\\s-]+")}[ \\t]+(\\p{L}{3,})`,
+    "u",
+  );
+  for (const raw of texts) {
+    const text = fold(raw);
+    for (const match of text.matchAll(
+      /([\p{L}\p{N}-]+)\.([a-z]{2,6})(?![\p{L}\p{N}])/gu,
+    )) {
+      const label = (match[1] ?? "").replace(/-/gu, "");
+      const site = `${match[1] ?? ""}.${match[2] ?? ""}`;
+      if (label.includes(compact) && registrableDomain(site) !== own)
+        names.push(label, match[2] ?? "");
+    }
+    const after = pattern.exec(text)?.[1];
+    if (
+      after !== undefined &&
+      !FURNITURE.has(after) &&
+      !PAGE_WORDS.has(after) &&
+      !theirs.some((mine) => sameStem(after, mine))
+    )
+      names.push(after);
+    for (const word of nameWords(raw))
+      if (nearSpelling(word, compact)) names.push(word);
+  }
+  return names;
+}
+
+/**
+ * Pages ABOUT a namesake on someone else's site (live 2026-10-31, an IC
+ * memo on "Nixo"): its Risks cited "Nixo Pest Reviews 2026: A Smart Pest
+ * Solution" (thebuyersreviews.com), "Nixo.top Review: Scam Report"
+ * (forensiclogicinc.com) and "Nexo Reaffirms EU Compliance" (nexo.com).
+ * Each names the subject's name in its title, so the namesake rule tied
+ * it, and none is on a site styled with the name. A page is another
+ * organisation's when, from stored fields only:
+ *
+ *  - its title or entity fields give it a name like the subject's that is
+ *    not the subject's (otherNamesOn); and
+ *  - what it says (its title, entity and statements, past the names and
+ *    page furniture) shares no word with the subject's own description,
+ *    and says at least two things; and
+ *  - nothing on it names the subject's recorded site, and no other source
+ *    corroborates any of its facts.
+ *
+ * Without a recorded site or description nothing is judged: unknown stays
+ * unknown.
+ */
+function strangerPages(
+  facts: readonly FactLike[],
+  identity: SubjectIdentity,
+  subject: readonly string[],
+): ReadonlySet<number> {
+  const strangers = new Set<number>();
+  const site = identity.site?.trim() ?? "";
+  const profile = identity.profile?.trim() ?? "";
+  if (site.length === 0 || profile.length === 0) return strangers;
+  if (subject.join("").length < 3) return strangers;
+  const own = registrableDomain(hostOf(site));
+  const theirs = describingWords(`${profile} ${identity.name}`, []).filter(
+    (word) => !FURNITURE.has(word),
+  );
+  const bySource = new Map<number, FactLike[]>();
+  for (const fact of facts)
+    bySource.set(fact.source, [...(bySource.get(fact.source) ?? []), fact]);
+  for (const [source, page] of bySource) {
+    const first = page[0];
+    if (first === undefined) continue;
+    if (registrableDomain(first.domain) === own) continue;
+    if (page.some((fact) => (fact.corroboratedBy ?? []).length > 0)) continue;
+    const named = [first.title ?? "", ...page.map((fact) => fact.entity ?? "")];
+    const everything = [...named, ...page.map((fact) => fact.statement)];
+    if (everything.some((text) => fold(text).includes(own))) continue;
+    const others = otherNamesOn(named, subject, own, theirs);
+    if (others.length === 0) continue;
+    const says = new Set(
+      everything.flatMap((text) =>
+        describingWords(text, [...subject, ...others]).filter(
+          (word) => !FURNITURE.has(word),
+        ),
+      ),
     );
     if (says.size < 2) continue;
     if ([...says].some((word) => theirs.some((mine) => sameStem(word, mine))))

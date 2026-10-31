@@ -1886,6 +1886,10 @@
       transparent
     );
   }
+  .cq-feed-video {
+    /* Read by placeCues (pitch-player.tsx): equal to the cue's size. */
+    --cq-feed-cue-size: 0.95em;
+  }
   .cq-feed-player,
   .cq-feed-video {
     position: absolute;
