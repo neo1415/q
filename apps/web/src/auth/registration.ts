@@ -64,11 +64,8 @@ export type ArrivalWorkspace = {
 /**
  * What `/welcome` does with somebody who has arrived.
  *
- *   - UNFINISHED  → back into their own unfinished setup (live re-check
- *     2026-10-31: a founder signed in mid-setup and landed on Home, the
- *     setup out of sight). Supersedes the 2026-10-16 "Home offers it back"
- *     arrival rule; the app itself still never holds them to the setup
- *     (`?again=1`, "Continue later" and every other page stay open).
+ *   - UNFINISHED  → treated as arrived (owner 2026-10-16: no gate); Home
+ *     offers the setup back.
  *   - DONE, with more than one workspace and none chosen in this browser
  *     session → the workspace chooser, so a person who is a founder at one
  *     company and an investor at one firm picks where they are working
@@ -82,7 +79,6 @@ export type ArrivalWorkspace = {
 export type Arrival =
   | { readonly kind: "CHOOSE_WORKSPACE" }
   | { readonly kind: "HOME" }
-  | { readonly kind: "RESUME"; readonly journey: RegistrationJourney }
   | { readonly kind: "WELCOME"; readonly journey: RegistrationJourney | null };
 
 export function decideArrival(input: {
@@ -98,21 +94,14 @@ export function decideArrival(input: {
 }): Arrival {
   const { state } = input;
   if (!input.again) {
-    // Somebody with several workspaces picks one first, as on any arrival.
-    if (
-      (state.kind === "UNFINISHED" || state.kind === "DONE") &&
-      input.workspaces.length > 1 &&
-      !input.workspaceChosen
-    ) {
-      return { kind: "CHOOSE_WORKSPACE" };
+    // Owner 2026-10-16: an unfinished setup no longer holds anybody at
+    // the door. They arrive like everybody else (Home, or the workspace
+    // choice); Home offers the setup back, at most once a day.
+    if (state.kind === "UNFINISHED" || state.kind === "DONE") {
+      return input.workspaces.length > 1 && !input.workspaceChosen
+        ? { kind: "CHOOSE_WORKSPACE" }
+        : { kind: "HOME" };
     }
-    // Live re-check 2026-10-31: an unfinished setup is where a person who
-    // signs in mid-setup carries on, in their own journey (never the
-    // other side's).
-    if (state.kind === "UNFINISHED") {
-      return { kind: "RESUME", journey: state.journey };
-    }
-    if (state.kind === "DONE") return { kind: "HOME" };
   }
   return {
     kind: "WELCOME",

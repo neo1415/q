@@ -44,8 +44,9 @@ export default async function WelcomePage({
     redirect("/discover");
   }
   // Founder decision 2026-10-03 (demo audit): whoever is set up lands on
-  // the Q page, Home, for both roles. Somebody whose setup is unfinished
-  // carries on with it (live re-check 2026-10-31; `decideArrival`).
+  // the Q page, Home, for both roles. Owner 2026-10-16 (supersedes the
+  // 2026-09-30 direction to send them back into it): so does somebody
+  // whose setup is unfinished; Home offers it back, at most once a day.
   //
   // Owner directive 2026-10-16: somebody with more than one workspace picks
   // one on arrival, and somebody who chose a journey at registration is not
@@ -69,8 +70,6 @@ export default async function WelcomePage({
       null,
   });
   if (arrival.kind === "HOME") redirect("/home");
-  // An unfinished setup carries on where it stopped, in its own journey.
-  if (arrival.kind === "RESUME") redirect(`/onboarding/${arrival.journey}`);
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;
   // Back, as opposed to here for the first time: the profile already
