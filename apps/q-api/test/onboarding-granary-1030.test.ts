@@ -370,7 +370,7 @@ describe("the conversation's checklist asks Q to say a long answer back", () => 
       /F1\.description \(say back\)|\(say back\).*F1\.description/u,
     );
     expect(brief).not.toMatch(/F1\.website.*\(say back\)/u);
-    expect(brief).toContain("say back in your own plain words");
+    expect(brief).toContain("say back what you understood for every one");
   });
 });
 

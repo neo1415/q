@@ -165,6 +165,29 @@ const FIRST_NAMED_KEPT_STEPS: ReadonlySet<string> = new Set([
   FOUNDER_STEPS.currency,
 ]);
 
+/** How the note that settles a check on the record begins. */
+const SETTLED_NOTE = "They confirmed this is right";
+
+/**
+ * Their own words kept beside a list of options or categories (live check
+ * 2026-10-31, "Halvmåne": "consumer apps" beside Gambling and Speculative
+ * crypto was kept but never said in the read-back): shown with the list.
+ */
+function theirWordsBesideList(
+  value: OnboardingResponseValue,
+  note: string | null | undefined,
+): boolean {
+  return (
+    (value.type === "MULTI_SELECT" || value.type === "RESOURCE_REFERENCE") &&
+    note !== null &&
+    note !== undefined &&
+    note.trim().length > 0 &&
+    !note.startsWith(SETTLED_NOTE) &&
+    !note.startsWith(ALSO_NAMED_NOTE) &&
+    !note.startsWith(READ_AS_NOTE)
+  );
+}
+
 /** How a note of options also named on a one-choice step begins. */
 export const ALSO_NAMED_NOTE = "Also named:";
 
@@ -1265,7 +1288,7 @@ export function createOnboardingPort(input: {
 
   /** The note that settles a check: prose, with the code's own check id. */
   const settledNote = (checkId: string) =>
-    `They confirmed this is right as it stands when asked (check ${checkId}).`;
+    `${SETTLED_NOTE} as it stands when asked (check ${checkId}).`;
 
   /** Checks on what is on the record that the person has not settled. */
   const openChecks = (view: OnboardingSessionView) => {
@@ -1365,7 +1388,9 @@ export function createOnboardingPort(input: {
                       : stored.note?.startsWith(ALSO_NAMED_NOTE) === true ||
                           stored.note?.startsWith(READ_AS_NOTE) === true
                         ? `${await spoken(step, stored.value, view)} (${stored.note})`
-                        : await spoken(step, stored.value, view),
+                        : theirWordsBesideList(stored.value, stored.note)
+                          ? `${await spoken(step, stored.value, view)}; ${stored.note ?? ""} (in their words)`
+                          : await spoken(step, stored.value, view),
                     600,
                   ) || null,
             ...(open?.options === undefined || open.options.length === 0
@@ -2006,8 +2031,15 @@ export function createOnboardingPort(input: {
       // name is read by meaning (the same reader as for categories, given
       // the options); never a catch-all, never outside the options.
       if (unnamed.length > 0 && input.chooseCategories !== undefined) {
+        // An option their other words already name is not this phrase's
+        // reading (live check 2026-10-31, "Halvmåne": "consumer apps,
+        // gambling or crypto are a firm no" kept Gambling and Speculative
+        // crypto and lost "consumer apps"), as for categories.
+        const namedByOthers = new Set(
+          c.stepType === "multi_select" ? keys : [],
+        );
         const choices = options
-          .filter((o) => o.key !== "other")
+          .filter((o) => o.key !== "other" && !namedByOthers.has(o.key))
           .map((o) => ({
             nodeId: o.key,
             displayName: o.label,
@@ -2015,6 +2047,10 @@ export function createOnboardingPort(input: {
           }));
         const still: string[] = [];
         for (const phrase of unnamed) {
+          if (choices.length === 0) {
+            still.push(phrase);
+            continue;
+          }
           const chosen = await input
             .chooseCategories({
               field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(0, 200),
@@ -2939,6 +2975,33 @@ export function createOnboardingPort(input: {
     // ahead and paraphrase it" states nothing, and still gets the summary
     // of what they said before read back to them.
     const narrative = steps.get(answer.stepKey);
+    // A summary of Q's they agreed to is saved as its content, cleanly
+    // cased (live check 2026-10-31, "Grannskap": saved as "The problem
+    // you're addressing is that…", "The process is: …" and "a marketplace
+    // where…"). The reading gives the field's content (reader v12); a
+    // topic's name Q put before it ("The process is: …") is left out.
+    if (
+      answer.basis !== "DELEGATED" &&
+      narrative !== undefined &&
+      PARAPHRASABLE.has(narrative.configuration.stepType) &&
+      typeof answer.value === "string" &&
+      (input.affirmed?.has(answer.stepKey) === true ||
+        agreedReadBack(answer.value.trim(), answer.quote))
+    ) {
+      const reference = (await heard).find(
+        (held) =>
+          held.stepKey === answer.stepKey &&
+          held.value.type === "TEXT" &&
+          isParaphraseRationale(held.rationale),
+      )?.value;
+      const content = summaryContent(
+        answer.value,
+        reference?.type === "TEXT" ? reference.text : null,
+      );
+      if (content !== answer.value) {
+        return planOne({ ...answer, value: content });
+      }
+    }
     if (
       answer.basis !== "DELEGATED" &&
       narrative !== undefined &&
@@ -5016,6 +5079,44 @@ export function fieldPartOf(quote: string, reading: string): string {
   if (part !== null) return part;
   const read = reading.trim();
   return read.length > 0 && read.length <= 200 ? read : said.slice(0, 300);
+}
+
+/** How many words a topic's name before a colon may be. */
+const TOPIC_NAME_WORDS_MAX = 6;
+
+/**
+ * A summary of Q's as a field's content (live check 2026-10-31,
+ * "Grannskap": "The process is: farms list…" and "a marketplace where…"
+ * were saved as they were said). The reading gives the content (reader
+ * v12); this keeps two things structural, never a list of phrases: a
+ * say-back line written as a topic's name and then its content ("The
+ * problem: Small farms…", as ONBOARDING_TYPED_REPLY v6 asks) keeps the
+ * content only, when the name is a few words before the line's first
+ * colon and the reading's own earlier text for the field (`reference`)
+ * shares none of the name's words; and the first letter is a capital.
+ * Idempotent.
+ */
+export function summaryContent(text: string, reference: string | null): string {
+  let content = text.trim().replace(/\s+/gu, " ");
+  const colon = content.indexOf(":");
+  if (colon > 0) {
+    const name = content.slice(0, colon);
+    const rest = content.slice(colon + 1).trim();
+    const nameWords = name.split(/\s+/u).filter((w) => w.length > 0);
+    const referenceWords = new Set(contentWords(reference ?? ""));
+    if (
+      nameWords.length <= TOPIC_NAME_WORDS_MAX &&
+      !/[\d.!?;]/u.test(name) &&
+      rest.split(/\s+/u).length >= 3 &&
+      !contentWords(name).some((word) => referenceWords.has(word))
+    ) {
+      content = rest;
+    }
+  }
+  const head = content.charAt(0);
+  return head.toLocaleUpperCase() === head
+    ? content
+    : `${head.toLocaleUpperCase()}${content.slice(1)}`;
 }
 
 /**

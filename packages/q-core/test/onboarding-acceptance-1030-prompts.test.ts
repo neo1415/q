@@ -49,7 +49,7 @@ describe("ONBOARDING_TRANSCRIPT_READER v9 (live re-check 2026-10-31)", () => {
   const template = active.definition.template;
 
   it("v11 is active (on the v5 output schema) and keeps v9's rules", () => {
-    expect(active.definition.version).toBe(11);
+    expect(active.definition.version).toBeGreaterThanOrEqual(11);
     expect(active.definition.output).toMatchObject({ schemaVersion: 5 });
   });
 
@@ -90,7 +90,7 @@ describe("ONBOARDING_TRANSCRIPT_READER v10 and ONBOARDING_TYPED_REPLY v5 (live f
   });
 
   it("the reply never asks what their latest message answered (it no longer waits for the reading)", () => {
-    expect(reply.version).toBe(5);
+    expect(reply.version).toBeGreaterThanOrEqual(5);
     expect(reply.template).toMatch(
       /The checklist is the record from before their latest message/u,
     );
@@ -112,7 +112,10 @@ describe("ONBOARDING_TRANSCRIPT_READER v11 (live check 2026-10-31, 2e79954fd)", 
     expect(reader.template).toMatch(
       /one summary of Q's that spoke to several LONG_TEXT steps, give every step that summary spoke to/u,
     );
-    expect(reader.template).toMatch(/copied exactly from that line/u);
+    // v12: Q's words for each, its content only (no lead-in).
+    expect(reader.template).toMatch(
+      /each with Q's words for it from that line/u,
+    );
   });
 
   it("a category step takes category words only, never a sentence", () => {
@@ -128,5 +131,55 @@ describe("ONBOARDING_TRANSCRIPT_READER v11 (live check 2026-10-31, 2e79954fd)", 
 
   it("an investor's thesis told at length is LONG_TEXT, said back for their yes", () => {
     expect(reader.template).toMatch(/\(their thesis\) is LONG_TEXT/u);
+  });
+});
+
+describe("ONBOARDING_TRANSCRIPT_READER v12 and ONBOARDING_TYPED_REPLY v6 (live check 2026-10-31, 84d8ede07)", () => {
+  const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
+  const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
+
+  it("are the active versions and keep the rules before them", () => {
+    expect(reader.version).toBe(12);
+    expect(reply.version).toBe(6);
+    expect(reader.template).toMatch(/\(their thesis\) is LONG_TEXT/u);
+    expect(reply.template).toMatch(
+      /The checklist is the record from before their latest message/u,
+    );
+  });
+
+  it("1. one say-back covers every told-at-length topic the message told, so one yes settles them", () => {
+    expect(reply.template).toMatch(
+      /says back what you understood for EVERY such topic it told you, all in this one message/u,
+    );
+    expect(reply.template).toMatch(/never one now and the others later/u);
+    expect(reply.template).toMatch(/say all of them back together/u);
+    expect(reply.template).not.toMatch(
+      /one short sentence a topic, what you understood/u,
+    );
+  });
+
+  it("2. a summary is its content: no lead-in, a capital first", () => {
+    expect(reply.template).toMatch(/never framed as you telling them/u);
+    expect(reader.template).toMatch(
+      /leave out Q's words that only introduce the topic or speak to them/u,
+    );
+    expect(reader.template).toMatch(/begin it with a capital letter/u);
+    expect(reader.template).not.toMatch(/exactly as Q said them/u);
+  });
+
+  it("3. the part of a list no option holds is kept in their words", () => {
+    expect(reader.template).toMatch(
+      /their own words for each part no option holds/u,
+    );
+  });
+
+  it("4. an approximate answer to a number step is their words, and never asked again", () => {
+    expect(reader.template).toMatch(
+      /An approximate answer to a number step is an answer/u,
+    );
+    expect(reader.template).toMatch(/never turn it into a figure/u);
+    expect(reply.template).toMatch(
+      /An approximate answer \("a bit under a year", "around a dozen"\) answers its topic/u,
+    );
   });
 });
