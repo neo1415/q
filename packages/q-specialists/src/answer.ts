@@ -91,6 +91,7 @@ import {
   spokenUnclearReply,
   pleasantryOf,
   pleasantryReply,
+  PLAN_OFFER_LINES,
   naturalPlaceLine,
   spokenFactsOf,
   withoutRecommendationClaims,
@@ -226,11 +227,51 @@ import {
  * to do now; `ask` is the question that answer answered, which is what
  * the plan is for.
  */
-type RecordedOffer = {
+export type RecordedOffer = {
   readonly kind: "PLAN";
   readonly runId: string;
   readonly ask: string;
 };
+
+/**
+ * The plan offer Q's last stored answer closed with, read from history:
+ * the answer ends with code's own offer copy (PLAN_OFFER_LINES, any
+ * language), and the plan is for their turn in that same run. Only Q's
+ * own copy is matched; what the person said is never read for meaning.
+ */
+export function storedPlanOffer(
+  history: readonly Pick<QConversationMessage, "role" | "runId" | "content">[],
+  lastQ: Pick<QConversationMessage, "role" | "runId" | "content">,
+): RecordedOffer | null {
+  const said = lastQ.content.trimEnd();
+  if (!PLAN_OFFER_LINES.some((line) => said.endsWith(line))) return null;
+  const asked = history.find(
+    (message) => message.role === "USER" && message.runId === lastQ.runId,
+  );
+  const ask = asked?.content.trim() ?? "";
+  return ask.length === 0 ? null : { kind: "PLAN", runId: lastQ.runId, ask };
+}
+
+/**
+ * What a plan started on this turn is asked and titled with (live
+ * 2026-10-31, "Your plan: yes"). Taken up (v74 acceptsOffer / v61
+ * workFromEarlier): the question the offer was made for, alone. Offered
+ * on Q's last turn but not read as taken up: that question first, then
+ * their words, and a title quoting neither (the reading did not say
+ * whose words name the plan). No offer: their words, as asked.
+ */
+export function planStartWords(input: {
+  readonly latest: string;
+  readonly taken: RecordedOffer | null;
+  readonly standing: RecordedOffer | null;
+}): { readonly ask: string; readonly quote?: string | null } {
+  if (input.taken !== null) return { ask: input.taken.ask };
+  if (input.standing === null) return { ask: input.latest };
+  return {
+    ask: `${input.standing.ask}\n${input.latest.trim()}`.slice(0, 2_000),
+    quote: null,
+  };
+}
 
 /** The plan Q offered: their own, for a goal or period, from what Q holds. */
 const OFFERED_PLAN_ASK: QPlanAskReading = {
@@ -4005,10 +4046,15 @@ export function createSpecialistQAnswer(
     conversationId: string,
     history: readonly QConversationMessage[],
   ): RecordedOffer | null => {
-    const offer = offers.get(conversationId);
-    if (offer === undefined) return null;
     const lastQ = [...history].reverse().find((m) => m.role === "Q");
-    return lastQ?.runId === offer.runId ? offer : null;
+    if (lastQ === undefined) return null;
+    const offer = offers.get(conversationId);
+    if (offer !== undefined && lastQ.runId === offer.runId) return offer;
+    // Live 2026-10-31 ("Your plan: yes"): memory alone forgets the offer on
+    // a restart. Q's stored answer closing with code's own plan offer is
+    // the same record, read back durably; the plan is of the question that
+    // answer answered (their turn in the same run), never of the yes.
+    return storedPlanOffer(history, lastQ);
   };
 
   /**
@@ -6207,11 +6253,27 @@ export function createSpecialistQAnswer(
     // with Q's turn (TURN_READER v74 acceptsOffer, by meaning). Taking up
     // the plan offer is the plan of what they first asked ("What should I
     // do today?"), never of the word "yes".
-    const offerTaken =
-      confident && read?.acceptsOffer === true
-        ? offerOfLastTurn(conversationId, history)
-        : null;
+    // v61 workFromEarlier ("hands over work offered just before") is the
+    // same taking-up, read by meaning: either binds the yes to the offer.
+    // Live 2026-10-31 ("Your plan: yes"): the reader read the yes as a
+    // plan ask (v73) but not as taking up the offer (v74), so the plan
+    // quoted "yes". When Q's last turn offered the plan, a plan asked for
+    // now is planned with the question that offer was made for in front
+    // of their words, and its title quotes their words only when they
+    // took nothing up -- never a bare reply ("Your plan" instead).
+    const takesOffer =
+      confident &&
+      (read?.acceptsOffer === true || read?.workFromEarlier === true);
+    const standingOffer = confident
+      ? offerOfLastTurn(conversationId, history)
+      : null;
+    const offerTaken = takesOffer ? standingOffer : null;
     const offeredPlan = offerTaken?.kind === "PLAN" ? offerTaken : null;
+    const planWords = planStartWords({
+      latest: latest.content,
+      taken: offeredPlan,
+      standing: standingOffer?.kind === "PLAN" ? standingOffer : null,
+    });
     if (
       confident &&
       dependencies.plan !== undefined &&
@@ -6230,15 +6292,17 @@ export function createSpecialistQAnswer(
         // anything is filed (one event insert; it never fails the turn).
         await showStage(request, "GATHERING_SITUATION");
         const started = await dependencies.plan
-          .start(request, {
-            ask: offeredPlan === null ? latest.content : offeredPlan.ask,
-            planAsk,
-          })
+          .start(request, { ...planWords, planAsk })
           .catch(() => ({ status: "FAILED" as const }));
         logger?.info(
           {
             qRunId: request.runId,
             offerTaken: offeredPlan !== null,
+            // Live 2026-10-31: what the reader said of the yes, so a plan
+            // titled from their words after an offer shows why.
+            acceptsOffer: read?.acceptsOffer === true,
+            workFromEarlier: read?.workFromEarlier === true,
+            offerStood: standingOffer !== null,
             planAsk: planAsk.kind,
             deliverable: planAsk.deliverable,
             research: planAsk.research,

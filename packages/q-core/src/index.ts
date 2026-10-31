@@ -92,6 +92,7 @@ export {
 } from "./language.js";
 export {
   hasReadinessLeadCopy,
+  PLAN_OFFER_LINES,
   READINESS_LEAD_ARABIC_STEPS,
   READINESS_STEPS_ARABIC,
   readinessLeadCopy,

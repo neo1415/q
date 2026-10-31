@@ -28,6 +28,7 @@ import {
 import { ModelGatewayError } from "@capital-q/model-gateway";
 import { createLogger, type Logger } from "@capital-q/observability";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
+import { PLAN_OFFER_LINES } from "@capital-q/q-core";
 import type {
   TurnReaderV24Result,
   TurnReaderV8Result as TurnReaderResult,
@@ -50,6 +51,8 @@ import {
   asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
+  planStartWords,
+  storedPlanOffer,
   TURN_REREAD_DEADLINE_MS,
   TURN_UNREAD_REPLY,
   unknownScreenLine,
@@ -5943,6 +5946,127 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
         },
       },
     ]);
+  });
+
+  it("live 2026-10-31: a yes read as a plan ask but not as taking up the offer is planned with the offered question first, and the title quotes neither", async () => {
+    const OFFER = "If you'd like a full plan, say so.";
+    const started: Record<string, unknown>[] = [];
+    let turn = 0;
+    const run = seam({
+      said: "What should I do today?",
+      earlier: [{ role: "Q", content: `Here is where things stand. ${OFFER}` }],
+      reading: () => {
+        turn += 1;
+        // Live run fde3dfce: planAsk GOAL (v73) with acceptsOffer false.
+        return turn === 1
+          ? advice()
+          : ({
+              kind: "TOOL_REQUEST",
+              confidence: "HIGH",
+              transcript: "CLEAR",
+              question: null,
+              aboutNamedOther: false,
+              nextSteps: false,
+              planAsk: { kind: "GOAL", subject: "OWN", deliverable: "PLAN" },
+              acceptsOffer: false,
+              teamJob: true,
+              tool: null,
+              handOver: null,
+            } as unknown as TurnReaderResult);
+      },
+      outcomes: [],
+      readinessLead: () => Promise.resolve(LEAD),
+      planOffer: () => Promise.resolve(OFFER),
+      plan: {
+        start: (_request, input) => {
+          started.push(input);
+          return Promise.resolve({
+            status: "STARTED" as const,
+            jobId: randomUUID(),
+            title: "Your plan",
+            line: "I'm on it.",
+          });
+        },
+      },
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    (run.message as { content: string }).content = "yes";
+    await run.answer.answer(request());
+    expect(started).toHaveLength(1);
+    expect(started[0]?.["ask"]).toBe("What should I do today?\nyes");
+    expect(started[0]?.["quote"]).toBeNull();
+  });
+
+  it("live 2026-10-31: after a restart the plan offer is read back from Q's stored answer, and a yes plans the question it answered", async () => {
+    const started: Record<string, unknown>[] = [];
+    const run = seam({
+      said: "yes",
+      // One run: their question, then Q's answer closing with code's offer.
+      earlier: [
+        { role: "USER", content: "What should I do today?" },
+        {
+          role: "Q",
+          content: `Verify your identity first. ${PLAN_OFFER_LINES[0] ?? ""} `,
+        },
+      ],
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        planAsk: null,
+        acceptsOffer: true,
+        tool: null,
+        handOver: null,
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+      plan: {
+        start: (_request, input) => {
+          started.push(input);
+          return Promise.resolve({
+            status: "STARTED" as const,
+            jobId: randomUUID(),
+            title: "Your plan",
+            line: "I'm on it.",
+          });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(started).toHaveLength(1);
+    expect(started[0]?.["ask"]).toBe("What should I do today?");
+    expect(started[0]?.["quote"]).toBeUndefined();
+  });
+
+  it("planStartWords: taken, standing and no offer", () => {
+    const offer = { kind: "PLAN" as const, runId: "r1", ask: "What now?" };
+    expect(
+      planStartWords({ latest: "yes", taken: offer, standing: offer }),
+    ).toEqual({ ask: "What now?" });
+    expect(
+      planStartWords({ latest: "Plan my raise", taken: null, standing: null }),
+    ).toEqual({ ask: "Plan my raise" });
+    expect(
+      planStartWords({ latest: " yes ", taken: null, standing: offer }),
+    ).toEqual({ ask: "What now?\nyes", quote: null });
+  });
+
+  it("storedPlanOffer reads only code's own offer copy at the end of Q's stored answer", () => {
+    const line = (role: "USER" | "Q", runId: string, content: string) => ({
+      role,
+      runId,
+      content,
+    });
+    const asked = line("USER", "r1", "What should I do today?");
+    const offered = line("Q", "r1", `Do this. ${PLAN_OFFER_LINES[1] ?? ""}`);
+    expect(storedPlanOffer([asked, offered], offered as never)).toEqual({
+      kind: "PLAN",
+      runId: "r1",
+      ask: "What should I do today?",
+    });
+    const plain = line("Q", "r1", "Do this. Want a plan?");
+    expect(storedPlanOffer([asked, plain], plain as never)).toBeNull();
   });
 
   it("live 2026-10-30: a yes to an offer code did not record moves nothing -- the answer is told so, never a guessed page", async () => {
