@@ -165,24 +165,31 @@ const CRITIQUE = {
 /**
  * Owner 2026-10-23: deep work's calls, each bounded on its own.
  *
- * Live 2026-10-29: the plan call stopped at exactly its 1,600-token
- * ceiling (12.4 s, the object unclosed); the gateway then asked again at
- * the model's maximum and timed out, and round one never searched. The
- * ledger's 48 hours: every STRUCTURED_EXTRACTION refusal on a long input
- * sat at 1,440-2,376 output tokens -- the plan's and the facts' ceilings --
- * while successful calls ran to 4,400. The schema admits 16 questions (code
- * keeps 12) and the output count includes any reasoning the provider
- * spends (these calls ask for none: the request's reasoning defaults to
- * NONE). Room for 16 questions with their second queries, and for 12
- * facts with their statements; at gpt-5.6-luna's $1.20 per million output
- * tokens 4,000 tokens cost about half a cent, inside each cap.
+ * The plan, re-measured from ai_ops.model_usage (7 days to 2026-10-31,
+ * STRUCTURED_EXTRACTION, DELEGATED_WORK, 2.0-3.7k input tokens): every
+ * successful plan wrote at most 889 output tokens (daily p99 606-889).
+ * Every failed one ran to whatever ceiling it had -- 1,600 on 10-29, 4,000
+ * on 10-30/31, and 8,000 on the gateway's doubled retry (live 10-31 17:31,
+ * job f468bff8: 4,000 tokens in 30.6 s, then 8,000 in 48.2 s, both cut
+ * off, 79 s gone and round one reduced to the request's own words). The
+ * reasoning effort is "none" (the request's default), so none of that was
+ * reasoning: these are runaways, not long plans. The longest answer the
+ * schema admits (16 questions at their bounds) is about 2,600 tokens.
+ *
+ * So the ceiling is 2,000 (2.2 times the largest real plan, room for 12
+ * questions at twice their usual length), a cut-off keeps the questions
+ * finished before it (gateway cutOffLists), and only a cut-off with none
+ * finished is asked again, at twice the room (4,000: above the schema's
+ * longest valid answer). A runaway now costs ~15 s, not 79.
  */
 export const RESEARCH_PLAN_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.04,
-  maxOutputTokens: 4_000,
+  maxOutputTokens: 2_000,
   attemptTimeoutMs: 45_000,
 } as const;
+/** A cut-off plan keeps at most the questions code keeps. */
+export const RESEARCH_PLAN_KEEP_QUESTIONS = 12;
 export const RESEARCH_FACTS_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.05,
@@ -428,6 +435,8 @@ export function createWorkforceModels(dependencies: {
     readonly dropListItems?: boolean | undefined;
     /** The model's own reasoning effort; none when not said. */
     readonly reasoning?: "LOW" | "MEDIUM" | "HIGH" | undefined;
+    /** A cut-off answer keeps its finished list elements (gateway). */
+    readonly cutOffLists?: { readonly keepItems: number } | undefined;
     /** The schema refused the whole object: its refused fields (paths). */
     readonly onRefused?: ((refusals: readonly string[]) => void) | undefined;
     /** The call failed: the gateway's failure class, or null (other). */
@@ -486,6 +495,9 @@ export function createWorkforceModels(dependencies: {
           ...(input.dropListItems === true
             ? { invalidListItems: "DROP" as const }
             : {}),
+          ...(input.cutOffLists === undefined
+            ? {}
+            : { cutOffLists: input.cutOffLists }),
         },
       );
       if (response.output.kind !== "STRUCTURED") return null;
@@ -653,12 +665,21 @@ export function createWorkforceModels(dependencies: {
           "You are planning searches, not running them. Code composes every query before anything leaves Capital Q.",
         etiquette: null,
         dropListItems: true,
+        cutOffLists: { keepItems: RESEARCH_PLAN_KEEP_QUESTIONS },
       });
       if (result === null) return null;
+      // A runaway can repeat itself before the cut: one line per query.
+      const seen = new Set<string>();
+      const distinct = result.output.questions.filter((one) => {
+        const key = one.query.trim().toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       return {
         costUsd: result.costUsd,
         output: {
-          questions: result.output.questions.slice(0, 12).map((one) => ({
+          questions: distinct.slice(0, 12).map((one) => ({
             lane: one.lane.slice(0, 40),
             query: one.query.slice(0, 160),
             alsoQuery:

@@ -529,6 +529,12 @@ export function keepRecordsApart(
 const CITATION_GROUP = /\[S\d{1,3}(?:\s*[,;]\s*S?\d{1,3})*\]/gu;
 const LIST_MARKER = /^\s*(?:[-*•]|\d+[.)])\s+/u;
 
+/** A line that opens with its own label ("Identity risk: ..."). */
+const LABELLED = /^[^.!?:\n]{2,60}:\s/u;
+/** A sentence that refers back to the one before it. */
+const LEANS_BACK =
+  /^\s*(?:this|that|these|those|it|its|they|their|them|such|both|neither|either)\b/iu;
+
 /** The [S n] numbers one citation mark names ("[S4]", "[S4, S9]"). */
 const markNumbers = (mark: string) =>
   [...mark.matchAll(/\d{1,3}/gu)].map((match) => Number(match[0]));
@@ -597,13 +603,28 @@ export function withoutCitationsOf(
       return kept === null ? [] : [kept];
     }
     const marker = LIST_MARKER.exec(line)?.[0] ?? "";
-    const kept = line
-      .slice(marker.length)
-      .split(/(?<=[.!?])\s+/u)
-      .map(unit)
-      .filter(
-        (part): part is string => part !== null && part.trim().length > 0,
-      );
+    const parts = line.slice(marker.length).split(/(?<=[.!?])\s+/u);
+    const kept: string[] = [];
+    let dropped = false;
+    for (const [index, part] of parts.entries()) {
+      const one = unit(part);
+      if (one === null) {
+        // Live 2026-10-31 (Clearwater memo, Risks): an item's opening
+        // sentence named the namesake and was removed, leaving "The
+        // relationship to Clearwater Assurance is unknown." -- a point
+        // with its subject cut out. An item, or a labelled line, whose
+        // opening sentence goes, goes whole.
+        if (index === 0 && (marker.length > 0 || LABELLED.test(part)))
+          return [];
+        dropped = true;
+        continue;
+      }
+      // A sentence that leans on the one just removed ("This...", "Its...")
+      // goes with it: it would point at nothing.
+      if (dropped && LEANS_BACK.test(one)) continue;
+      dropped = false;
+      if (one.trim().length > 0) kept.push(one);
+    }
     return kept.length === 0 ? [] : [`${marker}${kept.join(" ")}`];
   });
   return { text: lines.join("\n"), removed, cut };
@@ -995,6 +1016,10 @@ export const PUBLIC_UNAVAILABLE_GAP =
 export const PUBLIC_NONE_FOUND_GAP =
   "No public sources were found for this: nothing here comes from the public web, and what only public sources could tell is not known.";
 
+/** Pages about a namesake, listed apart from the sources a document cites. */
+export const SET_ASIDE_HEADING =
+  "Looked at and set aside: different organisations with similar names";
+
 export function analysisContent(input: {
   readonly draft: AnalysisDocumentResult;
   readonly review: AnalysisReview;
@@ -1020,6 +1045,13 @@ export function analysisContent(input: {
    * company's analysis); null or absent: a market or general question.
    */
   readonly subject?: SubjectIdentity | null | undefined;
+  /**
+   * The research under it ran reduced, and why (code's words). Stated by
+   * code at the top of the first section, never left to the writer (live
+   * 2026-10-31: the Clearwater memo said it mid-summary, labelled
+   * "(company record)").
+   */
+  readonly reducedResearch?: string | undefined;
 }): QArtifactContent {
   const { review } = input;
   const identity = input.subject ?? null;
@@ -1108,9 +1140,13 @@ export function analysisContent(input: {
             Q_ARTIFACT_GAP_MAX,
           ),
         ];
+  const reducedLead = input.reducedResearch?.trim() ?? "";
   const sections = draft.sections.map((section, index) => ({
     heading: section.heading,
-    body: section.body,
+    body:
+      index === 0 && reducedLead.length > 0
+        ? `${reducedLead}\n\n${section.body}`
+        : section.body,
     findings: [
       ...findingsFor(
         section.body,
@@ -1131,14 +1167,26 @@ export function analysisContent(input: {
       [...body.matchAll(CITED)].map((match) => Number(match[1])),
     ),
   );
-  // A namesake page the writer cited stays listed, named as not used.
-  const listed = input.sources.filter(
-    (source) => cited.has(source.index) || namesakeCut.has(source.index),
-  );
-  const sourceLines = listed.map((source) => {
-    const standing = filedTierText(source, identity, namesakes);
-    return `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${standing === null ? "" : ` (${standing})`}. ${source.url}`;
-  });
+  // A namesake page is never listed among the sources the document cites
+  // (live 2026-10-31, the Clearwater Assurance memo: Clearwater UW Ltd's
+  // Companies House page sat under "Public sources this document cites",
+  // labelled not used). One the writer cited, or one whose statements were
+  // removed, is listed apart, under its own plain heading.
+  const setAside = (index: number) => identity !== null && namesakes.has(index);
+  const sourceLine = (source: AnalysisSource, standing: string | null) =>
+    `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${standing === null ? "" : ` (${standing})`}. ${source.url}`;
+  const sourceLines = input.sources
+    .filter((source) => cited.has(source.index) && !setAside(source.index))
+    .map((source) =>
+      sourceLine(source, filedTierText(source, identity, namesakes)),
+    );
+  const setAsideLines = input.sources
+    .filter(
+      (source) =>
+        setAside(source.index) &&
+        (cited.has(source.index) || namesakeCut.has(source.index)),
+    )
+    .map((source) => sourceLine(source, null));
   const sourceSections =
     sourceLines.length === 0
       ? input.sourcesAlways === true
@@ -1152,6 +1200,13 @@ export function analysisContent(input: {
       : splitSection(
           "Sources",
           `Public sources this document cites. A source states what it states; Capital Q has not verified it.\n${sourceLines.join("\n")}`,
+        );
+  const setAsideSections =
+    identity === null || setAsideLines.length === 0
+      ? []
+      : splitSection(
+          SET_ASIDE_HEADING,
+          `Pages Q read about other organisations with names like ${identity.name}. They are not evidence about ${identity.name}, and nothing in this document rests on them.\n${setAsideLines.join("\n")}`,
         );
   const gaps = [
     // Stated by code, never left to the writer (2026-10-25).
@@ -1186,7 +1241,7 @@ export function analysisContent(input: {
           findings: [],
         })),
       ),
-      ...sourceSections.map((part) => ({
+      ...[...sourceSections, ...setAsideSections].map((part) => ({
         heading: part.heading,
         body: part.body,
         findings: [],

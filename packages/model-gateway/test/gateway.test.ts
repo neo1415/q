@@ -756,6 +756,103 @@ describe("structured output", () => {
     expect(beta.calls[1]?.request.maxOutputTokens).toBe(512);
   });
 
+  describe("a cut-off answer's finished list elements (cutOffLists)", () => {
+    const Plan = z.object({
+      questions: z.array(z.object({ query: z.string() })).max(16),
+      note: z.string().nullable().catch(null),
+    });
+    const planRequest = (): ModelGatewayRequestInput =>
+      request({
+        taskClass: "FAST_CLASSIFICATION",
+        output: {
+          kind: "STRUCTURED",
+          schemaName: "Plan",
+          jsonSchema: z.toJSONSchema(Plan),
+        },
+      });
+    // Live 2026-10-31: a research plan ran away to 4,000 then 8,000 tokens;
+    // the questions it finished before the cut are whole.
+    const runaway = `{"questions":[${Array.from({ length: 30 }, (_, n) => `{"query":"q${String(n)}"}`).join(",")},{"que`;
+
+    it("keeps them, at most keepItems, instead of asking again with more room", async () => {
+      const { gateway, beta, logLines } = build({
+        beta: [{ kind: "TEXT", text: runaway, finish: "MAX_OUTPUT_TOKENS" }],
+      });
+      const result = await gateway.execute(planRequest(), {
+        schema: Plan,
+        cutOffLists: { keepItems: 12 },
+      });
+      expect(beta.calls).toHaveLength(1);
+      expect(result.output.kind).toBe("STRUCTURED");
+      const value = (result.output as { value: z.infer<typeof Plan> }).value;
+      expect(value.questions).toHaveLength(12);
+      expect(value.questions[0]).toEqual({ query: "q0" });
+      expect(value.note).toBeNull();
+      expect(
+        (result.output as { dropped?: readonly string[] }).dropped?.[0],
+      ).toBe("(cut-off):kept_12_items");
+      expect(logLines.join("\n")).toContain("(cut-off):kept_12_items");
+    });
+
+    it("is not done for a caller that did not ask, nor for an answer that was not cut off", async () => {
+      const notAsked = build({
+        beta: [
+          { kind: "TEXT", text: runaway, finish: "MAX_OUTPUT_TOKENS" },
+          {
+            kind: "JSON",
+            value: { questions: [{ query: "whole" }], note: null },
+          },
+        ],
+      });
+      const asked = await notAsked.gateway.execute(planRequest(), {
+        schema: Plan,
+      });
+      expect(notAsked.beta.calls).toHaveLength(2);
+      expect(
+        (asked.output as { value: z.infer<typeof Plan> }).value.questions,
+      ).toEqual([{ query: "whole" }]);
+
+      const notCut = build({
+        beta: [
+          { kind: "TEXT", text: runaway },
+          {
+            kind: "JSON",
+            value: { questions: [{ query: "whole" }], note: null },
+          },
+        ],
+      });
+      await notCut.gateway.execute(planRequest(), {
+        schema: Plan,
+        cutOffLists: { keepItems: 12 },
+      });
+      expect(notCut.beta.calls).toHaveLength(2);
+    });
+
+    it("asks again with twice the room when nothing finished before the cut", async () => {
+      const { gateway, beta } = build({
+        beta: [
+          {
+            kind: "TEXT",
+            text: '{"questions":[{"que',
+            finish: "MAX_OUTPUT_TOKENS",
+          },
+          {
+            kind: "JSON",
+            value: { questions: [{ query: "whole" }], note: null },
+          },
+        ],
+      });
+      await gateway.execute(planRequest(), {
+        schema: Plan,
+        cutOffLists: { keepItems: 12 },
+      });
+      expect(beta.calls).toHaveLength(2);
+      expect(beta.calls[1]?.request.maxOutputTokens).toBe(
+        2 * (beta.calls[0]?.request.maxOutputTokens ?? 0),
+      );
+    });
+  });
+
   it("classifies invalid JSON and schema mismatches as INVALID_MODEL_OUTPUT, retries once, then falls back", async () => {
     const { gateway, usage } = build({
       beta: [

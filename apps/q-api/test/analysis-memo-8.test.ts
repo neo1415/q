@@ -4,6 +4,7 @@ import type { AnalysisDocumentResult } from "@capital-q/q-core";
 
 import {
   analysisContent,
+  SET_ASIDE_HEADING,
   type AnalysisFact,
   type AnalysisSource,
 } from "../src/composition/workforce/analysis.js";
@@ -130,9 +131,15 @@ const DRAFT: AnalysisDocumentResult = {
 
 const sourcesOf = (content: ReturnType<typeof analysisContent>) =>
   content.sections.find((section) => section.heading === "Sources")?.body ?? "";
+const setAsideOf = (content: ReturnType<typeof analysisContent>) =>
+  content.sections.find((section) => section.heading === SET_ASIDE_HEADING)
+    ?.body ?? "";
 const bodyOf = (content: ReturnType<typeof analysisContent>) =>
   content.sections
-    .filter((section) => section.heading !== "Sources")
+    .filter(
+      (section) =>
+        section.heading !== "Sources" && section.heading !== SET_ASIDE_HEADING,
+    )
     .map((section) => section.body)
     .join("\n");
 
@@ -166,13 +173,16 @@ describe("an exact-name stranger's site (live 2026-10-31, Nixo)", () => {
     expect([...namesakeSources(FACTS, NIXO)]).toEqual([32]);
   });
 
-  it("its citations are removed and Sources names it as not used", () => {
+  it("its citations are removed and it is listed apart from Sources", () => {
     const content = filed(NIXO);
     expect(bodyOf(content)).not.toContain("[S32]");
     expect(bodyOf(content)).not.toContain("117,243");
-    expect(sourcesOf(content)).toMatch(
-      /\[S32\][^\n]*not about Nixo: a different organisation/u,
+    // Live 2026-10-31 (Clearwater memo): never under Sources.
+    expect(sourcesOf(content)).not.toContain("[S32]");
+    expect(setAsideOf(content)).toMatch(
+      /\[S32\] Nixo \| 24\/7 Pest Protection/u,
     );
+    expect(setAsideOf(content)).toMatch(/not evidence about Nixo/u);
     expect(content.gaps.join(" ")).toMatch(/S32/u);
   });
 
