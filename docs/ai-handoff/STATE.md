@@ -1,5 +1,14 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED 68ab54317 — 31 October 2026, 03:45 UTC (Claude coordinator, owner's standing permission)
+
+- **All four services** pushed on `68ab54317` (`recovery/2026-09-12`, `build/int-rc`); CI green (run 1710). Integration branch `fix/resume-asking`.
+- **Hosted migrations 267/267**: `20261231180000` geography ISO countries (270 nodes, v5), `20261231190000` founder onboarding v8 (country from the geography taxonomy), `20261231201000` run-event visible stages widened (planning stages).
+- **MVP bar:** `docs/ai-handoff/MVP-DEFINITION.md` (owner 2026-10-30). Live acceptance on 4bcfa584b and re-checks on 91b19d615 recorded in HANDOFF-LOG; final re-check on 68ab54317 in progress.
+- **Active prompts of note:** PLAN_WRITE v5, PLAN_REVIEW v8, TURN_READER v74, onboarding transcript reader v9 (stated vs inferred), typed reply v4.
+- **Owner decisions kept:** an unfinished setup lands on Home, which offers it back (2026-10-16); cities are not collected (2026-10-30).
+- **Open owner question:** a "Not sure yet" option for investor "actively investing" (required step); until then "I don't know" is stored as that text.
+
 ## DEPLOYED 891425cbe — 30 October 2026, 06:15 UTC (Claude coordinator, overnight clean-up, owner's standing permission)
 
 - **Railway:** api, q-api, web, workers SUCCESS at `891425cbe` (`build/int-rc` = `recovery/2026-09-12` = `fix/resume-asking`). CI 41009711911 green. No migrations overnight (hosted 264).

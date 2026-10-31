@@ -1328,3 +1328,19 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - finish the onboarding recheck on 891425cbe;
   - re-record D and G when search credits allow (about 46 searches);
   - owner: domain, sender domain (SPF/DKIM/DMARC), Brevo click tracking off, Google consent screen to production, rotate Railway/Supabase tokens, top up or replace Serper/Tavily/ScrapingBee.
+
+## 2026-10-30/31 — working MVP bar and live acceptance (Claude coordinator)
+
+- **Owner direction:** decide what a working MVP is, finish it, test it live. Bar written in `MVP-DEFINITION.md` (14 items, live on fresh accounts, 1440 + 390).
+- **One country source:** every country list points at the ISO 3166-1 geography reference data (`@capital-q/taxonomy/countries`); founder country step bound to the taxonomy (v8); guard test `packages/taxonomy/test/one-country-source.test.ts`. Two search parsers still read countries their own way (known debt).
+- **Live acceptance (4bcfa584b):** founder and investor lanes; then fixes and re-checks on 91b19d615 and 68ab54317. Fixed classes:
+  - long answers paraphrased in the conversation, confirmed, saved as Q's words (typed and voice);
+  - a skip stays a skip; Q's own words are never the person's answer; stated vs inferred values (inferred held for a yes);
+  - a reply binds to the one thing Q just asked; Q's offer is recorded and "yes" carries it out;
+  - unread turns said plainly; reader timeout 9 s;
+  - what needs you on opening Q; priorities lead; planning stages storable;
+  - plan card: plain notes per step, better-reviewed draft delivered, honest label, one list for counts;
+  - text never cut mid-word in anything shown; memo PDF renders markdown; Discover regions line at 390.
+- **Process notes:** CI caught a research-replay drift (model-input quotes changed) and an unused import after a container restart; run app tsc, eslint and the research replay locally before pushing.
+- **Not live-verified yet:** the 68ab54317 re-check (in progress at writing).
+- **Next:** finish the re-check; deploy any fixes; re-record research cases D and G when search credits allow; owner: domain, sender domain, Google consent screen, rotate Railway/Supabase tokens, top up Serper/Tavily/ScrapingBee, "Not sure yet" option.
