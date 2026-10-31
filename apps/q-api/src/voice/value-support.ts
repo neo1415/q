@@ -125,3 +125,42 @@ export function textStatedIn(value: string, quote: string): boolean {
   if (wanted.length === 0) return false;
   return ` ${normalised(quote)} `.includes(` ${wanted} `);
 }
+
+/** Joining words a category's name carries that name nothing by themselves. */
+const NAME_JOINERS = new Set(["and", "or", "the", "of", "for", "in", "to"]);
+
+/**
+ * Whether their words name a category: every word of its name is a word
+ * of theirs, compared on letters and digits, a plural or a longer form of
+ * the same stem ("health" for Healthcare) counting as the word. Live
+ * 2026-10-31 ("Fjordlight Harbour Capital"): "B2B" was saved as "B2B
+ * SaaS" in the mandate as the investor's own selection, though nothing
+ * they said named SaaS. Structural, never a word list of meanings: which
+ * category the words mean stays the reader's, but a category their words
+ * do not name is the reader's reading of them, not their declaration.
+ */
+export function categoryNamedIn(
+  displayName: string,
+  words: readonly string[],
+): boolean {
+  const stem = (word: string) =>
+    word.length > 3 ? word.replace(/(?:es|s)$/u, "") : word;
+  const theirs = new Set(
+    words.flatMap((text) => normalised(text).split(" ").filter(Boolean)),
+  );
+  const said = [...theirs].map(stem);
+  const wanted = normalised(displayName)
+    .split(" ")
+    .filter((word) => word.length > 0 && !NAME_JOINERS.has(word))
+    .map(stem);
+  if (wanted.length === 0) return false;
+  return wanted.every((word) =>
+    said.some(
+      (mine) =>
+        mine === word ||
+        (mine.length >= 4 &&
+          word.length >= 4 &&
+          (word.startsWith(mine) || mine.startsWith(word))),
+    ),
+  );
+}

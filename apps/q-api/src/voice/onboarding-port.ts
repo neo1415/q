@@ -49,6 +49,7 @@ import type { Logger } from "@capital-q/observability";
 import { turnIsEnglish } from "./reply-language.js";
 
 import {
+  categoryNamedIn,
   figureCountIn,
   figureStatedIn,
   scaleDroppedIn,
@@ -164,6 +165,56 @@ const FIRST_NAMED_KEPT_STEPS: ReadonlySet<string> = new Set([
   INVESTOR_STEPS.currency,
   FOUNDER_STEPS.currency,
 ]);
+
+/**
+ * Choice steps whose answer keeps their words beyond the option they
+ * named (traction: "40 lockers in 12 towns" beside "Paying customers").
+ */
+const BEYOND_KEPT_STEPS: ReadonlySet<string> = new Set([FOUNDER_STEPS.signal]);
+
+/** Words too common to be anything said beyond an option. */
+const BEYOND_FILLER = new Set([
+  "a",
+  "an",
+  "and",
+  "the",
+  "we",
+  "we're",
+  "our",
+  "us",
+  "i",
+  "have",
+  "has",
+  "got",
+  "so",
+  "far",
+  "yes",
+  "some",
+  "few",
+  "already",
+  "now",
+  "with",
+  "of",
+]);
+
+/**
+ * Whether their turn says more than the options it named: a word that is
+ * neither part of an option's label nor filler. Structural, only to spare
+ * a reading of a turn that is the option and nothing more.
+ */
+export function saysBeyond(turn: string, labels: readonly string[]): boolean {
+  const words = (text: string) =>
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9']+/u)
+      .filter((w) => w.length > 0)
+      .map((w) => (w.length > 3 ? w.replace(/(?:es|s)$/u, "") : w));
+  const named = new Set(labels.flatMap(words));
+  // A bare count ("3 paying customers") is the option's own figure.
+  return words(turn).some(
+    (w) => !named.has(w) && !BEYOND_FILLER.has(w) && !/^\d+$/u.test(w),
+  );
+}
 
 /** How the note that settles a check on the record begins. */
 const SETTLED_NOTE = "They confirmed this is right";
@@ -1730,6 +1781,12 @@ export function createOnboardingPort(input: {
          * note only after every check on the choice itself.
          */
         readonly told?: string | undefined;
+        /**
+         * Mandate categories saved from words that do not name them (live
+         * 2026-10-31: "B2B" saved as "B2B SaaS", source user_selected):
+         * Q's reading, by display name, held for their yes.
+         */
+        readonly readings?: readonly string[] | undefined;
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
@@ -1881,6 +1938,7 @@ export function createOnboardingPort(input: {
     let otherWords: string | undefined;
     let aside: string | undefined;
     let told: string | undefined;
+    let readings: readonly string[] | undefined;
     // Their own words where they hold the answer; the model's reading of
     // them otherwise. Bounded as the runtime keeps them.
     const ownWordsFor = (reading: string): string => {
@@ -1926,6 +1984,8 @@ export function createOnboardingPort(input: {
       const readAs: string[] = [];
       /** Phrases no lookup placed: read against the whole list after. */
       const wholeListPhrases: string[] = [];
+      /** Categories the lookup named exactly, with the phrase it named. */
+      const exactPhrase = new Map<string, string>();
       for (const phrase of phrases) {
         const looked: TaxonomyCandidateResponse = await findTaxonomyCandidates(
           input.session,
@@ -1984,6 +2044,9 @@ export function createOnboardingPort(input: {
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
         nodeNames.set(best.nodeId, best.displayName);
+        // The lookup's own name for the phrase (a synonym: "B2B" for
+        // Business Customer) names it only when the phrase is theirs.
+        if (found.resolution === "EXACT") exactPhrase.set(best.nodeId, phrase);
       }
       const namedByOthers = new Set(ids);
       for (const phrase of wholeListPhrases) {
@@ -2178,6 +2241,40 @@ export function createOnboardingPort(input: {
         // correct it.
         aside = `${READ_AS_NOTE} ${readAs.join("; ")}.`.slice(0, 300);
       }
+      // A mandate category is the investor's declaration (source
+      // user_selected; DECISIONS 40: Declared Mandate ≠ Q Inference). One
+      // their words do not name — the lookup's nearest category, or the
+      // chooser's pick — is Q's reading of them, held for their yes
+      // (planOne), never saved as what they declared. A yes to what Q
+      // offered is their choice.
+      // Words in another language name a category by the reading's
+      // translation, as for options (turnIsEnglish): not checked here.
+      if (
+        input.journeyType === "investor" &&
+        !affirmed &&
+        turnIsEnglish(answer.quote ?? "")
+      ) {
+        const said = [
+          answer.quote ?? "",
+          ...input.personTurns.filter(
+            (turn) =>
+              (answer.quote ?? "").trim().length > 0 &&
+              quoteOccursIn(answer.quote ?? "", turn),
+          ),
+        ];
+        const theirPhrase = (phrase: string) =>
+          said.some((words) => textStatedIn(phrase, words));
+        const read = ids.flatMap((id) => {
+          const name = nodeNames.get(id);
+          if (name === undefined) return [];
+          const exact = exactPhrase.get(id);
+          const named =
+            (exact !== undefined && theirPhrase(exact)) ||
+            categoryNamedIn(name, said);
+          return named ? [] : [name];
+        });
+        if (read.length > 0) readings = read;
+      }
     } else if (
       c.stepType === "single_select" ||
       c.stepType === "multi_select"
@@ -2283,6 +2380,56 @@ export function createOnboardingPort(input: {
           );
         }
         unnamed.splice(0, unnamed.length, ...still);
+      }
+      // Live 2026-10-31 ("Kivisild"): "3 paying customers, 40 lockers in
+      // 12 towns" named "Paying customers" by its label, so the chooser
+      // never ran and "40 lockers in 12 towns" was nowhere, while Q told
+      // them their profile reflected it. On a step that keeps their words
+      // beyond the option, a turn that says more than the option is read
+      // for what it says beyond it, kept only as their words as said.
+      const turnOf =
+        (answer.quote ?? "").trim().length === 0
+          ? undefined
+          : input.personTurns.find((said) =>
+              quoteOccursIn(answer.quote ?? "", said),
+            );
+      const chosenLabels = keys.map(
+        (key) => options.find((o) => o.key === key)?.label ?? key,
+      );
+      if (
+        BEYOND_KEPT_STEPS.has(step.stepKey) &&
+        !affirmed &&
+        keys.length > 0 &&
+        unnamed.length === 0 &&
+        toldBeyond.length === 0 &&
+        input.chooseCategories !== undefined &&
+        turnOf !== undefined &&
+        saysBeyond(turnOf, chosenLabels)
+      ) {
+        const choices = options
+          .filter((o) => o.key !== "other")
+          .map((o) => ({
+            nodeId: o.key,
+            displayName: o.label,
+            vocabularyCode: step.stepKey,
+          }));
+        const chosen = await input
+          .chooseCategories({
+            field: (SPOKEN_QUESTIONS[step.stepKey] ?? c.prompt).slice(0, 200),
+            phrase: turnOf.slice(0, 200),
+            sentence: turnOf,
+            context: await contextNow(),
+            candidates: choices,
+          })
+          .catch(reported("option reading (beyond)", null));
+        const beyond = chosen?.beyond?.trim() ?? "";
+        if (
+          beyond.length > 0 &&
+          (chosen ?? []).some((key) => keys.includes(key)) &&
+          textStatedIn(beyond, turnOf)
+        ) {
+          toldBeyond.push(beyond);
+        }
       }
       // A yes to what Q offered names an option or nothing: never "their
       // words" on the catch-all or as the answer's text.
@@ -2442,6 +2589,7 @@ export function createOnboardingPort(input: {
       ...(otherWords === undefined ? {} : { note: otherWords }),
       ...(aside === undefined ? {} : { aside }),
       ...(told === undefined ? {} : { told }),
+      ...(readings === undefined ? {} : { readings }),
     };
   };
 
@@ -3511,6 +3659,54 @@ export function createOnboardingPort(input: {
     const resolvedRaw = await (warmed.get(answer) ?? resolve(answer));
     if (!resolvedRaw.ok) return done(resolvedRaw.result);
     const resolved = namedOnly(resolvedRaw, answer);
+    // A mandate category their words do not name is Q's reading of them:
+    // held for their yes, so the mandate never records Q's choice as their
+    // declaration (live 2026-10-31: "We back B2B companies with recurring
+    // revenue" saved B2B SaaS with source user_selected).
+    if (
+      answer.basis !== "DELEGATED" &&
+      resolved.readings !== undefined &&
+      resolved.readings.length > 0
+    ) {
+      const names = resolved.readings.join(", ").slice(0, 200);
+      if (store !== undefined) {
+        try {
+          await store.recommend({
+            userId,
+            sessionId: input.onboardingSessionId,
+            stepKey: resolved.step.stepKey,
+            value: resolved.value,
+            rationale:
+              `From what you said: "${answer.quote.slice(0, 120)}"`.slice(
+                0,
+                200,
+              ),
+            runId: input.runId ?? null,
+          });
+          return done({
+            stepKey: resolved.step.stepKey,
+            outcome: "REJECTED",
+            reason:
+              `Held for their confirmation, not recorded yet: ${names} is your reading of their words, which do not name it. Say it back in one short line as your reading and ask if it is right; when they agree, accept_recommendation records it. Never say it is saved.`.slice(
+                0,
+                600,
+              ),
+          });
+        } catch (caught: unknown) {
+          reported("category reading hold", undefined)(caught);
+          // Falls through to asking them.
+        }
+      }
+      return done({
+        stepKey: resolved.step.stepKey,
+        outcome: "REJECTED",
+        reason:
+          `Nothing was recorded: ${names} is your reading of their words, which do not name it. Say back what you understood in a few words and record it when they agree.`.slice(
+            0,
+            600,
+          ),
+      });
+    }
     // QA QO-25 (23 Oct): "I was a product lead at Paystack" saved their
     // role as Product; they are the CEO. A role is their role now: words
     // about a past job are read by meaning and not recorded as it.

@@ -124,7 +124,8 @@ describe("words that name no category are never the category field's value (live
       onboardingSessionId: turn(world, said).onboardingSessionId,
       journeyType: "investor",
       ownerUserId: actor.userId,
-      personTurns: [said],
+      // What they say next, naming the category.
+      personTurns: [said, "Agriculture, then."],
       authority: () => Promise.resolve(reading({ stated: ["I3.sectors"] })),
     });
     const [first] = await port.record([
@@ -144,7 +145,9 @@ describe("words that name no category are never the category field's value (live
       {
         stepKey: "I3.sectors",
         value: ["Agriculture"],
-        quote: said,
+        // They name it next (a category their words do not name is Q's
+        // reading, held for their yes: live 2026-10-31).
+        quote: "Agriculture, then.",
         basis: "STATED",
         ownWords: false,
       },

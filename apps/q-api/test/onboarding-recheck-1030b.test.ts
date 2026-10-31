@@ -119,7 +119,7 @@ describe("item 1: the geography list holds every country; its whole list is read
     expect(wholeListParts(wide)).toBeNull();
   });
 
-  it('"Benelux and the Nordics": the Nordics by lookup, Benelux read as its three countries from the part that holds them', async () => {
+  it('"Benelux and the Nordics": the Nordics by lookup, Benelux read as its three countries from the part that holds them, held for their yes', async () => {
     const world = investorSession({
       servesTurnSteps: true,
       currentStepKey: "I3.geography",
@@ -155,6 +155,7 @@ describe("item 1: the geography list holds every country; its whole list is read
       logger,
       readAfterMs: 5,
       categories,
+      recommendations: world.recommendations,
       reader: readerReturning({
         answers: [
           {
@@ -176,7 +177,15 @@ describe("item 1: the geography list holds every country; its whole list is read
     );
     await conversation.said?.(line, "PERSON", "Benelux and the Nordics");
     await conversation.flush?.(line);
-    const saved = world.recordedValue("I3.geography");
+    // Live 2026-10-31: the countries "Benelux" was read as are Q's reading
+    // of words that do not name them, so the mandate never records them as
+    // declared; the whole reading is held for their yes.
+    expect(world.recordedValue("I3.geography")).toBeUndefined();
+    const held = world
+      .heldSuggestions()
+      .filter((s) => s.stepKey === "I3.geography" && s.status === "PENDING");
+    expect(held).toHaveLength(1);
+    const saved = held[0]?.value;
     expect(saved?.type).toBe("RESOURCE_REFERENCE");
     expect(
       saved?.type === "RESOURCE_REFERENCE" ? [...saved.resourceIds].sort() : [],

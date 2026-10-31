@@ -479,7 +479,9 @@ describe("4. a sector no category holds is kept in their words, beside the ones 
           },
           {
             nodeId: "d0000000-0000-4000-8000-0000000000b2",
-            displayName: "Clean Energy",
+            // Named by their words (a category they do not name is Q's
+            // reading, held for their yes: live 2026-10-31).
+            displayName: "Climate Tech",
           },
         ],
         "industrial automation": [

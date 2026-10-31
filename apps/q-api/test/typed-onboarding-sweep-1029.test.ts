@@ -71,6 +71,8 @@ function typedWorld(options: {
   readonly authority: () => QTurnAuthority;
   readonly reading?: Reading;
   readonly categories?: TaxonomyChooser;
+  /** Q's suggestions kept by the world, as the service keeps them. */
+  readonly held?: boolean;
 }) {
   const reader: OnboardingTranscriptReader = {
     read: () =>
@@ -83,6 +85,9 @@ function typedWorld(options: {
     readAfterMs: 5,
     reader,
     categories: options.categories,
+    ...(options.held === true
+      ? { recommendations: options.world.recommendations }
+      : {}),
   });
   const typed = createTypedOnboarding({
     conversation,
@@ -271,7 +276,7 @@ describe("sweep D7: what is saved so far, read back", () => {
 describe("sweep D2: a region that is not a category", () => {
   const NETHERLANDS = "a1000000-0000-4000-8000-000000000001";
   const GERMANY = "a1000000-0000-4000-8000-000000000002";
-  it('"Benelux and the Nordics": the field\'s whole list goes to the reader, Benelux is read as its listed member, and the read-back says so', async () => {
+  it('"Benelux and the Nordics": the field\'s whole list goes to the reader, Benelux is read as its listed member, held for their yes', async () => {
     const world = investorSession({
       currentStepKey: "I3.geography",
       subject: FIRM,
@@ -285,6 +290,7 @@ describe("sweep D2: a region that is not a category", () => {
     const offered: { phrase: string; ids: string[] }[] = [];
     const say = typedWorld({
       world,
+      held: true,
       authority: () => reading({}),
       categories: (input) => {
         offered.push({
@@ -308,18 +314,24 @@ describe("sweep D2: a region that is not a category", () => {
       },
     });
     await say("Benelux and the Nordics");
+    const pending = () =>
+      world
+        .heldSuggestions()
+        .filter((s) => s.stepKey === "I3.geography" && s.status === "PENDING");
     for (let i = 0; i < 200; i += 1) {
-      if (world.recordedValue("I3.geography") !== undefined) break;
+      if (pending().length > 0) break;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    expect(world.recordedValue("I3.geography")).toEqual({
-      type: "RESOURCE_REFERENCE",
-      resourceType: "TAXONOMY_NODE",
-      resourceIds: [NETHERLANDS],
-    });
-    expect(world.recordedNote("I3.geography")).toBe(
-      "Read as: “Benelux” as the Netherlands. Kept as they said it: the Nordics.",
-    );
+    // Live 2026-10-31: the Netherlands is Q's reading of "Benelux", words
+    // that do not name it: held for their yes, never saved as declared.
+    expect(world.recordedValue("I3.geography")).toBeUndefined();
+    expect(pending().map((s) => s.value)).toEqual([
+      {
+        type: "RESOURCE_REFERENCE",
+        resourceType: "TAXONOMY_NODE",
+        resourceIds: [NETHERLANDS],
+      },
+    ]);
     // The reader chose among the field's own list, never outside it.
     expect([...new Set(offered.map((o) => o.phrase))].sort()).toEqual([
       "Benelux",

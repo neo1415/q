@@ -1481,3 +1481,30 @@ export function followUpAfter(
   if (plain(last.text) === plain(shown)) return null;
   return last.text;
 }
+
+/**
+ * Q's own sentence that has left the screen without joining the thread
+ * (live 2026-10-31, "Kivisild"): Q asked "The company: … Is that right?",
+ * the reading of their earlier words then saved that step, the screen
+ * moved to the next step's question ("How would you categorise the
+ * company?"), and Q's sentence vanished from the conversation as if that
+ * question had been asked in its place. What Q said stays said: the line
+ * is returned so it is appended to the thread before anything replaces
+ * it. Null while it is still the live question, or already in the thread
+ * (whitespace aside).
+ */
+export function displacedQLine(
+  question: { readonly text: string } | null,
+  live: string | null,
+  thread: readonly { readonly kind: string; readonly text: string }[],
+): string | null {
+  if (question === null) return null;
+  const plain = (text: string) => text.replace(/\s+/gu, " ").trim();
+  const said = plain(question.text);
+  if (said.length === 0) return null;
+  if (live !== null && plain(live) === said) return null;
+  if (thread.some((turn) => turn.kind === "Q" && plain(turn.text) === said)) {
+    return null;
+  }
+  return question.text;
+}
