@@ -385,6 +385,13 @@ export function teamJobOutcomeOf(
 export function teamJobLine(
   outcome: TeamJobOutcome,
   audience: TeamJobAudience = "INVESTOR",
+  options?: {
+    /**
+     * Owner decision 2026-10-31: a researched investment memo. Q says up
+     * front that it is researching the web first and roughly how long.
+     */
+    readonly researching?: boolean | undefined;
+  },
 ): string {
   switch (outcome.status) {
     case "ALREADY_WAITING": {
@@ -406,7 +413,11 @@ export function teamJobLine(
     case "FAILED":
       return `I couldn't plan this just now: something failed on my side, and nothing has started. Ask me again in a moment. ${ANSWER_HERE}`;
     case "STARTED":
-      return startedLine(outcome.plan, outcome.firstRead);
+      return startedLine(
+        outcome.plan,
+        outcome.firstRead,
+        options?.researching === true,
+      );
     case "PREPARED":
     case "ONE_PER_TURN":
       break;
@@ -493,7 +504,15 @@ export function ownWorkSummary(summary: string): string {
     .replace(/[.\s]+$/u, "");
 }
 
-function startedLine(plan: TeamJobPlan, firstRead: string | null): string {
+/** The researched memo's lead (live: ~3 minutes with research stages). */
+export const RESEARCHED_MEMO_WAIT =
+  "I'm researching it on the web first (sources, competitors and evidence), so the memo takes about three minutes. I'll bring it back to this conversation; you can carry on with anything else meanwhile.";
+
+function startedLine(
+  plan: TeamJobPlan,
+  firstRead: string | null,
+  researching = false,
+): string {
   const doing = ownWorkSummary(plan.summary);
   const lead =
     doing.length === 0
@@ -501,7 +520,9 @@ function startedLine(plan: TeamJobPlan, firstRead: string | null): string {
       : `On it. Starting now: ${doing.charAt(0).toLowerCase()}${doing.slice(1)}.`;
   return [
     lead,
-    "It will be ready in a few minutes and I'll bring it back to this conversation; you can carry on with anything else meanwhile.",
+    researching
+      ? RESEARCHED_MEMO_WAIT
+      : "It will be ready in a few minutes and I'll bring it back to this conversation; you can carry on with anything else meanwhile.",
     ...(firstRead === null || firstRead.trim().length === 0
       ? []
       : [`My first read, before the research is in: ${firstRead.trim()}`]),

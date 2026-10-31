@@ -1090,3 +1090,18 @@ export const TurnReaderV74ResultSchema = TurnReaderV70ResultSchema.extend({
   acceptsOffer: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV74Result = z.infer<typeof TurnReaderV74ResultSchema>;
+
+/**
+ * v75 (owner decision 2026-10-31): an investment memo on a company --
+ * an IC (investment committee) memo, a deal memo -- always includes web
+ * research: the researched memo job, never the quick profile-only
+ * document. investmentMemo says so, read by meaning in any language;
+ * code routes it to the team job. A founder's own memo, a short summary
+ * of a company and every other document keep their path. Lenient: a
+ * malformed value is false, never a lost reading.
+ */
+export const TURN_READER_V75_SCHEMA_VERSION = 75;
+export const TurnReaderV75ResultSchema = TurnReaderV74ResultSchema.extend({
+  investmentMemo: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV75Result = z.infer<typeof TurnReaderV75ResultSchema>;

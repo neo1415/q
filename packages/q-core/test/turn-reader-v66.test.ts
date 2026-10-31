@@ -17,7 +17,7 @@ import {
 describe("TURN_READER v66: Discover's own narrowing choices, only when stated", () => {
   it("is the active reader: v65 kept whole plus the qualifiers after raising", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(74);
+    expect(active.definition.version).toBe(75);
     expect(TURN_READER_V65.status).toBe("DEPRECATED");
     expect(TURN_READER_V66.template).toContain(
       `${V58_RAISING} ${V66_DISCOVER_QUALIFIERS}`,

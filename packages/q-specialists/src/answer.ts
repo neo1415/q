@@ -5678,6 +5678,17 @@ export function createSpecialistQAnswer(
         "a turn to Q was not read on the first try",
       );
     }
+    // Owner decision 2026-10-31: an investment (IC, deal) memo on a company
+    // always includes web research -- the researched memo job, never the
+    // quick profile-only document ("Write me an IC memo on Portside" came
+    // back in ~37 s from the profile alone). The reader decides it by
+    // meaning (v75 investmentMemo); code only refuses it for a document the
+    // reader bound to their own company (no subject named), so a founder's
+    // own memo keeps the quick path (v62).
+    const researchedMemo = read !== null && researchedMemoAsked(read);
+    if (read !== null && researchedMemo) {
+      read = { ...read, teamJob: true, handOver: null };
+    }
     const research: Promise<QResearchDirective> = Promise.resolve(
       read === null ||
         // Lane S: "put those three in a table" re-renders what was shown;
@@ -6396,7 +6407,11 @@ export function createSpecialistQAnswer(
       return recordAnswer(
         request,
         conversationId,
-        teamJobLine(planned, teamJobAudienceOf(request)),
+        teamJobLine(
+          planned,
+          teamJobAudienceOf(request),
+          researchedMemo ? { researching: true } : undefined,
+        ),
         teamJobBlocks(planned),
       );
     }
@@ -7986,6 +8001,29 @@ export function bareCityReply(
  * firewall's proof, as the record resolver above reads it -- a founder
  * otherwise.
  */
+/**
+ * The reader read an investment (IC, deal) memo on a company (v75
+ * investmentMemo), on a confident reading meant for Q. A document the
+ * reader bound to their own company (PREPARE_DOCUMENT with no subject
+ * named) is never one: their own memo keeps the quick path.
+ */
+export function researchedMemoAsked(read: {
+  readonly confidence: string;
+  readonly addressedToQ?: boolean | undefined;
+  readonly investmentMemo?: boolean | undefined;
+  readonly tool?: {
+    readonly kind: string;
+    readonly subjectName?: string | null | undefined;
+  } | null;
+}): boolean {
+  if (read.investmentMemo !== true) return false;
+  if (read.confidence === "LOW" || read.addressedToQ === false) return false;
+  const ownDocument =
+    read.tool?.kind === "PREPARE_DOCUMENT" &&
+    (read.tool.subjectName ?? null) === null;
+  return !ownDocument;
+}
+
 function teamJobAudienceOf(request: QAnswerRequest): TeamJobAudience {
   return ownInvestorOrganisationIn(request.plan) !== null
     ? "INVESTOR"

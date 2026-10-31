@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
-import { PLAN_F03_ASK, TurnReaderV74ResultSchema } from "@capital-q/q-core";
+import { PLAN_F03_ASK, TurnReaderV75ResultSchema } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
 import { acceptStructuredOutput } from "../src/policy/structured.js";
@@ -49,12 +49,17 @@ const read = (gateway: ModelGateway, utterance: string) =>
   });
 
 describe("the turn reader's planAsk and directsWork (v70)", () => {
-  it("asks the provider with the active (v74) schema and the lenient fields", async () => {
+  it("asks the provider with the active (v75) schema and the lenient fields", async () => {
     const { gateway, options } = fake(BASE);
     await read(gateway, "What should I do this week?");
-    expect(options[0]).toMatchObject({ schema: TurnReaderV74ResultSchema });
+    expect(options[0]).toMatchObject({ schema: TurnReaderV75ResultSchema });
     expect(TURN_READER_LENIENT_FIELDS).toEqual(
-      expect.arrayContaining(["planAsk", "directsWork", "acceptsOffer"]),
+      expect.arrayContaining([
+        "planAsk",
+        "directsWork",
+        "acceptsOffer",
+        "investmentMemo",
+      ]),
     );
   });
 
@@ -66,6 +71,16 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
     expect(taken?.acceptsOffer).toBe(true);
     const plain = await read(fake(BASE).gateway, "What should I do this week?");
     expect(plain?.acceptsOffer).toBe(false);
+  });
+
+  it("v75: an IC memo on a company reaches the caller as investmentMemo; absent is false", async () => {
+    const memo = await read(
+      fake({ ...BASE, teamJob: true, investmentMemo: true }).gateway,
+      "Write me an IC memo on Portside",
+    );
+    expect(memo?.investmentMemo).toBe(true);
+    const plain = await read(fake(BASE).gateway, "What should I do this week?");
+    expect(plain?.investmentMemo).toBe(false);
   });
 
   it("an investor's 'better deal flow' reaches the caller as an IMPROVE plan ask", async () => {
@@ -117,7 +132,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
       directsWork: "maybe",
       discoverWhom: "INVESTORS",
     });
-    const kept = acceptStructuredOutput(raw, TurnReaderV74ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV75ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);

@@ -258,7 +258,7 @@ describe("defect 3: what the reviewers still want is said plainly", () => {
 describe("defect 4: reader v71 reads what they want at the end", () => {
   it("names the live misreadings as cases, by meaning", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(74);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(75);
     const text = TURN_READER_V71.template;
     expect(text).toContain(
       '"I need to hire a CFO before our seed close, sort it out"',

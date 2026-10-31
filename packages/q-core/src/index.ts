@@ -508,6 +508,9 @@ export {
   TURN_READER_V74_SCHEMA_VERSION,
   TurnReaderV74ResultSchema,
   type TurnReaderV74Result,
+  TURN_READER_V75_SCHEMA_VERSION,
+  TurnReaderV75ResultSchema,
+  type TurnReaderV75Result,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -2011,6 +2014,10 @@ export {
   V74_NEXT_STEPS_ANY_KIND,
   V74_OFFER_TAKEN,
 } from "./prompts/tasks/turn-reader.v74.js";
+export {
+  TURN_READER_V75,
+  V75_INVESTMENT_MEMO,
+} from "./prompts/tasks/turn-reader.v75.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

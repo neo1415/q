@@ -40,7 +40,7 @@ const render = () =>
 
 describe("TURN_READER v68: only what applies is written", () => {
   it("is the active reader, v67's rules kept whole and v67 kept for rollback", () => {
-    expect(registry.getActive("TURN_READER").definition.version).toBe(74);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(75);
     expect(TURN_READER_V67.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 67)).toBeDefined();
     // Undo the rearrangement and the one line: v67 exactly.

@@ -58,6 +58,7 @@ import {
   unknownScreenLine,
 } from "../src/answer.js";
 import {
+  RESEARCHED_MEMO_WAIT,
   teamJobLine,
   teamJobOutcomeOf,
   type QTeamJobPort,
@@ -6638,5 +6639,119 @@ describe("situation-first planning: the reader's planAsk starts the plan job (S5
     expect(stored.at(-1)?.content).toMatch(
       /^Noted\. I'll work that in from the next step/u,
     );
+  });
+});
+
+describe("an investment memo on a company is the researched memo job (owner decision 2026-10-31, TURN_READER v75)", () => {
+  // Live 2026-10-31: "Write me an IC memo on Portside" was read as one
+  // document (a Q_REPORT, teamJob false) and came back in ~37 s from the
+  // profile alone. v75 reads investmentMemo by meaning; code starts the job.
+  const documentReading = (
+    subjectName: string | null,
+    documentType: string,
+    extra: Record<string, unknown> = {},
+  ) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: subjectName !== null,
+      tool: {
+        kind: "PREPARE_DOCUMENT",
+        destination: null,
+        visibility: null,
+        documentType,
+        subjectName,
+      },
+      teamJob: false,
+      ...extra,
+    }) as unknown as TurnReaderResult;
+  const recordingTeamJob = () => {
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({
+          status: "STARTED",
+          plan: {
+            summary: "Research Portside, then write an investment memo on it.",
+            steps: [
+              { who: "Research", does: "Reads Portside's public record." },
+              { who: "Documents", does: "Writes the investment memo." },
+            ],
+            needsYou: [],
+            cannot: [],
+          },
+          firstRead: null,
+        });
+      },
+    };
+    return { goals, teamJob };
+  };
+
+  it("an investor's 'Write me an IC memo on Portside' starts the researched job and says it is researching, and for how long", async () => {
+    const { goals, teamJob } = recordingTeamJob();
+    const said = "Write me an IC memo on Portside";
+    const { answer, delegated, stored } = seam({
+      said,
+      reading: documentReading("Portside", "Q_REPORT", {
+        investmentMemo: true,
+      }),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([said]);
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(/^On it\. Starting now: /u);
+    expect(stored.at(-1)?.content).toContain(RESEARCHED_MEMO_WAIT);
+    expect(RESEARCHED_MEMO_WAIT).toMatch(/researching it on the web/u);
+    expect(RESEARCHED_MEMO_WAIT).toMatch(/about three minutes/u);
+  });
+
+  it("'Give me a quick summary of Portside' stays the quick document: no job", async () => {
+    const { goals, teamJob } = recordingTeamJob();
+    const { answer, stored } = seam({
+      said: "Give me a quick summary of Portside",
+      reading: documentReading("Portside", "INVESTMENT_BRIEF"),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([]);
+    expect(
+      stored.some((message) => message.content.includes(RESEARCHED_MEMO_WAIT)),
+    ).toBe(false);
+  });
+
+  it("a founder's 'make me a one-pager' stays quick, even if the reader also said investmentMemo", async () => {
+    const { goals, teamJob } = recordingTeamJob();
+    const { answer } = seam({
+      said: "Make me a one-pager",
+      // Bound to their own company (no subject named): never the memo job.
+      reading: documentReading(null, "INVESTMENT_BRIEF", {
+        investmentMemo: true,
+      }),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([]);
+  });
+
+  it("a LOW reading of a memo is a guess and starts nothing", async () => {
+    const { goals, teamJob } = recordingTeamJob();
+    const { answer } = seam({
+      said: "IC memo Portside?",
+      reading: {
+        ...documentReading("Portside", "Q_REPORT", { investmentMemo: true }),
+        confidence: "LOW",
+      },
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([]);
   });
 });

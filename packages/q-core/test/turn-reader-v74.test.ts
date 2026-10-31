@@ -18,11 +18,14 @@ import {
  * the offer taken as its own field.
  */
 describe("TURN_READER v74", () => {
-  it("is the active reader: v73 with the NEXT STEPS rule extended, nothing else", () => {
+  it("was the active reader (v75 now): v73 with the NEXT STEPS rule extended, nothing else", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(74);
+    expect(active.version).toBe(75);
     expect(registry.get("TURN_READER", 73)?.definition.status).toBe(
+      "DEPRECATED",
+    );
+    expect(registry.get("TURN_READER", 74)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(
