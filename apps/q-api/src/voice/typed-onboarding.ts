@@ -76,7 +76,10 @@ const REPLY_BUDGET = {
 const THREAD_LIMIT = 60;
 
 export function createTypedOnboarding(dependencies: {
-  readonly conversation: Pick<OnboardingConversation, "said" | "flush">;
+  readonly conversation: Pick<
+    OnboardingConversation,
+    "said" | "flush" | "answered"
+  >;
   readonly gateway: ModelGateway;
   readonly delegation?: QDelegationReader | undefined;
   readonly heldWrites?: HeldWritesStore | undefined;
@@ -89,6 +92,11 @@ export function createTypedOnboarding(dependencies: {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   /** Sessions whose whole record code read back for their yes. */
   const readBackShown = new Set<string>();
+  /**
+   * Sessions whose read-back listed suggestions waiting on their yes: that
+   * yes is read before finishing, since the reading saves them.
+   */
+  const readBackWaiting = new Set<string>();
   /**
    * Sessions whose person asked to finish while essentials were still
    * open (sweep D1, 2026-10-29: "please finish", Q asked the last
@@ -130,6 +138,14 @@ export function createTypedOnboarding(dependencies: {
       );
       if (status !== "ACTIVE") return null;
       const startedAt = Date.now();
+      /** What Q is doing, shown at once on a turn that takes a while. */
+      const stage = (label: string): void => {
+        try {
+          input.onStage?.({ stage: "SAVING", label });
+        } catch {
+          // Display only.
+        }
+      };
       const turnNumber = (turnsTaken.get(input.onboardingSessionId) ?? 0) + 1;
       turnsTaken.delete(input.onboardingSessionId);
       turnsTaken.set(input.onboardingSessionId, turnNumber);
@@ -354,9 +370,31 @@ export function createTypedOnboarding(dependencies: {
         agreedToReadBack ||
         stillFinishing
       ) {
-        // What they just said is in before anything is called missing; a
-        // reading still under way after the bound gets one more.
-        if ((await reading) === false) await conversation.flush?.(line);
+        // Said at once (live check 2026-10-31: "skip the rest" and the
+        // final yes left the person looking at nothing for 12-23 s).
+        stage(
+          agreedToReadBack
+            ? "Finishing your setup"
+            : "Checking what I have saved for you",
+        );
+        // What they said is in before anything is called missing. Their
+        // latest words are waited for only when the reading of them beside
+        // the reply found they state something to save (or a yes to a
+        // read-back that listed suggestions, which the reading saves);
+        // otherwise only earlier words are, and the latest line's reading
+        // (declines, a "not sure") goes on in the background. Either way
+        // only their answers are waited for: setting aside what they
+        // declined is never waited on (it was twelve writes one by one).
+        const through =
+          statesMore(authority, input.journeyType) ||
+          (agreedToReadBack && readBackWaiting.has(input.onboardingSessionId))
+            ? "LATEST"
+            : "EARLIER";
+        const answeredIn =
+          conversation.answered === undefined
+            ? await reading
+            : await conversation.answered(line, through);
+        if (answeredIn === false) await conversation.flush?.(line);
         const finishing = portOf(true);
         const finished = await finishing.finish();
         const now = await finishing.state();
@@ -396,6 +434,11 @@ export function createTypedOnboarding(dependencies: {
         });
         if (review !== undefined && said !== null) {
           readBackShown.add(input.onboardingSessionId);
+          if (review.pending.length > 0) {
+            readBackWaiting.add(input.onboardingSessionId);
+          } else {
+            readBackWaiting.delete(input.onboardingSessionId);
+          }
           showedReadBack = true;
         }
         // Still open essentials: their next answer goes on toward the
@@ -639,6 +682,29 @@ export function createTypedOnboarding(dependencies: {
     );
     return parsed.success ? parsed.data : null;
   }
+}
+
+/**
+ * Whether the reading of their latest words beside the reply found they
+ * state something to save, beyond agreeing to a review: an answer, a
+ * choice handed to Q or a suggestion approved. No reading: assume so.
+ */
+export function statesMore(
+  authority: {
+    readonly stated: ReadonlySet<string>;
+    readonly handed: ReadonlySet<string>;
+    readonly approved: ReadonlySet<string>;
+  } | null,
+  journeyType: "founder" | "investor",
+): boolean {
+  if (authority === null) return true;
+  if (authority.handed.size > 0 || authority.approved.size > 0) return true;
+  const steps = definitionFor(journeyType).steps;
+  return [...authority.stated].some(
+    (stepKey) =>
+      steps.find((step) => step.stepKey === stepKey)?.configuration.stepType !==
+      "confirmation",
+  );
 }
 
 /** The step a line asked, when it is one of this journey's steps. */

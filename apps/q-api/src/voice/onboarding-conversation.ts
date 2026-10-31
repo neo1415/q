@@ -110,6 +110,19 @@ export type OnboardingConversation = {
    * when the wait ran out with a reading still under way.
    */
   readonly flush?: (line: ConversationLine) => Promise<boolean | void>;
+  /**
+   * What their words gave is on the record (answers, held summaries, a
+   * needed step not known), waited for (bounded); what they declined is
+   * set aside after, in the background (live check 2026-10-31: "skip the
+   * rest" waited 22.9 s, most of it setting aside twelve optional steps
+   * one by one before the read-back). `through` EARLIER: only words said
+   * before their latest line (its own reading goes on in the background).
+   * False when the wait ran out.
+   */
+  readonly answered?: (
+    line: ConversationLine,
+    through: "LATEST" | "EARLIER",
+  ) => Promise<boolean>;
 };
 
 /** Quiet after something they said before it is read (coalesced). */
@@ -136,6 +149,10 @@ type Reading = {
   heard: number;
   /** The count the last finished reading started from: read up to there. */
   readThrough: number;
+  /** The count whose words' answers are on the record (before set-asides). */
+  answeredThrough: number;
+  /** Waiting for answeredThrough to move. */
+  waiters: Set<() => void>;
 };
 
 export function createOnboardingConversation(dependencies: {
@@ -321,6 +338,8 @@ export function createOnboardingConversation(dependencies: {
   const readAndSave = async (
     line: ConversationLine,
     rereads = 0,
+    /** Called once what this reading gives is recorded, before set-asides. */
+    answeredNow: () => void = () => undefined,
   ): Promise<void> => {
     // Everything heard so far is in the thread before it is read.
     await (writes.get(line.voiceSessionId) ?? Promise.resolve());
@@ -675,6 +694,22 @@ export function createOnboardingConversation(dependencies: {
               .slice(0, 12)
               .map((item) => ({ stepKey: item.stepKey, quote: item.quote })),
           );
+    // What was just saved opened steps this reading could not see (a raise
+    // opens its amount and currency): the same words are read once more
+    // against them, so what they said is saved now, never asked again.
+    const answeredState = await port.state();
+    const opened = answeredState.steps.some(
+      (step) =>
+        isConversational(step) &&
+        step.status === "OPEN" &&
+        !state.steps.some((before) => before.stepKey === step.stepKey),
+    );
+    const savedNow = recorded.some(
+      (r) => r.outcome === "COMMITTED" && r.alreadyRecorded !== true,
+    );
+    const rereading = opened && savedNow && rereads < OPENED_REREADS_MAX;
+    // Their answers are in (a reading again carries this on).
+    if (!rereading) answeredNow();
     const setAside =
       declined.length === 0
         ? []
@@ -709,23 +744,9 @@ export function createOnboardingConversation(dependencies: {
       },
       "onboarding conversation read and saved",
     );
-    const after = await port.state();
+    const after = setAside.length === 0 ? answeredState : await port.state();
     considerResearch(line, identityOf(after));
-    // What was just saved opened steps this reading could not see (a raise
-    // opens its amount and currency): the same words are read once more
-    // against them, so what they said is saved now, never asked again.
-    const opened = after.steps.some(
-      (step) =>
-        isConversational(step) &&
-        step.status === "OPEN" &&
-        !state.steps.some((before) => before.stepKey === step.stepKey),
-    );
-    const savedNow = recorded.some(
-      (r) => r.outcome === "COMMITTED" && r.alreadyRecorded !== true,
-    );
-    if (opened && savedNow && rereads < OPENED_REREADS_MAX) {
-      await readAndSave(line, rereads + 1);
-    }
+    if (rereading) await readAndSave(line, rereads + 1, answeredNow);
     await researchFor(line.onboarding.journeyType)
       ?.offerReady(line.onboarding.sessionId, port)
       .catch((error: unknown) => {
@@ -751,6 +772,8 @@ export function createOnboardingConversation(dependencies: {
       line,
       heard: 1,
       readThrough: 0,
+      answeredThrough: 0,
+      waiters: new Set(),
     };
     readings.set(key, created);
     return created;
@@ -763,7 +786,12 @@ export function createOnboardingConversation(dependencies: {
     }
     // Everything heard by now is in the thread before it is read.
     const upTo = reading.heard;
-    reading.running = readAndSave(reading.line)
+    const answeredNow = () => {
+      if (reading.answeredThrough >= upTo) return;
+      reading.answeredThrough = upTo;
+      for (const wake of [...reading.waiters]) wake();
+    };
+    reading.running = readAndSave(reading.line, 0, answeredNow)
       .then(() => {
         reading.readThrough = Math.max(reading.readThrough, upTo);
       })
@@ -778,6 +806,8 @@ export function createOnboardingConversation(dependencies: {
       })
       .finally(() => {
         reading.running = null;
+        // Done or failed: nothing more of these words is coming.
+        answeredNow();
         if (reading.again) {
           reading.again = false;
           void run(reading);
@@ -831,6 +861,43 @@ export function createOnboardingConversation(dependencies: {
     ]);
   };
 
+  /** Their answers are on the record, waited for (bounded); see the type. */
+  const answered = async (
+    line: ConversationLine,
+    through: "LATEST" | "EARLIER",
+  ): Promise<boolean> => {
+    finishUtterance(line);
+    const reading = readingFor(line);
+    const wanted =
+      through === "LATEST" ? reading.heard : Math.max(0, reading.heard - 1);
+    if (reading.answeredThrough >= wanted) return true;
+    // Words not being read yet are read now (as flush would).
+    if (
+      reading.running === null ||
+      (through === "LATEST" && reading.timer !== null)
+    ) {
+      if (reading.timer !== null) {
+        clearTimeout(reading.timer);
+        reading.timer = null;
+      }
+      void run(reading);
+    }
+    return new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        reading.waiters.delete(wake);
+        resolve(false);
+      }, SETTLE_WAIT_MS);
+      timeout.unref?.();
+      function wake() {
+        if (reading.answeredThrough < wanted) return;
+        clearTimeout(timeout);
+        reading.waiters.delete(wake);
+        resolve(true);
+      }
+      reading.waiters.add(wake);
+    });
+  };
+
   return {
     heard: (line, segments) => {
       for (const segment of segments) {
@@ -855,6 +922,8 @@ export function createOnboardingConversation(dependencies: {
     },
 
     flush: (line) => flush(line),
+
+    answered: (line, through) => answered(line, through),
 
     ended: async (line) => {
       await flush(line);
@@ -1330,7 +1399,10 @@ export function briefOf(
     // agree to; a summary card beside the conversation raced it.
     ...(sayingBack
       ? [
-          "Topics marked (say back) are told at length. As soon as they have told you about any of them, say back in your own plain words, one short sentence a topic, what you understood, and ask if that's right, before you ask anything else. What they agree to is what is saved, so never move on to a new question in that same message. A summary waiting for their yes (not confirmed yet) is said back the same way.",
+          // Live check 2026-10-31 (Grannskap): one ramble told four of
+          // them and only the description was said back; the rest came one
+          // yes at a time, and the lead-ins Q used were saved with them.
+          "Topics marked (say back) are told at length. As soon as they have told you about any of them, needed or optional, say back what you understood for every one of those topics they told you, all in one say-back, one short line a topic (its name, then its content as it should read on their profile, never framed as you telling them), and ask once if that's right, before you ask anything else. One yes then settles them all: never say one back now and the others later. What they agree to is what is saved, so never move on to a new question in that same message. Summaries waiting for their yes (not confirmed yet) are said back the same way, all together.",
         ]
       : []),
     ...(groups.length === 0
