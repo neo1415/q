@@ -1372,3 +1372,16 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - onboarding firm lookup can pick up a similarly named firm (no identity judgement there);
   - research replay cases D and G unrecorded (search credits);
   - two search parsers still read countries their own way.
+
+## 2026-10-31 23:30 UTC — last live check on 24af1559a (Claude coordinator)
+
+- **Production:** q-api and web on `24af1559a` (CI run 1726 green); api and workers unchanged on `857aa249a`.
+- **Passed live:** geography saved in full; Q no longer claims unsaved facts; Q's past lines stay visible; investor cheque range labelled "(your mandate)"; no internal source ids in chat.
+- **Still failing live (data integrity / evidence honesty), NOT fixed:**
+  1. Mandate corruption: after "Yes, keep it" to their own words "recurring revenue", Q's mapping B2B SaaS was written as `user_selected` STRONG (`source_modality=SELECTION`). The yes binds to the words, but the mapped category is saved as declared.
+  2. Data loss: founder traction "40 lockers in 12 towns" never stored (only signal=paying, customers=3), again.
+  3. Reduced research not disclosed when every search provider is resting: `investigationReduced` misses the all-providers-resting case; chat line says "ready — here it is".
+  4. Memo summary labels the investor's mandate preferences "(company record)".
+- **Why fixes keep passing tests and failing live:** the onboarding tests use fake readers/choosers that return the shapes the fix expects; the live models return other shapes (e.g. traction words not in `beyond`). Next attempt should replay the real live transcripts through the real models (a few cents, owner approval for provider spend) before deploying.
+- **Outage:** since 23:01Z every public search provider (ScrapingBee, Serper, Tavily, Brave) is refusing — key refused or credit spent. All memos/research run with no public sources until the owner tops up or replaces keys.
+- **Also seen:** founder flow stalled >30 s after the raise answer until "let's finish"; a stray "What's your website?" after a skipped website; "I'll keep recurring revenue as your preference" while it is stored only as free text.
