@@ -201,13 +201,24 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     // Live e11: Q's line is kept with the step it asked, so a reopening
     // asks the question the conversation had open.
     expect(world.keptSteps()).toEqual([null, "I3.sectors"]);
-    await settled(
-      () => world.recordedValue("I10.inbound_preference") !== undefined,
-    );
+    await settled(() => world.recordedValue("I9.discovery_mode") !== undefined);
     const saved = answers.filter(
       ([stepKey]) => world.recordedValue(stepKey) !== undefined,
     );
-    expect(saved.length).toBeGreaterThanOrEqual(8);
+    // Live final re-check 2026-10-31: whether they are deploying now and
+    // how open they are to founders are judgements about their current
+    // state (askOnly): said unasked, they are held for their yes, never
+    // read in; the other six are saved.
+    expect(saved.map(([stepKey]) => stepKey)).toEqual([
+      "I2.stages",
+      "I2.currency",
+      "I2.cheque_min",
+      "I2.cheque_max",
+      "I2.investment_role",
+      "I9.discovery_mode",
+    ]);
+    expect(world.recordedValue("I1.deployment_status")).toBeUndefined();
+    expect(world.recordedValue("I10.inbound_preference")).toBeUndefined();
     expect(world.recordedValue("I2.investment_role")).toEqual({
       type: "MULTI_SELECT",
       optionKeys: ["lead", "co_invest"],

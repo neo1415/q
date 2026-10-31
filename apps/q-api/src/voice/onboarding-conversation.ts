@@ -20,6 +20,7 @@ import type { HeldWritesStore } from "./held-writes.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { definitionFor, toResponseValue } from "./interview-steps.js";
 import {
+  coverageProfileFor,
   createOnboardingPort,
   isLongAnswerStep,
   sameValue,
@@ -116,6 +117,13 @@ const READ_AFTER_MS = 2_500;
 /** A settle waits this long for saving before it answers from the record. */
 const SETTLE_WAIT_MS = 15_000;
 const THREAD_LIMIT = 100;
+/**
+ * Readings again of the same words once an answer opened steps the reading
+ * could not see (live final re-check 2026-10-31: "raising 1.5 million
+ * euros" saved only "raising"; the amount and currency steps open only
+ * once it is, and Q then asked the currency).
+ */
+const OPENED_REREADS_MAX = 2;
 
 type Buffer = { role: "PERSON" | "Q"; parts: string[] };
 
@@ -174,9 +182,11 @@ export function createOnboardingConversation(dependencies: {
     finishing = false,
     addsTo: ReadonlySet<string> = new Set(),
     place?: ReturnType<typeof placeOfQuote>,
+    affirmed: ReadonlySet<string> = new Set(),
   ) =>
     createOnboardingPort({
       addsTo,
+      affirmed,
       logger,
       // Owner 2026-10-17, re-agreed 2026-10-30: a narrative answer is
       // saved as Q's summary they agreed to in the conversation, never
@@ -308,7 +318,10 @@ export function createOnboardingConversation(dependencies: {
     if (buffer.role === "PERSON") schedule(line);
   };
 
-  const readAndSave = async (line: ConversationLine): Promise<void> => {
+  const readAndSave = async (
+    line: ConversationLine,
+    rereads = 0,
+  ): Promise<void> => {
     // Everything heard so far is in the thread before it is read.
     await (writes.get(line.voiceSessionId) ?? Promise.resolve());
     const session = sessionOf(line);
@@ -474,29 +487,55 @@ export function createOnboardingConversation(dependencies: {
     // the step's text. Not knowing is never a value: an optional step is
     // set aside, a needed one recorded as not known (the port), whatever
     // the same reading also gave for it.
-    const notKnownNow = (reading.notKnown ?? []).filter((item) => {
-      const status = stepOf(state, item.stepKey)?.status;
-      if (status === "OPEN") return true;
-      if (status !== "ANSWERED") return false;
-      return changesRecord({ ...item, aboutStep: false }) === "CHANGE";
-    });
+    // Live final re-check 2026-10-31: Q asked about pilots and the
+    // currency together; they gave the currency, and pilots was set aside
+    // as if they had skipped it. A decline or "do not know" is acted on
+    // only when the reading found their own words say so.
+    const saidSo = (item: { readonly saidSo?: boolean | undefined }) =>
+      item.saidSo !== false;
+    const notSaid = [...reading.declined, ...(reading.notKnown ?? [])].filter(
+      (item) => !saidSo(item),
+    );
+    const notKnownNow = (reading.notKnown ?? [])
+      .filter(saidSo)
+      .filter((item) => {
+        const status = stepOf(state, item.stepKey)?.status;
+        if (status === "OPEN") return true;
+        if (status !== "ANSWERED") return false;
+        return changesRecord({ ...item, aboutStep: false }) === "CHANGE";
+      });
     const notKnownSteps = new Set(notKnownNow.map((item) => item.stepKey));
     /** What the reading gave that is not saved, by reason: step keys only. */
-    const dropped: string[] = [];
-    const answers = reading.answers.filter((answer) => {
-      if (notKnownSteps.has(answer.stepKey)) {
-        dropped.push(`${answer.stepKey}:not_known`);
+    const dropped: string[] = notSaid.map(
+      (item) => `${item.stepKey}:not_said_so`,
+    );
+    const answers = reading.answers
+      .flatMap((read) => {
+        const answer = withoutAgreeingWords(read, (stepKey, value) =>
+          (stepOf(state, stepKey)?.options ?? []).some(
+            (option) => option.key === value,
+          ),
+        );
+        if (answer === null) {
+          dropped.push(`${read.stepKey}:agreement_as_words`);
+          return [];
+        }
+        return [answer];
+      })
+      .filter((answer) => {
+        if (notKnownSteps.has(answer.stepKey)) {
+          dropped.push(`${answer.stepKey}:not_known`);
+          return false;
+        }
+        const why = !isAnswerable(state, answer.stepKey)
+          ? "not_answerable"
+          : unchanged(answer.stepKey, answer.value)
+            ? null
+            : changesRecord(answer);
+        if (why === "NEW" || why === "CHANGE") return true;
+        if (why !== null) dropped.push(`${answer.stepKey}:${why}`);
         return false;
-      }
-      const why = !isAnswerable(state, answer.stepKey)
-        ? "not_answerable"
-        : unchanged(answer.stepKey, answer.value)
-          ? null
-          : changesRecord(answer);
-      if (why === "NEW" || why === "CHANGE") return true;
-      if (why !== null) dropped.push(`${answer.stepKey}:${why}`);
-      return false;
-    });
+      });
     // Live recheck 2026-10-30: a reading that saved nothing left no trace
     // of what it read. Step keys and reasons only, never their words.
     if (dropped.length > 0 || reading.answers.length === 0) {
@@ -516,7 +555,9 @@ export function createOnboardingConversation(dependencies: {
     // Q's question for it (the port withdraws it; a required step is
     // refused there and stays).
     const declined = [
-      ...reading.declined.filter((item) => !notKnownSteps.has(item.stepKey)),
+      ...reading.declined
+        .filter(saidSo)
+        .filter((item) => !notKnownSteps.has(item.stepKey)),
       ...notKnownNow.filter(
         (item) => stepOf(state, item.stepKey)?.required !== true,
       ),
@@ -532,8 +573,43 @@ export function createOnboardingConversation(dependencies: {
     // Live re-check 2026-10-31: a value the reading says Q worked out from
     // other words (source INFERRED) is held for their yes, never saved as
     // theirs; only what they stated goes the checked way to the record.
-    const stated = answers.filter((answer) => answer.source !== "INFERRED");
-    const inferred = answers.filter((answer) => answer.source === "INFERRED");
+    // Live final re-check 2026-10-31: "we write cheques of EUR 750k to 3
+    // million" was saved as "actively investing", labelled STATED by the
+    // reading, never asked. A step whose value is a judgement about their
+    // current state (the journey marks it askOnly) is theirs only from
+    // words said to Q's own question about it (Q's line just before asked
+    // it); from anything else it is held for their yes, whatever the
+    // reading calls its source. Code decides; the label is not the guard.
+    const askOnly = coverageProfileFor(line.onboarding.journeyType).fields;
+    const fromQuestion = (answer: {
+      readonly stepKey: string;
+      readonly quote: string;
+    }): boolean =>
+      askOnly[answer.stepKey]?.askOnly !== true ||
+      personSaid.some(
+        (turn) =>
+          turn.asked === answer.stepKey &&
+          quotedFrom(answer.quote, [turn.text]),
+      );
+    const unasked = answers.filter(
+      (answer) => answer.source !== "INFERRED" && !fromQuestion(answer),
+    );
+    if (unasked.length > 0) {
+      logger.info(
+        {
+          qVoiceSessionId: line.voiceSessionId,
+          onboardingSessionId: line.onboarding.sessionId,
+          heldUnasked: unasked.map((answer) => answer.stepKey),
+        },
+        "onboarding conversation reading held an unasked judgement",
+      );
+    }
+    const stated = answers.filter(
+      (answer) => answer.source !== "INFERRED" && fromQuestion(answer),
+    );
+    const inferred = answers.filter(
+      (answer) => answer.source === "INFERRED" || !fromQuestion(answer),
+    );
     if (
       answers.length === 0 &&
       declined.length === 0 &&
@@ -562,6 +638,11 @@ export function createOnboardingConversation(dependencies: {
       false,
       addsTo,
       placeOfQuote(thread.items),
+      new Set(
+        answers
+          .filter((answer) => answer.affirms === true)
+          .map((answer) => answer.stepKey),
+      ),
     );
     const recorded =
       stated.length === 0
@@ -630,6 +711,21 @@ export function createOnboardingConversation(dependencies: {
     );
     const after = await port.state();
     considerResearch(line, identityOf(after));
+    // What was just saved opened steps this reading could not see (a raise
+    // opens its amount and currency): the same words are read once more
+    // against them, so what they said is saved now, never asked again.
+    const opened = after.steps.some(
+      (step) =>
+        isConversational(step) &&
+        step.status === "OPEN" &&
+        !state.steps.some((before) => before.stepKey === step.stepKey),
+    );
+    const savedNow = recorded.some(
+      (r) => r.outcome === "COMMITTED" && r.alreadyRecorded !== true,
+    );
+    if (opened && savedNow && rereads < OPENED_REREADS_MAX) {
+      await readAndSave(line, rereads + 1);
+    }
     await researchFor(line.onboarding.journeyType)
       ?.offerReady(line.onboarding.sessionId, port)
       .catch((error: unknown) => {
@@ -975,6 +1071,38 @@ export function placeOfQuote(
       return at < 0 ? undefined : items[at]?.createdAt;
     },
   };
+}
+
+/**
+ * An answer that only agrees to what Q offered (the reading's `affirms`)
+ * carries Q's value; any of it that is the person's own agreeing words is
+ * no value (live final re-check 2026-10-31: "Yes, please." kept as the
+ * deployment status, "yes" joined a category note). Words, compared with
+ * their quote; an option of the step is always a value. Null: nothing of
+ * it is a value.
+ */
+export function withoutAgreeingWords<
+  T extends {
+    readonly stepKey: string;
+    readonly value: string | readonly string[] | number | boolean;
+    readonly quote: string;
+    readonly affirms?: boolean | undefined;
+  },
+>(answer: T, isOption: (stepKey: string, value: string) => boolean): T | null {
+  if (answer.affirms !== true) return answer;
+  const theirs = (text: string) =>
+    !isOption(answer.stepKey, text) && quotedFrom(text, [answer.quote]);
+  if (typeof answer.value === "string") {
+    return theirs(answer.value) ? null : answer;
+  }
+  if (isWords(answer.value)) {
+    const kept = answer.value.filter((item) => !theirs(item));
+    if (kept.length === 0) return null;
+    return kept.length === answer.value.length
+      ? answer
+      : { ...answer, value: kept };
+  }
+  return answer;
 }
 
 function isWords(value: unknown): value is readonly string[] {

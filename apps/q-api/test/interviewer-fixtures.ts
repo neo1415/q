@@ -154,6 +154,12 @@ export type WorldOptions = {
    */
   readonly opensAfter?: Readonly<Record<string, string>> | undefined;
   /**
+   * The steps in opensAfter are also not listed as eligible until they
+   * open, as the service's branching lists them (live final re-check
+   * 2026-10-31: the raise's amount and currency). Opt-in.
+   */
+  readonly listsOnlyOpened?: boolean | undefined;
+  /**
    * Steps whose save fails with a 500 every time (live 2026-10-28: the
    * website). A batch carrying one fails whole, as one transaction does.
    */
@@ -276,7 +282,13 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         currentPhaseKey: null,
         // Off their path: not listed, as the service lists only eligible steps.
         eligibleSteps: STEPS.filter(
-          (step) => options.ineligible?.includes(step.stepKey) !== true,
+          (step) =>
+            options.ineligible?.includes(step.stepKey) !== true &&
+            !(
+              options.listsOnlyOpened === true &&
+              options.opensAfter?.[step.stepKey] !== undefined &&
+              !held.has(options.opensAfter[step.stepKey] ?? "")
+            ),
         ).map((step) => ({
           stepKey: step.stepKey,
           required: step.required,

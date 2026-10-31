@@ -134,6 +134,7 @@ import {
   settledByFamily,
   withAnswered,
   questionAfterTap,
+  followUpAfter,
   type QQuestion,
   type JourneyVocabulary,
   type QPrompt,
@@ -1027,13 +1028,44 @@ export function QOnboardingWorkspace({
    * turn before. The session is read again as that reading usually lands
    * (bounded: two reads), so the counter and the review catch up.
    */
-  const settleAfterReading = useCallback(() => {
-    for (const ms of SETTLE_REFRESH_MS) {
-      window.setTimeout(() => {
-        void actions.refresh();
-      }, ms);
-    }
-  }, [actions]);
+  /** Lines they sent or tapped: a late follow-up never overtakes one. */
+  const sentTurns = useRef(0);
+  /** The reply a follow-up already replaced (the two settle reads). */
+  const followedUp = useRef<string | null>(null);
+  const settleAfterReading = useCallback(
+    (shown: string | null) => {
+      const sent = sentTurns.current;
+      for (const ms of SETTLE_REFRESH_MS) {
+        window.setTimeout(() => {
+          void actions.refresh().then(async () => {
+            // Live final re-check 2026-10-31: Q replies before the reading
+            // lands; when the reading shows the reply asked what their words
+            // had answered, Q's follow-up is kept after it. It replaces the
+            // stale question, once, while nothing was sent since.
+            const sessionId = viewRef.current?.session.id;
+            if (
+              shown === null ||
+              sessionId === undefined ||
+              sentTurns.current !== sent ||
+              followedUp.current === shown
+            ) {
+              return;
+            }
+            const line = followUpAfter(
+              await onboardingThreadAction(sessionId),
+              shown,
+            );
+            if (line === null || sentTurns.current !== sent) return;
+            followedUp.current = shown;
+            push("Q", shown);
+            setQAskedStep(viewRef.current?.askedStep ?? null);
+            pendingReply.hold(line);
+          });
+        }, ms);
+      }
+    },
+    [actions, push, pendingReply],
+  );
 
   /** The Continue later leaving, declared below; a pausing typed turn uses it. */
   const leaveLaterRef = useRef<(() => void) | null>(null);
@@ -1043,6 +1075,7 @@ export function QOnboardingWorkspace({
       if (trimmed.length === 0) {
         return;
       }
+      sentTurns.current += 1;
       if (voiceActive && voiceConnected && !typed) {
         // The spoken thread carries it: same runtime path, Q answers aloud.
         voiceSendText(trimmed);
@@ -1124,7 +1157,7 @@ export function QOnboardingWorkspace({
       if (turn !== null && draftId !== undefined) {
         confirmSent(draftId, trimmed);
       }
-      if (turn !== null) settleAfterReading();
+      if (turn !== null) settleAfterReading(turn.reply);
       if (turn === null) {
         // Q never answered (a failure, a timeout, a lost connection). The
         // line says so and can be sent again; it is never left looking
@@ -1342,6 +1375,7 @@ export function QOnboardingWorkspace({
       if (liveQuestion !== null) {
         push("Q", liveQuestion);
       }
+      sentTurns.current += 1;
       const tapped = chip.value;
       const stepKey = prompt.stepKey;
       const personLine = newId();

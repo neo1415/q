@@ -75,6 +75,7 @@ import {
   INVESTOR_WEBSITE_STEP,
   INVESTOR_WEBSITE_WRITE_TARGET,
 } from "../definition/investor-v2.js";
+import { NOT_SURE_OPTION_KEY } from "../definition/investor-v3.js";
 import {
   createInvestorDomainServices,
   type InvestorDomainDependencies,
@@ -1056,12 +1057,18 @@ export function createInvestorWriteTargets(
       values,
     ) => {
       const bound = await boundOrBootstrapped(services, context, values);
-      const state = InvestorDeploymentStateSchema.safeParse(
-        singleSelect(values, INVESTOR_STEPS.deploymentStatus)?.toUpperCase(),
-      );
-      if (!state.success) {
+      const chosen = singleSelect(values, INVESTOR_STEPS.deploymentStatus);
+      // v3 "Not sure yet" (live re-check 2026-10-31): an answer, never a
+      // deployment state. The organisation's state is unknown (null), not
+      // paused and not active; a state said before is no longer theirs.
+      const parsed =
+        chosen === NOT_SURE_OPTION_KEY
+          ? ({ success: true, data: null } as const)
+          : InvestorDeploymentStateSchema.safeParse(chosen?.toUpperCase());
+      if (!parsed.success) {
         invalid("value.optionKey", "deployment_state_required", "Choose one.");
       }
+      const state = parsed;
       const investor = await services.investors.getInvestorOrganisation({
         actor: bound.context,
         investorOrganisationId: bound.investorOrganisationId,

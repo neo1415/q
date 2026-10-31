@@ -45,7 +45,10 @@ const MIGRATION = fileURLToPath(
 
 describe("Investor Definition v2", () => {
   it("is v1 with an optional website step after the firm's name", () => {
-    expect(INVESTOR_DEFINITION_CURRENT).toBe(INVESTOR_DEFINITION_V2);
+    // v3 ("Not sure yet" on deploying) is current now; v2 is its base.
+    expect(INVESTOR_DEFINITION_CURRENT.version).toBeGreaterThan(
+      INVESTOR_DEFINITION_V2.version,
+    );
     expect(() =>
       validateOnboardingManifest(INVESTOR_DEFINITION_V2),
     ).not.toThrow();

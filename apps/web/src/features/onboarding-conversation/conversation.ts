@@ -1444,3 +1444,25 @@ export function uploadAnswer(
     },
   };
 }
+
+/**
+ * A line Q added after the reply on screen (live final re-check
+ * 2026-10-31): Q replies without waiting for the reading of their words,
+ * and when that reading shows the reply asked what the same words had
+ * answered, the server keeps a follow-up after it. The kept thread then
+ * ends with the reply on screen and that line, nothing of theirs between;
+ * that line is returned. Null otherwise. Whitespace aside, as the thread
+ * keeps it.
+ */
+export function followUpAfter(
+  kept: readonly { readonly role: string; readonly text: string }[],
+  shown: string,
+): string | null {
+  const plain = (text: string) => text.replace(/\s+/gu, " ").trim();
+  const last = kept.at(-1);
+  const before = kept.at(-2);
+  if (last?.role !== "Q" || before?.role !== "Q") return null;
+  if (plain(before.text) !== plain(shown)) return null;
+  if (plain(last.text) === plain(shown)) return null;
+  return last.text;
+}

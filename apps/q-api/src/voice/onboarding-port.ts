@@ -25,6 +25,7 @@ import {
   INVESTOR_STEPS,
   INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
+  NOT_SURE_OPTION_KEY,
 } from "@capital-q/investor-onboarding";
 import {
   deriveOnboardingCoverage,
@@ -642,10 +643,11 @@ export type BoundOnboardingPort = OnboardingToolPort &
   };
 
 /**
- * What a needed step holds when they said they do not know (owner's "Not
- * sure yet" option is pending, 2026-10-31): the same words the discovery
- * style kept live ("Discovery style · I don't know"), so the read-back says
- * it plainly and a later answer replaces it.
+ * What a needed step holds when they said they do not know and it has no
+ * "Not sure yet" option of its own (investor v3 gave the deployment status
+ * one, 2026-10-31): the same words the discovery style kept live
+ * ("Discovery style · I don't know"), so the read-back says it plainly and
+ * a later answer replaces it.
  */
 export const NOT_KNOWN_TEXT = "I don't know";
 
@@ -922,6 +924,12 @@ export function createOnboardingPort(input: {
    * the whole list. Absent: an answer replaces, as a typed one does.
    */
   readonly addsTo?: ReadonlySet<string> | undefined;
+  /**
+   * Steps whose answer only agrees to what Q offered (the transcript
+   * reading's `affirms`): saved as the value Q offered, or not at all;
+   * never with the person's agreeing words as its text or note.
+   */
+  readonly affirmed?: ReadonlySet<string> | undefined;
   /**
    * A category word the taxonomy lookup found ambiguous, chosen among the
    * lookup's own candidates by meaning (TAXONOMY_MAPPING). Null or empty:
@@ -1625,6 +1633,11 @@ export function createOnboardingPort(input: {
     /** Their own words for it, kept when no option or number holds them. */
     readonly quote?: string | undefined;
   }): Promise<Resolved> => {
+    // Their words only agreed to what Q offered (the reading's `affirms`):
+    // the value is Q's, and their agreeing words are never kept as the
+    // answer's text or note (live final re-check 2026-10-31: "Yes, please."
+    // saved as the deployment status, "; yes" in a category note).
+    const affirmed = input.affirmed?.has(answer.stepKey) === true;
     const refuse = (result: OnboardingRecordResult): Resolved => ({
       ok: false,
       result,
@@ -1650,6 +1663,14 @@ export function createOnboardingPort(input: {
         candidates: options.slice(0, 40).map((o) => o.label.slice(0, 160)),
       };
     };
+    /** A yes to an offer that names none of the step's choices. */
+    const affirmedUnmatched = (
+      step: OnboardingStepManifest,
+    ): OnboardingRecordResult => ({
+      ...unmatchedResult(step),
+      reason:
+        "They agreed to what you offered, but it names none of this step's choices, and their yes is not an answer's words. Nothing was recorded; ask them which choice they mean.",
+    });
     const step = steps.get(answer.stepKey);
     if (step === undefined) {
       return refuse({
@@ -1743,7 +1764,10 @@ export function createOnboardingPort(input: {
             nodeNames.set(id, node.displayName);
             names.push({
               displayName: node.displayName,
-              group: groupNodeIds.has(id),
+              // "region" is a place's word (live final re-check 2026-10-31:
+              // "grain-storage analytics" read as "Agriculture region").
+              group:
+                groupNodeIds.has(id) && c.vocabularyCodes.includes("geography"),
             });
           }
           if (names.length > 0) {
@@ -1794,6 +1818,12 @@ export function createOnboardingPort(input: {
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
         nodeNames.set(best.nodeId, best.displayName);
+      }
+      if (affirmed && unmatched.length > 0) {
+        // A yes to what Q offered: what Q offered that names a category is
+        // kept; nothing else of it is "their words".
+        if (ids.length === 0) return refuse(affirmedUnmatched(step));
+        unmatched.length = 0;
       }
       if (unmatched.length > 0 && ids.length > 0) {
         // The categories that matched, with their other words beside them:
@@ -1978,6 +2008,12 @@ export function createOnboardingPort(input: {
         }
         unnamed.splice(0, unnamed.length, ...still);
       }
+      // A yes to what Q offered names an option or nothing: never "their
+      // words" on the catch-all or as the answer's text.
+      if (affirmed && unnamed.length > 0) {
+        if (keys.length === 0) return refuse(affirmedUnmatched(step));
+        unnamed.length = 0;
+      }
       // Founder direction 2026-09-30: an answer outside the options is
       // kept in their words ("Uzbekistan", "Founder"), on the step's own
       // catch-all, never lost or forced into a near option. Only where the
@@ -2065,7 +2101,12 @@ export function createOnboardingPort(input: {
       // A number question answered in words no figure can be read from
       // ("a dozen or so", "about half the team"): kept as they said it,
       // unless the figure is impossible, which is asked about instead.
-      if (value === null && c.stepType === "range" && !impossibleFigure(raw)) {
+      if (
+        value === null &&
+        c.stepType === "range" &&
+        !affirmed &&
+        !impossibleFigure(raw)
+      ) {
         return {
           ok: true,
           step,
@@ -2076,6 +2117,7 @@ export function createOnboardingPort(input: {
     if (
       value === null &&
       (c.stepType === "single_select" || c.stepType === "multi_select") &&
+      !affirmed &&
       !OPTION_ONLY_STEPS.has(step.stepKey)
     ) {
       // More than one option named for a one-choice question: their words,
@@ -4582,28 +4624,47 @@ export function createOnboardingPort(input: {
           const onRecord = (await current()).responses.find(
             (r) => r.stepKey === step.stepKey,
           );
+          // The step's own "Not sure yet" where it has one (investor v3,
+          // live re-check 2026-10-31): an answer its write target reads as
+          // unknown. Otherwise the words of NOT_KNOWN_TEXT.
+          const notSure = optionsOf(step).find(
+            (option) => option.key === NOT_SURE_OPTION_KEY,
+          );
+          const recorded = notSure?.label ?? NOT_KNOWN_TEXT;
           if (
-            onRecord?.value.type === "TEXT" &&
-            onRecord.value.text === NOT_KNOWN_TEXT
+            (onRecord?.value.type === "TEXT" &&
+              onRecord.value.text === NOT_KNOWN_TEXT) ||
+            (onRecord?.value.type === "SINGLE_SELECT" &&
+              onRecord.value.optionKey === NOT_SURE_OPTION_KEY)
           ) {
             results.push({
               stepKey: step.stepKey,
               outcome: "COMMITTED",
               question,
-              recorded: NOT_KNOWN_TEXT,
+              recorded,
               alreadyRecorded: true,
             });
             continue;
           }
           // A new version over whatever was there (history kept): what was
-          // on record is no longer known, by their own word.
-          await submit(step.stepKey, { type: "TEXT", text: NOT_KNOWN_TEXT });
+          // on record is no longer known, by their own word. A session
+          // pinned to a version without the option takes the words.
+          const asOption =
+            notSure === undefined
+              ? false
+              : await submit(step.stepKey, {
+                  type: "SINGLE_SELECT",
+                  optionKey: NOT_SURE_OPTION_KEY,
+                }).then(() => true, reported("not-sure option save", false));
+          if (!asOption) {
+            await submit(step.stepKey, { type: "TEXT", text: NOT_KNOWN_TEXT });
+          }
           written.push(step.stepKey);
           results.push({
             stepKey: step.stepKey,
             outcome: "COMMITTED",
             question,
-            recorded: NOT_KNOWN_TEXT,
+            recorded: asOption ? recorded : NOT_KNOWN_TEXT,
           });
         } catch (error: unknown) {
           results.push(refused(step.stepKey, error));

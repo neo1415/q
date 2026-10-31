@@ -339,7 +339,7 @@ describe("live 2026-10-30 item 5: 'No website yet' settles the website", () => {
     expect(reader.definition.template).toContain("no website yet");
     expect(reader.definition.template).toContain("LONG_TEXT");
     const reply = registry.getActive("ONBOARDING_TYPED_REPLY");
-    expect(reply.definition.version).toBe(4);
+    expect(reply.definition.version).toBeGreaterThanOrEqual(4);
     expect(reply.definition.template).toContain("(say back)");
   });
 });

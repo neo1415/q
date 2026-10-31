@@ -34,9 +34,20 @@ export {
   STAGE_ORDER,
   type InvestorStepKey,
 } from "./investor-v1.js";
+/**
+ * The version new investor sessions pin to (v3: "Not sure yet" on the
+ * deployment status). A superset of v1 and v2, so an older session reads
+ * correctly through it.
+ */
+export {
+  DEPLOYMENT_STATUS_OPTIONS_V3,
+  INVESTOR_DEFINITION_V3,
+  INVESTOR_DEFINITION_V3 as INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V3_VERSION,
+  NOT_SURE_OPTION_KEY,
+} from "./investor-v3.js";
 export {
   INVESTOR_DEFINITION_V2,
-  INVESTOR_DEFINITION_V2 as INVESTOR_DEFINITION_CURRENT,
   INVESTOR_DEFINITION_V2_VERSION,
   INVESTOR_REVISABLE_STEPS,
   INVESTOR_WEBSITE_STEP,

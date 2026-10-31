@@ -3,9 +3,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  OnboardingTranscriptReaderV4ResultSchema,
+  OnboardingTranscriptReaderV5ResultSchema,
   renderPrompt,
-  type OnboardingTranscriptReaderV4Result,
+  type OnboardingTranscriptReaderV5Result,
   type OnboardingTranscriptReaderVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -21,8 +21,8 @@ import type { ModelGateway } from "../gateway.js";
  */
 export type OnboardingTranscriptReading = {
   readonly answers: readonly (Omit<
-    OnboardingTranscriptReaderV4Result["answers"][number],
-    "replaces" | "aboutStep" | "source"
+    OnboardingTranscriptReaderV5Result["answers"][number],
+    "replaces" | "aboutStep" | "source" | "affirms"
   > & {
     /**
      * A list step: true when they meant it as the whole list (read by
@@ -43,14 +43,32 @@ export type OnboardingTranscriptReading = {
      * reading, which is then a statement.
      */
     readonly source?: "STATED" | "INFERRED" | undefined;
+    /**
+     * Their words only agree to what Q's line just before put to them (a
+     * yes): the value is Q's offered value, and their agreeing words are
+     * never kept as the answer's text or note. Absent: false.
+     */
+    readonly affirms?: boolean | undefined;
   })[];
-  readonly declined: OnboardingTranscriptReaderV4Result["declined"];
+  readonly declined: readonly SaidStep[];
   /**
    * Steps they said they do not know or have not decided (never a value):
    * an optional one is declined, a needed one is recorded as not known.
    */
-  readonly notKnown?:
-    OnboardingTranscriptReaderV4Result["notKnown"] | undefined;
+  readonly notKnown?: readonly SaidStep[] | undefined;
+};
+
+/**
+ * A step they declined or do not know, with their words. `saidSo` false:
+ * the reading found they did not answer it, not that their words say so;
+ * nothing is acted on (live final re-check 2026-10-31: an unanswered half
+ * of Q's question was set aside as skipped). Absent: a hand-built reading,
+ * taken as said.
+ */
+export type SaidStep = {
+  readonly stepKey: string;
+  readonly quote: string;
+  readonly saidSo?: boolean | undefined;
 };
 
 export type OnboardingTranscriptReader = {
@@ -171,12 +189,12 @@ export function createOnboardingTranscriptReader(dependencies: {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: OnboardingTranscriptReaderV4ResultSchema,
+            schema: OnboardingTranscriptReaderV5ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = OnboardingTranscriptReaderV4ResultSchema.safeParse(
+        const parsed = OnboardingTranscriptReaderV5ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) {

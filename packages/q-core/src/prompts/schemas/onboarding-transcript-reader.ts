@@ -236,3 +236,71 @@ export const OnboardingTranscriptReaderV4ResultSchema = z
 export type OnboardingTranscriptReaderV4Result = z.infer<
   typeof OnboardingTranscriptReaderV4ResultSchema
 >;
+
+/**
+ * v5 (live final re-check 2026-10-31, production 68ab54317):
+ *
+ * - "Yes, please." to Q's offer to change the deployment status was kept
+ *   as the step's text, and "yes" to a say-back joined a category note.
+ *   Each answer now says whether their words only agree to what Q put to
+ *   them (`affirms`): the value is then Q's offered value, and code never
+ *   keeps their agreeing words as an answer's text or note.
+ * - An optional question they left unanswered (Q asked about pilots and
+ *   the currency together; they gave the currency) was set aside as if
+ *   they had skipped it. A decline or a "do not know" now says whether
+ *   their own words say so (`saidSo`); code acts only on those.
+ */
+export const ONBOARDING_TRANSCRIPT_READER_V5_SCHEMA_VERSION = 5;
+
+export const OnboardingTranscriptReaderV5ResultSchema = z
+  .object({
+    answers: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            value: ValueSchema,
+            quote: z.string().trim().min(1).max(400),
+            ownWords: z.boolean(),
+            replaces: z.boolean().default(false),
+            aboutStep: z.boolean().default(false),
+            source: z.enum(["STATED", "INFERRED"]),
+            /**
+             * True when their words for this value only agree to what Q's
+             * line just before put to them (a yes): the value is Q's.
+             * False when their own words give the value.
+             */
+            affirms: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(60),
+    declined: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            quote: z.string().trim().min(1).max(400),
+            /** Their own words say they skip it or do not have it. */
+            saidSo: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(30),
+    notKnown: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            quote: z.string().trim().min(1).max(400),
+            /** Their own words say they do not know it or have not decided. */
+            saidSo: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(30),
+  })
+  .strict();
+export type OnboardingTranscriptReaderV5Result = z.infer<
+  typeof OnboardingTranscriptReaderV5ResultSchema
+>;
