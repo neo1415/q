@@ -1,5 +1,14 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED b10cd6c87 — 1 November 2026, 17:19 UTC (Claude coordinator)
+
+- **All four services** SUCCESS on `b10cd6c87` (CI run 1728 green). It contains everything in `HANDOFF-2026-11-01.md` plus `fix/provider-recover`:
+  - while an exhausted or refused provider is blocked, one probe goes out every 30 s, so a top-up takes effect within about 30 s;
+  - an honest "can't reach my reasoning service… your message is kept" line replaces "send it again" when no model is reachable;
+  - an ERROR log line names the provider.
+- **Not yet exercised live:** q-api started cleanly with no errors, but no Q turn has run since. Hosted migrations are unchanged at 268/268.
+- **Open items:** `HANDOFF-2026-11-01.md` section 3.
+
 ## DEPLOYED 656719a90 — 31 October 2026, 17:11 UTC (Claude coordinator)
 
 - **All four services** on `656719a90` (`recovery/2026-09-12`, `build/int-rc`); CI green (run 1722). Integration branch `fix/resume-asking`. Hosted migrations 268/268 (latest `20261231210000` investor onboarding v3, "Not sure yet").

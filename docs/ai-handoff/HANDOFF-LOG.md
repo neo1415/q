@@ -1385,3 +1385,15 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Why fixes keep passing tests and failing live:** the onboarding tests use fake readers/choosers that return the shapes the fix expects; the live models return other shapes (e.g. traction words not in `beyond`). Next attempt should replay the real live transcripts through the real models (a few cents, owner approval for provider spend) before deploying.
 - **Outage:** since 23:01Z every public search provider (ScrapingBee, Serper, Tavily, Brave) is refusing — key refused or credit spent. All memos/research run with no public sources until the owner tops up or replaces keys.
 - **Also seen:** founder flow stalled >30 s after the raise answer until "let's finish"; a stray "What's your website?" after a skipped website; "I'll keep recurring revenue as your preference" while it is stored only as free text.
+
+## 2026-11-01 17:30 UTC — provider recovery deployed (Claude coordinator)
+
+- **Cause of the repeated "didn't come through / send it again" after the owner topped up OpenAI (31 Oct):**
+  - at 15:18:31Z OpenAI returned `credit_balance_exhausted`;
+  - `health.ts` then blocked the provider for 10 min with no probe;
+  - Gemini isn't configured, so every turn hit `no configured model is eligible`, and the turn reader returned a generic "send it again".
+- **Fix (`fix/provider-recover`, deployed `b10cd6c87`):**
+  - a blocked provider is probed once every 30 s;
+  - the person is told plainly that the reasoning service can't be reached;
+  - an ERROR log line names the provider.
+- **Not yet exercised by a live turn** since the deploy.
