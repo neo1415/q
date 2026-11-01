@@ -681,6 +681,9 @@ function turnReaderInput(
     /** The run the reading is for, so its model usage is the run's. */
     readonly runId: string;
     readonly signal?: AbortSignal | undefined;
+    /** Told why a reading failed (QTurnReader `onFailure`). */
+    readonly onFailure?:
+      ((failure: { readonly serviceUnavailable: boolean }) => void) | undefined;
   },
   /**
    * Capital Q's own note of what was shown and the last action (follow-55),
@@ -718,6 +721,9 @@ function turnReaderInput(
       qRunId: context.runId,
     },
     signal: context.signal,
+    ...(context.onFailure === undefined
+      ? {}
+      : { onFailure: context.onFailure }),
   };
 }
 
@@ -1838,6 +1844,16 @@ export const TURN_REREAD_DEADLINE_MS = TURN_READER_ATTEMPT_TIMEOUT_MS + 1_000;
  */
 export const TURN_UNREAD_REPLY =
   "Sorry, I couldn't read that request just now, so I haven't started anything. Please send it again in a moment.";
+
+/**
+ * What Q says instead when the turn went unread because no reasoning route
+ * could be reached at all (an exhausted provider account, a refused key,
+ * an outage). Live 2026-10-31: OpenAI credit ran out and every turn was
+ * told TURN_UNREAD_REPLY, as if the person's words were the problem. It is
+ * Q's side; their message is kept on the thread.
+ */
+export const TURN_UNREACHABLE_REPLY =
+  "I can't reach my reasoning service right now, so I haven't started anything on that yet. The fault is on my side, not in your message, and your message is kept here; send it again in a minute and I'll take it from there.";
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).
@@ -5433,6 +5449,9 @@ export function createSpecialistQAnswer(
     request.signal?.addEventListener("abort", () => readerAbort.abort(), {
       once: true,
     });
+    // Why this turn's latest reading failed: no reasoning route at all, or
+    // a model that answered nothing usable (live 2026-10-31).
+    const readFailure = { serviceUnavailable: false };
     const readTurn = (signal: AbortSignal = readerAbort.signal) =>
       turns.read(
         turnReaderInput(
@@ -5445,6 +5464,9 @@ export function createSpecialistQAnswer(
             correlationId: request.correlationId,
             runId: request.runId,
             signal,
+            onFailure: (failure) => {
+              readFailure.serviceUnavailable = failure.serviceUnavailable;
+            },
           },
           withResolution(referenceNote(shown, lastAction), pointed),
           request.plan.screen?.manifest?.controls,
@@ -7263,11 +7285,21 @@ export function createSpecialistQAnswer(
     // (TURN_UNREAD_REPLY). Whatever it asked for is not started and not
     // answered as something else; Q says so and they send it again.
     if (finalRequest.turnUnread === true) {
+      // No reasoning route at all is Q's side, said plainly; their message
+      // is on the thread either way (live 2026-10-31: credit ran out and
+      // every turn was told to send it again, as if the words were at fault).
+      const unavailable = readFailure.serviceUnavailable;
       logger?.warn(
-        { qRunId: request.runId },
-        "a turn to Q was not read; nothing started, asked to send it again",
+        { qRunId: request.runId, serviceUnavailable: unavailable },
+        unavailable
+          ? "a turn to Q was not read; no reasoning route could be reached, said so"
+          : "a turn to Q was not read; nothing started, asked to send it again",
       );
-      return recordAnswer(request, conversationId, TURN_UNREAD_REPLY);
+      return recordAnswer(
+        request,
+        conversationId,
+        unavailable ? TURN_UNREACHABLE_REPLY : TURN_UNREAD_REPLY,
+      );
     }
     {
       const sentAt = Date.parse(latest.createdAt);

@@ -54,6 +54,7 @@ import {
   planStartWords,
   storedPlanOffer,
   TURN_REREAD_DEADLINE_MS,
+  TURN_UNREACHABLE_REPLY,
   TURN_UNREAD_REPLY,
   unknownScreenLine,
 } from "../src/answer.js";
@@ -1631,6 +1632,62 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     expect(run.stored.map((message) => message.content)).toEqual([
       TURN_UNREAD_REPLY,
     ]);
+  });
+
+  // Live 2026-10-31 (q-api 24af1559a): OpenAI credit ran out; every turn
+  // had no eligible route and was told TURN_UNREAD_REPLY, as if their
+  // words were at fault. No reasoning route at all is said plainly.
+  it("a turn unread because no reasoning route could be reached says so, and that their message is kept", async () => {
+    let attempts = 0;
+    const reader = createQTurnReader({
+      gateway: {
+        execute: () => {
+          attempts += 1;
+          return Promise.reject(
+            new ModelGatewayError(
+              "no configured model is eligible for this request",
+              {
+                failureClass: "POLICY_INELIGIBLE",
+                attempts: 0,
+                candidates: [
+                  {
+                    providerCode: "openai",
+                    modelCode: "gpt-5.6-luna",
+                    candidateIndex: 0,
+                    reason: "PROVIDER_TEMPORARILY_FAILING",
+                  },
+                  {
+                    providerCode: "google",
+                    modelCode: "gemini-3.8-flash",
+                    candidateIndex: 1,
+                    reason: "PROVIDER_UNCONFIGURED",
+                  },
+                ],
+              },
+            ),
+          );
+        },
+      },
+      logger: createLogger(
+        { serviceName: "q-specialists-test", environment: "test" },
+        { level: "silent" },
+      ),
+    });
+    const run = seam({
+      said: "Plan my raise over 8 weeks",
+      reading: null,
+      outcomes: [],
+      read: (input) => reader.read(input),
+    });
+    await run.answer.answer(request());
+    expect(attempts).toBe(2);
+    expect(run.delegated()).toBe(0);
+    expect(run.stored.map((message) => message.content)).toEqual([
+      TURN_UNREACHABLE_REPLY,
+    ]);
+    expect(TURN_UNREACHABLE_REPLY).toMatch(/can't reach my reasoning service/u);
+    expect(TURN_UNREACHABLE_REPLY).toMatch(/not in your message/u);
+    expect(TURN_UNREACHABLE_REPLY).toMatch(/kept/u);
   });
 
   it("the extra reading is cut off at its deadline: one extra try, the turn answered as unread", async () => {

@@ -41,6 +41,7 @@ export {
 
 export {
   isModelGatewayError,
+  isModelServiceUnavailable,
   ModelGatewayError,
   ModelProviderFailure,
   type ModelGatewayErrorOptions,

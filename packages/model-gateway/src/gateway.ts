@@ -706,6 +706,28 @@ export function createModelGateway(
           // on every turn that then skips it), and counted.
           if (before === "HEALTHY" && after !== "HEALTHY") {
             metrics.providerCoolDowns.add(1, { ...labels, state: after });
+          }
+          // The owner must see this one at a glance (live 2026-10-31: credit
+          // ran out and only warnings said so). Said each time the account
+          // block opens or a probe finds it still shut, never per turn.
+          if (exhausted || failureClass === "AUTHENTICATION") {
+            logger?.error(
+              {
+                ...labels,
+                provider: provider.code,
+                failureClass,
+                accountExhausted: exhausted,
+                providerStatus:
+                  outcome.kind === "FAILURE" &&
+                  outcome.cause instanceof ModelProviderFailure
+                    ? outcome.cause.providerStatus
+                    : undefined,
+              },
+              exhausted
+                ? `model provider ${provider.code} account exhausted (credit or quota): every model on it set aside until a probe succeeds`
+                : `model provider ${provider.code} refused the key: this model set aside until a probe succeeds`,
+            );
+          } else if (before === "HEALTHY" && after !== "HEALTHY") {
             logger?.warn(
               {
                 ...labels,
@@ -989,9 +1011,25 @@ export function createModelGateway(
      */
     const room: { ranOut: boolean } = { ranOut: false };
 
+    /** Planned models a provider block turned away at the door. */
+    const turnedAway = new Set<number>();
+
     for (const candidate of plan.eligible) {
       const provider = dependencies.registry.get(candidate.provider.code);
       if (provider === undefined) {
+        continue;
+      }
+      // A blocked account or key: only the one due probe goes through, and
+      // after one of its models just answered "exhausted" in this request,
+      // none of its siblings is asked again (live 2026-10-31).
+      if (
+        health.admit?.(
+          candidate.provider.code,
+          candidate.model.modelCode,
+          clock.now(),
+        ) === false
+      ) {
+        turnedAway.add(candidate.candidateIndex);
         continue;
       }
       if (
@@ -1298,6 +1336,27 @@ export function createModelGateway(
       }
     }
 
+    // Every planned model turned away by a provider block, none asked: as
+    // much "no eligible route" as a plan that found none, and said so.
+    if (
+      lastFailure === undefined &&
+      attempts.length === 0 &&
+      turnedAway.size > 0
+    ) {
+      throw new ModelGatewayError(
+        "no configured model is eligible for this request",
+        {
+          failureClass: "POLICY_INELIGIBLE",
+          attempts: 0,
+          candidates: plan.decisions.map((decision) =>
+            turnedAway.has(decision.candidateIndex)
+              ? { ...decision, reason: "PROVIDER_TEMPORARILY_FAILING" as const }
+              : decision,
+          ),
+          routingPolicyCode: policy.code,
+        },
+      );
+    }
     const failureClass: ModelFailureClass =
       lastFailure ??
       (attempts.length === 0 ? "BUDGET_EXCEEDED" : "PROVIDER_OUTAGE");

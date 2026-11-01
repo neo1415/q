@@ -24,7 +24,7 @@ import {
   type TurnReaderV75Result,
 } from "@capital-q/q-core";
 
-import { isModelGatewayError } from "../errors.js";
+import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
 import type { ModelGateway } from "../gateway.js";
 
 /**
@@ -82,6 +82,15 @@ export type QTurnReader = {
       readonly qRunId?: string | undefined;
     };
     readonly signal?: AbortSignal | undefined;
+    /**
+     * Told, when the reading fails, whether it was because no reasoning
+     * route could be reached at all (an exhausted account, a refused key,
+     * an outage: `isModelServiceUnavailable`) rather than a model that was
+     * asked and gave nothing usable. The person is told which (live
+     * 2026-10-31). Never called for a cancelled reading.
+     */
+    readonly onFailure?:
+      ((failure: { readonly serviceUnavailable: boolean }) => void) | undefined;
   }) => Promise<QTurnReading | null>;
 };
 
@@ -567,6 +576,9 @@ export function createQTurnReader(dependencies: {
           isModelGatewayError(error) && error.failureClass === "CANCELLED"
         )) {
           logger.warn({ err: error }, "a turn to Q was not read");
+          input.onFailure?.({
+            serviceUnavailable: isModelServiceUnavailable(error),
+          });
         }
         return null;
       }
