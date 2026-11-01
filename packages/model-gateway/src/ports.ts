@@ -202,6 +202,19 @@ export type ProviderHealthPort = {
     model: ModelCode,
     at: Date,
   ) => ProviderHealthState;
+  /**
+   * Asked once, just before a planned model is first attempted: false
+   * means skip it. Only a model behind an account or key block says false;
+   * while such a block is open it says true to ONE ask per probe interval
+   * (claimed as it answers), so a fixed account is noticed within that
+   * interval without every concurrent turn paying for the check. Absent:
+   * always true.
+   */
+  readonly admit?: (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ) => boolean;
   readonly recordFailure: (
     code: ModelProviderCode,
     model: ModelCode,

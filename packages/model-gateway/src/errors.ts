@@ -90,3 +90,55 @@ export function isModelGatewayError(
 ): error is ModelGatewayError {
   return error instanceof ModelGatewayError;
 }
+
+/** Provider-side reasons a planned model was not available to ask. */
+const PROVIDER_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
+  "PROVIDER_TEMPORARILY_FAILING",
+  "PROVIDER_UNCONFIGURED",
+  "PROVIDER_DISABLED",
+]);
+
+/**
+ * Whether a failure means Q's reasoning service could not be reached at
+ * all -- every route set aside (an exhausted account, a refused key, an
+ * outage), none configured, or the spend limit -- as opposed to a model
+ * that was asked and gave nothing usable in time (a timeout, a refused
+ * answer). The person is told the first plainly, and that what they said
+ * is kept; it is never their message's fault (live 2026-10-31: OpenAI
+ * credit ran out and turns were answered "send it again").
+ */
+export function isModelServiceUnavailable(error: unknown): boolean {
+  if (!isModelGatewayError(error)) return false;
+  switch (error.failureClass) {
+    case "BUDGET_EXCEEDED":
+    case "AUTHENTICATION":
+    case "PROVIDER_OUTAGE":
+      return true;
+    case "PERMANENT":
+      return (
+        error.cause instanceof ModelProviderFailure &&
+        error.cause.accountExhausted
+      );
+    case "POLICY_INELIGIBLE":
+      // Only when providers, not the request's own privacy or price, left
+      // it without a route.
+      return (
+        error.candidates.some(
+          (decision) => decision.reason === "PROVIDER_TEMPORARILY_FAILING",
+        ) ||
+        (error.candidates.length > 0 &&
+          error.candidates.every((decision) =>
+            PROVIDER_UNAVAILABLE_REASONS.has(decision.reason),
+          ))
+      );
+    // Asked and answered nothing usable, or stopped: not unreachable.
+    case "TRANSIENT":
+    case "RATE_LIMIT":
+    case "TIMEOUT":
+    case "INVALID_MODEL_OUTPUT":
+    case "INVALID_REQUEST":
+    case "CONTEXT_LIMIT":
+    case "CANCELLED":
+      return false;
+  }
+}

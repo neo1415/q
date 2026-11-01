@@ -57,11 +57,22 @@ const TIMEOUT_MEANS_UNHEALTHY_AFTER_MS = 20_000;
 
 /**
  * A provider whose ACCOUNT cannot serve (credit or quota exhausted) is
- * skipped, every model on it, for this long after one such answer; then
- * one attempt probes it again. Live 2026-10-01: OpenAI credit ran out and
- * every turn first spent two retries on it before falling back.
+ * skipped, every model on it, for this long after one such answer. Live
+ * 2026-10-01: OpenAI credit ran out and every turn first spent two retries
+ * on it before falling back.
  */
 const ACCOUNT_EXHAUSTED_OPEN_MS = 10 * 60_000;
+
+/**
+ * While an account or key block is open, ONE real request is let through
+ * this often to see whether a person has fixed it. Live 2026-10-31: the
+ * owner topped up OpenAI credit, and every turn for the rest of the ten
+ * minutes still had no route and was told to send it again. An exhausted
+ * account answers 402 at once, so a probe costs one fast refusal a
+ * half-minute, never a retry and never one per concurrent turn
+ * (`admit`); a probe that succeeds clears the block (`recordSuccess`).
+ */
+const BLOCKED_PROBE_INTERVAL_MS = 30_000;
 
 /**
  * Round 8 (hosted Gemini 402, 2026-10-21): a 429 backs that one model off
@@ -76,6 +87,8 @@ export type ProviderHealthOptions = {
   readonly windowMs?: number | undefined;
   readonly openForMs?: number | undefined;
   readonly accountExhaustedOpenForMs?: number | undefined;
+  /** How often a blocked account or key is probed by one real request. */
+  readonly blockedProbeIntervalMs?: number | undefined;
 };
 
 export function createProcessLocalProviderHealth(
@@ -88,13 +101,49 @@ export function createProcessLocalProviderHealth(
   const openUntil = new Map<string, number>();
   const accountOpenForMs =
     options.accountExhaustedOpenForMs ?? ACCOUNT_EXHAUSTED_OPEN_MS;
+  const probeEveryMs =
+    options.blockedProbeIntervalMs ?? BLOCKED_PROBE_INTERVAL_MS;
   /** Provider-wide: every model on an exhausted account. */
   const accountOpenUntil = new Map<ModelProviderCode, number>();
+  /** One model whose key the provider refused (401/403). */
+  const refusedUntil = new Map<string, number>();
+  /**
+   * When each open block (provider for an account, provider+model for a
+   * refused key) last let a request through, or opened. A probe is due
+   * once this is `probeEveryMs` old.
+   */
+  const lastProbe = new Map<string, number>();
   /** One model, after a 429: tried only as the last resort until then. */
   const backoffUntil = new Map<string, number>();
 
   const keyOf = (code: ModelProviderCode, model: ModelCode): string =>
     `${code}\u0000${model}`;
+  const accountKey = (code: ModelProviderCode): string => `${code}\u0000*`;
+
+  /**
+   * The block a request to this model meets, if any: its key, and whether
+   * a probe of it is due. The account block is checked first because it
+   * covers every model on the provider.
+   */
+  const blockOf = (
+    code: ModelProviderCode,
+    model: ModelCode,
+    now: number,
+  ): { readonly key: string; readonly probeDue: boolean } | null => {
+    const due = (key: string) =>
+      now - (lastProbe.get(key) ?? 0) >= probeEveryMs;
+    const accountUntil = accountOpenUntil.get(code);
+    if (accountUntil !== undefined && accountUntil > now) {
+      const key = accountKey(code);
+      return { key, probeDue: due(key) };
+    }
+    const key = keyOf(code, model);
+    const refused = refusedUntil.get(key);
+    if (refused !== undefined && refused > now) {
+      return { key, probeDue: due(key) };
+    }
+    return null;
+  };
 
   const state = (
     code: ModelProviderCode,
@@ -105,8 +154,10 @@ export function createProcessLocalProviderHealth(
     if (until !== undefined && until > at.getTime()) {
       return "TEMPORARILY_FAILING";
     }
-    const accountUntil = accountOpenUntil.get(code);
-    if (accountUntil !== undefined && accountUntil > at.getTime()) {
+    // A block whose probe is due reads healthy, so the model is planned
+    // in its usual place; `admit` lets only one request actually ask.
+    const block = blockOf(code, model, at.getTime());
+    if (block !== null && !block.probeDue) {
       return "TEMPORARILY_FAILING";
     }
     const backoff = backoffUntil.get(keyOf(code, model));
@@ -118,6 +169,16 @@ export function createProcessLocalProviderHealth(
 
   return {
     state,
+    admit: (code, model, at) => {
+      const now = at.getTime();
+      const block = blockOf(code, model, now);
+      if (block === null) return true;
+      if (!block.probeDue) return false;
+      // Claimed here, synchronously, so concurrent turns that planned the
+      // same due probe do not all send it.
+      lastProbe.set(block.key, now);
+      return true;
+    },
     recordFailure: (
       code,
       model,
@@ -133,13 +194,16 @@ export function createProcessLocalProviderHealth(
       // (hosted Gemini 402, 2026-10-21).
       if (exhausted === true) {
         accountOpenUntil.set(code, now + accountOpenForMs);
+        lastProbe.set(accountKey(code), now);
         return;
       }
       // A key the provider refused (401/403, after the adapter tried its
       // other keys) does not heal either; only this model is skipped, as a
       // refusal can be one model's (not enabled for the key).
       if (failureClass === "AUTHENTICATION") {
-        openUntil.set(keyOf(code, model), now + accountOpenForMs);
+        const key = keyOf(code, model);
+        refusedUntil.set(key, now + accountOpenForMs);
+        lastProbe.set(key, now);
         return;
       }
       if (failureClass === "RATE_LIMIT") {
@@ -174,7 +238,10 @@ export function createProcessLocalProviderHealth(
     },
     recordSuccess: (code, model) => {
       accountOpenUntil.delete(code);
+      lastProbe.delete(accountKey(code));
       const key = keyOf(code, model);
+      refusedUntil.delete(key);
+      lastProbe.delete(key);
       backoffUntil.delete(key);
       failures.delete(key);
       openUntil.delete(key);
@@ -185,6 +252,7 @@ export function createProcessLocalProviderHealth(
 /** Always healthy; for tests and for compositions that opt out. */
 export const alwaysHealthy: ProviderHealthPort = {
   state: () => "HEALTHY",
+  admit: () => true,
   recordFailure: () => undefined,
   recordSuccess: () => undefined,
 };
