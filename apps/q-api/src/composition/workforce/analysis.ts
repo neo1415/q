@@ -411,7 +411,7 @@ export type AnalysisIssue = AnalysisCritiqueResult["issues"][number];
 const FIGURE =
   /(?:[$£€]\s?\d[\d,.]*|\b(?:USD|KES|KSh|EUR|GBP|NGN|ZAR)\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:%|per ?cent\b|percent\b|[mb]n?\b|million\b|billion\b|thousand\b|k\b))/iu;
 const BASIS =
-  /\[S\d{1,3}\]|\(estimate|\bestimate[sd]?\b|\(company record|\(Q's inference|Q's inference|\bnot known\b|\bunknown\b/iu;
+  /\[S\d{1,3}\]|\(estimate|\bestimate[sd]?\b|\(company record|\(your mandate\)|\(Q's inference|Q's inference|\bnot known\b|\bunknown\b/iu;
 const CITED = /\[S(\d{1,3})\]/gu;
 
 function sentencesOf(text: string): readonly string[] {

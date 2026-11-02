@@ -39,6 +39,7 @@ import {
 import { createWorkforceDocuments } from "../src/composition/workforce/documents.js";
 import {
   createOwnContextReader,
+  MANDATES_LINE,
   relationshipsInFocus,
 } from "../src/composition/workforce/own-context.js";
 import type { DataRoomReads } from "../src/composition/workforce/diligence-memo.js";
@@ -1797,7 +1798,7 @@ describe("J7: a document about a relationship carries its history", () => {
       "INVESTOR_MANDATES",
       "INVESTOR_ORGANISATION",
     ]);
-    expect(text).toContain("Their mandates (declared):");
+    expect(text).toContain(MANDATES_LINE);
     expect(text).toContain("Seed fintech, West Africa");
     // The pipeline the brief already holds is not repeated.
     expect(text).not.toContain("Their pipeline");
