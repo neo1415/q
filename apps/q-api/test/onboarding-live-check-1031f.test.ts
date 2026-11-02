@@ -342,7 +342,10 @@ describe("3. their words beyond the option they were read as are kept and read b
       type: "SINGLE_SELECT",
       optionKey: "paying",
     });
-    expect(w.recordedNote("F5.signal")).toBeUndefined();
+    // Never the chooser's words. Their turn does say more than the option,
+    // so (replay 2026-11-02) their sentence is kept as said instead of lost.
+    expect(w.recordedNote("F5.signal") ?? "").not.toMatch(/500|Finland/u);
+    expect(SAID.startsWith(w.recordedNote("F5.signal") ?? "")).toBe(true);
   });
 });
 

@@ -216,6 +216,31 @@ export function saysBeyond(turn: string, labels: readonly string[]): boolean {
   );
 }
 
+/**
+ * The parts of a chooser's `beyond` that are their words as said and say
+ * more than the option chosen. Replay 2026-11-02 (the live traction answer
+ * through TAXONOMY_CHOICE on gpt-5.6-luna): "3 paying customers, 40 lockers
+ * in 12 towns" came back as beyond "3, 40 lockers in 12 towns" -- two of
+ * their pieces joined, never said together, so the whole was refused and
+ * the lockers were lost. Each piece is checked as theirs on its own; the
+ * option's own count ("3") is not kept beside it.
+ */
+export function beyondPieces(
+  beyond: string,
+  said: readonly string[],
+  labels: readonly string[],
+): readonly string[] {
+  return beyond
+    .split(/[,;]/u)
+    .map((piece) => piece.trim())
+    .filter(
+      (piece) =>
+        piece.length > 0 &&
+        said.some((words) => textStatedIn(piece, words)) &&
+        saysBeyond(piece, labels),
+    );
+}
+
 /** How the note that settles a check on the record begins. */
 const SETTLED_NOTE = "They confirmed this is right";
 
@@ -2374,14 +2399,17 @@ export function createOnboardingPort(input: {
             continue;
           }
           // What their words say beyond the option, as they said it.
-          const beyond = chosen?.beyond?.trim() ?? "";
-          if (
-            beyond.length > 0 &&
-            (textStatedIn(beyond, answer.quote ?? "") ||
-              input.personTurns.some((said) => textStatedIn(beyond, said)))
-          ) {
-            toldBeyond.push(beyond);
-          }
+          toldBeyond.push(
+            ...beyondPieces(
+              chosen?.beyond?.trim() ?? "",
+              [answer.quote ?? "", ...input.personTurns],
+              picked.map(
+                (key) =>
+                  choices.find((choice) => choice.nodeId === key)
+                    ?.displayName ?? key,
+              ),
+            ),
+          );
           keys.push(
             ...(c.stepType === "single_select" ? picked.slice(0, 1) : picked),
           );
@@ -2429,14 +2457,14 @@ export function createOnboardingPort(input: {
             candidates: choices,
           })
           .catch(reported("option reading (beyond)", null));
-        const beyond = chosen?.beyond?.trim() ?? "";
-        if (
-          beyond.length > 0 &&
-          (chosen ?? []).some((key) => keys.includes(key)) &&
-          textStatedIn(beyond, turnOf)
-        ) {
-          toldBeyond.push(beyond);
-        }
+        const pieces = (chosen ?? []).some((key) => keys.includes(key))
+          ? beyondPieces(chosen?.beyond?.trim() ?? "", [turnOf], chosenLabels)
+          : [];
+        // Replay 2026-11-02: one phrasing came back with beyond "3" only,
+        // the lockers unread. Their turn says more than the option (checked
+        // above), so with no piece of it kept their sentence is kept whole,
+        // as they said it: never lost, never reworded.
+        toldBeyond.push(...(pieces.length > 0 ? pieces : [turnOf.trim()]));
       }
       // A yes to what Q offered names an option or nothing: never "their
       // words" on the catch-all or as the answer's text.
@@ -2452,6 +2480,27 @@ export function createOnboardingPort(input: {
       if (unnamed.length > 0 && catchAll !== undefined) {
         keys.push(catchAll);
         otherWords = unnamed.join(", ").slice(0, 200);
+      } else if (
+        unnamed.length > 0 &&
+        keys.length > 0 &&
+        BEYOND_KEPT_STEPS.has(step.stepKey)
+      ) {
+        // A single choice with no catch-all dropped the rest of what they
+        // said ("40 lockers in 12 towns" beside "Paying customers"): kept
+        // beside the option as their words, the phrase as said or else
+        // their sentence whole.
+        const theirs = unnamed.filter((phrase) =>
+          [answer.quote ?? "", ...input.personTurns].some((words) =>
+            textStatedIn(phrase, words),
+          ),
+        );
+        toldBeyond.push(
+          ...(theirs.length > 0
+            ? theirs
+            : turnOf === undefined
+              ? []
+              : [turnOf.trim()]),
+        );
       } else if (
         unnamed.length > 0 &&
         keys.length > 0 &&

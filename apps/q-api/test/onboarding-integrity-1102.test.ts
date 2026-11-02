@@ -189,3 +189,108 @@ describe("a yes binds to the Q line it answered (live 2026-10-31 23:02)", () => 
     expect(w.recordedValue(MODELS)).toEqual(SAAS);
   });
 });
+
+/**
+ * Item 2, replayed 2026-11-02: the live traction answer through the
+ * production TAXONOMY_CHOICE chooser on gpt-5.6-luna came back as
+ * beyond "3, 40 lockers in 12 towns" (two of their pieces joined, never
+ * said together: refused whole, the lockers lost) and, for another
+ * phrasing, beyond "3" alone. These chooser fakes return exactly those.
+ */
+describe("2. traction words beyond the option are kept, from the shapes the live model returns", () => {
+  const COMPANY = {
+    type: "COMPANY" as const,
+    id: "e0000000-0000-4000-8000-0000000000ab",
+  };
+  async function traction(
+    said: string,
+    beyond: string | null,
+    reading: { value: string | string[]; quote: string } = {
+      value: "Paying customers",
+      quote: "3 paying customers",
+    },
+  ) {
+    const w = investorSession({
+      journey: "founder",
+      currentStepKey: "F5.signal",
+      subject: COMPANY,
+      servesTurnSteps: true,
+      recorded: { "F1.stage": "seed" },
+    });
+    const port = createOnboardingPort({
+      session: turn(w, said).session,
+      onboardingSessionId: turn(w, said).onboardingSessionId,
+      journeyType: "founder",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () =>
+        Promise.resolve(authorityReading({ stated: ["F5.signal"] })),
+      chooseCategories: (choice) => {
+        const paying = choice.candidates.find(
+          (c) => c.displayName === "Paying customers",
+        );
+        if (beyond === null) return Promise.resolve(null);
+        return Promise.resolve(
+          Object.assign(paying === undefined ? [] : [paying.nodeId], {
+            beyond,
+          }),
+        );
+      },
+    });
+    const [result] = await port.record([
+      {
+        stepKey: "F5.signal",
+        value: reading.value,
+        quote: reading.quote,
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    return { w, result };
+  }
+
+  it('"3, 40 lockers in 12 towns" keeps the piece they said, not the joined whole or the count', async () => {
+    const said = "We have 3 paying customers, 40 lockers in 12 towns.";
+    const { w, result } = await traction(said, "3, 40 lockers in 12 towns");
+    expect(result?.outcome).toBe("COMMITTED");
+    expect(w.recordedValue("F5.signal")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "paying",
+    });
+    expect(w.recordedNote("F5.signal")).toBe("40 lockers in 12 towns");
+  });
+
+  it('beyond "3" alone: their sentence is kept whole, never lost', async () => {
+    const said =
+      "We've got 3 paying customers so far and 40 lockers live in 12 towns.";
+    const { w } = await traction(said, "3");
+    expect(w.recordedNote("F5.signal")).toBe(said);
+  });
+
+  it("no reading came back: their sentence is kept whole", async () => {
+    const said = "We have 3 paying customers, 40 lockers in 12 towns.";
+    const { w } = await traction(said, null);
+    expect(w.recordedNote("F5.signal")).toBe(said);
+  });
+
+  it("the reader hands the rest over as its own phrase: kept beside the option", async () => {
+    const said = "We have 3 paying customers, 40 lockers in 12 towns.";
+    const { w } = await traction(said, null, {
+      value: ["Paying customers", "40 lockers in 12 towns"],
+      quote: said,
+    });
+    expect(w.recordedValue("F5.signal")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "paying",
+    });
+    expect(w.recordedNote("F5.signal")).toBe("40 lockers in 12 towns");
+  });
+
+  it("the option and its count alone add no note", async () => {
+    const { w } = await traction("3 paying customers", null, {
+      value: "Paying customers",
+      quote: "3 paying customers",
+    });
+    expect(w.recordedNote("F5.signal")).toBeUndefined();
+  });
+});
