@@ -1442,6 +1442,28 @@ export function investigationReduced(
   );
 }
 
+/**
+ * Live 2026-10-31 23:30 (IC memo while every search provider rested): the
+ * research step completed with public sources UNAVAILABLE and no dossier,
+ * so no investigation summary existed for investigationReduced to read.
+ * The gap sat only at the end of "Not known"; the memo's top and Q's chat
+ * line said "ready — here it is". Read from the step's typed gap, never
+ * from prose: research that could not search at all is reduced research.
+ * Only when no source was gathered: publicSourcesGapOf reports the gravest
+ * gap among several research steps, and another may have found pages.
+ */
+export const PUBLIC_UNAVAILABLE_REDUCED =
+  "This was prepared without public research: the public search services couldn't be reached, so nothing here comes from the public web, and what only public sources could tell (market size, competitors, prices, recent news) is not known. Ask again later for the full investigation.";
+
+export function publicSourcesReduced(
+  gap: PublicSourcesGap | null | undefined,
+  sources: number,
+): string | undefined {
+  return gap === "UNAVAILABLE" && sources === 0
+    ? PUBLIC_UNAVAILABLE_REDUCED
+    : undefined;
+}
+
 /** What the writer is told when the research under it ran reduced. */
 export function reducedResearchText(reduced: string): string {
   return `RESEARCH RAN REDUCED (code's finding; say so plainly in the summary, and never present this as a full investigation): ${reduced}`;

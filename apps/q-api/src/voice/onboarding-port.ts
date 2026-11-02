@@ -2249,11 +2249,17 @@ export function createOnboardingPort(input: {
       // offered is their choice.
       // Words in another language name a category by the reading's
       // translation, as for options (turnIsEnglish): not checked here.
+      // A turn that only agrees (affirmed) agrees to the Q line it
+      // answered: a category that line named is theirs by their yes, and
+      // one it did not name is still Q's reading (live 2026-10-31 23:02:
+      // "Yes, keep it" to "keep recurring revenue?" wrote B2B SaaS).
       if (
         input.journeyType === "investor" &&
-        !affirmed &&
         turnIsEnglish(answer.quote ?? "")
       ) {
+        const agreedTo = affirmed
+          ? (input.qLineBefore?.(answer.quote ?? "") ?? input.lastQTurn)
+          : undefined;
         const said = [
           answer.quote ?? "",
           ...input.personTurns.filter(
@@ -2261,6 +2267,7 @@ export function createOnboardingPort(input: {
               (answer.quote ?? "").trim().length > 0 &&
               quoteOccursIn(answer.quote ?? "", turn),
           ),
+          ...(agreedTo === undefined ? [] : [agreedTo]),
         ];
         const theirPhrase = (phrase: string) =>
           said.some((words) => textStatedIn(phrase, words));
@@ -4572,6 +4579,41 @@ export function createOnboardingPort(input: {
               "Held for their confirmation: your summary was not said back to them word for word, so nothing was recorded. Say it back in one line exactly as held and ask if you should save it.",
           });
           continue;
+        }
+        // Live 2026-10-31 23:02 ("Nordbrücke"): Q held B2B SaaS as its
+        // reading of "recurring revenue", then asked "should I keep
+        // recurring revenue as your business-model preference"; "Yes, keep
+        // it" accepted B2B SaaS as their selection, a category never said
+        // to them. The approval binds to exactly what they heard: a held
+        // mandate category is accepted only when Q's last line named it.
+        if (
+          input.journeyType === "investor" &&
+          held.value.type === "RESOURCE_REFERENCE" &&
+          held.value.resourceType === "TAXONOMY_NODE" &&
+          held.value.resourceIds.length > 0
+        ) {
+          const names = (await spoken(step, held.value, await current()))
+            .split(", ")
+            .filter((name) => name.length > 0);
+          const heardNames =
+            // spoken names at most 8, and leaves out a name it cannot read.
+            names.length === held.value.resourceIds.length &&
+            input.lastQTurn !== undefined &&
+            names.every((name) =>
+              categoryNamedIn(name, [input.lastQTurn ?? ""]),
+            );
+          if (!heardNames) {
+            results.push({
+              stepKey,
+              outcome: "REJECTED",
+              reason:
+                `Held for their confirmation, not recorded: your last line did not name ${names.join(", ").slice(0, 200) || "the categories held"}, so their yes was not to it. Say it back by name as your reading of their words and ask if it is right.`.slice(
+                  0,
+                  600,
+                ),
+            });
+            continue;
+          }
         }
         // A plain yes (or "go ahead and save it") to the summary they just
         // heard is decided by code; anything else is the reader's.

@@ -166,6 +166,8 @@ export function createTypedOnboarding(dependencies: {
       const portOf = (
         finishing: boolean,
         approved: ReadonlySet<string> = new Set<string>(),
+        /** Q's line they answered: a held category is accepted only when it named it. */
+        lastQTurn?: string,
       ) =>
         createOnboardingPort({
           logger,
@@ -174,6 +176,7 @@ export function createTypedOnboarding(dependencies: {
           journeyType: input.journeyType,
           ownerUserId: actor.userId,
           personTurns: [utterance],
+          ...(lastQTurn === undefined ? {} : { lastQTurn }),
           // This port writes nothing from words: it reads the record and,
           // on their word as the reading found it, finishes.
           authority: () =>
@@ -400,6 +403,7 @@ export function createTypedOnboarding(dependencies: {
         const accepted = await portOf(
           false,
           new Set(approvedOffer.map((item) => item.stepKey)),
+          lastQ,
         )
           .accept(approvedOffer.map((item) => item.stepKey))
           .catch((error: unknown) => {
