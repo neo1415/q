@@ -411,7 +411,7 @@ export type AnalysisIssue = AnalysisCritiqueResult["issues"][number];
 const FIGURE =
   /(?:[$£€]\s?\d[\d,.]*|\b(?:USD|KES|KSh|EUR|GBP|NGN|ZAR)\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:%|per ?cent\b|percent\b|[mb]n?\b|million\b|billion\b|thousand\b|k\b))/iu;
 const BASIS =
-  /\[S\d{1,3}\]|\(estimate|\bestimate[sd]?\b|\(company record|\(Q's inference|Q's inference|\bnot known\b|\bunknown\b/iu;
+  /\[S\d{1,3}\]|\(estimate|\bestimate[sd]?\b|\(company record|\(your mandate\)|\(Q's inference|Q's inference|\bnot known\b|\bunknown\b/iu;
 const CITED = /\[S(\d{1,3})\]/gu;
 
 function sentencesOf(text: string): readonly string[] {
@@ -1440,6 +1440,28 @@ export function investigationReduced(
     `This investigation ran in a reduced form: ${lanes.length === 1 ? "one line of enquiry" : `${String(lanes.length)} lines of enquiry`} (${list}) could not be searched, so what only ${lanes.length === 1 ? "it" : "they"} could tell is not known. Ask again for the full investigation.`,
     400,
   );
+}
+
+/**
+ * Live 2026-10-31 23:30 (IC memo while every search provider rested): the
+ * research step completed with public sources UNAVAILABLE and no dossier,
+ * so no investigation summary existed for investigationReduced to read.
+ * The gap sat only at the end of "Not known"; the memo's top and Q's chat
+ * line said "ready — here it is". Read from the step's typed gap, never
+ * from prose: research that could not search at all is reduced research.
+ * Only when no source was gathered: publicSourcesGapOf reports the gravest
+ * gap among several research steps, and another may have found pages.
+ */
+export const PUBLIC_UNAVAILABLE_REDUCED =
+  "This was prepared without public research: the public search services couldn't be reached, so nothing here comes from the public web, and what only public sources could tell (market size, competitors, prices, recent news) is not known. Ask again later for the full investigation.";
+
+export function publicSourcesReduced(
+  gap: PublicSourcesGap | null | undefined,
+  sources: number,
+): string | undefined {
+  return gap === "UNAVAILABLE" && sources === 0
+    ? PUBLIC_UNAVAILABLE_REDUCED
+    : undefined;
 }
 
 /** What the writer is told when the research under it ran reduced. */

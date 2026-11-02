@@ -22,7 +22,10 @@ import { boundPlan, registeredExecutors } from "@capital-q/q-orchestrator";
 import { teamJobBlocks, teamJobLine } from "@capital-q/q-specialists";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { basisProblems } from "../src/composition/workforce/analysis.js";
+import {
+  basisProblems,
+  PUBLIC_UNAVAILABLE_REDUCED,
+} from "../src/composition/workforce/analysis.js";
 import {
   readOf,
   workforceDeepResearch,
@@ -36,6 +39,7 @@ import {
 import { createWorkforceDocuments } from "../src/composition/workforce/documents.js";
 import {
   createOwnContextReader,
+  MANDATES_LINE,
   relationshipsInFocus,
 } from "../src/composition/workforce/own-context.js";
 import type { DataRoomReads } from "../src/composition/workforce/diligence-memo.js";
@@ -1495,6 +1499,54 @@ describe("the analysis is critiqued and really revised", () => {
   });
 });
 
+describe("research that could not search at all is said first (live 2026-10-31 23:30)", () => {
+  it("every provider resting: the top of the document, the writer and Q's line all say it", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+    });
+    const result = await world.documents({
+      ...world.input,
+      research: [],
+      publicSources: "UNAVAILABLE",
+    });
+    expect(result.status).toBe("READY");
+    if (result.status !== "READY") return;
+    expect(PUBLIC_UNAVAILABLE_REDUCED.length).toBeLessThanOrEqual(400);
+    expect(world.writes[0]?.company).toContain("RESEARCH RAN REDUCED");
+    expect(
+      world.filed[0]?.content.sections[0]?.body.startsWith(
+        `${PUBLIC_UNAVAILABLE_REDUCED}\n\n`,
+      ),
+    ).toBe(true);
+    expect(result.delivery?.reducedResearch).toBe(PUBLIC_UNAVAILABLE_REDUCED);
+    if (result.delivery === undefined) return;
+    const text = deliveryText({
+      artifactId: "22222222-2222-4222-8222-222222222222",
+      delivery: {
+        ...result.delivery,
+        topRecommendations: [...result.delivery.topRecommendations],
+      },
+    });
+    expect(text).toContain("from reduced research");
+    expect(text).not.toMatch(/is ready — here it is/u);
+  });
+
+  it("another research step found pages: not said to come from nowhere", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+    });
+    const result = await world.documents({
+      ...world.input,
+      publicSources: "UNAVAILABLE",
+    });
+    expect(result.status).toBe("READY");
+    if (result.status !== "READY") return;
+    expect(result.delivery?.reducedResearch).toBeUndefined();
+  });
+});
+
 describe("delivery to the conversation", () => {
   it("reads the document from the job's results and says 4-6 lines", () => {
     const document = deliveredDocument({
@@ -1746,7 +1798,7 @@ describe("J7: a document about a relationship carries its history", () => {
       "INVESTOR_MANDATES",
       "INVESTOR_ORGANISATION",
     ]);
-    expect(text).toContain("Their mandates (declared):");
+    expect(text).toContain(MANDATES_LINE);
     expect(text).toContain("Seed fintech, West Africa");
     // The pipeline the brief already holds is not repeated.
     expect(text).not.toContain("Their pipeline");

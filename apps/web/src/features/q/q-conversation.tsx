@@ -1473,6 +1473,11 @@ export function QConversationPanel({
                             <QAnswer
                               turn={line.turn}
                               mark={false}
+                              // Owner 2026-11-02: the chat view has no stage,
+                              // so a ranked answer said "They're on screen"
+                              // over nothing. Its cards are drawn in the
+                              // thread, as in the dock.
+                              cardsInline
                               onAsk={sayOrAsk}
                               onOpenArtifact={showArtifact}
                               working={

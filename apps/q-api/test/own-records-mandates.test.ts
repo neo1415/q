@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createOwnRecordsPort } from "../src/composition/own-records.js";
-import { createOwnContextReader } from "../src/composition/workforce/own-context.js";
+import {
+  createOwnContextReader,
+  MANDATES_LINE,
+} from "../src/composition/workforce/own-context.js";
 
 /**
  * Live 2026-10-29 (deep research, run A): a report for an investor with an
@@ -145,7 +148,7 @@ describe("INVESTOR_MANDATES record", () => {
       ownInvestorOrganisation: () => Promise.resolve(ORG),
       records,
     })(actor);
-    expect(context).toContain("Their mandates (declared):");
+    expect(context).toContain(MANDATES_LINE);
     expect(context).toContain('"max":"1000000"');
     expect(context).toContain("nigeria");
     expect(context).toContain("digital_lending");

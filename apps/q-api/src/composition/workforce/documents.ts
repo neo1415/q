@@ -34,6 +34,7 @@ import {
   investigationGaps,
   investigationReduced,
   mandateLabels,
+  publicSourcesReduced,
   reducedResearchText,
   investigationSections,
   mergeDossiers,
@@ -387,9 +388,13 @@ export function createWorkforceDocuments(dependencies: {
     codeGaps.push(...investigationGaps(merged.investigations));
     // Reduced when no plan could be made OR a planned line could not be
     // searched (investigationReduced): said at the top and in Q's line.
-    const reduced = merged.investigations
-      .map(investigationReduced)
-      .find((one) => one !== undefined);
+    // A research step that could not search at all left no investigation
+    // to read; its typed gap says so (publicSourcesReduced).
+    const reduced =
+      merged.investigations
+        .map(investigationReduced)
+        .find((one) => one !== undefined) ??
+      publicSourcesReduced(input.publicSources, merged.sources.length);
     if (reduced !== undefined)
       company = `${company}\n\n${reducedResearchText(reduced)}`;
     if (

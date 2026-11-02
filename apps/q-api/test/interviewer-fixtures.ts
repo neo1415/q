@@ -478,6 +478,32 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         ),
       );
     }
+    // One node by id, for a node the fixture names (taxonomyAmbiguous): a
+    // fresh port names a held category this way when it accepts it.
+    const nodeId = /\/taxonomy\/nodes\/([0-9a-f-]{36})(?:\?|$)/.exec(url)?.[1];
+    if (method === "GET" && nodeId !== undefined) {
+      const named = Object.values(options.taxonomyAmbiguous ?? {})
+        .flat()
+        .find((c) => c.nodeId === nodeId);
+      if (named !== undefined) {
+        return Promise.resolve(
+          Response.json({
+            id: named.nodeId,
+            vocabularyCode: "industry",
+            canonicalCode: named.displayName
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "_"),
+            displayName: named.displayName,
+            description: null,
+            parentNodeId: null,
+            depth: 0,
+            status: "ACTIVE",
+            ancestors: [],
+            aliases: [],
+          }),
+        );
+      }
+    }
     if (url.includes("/taxonomy/candidates")) {
       const body = JSON.parse(readBody(init)) as {
         text?: string;

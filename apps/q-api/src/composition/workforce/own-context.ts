@@ -65,8 +65,16 @@ export function relationshipsInFocus(
     .slice(0, HISTORY_MAX);
 }
 
-/** How the mandate in force is handed to the writer (mandateAmounts reads it). */
-export const MANDATES_LINE = "Their mandates (declared): ";
+/**
+ * How the mandate in force is handed to the writer and its reviewer
+ * (mandateAmounts reads it). Live 2026-10-31 (Kycana Hub memo): the
+ * investor's stated preferences (Germany, fintech, business customers)
+ * were labelled "(company record)": the writer's basis labels name only
+ * the company's record. Said here, beside the facts, so both read it:
+ * replays build their own record block, so no recorded input changes.
+ */
+export const MANDATES_LINE =
+  "Their mandates (declared; the person's own, never the company's record: a figure or preference from here is labelled (your mandate), never (company record)): ";
 
 /**
  * The money amounts of the person's own declared mandate (cheques, ticket

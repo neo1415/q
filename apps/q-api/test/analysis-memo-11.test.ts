@@ -4,6 +4,7 @@ import type { AnalysisDocumentResult } from "@capital-q/q-core";
 
 import {
   analysisContent,
+  basisProblems,
   investigationGaps,
   investigationReduced,
   mandateLabels,
@@ -439,5 +440,34 @@ describe("Q's chat line carries no source ids", () => {
     });
     expect(line).not.toMatch(/\bS\d+\b/u);
     expect(line).toContain("ownership and source-association verification.");
+  });
+});
+
+describe("the investor's preferences are theirs, not the company's (live 2026-10-31, Kycana Hub memo)", () => {
+  it("the record the writer and its reviewer read says how a mandate fact is labelled", () => {
+    expect(MANDATES_LINE).toContain("never the company's record");
+    expect(MANDATES_LINE).toContain("labelled (your mandate)");
+    // mandateAmounts reads its own line whatever it says after the prefix.
+    expect(
+      mandateAmounts(
+        `${MANDATES_LINE}{"inForce":[{"cheque":{"min":"250000","max":"1200000"}}]}`,
+      ),
+    ).toEqual([250_000, 1_200_000]);
+  });
+
+  it("a figure labelled (your mandate) has its basis", () => {
+    expect(
+      basisProblems(
+        {
+          title: "Kycana Hub — IC memo",
+          summary:
+            "Kycana Hub's EUR 1 million round sits inside your EUR 250,000 to 1.2 million cheque range (your mandate).",
+          sections: [],
+          topRecommendations: [],
+          gaps: [],
+        },
+        new Set(),
+      ),
+    ).toEqual([]);
   });
 });
