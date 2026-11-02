@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED c53a08055 — 2 November 2026, 20:42 UTC (Claude, local session)
+
+- **web + q-api SUCCESS on `c53a08055`** (CI run 41518159421 green: build, lint, typecheck, test, pgTAP). **api + workers unchanged on `b10cd6c87`.** No migrations (still 268/268). Also pushed to `build/int-rc`.
+- **In it:** a yes binds to the Q line it answered (Q's category reading never saved as the investor's choice); no-public-research memos say so at the top and in Q's line; the investor's mandate is labelled "(your mandate)"; traction words beyond the option kept from the live chooser's shapes; ranked cards drawn in the chat view. Details: HANDOFF-LOG 2026-11-02.
+- **Live-verified (fictional investor.savanna-seed, IC memo on Kycana Hub, job 12e184e4):** mandate facts labelled "(your mandate)" (3x), company facts "(company record)". Public search is answering again (38 sources, 16 lines), so the no-research disclosure was not exercised live (test-covered).
+- **Not live-checked:** items 1 and 2 need a fresh onboarding (fresh fictional accounts; not created by this session); chat cards need a signed-in browser.
+- **Open:** live voice line ends ~3–28 s into a call and the answer is read by one-way speech (diagnosis in HANDOFF-LOG 2026-11-02; needs a browser reproduction).
+
 ## DEPLOYED b10cd6c87 — 1 November 2026, 17:19 UTC (Claude coordinator)
 
 - **All four services** SUCCESS on `b10cd6c87` (CI run 1728 green). It contains everything in `HANDOFF-2026-11-01.md` plus `fix/provider-recover`:
