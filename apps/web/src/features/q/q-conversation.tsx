@@ -420,6 +420,14 @@ export function QConversationPanel({
   const heard = useRef<Set<string> | null>(null);
   /** Turn latency row 18: how much of each answer was handed to speech. */
   const spokenSoFar = useRef(new Map<string, number>());
+  /**
+   * Owner 2026-11-03: typing while a call was open closes it (QO-12) and
+   * makes the turn a written one, yet its answer was then read aloud by
+   * the one-way voice -- a different voice from the call's, heard as Q's
+   * voice changing. The thread length when such a typed turn closed the
+   * line: the answer after it is written, not spoken.
+   */
+  const writtenFrom = useRef<number | null>(null);
   useEffect(() => {
     if (q.loading) {
       heard.current = null;
@@ -445,15 +453,21 @@ export function QConversationPanel({
     // Said as words: the answer's Markdown is structure on screen, never
     // asterisks and pipes read aloud.
     const plain = plainFromMarkdown(latest.text);
+    const written =
+      writtenFrom.current !== null &&
+      turns.lastIndexOf(latest) >= writtenFrom.current;
+    if (written && final) writtenFrom.current = null;
     const spoken = spokenSoFar.current.get(latest.id) ?? 0;
     // Row 18: each finished sentence is said as it arrives; the rest of
     // the answer when it settles. An answer that arrives whole is one line.
-    const next = nextSpokenPiece({
-      text: plain,
-      spoken,
-      final,
-      limit: Q_SPEECH_MAX_CHARS,
-    });
+    const next = written
+      ? null
+      : nextSpokenPiece({
+          text: plain,
+          spoken,
+          final,
+          limit: Q_SPEECH_MAX_CHARS,
+        });
     if (next !== null) {
       spokenSoFar.current.set(latest.id, next.spoken);
       if (spoken === 0 && final) void say(next.piece, voice.voice);
@@ -809,7 +823,11 @@ export function QConversationPanel({
       // into the open line left the stage on "Listening" with only a
       // picture. Typing switches to the written conversation: the line
       // closes as End closes it, and the answer is written on the stage.
-      if (lineOpen) end();
+      if (lineOpen) {
+        // Its answer is written, not read by another voice (writtenFrom).
+        writtenFrom.current = turnCount;
+        end();
+      }
       await qAsk(text);
       markAttachmentsSent();
     },
