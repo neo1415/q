@@ -99,7 +99,7 @@ describe("L-3: the live preview in the thread", () => {
       <QAnswer
         turn={turn({ streaming: true, preview: PREVIEW })}
         mark={false}
-        picturesInline={false}
+        surface="caption"
       />,
     );
     expect(container.querySelector("[data-q-preview]")).toBeNull();
@@ -181,7 +181,7 @@ describe("round 5: objects first, words as caption", () => {
       <QAnswer
         turn={turn({ blocks: [PICTURE] })}
         mark={false}
-        picturesInline={false}
+        surface="caption"
       />,
     );
     expect(onStage.container.querySelector("[data-q-picture]")).toBeNull();

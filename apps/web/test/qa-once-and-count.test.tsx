@@ -20,8 +20,8 @@ const ARTIFACT = QArtifactReferenceBlockSchema.parse({
 describe("a document Q made is drawn once (F-35)", () => {
   it("is the stage's where the stage draws the answer's objects, and the thread's otherwise", () => {
     const blocks: Parameters<typeof replyParts>[0] = [ARTIFACT];
-    expect(replyParts(blocks, false, false).inline).toEqual([]);
-    expect(replyParts(blocks, false, true).inline).toHaveLength(1);
+    expect(replyParts(blocks, "caption").inline).toEqual([]);
+    expect(replyParts(blocks, "thread").inline).toHaveLength(1);
   });
 });
 

@@ -74,6 +74,9 @@ export const Q_RESULT_BLOCK_KINDS = [
   "SUMMARY",
   // L-13 (2026-10-20): a picture of something visual, credited.
   "PICTURE",
+  // Owner 2026-10-24: a document being made, followed as it is (N3: it was
+  // in the union but missing from this list).
+  "WORK_IN_PROGRESS",
   // Live 2026-10-28: their day, as list_schedule read it.
   "SCHEDULE",
   // Situation-first planning (owner 2026-10-28): a plan Q wrote for them.

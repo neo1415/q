@@ -261,6 +261,11 @@ const completedRun = {
       affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
     },
     {
+      kind: "WORK_IN_PROGRESS",
+      jobId: "7f0c3a52-2c55-4c71-9a4a-6f1e2d3c4b5a",
+      title: "Deck for Nixo",
+    },
+    {
       kind: "NAVIGATION_OFFER",
       intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
       place: "Relationships",

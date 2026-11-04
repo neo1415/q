@@ -206,13 +206,14 @@ describe("answer cards beside Discover", () => {
     // The canvas is a lazy chunk; loaded first, so the assertion is about
     // what it draws, not how fast a busy machine transforms it.
     await import("../src/features/q/answer-canvas");
-    render(<QAnswer turn={turn({ blocks: [block] })} cardsInline />);
+    render(<QAnswer turn={turn({ blocks: [block] })} surface="thread" />);
     expect(
       await screen.findByRole("button", { name: "Open Authorized company" }),
     ).toBeTruthy();
     expect(screen.getByText("Declared seed profile")).toBeTruthy();
   });
-  it("keeps the stage's existing ownership when inline cards were not requested", () => {
-    expect(replyParts([block]).inline).toEqual([]);
+  it("leaves the cards to the stage in the Q view's captions (N3: drawn once)", () => {
+    expect(replyParts([block], "caption").inline).toEqual([]);
+    expect(replyParts([block], "thread").inline).toEqual([block]);
   });
 });

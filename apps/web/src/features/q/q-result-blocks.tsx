@@ -624,9 +624,7 @@ export function QResultBlocks({
                 key={key}
                 block={block}
                 href={intentHref(block.intent)}
-                settleKey={
-                  turnId === undefined ? undefined : `${turnId}:${key}`
-                }
+                turnId={turnId}
               />
             );
 

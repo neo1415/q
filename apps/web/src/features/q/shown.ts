@@ -1,4 +1,5 @@
 import type { QTurn, QTurnObjectBlock } from "./conversation";
+import { onStage } from "./block-surfaces";
 import { roomShowOf } from "./room/room-stage";
 
 /**
@@ -33,23 +34,15 @@ import { roomShowOf } from "./room/room-stage";
 /** How many recent objects the side list keeps. */
 export const SHOWN_RECENTLY_MAX = 8;
 
-const SHOWABLE: ReadonlySet<QTurnObjectBlock["kind"]> = new Set([
-  "ARTIFACT_REFERENCE",
-  "COMPARISON",
-  "COMPARISON_CARDS",
-  "ANSWER_CARDS",
-  "CLARIFICATION_REQUEST",
-  // RECOVERY-2026-10 E4 data. Until lane A these were drawn only in Chat,
-  // so on the presence view "here's the table" had nothing behind it.
-  "TABLE",
-  "CHART",
-  "MAP",
-  "TIMELINE",
-  // Artifacts live (L-14): the summary Q speaks over.
-  "SUMMARY",
-  // L-13: a picture of what Q is talking about, credited on the stage too.
-  "PICTURE",
-]);
+/**
+ * What the stage draws as its object: the one shared rule (N3,
+ * block-surfaces.ts) -- documents, comparisons, cards, a question back,
+ * laid-out data (E4), the summary Q speaks over (L-14), a picture (L-13),
+ * and (N3) a plan, the person's day, what needs them and work being made,
+ * which were drawn only in Chat before, so on the presence view "here's
+ * your plan" had nothing behind it.
+ */
+const SHOWABLE = (kind: QTurnObjectBlock["kind"]): boolean => onStage(kind);
 
 export type ShownItem = {
   /** The answer that showed it. */
@@ -85,11 +78,13 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
         return block.question;
       case "PICTURE":
         return block.alt;
+      case "ATTENTION":
+        return "Needs you";
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "ACTION_PROPOSAL":
       case "UI_INTENT":
-      case "ATTENTION":
+      case "NAVIGATION_OFFER":
         break;
     }
   }
@@ -114,7 +109,7 @@ function oneSet(
 ): readonly QTurnObjectBlock[] {
   let cards = false;
   return blocks.filter((block) => {
-    if (!SHOWABLE.has(block.kind)) return false;
+    if (!SHOWABLE(block.kind)) return false;
     if (block.kind !== "ANSWER_CARDS") return true;
     if (cards) return false;
     cards = true;
@@ -191,6 +186,11 @@ const KIND_WORDS: Readonly<
   MAP: ["map", "where they are", "where they re", "based"],
   TIMELINE: ["timeline", "history", "dates"],
   SUMMARY: ["summary", "recap", "key points", "main points"],
+  // N3: follow-ups on a plan, a day or a report still on the stage.
+  PLAN: ["plan", "steps"],
+  SCHEDULE: ["schedule", "calendar", "my day"],
+  ATTENTION: ["needs me", "needs my attention", "waiting on me"],
+  WORK_IN_PROGRESS: ["deck", "document", "brief", "draft", "report"],
   ARTIFACT_REFERENCE: [
     "brief",
     "document",
@@ -306,6 +306,7 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
       case "ATTENTION":
       case "PICTURE": // names no subject to point back at
       case "SCHEDULE": // their own day: talked about as such, not by a name
+      case "NAVIGATION_OFFER": // beside the stage, never its object (N3)
         break;
       case "SUMMARY":
         // Its points are the answer's words: it is talked about as "the

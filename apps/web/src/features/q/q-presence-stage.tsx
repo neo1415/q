@@ -38,15 +38,18 @@ const PREFETCH_AFTER_MS = 800;
 /** The longest a set takes to fly to the Board (560 ms plus its stagger). */
 const LEAVING_MAX_MS = 1_500;
 import {
+  answerCardKeys,
   answerCardRef,
   hideKey,
   isHiddenIn,
   reopenStaged,
+  restoreKeys,
   useCardsState,
   useVisibleCards,
   type CardRef,
 } from "./cards/card-visibility";
 import { LivePreview } from "./live-preview";
+import { openOffers } from "./navigation-offers";
 import { rememberResults, useResultShelf } from "./result-shelf";
 import {
   latestAnswerRun,
@@ -70,6 +73,16 @@ export function stageCardRef(item: ShownItem): CardRef {
     key: `stage:${item.run}`,
     names: [item.title, ...subjectOf(item).names],
   };
+}
+
+/**
+ * Bring a stage object back, with its cards: D7 (N3) a card closed anywhere
+ * is closed under its one key, so reopening the set brings its cards back
+ * too (a set whose every card stayed closed would draw nothing).
+ */
+function reopenItem(item: ShownItem, turns: readonly QTurn[]): void {
+  restoreKeys(answerCardKeys(item.id, item.blocks));
+  reopenStaged(item.run, latestAnswerRun(turns));
 }
 
 const SHOW_ON_STAGE = "cq:q-show-answer";
@@ -226,8 +239,7 @@ export function QPresenceStage({
   );
   // F-35: what is on the stage now is not listed again beside it.
   const recent = shownRecently(items).filter((item) => item.id !== shown?.id);
-  const reopen = (item: ShownItem) =>
-    reopenStaged(item.run, latestAnswerRun(turns));
+  const reopen = (item: ShownItem) => reopenItem(item, turns);
   // Q room R4: the card Q brought into the room, open while the
   // conversation stays on its subject (room-stage), or until closed here.
   // W7: the room's cards are checked against the wire's contracts, and
@@ -256,6 +268,7 @@ export function QPresenceStage({
   const latestQ = turns.findLast(
     (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
   );
+  const offers = useMemo(() => openOffers(turns), [turns]);
 
   // What the line over the cards says: the answer that showed them, or,
   // for a set kept or brought back, the latest settled exchange.
@@ -388,7 +401,7 @@ export function QPresenceStage({
         typeof detail.id === "string"
       ) {
         const item = items.find((one) => one.id === detail.id);
-        if (item !== undefined) reopenStaged(item.run, latestAnswerRun(turns));
+        if (item !== undefined) reopenItem(item, turns);
       }
     };
     window.addEventListener(SHOW_ON_STAGE, onShow);
@@ -536,6 +549,7 @@ export function QPresenceStage({
                 blocks={canvas.rest}
                 onAsk={onAsk}
                 onOpenArtifact={onOpenArtifact}
+                turnId={canvas.item.id}
               />
             </div>
           )}
@@ -619,6 +633,7 @@ export function QPresenceStage({
                 blocks={shown.blocks}
                 onAsk={onAsk}
                 onOpenArtifact={onOpenArtifact}
+                turnId={shown.id}
               />
               <RenderedMark
                 run={shown.run}
@@ -627,6 +642,25 @@ export function QPresenceStage({
             </Suspense>
           </div>
         </section>
+      )}
+
+      {/* N3: the page Q offered to open (Open / Stay), beside whatever is
+          up: drawn here on the Q view whether or not captions are on, and
+          left out of the caption (block-surfaces BESIDE). */}
+      {offers.length === 0 ? null : (
+        <div className="w-full" data-q-stage-offers>
+          <Suspense fallback={null}>
+            {offers.map((offer) => (
+              <QResultBlocks
+                key={`${offer.turnId}:${offer.block.openLabel}`}
+                blocks={[offer.block]}
+                turnId={offer.turnId}
+                onAsk={onAsk}
+                onOpenArtifact={onOpenArtifact}
+              />
+            ))}
+          </Suspense>
+        </div>
       )}
 
       {roomShown ? (

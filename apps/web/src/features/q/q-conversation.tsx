@@ -106,7 +106,7 @@ import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
-import { earlierWork, PinnedWorkLines } from "./pinned-work";
+import { earlierWork, jobIdsIn, PinnedWorkLines } from "./pinned-work";
 import { QWorkProgress } from "./work-progress-view";
 import { promisedJobs } from "./work-live";
 
@@ -721,6 +721,16 @@ export function QConversationPanel({
     boardTimeline(boardTurns, q.decisions),
     boardMarks.dismissed,
     stageObject,
+  );
+  // N3: a job whose own card the stage draws now is not also a line under it.
+  const stageJobs = useMemo(
+    () =>
+      jobIdsIn(
+        boardTurns.flatMap((turn) =>
+          turn.kind === "Q" && turn.id === stageObject ? [turn] : [],
+        ),
+      ),
+    [boardTurns, stageObject],
   );
   const [boardBump, setBoardBump] = useState(0);
   const onBoardLanded = useCallback(() => {
@@ -1353,7 +1363,9 @@ export function QConversationPanel({
                                 one tap away; it goes when it is done. */}
                             <div className="w-full max-w-md">
                               <PinnedWorkLines
-                                jobs={roomWork}
+                                jobs={roomWork.filter(
+                                  (job) => !stageJobs.has(job.jobId),
+                                )}
                                 onOpenArtifact={showArtifact}
                                 onAsk={sayOrAsk}
                               />
@@ -1388,7 +1400,9 @@ export function QConversationPanel({
                               earlier: its line stays in view (owner
                               2026-10-24, coordinator 25 Oct). */}
                             <PinnedWorkLines
-                              jobs={pinnedWork}
+                              jobs={pinnedWork.filter(
+                                (job) => !stageJobs.has(job.jobId),
+                              )}
                               onOpenArtifact={showArtifact}
                               onAsk={sayOrAsk}
                             />
@@ -1443,9 +1457,10 @@ export function QConversationPanel({
                                       <QAnswer
                                         turn={line.turn}
                                         mark={false}
-                                        // The stage around this thread draws
-                                        // the answer's pictures.
-                                        picturesInline={false}
+                                        // N3: the stage around these captions
+                                        // draws its own kinds; the caption
+                                        // draws the rest (block-surfaces).
+                                        surface="caption"
                                         onAsk={sayOrAsk}
                                         onOpenArtifact={showArtifact}
                                       />
@@ -1539,8 +1554,9 @@ export function QConversationPanel({
                               // Owner 2026-11-02: the chat view has no stage,
                               // so a ranked answer said "They're on screen"
                               // over nothing. Its cards are drawn in the
-                              // thread, as in the dock.
-                              cardsInline
+                              // thread, as in the dock (N3: the thread
+                              // surface draws every object).
+                              surface="thread"
                               onAsk={sayOrAsk}
                               onOpenArtifact={showArtifact}
                               working={

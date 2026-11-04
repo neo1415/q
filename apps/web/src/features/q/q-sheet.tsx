@@ -39,6 +39,7 @@ import { WorkingLine } from "@/components/working/working-line";
 import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { useAnchorQuestion } from "./follow-newest";
+import { jobIdsIn } from "./pinned-work";
 import { QAnswer } from "./q-answer";
 import { StageLine, TaskProgress } from "./stage-line";
 import { QNow } from "./q-now";
@@ -98,6 +99,9 @@ export function QSheetConversation({
       turns.findLastIndex((turn) => turn.kind === "PERSON")
       ? latestQ
       : undefined;
+  // N2 leftover (N3): the latest answer's own work card is drawn below; the
+  // progress list above does not draw that job a second time.
+  const latestJobs = jobIdsIn(latestAnswer === undefined ? [] : [latestAnswer]);
 
   // Owner 2026-10-17: the question goes to the top and stays put while the
   // answer arrives beneath it; the panel never chases the newest line.
@@ -201,7 +205,9 @@ export function QSheetConversation({
       {/* N2 (owner 2026-11-04): Q's work as it really happens -- the
           answer's trail of stages and each piece of deep work -- read
           from the run and the jobs, so it is here on every page. */}
-      <QWorkProgress />
+      {/* N3: a job whose own card the latest answer draws below is not
+          drawn a second time here. */}
+      <QWorkProgress except={latestJobs} />
 
       {voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
@@ -248,7 +254,7 @@ export function QSheetConversation({
           <div aria-live="polite">
             <QAnswer
               turn={latestAnswer}
-              cardsInline
+              surface="thread"
               onAsk={(question) => void q.ask(question)}
               onOpenArtifact={session.openArtifact}
             />

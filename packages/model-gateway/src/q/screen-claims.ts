@@ -13,6 +13,7 @@
  * alone.
  */
 
+import { Q_DRAWN_BLOCK_KINDS } from "@capital-q/contracts";
 import { splitSentences } from "@capital-q/q-core";
 
 export const NOT_ON_SCREEN_LINE =
@@ -75,19 +76,12 @@ export function askedToOpen(text: string): boolean {
 /**
  * QA F-111: block kinds that are drawn on their screen as the answer
  * arrives. A sentence saying something is on screen is backed by any of
- * them, not by a screen move alone.
+ * them, not by a screen move alone. N3: the one shared table of where each
+ * kind is drawn (contracts' Q_BLOCK_SURFACES) decides, so a schedule, a
+ * plan or a summary on screen backs it as the web draws it, and an offer to
+ * open a page (nothing opened) does not.
  */
-export const DRAWN_BLOCK_KINDS: ReadonlySet<string> = new Set([
-  "UI_INTENT",
-  "ANSWER_CARDS",
-  "COMPARISON_CARDS",
-  "TABLE",
-  "CHART",
-  "MAP",
-  "TIMELINE",
-  "PICTURE",
-  "ARTIFACT_REFERENCE",
-]);
+export const DRAWN_BLOCK_KINDS: ReadonlySet<string> = Q_DRAWN_BLOCK_KINDS;
 
 /** True when the sentence tells the person something is on their screen. */
 export function claimsOnScreen(sentence: string): boolean {

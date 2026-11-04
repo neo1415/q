@@ -154,17 +154,26 @@ function PinnedWorkLine({
  */
 type WithBlocks = { readonly blocks: readonly QTurnObjectBlock[] };
 
-export function earlierWork(
-  earlier: readonly WithBlocks[],
-  latest: readonly WithBlocks[],
-): readonly WorkInProgress[] {
-  const inLatest = new Set(
-    latest.flatMap((turn) =>
+/**
+ * N2/N3: the jobs these turns draw as their own work card. A surface that
+ * draws one of them as a card does not draw that job a second time as a
+ * line or a progress stream beside it (the dock, the stage).
+ */
+export function jobIdsIn(turns: readonly WithBlocks[]): ReadonlySet<string> {
+  return new Set(
+    turns.flatMap((turn) =>
       turn.blocks.flatMap((block) =>
         block.kind === "WORK_IN_PROGRESS" ? [block.jobId] : [],
       ),
     ),
   );
+}
+
+export function earlierWork(
+  earlier: readonly WithBlocks[],
+  latest: readonly WithBlocks[],
+): readonly WorkInProgress[] {
+  const inLatest = jobIdsIn(latest);
   const seen = new Set<string>();
   const jobs: WorkInProgress[] = [];
   for (const turn of earlier) {

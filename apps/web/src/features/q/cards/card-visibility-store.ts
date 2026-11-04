@@ -283,6 +283,23 @@ export function hideKey(key: string): void {
 }
 
 /**
+ * D7 (N3): bring cards back by their keys ("Show again" in Chat, a stage
+ * object reopened): shown again even after a clear, wherever they are drawn.
+ */
+export function restoreKeys(keys: readonly string[]): void {
+  const back = keys.filter((key) => key.length > 0);
+  if (back.length === 0) return;
+  commit({
+    ...state,
+    keys: state.keys.filter((one) => !back.includes(one)),
+    shownKeys: [
+      ...state.shownKeys.filter((one) => !back.includes(one)),
+      ...back,
+    ].slice(-KEYS_MAX),
+  });
+}
+
+/**
  * Bring a stage object back ("Shown recently", "Show again"): shown
  * again even after a clear, and on the stage from now until the
  * conversation moves on from it. `after` is the latest answer's run.

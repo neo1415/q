@@ -94,4 +94,17 @@ describe("QA F-111: no apology for opening what nobody asked to open", () => {
       expect(DRAWN_BLOCK_KINDS.has(kind), kind).toBe(true);
     }
   });
+
+  it("N3: the shared table decides (a schedule or plan card backs it; an offer does not)", () => {
+    for (const kind of ["SCHEDULE", "PLAN", "SUMMARY", "ATTENTION"]) {
+      expect(DRAWN_BLOCK_KINDS.has(kind), kind).toBe(true);
+    }
+    for (const kind of [
+      "NAVIGATION_OFFER",
+      "ACTION_PROPOSAL",
+      "COMPANY_REFERENCE",
+    ]) {
+      expect(DRAWN_BLOCK_KINDS.has(kind), kind).toBe(false);
+    }
+  });
 });

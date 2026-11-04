@@ -7,6 +7,7 @@ import { QMark } from "@capital-q/ui/q-mark";
 
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { RenderedMark } from "./artifact-rendered";
+import { placeOn, type QBlockSurface } from "./block-surfaces";
 import { LivePreview } from "./live-preview";
 import { QMarkdown } from "./markdown";
 import { useMoveLine } from "./move-line";
@@ -30,11 +31,18 @@ import { StoryOffer } from "@/features/q-pitch/story/story-offer";
 
 type Panel = "sources" | "companies" | "investors";
 
-/** What stays in view, and what sits behind a chip. */
+/**
+ * What stays in view, and what sits behind a chip, on this surface (N3:
+ * one rule, block-surfaces.ts). In a thread (Chat, the dock) every object
+ * the answer produced is in view. In the Q view's captions, what the stage
+ * draws is the stage's (F-35, owner 2026-10-23: the same picture, document
+ * or table in the caption and on the stage around it read as broken), and
+ * the caption draws the rest. A change waiting for approval is drawn once,
+ * where it is decided (QNow, the exact payload).
+ */
 export function replyParts(
   blocks: readonly QTurnObjectBlock[],
-  cardsInline = false,
-  picturesInline = true,
+  surface: QBlockSurface = "thread",
 ): {
   readonly inline: readonly QTurnObjectBlock[];
   readonly companies: readonly QTurnObjectBlock[];
@@ -44,51 +52,11 @@ export function replyParts(
   const companies: QTurnObjectBlock[] = [];
   const investors: QTurnObjectBlock[] = [];
   for (const block of blocks) {
-    switch (block.kind) {
-      case "COMPANY_REFERENCE":
-        companies.push(block);
-        break;
-      case "INVESTOR_REFERENCE":
-        investors.push(block);
-        break;
-      case "ACTION_PROPOSAL":
-        // Shown once, where it is decided (the approval, exact payload).
-        break;
-      case "ARTIFACT_REFERENCE":
-        // F-35 (QA 2026-10-23): a document Q made is drawn once. Where the
-        // stage draws the answer's objects, it is the stage's (and "Shown
-        // recently" brings it back); the thread names it in words.
-        if (picturesInline) inline.push(block);
-        break;
-      case "UI_INTENT":
-      case "COMPARISON":
-      case "COMPARISON_CARDS":
-      case "CLARIFICATION_REQUEST":
-      case "WORK_IN_PROGRESS":
-      case "TABLE":
-      case "CHART":
-      case "MAP":
-      case "TIMELINE":
-      case "ATTENTION":
-      case "SUMMARY":
-      case "SCHEDULE":
-      case "PLAN":
-      case "NAVIGATION_OFFER":
-        // What the answer produced or needs from the person, and (E4) its
-        // laid-out data: in view.
-        inline.push(block);
-        break;
-      case "PICTURE":
-        // Drawn once (owner 2026-10-23: the same picture in the thread and
-        // on the stage around it read as broken): where the stage draws it,
-        // the answer leaves it to the stage.
-        if (picturesInline) inline.push(block);
-        break;
-      case "ANSWER_CARDS":
-        // The dock has no stage to draw these. Reuse the card renderer
-        // there; the full Q stage retains its existing ownership.
-        if (cardsInline) inline.push(block);
-        break;
+    const place = placeOn(surface, block.kind);
+    if (place === "OBJECT") inline.push(block);
+    else if (place === "CHIP") {
+      if (block.kind === "COMPANY_REFERENCE") companies.push(block);
+      else if (block.kind === "INVESTOR_REFERENCE") investors.push(block);
     }
   }
   return { inline, companies, investors };
@@ -144,8 +112,7 @@ export function QAnswer({
   onAsk,
   onOpenArtifact,
   mark = true,
-  cardsInline = false,
-  picturesInline = true,
+  surface = "thread",
   working,
 }: {
   readonly turn: Extract<QTurn, { kind: "Q" }>;
@@ -154,10 +121,11 @@ export function QAnswer({
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
   /** False in a thread, where the row itself says who is speaking. */
   readonly mark?: boolean | undefined;
-  /** The dock has no separate answer stage. */
-  readonly cardsInline?: boolean | undefined;
-  /** False where the stage around the thread draws the answer's pictures. */
-  readonly picturesInline?: boolean | undefined;
+  /**
+   * N3: "caption" in the Q view, where the stage around the captions draws
+   * its own kinds; "thread" (Chat, the dock) draws everything.
+   */
+  readonly surface?: QBlockSurface | undefined;
   /**
    * Where Q is while it works (round 4/5): one line at the top of the
    * answer, held at its height once the answer lands, so nothing moves.
@@ -167,11 +135,7 @@ export function QAnswer({
   const t = useT();
   const id = useId();
   const [open, setOpen] = useState<Panel | null>(null);
-  const { inline, companies, investors } = replyParts(
-    turn.blocks,
-    cardsInline,
-    picturesInline,
-  );
+  const { inline, companies, investors } = replyParts(turn.blocks, surface);
   const leading = inline.filter((block) => LEADING_KINDS.has(block.kind));
   const trailing = inline.filter((block) => !LEADING_KINDS.has(block.kind));
   // Streamed here in this mount: its working line keeps its height once it
@@ -181,7 +145,8 @@ export function QAnswer({
   const [objectsRef, objectsFloor] = useNeverShrink(streamedHere);
   // QA 2026-10-23 (U2): where the stage draws the pictures it also draws
   // the live preview; the thread drawing it too showed every frame twice.
-  const preview = turn.streaming && picturesInline ? turn.preview : undefined;
+  const preview =
+    turn.streaming && surface === "thread" ? turn.preview : undefined;
   const sources = evidenceSummary(turn, false);
   // R3: "Opening X…" until this tab's browser VERIFIED the move.
   const text = useMoveLine(turn.text, turn.blocks);
