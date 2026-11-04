@@ -2522,6 +2522,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Needs evidence",
   "Needs work",
   "Needs you",
+  "Needs you: tell Q what to prepare",
   "Needs your OK",
   "Needs your approval",
   "Needs your choice",

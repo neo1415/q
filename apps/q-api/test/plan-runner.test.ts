@@ -22,6 +22,7 @@ import {
   executePayloadOf,
   jobOutputLine,
   planStartedLine,
+  stepRoles,
   stepDoneLine,
   type PlanCardAsk,
 } from "../src/composition/workforce/plans.js";
@@ -447,14 +448,23 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     const status = (await w.plans.view(owner, block.planId))?.lines.map(
       (one) => one.text,
     );
-    // No card is prepared for it yet, so it is never "ready for your
-    // approval" (live 2026-10-29: said with no approval behind it).
+    // Coordinator 2026-11-04: a message step is prepared by the existing
+    // outward workforce card (q.workforce.job.start), approved on its own;
+    // "ready" only because that card exists. A connection request has no
+    // preparer: it needs the person's words, and says so.
     expect(status).toContain(
-      "Q will prepare it for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
+      "Ready for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
     );
     expect(
-      status?.some((line) => line.startsWith("Ready for your approval")),
-    ).toBe(false);
+      w.cards.filter((card) => card.actionType === "q.workforce.job.start")
+        .length,
+    ).toBeGreaterThan(0);
+    expect(status).toContain(
+      "Needs you: tell Q what to prepare: Request a connection with Savanna Health Fund",
+    );
+    expect(status?.some((line) => line.startsWith("Q will prepare"))).toBe(
+      false,
+    );
     expect(status).toContain(
       "Your part: Add a Business model slide showing revenue per clinic",
     );
@@ -639,6 +649,10 @@ describe("S5: Execute is one approval bound to the exact version", () => {
   });
 });
 
+/** The plan's execute cards (a step's own outward card is another kind). */
+const executeCards = (w: ReturnType<typeof world>) =>
+  w.cards.filter((card) => card.actionType === "q.plan.execute");
+
 describe("owner 2026-11-04: Execute is the approval, once", () => {
   it("a press of Execute approves its one card and starts the plan, with no second prompt", async () => {
     const w = world({ approve: true });
@@ -653,8 +667,8 @@ describe("owner 2026-11-04: Execute is the approval, once", () => {
     expect(decided.outcome).toBe("EXECUTING");
     expect(decided.message).toMatch(/^Running it now/u);
     // One card, approved once, bound to the version the card showed.
-    expect(w.cards).toHaveLength(1);
-    expect(w.cards[0]?.payload).toEqual(
+    expect(executeCards(w)).toHaveLength(1);
+    expect(executeCards(w)[0]?.payload).toEqual(
       executePayloadOf(founder.userId, view.plan, view.bodySha256),
     );
     expect(w.approvals).toEqual([decided.actionId]);
@@ -667,7 +681,7 @@ describe("owner 2026-11-04: Execute is the approval, once", () => {
       bodySha256: view.bodySha256,
     });
     expect(again.outcome).toBe("EXECUTING");
-    expect(w.cards).toHaveLength(1);
+    expect(executeCards(w)).toHaveLength(1);
     expect(w.approvals).toHaveLength(1);
     expect(w.board).toHaveLength(3);
   });
@@ -686,7 +700,7 @@ describe("owner 2026-11-04: Execute is the approval, once", () => {
     });
     expect(decided.outcome).toBe("EXECUTING");
     expect(decided.actionId).toBe(offer?.qActionId);
-    expect(w.cards).toHaveLength(1);
+    expect(executeCards(w)).toHaveLength(1);
   });
 
   it("a press on a card showing another body approves nothing", async () => {
@@ -729,7 +743,7 @@ describe("owner 2026-11-04: Execute is the approval, once", () => {
       bodySha256: after.bodySha256,
     });
     expect(ran.outcome).toBe("EXECUTING");
-    expect(w.cards.map((card) => card.key)).toEqual([
+    expect(executeCards(w).map((card) => card.key)).toEqual([
       `plan-execute:${block.planId}:2`,
     ]);
   });
@@ -814,7 +828,7 @@ describe("P3 lines are counted, never estimated", () => {
       ]),
     );
     expect(line).toBe(
-      "Your plan is running: 3 steps. Started now: 1 step of mine. On your board: 1 task. 1 step needs its own approval card, not prepared yet. I'll tell you here as each step lands.",
+      "Your plan is running: 3 steps. Started now: 1 step of mine. On your board: 1 task. Needs you first: 1 step -- tell me what to prepare. I'll tell you here as each step lands.",
     );
   });
 
@@ -866,5 +880,25 @@ describe("a plan that could not be written", () => {
     expect(answer !== null && "answer" in answer).toBe(true);
     if (answer === null || !("answer" in answer)) return;
     expect(answer.answer.line).toContain("here is where things stand");
+  });
+});
+
+describe("coordinator 2026-11-04: which proposal steps the workforce prepares", () => {
+  it("a message, an interest or a meeting runs as outward workforce work; others need you", () => {
+    const of = (tool: string) =>
+      stepRoles({ action: { kind: "TOOL_PROPOSAL", tool } } as never);
+    expect(of("propose_chat_message")).toEqual(["CONVERSATION"]);
+    expect(of("propose_express_interest")).toEqual(["OUTREACH"]);
+    expect(of("propose_meeting")).toEqual(["SCHEDULER"]);
+    for (const tool of [
+      "propose_email",
+      "propose_reminder",
+      "propose_connection_request",
+      "propose_interest_answer",
+      "propose_connection_request_answer",
+    ]) {
+      expect(of(tool)).toBeNull();
+    }
+    expect(stepRoles({ action: { kind: "TASK" } } as never)).toBeNull();
   });
 });

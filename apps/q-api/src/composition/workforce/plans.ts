@@ -844,10 +844,9 @@ export function createPlans(dependencies: PlansDependencies) {
         .catch(() => null);
     }
     const action = step.action;
-    if (action.kind === "WORKFORCE") {
-      const outward = action.roles.some(
-        (role) => OUTWARD_TOOLS[role] !== undefined,
-      );
+    const roles = stepRoles(step);
+    if (roles !== null) {
+      const outward = roles.some((role) => OUTWARD_TOOLS[role] !== undefined);
       const payload = stepJobPayload(actor.userId, plan, step);
       if (payload === null) {
         await thread.move(owner, plan, step, "PROPOSED", { prepared: false });
@@ -907,10 +906,14 @@ export function createPlans(dependencies: PlansDependencies) {
       }
       return;
     }
-    // A single proposal Q prepares when they say go: its card names the
-    // exact message, meeting or change, approved on its own. Nothing is
-    // prepared yet, so it is never said to be ready for approval.
-    await thread.move(owner, plan, step, "PROPOSED", { prepared: false });
+    // Coordinator 2026-11-04: nothing existing prepares this kind's card
+    // (an email, a reminder, a connection request or an answer to one, Q's
+    // own task): it needs the person's words first, and is said so --
+    // never "Q will prepare it", never sent. Nothing is prepared.
+    await thread.move(owner, plan, step, "PROPOSED", {
+      prepared: false,
+      needsYou: true,
+    });
   };
 
   /**
@@ -1505,12 +1508,49 @@ export function executePayloadOf(
  * its roles need; a specialist's (addendum 1) mapped to the executor that
  * runs them and named as the specialist -- never wider than its own tools.
  */
+type StepRole = Extract<
+  QPlanStep["action"],
+  { readonly kind: "WORKFORCE" }
+>["roles"][number];
+
+/**
+ * Coordinator 2026-11-04: a proposal step whose card the workforce already
+ * prepares -- a message in a conversation they have, interest in a
+ * company, a meeting -- runs as that same outward workforce work, through
+ * its own q.workforce.job.start card (Prepare, Recommend, their approval,
+ * then Execute; nothing is sent before it). Other proposal kinds have no
+ * preparer and wait on the person's words.
+ */
+const PROPOSAL_ROLES: Readonly<Record<string, StepRole>> = {
+  propose_chat_message: "CONVERSATION",
+  propose_express_interest: "OUTREACH",
+  propose_meeting: "SCHEDULER",
+};
+
+/** The workforce roles a step runs as; null: no workforce work prepares it. */
+export function stepRoles(
+  step: Pick<QPlanStep, "action">,
+): readonly StepRole[] | null {
+  switch (step.action.kind) {
+    case "WORKFORCE":
+      return step.action.roles;
+    case "TOOL_PROPOSAL": {
+      const role = PROPOSAL_ROLES[step.action.tool];
+      return role === undefined ? null : [role];
+    }
+    case "APP_ACTION":
+    case "TASK":
+      return null;
+  }
+}
+
 export function stepJobPayload(
   ownerUserId: string,
   plan: QPlan,
   step: QPlanStep,
 ): WorkforceJobStartPayload | null {
-  if (step.action.kind !== "WORKFORCE") return null;
+  const roles = stepRoles(step);
+  if (roles === null) return null;
   const specialist = plan.specialists?.find((one) => one.stepKey === step.key);
   const goal = `${step.title}. ${step.why}`.slice(0, 400);
   type DraftStep = {
@@ -1525,7 +1565,7 @@ export function stepJobPayload(
     readonly why: string;
     readonly document?: unknown;
   };
-  const steps = step.action.roles.flatMap((role, index): DraftStep[] => {
+  const steps = roles.flatMap((role, index): DraftStep[] => {
     const key = `${step.key.slice(0, 30)}_${String(index + 1)}`;
     const base = {
       key,
@@ -1735,7 +1775,7 @@ export function standingWords(runtime: StepRuntime): string {
       return "is on your board for you";
     case "PROPOSED":
       return runtime.actionId === null
-        ? "needs its own approval card, not prepared yet"
+        ? "needs you first: tell Q what to prepare"
         : "is waiting for your approval on its card";
     case "SKIPPED":
       return "was skipped";
@@ -1774,7 +1814,7 @@ export function planStartedLine(
       : `Waiting for your approval on their own cards: ${countWords(cards, "step")}.`,
     unprepared === 0
       ? null
-      : `${countWords(unprepared, "step")} ${unprepared === 1 ? "needs" : "need"} its own approval card, not prepared yet.`,
+      : `Needs you first: ${countWords(unprepared, "step")} -- tell me what to prepare.`,
     waiting === 0
       ? null
       : `${countWords(waiting, "step")} ${waiting === 1 ? "waits" : "wait"} on an earlier one.`,

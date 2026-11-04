@@ -79,6 +79,10 @@ describe("each step says where it stands", () => {
     expect(stepStatusWords(step("s1", "PROPOSED"))).toBe(
       "Q prepares it for your approval",
     );
+    // Coordinator 2026-11-04: running, with no card, it waits on them.
+    expect(stepStatusWords(step("s1", "PROPOSED"), true)).toBe(
+      "Needs you: tell Q what to prepare",
+    );
     expect(
       stepStatusWords(step("s1", "PROPOSED", { proposalId: BOARD_ITEM })),
     ).toBe("Ready for your approval");

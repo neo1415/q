@@ -163,6 +163,8 @@ export function factNote(fact: Pick<CitedFact, "truthClass">): string | null {
  */
 export function stepStatusWords(
   step: Pick<QPlanStep, "status" | "proposalId" | "boardItemId">,
+  /** The plan is running: an unprepared step is waiting on the person. */
+  running = false,
 ): string | null {
   switch (step.status) {
     case "DOING":
@@ -170,9 +172,14 @@ export function stepStatusWords(
     case "DONE":
       return "Done";
     case "PROPOSED":
+      // Coordinator 2026-11-04: once the plan runs, a step with no card was
+      // left for the person (nothing existing prepares its kind): never
+      // "Q prepares it", which nothing would.
       return step.proposalId !== null
         ? "Ready for your approval"
-        : "Q prepares it for your approval";
+        : running
+          ? "Needs you: tell Q what to prepare"
+          : "Q prepares it for your approval";
     case "WAITING_YOU":
       return step.boardItemId !== null
         ? "Your part, on your board"
@@ -534,7 +541,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           >
             {plan.steps.map((step, index) => {
               const noteText = stepNote(step);
-              const standing = stepStatusWords(step);
+              const standing = stepStatusWords(step, running);
               const cited = step.cites.flatMap((ref) => {
                 const fact = facts.get(ref);
                 return fact === undefined ? [] : [fact];
