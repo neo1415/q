@@ -539,3 +539,92 @@ describe("QX-003C · reading somebody else's", () => {
     expect(await subject.list(stranger, { limit: 20 })).toEqual({ items: [] });
   });
 });
+
+describe("SEC-01 · a colleague, or a reader whose access ended", () => {
+  const COLLEAGUE: ActorContext = {
+    ...ACTOR,
+    userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000002"),
+    membershipId: MembershipIdSchema.parse(
+      "e0000000-0000-4000-8000-000000000002",
+    ),
+  };
+
+  it("a colleague in the same organisation cannot open, list, page or export it", async () => {
+    const { repository } = inMemoryRepository();
+    const subject = service(repository);
+    const mine = await subject.prepareArtifact(prepareInput());
+    const id = mine.artifact.artifactId;
+
+    await expect(subject.read(COLLEAGUE, id)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    await expect(subject.readVersion(COLLEAGUE, id, 1)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    await expect(subject.summarise(COLLEAGUE, id)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    expect(await subject.list(COLLEAGUE, { limit: 20 })).toEqual({
+      items: [],
+    });
+    // The owner still reads it.
+    expect((await subject.read(ACTOR, id)).artifact.artifactId).toBe(id);
+    expect((await subject.list(ACTOR, { limit: 20 })).items).toHaveLength(1);
+  });
+
+  it("the owner loses it at the moment access to its subject ends", async () => {
+    const { repository } = inMemoryRepository();
+    let entitled = true;
+    const asked: unknown[] = [];
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      entitlement: (actor, ref) => {
+        asked.push({ userId: actor.userId, ref });
+        return Promise.resolve(entitled);
+      },
+    });
+    const mine = await subject.prepareArtifact(prepareInput());
+    const id = mine.artifact.artifactId;
+    expect((await subject.read(ACTOR, id)).artifact.artifactId).toBe(id);
+    expect(asked).toContainEqual({
+      userId: ACTOR.userId,
+      ref: { kind: "COMPANY", companyId: COMPANY },
+    });
+
+    entitled = false;
+    await expect(subject.read(ACTOR, id)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    await expect(subject.readVersion(ACTOR, id, 1)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    await expect(subject.summarise(ACTOR, id)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    expect(await subject.list(ACTOR, { limit: 20 })).toEqual({ items: [] });
+    await expect(
+      subject.reviseArtifact({
+        actorContext: ACTOR,
+        permittedContextPlan: plan(),
+        qRunId: RUN,
+        artifactId: id,
+        instruction: "shorter",
+        content: composed("Shorter."),
+      }),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+  });
+
+  it("an entitlement check that fails closes the artifact, never opens it", async () => {
+    const { repository } = inMemoryRepository();
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      entitlement: () => Promise.reject(new Error("disclosure down")),
+    });
+    const mine = await subject.prepareArtifact(prepareInput());
+    await expect(
+      subject.read(ACTOR, mine.artifact.artifactId),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+  });
+});

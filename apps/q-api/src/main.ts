@@ -4628,6 +4628,11 @@ const qArtifacts = createQArtifacts({
   transactions: database.transactions,
   gateway: modelGateway,
   logger,
+  // SEC-01: an artifact about a company or investor is readable only while
+  // its owner can still reach that subject (a revoked share or relationship
+  // ends the brief built from it), by the run's own subject resolution.
+  entitlement: async (actor, subject) =>
+    (await subjects.resolve(actor, subject)) !== null,
   photos: createPexelsPhotos(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
