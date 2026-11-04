@@ -10,6 +10,7 @@ import {
   type NamedRecordFacet,
   type NamedRecordRequest,
   cannotOpenPartLine,
+  compactName,
   matchOwnCounterpart,
   misheardOwnCounterpart,
   namedRecordRequestOf,
@@ -137,8 +138,32 @@ export async function resolveNamedRecord(input: {
     return null;
   }
   const name = match.kind === "ONE" ? match.name : asked.name;
+  // Acceptance 2026-11-04 (J6): "Ledgerline's pitch video" opened their
+  // Ledgerfold, because only their own relationships were compared and
+  // Ledgerfold is close by letters. A close own name is a guess at what
+  // was meant; the name as said, when it reaches a different record they
+  // may open (open_page's own name match, exact first), is what was meant.
+  // Their name's leading words ("Halyard" for Halyard Security) are not a
+  // guess.
+  const guessed =
+    match.kind === "ONE" &&
+    !leadingWordsOf(asked.name, match.name) &&
+    plausibleName(asked.name);
   for (const page of pagesFor(asked.facet, input.side)) {
     const intent = await input.open(page, name).catch(() => null);
+    if (guessed) {
+      const said = await input.open(page, asked.name).catch(() => null);
+      if (said !== null && said.id !== intent?.id) {
+        return {
+          kind: "OPEN",
+          intent: namedTab === null ? said : withTabs(said, namedTab),
+          page,
+          said: openingLine(page, asked.name),
+          own: false,
+          name: spokenRecordName(asked.name),
+        };
+      }
+    }
     if (intent === null) continue;
     return {
       kind: "OPEN",
@@ -160,6 +185,19 @@ export async function resolveNamedRecord(input: {
         said: notFoundLine(asked, match.near),
         log: "NOT_FOUND",
       };
+}
+
+/** Whether the said name is the record's name or its leading words. */
+function leadingWordsOf(said: string, recorded: string): boolean {
+  const saidKey = compactName(said);
+  const words = recorded
+    .replace(/\([^)]*\)/gu, " ")
+    .split(/\s+/u)
+    .filter((word) => word.length > 0);
+  for (let count = 1; count <= words.length; count += 1) {
+    if (compactName(words.slice(0, count).join(" ")) === saidKey) return true;
+  }
+  return false;
 }
 
 export type FastNavigation =
