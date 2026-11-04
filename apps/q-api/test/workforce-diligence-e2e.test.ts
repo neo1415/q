@@ -176,7 +176,11 @@ function world() {
   const planInputs: { subject: string; request: string }[] = [];
   const writes: { company: string; purpose: string; research: string }[] = [];
   const read: string[] = [];
-  const filed: { title: string; content: QArtifactContent }[] = [];
+  const filed: {
+    title: string;
+    content: QArtifactContent;
+    sources: readonly { kind: string; id: string }[] | undefined;
+  }[] = [];
 
   const models: Pick<
     WorkforceModels,
@@ -337,10 +341,12 @@ function world() {
       port: {
         prepare: (input: {
           content: { title: string; content: QArtifactContent };
+          sources?: readonly { kind: string; id: string }[];
         }) => {
           filed.push({
             title: input.content.title,
             content: input.content.content,
+            sources: input.sources,
           });
           return Promise.resolve({ artifactId: randomUUID() });
         },
@@ -477,6 +483,11 @@ describe('"do due diligence on Ledgerfold, give me a memo", end to end', () => {
     // The filed memo: the fixed sections, in order.
     const memo = w.filed[0];
     if (memo === undefined) throw new Error("nothing filed");
+    // SEC-01: the data-room document it read is filed as its source, so the
+    // memo closes if that grant is revoked; the unread one is not.
+    expect(memo.sources).toEqual([
+      { kind: "data_room_document", id: "doc-open" },
+    ]);
     expect(JSON.stringify(memo)).not.toContain(PRIVATE_MARKER);
     expect(memo.content.sections.map((section) => section.heading)).toEqual([
       ...DILIGENCE_SECTIONS,

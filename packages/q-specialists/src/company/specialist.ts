@@ -760,6 +760,7 @@ export function createCompanyIntelligenceSpecialist(
           research: null,
           recordedStatements: [],
           artifactRequest: null,
+          sourceDocumentIds: assembled.sourceDocumentIds ?? [],
           telemetry,
         });
       }
@@ -1167,6 +1168,7 @@ export function createCompanyIntelligenceSpecialist(
           }
           return read;
         })(),
+        sourceDocumentIds: assembled.sourceDocumentIds ?? [],
         telemetry,
       });
     },

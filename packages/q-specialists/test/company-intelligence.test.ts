@@ -489,4 +489,39 @@ describe("QCIU-011 · canonical state is assembled before documents", () => {
     expect(assembled.facts[0]?.fact.scope).toBe("CAPITAL_OBJECTIVE");
     expect(assembled.byLabel.get("F1")).toBeDefined();
   });
+
+  it("SEC-01: names every document a passage came from, cited or not", () => {
+    const passage = (documentId: string, canDiscloseExistence: boolean) =>
+      ({
+        chunkId: "c0000000-0000-4000-8000-0000000000c1",
+        documentId,
+        documentVersionId: "c0000000-0000-4000-8000-0000000000d1",
+        documentTitle: "Management accounts",
+        locator: {},
+        content: "Revenue grew in Q3.",
+        scopeKind: "EVIDENCE_DOCUMENTS",
+        canDiscloseExistence,
+      }) as never;
+    const assembled = assembleCompanyContext({
+      plan: {
+        subjects: [],
+        maxSensitivity: "INTERNAL",
+        purpose: { capability: "ANSWER", taskClass: "OWN_COMPANY_QUESTION" },
+      } as never,
+      canonicalFacts: [],
+      knowledge: [],
+      passages: [
+        passage("AA000000-0000-4000-8000-000000000001", true),
+        // Its existence is not disclosable, so it is never cited -- but it
+        // informed the answer, so what is composed from it closes with it.
+        passage("aa000000-0000-4000-8000-000000000002", false),
+        passage("aa000000-0000-4000-8000-000000000001", true),
+      ],
+      subjectDescription: "a synthetic test company",
+    });
+    expect(assembled.sourceDocumentIds).toEqual([
+      "aa000000-0000-4000-8000-000000000001",
+      "aa000000-0000-4000-8000-000000000002",
+    ]);
+  });
 });

@@ -259,5 +259,30 @@ describe("a document made by the worker", () => {
     expect(requested[0]?.kind).toBe("ONE_PAGER");
     expect(requested[0]?.content.title).toBe("Northstar — one-pager");
     expect(requested[0]?.content.content.deck).toBeUndefined();
+    // No document was read for this result: nothing is recorded.
+    expect(requested[0]?.sources).toBeUndefined();
+  });
+
+  it("SEC-01: the documents the findings were read from travel with the document", async () => {
+    const DOC = "aa000000-0000-4000-8000-000000000001";
+    const requested: Parameters<DocumentPipelinePort["request"]>[0][] = [];
+    await prepareOrReviseArtifact({
+      artifacts: preparation({
+        request: (input) => {
+          requested.push(input);
+          return Promise.resolve(card("PREPARING"));
+        },
+        wait: () => Promise.resolve(null),
+      }),
+      request,
+      company: { kind: "COMPANY", companyId: COMPANY },
+      companyName: "Northstar",
+      saidVerbatim: "Draft my memo",
+      result: { ...result("MEMO"), sourceDocumentIds: [DOC] },
+      history: [],
+    });
+    expect(requested[0]?.sources).toEqual([
+      { kind: "retrieved_document", id: DOC },
+    ]);
   });
 });

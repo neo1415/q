@@ -16,6 +16,8 @@ import type { ArtifactService } from "@capital-q/q-artifacts";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import {
   prepareOrReviseArtifact,
+  retrievedSources,
+  type ArtifactCompositionSource,
   type ArtifactPreparation,
   type CompanyIntelligenceRequest,
   type CompanyIntelligenceResult,
@@ -214,6 +216,9 @@ export function createWorkforceDocuments(dependencies: {
     const recordContradictions: (readonly string[])[] = [];
     const codeGaps: string[] = [];
     let dataRoomPassages = 0;
+    // SEC-01: every company document this analysis read, filed with it so
+    // the analysis closes when the person's access to any of them ends.
+    const sources: ArtifactCompositionSource[] = [];
     const runId = QRunIdSchema.parse(input.qRunId);
     const correlationId = createCorrelationId();
     const authorise = async (who: ActorContext) =>
@@ -281,6 +286,7 @@ export function createWorkforceDocuments(dependencies: {
       );
       if (read.blocked !== null || read.companyId !== companyId)
         return unavailable();
+      sources.push(...retrievedSources(read.sourceDocumentIds));
       companyName = read.companyName ?? null;
       companySite = read.companyWebsite ?? null;
       companyProfile = read.canonicalDescription ?? null;
@@ -338,6 +344,12 @@ export function createWorkforceDocuments(dependencies: {
           subject.companyId,
         );
         dataRoomPassages = room.passages.length;
+        sources.push(
+          ...room.passages.map((passage) => ({
+            kind: "data_room_document" as const,
+            id: passage.documentId,
+          })),
+        );
         if (diligence)
           claims.push(...room.passages.flatMap((one) => one.claims));
         for (const title of room.heldBack)
@@ -530,6 +542,7 @@ export function createWorkforceDocuments(dependencies: {
         summary: mandateLabels(personProse(written.draft.summary), mandate),
         content,
       },
+      ...(sources.length === 0 ? {} : { sources }),
       workforce,
     });
     dependencies.logger?.info(

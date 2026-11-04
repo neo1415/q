@@ -6,6 +6,7 @@ import {
   createPostgresArtifactRepository,
   createPostgresDocumentJobRepository,
   type ArtifactService,
+  type ArtifactSourceRef,
 } from "@capital-q/q-artifacts";
 import {
   applyDocumentEdit,
@@ -77,6 +78,17 @@ export function createQArtifacts(dependencies: {
   readonly entitlement?:
     | ((actor: ActorContext, subject: QSubjectRef) => Promise<boolean>)
     | undefined;
+  /**
+   * SEC-01: whether the actor may still open every recorded source
+   * document of an artifact, asked at every read (the data room's own view
+   * as the person: OPEN, or the company's own team).
+   */
+  readonly sourceEntitlement?:
+    | ((
+        actor: ActorContext,
+        sources: readonly ArtifactSourceRef[],
+      ) => Promise<boolean>)
+    | undefined;
   /** Stock photos for decks; absent means decks are made without them. */
   readonly photos?: StockPhotoPort | undefined;
   /** DOCS: the confirmed brand kit and the actor's own company, as the actor. */
@@ -133,6 +145,9 @@ export function createQArtifacts(dependencies: {
     ...(dependencies.entitlement === undefined
       ? {}
       : { entitlement: dependencies.entitlement }),
+    ...(dependencies.sourceEntitlement === undefined
+      ? {}
+      : { sourceEntitlement: dependencies.sourceEntitlement }),
   });
 
   const port: ArtifactPreparationPort = {
@@ -144,6 +159,7 @@ export function createQArtifacts(dependencies: {
         ...(input.subject === undefined ? {} : { subject: input.subject }),
         artifactType: input.artifactType,
         content: input.content,
+        ...(input.sources === undefined ? {} : { sources: input.sources }),
         ...(input.workforce === undefined
           ? {}
           : { workforce: input.workforce }),
@@ -158,6 +174,7 @@ export function createQArtifacts(dependencies: {
         artifactId: input.artifactId,
         instruction: input.instruction,
         content: input.content,
+        ...(input.sources === undefined ? {} : { sources: input.sources }),
       });
       return detail.artifact;
     },
@@ -436,6 +453,7 @@ export function createDocumentPipelinePort(
           ...(input.subject === undefined ? {} : { subject: input.subject }),
           artifactType: input.artifactType,
           content: input.content,
+          ...(input.sources === undefined ? {} : { sources: input.sources }),
           kind: input.kind,
           job: {
             grounding: [...input.job.grounding],

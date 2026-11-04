@@ -598,6 +598,7 @@ import {
   createProductionEmbeddingService,
 } from "./composition/q-intelligence.js";
 import { createQArtifacts } from "./composition/artifacts.js";
+import { createArtifactSourceEntitlement } from "./composition/artifact-sources.js";
 import {
   createCompanyProfileUpdateAction,
   createProfileUpdateBoard,
@@ -4633,6 +4634,14 @@ const qArtifacts = createQArtifacts({
   // ends the brief built from it), by the run's own subject resolution.
   entitlement: async (actor, subject) =>
     (await subjects.resolve(actor, subject)) !== null,
+  // SEC-01: and only while every document it was composed from is still
+  // open to them in the data room's own view (a revoked grant closes it).
+  sourceEntitlement: createArtifactSourceEntitlement({
+    documentCompany: (documentId) =>
+      findActiveDocumentById(database.sql, documentId),
+    dataRoomView: (actor, companyId) =>
+      profileMaterial.dataRoom.view(actor, companyId),
+  }),
   photos: createPexelsPhotos(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),

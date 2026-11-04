@@ -69,6 +69,12 @@ export type AssembledCompanyContext = {
   readonly facts: readonly LabelledFact[];
   readonly subjectDescription: string;
   readonly byLabel: ReadonlyMap<string, LabelledFact>;
+  /**
+   * SEC-01: the company documents this context was read from (passages and
+   * document citations), lower-cased and de-duplicated. Optional so a
+   * hand-built context in a test need not invent one.
+   */
+  readonly sourceDocumentIds?: readonly string[] | undefined;
 };
 
 /** Bounded: a prompt is not a database dump, and a long one is a slow one (§99). */
@@ -375,11 +381,16 @@ export function assembleCompanyContext(
     }
     facts.push(knowledgeToFact(known, labelAt(facts.length), audience));
   }
+  // SEC-01: every document whose passage reached the context, cited or not
+  // (a passage whose existence is not disclosable still informs the
+  // answer), so what is composed from it can close when its access does.
+  const passageDocuments: string[] = [];
   for (const hit of input.passages) {
     if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
       break;
     }
     facts.push(passageToFact(hit, labelAt(facts.length)));
+    passageDocuments.push(hit.documentId);
   }
   for (const source of input.publicSources ?? []) {
     if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
@@ -392,5 +403,17 @@ export function assembleCompanyContext(
     facts,
     subjectDescription: input.subjectDescription,
     byLabel: new Map(facts.map((f) => [f.label, f] as const)),
+    sourceDocumentIds: [
+      ...new Set(
+        [
+          ...passageDocuments,
+          ...facts.flatMap((f) =>
+            f.evidenceRefs.flatMap((ref) =>
+              ref.kind === "DOCUMENT" ? [ref.documentId] : [],
+            ),
+          ),
+        ].map((id) => id.toLowerCase()),
+      ),
+    ],
   };
 }
