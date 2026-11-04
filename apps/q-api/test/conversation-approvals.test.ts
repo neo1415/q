@@ -621,6 +621,39 @@ describe("approval by the person's own words (owner 2026-10-16)", () => {
     }
   });
 
+  it("keeps the card for the q-api raise share and standing grants (SEC-02)", async () => {
+    // Not app. actions: these were word-approvable because the check
+    // returned before looking at them. A "yes" must not disclose the
+    // founder-private raise or hand Q standing authority.
+    for (const actionType of [
+      "disclosure.raise.share",
+      "q.instruction.grant",
+      "q.work.standin.start",
+      "q.work.outreach.start",
+    ]) {
+      for (const text of ["yes", "I approve", "yes, share it"]) {
+        const row = pending({ actionType });
+        const { port, approvals, commands } = harness([row], {
+          said: { text },
+        });
+        expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+          status: "CARD_ONLY",
+        });
+        expect(approvals).toEqual([]);
+        expect(commands).toEqual([]);
+      }
+    }
+  });
+
+  it("approves revoking a raise share by words: it only narrows", async () => {
+    const row = pending({ actionType: "disclosure.share.revoke" });
+    const { port, approvals } = harness([row], { said: { text: "yes" } });
+    expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+      status: "SAVED",
+    });
+    expect(approvals).toEqual([row.proposalId]);
+  });
+
   it("approves a message, a meeting or a diligence request by words", async () => {
     for (const kind of [
       { actionType: "app.chat.message.send" },
@@ -654,6 +687,25 @@ describe("keepsItsCard", () => {
         actionClass: "CONFIRM_REQUIRED",
       }),
     ).toBe(false);
+  });
+
+  it("keeps the card by consequence for every category, not only app.", () => {
+    for (const actionType of [
+      "disclosure.raise.share",
+      "q.instruction.grant",
+      "app.disclosure.raise.share",
+    ]) {
+      expect(
+        keepsItsCard({ actionType, actionClass: "CONFIRM_REQUIRED" }),
+      ).toBe(true);
+    }
+  });
+
+  it("keeps the card when the action type is not known at all", () => {
+    // Voice falls back to "" when the proposal could not be read.
+    expect(
+      keepsItsCard({ actionType: "", actionClass: "CONFIRM_REQUIRED" }),
+    ).toBe(true);
   });
 });
 
