@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-04",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link; service key read from Railway api variables in memory, never printed or stored",
+  "deploy": {
+    "commit": "7b9a267ce",
+    "from": "11c36f6ea (pushed by integration owner 22:31Z)",
+    "web": "SUCCESS",
+    "api": "SUCCESS",
+    "qApi": "SUCCESS",
+    "workers": "SUCCESS",
+    "allSuccessAt": "2026-11-04T22:52:54Z"
+  },
+  "qTurns": 5,
+  "qTurnLog": [
+    "1440 memo",
+    "1440 ranked list",
+    "1440 compare 2nd and 3rd",
+    "1440 which has better traction",
+    "390 investor pipeline"
+  ],
+  "1_back": {
+    "verdict": "PASS",
+    "interior": {
+      "/company/<Ledgerline>": "Back 'Discover'",
+      "/settings/plan": "Back 'Settings'",
+      "/relationships/company/<Ledgerline>": "Back 'CRM'"
+    },
+    "root": { "/home": 0, "/discover": 0, "/relationships": 0 },
+    "widths": "same at 1440 and 390"
+  },
+  "2_memo": {
+    "verdict": "FAIL",
+    "ownRecord": "PASS: Ledgerline's own record (seed, $1.8M, 1,140 paying businesses, NGN 38m MRR, FIRS); no 'identity unresolved'; 0 Ledgerfold mentions",
+    "onePage": "FAIL: PDF 'Ledgerline — One-Page Investment Memo' is 2 pages (Page 1 of 2, Page 2 of 2)",
+    "doubledSentences": "PASS: the only repeated sentence is the per-page footer disclaimer",
+    "otherObservations": [
+      "The chat answer shows raw markdown headings inline: '... break-even date. ## Key Gaps and Risks', '## Initial Assessment'",
+      "The PDF body ends with 'The memo text is ready for review.' (an assistant line leaked into the document)"
+    ],
+    "files": [
+      "memo.pdf",
+      "memo-page-1.png",
+      "memo-page-2.png",
+      "2-memo-1440.png",
+      "2-memo-doc-1440.png",
+      "2-memo-390.png"
+    ]
+  },
+  "3_compareFollowUps": {
+    "verdict": "PASS",
+    "ranked": "1 MedTrail 9.0, 2 Mizan 9.0, 3 Silo Credit 9.0",
+    "compare": "Mizan vs Silo Credit; Mizan: 3 banks live, EGP 640m originated, 0.9% NPL; Silo: 14 warehouses, ~NGN 2.1bn financed, loss rate <0.5%",
+    "traction": "On the figures available, Silo Credit has the stronger reported credit-performance signal: it says its loss rate is under 0.5%, versus Mizan's reported 0.9% non-performing rate. ... Silo has financed about ₦2.1bn across 14 certified warehouses, while Mizan has originated EGP 640m through three live banks",
+    "observations": [
+      "The traction answer re-renders the full comparison table and preamble before answering",
+      "Silo 'Round terms: Not known' while stating priced equity at a $12m valuation"
+    ],
+    "files": [
+      "3-rank-1440.png",
+      "3-compare-1440.png",
+      "3-traction-1440.png",
+      "3-traction-390.png"
+    ]
+  },
+  "4_pipeline": {
+    "verdict": "PASS",
+    "q": "12 companies: 1 in diligence; 8 connected; 3 awaiting reply. Your full pipeline is in Relationships. Would you like to open it?",
+    "relationshipsPage": "All 12 · Needs you 2 · Awaiting reply 3 · Connected 8 · In diligence 1",
+    "note": "Q does not mention 'Needs you 2' (it overlaps the other groups)",
+    "files": [
+      "4-pipeline-390.png",
+      "4-pipeline-1440.png",
+      "4-relationships-390.png"
+    ]
+  },
+  "5_logos": {
+    "verdict": "PASS",
+    "observed": "Discover 'For you' (Ledgerline: no logo, neutral building placeholder); 'Your companies' Harbourline Cargo shows its 'HC' logo, not a black square, at 1440 and 390",
+    "observation": "At 1440 the 'Your companies' tab header sits over the video column, and the video's title text is overlapped by the captions",
+    "files": [
+      "5-discover-1440.png",
+      "5-discover-390.png",
+      "5-yours-1440.png",
+      "5-yours-390.png"
+    ]
+  },
+  "6_qCard390": {
+    "verdict": "PASS",
+    "observed": "Full firm name 'Savanna Seed Partners' on one line, nothing truncated; QR below the name and handle",
+    "files": ["6-profile-390.png", "6-qcard-390.png", "6-profile-1440.png"]
+  },
+  "approvals": "none clicked; no outward sends"
+}
