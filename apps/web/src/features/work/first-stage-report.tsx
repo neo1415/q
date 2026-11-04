@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import type { QWorkReportDto } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   CircleHelp,
@@ -38,6 +36,7 @@ import {
   WorkTag,
   workButton,
 } from "./work-b-kit";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * The first-stage report (chosen design 2026-10-21, "Prepared next
@@ -133,17 +132,7 @@ export function FirstStageReport({
 
   return (
     <div className="cq-charcoal flex flex-col" data-first-stage-report>
-      <Link
-        href="/work"
-        className="-mt-2.5 inline-flex min-h-11 items-center gap-1.5 self-start text-sm text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-      >
-        <ArrowLeft
-          size={ICON_SIZE.compact}
-          aria-hidden="true"
-          className="rtl:rotate-180"
-        />
-        {t("Back to Q’s work")}
-      </Link>
+      <BackLink fallbackHref="/work" label={t("Work")} className="-mt-2.5" />
       <div className="mt-1 mb-4 flex flex-wrap items-center gap-3">
         {report.companyId === null ? null : (
           <EntityAvatar

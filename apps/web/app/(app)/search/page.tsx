@@ -8,6 +8,7 @@ import {
 import { SearchHome } from "@/features/search/search-home";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export default async function SearchPage({
   return (
     <PageContainer className="cq-charcoal">
       <QSection id="search" kind="SEARCH_RESULTS" label={t("search results")}>
+        <BackLink fallbackHref="/home" label="Q" />
         <PageHeader
           title={t("Search")}
           description={t(

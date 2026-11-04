@@ -32,6 +32,7 @@ import {
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Investor interest" };
 export const dynamic = "force-dynamic";
@@ -49,11 +50,15 @@ export default async function InvestorInterestPage() {
   const context = await resolveOwnContext();
   const session = await apiSession();
 
+  const back = <BackLink fallbackHref="/home" label="Q" />;
   const header = (
-    <PageHeader
-      title={t("Investor interest")}
-      description={t("Accepting connects you. It isn’t an investment.")}
-    />
+    <>
+      {back}
+      <PageHeader
+        title={t("Investor interest")}
+        description={t("Accepting connects you. It isn’t an investment.")}
+      />
+    </>
   );
 
   if (context.kind === "INVESTOR") {
@@ -134,6 +139,7 @@ export default async function InvestorInterestPage() {
         >
           {/* The chosen design (interest, option 1): the title, then its
             two tabs, then the cards; no line under the title. */}
+          {back}
           <h1 className="cq-title-xl mb-2.5 text-(--cq-text-primary)">
             {t("Investor interest")}
           </h1>

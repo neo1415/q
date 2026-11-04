@@ -16,6 +16,7 @@ import { InvestorVisibilityScreen } from "@/features/investor/visibility-screen"
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Visibility and discovery" };
 
@@ -51,6 +52,7 @@ export default async function VisibilityPage() {
         }
         label={t("visibility and discovery")}
       >
+        <BackLink fallbackHref="/profile" label={t("Profile")} />
         {/* A founder's page is option 3 of the chosen designs: being
             visible and being recommended, said separately. */}
         <PageHeader

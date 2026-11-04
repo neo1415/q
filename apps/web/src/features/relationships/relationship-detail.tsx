@@ -14,7 +14,6 @@ import {
 import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
-  ArrowLeft,
   ArrowUpRight,
   ChevronDown,
   Globe,
@@ -24,6 +23,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { PageContainer } from "@/components/app-shell/page-container";
+import { BackLink } from "@/features/company/back-link";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
 import { DockAvoidZone } from "@/features/q-dock/dock-avoid-zone";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
@@ -1299,15 +1299,7 @@ export function BackToRelationships({
 }) {
   const t = serverTNow();
 
-  return (
-    <Link
-      href={href}
-      className="cq-body-sm -ms-1 inline-flex min-h-11 items-center gap-1.5 self-start px-1 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-    >
-      <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-      {t(label)}
-    </Link>
-  );
+  return <BackLink fallbackHref={href} label={t(label)} />;
 }
 
 /** A page that cannot answer for this person: one calm sentence. */

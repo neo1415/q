@@ -1,8 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { cx } from "@capital-q/ui";
-import { ArrowLeft, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * The account pages' frame (chosen designs 2026-10-21), server-safe: an
@@ -49,19 +48,11 @@ export function AccountHead({
   return (
     <header className="mb-5">
       {back === undefined ? null : (
-        <Link
-          href={back.href}
-          className="-ms-1 mb-1 inline-flex min-h-11 items-center gap-1.5 rounded-(--cq-radius-md) px-1 text-sm text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-          data-account-back
-        >
-          <ArrowLeft
-            size={ICON_SIZE.compact}
-            strokeWidth={ICON_STROKE}
-            aria-hidden="true"
-            className="rtl:rotate-180"
-          />
-          {back.label}
-        </Link>
+        <BackLink
+          fallbackHref={back.href}
+          label={back.label}
+          className="mb-1"
+        />
       )}
       <div className="flex min-h-11 items-center gap-3">
         <h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-(--cq-text-primary) lg:text-[28px]">

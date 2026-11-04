@@ -10,6 +10,7 @@ import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 import { PageContainer } from "@/components/app-shell/page-container";
 import { PitchRail } from "@/features/q-pitch/founder/pitch-rail";
 import { QSection } from "@/features/q/q-section";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Capital Q, presented by Q" };
 
@@ -61,6 +62,7 @@ export default function CapitalQPitchPage() {
   return (
     <PageContainer>
       <QSection id="capital-q-pitch" kind="PITCH" label="the Capital Q pitch">
+        <BackLink fallbackHref="/q-pitch" label="Q Pitch" />
         <header className="flex max-w-3xl flex-col gap-4 pb-10 sm:pb-14">
           <p className="cq-body-sm text-(--cq-text-secondary)">
             Presented by Q, on the template every founder&rsquo;s overview uses

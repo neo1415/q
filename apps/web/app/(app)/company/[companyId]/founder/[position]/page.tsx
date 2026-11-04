@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { getCompanyFounder } from "@capital-q/api-client";
-import { buttonClassName } from "@capital-q/ui/button";
-import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
@@ -11,6 +8,7 @@ import { FounderPerson } from "@/features/company/material/team";
 import { apiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Founder" };
 export const dynamic = "force-dynamic";
@@ -46,13 +44,10 @@ export default async function FounderPage({
         total={person === null ? 0 : 1}
         label={t("a founder on the team")}
       >
-        <Link
-          href={`/company/${encodeURIComponent(companyId)}?tab=team`}
-          className={buttonClassName("quiet", "compact", "self-start")}
-        >
-          <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-          {t("Back to the team")}
-        </Link>
+        <BackLink
+          fallbackHref={`/company/${encodeURIComponent(companyId)}?tab=team`}
+          label={t("Team")}
+        />
         {person === null ? (
           <EmptyState
             title={t("This person isn't available to you.")}

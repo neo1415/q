@@ -11,7 +11,6 @@ import {
 import { cx } from "@capital-q/ui";
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   Check,
   CircleHelp,
@@ -39,6 +38,7 @@ import {
 import { outOfTen } from "./rehearsals-home";
 import { ReviewRefresh } from "./review-refresh";
 import { useT } from "@/features/i18n/language";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * The review after a rehearsal (REHEARSE; chosen design 2026-10-21,
@@ -352,13 +352,11 @@ export function RehearsalReview({
 
   return (
     <article className="cq-charcoal flex flex-col" data-rehearsal-review>
-      <Link
-        href="/rehearsals"
-        className="-mt-2.5 inline-flex min-h-11 items-center gap-1.5 self-start text-sm text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-      >
-        <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-        {t("Rehearsals")}
-      </Link>
+      <BackLink
+        fallbackHref="/rehearsals"
+        label={t("Rehearsals")}
+        className="-mt-2.5"
+      />
       <header className="mb-[18px] flex flex-col gap-1">
         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-(--cq-text-tertiary)">
           <CircleHelp size={14} aria-hidden="true" />

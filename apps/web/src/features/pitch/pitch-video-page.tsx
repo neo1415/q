@@ -1,14 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 
-import { buttonClassName } from "@capital-q/ui/button";
-import { ChevronLeft, ICON_SIZE } from "@capital-q/ui/icons";
-
 import { PitchUpload } from "./pitch-upload";
 import { useT } from "@/features/i18n/language";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * One video's page (ADR 0022): a new one (`mediaAssetId` null) or one the
@@ -39,12 +36,7 @@ export function PitchVideoPage({
   );
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link href="/pitch" className={buttonClassName("quiet", "compact")}>
-          <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
-          {t("All videos")}
-        </Link>
-      </div>
+      <BackLink fallbackHref="/pitch" label={t("All videos")} />
       <PitchUpload
         companyId={companyId}
         mediaAssetId={mediaAssetId}

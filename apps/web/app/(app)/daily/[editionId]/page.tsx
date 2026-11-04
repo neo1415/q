@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ApiProblemError, getQDailyEdition } from "@capital-q/api-client";
-import { buttonClassName } from "@capital-q/ui/button";
 
 import {
   PageContainer,
@@ -14,6 +12,7 @@ import { DailyPaper } from "@/features/daily/daily-paper";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -50,6 +49,7 @@ export default async function DailyEditionPage({
     return (
       <PageContainer width="reading" className="flex flex-col gap-4">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
+          <BackLink fallbackHref="/daily" label={t("The Q Daily")} />
           <PageHeader title={t("The Q Daily")} />
           <p
             className="cq-body text-(--cq-text-secondary)"
@@ -64,12 +64,7 @@ export default async function DailyEditionPage({
   return (
     <PageContainer width="content" className="flex flex-col gap-8">
       <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
-        <Link
-          href="/daily"
-          className={buttonClassName("quiet", "compact", "self-start")}
-        >
-          {t("Latest edition")}
-        </Link>
+        <BackLink fallbackHref="/daily" label={t("The Q Daily")} />
         <DailyAnchorFocus />
         <div className="cq-ink">
           <DailyPaper

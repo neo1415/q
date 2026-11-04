@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import type { QWorkDetailDto, QWorkDto } from "@capital-q/contracts";
-import { ArrowLeft, Check, Pause, Play, UserRound } from "@capital-q/ui/icons";
+import { Check, Pause, Play, UserRound } from "@capital-q/ui/icons";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { QControl } from "@/features/q/control/q-control";
@@ -23,6 +23,7 @@ import { stopWorkAction } from "./work-actions";
 import { UnknownTag, WorkTag, workButton, type WorkTagTone } from "./work-kit";
 import { setPausedAction } from "./work-page-actions";
 import { jobTitle } from "./workforce-view";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * What Q did, option 1: the audit trail (owner 2026-10-21; prototype
@@ -164,13 +165,7 @@ function Audit({
       className="cq-wk cq-ink flex max-w-[860px] flex-col gap-[22px]"
       data-delegation-audit={work.id}
     >
-      <Link
-        href="/work"
-        className="-mt-2.5 inline-flex min-h-11 items-center gap-1.5 self-start text-sm text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-      >
-        <ArrowLeft size={14} aria-hidden="true" />
-        {t("Back to Q’s work")}
-      </Link>
+      <BackLink fallbackHref="/work" label={t("Work")} className="-mt-2.5" />
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-[1_1_calc(100%-52px)] lg:flex-1">
           <div className="cq-label font-normal text-(--cq-text-tertiary)">

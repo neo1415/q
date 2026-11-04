@@ -5,7 +5,6 @@ import {
   type RehearsalCounterpartKind,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
-import { ChevronLeft, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 import { z } from "zod";
 
@@ -14,6 +13,7 @@ import { resolveOwnContext } from "@/features/q/context";
 import { RehearsalLobby } from "@/features/rehearsal/rehearsal-lobby";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * A rehearsal's lobby (REHEARSE): a founder rehearses with an investor, an
@@ -81,13 +81,7 @@ export async function RehearsalLobbyPage({
         label={t("a rehearsal lobby")}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-          <Link
-            href="/rehearsals"
-            className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)"
-          >
-            <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
-            {t("Rehearsals")}
-          </Link>
+          <BackLink fallbackHref="/rehearsals" label={t("Rehearsals")} />
           <RehearsalLobby
             requestedVideo={requestedVideo}
             kind={kind}
