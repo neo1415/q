@@ -21,6 +21,28 @@ const USER_MAX = 8_000;
 const Q_MAX = 32_000;
 
 /**
+ * Owner report 2026-11-04: one spoken reply reached the conversation as
+ * ten Q messages ("I don't have a task from" / "you yet." / …), each its
+ * own row in Chat. Consecutive segments of one side are one turn: they are
+ * written as one message, in order, separated by a single space (each
+ * segment is a whole stretch of speech, already trimmed by the line).
+ */
+function joinedTurns(
+  segments: RecordSpokenExchangeCommand["messages"],
+): { role: "USER" | "Q"; content: string }[] {
+  const out: { role: "USER" | "Q"; content: string }[] = [];
+  for (const segment of segments) {
+    const content = segment.content.trim();
+    if (content.length === 0) continue;
+    const last = out.at(-1);
+    if (last?.role === segment.role)
+      last.content = `${last.content} ${content}`;
+    else out.push({ role: segment.role, content });
+  }
+  return out;
+}
+
+/**
  * VOICE-BRAIN (founder live 2026-10-08): a turn the realtime voice
  * answered without Q (small talk, a reply to a card) is still part of the
  * conversation. It is written to the conversation's messages, bound to
@@ -36,7 +58,7 @@ export function createRecordSpokenExchange(dependencies: QRuntimeDependencies) {
       command.conversationId,
     );
     if (!conversationId.success) return 0;
-    const messages = command.messages
+    const messages = joinedTurns(command.messages)
       .map((m) => ({
         role: m.role,
         content: m.content
