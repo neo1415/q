@@ -445,7 +445,7 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
       // Unknown stays unknown: the gap is stored as a gap, not as a zero.
       expect(read?.content.gaps).toEqual(["Traction"]);
       expect(artifact.status).toBe("PREPARING");
-      expect(artifact.visibilityScope).toBe("organisation_private");
+      expect(artifact.visibilityScope).toBe("personal_private");
     });
   });
 });

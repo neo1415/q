@@ -6716,6 +6716,9 @@ const rehearsalMaterial: RehearsalMaterial = {
             on v.artifact_id = a.id and v.tenant_id = a.tenant_id
          where a.tenant_id = ${actor.tenantId}
            and a.organisation_id = ${actor.organisationId}
+           -- SEC-01: a Q artifact is its creator's (20261231220000); a
+           -- colleague's generated deck is never read in here.
+           and a.created_by_user_id = ${actor.userId}
            and a.type = 'PITCH_DECK' and a.archived_at is null
          order by v.created_at desc limit 1`.catch(() => []),
         // A deck they uploaded, in every scope but someone's personal notes.
