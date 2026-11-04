@@ -118,11 +118,49 @@ describe("A4: the deck's figures, as the founder's claims", () => {
     expect(facts[0]?.statement).toContain(
       "Current monthly net burn: About $39,000",
     );
-    expect(facts.length).toBeLessThanOrEqual(16);
-    // No section gives more than its share.
+    expect(facts.length).toBeLessThanOrEqual(24);
+    // No section gives more than its share (8): TRACTION's 10 are cut to 8,
+    // and BUSINESS_MODEL (which reuses those labels here) gives its 5.
     expect(
       facts.filter((fact) => fact.statement.includes("Traction figure")).length,
-    ).toBeLessThanOrEqual(12);
+    ).toBe(13);
+  });
+
+  it("Ledgerline's real shape (live trace): burn is the eighth of eight FINANCIALS facts and still reaches Q", () => {
+    const filler = (label: string, n: number) =>
+      Array.from({ length: n }, (_, index) => ({
+        ...BURN,
+        label: `${label} ${String(index + 1)}`,
+        value: String(index + 1),
+      }));
+    const facts = companyDeckFiguresFacts(
+      {
+        sections: [
+          {
+            section: "BUSINESS_MODEL",
+            status: "PRESENT",
+            facts: filler("Model", 7),
+          },
+          {
+            section: "TRACTION",
+            status: "PRESENT",
+            facts: filler("Traction", 8),
+          },
+          {
+            section: "FINANCIALS",
+            status: "PRESENT",
+            facts: [...filler("Financial", 7), BURN],
+          },
+          { section: "THE_ASK", status: "PRESENT", facts: filler("Ask", 8) },
+        ],
+      },
+      "Ledgerline",
+    );
+    expect(
+      facts.some((fact) =>
+        fact.statement.includes("Current monthly net burn: About $39,000"),
+      ),
+    ).toBe(true);
   });
 
   it("keeps a document-supported figure's own evidence status, never upgrades a claim", () => {

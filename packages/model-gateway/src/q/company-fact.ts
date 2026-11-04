@@ -185,9 +185,9 @@ export function companyFiguresFacts(
 }
 
 /** At most this many of one deck's figures go to the model. */
-const DECK_FIGURES_MAX = 16;
+const DECK_FIGURES_MAX = 24;
 /** At most this many from one section, so no section crowds out another. */
-const DECK_FIGURES_PER_SECTION = 6;
+const DECK_FIGURES_PER_SECTION = 8;
 /**
  * The deck sections whose figures the profile's Key numbers draw on, in
  * the order they are taken. Live 2026-11-04 (55936724d): Ledgerline's
