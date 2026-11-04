@@ -1,0 +1,82 @@
+{
+  "date": "2026-11-04",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link (token_hash -> /auth/callback) for the fictional account; service key read from Railway api variables in memory, never printed or stored",
+  "deploy": {
+    "commit": "06597e7c8",
+    "from": "9dc0dcb9b (fast-forward push to recovery/2026-09-12)",
+    "rollback": "9dc0dcb9b",
+    "createdAt": "2026-11-04T17:11:07Z",
+    "web": "SUCCESS",
+    "api": "SUCCESS",
+    "qApi": "SUCCESS",
+    "workers": "SUCCESS",
+    "notes": "web/api/q-api SUCCESS by ~17:19Z, workers by 17:22Z; no serviceInstanceDeployV2 fallback needed"
+  },
+  "voiceLogs": {
+    "preDeploy_9dc0dcb9b": [
+      {
+        "ended": "15:08:10Z",
+        "reason": "idle",
+        "delegations": 1,
+        "recordedSeconds": 268,
+        "note": "another account's session (same entry as live2)"
+      }
+    ],
+    "postDeploy_06597e7c8": "no 'live voice line ended' entries 17:10-18:00Z"
+  },
+  "qTurns": {
+    "serverRuns": 3,
+    "log": [
+      "17:22:58 plan 1 ask (conversation 04bebfb6)",
+      "17:36:32 P2 'Give me a short summary'",
+      "17:52:32 plan 2 ask (conversation 014faef1)"
+    ],
+    "notCounted": "three typed 'okay' attempts never reached q-api (no POST /v1/q/runs, no approval decision); the plan runner's own PREPARE_ACTION runs are not user turns"
+  },
+  "P1": {
+    "verdict": "FAIL",
+    "planCard": "No plan card and no Execute button rendered anywhere: Chat thread, Q view, Board panel, /board, /work (data-q-plan-card / data-q-plan-execute count 0 at 1440 and 390, reproduced on a second plan). The delivery message DOES carry a PLAN block with affordances [EXECUTE, PUT_ON_BOARD, CHANGE] (seen in the RSC payload), so the web client drops it.",
+    "whatShowsInstead": "Before execute, the plan's execute approval is the visible control: 'Now · Needs you · Run your plan: Follow up this week with three companies ... Approve / Change it / Keep it with me / Drop' in the Chat thread (1440 and 390), and the same item in Work > Needs you.",
+    "substituteAction": "Pressed that single 'Approve' once (Work > Needs you, 17:48:02Z). q-api: 'q approval decided' APPROVED via CARD; 'approved action's run is not resumable; executing through the gate' (reason QOrchestrationVersionError); gate outcome EXECUTED 17:48:06.",
+    "stepsStarted": "PASS: thread shows 'Approved. I'm starting my steps and putting yours on your board; the plan card shows each one as it lands, and anything that goes out comes to you first.' and 'Your plan is running: 5 steps. On your board: 2 tasks, 1 with a reminder. Waiting for your approval on their own cards: 3 steps. 1 step waits on an earlier one.'",
+    "secondPrompt": "The plan-level approval was not asked again. But the runner raised 3 q.workforce.job.start approvals (riskClass CONFIRM_REQUIRED) at 17:48:05-06, one per Q-prepare step, BEFORE anything is drafted. The visible one (Now panel, 1440 and 390) reads: 'Needs you · Prepare a meeting proposal for Maji Loop ... What will need you: Your approval of this plan before anything starts. Budget: up to $0.50 of Q's work. Approve / Change it / Keep it with me / Drop'. These are approvals to START preparing, not approvals of a prepared outward message, and their wording asks for approval 'of this plan' again. None were approved.",
+    "workPage": "After approve, Work > Moving still read 'Nothing running. Give Q a task above, and it shows here as one line.' for 2 minutes.",
+    "screenshots": [
+      "P1-plan-ready-1440.png",
+      "P1-chat-before-execute-1440.png",
+      "P1-chat-before-execute-390.png",
+      "P1-work-execute-card-before-1440.png",
+      "P1-work-after-approve-30s-1440.png",
+      "P1-work-after-approve-2min-1440.png",
+      "P1-chat-after-execute-1440.png",
+      "P1-after-execute-running-step-card-1440.png",
+      "P1-after-execute-step-card-390.png",
+      "P1b-plan-ready-1440.png"
+    ]
+  },
+  "P2": {
+    "verdict": "PASS",
+    "offer": "Plan-ready message ends 'Would you like a short summary, the whole plan read out, or shall I run it now and keep you posted?' with buttons 'Give me a short summary' / 'Read me the whole plan' / 'Go ahead and run it'",
+    "answer": "Your plan: Follow up this week with three companies ... Ledgerline, Watchly and Maji Loop, while clearing the reply waiting from Clinicrest. 5 steps: 4 I do or prepare, 1 for you. ... First: Approve, change or decline the pending expression of interest in Ledgerline / Confirm whether you lead rounds before replying to Clinicrest / Draft a reply to Clinicrest ... …and 2 more steps. Want me to run it?",
+    "server": "q-api 17:36:33 'q read the offered plan back by code'",
+    "screenshots": ["P2-summary-1440.png"]
+  },
+  "C_okay": {
+    "verdict": "FAIL",
+    "observed": "Typed 'okay' in the 'Message Q' composer (3 attempts, 2 conversations, arrival-briefing popup closed on the last two). The composer cleared, but no Q run was created, no approval was decided, and the plan did not start. Attempt 1 went to the arrival briefing's needs-you walk-through ('Needs you 1 of 2 · Tell Q what to do with these · Do it'); attempts 2-3 left the execute card waiting ('Run your plan: ... Approve / Dismiss / Later. Or say “send it”, ...').",
+    "screenshots": ["C-okay-1440.png", "C2-okay-1440.png"],
+    "leftAsIs": "plan 2 (conversation 014faef1) was not executed"
+  },
+  "P4": {
+    "verdict": "FAIL",
+    "observed": "Q view (toggle Q aria-pressed=true) stage holds data-q-work-streams / data-q-thread / data-q-now but no plan card: data-q-plan-* count 0. The plan appears only as Q's text and the Now card.",
+    "screenshots": ["P4-N2-qview-running-1440.png"]
+  },
+  "N2": {
+    "verdict": "FAIL",
+    "observed": "While the plan was running, the stage work list ([data-q-work-streams]) read only 'Waiting for your approval · Done: Understanding your request' at 1440 and 390; no plan steps listed or moving.",
+    "screenshots": ["N2-stage-1440.png", "N2-stage-390.png"]
+  },
+  "outwardSends": "none: no outward approval was pressed; the pending Ledgerline expression of interest and the three step cards remain unapproved"
+}
