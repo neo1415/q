@@ -18,6 +18,7 @@ import { interceptHeard } from "../heard-intercept";
 import { watchSpokenMove } from "../use-follow-turn";
 import { idleEnds } from "./line-hold";
 import { noteForMove, receiptListener, type MoveOutcome } from "./move";
+import { createReplyLine } from "./reply-line";
 import {
   boundedContent,
   createLiveBridge,
@@ -235,6 +236,8 @@ function channelOpened(
 }
 const SPEAKING_LEVEL = 0.02;
 const UTTERANCE_END_MS = 900;
+/** Q quiet this long, with no new words, ends its reply (reply-line.ts). */
+const REPLY_SETTLE_MS = 1_200;
 const RENEWALS_MAX = 2;
 /** The page's speech hint: words this close together are one stretch. */
 const SPEECH_GAP_MS = 1_500;
@@ -682,8 +685,13 @@ export async function startLiveCall(
       void navigationHeardFor(done.key, done.text.trim());
     }
   };
-  let reply: { key: string; text: string } | null = null;
-  let replyCount = 0;
+  // One reply, one line and one stored segment (reply-line.ts): an audio
+  // dip between chunks no longer ends it mid-word.
+  const reply = createReplyLine({
+    onTranscript: (line) => options.onTranscript?.(line),
+    keep: (text) => keep("Q", text),
+    settleMs: REPLY_SETTLE_MS,
+  });
 
   const reportUsage = async (seconds: number, final: boolean) => {
     if (id === null) return;
@@ -797,8 +805,7 @@ export async function startLiveCall(
         lastInputAt = ms;
         lastSpeechAt = performance.now();
         // Interrupted mid-sentence: what it had said is still kept.
-        if (reply !== null) keep("Q", reply.text);
-        reply = null;
+        reply.interrupted();
         if (utterance === null) {
           // A new turn of theirs: whatever the voice answers is its own
           // until it hands this one to Q.
@@ -845,17 +852,7 @@ export async function startLiveCall(
           };
           lastInputAt = null;
         }
-        if (reply === null) {
-          replyCount += 1;
-          reply = { key: `live_q${String(replyCount)}`, text: "" };
-        }
-        reply.text += delta;
-        options.onTranscript?.({
-          key: reply.key,
-          role: "q",
-          text: reply.text.trim(),
-          final: false,
-        });
+        reply.delta(delta);
         break;
       }
       case "session.usage.updated":
@@ -1053,16 +1050,7 @@ export async function startLiveCall(
     if (speaking) lastSpeechAt = performance.now();
     if (speaking !== stats.qSpeaking) {
       stats = { ...stats, qSpeaking: speaking };
-      if (!speaking && reply !== null) {
-        keep("Q", reply.text);
-        options.onTranscript?.({
-          key: reply.key,
-          role: "q",
-          text: reply.text.trim(),
-          final: true,
-        });
-        reply = null;
-      }
+      reply.speaking(speaking);
       update();
     }
     watchPage();
@@ -1142,8 +1130,7 @@ export async function startLiveCall(
     clearInterval(meter);
     if (pageTimer !== null) clearTimeout(pageTimer);
     finishUtterance();
-    if (reply !== null) keep("Q", reply.text);
-    reply = null;
+    reply.end();
     const flushed = flushTranscript();
     const mine = connection;
     if (mine !== null) {
