@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { QArtifactDetail } from "@capital-q/contracts";
+import type { QArtifactDetail, QPlanStatus } from "@capital-q/contracts";
 import type { QWorkJobResult } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
@@ -133,6 +133,12 @@ export function createWorkforceJobResults(dependencies: {
   readonly conversationOf?:
     | ((actor: ActorContext, runId: string) => Promise<string | null>)
     | undefined;
+  /**
+   * live5 g: the situation plan a job produced, as it stands now (its
+   * status and step states, as the plan card reads them); null: none.
+   */
+  readonly planOfJob?:
+    ((owner: Owner, jobId: string) => Promise<JobPlan | null>) | undefined;
 }) {
   async function review(
     actor: ActorContext,
@@ -279,10 +285,18 @@ export function createWorkforceJobResults(dependencies: {
       chosen.map(async ({ job, row, inThisConversation }) => {
         const outputs = doneOutputs(row);
         const progress = progressLine(row);
+        // A read that fails leaves the job as its own state says.
+        const plan =
+          (await dependencies.planOfJob?.(owner, job.id).catch(() => null)) ??
+          null;
+        const planned = plan === null ? null : planStanding(plan);
         return {
           jobId: job.id,
           goal: job.goal,
-          state: row?.state ?? job.status,
+          // The plan's standing wins over the job's: a plan job stays
+          // RUNNING after it has handed its plan over (live5 g).
+          state: planned?.state ?? row?.state ?? job.status,
+          ...(planned === null ? {} : { plan: planned }),
           finishedAt: row?.finished_at?.toISOString() ?? null,
           inThisConversation,
           review: await review(actor, outputs),
@@ -291,6 +305,44 @@ export function createWorkforceJobResults(dependencies: {
         };
       }),
     );
+  };
+}
+
+/** A job's situation plan as it stands: its status and step states. */
+export type JobPlan = {
+  readonly status: QPlanStatus;
+  readonly goal: string;
+  readonly steps: readonly { readonly status: string }[];
+};
+
+/** Plan status -> what Q says about the task (bounded, code's words). */
+const PLAN_STANDING: Readonly<Record<QPlanStatus, string>> = {
+  DRAFT: "PLAN_BEING_DRAFTED",
+  OFFERED: "READY_FOR_THEIR_DECISION",
+  ACCEPTED: "APPROVED_STARTING",
+  ON_BOARD: "ON_THEIR_BOARD",
+  EXECUTING: "RUNNING_STEPS",
+  DONE: "DONE",
+  SUPERSEDED: "REPLACED_BY_A_NEWER_PLAN",
+};
+
+/** live5 g: the plan a job produced, said as where the task stands. */
+export function planStanding(
+  plan: JobPlan,
+): NonNullable<QWorkJobResult["plan"]> {
+  const done = plan.steps.filter(
+    (step) => step.status === "DONE" || step.status === "SKIPPED",
+  ).length;
+  return {
+    state:
+      plan.status === "EXECUTING" &&
+      plan.steps.length > 0 &&
+      done === plan.steps.length
+        ? "DONE"
+        : PLAN_STANDING[plan.status],
+    goal: plan.goal,
+    done,
+    total: plan.steps.length,
   };
 }
 

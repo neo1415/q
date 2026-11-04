@@ -104,6 +104,22 @@ export type QWorkJobResult = {
    * the steps not done (with why), what steps found (contradictions,
    * missing information) and what is next. Null or absent: no plan on record.
    */
+  /**
+   * Live 2026-11-04 (live5 g): the situation plan this job produced, as it
+   * stands now. A plan job's own state stays RUNNING after it hands over
+   * its plan, so "how far is the task?" was answered "still running" with
+   * a five-step plan ready for their decision. Absent: the job made none.
+   */
+  readonly plan?:
+    | {
+        /** READY_FOR_THEIR_DECISION, APPROVED_STARTING, RUNNING_STEPS, DONE, ... */
+        readonly state: string;
+        readonly goal: string;
+        readonly done: number;
+        readonly total: number;
+      }
+    | null
+    | undefined;
   readonly progress?:
     | {
         readonly outcome: string | null;
@@ -382,6 +398,19 @@ const WorkJobResultSchema = z
       })
       .strict()
       .nullable(),
+    /** The situation plan this job produced, as it stands now. */
+    plan: z
+      .object({
+        state: z.string().max(40),
+        goal: z.string().max(300),
+        done: z.number().int().min(0),
+        total: z.number().int().min(0),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The plan this job made, as it stands now; it decides how far the task is. READY_FOR_THEIR_DECISION: the plan is ready and waits for their Execute or go-ahead (the task is not still running).",
+      ),
     /** wf: the plan as it stands (code's words). Absent: no plan on record. */
     progress: z
       .object({
@@ -748,6 +777,16 @@ function jobView(job: QWorkJobResult): z.infer<typeof WorkJobResultSchema> {
               .map((question) => cut(question, 600)),
             filedForApproval: job.diligence.filedForApproval,
           },
+    ...(job.plan == null
+      ? {}
+      : {
+          plan: {
+            state: cut(job.plan.state, 40),
+            goal: cut(job.plan.goal, 300),
+            done: job.plan.done,
+            total: job.plan.total,
+          },
+        }),
     ...(job.progress == null
       ? {}
       : {

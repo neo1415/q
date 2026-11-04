@@ -413,3 +413,80 @@ describe("live 2026-10-12: the Ledgerfold job as production persisted it", () =>
     expect(found?.diligence?.questions).toEqual(LEDGERFOLD_QUESTIONS);
   });
 });
+
+describe("live5 g: a job's plan is where the task stands", () => {
+  it("a plan ready for their decision is reported as ready, not 'running'", async () => {
+    const fixture = await setup();
+    const running = fixture.rows[0];
+    if (running !== undefined) {
+      fixture.rows[0] = { ...running, state: "RUNNING", finished_at: null };
+    }
+    const planOfJob = vi.fn((owner: Owner, jobId: string) =>
+      Promise.resolve(
+        owner.userId === ownerA.userId && jobId === fixture.job.id
+          ? {
+              status: "OFFERED" as const,
+              goal: "Complete a first-pass diligence review of Ledgerline",
+              steps: [
+                { status: "PLANNED" },
+                { status: "PLANNED" },
+                { status: "PLANNED" },
+                { status: "PLANNED" },
+                { status: "PLANNED" },
+              ],
+            }
+          : null,
+      ),
+    );
+    const read = createWorkforceJobResults({
+      store: fixture.store,
+      work: { forOwner: fixture.forOwner },
+      artifacts: { readVersion: fixture.readVersion },
+      conversationOf: () => Promise.resolve(conversationId),
+      planOfJob,
+    });
+    const [result] = await read(actorOf(ownerA), { runId: randomUUID() });
+    expect(result?.state).toBe("READY_FOR_THEIR_DECISION");
+    expect(result?.plan).toEqual({
+      state: "READY_FOR_THEIR_DECISION",
+      goal: "Complete a first-pass diligence review of Ledgerline",
+      done: 0,
+      total: 5,
+    });
+    // Read as the job's owner only.
+    expect(planOfJob).toHaveBeenCalledWith(ownerA, fixture.job.id);
+  });
+
+  it("a running plan reports its steps; one with every step done is done", async () => {
+    const { planStanding } =
+      await import("../src/composition/workforce/results.js");
+    expect(
+      planStanding({
+        status: "EXECUTING",
+        goal: "g",
+        steps: [{ status: "DONE" }, { status: "DOING" }],
+      }),
+    ).toEqual({ state: "RUNNING_STEPS", goal: "g", done: 1, total: 2 });
+    expect(
+      planStanding({
+        status: "EXECUTING",
+        goal: "g",
+        steps: [{ status: "DONE" }, { status: "SKIPPED" }],
+      }).state,
+    ).toBe("DONE");
+  });
+
+  it("a job with no plan keeps its own state, and a failed plan read changes nothing", async () => {
+    const fixture = await setup();
+    const read = createWorkforceJobResults({
+      store: fixture.store,
+      work: { forOwner: fixture.forOwner },
+      artifacts: { readVersion: fixture.readVersion },
+      conversationOf: () => Promise.resolve(conversationId),
+      planOfJob: () => Promise.reject(new Error("down")),
+    });
+    const [result] = await read(actorOf(ownerA), { runId: randomUUID() });
+    expect(result?.state).toBe("COMPLETED");
+    expect(result).not.toHaveProperty("plan");
+  });
+});

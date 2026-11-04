@@ -2690,6 +2690,20 @@ const workforceJobResults = createWorkforceJobResults({
   conversationOf: async (actor, runId) =>
     (await qRuntime.getRun({ actor, runId: QRunIdSchema.parse(runId) })).run
       .conversationId,
+  // live5 g: the plan a job produced, read as the plan card reads it
+  // (planStore and plans are composed below; read only at call time).
+  planOfJob: async (owner, jobId) => {
+    const head = (await planStore.forJob?.(owner, jobId)) ?? null;
+    if (head === null) return null;
+    const view = await plans.view(owner, head.planId);
+    return view === null
+      ? null
+      : {
+          status: view.status,
+          goal: view.plan.goal,
+          steps: view.plan.steps,
+        };
+  },
 });
 const workPort = createWorkPort({
   jobResults: workforceJobResults,

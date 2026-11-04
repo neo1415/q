@@ -83,6 +83,8 @@ export type PlanStore = {
     },
   ) => Promise<PlanHead>;
   readonly head: (owner: Owner, planId: string) => Promise<PlanHead | null>;
+  /** The newest plan a job produced, as its owner's; null when none. */
+  readonly forJob?: (owner: Owner, jobId: string) => Promise<PlanHead | null>;
   /** False: that version already exists (a retried write). */
   readonly addVersion: (
     owner: Owner,
@@ -223,6 +225,17 @@ export function createPostgresPlanStore(dependencies: {
         select id, current_version, status, side, goal, job_id
           from q_runtime.q_plans
          where id = ${planId} and tenant_id = ${owner.tenantId} and user_id = ${owner.userId}`;
+      const row = rows[0];
+      return row === undefined ? null : headOf(row);
+    },
+
+    forJob: async (owner, jobId) => {
+      const rows = await sql<HeadRow[]>`
+        select id, current_version, status, side, goal, job_id
+          from q_runtime.q_plans
+         where job_id = ${jobId} and tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
+         order by created_at desc
+         limit 1`;
       const row = rows[0];
       return row === undefined ? null : headOf(row);
     },
