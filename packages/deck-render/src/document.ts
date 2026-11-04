@@ -43,6 +43,7 @@ import { themeFor, type BrandInput } from "./theme.js";
  */
 
 export type DocumentFinding = {
+  /** Empty when it is the section's body word for word (printed once). */
   readonly statement: string;
   /** "user claim · self reported": whose claim it is, and what supports it. */
   readonly provenance: string;
@@ -158,7 +159,25 @@ export function splitReviewPoints(gaps: readonly string[]): {
   return { gaps: evidence, reviewOpen };
 }
 
-/** One stored version as a document. Adds nothing the version does not say. */
+/** Words only: the same sentence wrapped, spaced or marked up differently. */
+function sameWords(a: string, b: string): boolean {
+  const words = (text: string) =>
+    plainMarkdown(text)
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  const left = words(a);
+  return left.length > 0 && left === words(b);
+}
+
+/**
+ * One stored version as a document. Adds nothing the version does not say,
+ * and prints nothing twice (acceptance 2026-11-04, J3 "every sentence is
+ * doubled"): the writer gives a section a finding whose statement is the
+ * body itself, and a "Summary" section that is the summary under the
+ * title. A repeated statement keeps its provenance line; a section that
+ * only repeats the summary is not printed again.
+ */
 export function documentFromArtifact(input: {
   readonly type: string;
   readonly version: QArtifactVersion;
@@ -169,14 +188,25 @@ export function documentFromArtifact(input: {
     title: version.title,
     summary: version.summary,
     dateline: `Version ${String(version.version)} · ${dateOf(version.createdAt)}`,
-    sections: version.content.sections.map((section) => ({
-      heading: section.heading,
-      body: section.body,
-      findings: section.findings.map((finding) => ({
-        statement: finding.statement,
-        provenance: provenanceOf(finding),
+    sections: version.content.sections
+      .filter(
+        (section) =>
+          !(
+            section.findings.length === 0 &&
+            version.summary !== undefined &&
+            sameWords(section.body, version.summary)
+          ),
+      )
+      .map((section) => ({
+        heading: section.heading,
+        body: section.body,
+        findings: section.findings.map((finding) => ({
+          statement: sameWords(finding.statement, section.body)
+            ? ""
+            : finding.statement,
+          provenance: provenanceOf(finding),
+        })),
       })),
-    })),
     ...splitReviewPoints(version.content.gaps),
     notice: NOTICE,
     ...(version.content.look === undefined
@@ -800,22 +830,25 @@ export async function documentToPdf(
     if (section.findings.length > 0) {
       flow.gap(8);
       for (const finding of section.findings) {
-        flow.lines(
-          fonts.regular,
-          wrapWith(
+        // Empty: the statement is the section's body, already printed.
+        if (finding.statement.length > 0) {
+          flow.lines(
             fonts.regular,
-            plainMarkdown(finding.statement),
-            9.5,
-            width - 14,
-          ),
-          {
-            size: 9.5,
-            leading: 1.45,
-            colour: SECONDARY,
-            indent: 14,
-            rule: accent,
-          },
-        );
+            wrapWith(
+              fonts.regular,
+              plainMarkdown(finding.statement),
+              9.5,
+              width - 14,
+            ),
+            {
+              size: 9.5,
+              leading: 1.45,
+              colour: SECONDARY,
+              indent: 14,
+              rule: accent,
+            },
+          );
+        }
         flow.lines(
           fonts.regular,
           wrapWith(fonts.regular, finding.provenance, 8.5, width - 14),
