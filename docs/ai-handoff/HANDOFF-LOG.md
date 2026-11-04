@@ -1434,3 +1434,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Fix:** removed the auto `chooseOpener("SHOW")` and the on-open discovery cards; restored the tests `519f41625` replaced; the switch always renders; Chat before the first word shows the greeting with Q in the corner. DECISIONS 54; MVP item 7 reworded.
 - **Also ships:** `f137cfdf3` (a typed turn that closes a call is answered in writing).
 - **Behaviour change to check:** a phone's default view is Chat, so a fresh phone now opens on the greeting without the large Q.
+
+## 2026-11-04 — fix-and-ship day (Claude integration owner, session_01Eyr9vLWNKc3FEiHheX7Mwc)
+
+- Integrated A1–A6, B1, voice end reasons, C security (SEC-02, ACT-03, SEC-01, SEC-04), D client UI, N1 navigation offer, N2 live progress, N3 one render registry, on `fix/resume-asking-cv9ru3` (now `9dc0dcb9b`, CI green).
+- Deployed `55936724d` to all four services (api/workers needed serviceInstanceDeployV2). Live: A1 PASS 4/4, A3 PASS, A6 PASS; A2 FAIL (comparison table built by code from a top-two count in a prepare warmed before the reference was bound) and A4 FAIL (deck facts capped at 8 in deck order; Ledgerline's FINANCIALS is section 9). Both fixed with failing-first tests in `0180d7bd6`/`9dc0dcb9b`; `9dc0dcb9b` deploying with live recheck.
+- Lesson repeated: fake-model tests passed while live failed because a second code path (warmed prepare + compareTargets) built the visible result. Trace production logs before fixing.
+- Owner actions: set CQ_SEED_ACCOUNT_PASSWORD as an environment secret; replace SUPABASE_ACCESS_TOKEN (401) and rotate tokens pasted in chat.
+- Open: B-cause (needs one real voice call), E (Hey Q), C residuals, N4 remaining journeys.
