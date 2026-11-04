@@ -1,0 +1,38 @@
+{
+  "light-1440": {
+    "talkButtons": 1,
+    "status2s": "Connecting",
+    "status5s": "Connecting",
+    "ws": [],
+    "qcardShadow": null
+  },
+  "light-390": {
+    "talkButtons": 1,
+    "status2s": "",
+    "status5s": "",
+    "ws": [],
+    "qcardShadow": null
+  },
+  "dark-1440": {
+    "talkButtons": 1,
+    "status2s": "I'm on it: gathering where things stand for you now, then drafting a plan and having it reviewed twice before you see it. It usually takes a minute or two; you can follow it here. / Drafting the plan / Connecting",
+    "status5s": "I'm on it: gathering where things stand for you now, then drafting a plan and having it reviewed twice before you see it. It usually takes a minute or two; you can follow it here. / Drafting the plan / Connecting",
+    "ws": [],
+    "qcardShadow": null
+  },
+  "dark-390": {
+    "talkButtons": 1,
+    "status2s": "Q:\n\nGood evening, Amara. Good to see you. You have 26 things waiting. Would you like to look at them now, or talk about something else?\n\nYou:\nShow me Ledgerline's pitch video\n\nHide from Q\nQ:\n\nAsked to open Ledgerfold's elevator pitch.\n\nWhere this lives\nOpen the elevator pitch / Connecting",
+    "status5s": "Q:\n\nGood evening, Amara. Good to see you. You have 26 things waiting. Would you like to look at them now, or talk about something else?\n\nYou:\nShow me Ledgerline's pitch video\n\nHide from Q\nQ:\n\nAsked to open Ledgerfold's elevator pitch.\n\nWhere this lives\nOpen the elevator pitch / Connecting",
+    "ws": [],
+    "qcardShadow": null
+  },
+  "splash-light": {
+    "bodyBg": "rgb(255, 255, 255)",
+    "overlay": ["geistmono_f53ffa5b-module__EUzGkG__variable rgba(0, 0, 0, 0)"]
+  },
+  "splash-dark": {
+    "bodyBg": "rgb(33, 33, 33)",
+    "overlay": ["geistmono_f53ffa5b-module__EUzGkG__variable rgba(0, 0, 0, 0)"]
+  }
+}

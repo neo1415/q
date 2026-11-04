@@ -1,0 +1,88 @@
+{
+  "light-1440": {
+    "qpage": {
+      "themeColor": [
+        "#ffffff [manual]",
+        "#ffffff ((prefers-color-scheme: light))",
+        "#212121 ((prefers-color-scheme: dark))"
+      ],
+      "bodyBg": "rgb(255, 255, 255)",
+      "htmlTheme": "light",
+      "bodyBefore": "none"
+    },
+    "composerWidth": {
+      "maxWidth": "768px",
+      "w": 768
+    },
+    "talkStatus": "Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Board | 0 | Conversations | Voice paused |   | Welcome back, Amara. | What's on your mind today? | Live voice isn't available right now, so I'm on my standard voice. | Dismiss | Clear | Q | Ask Q",
+    "chatColumn": {
+      "maxWidth": "768px",
+      "w": 768
+    }
+  },
+  "light-390": {
+    "qpage": {
+      "themeColor": [
+        "#ffffff [manual]",
+        "#ffffff ((prefers-color-scheme: light))",
+        "#212121 ((prefers-color-scheme: dark))"
+      ],
+      "bodyBg": "rgb(255, 255, 255)",
+      "htmlTheme": "light",
+      "bodyBefore": "none"
+    },
+    "composerWidth": {
+      "maxWidth": "768px",
+      "w": 366
+    },
+    "talkStatus": "Q | Chat | Board | 0 | Conversations | Welcome back, Amara. | What's on your mind today? | Live voice isn't available right now, so I'm on my standard voice. | Dismiss | Clear | Q | Ask Q",
+    "chatColumn": {
+      "maxWidth": "768px",
+      "w": 366
+    }
+  },
+  "dark-1440": {
+    "qpage": {
+      "themeColor": [
+        "#212121 [manual]",
+        "#ffffff ((prefers-color-scheme: light))",
+        "#212121 ((prefers-color-scheme: dark))"
+      ],
+      "bodyBg": "rgb(33, 33, 33)",
+      "htmlTheme": "dark",
+      "bodyBefore": "none"
+    },
+    "composerWidth": {
+      "maxWidth": "768px",
+      "w": 768
+    },
+    "talkStatus": "Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Board | 0 | Conversations | Voice paused |   | Welcome back, Amara. | What's on your mind today? | Live voice isn't available right now, so I'm on my standard voice. | Dismiss | Clear | Q | Ask Q",
+    "chatColumn": {
+      "maxWidth": "768px",
+      "w": 768
+    }
+  },
+  "dark-390": {
+    "qpage": {
+      "themeColor": [
+        "#212121 [manual]",
+        "#ffffff ((prefers-color-scheme: light))",
+        "#212121 ((prefers-color-scheme: dark))"
+      ],
+      "bodyBg": "rgb(33, 33, 33)",
+      "htmlTheme": "dark",
+      "bodyBefore": "none"
+    },
+    "composerWidth": {
+      "maxWidth": "768px",
+      "w": 366
+    },
+    "talkStatus": "Q | Chat | Board | 2 | Conversations | Q: | Good evening, Amara. Good to see you. You have 26 things waiting. Would you like to look at them now, or talk about something else? | You: | Show me the top companies for my mandate | Hide from Q | Q: | 1 | Number 1: | M | MedTrail | 9.0 | Open | Strong: | Raising seed; you invest at seed. | Strong: | In one of your sectors. | Not known yet: | Round term",
+    "chatColumn": {
+      "maxWidth": "768px",
+      "w": 366
+    }
+  },
+  "splash-light": "no splash element at 0.7s",
+  "splash-dark": "no splash element at 0.7s"
+}

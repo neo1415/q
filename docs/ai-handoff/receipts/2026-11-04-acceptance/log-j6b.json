@@ -1,0 +1,36 @@
+[
+  {
+    "at": "/home"
+  },
+  {
+    "click": "Chat",
+    "matches": 1
+  },
+  {
+    "after": "/home"
+  },
+  {
+    "asked": "Show me a chart of Ledgerline's revenue"
+  },
+  {
+    "settledMs": 21113,
+    "url": "/home?c=acb933d8-c73a-43aa-9a8a-1151fd31d66b"
+  },
+  {
+    "shot": "j6-chart-1440.png"
+  },
+  {
+    "dump": "chart",
+    "text": "Q | Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Board | 0 | Conversations | You: | Show me a chart of Ledgerline's revenue | Hide from Q | Q: |   | Ledgerline's self-reported revenue rises from ₦19.6m MRR in October 2025 to ₦38m in September 2026. The deck also projects FY2027 revenue of ₦780m, FY2028 revenue of ₦1.65bn, and FY2029 revenue of ₦3.1bn. I couldn't display the chart here, but the figures are available in the deck's revenue section. | I tried, but it didn't go through, so nothing was prepared or changed. Ask me again in a moment, or do it from its page. | Sources | Company · 1 | Clear | Q | Ask Q"
+  },
+  {
+    "eval": "chart",
+    "v": {
+      "url": "/home?c=acb933d8-c73a-43aa-9a8a-1151fd31d66b",
+      "svgCharts": 0,
+      "canvas": 2,
+      "tables": 0,
+      "imgs": 0
+    }
+  }
+]

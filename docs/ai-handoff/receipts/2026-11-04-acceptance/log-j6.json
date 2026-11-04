@@ -1,0 +1,37 @@
+[
+  {
+    "at": "/home"
+  },
+  {
+    "click": "Chat",
+    "matches": 1
+  },
+  {
+    "after": "/home"
+  },
+  {
+    "asked": "Show me Ledgerline's pitch video"
+  },
+  {
+    "settledMs": 11065,
+    "url": "/company/84b9641f-b618-4fa3-8b35-1d19b1c71d82?tab=elevator"
+  },
+  {
+    "shot": "j6-video-1440.png"
+  },
+  {
+    "dump": "video",
+    "text": "every few weeks with no credit to match. | Claim | 0:06 | Founder | Adezen Wachukwu founded LedgerFold. | Claim | 0:06 | Relevant experience | Adezen Wachukwu founded LedgerFold after years in microfinance. | Claim | 0:14 | Free bookkeeping | Traders keep their books free in the app. | Claim | 0:14 | Loan duration | Traders borrow for 14 to 60 days. | Claim | 0:14 | Repayment method | Traders repay from daily sales. | Claim | 0:28 | The raise | “Ledger Fold is raising $2.5 million in a price seed round.” | Claim | 0:28 | Stage | “Ledger Fold is raising $2.5 million in a price seed round.” | Claim | 0:28 | Fundraising | LedgerFold is raising $2.5 million in a price seed round. | Claim | The company’s own claims, from its pitch video. Not verified. | Ledgerfold: pitch summary (AI presenter, AI-generated) · 0:36 | Video 2 · 1:27 | Not said in the pitch | Instrument | Use of funds | Historical financial statements | Market source | Customer acquisition cost | Headcount | Unknown is not negative. These stay open until Ledgerfold answers or shares a document. | Q | Q’s read, not verified | The pitch says $2.5M; the deck says USD 2,500,000. Both stand as stated until the company reconciles them. | The pitch doesn’t mention instrument or use of funds, the first things to ask. | About this video | Title | Ledgerfold: pitch summary (AI presenter, AI-generated) | Length | 0:36 | Captions | On | Sound | Off until you turn it on | Where the Overview’s $2.5M comes from: this video at 0:28."
+  },
+  {
+    "eval": "media",
+    "v": {
+      "videos": 0,
+      "iframes": 0,
+      "posters": []
+    }
+  },
+  {
+    "error": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('textarea').first()\u001b[22m\n"
+  }
+]

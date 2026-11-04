@@ -1,0 +1,122 @@
+{
+  "date": "2026-11-04",
+  "deployedCommit": "8967c4fd4",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link; service key read from Railway api variables in memory only; no tokens in receipts",
+  "outwardActions": "none; no approval card was approved, nothing was sent",
+  "qTurns": 13,
+  "journeys": {
+    "J1_pipeline_open": {
+      "verdict": "PASS",
+      "conversation": "044895d5-a3c0-463e-9e94-91ae21fc8088",
+      "answer": "12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it?",
+      "card": "Where this lives / Relationships / Open pipeline / Stay here",
+      "afterOpen": "/relationships?view=pipeline (Investment Hub, Pipeline tab, 12 companies)",
+      "drawer": "Ctrl+K dock on the pipeline page shows the same question and answer; 'Q can see: Relationships · 12 relationships'",
+      "files": [
+        "j1-answer-1440.png",
+        "j1-relationships-1440.png",
+        "j1-dock-1440.png",
+        "log-j1.json",
+        "log-j1b.json"
+      ]
+    },
+    "J2_pipeline_stay": {
+      "verdict": "PASS",
+      "viewport": 390,
+      "conversation": "eaf4d4de-8a94-4f29-8471-f891a91fb401",
+      "afterStay": "URL unchanged /home?c=eaf4d4de…; offer card removed; answer kept",
+      "files": ["j2-answer-390.png", "j2-stay-390.png", "log-j2.json"]
+    },
+    "J3_memo": {
+      "verdict": "PARTIAL",
+      "conversation": "747374ce-bb07-4822-aa80-90994b797e68",
+      "progress": "Working: Understanding your request ✓, Pulling it together ✓, Looking at the company ✓, Writing your document ✓, Looking into it …",
+      "interimLine": "Drafting that note to Ledgerline now.  (reads as an outward message to the company)",
+      "answer": "Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card.",
+      "navigateAwayBack": "PASS: /discover then back; card 'Investment brief — Ledgerline' with Open / Download PDF / Edit with Q still present",
+      "view": "PASS: Open shows the document dialog, Version 1 · 4 Nov 2026, 20:22",
+      "download": "PASS: Investment-brief-Ledgerline.pdf (232 KB, 2 pages)",
+      "contentDefects": [
+        "Ignores Capital Q's own Ledgerline record (deck burn $39,000 is known, J7): 'The company identity is unresolved because public sources describe three materially different Ledgerline businesses'",
+        "Each section's sentence is printed twice in the PDF",
+        "Asked for one page; PDF is 2 pages"
+      ],
+      "files": [
+        "j3-progress-1440.png",
+        "j3-away-discover-1440.png",
+        "j3-back-1440.png",
+        "j3-done-1440.png",
+        "j3-open-1440.png",
+        "j3-after-download-1440.png",
+        "Investment-brief-Ledgerline.pdf",
+        "log-j3.json",
+        "log-j3b.json"
+      ]
+    },
+    "J4_plan": {
+      "verdict": "PARTIAL",
+      "conversation": "48802bd9-3555-43ae-af23-bde50d6e03e2",
+      "ask": "Make me a plan to follow up this week with the three most promising companies in my pipeline",
+      "duration": "over 2 min (stage read 'Going for 1 min 54 s · Next: Reviewing' at 2 min)",
+      "planCard": "PASS: 'Your plan is ready: 6 steps … (3 I can do or prepare, 3 for you)'; Execute / Put on my board / Change it on the Q stage and in Chat",
+      "separateNowCard": "FAIL: a separate 'Now · Q asks · What would you like to do with your plan? · Give me a short summary / Read me the whole plan / Go ahead and run it' block still renders under the plan card (stage and Chat)",
+      "okayWhileDrafting": "FAIL: 'okay' typed while the plan was still drafting vanished: composer cleared, no message in the thread, no reply",
+      "okayWhenReady": "PASS: 'Running it now: my steps have started and yours are on your board. Anything that goes out to someone still comes to you first, and I'll tell you here as each step lands.'",
+      "workList": "PARTIAL: the plan card was put away ('Put … away as we moved on'); no step list on the stage. /work 'Moving' read 'Nothing running'; the step 'Approve a reply to Clinicrest…' appears as an approval card (not approved)",
+      "files": [
+        "j4-plan-stage-1440.png",
+        "j4-plan-chat-1440.png",
+        "j4-okay-early-1440.png",
+        "j4-okay-1440.png",
+        "j4-readback-stage-1440.png",
+        "j4-readback-chat-1440.png",
+        "j4-okay2-early-1440.png",
+        "j4-okay2-stage-1440.png",
+        "j4-okay2-chat-1440.png",
+        "j4-work-1440.png",
+        "j4-work2-1440.png",
+        "log-j4.json",
+        "log-j4b.json",
+        "log-j4c.json"
+      ]
+    },
+    "J5_compare_context": {
+      "verdict": "PARTIAL",
+      "conversation": "49a311ee-747d-4f44-94cd-f24ae0b87975",
+      "list": "1 MedTrail 9.0, 2 Mizan 9.0, 3 Silo Credit 9.0, 4 Duplo …",
+      "compare": "PASS: side-by-side table Mizan vs Silo Credit (the displayed 2nd and 3rd)",
+      "traction": "Context kept (Mizan vs Silo Credit). Answer: 'Mizan reports three live banks, EGP 640m originated and a 0.9% non-performing rate. That gives Silo the stronger visible operating footprint and lower reported credit-loss figure, while Mizan shows meaningful institutional adoption…' — figures attributed to Mizan, conclusion credited to Silo; Silo's own figures missing",
+      "files": [
+        "j5-list-1440.png",
+        "j5-compare-1440.png",
+        "j5-traction-1440.png",
+        "log-j5.json",
+        "log-j5b.json"
+      ]
+    },
+    "J6_media_in_chat": {
+      "verdict": "FAIL",
+      "video": "'Show me Ledgerline's pitch video' (Chat mode) → Q answered 'Asked to open Ledgerfold's elevator pitch.' and navigated to /company/84b9641f…?tab=elevator — Ledgerfold, a different company. The page shows a video player with poster and Play; nothing renders in chat",
+      "chart": "'Show me a chart of Ledgerline's revenue' → 'Ledgerline's self-reported revenue rises from ₦19.6m MRR in October 2025 to ₦38m in September 2026. The deck also projects FY2027 revenue of ₦780m, FY2028 ₦1.65bn, FY2029 ₦3.1bn. I couldn't display the chart here…' plus 'I tried, but it didn't go through, so nothing was prepared or changed.' No chart rendered",
+      "files": [
+        "j6-video-1440.png",
+        "j6-chart-1440.png",
+        "log-j6.json",
+        "log-j6b.json"
+      ]
+    },
+    "J7_robustness": {
+      "verdict": "PASS (artifact denial PARTIAL)",
+      "refresh": "PASS: reload 4 s after asking 'What is Ledgerline's current monthly burn?'; one answer rendered once: 'Ledgerline's current monthly net burn is reported as about $39,000 …'",
+      "randomArtifact": "PARTIAL: /api/q-artifact/3f9c2b1e-7a4d-4e8b-9c6f-1d2e3a4b5c6d/pdf denied honestly, but shown as raw JSON {\"message\":\"I couldn't find that document.\"}",
+      "okayNothingPending": "PASS: 'What would you like to look at next, Amara?'",
+      "files": [
+        "j7-refresh-1440.png",
+        "j7-okay-1440.png",
+        "j7-artifact-uuid-1440.png",
+        "log-j7.json"
+      ]
+    }
+  }
+}

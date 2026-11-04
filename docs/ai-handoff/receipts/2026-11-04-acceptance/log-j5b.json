@@ -1,0 +1,19 @@
+[
+  {
+    "at": "/home?c=49a311ee-747d-4f44-94cd-f24ae0b87975"
+  },
+  {
+    "click": "Chat",
+    "matches": 1
+  },
+  {
+    "after": "/home?c=49a311ee-747d-4f44-94cd-f24ae0b87975"
+  },
+  {
+    "eval": "answers",
+    "v": {
+      "compareReplyStart": "Compare the second and third | Hide from Q | Q: | 1 | Number 1: | M | Mizan | Good fit | 6 of 7 measures known · no source documents yet | Tied with Silo Credit on mandate fit (9.0). | 9.0 | mandate fit, out of 10 | Open | Strong: | Raising seed; you invest at seed. | Strong: | In one of your sectors. | Not known yet: | Round terms not known yet. | Stage | Strong | Sector | Strong | Geography | Partial | Cheque compatibility | Strong | Business model | Strong | Thesis | Strong | Round terms | Unknown | How 9.0 is worked out | Open profile | Ask about this | Raising seed; you invest at seed. | 2 | Number 2: | SC | Silo Credit | Good fit | 6 of 7 measures known · no source documents yet | Tied",
+      "tractionReply": "which has better traction? | Hide from Q | Q: | 1 | Number 1: | M | Mizan | Good fit | 6 of 7 measures known · no source documents yet | Tied with Silo Credit on mandate fit (9.0). | 9.0 | mandate fit, out of 10 | Open | Strong: | Raising seed; you invest at seed. | Strong: | In one of your sectors. | Not known yet: | Round terms not known yet. | Stage | Strong | Sector | Strong | Geography | Partial | Cheque compatibility | Strong | Business model | Strong | Thesis | Strong | Round terms | Unknown | How 9.0 is worked out | Open profile | Ask about this | Raising seed; you invest at seed. | 2 | Number 2: | SC | Silo Credit | Good fit | 6 of 7 measures known · no source documents yet | Tied with Mizan on mandate fit (9.0). | 9.0 | mandate fit, out of 10 | Open | Strong: | Raising seed; you invest at seed. | Strong: | In one of your sectors. | Not known yet: | Round terms not known yet. | Stage | Strong | Sector | Strong | Geography | Partial | Cheque compatibility | Strong | Business model | Strong | Thesis | Strong | Round terms | Unknown | How 9.0 is worked out | Open profile | Ask about this | Raising seed; you invest at seed. | Side by side | Attribute | \tMizan\tSilo Credit | What they do\tAn API that lets Egyptian banks and fintechs offer Shariah-compliant SME financing: structuring, Shariah review, documents and repayments. (company-stated)\tSilo Credit certifies warehouses and issues digital receipts that let Kano grain traders borrow against stored grain and sell later. ("
+    }
+  }
+]

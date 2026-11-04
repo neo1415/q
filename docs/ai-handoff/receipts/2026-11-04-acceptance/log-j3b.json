@@ -1,0 +1,41 @@
+[
+  {
+    "at": "/home?c=747374ce-bb07-4822-aa80-90994b797e68"
+  },
+  {
+    "click": "Open",
+    "matches": 1
+  },
+  {
+    "after": "/home?c=747374ce-bb07-4822-aa80-90994b797e68"
+  },
+  {
+    "shot": "j3-open-1440.png"
+  },
+  {
+    "eval": "opened",
+    "v": {
+      "url": "/home",
+      "dialogs": [
+        "Document | Investment brief | Investment brief — Ledgerline | Version 1 · 4 Nov 2026, 20:22 | Edit with Q | Download | PDF | Summary | This brief sets out what Capital Q holds on record about Ledgerline, and what it does not. | What the company does | The company identity is unresolved because public sources describe three materially different Ledgerline businesses. | Sources | · 1 | Product | No single product can be established because the sources describe incorporation, accounting and compliance services; POS, inventory and reporting software; or audit services. | Sources | · 1 | Market | Geography is unresolved: one source addresses founders worldwide, one says the product is available for Nigerian businesses, and one addresses US retirement-plan sponsors. | Sources | · 1 | Business model | The business model cannot be established: the sources variously indicate professional services"
+      ],
+      "iframes": []
+    }
+  },
+  {
+    "pressed": "Escape"
+  },
+  {
+    "click": "Download PDF",
+    "matches": 1
+  },
+  {
+    "download": "Investment-brief-Ledgerline.pdf"
+  },
+  {
+    "after": "/home?c=747374ce-bb07-4822-aa80-90994b797e68"
+  },
+  {
+    "shot": "j3-after-download-1440.png"
+  }
+]

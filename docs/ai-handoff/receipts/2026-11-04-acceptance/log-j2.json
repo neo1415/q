@@ -1,0 +1,33 @@
+[
+  {
+    "at": "/home"
+  },
+  {
+    "asked": "Show me my investor pipeline"
+  },
+  {
+    "settledMs": 9029,
+    "url": "/home?c=eaf4d4de-8a94-4f29-8471-f891a91fb401"
+  },
+  {
+    "shot": "j2-answer-390.png"
+  },
+  {
+    "dump": "answer",
+    "text": "Q | Chat | Board | 0 | Conversations | You: | Show me my investor pipeline | Hide from Q | Q: | 12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it? | Where this lives | Relationships | Open pipeline | Stay here | Clear | Q | Ask Q"
+  },
+  {
+    "click": "Stay here",
+    "matches": 1
+  },
+  {
+    "after": "/home?c=eaf4d4de-8a94-4f29-8471-f891a91fb401"
+  },
+  {
+    "shot": "j2-stay-390.png"
+  },
+  {
+    "dump": "after",
+    "text": "Q | Chat | Board | 0 | Conversations | You: | Show me my investor pipeline | Hide from Q | Q: | 12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it? | Clear | Q | Ask Q"
+  }
+]

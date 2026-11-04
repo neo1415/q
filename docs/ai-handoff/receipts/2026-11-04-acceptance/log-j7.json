@@ -1,0 +1,53 @@
+[
+  {
+    "at": "/home"
+  },
+  {
+    "click": "Chat",
+    "matches": 1
+  },
+  {
+    "after": "/home"
+  },
+  {
+    "asked": "What is Ledgerline's current monthly burn?"
+  },
+  {
+    "reloadAt": "https://capital-qweb-production.up.railway.app/home?c=d0372dee-842d-4bd6-bbff-44b7782c0375"
+  },
+  {
+    "settledMs": 15110,
+    "url": "/home?c=d0372dee-842d-4bd6-bbff-44b7782c0375"
+  },
+  {
+    "shot": "j7-refresh-1440.png"
+  },
+  {
+    "dump": "refresh",
+    "text": "Q | Q | Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Board | 0 | Conversations | You: | What is Ledgerline's current monthly burn? | Hide from Q | Q: |   | Ledgerline’s current monthly net burn is reported as about $39,000. That is the company’s self-reported figure in its pitch deck; the planned burn after the raise is near $85,000 per month. | Sources | Company · 1 | Q | Ask Q"
+  },
+  {
+    "asked": "okay"
+  },
+  {
+    "settledMs": 13055,
+    "url": "/home?c=d0372dee-842d-4bd6-bbff-44b7782c0375"
+  },
+  {
+    "shot": "j7-okay-1440.png"
+  },
+  {
+    "dump": "okay",
+    "text": "Q | Q | Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Board | 0 | Conversations | You: | What is Ledgerline's current monthly burn? | Hide from Q | Q: |   | Ledgerline’s current monthly net burn is reported as about $39,000. That is the company’s self-reported figure in its pitch deck; the planned burn after the raise is near $85,000 per month. | Sources | Company · 1 | You: | okay | Hide from Q | Q: | What would you like to look at next, Amara? | Sources | Investor · 1 | Q | Ask Q"
+  },
+  {
+    "at": "/api/q-artifact/3f9c2b1e-7a4d-4e8b-9c6f-1d2e3a4b5c6d/pdf"
+  },
+  {
+    "shot": "j7-artifact-uuid-1440.png"
+  },
+  {
+    "eval": "artifactBody",
+    "v": "{\"message\":\"I couldn't find that document.\"}"
+  }
+]

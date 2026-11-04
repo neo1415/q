@@ -1,0 +1,66 @@
+[
+  {
+    "at": "/home"
+  },
+  {
+    "asked": "Write me a one-page memo on Ledgerline"
+  },
+  {
+    "shot": "j3-progress-1440.png",
+    "url": "https://capital-qweb-production.up.railway.app/home?c=747374ce-bb07-4822-aa80-90994b797e68"
+  },
+  {
+    "settledMs": 17115,
+    "url": "/home?c=747374ce-bb07-4822-aa80-90994b797e68"
+  },
+  {
+    "dump": "progress",
+    "text": "Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Captions | Board | 1 | Conversations | Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card. | You: | Write me a one-page memo on Ledgerline | Hide from Q | Q: | Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card. | Investment brief — Ledgerline | Investment brief · Private draft, not shared | Investment brief — Ledgerline | Open | Download | PDF | Edit with Q | Clear | Q | Ask Q"
+  },
+  {
+    "at": "/discover"
+  },
+  {
+    "shot": "j3-away-discover-1440.png"
+  },
+  {
+    "back": "/home?c=747374ce-bb07-4822-aa80-90994b797e68"
+  },
+  {
+    "shot": "j3-back-1440.png"
+  },
+  {
+    "dump": "back",
+    "text": "Q | Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Captions | Board | 1 | Conversations | Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card. | You: | Write me a one-page memo on Ledgerline | Hide from Q | Q: | Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card. | Investment brief — Ledgerline | Investment brief · Private draft, not shared | Investment brief — Ledgerline | Open | Download | PDF | Edit with Q | Clear | Q | Ask Q"
+  },
+  {
+    "settledMs": 9052
+  },
+  {
+    "shot": "j3-done-1440.png"
+  },
+  {
+    "dump": "done",
+    "text": "Q | Investor private · Savanna Seed Partners | Q can see: | Q room · nothing open | Q | Chat | Captions | Board | 1 | Conversations | Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card. | You: | Write me a one-page memo on Ledgerline | Hide from Q | Q: | Here's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card. | Investment brief — Ledgerline | Investment brief · Private draft, not shared | Investment brief — Ledgerline | Open | Download | PDF | Edit with Q | Clear | Q | Ask Q"
+  },
+  {
+    "buttons": [
+      "Q",
+      "Chat",
+      "Captions",
+      "Q's voice: Female voice",
+      "Board, 1 item",
+      "Conversations",
+      "Open the transcript",
+      "Hide from Q",
+      "Dismiss Investment brief — Ledgerline",
+      "Open",
+      "Download PDF ->/api/q-artifact/e74e3587-c9f0-4d6b-92ea-31ec131256de/pdf",
+      "Edit with Q",
+      "Clear",
+      "Attach a document",
+      "Talk with Q",
+      "Send to Q"
+    ]
+  }
+]

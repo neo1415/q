@@ -1,0 +1,24 @@
+[
+  {
+    "at": "/home?c=044895d5-a3c0-463e-9e94-91ae21fc8088"
+  },
+  {
+    "click": "Open pipeline",
+    "matches": 1
+  },
+  {
+    "after": "/relationships?view=pipeline"
+  },
+  {
+    "pressed": "Control+k"
+  },
+  {
+    "shot": "j1-dock-1440.png"
+  },
+  {
+    "eval": "dockText",
+    "v": [
+      "Q | About Savanna Seed Partners. | Ready |   | Q can see: | Relationships · 12 relationships | You: | Show me my investor pipeline | Q | 12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it? | Q | Ask Q | Investor private · Savanna Seed Partners | Move Q | Open Q"
+    ]
+  }
+]
