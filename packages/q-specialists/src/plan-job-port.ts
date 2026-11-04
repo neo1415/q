@@ -1,4 +1,5 @@
 import type { QAnswerRequest } from "@capital-q/q-runtime";
+import { readApprovalWords } from "@capital-q/q-tools";
 
 /**
  * Situation-first planning (S5, S6): the answer's port to the plan job.
@@ -59,6 +60,24 @@ export type QPlanJobPort = {
    * from the stored version (a short summary, or every step), as the
    * person; null when it is not theirs or not there. Absent: not offered.
    */
+  /**
+   * Live 2026-11-04 ("okay" started a new plan called "okay"): a plain yes
+   * straight after Q's own offer runs exactly the offered version, through
+   * its waiting execute card (decision 55: a typed or spoken yes may
+   * approve q.plan.execute). Absent: words never run a plan here.
+   */
+  readonly runOffered?:
+    | ((
+        request: QAnswerRequest,
+        input: {
+          readonly planId: string;
+          readonly version: number;
+          /** Their message that is the approval. */
+          readonly evidenceRef: string;
+          readonly channel: "TEXT" | "VOICE";
+        },
+      ) => Promise<QPlanRunOutcome>)
+    | undefined;
   readonly readOffered?:
     | ((
         request: QAnswerRequest,
@@ -70,6 +89,18 @@ export type QPlanJobPort = {
       ) => Promise<string | null>)
     | undefined;
 };
+
+/**
+ * Live 2026-11-04: what running an offered plan by their words did. STARTED:
+ * the waiting execute card for that exact version was approved as them
+ * (their message is the evidence) and the plan runs; RUNNING: it already
+ * runs; WAITING: approved but not started (it still waits, said so);
+ * NONE: not theirs, not the newest version, or no card -- answered as any
+ * other turn.
+ */
+export type QPlanRunOutcome =
+  | { readonly status: "STARTED" | "RUNNING" | "WAITING"; readonly line: string }
+  | { readonly status: "NONE" };
 
 /** What of an offered plan the person asked to hear. */
 export type QPlanReadPart = "SUMMARY" | "WHOLE";
@@ -134,6 +165,90 @@ export function readPlanChoice(words: string): QPlanReadPart | null {
   return null;
 }
 
+type OfferHistory = readonly {
+  readonly id: string;
+  readonly role: string;
+  readonly content: string;
+  readonly blocks?: readonly { readonly kind: string }[] | undefined;
+}[];
+
+/**
+ * The plan Q's own offer stands for, when Q made it since the person last
+ * spoke (the offer is followed by its execute card's own lines), or closed
+ * a plan read back by code on it; null otherwise.
+ */
+function standingPlanOffer(
+  history: OfferHistory,
+  latest: { readonly id: string },
+  options: { readonly withCard?: boolean } = {},
+): {
+  readonly planId: string;
+  readonly version: number;
+  readonly title: string;
+} | null {
+  const before = history.filter((message) => message.id !== latest.id);
+  const lastQ = before.findLast((message) => message.role === "Q");
+  // Straight after the offer (and its card's lines), or after a plan read
+  // back by code, which closes on the same offer.
+  const readBack = lastQ?.content.includes(PLAN_READ_CLOSE) === true;
+  const lastTheirs = before.findLastIndex((message) => message.role === "USER");
+  const offer = (readBack ? before : before.slice(lastTheirs + 1)).findLast(
+    (message) =>
+      message.role === "Q" &&
+      (message.content.includes(PLAN_OFFER_QUESTION) ||
+        (options.withCard !== true &&
+          message.content.includes(PLAN_OFFER_WITHOUT_CARD))),
+  );
+  if (offer === undefined) return null;
+  const plan = (offer.blocks ?? []).find(
+    (
+      block,
+    ): block is {
+      kind: "PLAN";
+      planId: string;
+      version: number;
+      title?: unknown;
+    } =>
+      block.kind === "PLAN" &&
+      typeof (block as { planId?: unknown }).planId === "string" &&
+      typeof (block as { version?: unknown }).version === "number",
+  );
+  return plan === undefined
+    ? null
+    : {
+        planId: plan.planId,
+        version: plan.version,
+        title: typeof plan.title === "string" ? plan.title : "",
+      };
+}
+
+/**
+ * Live 2026-11-04 (conversation 014faef1): "okay" straight after Q's offer
+ * ("…or shall I run it now…? Pick one below, or tell me to go ahead.") was
+ * read as handing over new work and started a plan titled "okay"; the
+ * waiting execute card was never decided. A plain yes to that offer, by
+ * code's own reading of approval words, is the answer to it: the offered
+ * plan, by id and version. Anything that asks for a change, declines,
+ * picks by number, or is not approval words is left to the readings.
+ */
+export function offeredPlanAccepted(
+  history: OfferHistory,
+  latest: { readonly id: string; readonly content: string },
+): { readonly planId: string; readonly version: number } | null {
+  const said = latest.content.trim();
+  if (said.length === 0 || said.length > 160) return null;
+  // Only the offer that has a card to decide ("tell me to go ahead").
+  const plan = standingPlanOffer(history, latest, { withCard: true });
+  if (plan === null) return null;
+  // Read against the card's own summary, as the waiting card's path reads
+  // it ("Go ahead and run it" names running it).
+  const words = readApprovalWords(said, {
+    summaries: [`Run your plan: ${plan.title}`],
+  });
+  if (words.kind !== "APPROVE" || words.ordinal !== null) return null;
+  return { planId: plan.planId, version: plan.version };
+}
+
 /**
  * The plan Q offered with code's own copy since the person last spoke (the
  * offer is followed by its execute card's own lines), and the part their
@@ -153,26 +268,8 @@ export function offeredPlanChoice(
   readonly version: number;
   readonly part: QPlanReadPart;
 } | null {
-  const before = history.filter((message) => message.id !== latest.id);
-  const lastQ = before.findLast((message) => message.role === "Q");
-  // Straight after the offer (and its card's lines), or after a plan read
-  // back by code, which closes on the same offer.
-  const readBack = lastQ?.content.includes(PLAN_READ_CLOSE) === true;
-  const lastTheirs = before.findLastIndex((message) => message.role === "USER");
-  const offer = (readBack ? before : before.slice(lastTheirs + 1)).findLast(
-    (message) =>
-      message.role === "Q" &&
-      (message.content.includes(PLAN_OFFER_QUESTION) ||
-        message.content.includes(PLAN_OFFER_WITHOUT_CARD)),
-  );
-  if (offer === undefined) return null;
-  const plan = (offer.blocks ?? []).find(
-    (block): block is { kind: "PLAN"; planId: string; version: number } =>
-      block.kind === "PLAN" &&
-      typeof (block as { planId?: unknown }).planId === "string" &&
-      typeof (block as { version?: unknown }).version === "number",
-  );
-  if (plan === undefined) return null;
+  const plan = standingPlanOffer(history, latest);
+  if (plan === null) return null;
   const part = readPlanChoice(latest.content);
   return part === null
     ? null

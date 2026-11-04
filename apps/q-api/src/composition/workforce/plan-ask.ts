@@ -129,8 +129,15 @@ export function createPlanCardApprove(dependencies: {
     "findApprovalForAction" | "approve"
   >;
   readonly continueApproved: () => ApprovedContinuation;
-}): (actor: ActorContext, qActionId: string) => Promise<PlanCardApproval> {
-  return async (actor, qActionId) => {
+}): (
+  actor: ActorContext,
+  qActionId: string,
+  via?: {
+    readonly channel: "CARD" | "TEXT" | "VOICE";
+    readonly evidenceRef?: string | undefined;
+  },
+) => Promise<PlanCardApproval> {
+  return async (actor, qActionId, via = { channel: "CARD" }) => {
     const actionId = QActionProposalIdSchema.safeParse(qActionId);
     if (!actionId.success) return "FAILED";
     const actions = dependencies.actions();
@@ -146,7 +153,12 @@ export function createPlanCardApprove(dependencies: {
         actor,
         approvalId: QApprovalIdSchema.parse(approval.id),
         correlationId,
-        via: { channel: "CARD" },
+        // The button pressed, or their own words (decision 55), as the
+        // audit row records them; every channel meets the same checks.
+        via:
+          via.evidenceRef === undefined
+            ? { channel: via.channel }
+            : { channel: via.channel, evidenceRef: via.evidenceRef },
       });
       // Approved already and run (a second press): nothing to continue.
       if (!decided.decided && decided.action.status !== "APPROVED") {

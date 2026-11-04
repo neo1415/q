@@ -15,6 +15,7 @@ import {
 } from "./tool-focus.js";
 import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
 import {
+  offeredPlanAccepted,
   offeredPlanChoice,
   planAskRoutes,
   type QPlanAskReading,
@@ -5077,6 +5078,45 @@ export function createSpecialistQAnswer(
             "q read the offered plan back by code",
           );
           return recordAnswer(request, conversationId, read);
+        }
+      }
+    }
+    // Live 2026-11-04: a plain yes ("okay", "go ahead", "Go ahead and run
+    // it") to Q's own plan offer runs exactly the offered version through
+    // its waiting execute card, as them, by code (decision 55). Before
+    // this, the readings took "okay" as new work and a plan titled "okay"
+    // was started while the offered plan's card still waited.
+    const runOffered = dependencies.plan?.runOffered;
+    if (
+      runOffered !== undefined &&
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined
+    ) {
+      const accepted = offeredPlanAccepted(history, latest);
+      if (accepted !== null) {
+        const ran = await runOffered(request, {
+          ...accepted,
+          evidenceRef: latest.id,
+          channel: latest.utteranceRef === undefined ? "TEXT" : "VOICE",
+        }).catch((error: unknown) => {
+          logger?.warn(
+            { err: error, qRunId: request.runId },
+            "the offered plan was not run by their words; answering normally",
+          );
+          return { status: "NONE" } as const;
+        });
+        if (ran.status !== "NONE") {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              lane: "PLAN_RUN",
+              outcome: ran.status,
+              modelCalls: 0,
+            },
+            "q ran the offered plan on their yes",
+          );
+          return recordAnswer(request, conversationId, ran.line);
         }
       }
     }

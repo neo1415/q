@@ -127,6 +127,14 @@ export type PlanSay = (
 export type PlanCardApprove = (
   actor: ActorContext,
   qActionId: string,
+  /**
+   * How they decided: the button (CARD, the default), or their own words
+   * in the conversation (TEXT / VOICE, decision 55), with that message.
+   */
+  via?: {
+    readonly channel: "CARD" | "TEXT" | "VOICE";
+    readonly evidenceRef?: string | undefined;
+  },
 ) => Promise<"STARTED" | "CHANGED" | "EXPIRED" | "FAILED">;
 
 export type PlansDependencies = {
@@ -476,6 +484,76 @@ export function createPlans(dependencies: PlansDependencies) {
     const head = await store.head(owner, planId);
     const trace = await traceOf(owner, head?.jobId ?? null);
     return prepareExecute(actor, stored, trace);
+  };
+
+  /**
+   * Live 2026-11-04: a plain yes to Q's own offer runs the offered version
+   * (decision 55: a typed or spoken yes may approve q.plan.execute). Only
+   * the newest version, still the person's, never one already running: its
+   * waiting execute card (the one the offer prepared, found by its key) is
+   * approved as them with their message as evidence, through the Approval
+   * Engine, then run once through the execution gate -- exactly as the
+   * card's Execute does. NONE: nothing here to run; answered as ever.
+   */
+  const runOffered = async (
+    actor: ActorContext,
+    input: {
+      readonly planId: string;
+      readonly version: number;
+      readonly evidenceRef: string;
+      readonly channel: "TEXT" | "VOICE";
+    },
+  ): Promise<
+    | { readonly status: "STARTED" | "RUNNING" | "WAITING"; readonly line: string }
+    | { readonly status: "NONE" }
+  > => {
+    if (dependencies.approve === undefined) return { status: "NONE" };
+    const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const head = await store.head(owner, input.planId);
+    if (head === null || head.currentVersion !== input.version) {
+      return { status: "NONE" };
+    }
+    const stored = await store.read(owner, input.planId);
+    if (stored === null || stored.plan.version !== input.version) {
+      return { status: "NONE" };
+    }
+    if (stored.status === "EXECUTING" || stored.status === "DONE") {
+      return {
+        status: "RUNNING",
+        line: "This plan is already running; the plan card shows each step as it lands.",
+      };
+    }
+    const trace = await traceOf(owner, head.jobId);
+    const card = await prepareExecute(actor, stored, trace);
+    if (card === null) return { status: "NONE" };
+    const approved = await dependencies
+      .approve(actor, card.qActionId, {
+        channel: input.channel,
+        evidenceRef: input.evidenceRef,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, planId: input.planId, actionId: card.qActionId },
+          "offered plan not approved by their words",
+        );
+        return "FAILED" as const;
+      });
+    if (approved === "CHANGED" || approved === "EXPIRED") {
+      return { status: "NONE" };
+    }
+    if (approved === "STARTED") {
+      const after = await store.read(owner, input.planId).catch(() => null);
+      if (after?.status === "EXECUTING" || after?.status === "DONE") {
+        return {
+          status: "STARTED",
+          line: "Running it now: my steps have started and yours are on your board. Anything that goes out to someone still comes to you first, and I'll tell you here as each step lands.",
+        };
+      }
+    }
+    return {
+      status: "WAITING",
+      line: "I couldn't start the plan just now; it's still waiting. Press Execute on the plan card, or tell me to go ahead again in a moment.",
+    };
   };
 
   /** The offered version read back as its owner (null: not theirs). */
@@ -1331,6 +1409,7 @@ export function createPlans(dependencies: PlansDependencies) {
     view,
     offer,
     readOffered,
+    runOffered,
     decide,
     execute,
     executeAction,

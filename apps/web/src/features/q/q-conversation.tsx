@@ -840,6 +840,7 @@ export function QConversationPanel({
   // talk about something else. A typed "yes" or "something else" is that
   // answer (it brings the cards up, or moves on) and goes no further; a
   // question of its own is answered as asked.
+  const approvalWaiting = q.state.approval !== null;
   const submitTyped = useCallback(
     async (typed: string) => {
       // Lane 8: Send on an attached document alone asks about it.
@@ -852,7 +853,11 @@ export function QConversationPanel({
         return;
       }
       if (interceptTyped(text)) return;
-      if (typedOpenerAnswer(text, lineOpen)) return;
+      // Live 2026-11-04: "okay" typed while a change waits for their yes
+      // (the plan's execute card) was taken as the welcome's answer and
+      // never reached Q. A waiting approval comes first: the words go to
+      // the server, whose conversation path decides it (decision 55).
+      if (!approvalWaiting && typedOpenerAnswer(text, lineOpen)) return;
       // QO-12 (QA 2026-10-23): typing is a written turn. The voice room
       // shows no reply (its transcript is Chat), so a typed question sent
       // into the open line left the stage on "Listening" with only a
@@ -866,7 +871,7 @@ export function QConversationPanel({
       await qAsk(text);
       markAttachmentsSent();
     },
-    [lineOpen, endForTyping, qAsk, turnCount],
+    [lineOpen, endForTyping, qAsk, turnCount, approvalWaiting],
   );
 
   // The same answer, said on a voice line: the person's own transcript,

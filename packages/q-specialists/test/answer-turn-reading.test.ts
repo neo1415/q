@@ -29,6 +29,7 @@ import { ModelGatewayError } from "@capital-q/model-gateway";
 import { createLogger, type Logger } from "@capital-q/observability";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
 import { PLAN_OFFER_LINES } from "@capital-q/q-core";
+import { PLAN_OFFER_QUESTION } from "../src/plan-job-port.js";
 import type {
   TurnReaderV24Result,
   TurnReaderV8Result as TurnReaderResult,
@@ -6918,5 +6919,116 @@ describe("an investment memo on a company is the researched memo job (owner deci
     });
     await answer.answer(request());
     expect(goals).toEqual([]);
+  });
+});
+
+describe("live 2026-11-04: 'okay' to Q's plan offer runs that plan, never a plan of 'okay'", () => {
+  const PLAN_ID = "934b1576-b7c1-489d-b819-344a397f9651";
+  const offerLine = {
+    role: "Q" as const,
+    content: `Your plan is ready: 8 steps.\n\n${PLAN_OFFER_QUESTION}`,
+    blocks: [
+      {
+        kind: "PLAN" as const,
+        planId: PLAN_ID,
+        version: 1,
+        title: "Check in this week with two connected founders",
+        steps: 8,
+        reviewed: false,
+        affordances: ["EXECUTE" as const, "PUT_ON_BOARD" as const, "CHANGE" as const],
+      },
+    ],
+  };
+  // Live run 1bdae62a: read as handing over new work, with a plan ask.
+  const liveReading = {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    nextSteps: false,
+    planAsk: { kind: "GOAL", subject: "OWN", deliverable: "PLAN" },
+    acceptsOffer: true,
+    workFromEarlier: true,
+    tool: null,
+    handOver: null,
+  } as unknown as TurnReaderResult;
+
+  const planPort = (
+    started: unknown[],
+    ran: Record<string, unknown>[],
+  ): import("../src/plan-job-port.js").QPlanJobPort => ({
+    start: (_request, input) => {
+      started.push(input);
+      return Promise.resolve({
+        status: "STARTED" as const,
+        jobId: randomUUID(),
+        title: "Your plan: okay",
+        line: "I'm on it.",
+      });
+    },
+    runOffered: (_request, input) => {
+      ran.push({ ...input });
+      return Promise.resolve({
+        status: "STARTED" as const,
+        line: "Running it now: my steps have started.",
+      });
+    },
+  });
+
+  it.each(["okay", "yes", "Go ahead and run it"])(
+    "%j runs the offered version on their words",
+    async (said) => {
+      const started: unknown[] = [];
+      const ran: Record<string, unknown>[] = [];
+      const run = seam({
+        said,
+        earlier: [offerLine],
+        reading: liveReading,
+        outcomes: [],
+        plan: planPort(started, ran),
+      });
+      await run.answer.answer(request());
+      expect(started).toEqual([]);
+      expect(ran).toEqual([
+        {
+          planId: PLAN_ID,
+          version: 1,
+          evidenceRef: run.message.id,
+          channel: "TEXT",
+        },
+      ]);
+      expect(run.stored.at(-1)?.content).toBe(
+        "Running it now: my steps have started.",
+      );
+    },
+  );
+
+  it("a change, a no, or a new question after the offer runs nothing by code", async () => {
+    for (const said of ["okay but change step two", "no", "what's my runway?"]) {
+      const ran: Record<string, unknown>[] = [];
+      const run = seam({
+        said,
+        earlier: [offerLine],
+        reading: null,
+        outcomes: [],
+        plan: planPort([], ran),
+      });
+      await run.answer.answer(request()).catch(() => undefined);
+      expect(ran).toEqual([]);
+    }
+  });
+
+  it("a yes with no offer from Q since they last spoke runs nothing by code", async () => {
+    const ran: Record<string, unknown>[] = [];
+    const run = seam({
+      said: "okay",
+      earlier: [offerLine, { role: "USER", content: "what's my runway?" }, { role: "Q", content: "About nine months." }],
+      reading: null,
+      outcomes: [],
+      plan: planPort([], ran),
+    });
+    await run.answer.answer(request()).catch(() => undefined);
+    expect(ran).toEqual([]);
   });
 });

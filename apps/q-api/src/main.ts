@@ -4864,6 +4864,9 @@ const qIntelligence = composeQIntelligence({
         : started;
     },
     direct: (request, text) => plans.direct(request.actor, request.runId, text),
+    // Live 2026-11-04: a plain yes to Q's offer runs that exact version
+    // through its waiting execute card, as them (decision 55).
+    runOffered: (request, input) => plans.runOffered(request.actor, input),
     // Owner 2026-11-04: the offered plan read back by code, as its owner.
     readOffered: (request, input) =>
       plans.readOffered(

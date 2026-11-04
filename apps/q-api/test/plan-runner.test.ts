@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { QPlanExecutePayloadSchema } from "@capital-q/contracts";
@@ -143,6 +145,7 @@ function world(
     });
   const cards: Parameters<PlanCardAsk>[1][] = [];
   const approvals: string[] = [];
+  const vias: unknown[] = [];
   const executed = new Set<string>();
   const board: { title: string; dueOn?: string; key: string }[] = [];
   const reminders: { title: string; key: string }[] = [];
@@ -214,8 +217,13 @@ function world(
     },
     ...(options.approve === true
       ? {
-          approve: async (actor: ActorContext, actionId: string) => {
+          approve: async (
+            actor: ActorContext,
+            actionId: string,
+            via?: { readonly channel: string; readonly evidenceRef?: string },
+          ) => {
             approvals.push(actionId);
+            vias.push(via ?? { channel: "CARD" });
             if (executed.has(actionId)) return "STARTED" as const;
             const index = Number(actionId.slice(-2));
             const card = cards[index];
@@ -255,6 +263,7 @@ function world(
     calls,
     cards,
     approvals,
+    vias,
     said,
     markBoardDone: () => {
       boardDone = true;
@@ -900,5 +909,67 @@ describe("coordinator 2026-11-04: which proposal steps the workforce prepares", 
       expect(of(tool)).toBeNull();
     }
     expect(stepRoles({ action: { kind: "TASK" } } as never)).toBeNull();
+  });
+});
+
+describe("live 2026-11-04: a yes to Q's offer runs the offered plan (decision 55)", () => {
+  it("approves the offer's waiting card on their words, once, and the plan runs", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const offer = await w.plans.offer(founder, block.planId, 1);
+    expect(offer).not.toBeNull();
+    const evidenceRef = randomUUID();
+    const ran = await w.plans.runOffered(founder, {
+      planId: block.planId,
+      version: 1,
+      evidenceRef,
+      channel: "TEXT",
+    });
+    expect(ran.status).toBe("STARTED");
+    // The card the offer prepared, never a second one; their message is
+    // the evidence the audit row keeps.
+    expect(executeCards(w)).toHaveLength(1);
+    expect(w.approvals).toEqual([offer?.qActionId]);
+    expect(w.vias).toEqual([{ channel: "TEXT", evidenceRef }]);
+    expect(w.plansStore.plans.get(block.planId)?.status).toBe("EXECUTING");
+    // Said again: already running, nothing approved twice.
+    const again = await w.plans.runOffered(founder, {
+      planId: block.planId,
+      version: 1,
+      evidenceRef: randomUUID(),
+      channel: "TEXT",
+    });
+    expect(again.status).toBe("RUNNING");
+    expect(w.approvals).toHaveLength(1);
+  });
+
+  it("an older version, or someone else's plan, runs nothing", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    expect(
+      (
+        await w.plans.runOffered(founder, {
+          planId: block.planId,
+          version: 2,
+          evidenceRef: randomUUID(),
+          channel: "TEXT",
+        })
+      ).status,
+    ).toBe("NONE");
+    const stranger: ActorContext = {
+      ...founder,
+      userId: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+    };
+    expect(
+      (
+        await w.plans.runOffered(stranger, {
+          planId: block.planId,
+          version: 1,
+          evidenceRef: randomUUID(),
+          channel: "TEXT",
+        })
+      ).status,
+    ).toBe("NONE");
+    expect(w.approvals).toEqual([]);
   });
 });

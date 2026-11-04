@@ -7,9 +7,38 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { ChatDraftEditor } from "../integrations/chat-draft-editor";
 import { EmailDraftEditor } from "../integrations/email-draft-editor";
 import { openQuestions } from "./board";
+import { planCardStandsFor } from "./carried-approval";
 import type { QSessionValue } from "./q-session";
 import { TaskProgress } from "./stage-line";
 import { useT } from "@/features/i18n/language";
+
+/**
+ * The approval Now shows, with the proposal it binds to. Live 2026-11-04:
+ * the plan's execute card waits quietly behind the plan card this
+ * conversation shows (its Execute, or "okay", decides it), so Now never
+ * shows it as a second "Needs you · Run your plan" control. It still
+ * waits: Work keeps it, and typed words still reach it.
+ */
+export function nowApproval(state: {
+  readonly approval: QSessionValue["q"]["state"]["approval"];
+  readonly proposals: QSessionValue["q"]["state"]["proposals"];
+  readonly messages: QSessionValue["q"]["state"]["messages"];
+}): {
+  readonly approval: QSessionValue["q"]["state"]["approval"];
+  readonly proposal: QSessionValue["q"]["state"]["proposals"][number] | undefined;
+} {
+  const waiting = state.approval;
+  const proposal =
+    waiting === null
+      ? undefined
+      : state.proposals.find(
+          (candidate) => candidate.proposalId === waiting.proposalId,
+        );
+  if (proposal !== undefined && planCardStandsFor(proposal, state.messages)) {
+    return { approval: null, proposal: undefined };
+  }
+  return { approval: waiting, proposal };
+}
 
 /**
  * Now / Needs you (spec §7.1): the task view. What Q is doing right now,
@@ -49,13 +78,7 @@ export function QNow({
   // "Keep it with me": out of the way here, still waiting in Work.
   const [kept, setKept] = useState<string | null>(null);
   const { q, turns, voice } = session;
-  const approval = q.state.approval;
-  const proposal =
-    approval === null
-      ? undefined
-      : q.state.proposals.find(
-          (candidate) => candidate.proposalId === approval.proposalId,
-        );
+  const { approval, proposal } = nowApproval(q.state);
   const questions = openQuestions(turns);
   const nothing = !q.working && approval === null && questions.length === 0;
   if (nothing && quietWhenIdle) return null;

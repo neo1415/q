@@ -130,6 +130,35 @@ export function shownItems(turns: readonly QTurn[]): readonly ShownItem[] {
     if (turn.streaming) continue;
     const blocks = oneSet(turn.blocks);
     if (blocks.length === 0) continue;
+    // Live 2026-11-04 (P1/P4): a job's delivery (the plan, the document)
+    // is stored on the same run as the "I'm on it" turn whose progress
+    // card it finishes, so the run's set was that progress card and the
+    // plan never reached the stage. The delivery is that work's result:
+    // it takes the set's place, as the finished document's card does in
+    // the thread (followWork). Any other repeat of a run stays out.
+    const delivered = new Set(turn.deliveredJobs ?? []);
+    const working =
+      delivered.size === 0
+        ? -1
+        : items.findIndex(
+            (item) =>
+              item.run === key &&
+              item.blocks.every(
+                (block) =>
+                  block.kind === "WORK_IN_PROGRESS" &&
+                  delivered.has(block.jobId),
+              ),
+          );
+    const earlier = working === -1 ? undefined : items[working];
+    if (earlier !== undefined) {
+      items[working] = {
+        ...earlier,
+        id: turn.id,
+        title: titleOf(blocks),
+        blocks,
+      };
+      continue;
+    }
     // Already shown as its own set: never a second, never merged.
     if (shownRuns.has(key)) continue;
     shownRuns.add(key);
