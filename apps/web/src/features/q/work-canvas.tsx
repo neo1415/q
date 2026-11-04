@@ -238,10 +238,25 @@ export function stepStates(
     live !== null && (live.state === "FAILED" || live.state === "STOPPED");
   // No second draft was needed: revising was skipped, not done.
   const revised = (live?.stage?.draft ?? 1) > 1;
+  // N2: when the job kept the stages it really passed, a step it never
+  // went through is "Not needed", never shown as done.
+  const passed = live?.stage?.passed;
+  const occurred =
+    passed === undefined || live?.stage == null
+      ? null
+      : new Set(
+          [
+            ...passed,
+            live.stage.stage,
+            // Done means filed, even when the pipeline filed it unreported.
+            ...(live.state === "DONE" ? (["FILING"] as const) : []),
+          ].map((name) => SHOWN_ON[name] ?? name),
+        );
   return steps.map((step, index) => {
     if (index < shown)
       return (step.stage === "REVISING" && !revised) ||
-        (steps === PLAN_STEPS && planStepSkipped(step.stage, live))
+        (steps === PLAN_STEPS && planStepSkipped(step.stage, live)) ||
+        (occurred !== null && !occurred.has(step.stage))
         ? "SKIPPED"
         : "DONE";
     if (index === shown) return failed ? "FAILED" : "CURRENT";

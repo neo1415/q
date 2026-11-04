@@ -45,6 +45,7 @@ import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
 import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
+import { QWorkProgress } from "./work-progress-view";
 import { readTypedDraft } from "./control/fast-navigation";
 import { useT } from "@/features/i18n/language";
 
@@ -196,6 +197,11 @@ export function QSheetConversation({
           ) : null}
         </div>
       )}
+
+      {/* N2 (owner 2026-11-04): Q's work as it really happens -- the
+          answer's trail of stages and each piece of deep work -- read
+          from the run and the jobs, so it is here on every page. */}
+      <QWorkProgress />
 
       {voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>

@@ -12,6 +12,7 @@ import {
   useWorkLive,
   type WorkInProgress,
 } from "./work-live";
+import { jobProgress } from "./work-progress";
 
 /**
  * Owner 2026-10-24 ("I want to SEE the document being made"), coordinator
@@ -70,7 +71,12 @@ function PinnedWorkLine({
     return null;
   }
   const title = live?.document?.title ?? live?.stage?.title ?? job.title;
-  const percent = Math.round(liveFraction(live) * 100);
+  // N2: the plan's real finished steps only; no bar when there are none.
+  const fraction = liveFraction(live);
+  const percent = fraction === null ? null : Math.round(fraction * 100);
+  // N2: the stages this job really went through, the newest in progress.
+  const steps =
+    jobProgress({ jobId: job.jobId, title, live, missing })?.steps ?? [];
   return (
     <li className="flex flex-col gap-2" data-q-pinned-work-job={job.jobId}>
       <button
@@ -93,19 +99,47 @@ function PinnedWorkLine({
               : t(liveLine(live?.stage ?? null))}
           </span>
         </span>
-        <span
-          className="block h-1 w-full overflow-hidden rounded-full bg-(--cq-surface-subtle)"
-          role="progressbar"
-          aria-label={t("Progress")}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-        >
+        {steps.length < 2 ? null : (
           <span
-            className="block h-full rounded-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none"
-            style={{ width: `${String(percent)}%` }}
-          />
-        </span>
+            className="cq-caption flex w-full min-w-0 flex-wrap gap-x-1.5 text-(--cq-text-tertiary)"
+            aria-label={t("Steps so far")}
+            data-q-pinned-work-steps
+          >
+            {steps.map((step, index) => (
+              <span
+                key={step.key}
+                className={
+                  step.state === "DONE"
+                    ? ""
+                    : "font-medium text-(--cq-text-primary)"
+                }
+                data-q-work-step={step.state}
+              >
+                {index === 0 ? null : (
+                  <span aria-hidden="true" className="me-1.5">
+                    ·
+                  </span>
+                )}
+                {t(step.label)}
+              </span>
+            ))}
+          </span>
+        )}
+        {percent === null ? null : (
+          <span
+            className="block h-1 w-full overflow-hidden rounded-full bg-(--cq-surface-subtle)"
+            role="progressbar"
+            aria-label={t("Plan steps finished")}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+          >
+            <span
+              className="block h-full rounded-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none"
+              style={{ width: `${String(percent)}%` }}
+            />
+          </span>
+        )}
       </button>
       {open ? (
         <WorkInProgressCard block={job} onOpen={onOpenArtifact} onAsk={onAsk} />

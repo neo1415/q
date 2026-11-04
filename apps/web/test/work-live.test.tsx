@@ -149,21 +149,26 @@ describe("what the card says is happening", () => {
     );
   });
 
-  it("moves the bar forward and fills it only when done", () => {
-    const working = (s: ReturnType<typeof stage> | null): WorkforceLive => ({
+  it("N2: the bar is the plan's real finished steps, never a stage weighted into a guess", () => {
+    const working = (
+      s: ReturnType<typeof stage> | null,
+      total = 2,
+    ): WorkforceLive => ({
       jobId: JOB,
       state: "WORKING",
       done: 1,
-      total: 2,
+      total,
       stage: s,
       document: null,
       reason: null,
     });
-    const searching = liveFraction(working(stage({})));
-    const reviewing = liveFraction(working(stage({ stage: "REVIEWING" })));
-    expect(searching).toBe(0.5);
-    expect(reviewing).toBeGreaterThan(searching);
-    expect(liveFraction(working(stage({ stage: "FILING" })))).toBeLessThan(1);
+    // The stage does not move the bar: only a finished plan step does.
+    expect(liveFraction(working(stage({})))).toBe(0.5);
+    expect(liveFraction(working(stage({ stage: "REVIEWING" })))).toBe(0.5);
+    expect(liveFraction(working(stage({ stage: "FILING" })))).toBe(0.5);
+    // Nothing real to count: no bar at all.
+    expect(liveFraction(working(stage({ stage: "REVIEWING" }), 0))).toBeNull();
+    expect(liveFraction(null)).toBeNull();
     expect(liveFraction({ ...working(null), state: "DONE" })).toBe(1);
   });
 });

@@ -32,6 +32,7 @@ import {
   useQMotion,
 } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
+import { QWorkDockLine } from "@/features/q/work-progress-view";
 
 import { obstacleRects, subscribeAvoid, watchLayout } from "./dock-avoid";
 import { useDockClass, useDockMenu } from "./use-dock-menu";
@@ -423,7 +424,10 @@ export function QDock() {
             <span className="cq-caption truncate text-(--cq-text-secondary)">
               {presence.detail}
             </span>
-          ) : null}
+          ) : (
+            // N2: deep work Q is doing, from the job's own record.
+            <QWorkDockLine />
+          )}
         </span>
         {voice?.active === true ? (
           <span className="cq-q-dock-mic" data-q-dock-mic>

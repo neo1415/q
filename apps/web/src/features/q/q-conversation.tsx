@@ -107,6 +107,7 @@ import { readTypedDraft } from "./control/fast-navigation";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
 import { earlierWork, PinnedWorkLines } from "./pinned-work";
+import { QWorkProgress } from "./work-progress-view";
 import { promisedJobs } from "./work-live";
 
 /*
@@ -1356,6 +1357,7 @@ export function QConversationPanel({
                                 onOpenArtifact={showArtifact}
                                 onAsk={sayOrAsk}
                               />
+                              <QWorkProgress jobs={false} className="mt-2" />
                             </div>
                             {/* QO-19: Q's spoken words as captions, in a
                                 slot of fixed height that is there whether
@@ -1390,6 +1392,10 @@ export function QConversationPanel({
                               onOpenArtifact={showArtifact}
                               onAsk={sayOrAsk}
                             />
+                            {/* N2: the answer's real trail of stages, and
+                                its waiting or failed state. */}
+                            <QWorkProgress jobs={false} />
+
                             <ol
                               className="flex w-full flex-col gap-5"
                               aria-label={t("Conversation")}
@@ -1590,6 +1596,11 @@ export function QConversationPanel({
                     ) : null}
                   </ol>
                 )}
+
+                {/* N2 (owner 2026-11-04): the answer's real trail of
+                    stages in Chat; deep work has its own card in the
+                    thread, where it was asked for. */}
+                {bigPresence ? null : <QWorkProgress jobs={false} />}
 
                 {/* What Q is doing, only while it is doing something: the
                     swarm at work beside it (founder live 2026-09-29), and

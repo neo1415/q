@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 import {
   WorkforceLiveSchema,
   type WorkforceLive,
   type WorkforceLiveStage,
-  type WorkforceLiveStageName,
 } from "@capital-q/contracts";
 
 import {
@@ -130,34 +129,17 @@ export const WORK_LIVE_PACE = { firstMs: 2_500, maxMs: 15_000 } as const;
 /** A card stops asking after this long; a reload asks again. */
 export const WORK_LIVE_WATCH_MS = 20 * 60_000;
 
-/** How far along a stage is, of the work a document step does. */
-const STAGE_WEIGHT: Readonly<Record<WorkforceLiveStageName, number>> = {
-  SEARCHING: 0.12,
-  READING: 0.32,
-  DRAFTING: 0.5,
-  REVIEWING: 0.7,
-  REVISING: 0.82,
-  FILING: 0.95,
-  // Situation-first planning: a plan's own stages.
-  GATHERING: 0.1,
-  READING_DOCUMENTS: 0.25,
-  PLANNING: 0.5,
-  REVIEWING_PLAN: 0.75,
-  // Investigation-grade research (2026-10-29).
-  PLANNING_RESEARCH: 0.06,
-  CROSS_CHECKING: 0.4,
-};
-
 /**
- * The bar's fill, 0..1: the plan's finished steps, or the running
- * document work's stage when that is further on. Never full until done.
+ * The bar's fill, 0..1: the approved plan's finished steps of all of them
+ * (real counts the job keeps), full only when done. N2 (owner 2026-11-04):
+ * no fabricated percentage, so a stage is never weighted into a guess;
+ * null when the job has no plan steps to count, and no bar is drawn.
  */
-export function liveFraction(live: WorkforceLive | null): number {
-  if (live === null) return 0.04;
+export function liveFraction(live: WorkforceLive | null): number | null {
+  if (live === null) return null;
   if (live.state === "DONE") return 1;
-  const steps = live.total === 0 ? 0 : live.done / live.total;
-  const stage = live.stage === null ? 0 : STAGE_WEIGHT[live.stage.stage];
-  return Math.min(0.97, Math.max(0.04, steps, stage));
+  if (live.total === 0) return null;
+  return Math.min(1, live.done / live.total);
 }
 
 /**
@@ -247,7 +229,7 @@ export function liveKey(live: WorkforceLive): string {
   ].join("|");
 }
 
-type LiveSnapshot = {
+export type LiveSnapshot = {
   readonly live: WorkforceLive | null;
   readonly missing: boolean;
 };
@@ -457,6 +439,48 @@ export function useWorkLive(jobId: string): LiveSnapshot {
   );
 }
 
+/**
+ * N2: several jobs at once, through the same one-read-per-job store (a
+ * hook per job cannot sit in a loop). The array is stable while no job's
+ * snapshot changed, as useSyncExternalStore requires.
+ */
+export function useWorkLives(
+  jobIds: readonly string[],
+): readonly LiveSnapshot[] {
+  const key = jobIds.join(",");
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      if (key === "") return () => undefined;
+      const stops = key
+        .split(",")
+        .map((jobId) => subscribeLive(jobId, listener));
+      return () => {
+        for (const stop of stops) stop();
+      };
+    },
+    [key],
+  );
+  const held = useRef<readonly LiveSnapshot[]>([]);
+  const read = useCallback((): readonly LiveSnapshot[] => {
+    const next =
+      key === ""
+        ? []
+        : key
+            .split(",")
+            .map((jobId) => liveEntries.get(jobId)?.snapshot ?? EMPTY_LIVE);
+    const before = held.current;
+    if (
+      before.length === next.length &&
+      before.every((snapshot, index) => snapshot === next[index])
+    )
+      return before;
+    held.current = next;
+    return next;
+  }, [key]);
+  return useSyncExternalStore(subscribe, read, () => NO_LIVES);
+}
+const NO_LIVES: readonly LiveSnapshot[] = [];
+
 /** Where the work stands: the line, the bar, and the draft's sections. */
 export function WorkLiveProgress({
   live,
@@ -493,19 +517,21 @@ export function WorkLiveProgress({
           >
             {line}
           </p>
-          <div
-            className="h-1 w-full overflow-hidden rounded-full bg-(--cq-surface-subtle)"
-            role="progressbar"
-            aria-label={t("Progress")}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(fraction * 100)}
-          >
+          {fraction === null ? null : (
             <div
-              className="h-full rounded-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none"
-              style={{ width: `${String(Math.round(fraction * 100))}%` }}
-            />
-          </div>
+              className="h-1 w-full overflow-hidden rounded-full bg-(--cq-surface-subtle)"
+              role="progressbar"
+              aria-label={t("Progress")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(fraction * 100)}
+            >
+              <div
+                className="h-full rounded-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none"
+                style={{ width: `${String(Math.round(fraction * 100))}%` }}
+              />
+            </div>
+          )}
           {live === null || live.total === 0 ? null : (
             <p className="cq-caption cq-numeric text-(--cq-text-tertiary)">
               {t(

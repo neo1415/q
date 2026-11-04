@@ -178,6 +178,12 @@ export type QSessionValue = {
      * for the one live line; null when Q is not working or no stage yet.
      */
     readonly stage: QWorkingStage | null;
+    /**
+     * N2 (owner 2026-11-04): every stage this turn has really reported,
+     * oldest first (typed: the run's durable stage events, replayed after
+     * a reconnect; voice: the room's stages). The last is `stage`.
+     */
+    readonly trail?: readonly QWorkingStage[] | undefined;
   };
   /** The page asks for a conversation (null: a new one). */
   readonly open: (conversationId: string | null) => void;
@@ -749,6 +755,25 @@ export function QSessionProvider({
         };
   }, [voice.active, roomStages, q.working, typedSteps]);
 
+  const trail = useMemo<readonly QWorkingStage[]>(() => {
+    if (voice.active) {
+      const stages = roomStages?.stages ?? [];
+      return stages.map((stage, index) =>
+        index === stages.length - 1 && roomStages?.about !== undefined
+          ? { stage, about: roomStages.about }
+          : { stage },
+      );
+    }
+    if (typedSteps.length === 0) {
+      return current === null ? [] : [current];
+    }
+    return typedSteps.map((step) =>
+      step.about === undefined
+        ? { stage: step.stage }
+        : { stage: step.stage, about: step.about },
+    );
+  }, [voice.active, roomStages, typedSteps, current]);
+
   const value = useMemo<QSessionValue>(
     () => ({
       connected,
@@ -760,7 +785,7 @@ export function QSessionProvider({
       spokenOnly,
       voiceOutcomes,
       spokenPreview,
-      presence: { state, label, detail, stage: current },
+      presence: { state, label, detail, stage: current, trail },
       open,
       talk,
       act,
@@ -782,6 +807,7 @@ export function QSessionProvider({
       label,
       detail,
       current,
+      trail,
       open,
       talk,
       act,
