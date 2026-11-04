@@ -2626,7 +2626,18 @@ const instructionTriggers = createInstructionTriggers({
   store: instructionStore,
   engine: () => instructionEngine.current,
   // Recovery D-01: lapsed approvals expire eagerly, every sweep.
-  expireLapsed: () => qActions.expireLapsed?.() ?? Promise.resolve(0),
+  // ACT-03: an action a stopped process left EXECUTING is moved to
+  // RECONCILIATION_REQUIRED on the same sweep (never retried); logged by
+  // the engine, and not counted as lapsed here.
+  expireLapsed: async () => {
+    await (qActions.reconcileInterrupted?.() ?? Promise.resolve(0)).catch(
+      (error: unknown) => {
+        logger.warn({ err: error }, "interrupted q actions not reconciled");
+        return 0;
+      },
+    );
+    return qActions.expireLapsed?.() ?? 0;
+  },
   logger,
 });
 setInterval(() => {

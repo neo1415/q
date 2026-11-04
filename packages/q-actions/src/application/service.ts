@@ -12,6 +12,7 @@ import {
 } from "@capital-q/audit";
 import {
   canonicalJsonStringify,
+  CorrelationIdSchema,
   Q_ACTION_REASON_MAX_LENGTH,
   Q_CONTRACT_VERSION,
   QActionProposalIdSchema,
@@ -303,6 +304,18 @@ export type QActionService = {
   readonly expireLapsed?: (input?: {
     readonly limit?: number | undefined;
   }) => Promise<number>;
+  /**
+   * Audit 2026-11-04 ACT-03: an action left EXECUTING by a process that
+   * stopped between claim and finalise. After `olderThanMs` without a
+   * finalise it becomes RECONCILIATION_REQUIRED (EXECUTION_INTERRUPTED):
+   * the side effect may or may not have happened, so it is never retried
+   * or resent, and the person sees "not saved" and a review, not "saving"
+   * forever. Returns how many were moved.
+   */
+  readonly reconcileInterrupted?: (input?: {
+    readonly olderThanMs?: number | undefined;
+    readonly limit?: number | undefined;
+  }) => Promise<number>;
   /** Replace a pending proposal's payload; voids the old approval (BIZ-007). */
   readonly revise: (
     command: ReviseQApprovalCommand,
@@ -356,6 +369,14 @@ const AUDIT = {
 function iso(date: Date): UtcTimestamp {
   return date.toISOString();
 }
+
+/**
+ * How long an action may stay EXECUTING without a finalise before it is
+ * taken as interrupted (ACT-03). Far beyond any executor's own timeout, so
+ * a live execution is never caught; the floor stops a caller shrinking it.
+ */
+export const EXECUTION_INTERRUPTED_AFTER_MS = 15 * 60_000;
+const EXECUTION_INTERRUPTED_MIN_MS = 5 * 60_000;
 
 /** How far back a restated request is matched with one already carried out. */
 const ALREADY_DONE_LOOKBACK_MS = 24 * 60 * 60_000;
@@ -2384,8 +2405,121 @@ export function createQActionService(
     return expired;
   };
 
+  const reconcileInterrupted: NonNullable<
+    QActionService["reconcileInterrupted"]
+  > = async (input) => {
+    const list = repositories.actions.listStuckExecuting;
+    if (list === undefined) return 0;
+    const now = clock.now();
+    const window = Math.max(
+      input?.olderThanMs ?? EXECUTION_INTERRUPTED_AFTER_MS,
+      EXECUTION_INTERRUPTED_MIN_MS,
+    );
+    const before = new Date(now.getTime() - window);
+    const stuck = await list(sql, {
+      before,
+      limit: Math.min(Math.max(input?.limit ?? 100, 1), 500),
+    });
+    let moved = 0;
+    for (const one of stuck) {
+      try {
+        const done = await transactions.run(async (tx) => {
+          const locked = await repositories.actions.lockById(
+            tx,
+            one.tenantId,
+            one.actionId,
+          );
+          // Finalised meanwhile, or touched since it was listed: leave it.
+          if (
+            locked === null ||
+            locked.status !== "EXECUTING" ||
+            Date.parse(locked.updatedAt) > before.getTime()
+          ) {
+            return false;
+          }
+          assertActionTransition(locked.status, "RECONCILIATION_REQUIRED");
+          const reconciled = await repositories.actions.transition(tx, {
+            tenantId: locked.tenantId,
+            actionId: locked.id,
+            expectedVersion: locked.version,
+            status: "RECONCILIATION_REQUIRED",
+            failureCode: "EXECUTION_INTERRUPTED",
+            retryPermitted: false,
+          });
+          if (reconciled === null) return false;
+          const approvals = await repositories.approvals.listForAction(
+            tx.sql,
+            reconciled.tenantId,
+            reconciled.id,
+          );
+          const approval = approvals.find(
+            (candidate) => candidate.status === "APPROVED",
+          );
+          const correlationId = CorrelationIdSchema.parse(
+            `cor_${randomUUID()}`,
+          );
+          await audit.record(tx, {
+            auditEventId: createAuditEventId(),
+            tenantId: reconciled.tenantId,
+            actorType: "Q",
+            actorId: reconciled.runId,
+            authorityUserId:
+              approval?.approvedByUserId ?? reconciled.proposedByUserId,
+            organisationId: reconciled.organisationId ?? undefined,
+            actionType: AUDIT.executionFailed,
+            resourceType: RESOURCE_Q_ACTION,
+            resourceId: reconciled.id,
+            occurredAt: iso(now),
+            outcome: "FAILED",
+            metadata: auditMetadata(reconciled, {
+              ...(approval === undefined ? {} : { approvalId: approval.id }),
+              attempt: reconciled.executionAttempts,
+              failureCode: "EXECUTION_INTERRUPTED",
+              retryPermitted: false,
+              outcomeKnown: false,
+            }),
+            correlationId,
+          });
+          if (dependencies.outbox !== undefined && approval !== undefined) {
+            await dependencies.outbox.enqueue(
+              tx,
+              qActionEvent(
+                QActionExecutionFailedEvent,
+                eventContext(
+                  reconciled,
+                  { type: "Q", id: reconciled.runId },
+                  correlationId,
+                ),
+                {
+                  ...eventData(reconciled, approval.id),
+                  failureCode: "EXECUTION_INTERRUPTED",
+                  retryPermitted: false,
+                },
+              ),
+            );
+          }
+          return true;
+        });
+        if (done) {
+          moved += 1;
+          logger?.warn(
+            { actionId: one.actionId },
+            "q action left executing by a stopped process; needs reconciliation, not retried",
+          );
+        }
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, actionId: one.actionId },
+          "interrupted q action not reconciled",
+        );
+      }
+    }
+    return moved;
+  };
+
   return {
     propose,
+    reconcileInterrupted,
     revise,
     supersedeStale,
     expireLapsed,

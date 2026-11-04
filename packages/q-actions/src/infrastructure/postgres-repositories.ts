@@ -251,6 +251,22 @@ export function createPostgresQActionRepositories(): QActionRepositories {
            for update`;
         return rows.length === 0 ? null : toAction(rows[0]);
       },
+      listStuckExecuting: async (executor, input) => {
+        // updated_at moves on every lifecycle write (set_updated_at), so an
+        // EXECUTING row older than `before` has had no finalise since its
+        // claim. actions_live_idx covers the status predicate.
+        const rows = await executor<{ tenant_id: string; id: string }[]>`
+          select a.tenant_id, a.id
+            from q_runtime.actions a
+           where a.status = 'EXECUTING'
+             and a.updated_at <= ${input.before.toISOString()}::text::timestamptz
+           order by a.updated_at, a.id
+           limit ${input.limit}`;
+        return rows.map((row) => ({
+          tenantId: TenantIdSchema.parse(row.tenant_id),
+          actionId: QActionProposalIdSchema.parse(row.id),
+        }));
+      },
       listAwaitingForProposer: async (executor, input) => {
         const rows = await executor`
           select a.id as action_id, p.id as approval_id
