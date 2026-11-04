@@ -94,6 +94,37 @@ describe("A4: the deck's figures, as the founder's claims", () => {
     ]);
   });
 
+  it("live 2026-11-04: a long traction section never crowds out the burn the profile shows", () => {
+    const traction = Array.from({ length: 10 }, (_, index) => ({
+      ...BURN,
+      label: `Traction figure ${String(index + 1)}`,
+      value: String(index + 1),
+      pages: [4],
+    }));
+    const facts = companyDeckFiguresFacts(
+      {
+        sections: [
+          { section: "TRACTION", status: "PRESENT", facts: traction },
+          {
+            section: "BUSINESS_MODEL",
+            status: "PRESENT",
+            facts: traction.slice(0, 5),
+          },
+          { section: "FINANCIALS", status: "PRESENT", facts: [BURN] },
+        ],
+      },
+      "Ledgerline",
+    );
+    expect(facts[0]?.statement).toContain(
+      "Current monthly net burn: About $39,000",
+    );
+    expect(facts.length).toBeLessThanOrEqual(16);
+    // No section gives more than its share.
+    expect(
+      facts.filter((fact) => fact.statement.includes("Traction figure")).length,
+    ).toBeLessThanOrEqual(12);
+  });
+
   it("keeps a document-supported figure's own evidence status, never upgrades a claim", () => {
     const supported = companyDeckFiguresFacts(
       {

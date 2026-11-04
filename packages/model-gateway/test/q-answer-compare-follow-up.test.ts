@@ -771,6 +771,58 @@ describe("compare the top two, right after a list of five", () => {
     );
   });
 
+  // A2, live 2026-11-04 on 55936724d: after MedTrail, Duplo, Bumpa,
+  // "compare the second and third" tabled MedTrail vs Duplo. The prepare
+  // was warmed before code bound the places, and its top-two table was
+  // kept. The bound places now decide the set, in the order said.
+  it("explicit places bound after the warm prepare decide the table, in the order said", async () => {
+    // "Compare the second and the first": only the bound places give
+    // Silo Credit before Mizan; a top-two count over the cards cannot.
+    const { seam, request, stored } = build(
+      "Compare the second and the first",
+      { compare: { count: 2, names: [] } },
+    );
+    seam.warm?.(request);
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          references: "RESOLVED: numbers 2 and 1, in that order.",
+          referencedCompanyIds: [SILO, MIZAN],
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    const table = (stored.at(-1)?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Silo Credit",
+      "Mizan",
+    ]);
+  });
+
+  it("a bound id that is not on Q's cards is never compared", async () => {
+    const { seam, request, stored } = build("Compare the second and third", {
+      compare: { count: 2, names: [] },
+    });
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          referencedCompanyIds: [SILO, "00000000-0000-4000-8000-0000000000ff"],
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    const table = (stored.at(-1)?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    // Falls back to the reader's count over the cards, never the stray id.
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Mizan",
+      "Silo Credit",
+    ]);
+  });
+
   // Coordinator 24 Oct (live on bbb4b677, savanna-seed ~20:40): with no
   // reader comparison, "Which is better, Anchor or Afyascan?" compared
   // nothing, and a web namesake answered for Anchor. The names in the words

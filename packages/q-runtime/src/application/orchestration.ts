@@ -455,6 +455,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly references?: string | undefined;
   /**
+   * A2 (live 2026-11-04): the companies `references` bound, in the order the
+   * person said them ("the second and third"), as ids. Set only when code
+   * bound explicit places to a list they were shown; a comparison uses
+   * these before any count over the cards. Grants nothing: each id is
+   * still read through its tool's authorize step.
+   */
+  readonly referencedCompanyIds?: readonly string[] | undefined;
+  /**
    * The declared action the reader read them as asking for, by its name
    * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
    */

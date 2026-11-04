@@ -185,14 +185,22 @@ export function companyFiguresFacts(
 }
 
 /** At most this many of one deck's figures go to the model. */
-const DECK_FIGURES_MAX = 8;
-/** The deck sections whose figures the profile's Key numbers draw on. */
-const DECK_FIGURE_SECTIONS: ReadonlySet<string> = new Set([
+const DECK_FIGURES_MAX = 16;
+/** At most this many from one section, so no section crowds out another. */
+const DECK_FIGURES_PER_SECTION = 6;
+/**
+ * The deck sections whose figures the profile's Key numbers draw on, in
+ * the order they are taken. Live 2026-11-04 (55936724d): Ledgerline's
+ * traction figures filled the cap in deck order before FINANCIALS was
+ * reached, so the burn its profile shows never reached Q. Burn, runway
+ * and the ask come first; no section gives more than its share.
+ */
+const DECK_FIGURE_SECTIONS: readonly string[] = [
   "FINANCIALS",
-  "TRACTION",
   "THE_ASK",
+  "TRACTION",
   "BUSINESS_MODEL",
-]);
+];
 
 /**
  * A4 (rehearsal 2026-11-04): an investor on Ledgerline's profile saw "Current
@@ -214,18 +222,24 @@ export function companyDeckFiguresFacts(
   const sections = (data as { readonly sections?: unknown }).sections;
   if (!Array.isArray(sections)) return [];
   const facts: AuthorisedFact[] = [];
-  for (const section of sections as readonly unknown[]) {
-    if (typeof section !== "object" || section === null) continue;
+  const present = (sections as readonly unknown[]).flatMap((section) => {
+    if (typeof section !== "object" || section === null) return [];
     const s = section as Record<string, unknown>;
     if (s["status"] !== "PRESENT" || typeof s["section"] !== "string") {
-      continue;
+      return [];
     }
-    if (!DECK_FIGURE_SECTIONS.has(s["section"])) continue;
+    return [s];
+  });
+  for (const code of DECK_FIGURE_SECTIONS) {
+    const s = present.find((one) => one["section"] === code);
+    if (s === undefined) continue;
     const listed = Array.isArray(s["facts"])
       ? (s["facts"] as readonly unknown[])
       : [];
+    let taken = 0;
     for (const fact of listed) {
       if (facts.length >= DECK_FIGURES_MAX) return facts;
+      if (taken >= DECK_FIGURES_PER_SECTION) break;
       if (typeof fact !== "object" || fact === null) continue;
       const f = fact as Record<string, unknown>;
       const label = text(f["label"]);
@@ -251,7 +265,10 @@ export function companyDeckFiguresFacts(
         source: "The company's pitch deck, as Q read it (founder's claims)",
         ...(asOf === null ? {} : { asOf: asOf.slice(0, 40) }),
       });
-      if (parsed.success) facts.push(parsed.data);
+      if (parsed.success) {
+        facts.push(parsed.data);
+        taken += 1;
+      }
     }
   }
   return facts;

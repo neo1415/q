@@ -4150,11 +4150,18 @@ export function createSpecialistQAnswer(
 
   /** B6: the reference each run's words were bound to, for its answer. */
   const resolvedInRun = new Map<string, string>();
+  /** A2: the companies explicit places bound, in the order said. */
+  const placedInRun = new Map<string, readonly string[]>();
   const withReferences = (request: QAnswerRequest): QAnswerRequest => {
     const note = resolvedInRun.get(request.runId);
+    const placed = placedInRun.get(request.runId);
     return note === undefined || request.references !== undefined
       ? request
-      : { ...request, references: note };
+      : {
+          ...request,
+          references: note,
+          ...(placed === undefined ? {} : { referencedCompanyIds: placed }),
+        };
   };
   const openPointedRecord = (
     text: string,
@@ -5389,7 +5396,15 @@ export function createSpecialistQAnswer(
         const oldest = resolvedInRun.keys().next().value;
         if (oldest === undefined) break;
         resolvedInRun.delete(oldest);
+        placedInRun.delete(oldest);
       }
+      const placed =
+        pointed.ask?.kind === "POSITIONS" && pointed.resolved?.kind === "PAIR"
+          ? pointed.resolved.entities
+              .filter((entity) => entity.kind === "COMPANY")
+              .map((entity) => entity.id)
+          : [];
+      if (placed.length >= 2) placedInRun.set(request.runId, placed);
       logger?.info(
         {
           qRunId: request.runId,

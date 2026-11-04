@@ -169,6 +169,7 @@ function kindOf(
       case "INVESTOR_REFERENCE":
       case "CLARIFICATION_REQUEST":
       case "UI_INTENT":
+      case "NAVIGATION_OFFER":
         break;
       case "SCHEDULE":
         return "Your schedule";

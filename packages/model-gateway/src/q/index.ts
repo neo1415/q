@@ -3472,6 +3472,11 @@ export function createModelGatewayQAnswer(
     };
     const compareFor = async (
       reading: QAnswerRequest["compare"],
+      /**
+       * A2: places bound by code on the turn's own request. The prepare is
+       * warmed before the binding exists, so the answer passes them here.
+       */
+      placedIds: readonly string[] | undefined = request.referencedCompanyIds,
     ): Promise<CompareOutcome | null> => {
       if (latest === undefined) return null;
       // No reader comparison (a warmed prepare, or a reading without one):
@@ -3481,11 +3486,17 @@ export function createModelGatewayQAnswer(
       const asked =
         reading ??
         (worded.length >= 2 ? { count: null, names: worded } : undefined);
-      const fromCards = compareTargets(
-        latest.content,
-        newestAnswerCards(earlier),
-        asked,
+      // A2 (live 2026-11-04: "compare the second and third" tabled the
+      // first two): places code bound to the shown list come first, in the
+      // order said. Only ids from cards Q showed this person.
+      const shownCards = newestAnswerCards(earlier);
+      const placed = (placedIds ?? []).filter((id) =>
+        shownCards.some((card) => card.companyId === id),
       );
+      const fromCards =
+        placed.length >= 2
+          ? [...new Set(placed)].slice(0, 4)
+          : compareTargets(latest.content, shownCards, asked);
       const named = asked?.names ?? [];
       if (fromCards.length < 2 && named.length < 2) return null;
       const { names } = await prefetchToolsRead;
@@ -5171,8 +5182,17 @@ export function createModelGatewayQAnswer(
       });
       // The turn's own reading decides a comparison: a prepare warmed before
       // the reading built none, so its reads run now (see compareFor).
-      const lateCompare =
-        preparedCompareTable === null && request.compare !== undefined
+      // A2 (live 2026-11-04): explicit places bound after the warm prepare
+      // ("the second and third") decide the set; a warmed top-two table of
+      // other companies is replaced, never shown.
+      const placed = request.referencedCompanyIds ?? [];
+      const placedDiffers =
+        placed.length >= 2 &&
+        (preparedCompareIds.length !== placed.length ||
+          preparedCompareIds.some((id, index) => id !== placed[index]));
+      const lateCompare = placedDiffers
+        ? await compareLate(request.compare, placed).catch(() => null)
+        : preparedCompareTable === null && request.compare !== undefined
           ? await compareLate(request.compare).catch(() => null)
           : null;
       const compareFacts = lateCompare?.facts ?? preparedCompareFacts;

@@ -1110,6 +1110,9 @@ describe("explicit places bind the records shown at those places (A2)", () => {
     expect(run.delegatedWith[0]?.references).toBe(
       `RESOLVED: numbers 2 and 3, in that order = "Duplo" (company ${DUPLO}) and "Bumpa" (company ${BUMPA}).`,
     );
+    // Live 2026-11-04: the comparison table is built from these, not from
+    // a count over the cards.
+    expect(run.delegatedWith[0]?.referencedCompanyIds).toEqual([DUPLO, BUMPA]);
   });
 
   it("tells the answer to ask when the places are not on any list", async () => {
