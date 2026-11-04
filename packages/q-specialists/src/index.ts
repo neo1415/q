@@ -160,6 +160,10 @@ export {
 
 export type { ArtifactPreparationPort } from "./company/artifact-port.js";
 export {
+  retrievedSources,
+  type ArtifactSourceRef as ArtifactCompositionSource,
+} from "./company/artifact-port.js";
+export {
   latestArtifactIn,
   prepareOrReviseArtifact,
   type ArtifactPreparationOutcome,

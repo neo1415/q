@@ -25,6 +25,27 @@ import type { ActorContext } from "@capital-q/security";
  * refused there, not here.
  */
 
+/**
+ * SEC-01: one source document a composition was read from. Provenance the
+ * artifact context records and re-checks for the reader on every read;
+ * never a grant. Structurally the artifact context's own source reference,
+ * declared here so this package imports nothing from it.
+ */
+export type ArtifactSourceRef = {
+  readonly kind: "retrieved_document" | "data_room_document";
+  readonly id: string;
+};
+
+/** The documents an investigation read, as source references. */
+export function retrievedSources(
+  documentIds: readonly string[] | undefined,
+): readonly ArtifactSourceRef[] {
+  return (documentIds ?? []).map((id) => ({
+    kind: "retrieved_document" as const,
+    id,
+  }));
+}
+
 export type ArtifactPreparationPort = {
   /** Create the artifact and its first version. Returns the public card. */
   readonly prepare: (input: {
@@ -43,6 +64,8 @@ export type ArtifactPreparationPort = {
       readonly summary: string;
       readonly content: QArtifactContent;
     };
+    /** SEC-01: the documents the content was composed from. */
+    readonly sources?: readonly ArtifactSourceRef[] | undefined;
     /** A workforce step's document: filed at most once per (job, step). */
     readonly workforce?:
       | {
@@ -65,6 +88,8 @@ export type ArtifactPreparationPort = {
       readonly summary: string;
       readonly content: QArtifactContent;
     };
+    /** SEC-01: documents this revision read beyond the artifact's own. */
+    readonly sources?: readonly ArtifactSourceRef[] | undefined;
   }) => Promise<QArtifactSummary>;
 
   /**
@@ -98,6 +123,8 @@ export type DocumentPipelinePort = {
       readonly summary: string;
       readonly content: QArtifactContent;
     };
+    /** SEC-01: the documents the content was composed from. */
+    readonly sources?: readonly ArtifactSourceRef[] | undefined;
     readonly job: {
       readonly grounding: readonly string[];
       readonly sectorCodes: readonly string[];

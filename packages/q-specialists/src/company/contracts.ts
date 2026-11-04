@@ -224,6 +224,13 @@ export type CompanyIntelligenceResult = {
       "MINIMAL_INSTITUTIONAL" | "DARK_TECHNICAL" | "WARM_GROWTH" | null;
     readonly quote: string;
   } | null;
+  /**
+   * SEC-01: the company documents the findings were read from (retrieved
+   * passages, cited documents). Server-side provenance only, never shown:
+   * an artifact composed from these findings records them, and closes when
+   * the reader's access to any one of them ends. Absent: none were read.
+   */
+  readonly sourceDocumentIds?: readonly string[] | undefined;
   /** Safe operational record for traces, evals and the developer smoke. */
   readonly telemetry: CompanyIntelligenceTelemetry;
 };

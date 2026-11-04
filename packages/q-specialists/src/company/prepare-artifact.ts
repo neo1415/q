@@ -11,9 +11,10 @@ import {
 import type { Logger } from "@capital-q/observability";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
-import type {
-  ArtifactPreparationPort,
-  DocumentPipelinePort,
+import {
+  retrievedSources,
+  type ArtifactPreparationPort,
+  type DocumentPipelinePort,
 } from "./artifact-port.js";
 import type { BriefReviser } from "./brief-reviser.js";
 import type { CompanyIntelligenceResult } from "./contracts.js";
@@ -276,6 +277,10 @@ export async function prepareOrReviseArtifact(input: {
   const instruction =
     ask.instruction.length > 0 ? ask.instruction : input.saidVerbatim;
   const findingStatements = result.findings.map((finding) => finding.statement);
+  // SEC-01: what the findings were read from, filed with what is composed
+  // from them, so the document closes when access to any of them does.
+  const sources = retrievedSources(result.sourceDocumentIds);
+  const withSources = sources.length === 0 ? {} : { sources };
 
   /**
    * A change to a document that already exists is a revision of THAT
@@ -347,6 +352,7 @@ export async function prepareOrReviseArtifact(input: {
               artifactId: target,
               instruction,
               content: audited,
+              ...withSources,
             }),
           };
         }
@@ -491,6 +497,7 @@ export async function prepareOrReviseArtifact(input: {
         artifactType: ask.artifactType,
         kind,
         content: composed,
+        ...withSources,
         job: {
           grounding,
           sectorCodes,
@@ -541,6 +548,7 @@ export async function prepareOrReviseArtifact(input: {
           ...(company === undefined ? {} : { subject: company }),
           artifactType: ask.artifactType,
           content: { ...composed, content: made.content },
+          ...withSources,
         }),
       };
     }
@@ -573,6 +581,7 @@ export async function prepareOrReviseArtifact(input: {
         ...(company === undefined ? {} : { subject: company }),
         artifactType: ask.artifactType,
         content: { ...composed, content },
+        ...withSources,
       }),
     };
   } catch (error: unknown) {

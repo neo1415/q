@@ -24,6 +24,29 @@ export type WorkforceDocumentBinding = {
 };
 
 /**
+ * SEC-01: the kinds of source an artifact can be composed from. Reference
+ * data (persisted as text, never a Postgres enum): a company document whose
+ * passages the run's authorised retrieval read or a finding cited, and a
+ * company document read through the data room's own view as the person.
+ */
+export const ARTIFACT_SOURCE_KINDS = [
+  "retrieved_document",
+  "data_room_document",
+] as const;
+export type ArtifactSourceKind = (typeof ARTIFACT_SOURCE_KINDS)[number];
+
+/**
+ * One source document an artifact was composed from. Provenance, never a
+ * grant: on every read the reader's current access to each one is asked
+ * again, and any that is no longer open to them closes the artifact.
+ */
+export type ArtifactSourceRef = {
+  readonly kind: ArtifactSourceKind;
+  /** The source's id in its owning context (an Evidence document id). */
+  readonly id: string;
+};
+
+/**
  * What this context stores, and what it borrows (QX-003C, ADR 0013).
  *
  * Artifacts owns the artifact, its versions and their order. It owns no
@@ -139,6 +162,32 @@ export type ArtifactRepository = {
     actor: ActorContext,
     artifactId: string,
   ) => Promise<readonly ArtifactHistoryEntry[]>;
+
+  /**
+   * SEC-01: record which source documents an artifact was composed from,
+   * in the caller's transaction. Idempotent per (artifact, kind, id); never
+   * removes or rewrites a recorded source. Optional only for adapters that
+   * record none: the service refuses to file an artifact with sources into
+   * a repository that cannot record them.
+   */
+  readonly recordSources?: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: string;
+      readonly artifactId: string;
+      readonly sources: readonly ArtifactSourceRef[];
+    },
+  ) => Promise<void>;
+
+  /**
+   * SEC-01: the recorded sources of these artifacts, scoped by the actor in
+   * the query like every other read. An artifact with none is absent from
+   * the map (or maps to an empty list).
+   */
+  readonly sourcesOf?: (
+    actor: ActorContext,
+    artifactIds: readonly string[],
+  ) => Promise<ReadonlyMap<string, readonly ArtifactSourceRef[]>>;
 };
 
 /**
