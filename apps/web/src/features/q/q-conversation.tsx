@@ -58,7 +58,7 @@ import {
   takeAcceptedDeckOffer,
 } from "@/features/onboarding-conversation/deck-offer";
 
-import { QAperture, QLumen, useStageApertureSize } from "../q-aperture";
+import { QAperture, useStageApertureSize } from "../q-aperture";
 import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
@@ -1056,12 +1056,6 @@ export function QConversationPanel({
           data-q-turns={String(turns.length)}
           data-q-voice={voice.active ? client.state : undefined}
         >
-          <QLumen
-            active={voice.active}
-            input={client.inputLevel}
-            output={client.outputLevel}
-          />
-
           {/* The top line: history and the saved transcript, quiet. It
               wraps rather than overflow (live run 2026-10-28, 390px: the
               history button sat past the viewport's edge). */}
@@ -1245,7 +1239,7 @@ export function QConversationPanel({
           >
             {conversing ? (
               <div
-                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : room.filled && stageMode === "FULL" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}
+                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : room.filled && stageMode === "FULL" ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl"}`}
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >
                 {bigPresence ? (
@@ -1855,7 +1849,7 @@ export function QConversationPanel({
               microphone is in the field; before the first word it is also
               the stage's own button. */}
           <div
-            className="cq-q-controls flex flex-none flex-col items-center gap-2 border-t border-(--cq-border-subtle) px-3 pt-2 sm:px-8"
+            className="cq-q-controls flex flex-none flex-col items-center gap-2 px-3 pt-2 sm:px-8"
             data-q-voice-stage-controls
           >
             <div className="flex flex-wrap items-center justify-center gap-2 empty:hidden">
@@ -1871,7 +1865,8 @@ export function QConversationPanel({
             </div>
             {/* Latency: a record named as they type is resolved and its
                 page prefetched before Send (fast-navigation.ts). */}
-            <div className="w-full max-w-2xl" onInput={readTypedDraft}>
+            {/* ~768 px, like a reading column (owner 2026-11-04). */}
+            <div className="w-full max-w-3xl" onInput={readTypedDraft}>
               <QComposer
                 id={COMPOSER_ID}
                 showContext={false}

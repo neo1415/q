@@ -91,18 +91,15 @@ export function QCard({
       aria-label={`Q Card for ${name}`}
       style={style}
       className={cx(
-        "relative m-0 flex min-h-48 w-full sm:aspect-[1.8/1] max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text) shadow-[0_0_24px_var(--cq-qcard-glow)]",
+        "relative m-0 flex min-h-48 w-full sm:aspect-[1.8/1] max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text)",
         className,
       )}
     >
-      {/* The one arc of light: decorative, faint, behind everything. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-1/3 -right-1/4 size-[120%] rounded-full border-[1.5px] border-(--cq-qcard-arc) shadow-[inset_0_0_40px_var(--cq-qcard-arc)]"
-      />
+      {/* No arc or glow (UX-07, owner 2026-11-04): an ID card is flat and
+          quiet; the edge and the Q mark carry the brand. */}
       <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-3 p-[6%]">
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-9 items-center justify-center rounded-xl border border-(--cq-card-edge) shadow-[0_0_10px_var(--cq-qcard-glow)]">
+          <span className="inline-flex size-9 items-center justify-center rounded-xl border border-(--cq-card-edge)">
             <QNavIcon
               size={18}
               strokeWidth={2}

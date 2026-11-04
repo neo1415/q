@@ -176,9 +176,11 @@ export const NIGHT_LIGHTING: PresenceLighting = {
   white: 1,
   weight: 1,
   floor: 0,
-  halo: 0.24,
+  // UX-06 (owner 2026-11-04): no halo or whitened core behind Q; the
+  // points themselves are the one indicator of Q's state.
+  halo: 0,
   haloReach: 0.98,
-  coreLight: true,
+  coreLight: false,
 };
 
 export const PAPER_LIGHTING: PresenceLighting = {
@@ -186,7 +188,7 @@ export const PAPER_LIGHTING: PresenceLighting = {
   white: 0,
   weight: 1.7,
   floor: 0.6,
-  halo: 0.05,
+  halo: 0,
   haloReach: 0.5,
   coreLight: false,
 };
