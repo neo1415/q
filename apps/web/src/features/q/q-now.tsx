@@ -42,6 +42,23 @@ export function nowApproval(state: {
 }
 
 /**
+ * Q's questions Now shows. Acceptance 2026-11-04 J4: the plan's offer ("a
+ * short summary, the whole plan, or run it now") is asked in the same
+ * turn as the plan card, which already stands for that choice in the
+ * conversation (its Execute, or a typed "okay"), so Now never repeats it
+ * as a second "Q asks" card under it. Any other question still shows.
+ */
+export function nowQuestions(
+  turns: QSessionValue["turns"],
+): ReturnType<typeof openQuestions> {
+  const questions = openQuestions(turns);
+  if (questions.length === 0) return questions;
+  const latest = turns.findLast((turn) => turn.kind === "Q");
+  if (latest?.kind !== "Q") return questions;
+  return latest.blocks.some((block) => block.kind === "PLAN") ? [] : questions;
+}
+
+/**
  * Now / Needs you (spec §7.1): the task view. What Q is doing right now,
  * with its approved stage and Stop; what waits on the person -- an
  * approval, shown with the exact payload the decision binds to, and Q's
@@ -80,7 +97,7 @@ export function QNow({
   const [kept, setKept] = useState<string | null>(null);
   const { q, turns, voice } = session;
   const { approval, proposal } = nowApproval(q.state);
-  const questions = openQuestions(turns);
+  const questions = nowQuestions(turns);
   const nothing = !q.working && approval === null && questions.length === 0;
   if (nothing && quietWhenIdle) return null;
 

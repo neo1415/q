@@ -205,3 +205,41 @@ describe("N2: a running plan's steps are in the work list", () => {
     expect(latestPlanOf(turns.slice(0, 2))).toBeNull();
   });
 });
+
+describe("Now shows no second 'Q asks' for the plan's own offer (J4)", () => {
+  it("the plan turn's offer stays with the plan card", async () => {
+    const { nowQuestions } = await import("../src/features/q/q-now");
+    const turns = turnsFrom({ ...createQStreamState(), messages }, []);
+    expect(nowQuestions(turns)).toEqual([]);
+  });
+
+  it("a question in a turn without a plan still shows", async () => {
+    const { nowQuestions } = await import("../src/features/q/q-now");
+    const asking = QMessageSchema.parse({
+      messageId: "9b000000-0000-4000-8000-000000000005",
+      runId: RUN,
+      role: "Q",
+      text: "Which fund is this for?",
+      createdAt: "2026-11-04T17:56:00.000Z",
+      blocks: [
+        {
+          kind: "CLARIFICATION_REQUEST",
+          question: "Which fund is this for?",
+          options: ["Fund I", "Fund II"],
+        },
+      ],
+    });
+    const turns = turnsFrom(
+      {
+        ...createQStreamState(),
+        messages: [messages[0], asking].filter(
+          (message): message is QMessage => message !== undefined,
+        ),
+      },
+      [],
+    );
+    expect(nowQuestions(turns).map((q) => q.question)).toEqual([
+      "Which fund is this for?",
+    ]);
+  });
+});
