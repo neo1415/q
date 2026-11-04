@@ -121,8 +121,10 @@ export function useWorkStreams(options: {
   );
   const lives = useWorkLives(work.map((job) => job.jobId));
   // N2: a running plan's steps, where the whole work list is drawn (the
-  // dock's one line has no room for them).
-  const plan = useRunningPlan(options.run && options.jobs ? turns : undefined);
+  // dock's one line has no room for them). Acceptance 2026-11-04 J4: not
+  // tied to `jobs` -- the Q stage draws its jobs as cards (jobs={false}),
+  // so the plan was never read there and its steps never showed.
+  const plan = useRunningPlan(options.run ? turns : undefined);
   const q = session?.q;
   const trail = session?.presence.trail;
   return useMemo(() => {
@@ -163,6 +165,32 @@ export function useWorkStreams(options: {
       details,
     };
   }, [options.run, q, trail, labels, work, lives, plan]);
+}
+
+/**
+ * The conversation's running plan as one work stream (J4: /work's Moving
+ * said "Nothing running" while it ran). Null when none is running.
+ */
+export function useRunningPlanStream(): WorkStream | null {
+  const plan = useRunningPlan(useQSessionOptional()?.turns);
+  return useMemo(
+    () =>
+      plan === null
+        ? null
+        : planStream(plan, (step) => stepStatusWords(step, true)),
+    [plan],
+  );
+}
+
+/** /work's Moving: the running plan's steps, as the stage lists them. */
+export function QRunningPlan({
+  className,
+}: {
+  readonly className?: string | undefined;
+}) {
+  const stream = useRunningPlanStream();
+  if (stream === null) return null;
+  return <WorkProgressList streams={[stream]} className={className} />;
 }
 
 export function QWorkProgress({

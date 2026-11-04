@@ -28,7 +28,13 @@ export function latestPlanOf(
 const PACE = { firstMs: 2_000, maxMs: 15_000 } as const;
 const FOLLOW_MAX_MS = 15 * 60_000;
 
+/**
+ * Nothing more to follow. An accepted plan is about to run, so it is
+ * followed on; one only offered (or on the board) waits for the person,
+ * and is read again when the conversation moves (below).
+ */
 function settled(view: QPlanView): boolean {
+  if (view.status === "ACCEPTED") return false;
   return (
     view.status !== "EXECUTING" ||
     view.plan.steps.every(
@@ -49,6 +55,11 @@ export function useRunningPlan(
   const latest = latestPlanOf(turns);
   const planId = latest?.planId ?? null;
   const version = latest?.version ?? null;
+  // Acceptance 2026-11-04 J4: a typed "okay" approves the plan through
+  // the server, so no approval-decided event fires in this tab; the plan
+  // was read once (OFFERED), never again, and its steps never showed.
+  // Q's next turn ("Running it now") is the cue to read it again.
+  const turnCount = turns?.length ?? 0;
   const [view, setView] = useState<QPlanView | null>(null);
   const [reads, setReads] = useState(0);
 
@@ -82,7 +93,7 @@ export function useRunningPlan(
       { immediate: true },
     );
     return () => poll.stop();
-  }, [planId, version, reads]);
+  }, [planId, version, reads, turnCount]);
 
   return useMemo(
     () => (view !== null && view.plan.planId === planId ? view : null),
