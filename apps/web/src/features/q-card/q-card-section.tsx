@@ -68,6 +68,7 @@ export async function QCardSection({
   tagline,
   brand,
   values,
+  portraitUrl = null,
   given,
 }: {
   readonly subjectType: QCardSubjectType;
@@ -83,6 +84,12 @@ export async function QCardSection({
    * the card.
    */
   readonly values?: Readonly<Record<string, string | null>> | undefined;
+  /**
+   * The owner's own photo or logo (a signed URL), for the owner's preview:
+   * the owner may always see their own image. Strangers get the
+   * audience-filtered one on the public page (public-card-view.tsx).
+   */
+  readonly portraitUrl?: string | null | undefined;
   /**
    * Design review only (/dev/account-review): the card, given, so nothing
    * is read (and the public descriptor is left out).
@@ -163,6 +170,7 @@ export async function QCardSection({
             displayUrl={displayUrlFor(handle)}
             href={`${origin}/@${handle}`}
             qrSvg={qrSvg(`${origin}/c/${card.publicCode}`)}
+            portraitUrl={portraitUrl}
             brand={brand}
           />
         )
