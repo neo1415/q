@@ -17,12 +17,16 @@ import { useT } from "@/features/i18n/language";
 import { downloadArtifact } from "./artifact-download";
 import { failureMessage } from "./conversation";
 import { useQSessionOptional, type QSessionValue } from "./q-session";
+import { stepStatusWords } from "./plan-card";
+import { nowApproval } from "./q-now";
+import { useRunningPlan } from "./running-plan";
 import { stageLineText, type QWorkingStage } from "./stage-line";
 import { useWire } from "./use-wire";
 import { promisedJobs, useWorkLives, type WorkInProgress } from "./work-live";
 import {
   jobProgress,
   jobStepDetail,
+  planStream,
   runProgress,
   WORK_STATUS_WORDS,
   workStreams,
@@ -116,6 +120,9 @@ export function useWorkStreams(options: {
     [turns, options.jobs, exceptKey],
   );
   const lives = useWorkLives(work.map((job) => job.jobId));
+  // N2: a running plan's steps, where the whole work list is drawn (the
+  // dock's one line has no room for them).
+  const plan = useRunningPlan(options.run && options.jobs ? turns : undefined);
   const q = session?.q;
   const trail = session?.presence.trail;
   return useMemo(() => {
@@ -126,7 +133,9 @@ export function useWorkStreams(options: {
         runId: q.state.runId,
         stages: trail ?? [],
         working: q.working,
-        awaitingApproval: q.state.approval !== null,
+        // The plan's quiet execute card waits behind the plan card (its
+        // Execute or "okay" decides it): not "Waiting for your approval".
+        awaitingApproval: nowApproval(q.state).approval !== null,
         awaitingReply: q.state.clarification !== null && !q.working,
         failure: failure === null ? null : failureMessage(failure),
         label: runStageLabel(labels),
@@ -145,8 +154,15 @@ export function useWorkStreams(options: {
         missing: snapshot?.missing ?? false,
       });
     });
-    return { streams: workStreams(run, jobs), details };
-  }, [options.run, q, trail, labels, work, lives]);
+    const planned =
+      plan === null
+        ? null
+        : planStream(plan, (step) => stepStatusWords(step, true));
+    return {
+      streams: workStreams(run, planned === null ? jobs : [planned, ...jobs]),
+      details,
+    };
+  }, [options.run, q, trail, labels, work, lives, plan]);
 }
 
 export function QWorkProgress({
@@ -309,6 +325,8 @@ function WorkStreamItem({
               >
                 {step.state === "CURRENT" ? (
                   <WorkingMark />
+                ) : step.state === "WAITING" ? (
+                  <span className="size-1.5 rounded-full bg-(--cq-text-tertiary)" />
                 ) : step.state === "FAILED" ? (
                   <CircleAlert
                     size={ICON_SIZE.compact}
@@ -337,11 +355,21 @@ function WorkStreamItem({
                         ? "Done:"
                         : step.state === "FAILED"
                           ? "Stopped at:"
-                          : "Now:",
+                          : step.state === "WAITING"
+                            ? "Next:"
+                            : "Now:",
                     )}{" "}
                   </span>
                   {t(step.label)}
                 </span>
+                {step.note !== undefined && !compact ? (
+                  <span
+                    className="cq-caption truncate text-(--cq-text-tertiary)"
+                    data-q-work-step-note
+                  >
+                    {t(step.note)}
+                  </span>
+                ) : null}
                 {step.state === "CURRENT" && detail !== null && !compact ? (
                   <span
                     className="cq-caption cq-numeric truncate text-(--cq-text-tertiary)"

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { QPlanExecutePayloadSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { PLAN_F03_ASK } from "@capital-q/q-core";
-import type { ActorContext } from "@capital-q/security";
+import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
   deliveredPlan,
@@ -220,7 +220,10 @@ function world(
           approve: async (
             actor: ActorContext,
             actionId: string,
-            via?: { readonly channel: string; readonly evidenceRef?: string },
+            via?: {
+              readonly channel: "CARD" | "TEXT" | "VOICE";
+              readonly evidenceRef?: string | undefined;
+            },
           ) => {
             approvals.push(actionId);
             vias.push(via ?? { channel: "CARD" });
@@ -956,10 +959,10 @@ describe("live 2026-11-04: a yes to Q's offer runs the offered plan (decision 55
         })
       ).status,
     ).toBe("NONE");
-    const stranger: ActorContext = {
+    const stranger = ActorContextSchema.parse({
       ...founder,
       userId: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
-    };
+    });
     expect(
       (
         await w.plans.runOffered(stranger, {

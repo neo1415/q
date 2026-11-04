@@ -1,4 +1,5 @@
 import type {
+  QPlanView,
   QVisibleStage,
   WorkforceLive,
   WorkforceLiveStageName,
@@ -25,7 +26,8 @@ import { liveLine } from "./work-live";
  * its own state.
  */
 
-export type WorkStepState = "DONE" | "CURRENT" | "FAILED";
+/** WAITING: a plan's step that has not begun, or waits on the person. */
+export type WorkStepState = "DONE" | "CURRENT" | "FAILED" | "WAITING";
 
 export type WorkStep = {
   /** Stable within its stream: the stage and where it fell. */
@@ -33,6 +35,8 @@ export type WorkStep = {
   /** English, approved words; the screen translates them. */
   readonly label: string;
   readonly state: WorkStepState;
+  /** A plan step's own state in words ("Ready for your approval"). */
+  readonly note?: string | undefined;
 };
 
 export type WorkStatus =
@@ -54,7 +58,7 @@ export type WorkAction = {
 
 export type WorkStream = {
   readonly id: string;
-  readonly source: "RUN" | "JOB";
+  readonly source: "RUN" | "JOB" | "PLAN";
   /** What the work is (a job's title); null for an answer being worked out. */
   readonly title: string | null;
   readonly steps: readonly WorkStep[];
@@ -310,4 +314,47 @@ export function workStreams(
     out.push(job);
   }
   return out;
+}
+
+/**
+ * Live 2026-11-04 (N2): a running plan's steps in the work list, from the
+ * plan as stored (read as its owner), so the stage says what moves --
+ * Q's work started, a card waiting, the person's part on their board --
+ * rather than only "Waiting for your approval · Understanding your
+ * request". Null unless the newest version is running.
+ */
+export function planStream(
+  view: Pick<QPlanView, "current" | "status" | "plan">,
+  words: (step: QPlanView["plan"]["steps"][number]) => string | null,
+): WorkStream | null {
+  if (!view.current || view.status !== "EXECUTING") return null;
+  const steps: WorkStep[] = view.plan.steps.map((step) => {
+    const state: WorkStepState =
+      step.status === "DONE" || step.status === "SKIPPED"
+        ? "DONE"
+        : step.status === "DOING"
+          ? "CURRENT"
+          : "WAITING";
+    const note = state === "WAITING" ? words(step) : null;
+    return {
+      key: step.key,
+      label: step.title.replace(/[.\s]+$/u, ""),
+      state,
+      ...(note === null ? {} : { note }),
+    };
+  });
+  const status: WorkStatus = steps.some((step) => step.state === "CURRENT")
+    ? "WORKING"
+    : steps.every((step) => step.state === "DONE")
+      ? "READY"
+      : "WAITING";
+  return {
+    id: view.plan.planId,
+    source: "PLAN",
+    title: view.plan.goal,
+    steps,
+    status,
+    note: null,
+    actions: [],
+  };
 }

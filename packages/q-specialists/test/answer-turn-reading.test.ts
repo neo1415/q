@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   PermittedContextPlanSchema,
   QArtifactIdSchema,
+  QResultBlockSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import {
@@ -6928,15 +6929,15 @@ describe("live 2026-11-04: 'okay' to Q's plan offer runs that plan, never a plan
     role: "Q" as const,
     content: `Your plan is ready: 8 steps.\n\n${PLAN_OFFER_QUESTION}`,
     blocks: [
-      {
-        kind: "PLAN" as const,
+      QResultBlockSchema.parse({
+        kind: "PLAN",
         planId: PLAN_ID,
         version: 1,
         title: "Check in this week with two connected founders",
         steps: 8,
         reviewed: false,
-        affordances: ["EXECUTE" as const, "PUT_ON_BOARD" as const, "CHANGE" as const],
-      },
+        affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
+      }),
     ],
   };
   // Live run 1bdae62a: read as handing over new work, with a plan ask.
@@ -7005,7 +7006,11 @@ describe("live 2026-11-04: 'okay' to Q's plan offer runs that plan, never a plan
   );
 
   it("a change, a no, or a new question after the offer runs nothing by code", async () => {
-    for (const said of ["okay but change step two", "no", "what's my runway?"]) {
+    for (const said of [
+      "okay but change step two",
+      "no",
+      "what's my runway?",
+    ]) {
       const ran: Record<string, unknown>[] = [];
       const run = seam({
         said,
@@ -7023,7 +7028,11 @@ describe("live 2026-11-04: 'okay' to Q's plan offer runs that plan, never a plan
     const ran: Record<string, unknown>[] = [];
     const run = seam({
       said: "okay",
-      earlier: [offerLine, { role: "USER", content: "what's my runway?" }, { role: "Q", content: "About nine months." }],
+      earlier: [
+        offerLine,
+        { role: "USER", content: "what's my runway?" },
+        { role: "Q", content: "About nine months." },
+      ],
       reading: null,
       outcomes: [],
       plan: planPort([], ran),

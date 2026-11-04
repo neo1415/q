@@ -504,7 +504,10 @@ export function createPlans(dependencies: PlansDependencies) {
       readonly channel: "TEXT" | "VOICE";
     },
   ): Promise<
-    | { readonly status: "STARTED" | "RUNNING" | "WAITING"; readonly line: string }
+    | {
+        readonly status: "STARTED" | "RUNNING" | "WAITING";
+        readonly line: string;
+      }
     | { readonly status: "NONE" }
   > => {
     if (dependencies.approve === undefined) return { status: "NONE" };

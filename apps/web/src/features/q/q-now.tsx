@@ -25,7 +25,8 @@ export function nowApproval(state: {
   readonly messages: QSessionValue["q"]["state"]["messages"];
 }): {
   readonly approval: QSessionValue["q"]["state"]["approval"];
-  readonly proposal: QSessionValue["q"]["state"]["proposals"][number] | undefined;
+  readonly proposal:
+    QSessionValue["q"]["state"]["proposals"][number] | undefined;
 } {
   const waiting = state.approval;
   const proposal =

@@ -99,7 +99,10 @@ export type QPlanJobPort = {
  * other turn.
  */
 export type QPlanRunOutcome =
-  | { readonly status: "STARTED" | "RUNNING" | "WAITING"; readonly line: string }
+  | {
+      readonly status: "STARTED" | "RUNNING" | "WAITING";
+      readonly line: string;
+    }
   | { readonly status: "NONE" };
 
 /** What of an offered plan the person asked to hear. */

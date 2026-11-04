@@ -79,9 +79,7 @@ describe("the plan's delivery reaches the Q view's stage (P1/P4)", () => {
     expect(kinds).toContain("PLAN");
     expect(kinds).not.toContain("WORK_IN_PROGRESS");
     const pick = stageOf(items, turns);
-    expect(pick.item?.blocks.some((block) => block.kind === "PLAN")).toBe(
-      true,
-    );
+    expect(pick.item?.blocks.some((block) => block.kind === "PLAN")).toBe(true);
   });
 
   it("a repeat of a run that delivered nothing still never makes a second set", () => {
@@ -135,12 +133,75 @@ describe("Now shows no second control for the plan's quiet execute card", () => 
     const { nowApproval } = await import("../src/features/q/q-now");
     const noPlan = messages.slice(0, 2);
     expect(
-      nowApproval({ approval, proposals: [proposal], messages: noPlan } as never)
-        .approval,
+      nowApproval({
+        approval,
+        proposals: [proposal],
+        messages: noPlan,
+      } as never).approval,
     ).toEqual(approval);
     const send = { ...proposal, actionType: "chat.message.send" };
     expect(
       nowApproval({ approval, proposals: [send], messages } as never).approval,
     ).toEqual(approval);
+  });
+});
+
+describe("N2: a running plan's steps are in the work list", () => {
+  const step = (key: string, title: string, status: string) => ({
+    key,
+    title,
+    status,
+    proposalId: status === "PROPOSED" ? UUID_A : null,
+    boardItemId: status === "WAITING_YOU" ? UUID_A : null,
+  });
+  const UUID_A = "1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a";
+  const view = (status: string) =>
+    ({
+      current: true,
+      status,
+      plan: {
+        planId: PLAN,
+        goal: "Check in this week with two connected founders",
+        steps: [
+          step("s1", "Prepare the connected-founder shortlist.", "DONE"),
+          step("s2", "Draft tailored check-in messages", "DOING"),
+          step("s3", "Prepare a meeting proposal for Maji Loop", "PROPOSED"),
+          step("s4", "Choose the two founders", "WAITING_YOU"),
+        ],
+      },
+    }) as never;
+
+  it("lists every step with where it stands while the plan runs", async () => {
+    const { planStream } = await import("../src/features/q/work-progress");
+    const { stepStatusWords } = await import("../src/features/q/plan-card");
+    const stream = planStream(view("EXECUTING"), (one) =>
+      stepStatusWords(one, true),
+    );
+    expect(stream?.source).toBe("PLAN");
+    expect(stream?.status).toBe("WORKING");
+    expect(
+      stream?.steps.map((one) => [one.label, one.state, one.note]),
+    ).toEqual([
+      ["Prepare the connected-founder shortlist", "DONE", undefined],
+      ["Draft tailored check-in messages", "CURRENT", undefined],
+      [
+        "Prepare a meeting proposal for Maji Loop",
+        "WAITING",
+        "Ready for your approval",
+      ],
+      ["Choose the two founders", "WAITING", "Your part, on your board"],
+    ]);
+  });
+
+  it("nothing for a plan that is not running", async () => {
+    const { planStream } = await import("../src/features/q/work-progress");
+    expect(planStream(view("OFFERED"), () => null)).toBeNull();
+  });
+
+  it("the newest plan in the conversation is the one followed", async () => {
+    const { latestPlanOf } = await import("../src/features/q/running-plan");
+    const turns = turnsFrom({ ...createQStreamState(), messages }, []);
+    expect(latestPlanOf(turns)).toEqual({ planId: PLAN, version: 1 });
+    expect(latestPlanOf(turns.slice(0, 2))).toBeNull();
   });
 });
