@@ -1,0 +1,15 @@
+# Live verification 5: 11c36f6ea (4 Nov 2026)
+
+These checks used the fictional investor `investor.savanna-seed@fictional.capitalq.local` at 1440 and 390 px, with 8 Q turns and no approvals. Full detail is in `results.json`.
+
+Deploy: `8967c4fd4` → `11c36f6ea`. Web, api, q-api and workers were all SUCCESS at 21:41:29Z, with no fallback needed.
+
+| Check                                                                | Result | Observed                                                                                                                                                                                                            |
+| -------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a. Chat answer renders as prose                                      | PASS   | One paragraph at both widths                                                                                                                                                                                        |
+| b. No "Show again" on a fresh Q page or Chat                         | PASS   | 0 at both widths                                                                                                                                                                                                    |
+| c. "Show me Ledgerline's pitch deck"                                 | PASS   | Opens Ledgerline's company page (data room tab); 0 mentions of Ledgerfold                                                                                                                                           |
+| d. Plan card + Execute; no separate Now card; work list; "okay" kept | FAIL   | "okay" PASS. The 1440 plan card was put away ("away as we moved on") with 0 Execute buttons. At 390 a plan request became a research job. A separate "Now · Looking at the company" chip still shows while drafting |
+| e. Splash white in light theme                                       | PASS   | `rgb(255, 255, 255)`                                                                                                                                                                                                |
+| f. Random-UUID `/api/q-artifact` URL                                 | PASS   | 404 HTML not-found page ("This page isn't here."); the `/pdf` variant was reset by the sandbox proxy                                                                                                                |
+| g. "How far with the task I gave you?"                               | FAIL   | "…no reviewed diligence plan … recorded yet" while a 5-step plan was ready                                                                                                                                          |

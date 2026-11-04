@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-04",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link; service key read from Railway api variables in memory, never printed or stored in repo",
+  "deploy": {
+    "commit": "11c36f6ea",
+    "from": "8967c4fd4 (fast-forward push to recovery/2026-09-12)",
+    "web": "SUCCESS",
+    "api": "SUCCESS",
+    "qApi": "SUCCESS",
+    "workers": "SUCCESS",
+    "allSuccessAt": "2026-11-04T21:41:29Z",
+    "fallback": "none needed"
+  },
+  "qTurns": 8,
+  "qTurnLog": [
+    "1440 a (Chat)",
+    "1440 c (deck)",
+    "1440 d (plan)",
+    "1440 d (okay while drafting)",
+    "1440 g",
+    "390 a (Chat)",
+    "390 c (deck)",
+    "390 d (clean plan)"
+  ],
+  "a_chatProse": {
+    "verdict": "PASS",
+    "1440": "Ledgerline is at the seed stage. Its pitch deck says it is raising $1.8 million through a post-money SAFE, with a $14 million valuation cap and a $50,000 minimum cheque. ... (one paragraph)",
+    "390": "same, one paragraph",
+    "screenshots": ["a-chat-1440.png", "a-chat-390.png"]
+  },
+  "b_noShowAgain": {
+    "verdict": "PASS",
+    "1440": { "q": 0, "chat": 0 },
+    "390": { "q": 0, "chat": 0 },
+    "screenshots": [
+      "b-q-1440.png",
+      "b-chat-1440.png",
+      "b-q-390.png",
+      "b-chat-390.png"
+    ]
+  },
+  "c_ledgerlineDeck": {
+    "verdict": "PASS",
+    "answer": "Opening Ledgerline's pitch deck… / Where this lives / Open the document",
+    "openTarget": "/company/6f075a0b-8372-4458-9060-09afd73a9c37?tab=dataroom (Ledgerline); 'Ledgerfold' occurrences 0 at both widths",
+    "screenshots": [
+      "c-deck-1440.png",
+      "c-deck-open-1440.png",
+      "c-deck-390.png",
+      "c-deck-open-390.png"
+    ]
+  },
+  "d_plan": {
+    "verdict": "FAIL",
+    "okayWhileDrafting": {
+      "verdict": "PASS",
+      "inputBeforeSend": "okay",
+      "after800ms": "okay",
+      "visibleInThread": true,
+      "visibleAtEnd": true
+    },
+    "planCardWithExecute": {
+      "verdict": "FAIL",
+      "1440": "Plan finished ('Your plan is ready: 5 steps ...') but its card was put away: \"Put 'Complete a disciplined first-pass diligence review of Ledgerline ...' away as we moved on.\" Execute buttons on stage: 0 (also after reopening via Shown recently).",
+      "390": "A clean plan request ('Make me a plan to check Ledgerline's unit economics this week') became a research job ('Research Ledgerline's unit economics and prepare a diligence memo ...'), with no plan card and no Execute."
+    },
+    "separateNowCard": {
+      "verdict": "FAIL",
+      "observed": "While drafting, both widths show the Working list ('Now: Looking at the company') plus a separate 'Now' label with a 'Looking at the company' chip under 'Looking into Ledgerline now.'"
+    },
+    "workList": {
+      "1440": "Needs you: 'Run your plan: Complete a disciplined first-pass diligence review of Ledgerline this week ...' (now); Moving: 'Nothing running.' (plan awaits approval)",
+      "390": "Moving: 'Make me a plan to check Ledgerline's unit economics this week · Working'"
+    },
+    "okayReply": "The Ledgerline first-pass diligence plan is still running. No reviewed plan or diligence questions have been recorded yet, ...",
+    "screenshots": [
+      "d-plan-1440-drafting.png",
+      "d-plan-1440-okay.png",
+      "d-plan-1440.png",
+      "d-plan-1440-recent.png",
+      "d-plan-1440-plan.png",
+      "d-plan-1440-work.png",
+      "d-plan-390.png",
+      "d-plan-390-later.png",
+      "d-work-390.png"
+    ]
+  },
+  "e_splashLight": {
+    "verdict": "PASS",
+    "1440": "rgb(255, 255, 255)",
+    "390": "rgb(255, 255, 255)",
+    "screenshots": ["e-splash-1440.png", "e-splash-390.png"]
+  },
+  "f_artifactNotFound": {
+    "verdict": "PASS",
+    "observed": "/api/q-artifact/<random uuid>: HTTP 404 text/html, 'This page isn't here.' not-found page at both widths",
+    "note": "/api/q-artifact/<uuid>/pdf: ERR_CONNECTION_RESET through the sandbox proxy; inconclusive",
+    "screenshots": ["f-bare-1440.png", "f-bare-390.png"]
+  },
+  "g_progressQuestion": {
+    "verdict": "FAIL",
+    "answer": "The Ledgerline first-pass diligence task hasn't completed. It's still running; no reviewed diligence plan or founder questions have been recorded yet, so the evidence review has not produced a final fit assessment or advance, pause or pass recommendation.",
+    "why": "Names the right task, but contradicts the ready 5-step plan in the same conversation instead of answering from it.",
+    "screenshots": ["g-progress-1440.png"]
+  },
+  "approvals": "none clicked; no outward step cards approved"
+}
