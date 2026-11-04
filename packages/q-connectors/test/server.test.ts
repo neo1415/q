@@ -2,7 +2,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
 
-import { createQToolExecutor, createQToolRegistry } from "@capital-q/q-tools";
+import {
+  createQToolExecutor,
+  createQToolRegistry,
+  type AnyQToolDefinition,
+} from "@capital-q/q-tools";
 
 import { createQMcpServer } from "../src/index.js";
 import { contextWith, fakeLookupTool, planWith } from "./support.js";
@@ -26,6 +30,33 @@ async function host(kinds: readonly string[]) {
   await client.connect(clientSide);
   return client;
 }
+
+describe("Q as an MCP server: tool annotations (SEC-04)", () => {
+  it("marks only a READ_ONLY tool read-only; a SIDE_EFFECT tool is not", async () => {
+    const write = {
+      ...fakeLookupTool(),
+      id: "test.save",
+      providerName: "save_company",
+      classification: "SIDE_EFFECT",
+      riskClass: "LOW_RISK_INTERNAL",
+    } as AnyQToolDefinition;
+    const registry = createQToolRegistry([fakeLookupTool(), write]);
+    const server = createQMcpServer({
+      registry,
+      tools: createQToolExecutor({ registry }),
+      context: contextWith(planWith(["NETWORK_VISIBLE_DATA"])),
+    });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    const client = new Client({ name: "host", version: "1" });
+    await client.connect(clientSide);
+    const listed = (await client.listTools()).tools;
+    const hint = (name: string) =>
+      listed.find((tool) => tool.name === name)?.annotations?.readOnlyHint;
+    expect(hint("lookup_company")).toBe(true);
+    expect(hint("save_company")).toBe(false);
+  });
+});
 
 describe("Q as an MCP server", () => {
   it("lists exactly the tools the plan admits", async () => {

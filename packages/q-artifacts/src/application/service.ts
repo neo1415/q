@@ -284,9 +284,93 @@ export function createArtifactService(dependencies: {
   readonly jobs?: DocumentJobRepository | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * SEC-01: whether this actor may still reach the artifact's subject (the
+   * company or investor organisation it is about), asked at every read.
+   * An artifact is derived from what its subject disclosed to its owner;
+   * when that ends (a revoked relationship or share), the artifact ends
+   * with it. A refusal or an error closes it; it is never opened by one.
+   * Absent: the subject is not re-checked (tests and stacks without a
+   * disclosure layer); the owner rule still applies.
+   */
+  readonly entitlement?:
+    | ((actor: ActorContext, subject: QSubjectRef) => Promise<boolean>)
+    | undefined;
 }): ArtifactService {
-  const { repository, transactions } = dependencies;
+  const { transactions } = dependencies;
   const now = dependencies.now ?? (() => new Date());
+
+  /**
+   * SEC-01 (audit 2026-11-04): an artifact is its owner's. The SQL already
+   * selects only the actor's own rows; this holds the same rule for any
+   * repository, so a colleague in the same organisation reads nothing by
+   * id, by version, by history or in a list. No sharing exists yet; when
+   * it does, it is an explicit grant checked here, never organisation
+   * membership.
+   */
+  const owns = (actor: ActorContext, artifact: StoredArtifact): boolean =>
+    artifact.createdByUserId === actor.userId &&
+    artifact.tenantId === actor.tenantId &&
+    artifact.organisationId === actor.organisationId;
+  const store = dependencies.repository;
+  const repository: ArtifactRepository = {
+    ...store,
+    findById: async (actor, artifactId) => {
+      const found = await store.findById(actor, artifactId);
+      return found !== null && owns(actor, found) ? found : null;
+    },
+    list: async (actor, query) =>
+      (await store.list(actor, query)).filter((artifact) =>
+        owns(actor, artifact),
+      ),
+    findVersion: async (actor, artifactId, version) =>
+      (await repository.findById(actor, artifactId)) === null
+        ? null
+        : store.findVersion(actor, artifactId, version),
+    history: async (actor, artifactId) =>
+      (await repository.findById(actor, artifactId)) === null
+        ? []
+        : store.history(actor, artifactId),
+  };
+
+  const subjectOf = (artifact: StoredArtifact): QSubjectRef | undefined =>
+    artifact.companyId !== null
+      ? { kind: "COMPANY", companyId: artifact.companyId }
+      : artifact.investorOrganisationId !== null
+        ? {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: artifact.investorOrganisationId,
+          }
+        : undefined;
+
+  /** The current source entitlement, re-asked now; fail closed. */
+  const stillEntitled = async (
+    actor: ActorContext,
+    artifact: StoredArtifact,
+  ): Promise<boolean> => {
+    const check = dependencies.entitlement;
+    const subject = subjectOf(artifact);
+    if (check === undefined || subject === undefined) return true;
+    try {
+      return await check(actor, subject);
+    } catch (error: unknown) {
+      dependencies.logger?.warn(
+        { err: error, artifactId: artifact.id },
+        "artifact subject entitlement could not be checked; not shown",
+      );
+      return false;
+    }
+  };
+
+  /** An artifact this actor may read now, or null: "not found" either way. */
+  const readable = async (
+    actor: ActorContext,
+    artifactId: string,
+  ): Promise<StoredArtifact | null> => {
+    const artifact = await repository.findById(actor, artifactId);
+    if (artifact === null) return null;
+    return (await stillEntitled(actor, artifact)) ? artifact : null;
+  };
 
   /**
    * Re-derive the caller's authority from the plan, or refuse.
@@ -542,24 +626,13 @@ export function createArtifactService(dependencies: {
     },
 
     reviseArtifact: async (input) => {
-      const artifact = await repository.findById(
-        input.actorContext,
-        input.artifactId,
-      );
+      const artifact = await readable(input.actorContext, input.artifactId);
       if (artifact === null) {
         throw new ArtifactNotFoundError();
       }
       // The subject is the artifact's own, so a revision cannot be used to
       // reach a company this run was never authorised for.
-      const subject: QSubjectRef | undefined =
-        artifact.companyId !== null
-          ? { kind: "COMPANY", companyId: artifact.companyId }
-          : artifact.investorOrganisationId !== null
-            ? {
-                kind: "INVESTOR_ORGANISATION",
-                investorOrganisationId: artifact.investorOrganisationId,
-              }
-            : undefined;
+      const subject = subjectOf(artifact);
       authorise({ ...input, subject });
       if (!canRevise(artifact)) {
         throw new ArtifactNotRevisableError();
@@ -679,7 +752,7 @@ export function createArtifactService(dependencies: {
       if (actor.organisationId === undefined) {
         throw new ArtifactAuthorityError();
       }
-      const artifact = await repository.findById(actor, input.artifactId);
+      const artifact = await readable(actor, input.artifactId);
       if (artifact === null) throw new ArtifactNotFoundError();
       if (!canRevise(artifact)) return { status: "NOT_EDITABLE" };
       if (artifact.currentVersion !== input.baseVersion) {
@@ -715,7 +788,7 @@ export function createArtifactService(dependencies: {
     },
 
     read: async (actor, artifactId) => {
-      const artifact = await repository.findById(actor, artifactId);
+      const artifact = await readable(actor, artifactId);
       if (artifact === null) {
         throw new ArtifactNotFoundError();
       }
@@ -723,7 +796,7 @@ export function createArtifactService(dependencies: {
     },
 
     readVersion: async (actor, artifactId, version) => {
-      const artifact = await repository.findById(actor, artifactId);
+      const artifact = await readable(actor, artifactId);
       if (artifact === null) {
         throw new ArtifactNotFoundError();
       }
@@ -738,7 +811,7 @@ export function createArtifactService(dependencies: {
     },
 
     summarise: async (actor, artifactId) => {
-      const artifact = await repository.findById(actor, artifactId);
+      const artifact = await readable(actor, artifactId);
       if (artifact === null) {
         throw new ArtifactNotFoundError();
       }
@@ -762,8 +835,14 @@ export function createArtifactService(dependencies: {
         subjectId: query.subjectId,
       });
       const page = rows.slice(0, query.limit);
+      // Entitlement is re-asked per row; the cursor stays the unfiltered
+      // page's, so a hidden row never ends the list early.
+      const entitled = await Promise.all(
+        page.map((artifact) => stillEntitled(actor, artifact)),
+      );
+      const shown = page.filter((_, index) => entitled[index] === true);
       const items = await Promise.all(
-        page.map(async (artifact) => {
+        shown.map(async (artifact) => {
           const current =
             artifact.currentVersion === 0
               ? null

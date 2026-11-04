@@ -104,6 +104,21 @@ export type QActionRepository = {
     tenantId: TenantId,
     runId: QRunId,
   ) => Promise<readonly QActionRecord[]>;
+  /**
+   * Audit 2026-11-04 ACT-03: actions claimed EXECUTING whose row has not
+   * moved since `before` -- the process that claimed them stopped between
+   * claim and finalise. Across tenants, oldest first, ids only. Optional
+   * so older doubles still compose.
+   */
+  readonly listStuckExecuting?: (
+    executor: DatabaseExecutor,
+    input: { readonly before: Date; readonly limit: number },
+  ) => Promise<
+    readonly {
+      readonly tenantId: TenantId;
+      readonly actionId: QActionProposalId;
+    }[]
+  >;
   /** One lifecycle move under the expected version; null when a stale writer. */
   readonly transition: (
     tx: TransactionContext,

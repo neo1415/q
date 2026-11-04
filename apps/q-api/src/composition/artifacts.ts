@@ -25,7 +25,7 @@ import type {
   DocumentRevisionPort,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
-import type { PermittedContextPlan } from "@capital-q/contracts";
+import type { PermittedContextPlan, QSubjectRef } from "@capital-q/contracts";
 
 /**
  * The artifact context, composed (QX-003D; ADR 0013).
@@ -69,6 +69,14 @@ export function createQArtifacts(dependencies: {
   readonly transactions: TransactionManager;
   readonly gateway: ModelGateway;
   readonly logger?: Logger | undefined;
+  /**
+   * SEC-01: whether the actor may still reach an artifact's subject, asked
+   * at every read (the same subject resolution a run's subjects take: own
+   * tenant, or disclosure says this actor may view it).
+   */
+  readonly entitlement?:
+    | ((actor: ActorContext, subject: QSubjectRef) => Promise<boolean>)
+    | undefined;
   /** Stock photos for decks; absent means decks are made without them. */
   readonly photos?: StockPhotoPort | undefined;
   /** DOCS: the confirmed brand kit and the actor's own company, as the actor. */
@@ -122,6 +130,9 @@ export function createQArtifacts(dependencies: {
     ...(dependencies.logger === undefined
       ? {}
       : { logger: dependencies.logger }),
+    ...(dependencies.entitlement === undefined
+      ? {}
+      : { entitlement: dependencies.entitlement }),
   });
 
   const port: ArtifactPreparationPort = {

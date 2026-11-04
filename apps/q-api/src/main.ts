@@ -2626,7 +2626,18 @@ const instructionTriggers = createInstructionTriggers({
   store: instructionStore,
   engine: () => instructionEngine.current,
   // Recovery D-01: lapsed approvals expire eagerly, every sweep.
-  expireLapsed: () => qActions.expireLapsed?.() ?? Promise.resolve(0),
+  // ACT-03: an action a stopped process left EXECUTING is moved to
+  // RECONCILIATION_REQUIRED on the same sweep (never retried); logged by
+  // the engine, and not counted as lapsed here.
+  expireLapsed: async () => {
+    await (qActions.reconcileInterrupted?.() ?? Promise.resolve(0)).catch(
+      (error: unknown) => {
+        logger.warn({ err: error }, "interrupted q actions not reconciled");
+        return 0;
+      },
+    );
+    return qActions.expireLapsed?.() ?? 0;
+  },
   logger,
 });
 setInterval(() => {
@@ -4617,6 +4628,11 @@ const qArtifacts = createQArtifacts({
   transactions: database.transactions,
   gateway: modelGateway,
   logger,
+  // SEC-01: an artifact about a company or investor is readable only while
+  // its owner can still reach that subject (a revoked share or relationship
+  // ends the brief built from it), by the run's own subject resolution.
+  entitlement: async (actor, subject) =>
+    (await subjects.resolve(actor, subject)) !== null,
   photos: createPexelsPhotos(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),

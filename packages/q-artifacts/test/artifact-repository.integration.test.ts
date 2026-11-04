@@ -287,6 +287,27 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
       expect(
         await repository.findById(crossOrganisation, artifact.id),
       ).toBeNull();
+
+      // SEC-01: a colleague, a member of the same organisation, is not its
+      // owner and selects nothing either.
+      const colleagueAuthId = randomUUID();
+      await tx.sql`insert into auth.users (id) values (${colleagueAuthId})`;
+      const [colleagueProfile] = await tx.sql<{ id: string }[]>`
+        select id from identity.user_profiles where auth_user_id = ${colleagueAuthId}`;
+      const colleagueMembershipId = randomUUID();
+      await tx.sql`insert into identity.organisation_memberships (id, tenant_id, organisation_id, user_id)
+        values (${colleagueMembershipId}, ${mine.tenantId}, ${mine.organisationId}, ${colleagueProfile?.id ?? ""})`;
+      const colleague: ActorContext = {
+        ...mine.actor,
+        userId: UserIdSchema.parse(colleagueProfile?.id ?? ""),
+        membershipId: MembershipIdSchema.parse(colleagueMembershipId),
+      };
+      expect(await repository.findById(colleague, artifact.id)).toBeNull();
+      expect(
+        await repository.findVersion(colleague, artifact.id, 1),
+      ).toBeNull();
+      expect(await repository.history(colleague, artifact.id)).toEqual([]);
+      expect(await repository.list(colleague, { limit: 20 })).toEqual([]);
     });
   });
 

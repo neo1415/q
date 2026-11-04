@@ -80,11 +80,31 @@ export function plainProposalStatus(view: QApprovalView): ProposalPlainStatus {
  * changes, interest, connection requests) is approvable by the person's
  * own typed or spoken words.
  */
-const CARD_ONLY_CONSEQUENCES: ReadonlySet<string> = new Set(["MONEY", "TERMS"]);
+const CARD_ONLY_CONSEQUENCES: ReadonlySet<string> = new Set([
+  "MONEY",
+  "TERMS",
+  "DISCLOSURE",
+  "DELEGATION",
+]);
 const CARD_ONLY_APP_ACTIONS: ReadonlySet<string> = new Set([
   "diligence.document.share",
   "diligence.request.fulfil",
   "diligence.request.upload_fulfil",
+]);
+
+/**
+ * The consequence of the q-api's own actions (not declared in
+ * @capital-q/app-actions), so the same policy reaches every category
+ * (audit 2026-11-04 SEC-02: the check used to return before these).
+ * DISCLOSURE: founder-private material leaves the company (the raise).
+ * DELEGATION: Q gains standing authority to act over time. Revoking a share
+ * only narrows what is disclosed, so it stays approvable by words.
+ */
+const NON_APP_CONSEQUENCES: ReadonlyMap<string, string> = new Map([
+  ["disclosure.raise.share", "DISCLOSURE"],
+  ["q.instruction.grant", "DELEGATION"],
+  ["q.work.standin.start", "DELEGATION"],
+  ["q.work.outreach.start", "DELEGATION"],
 ]);
 
 type DeclaredAction = {
@@ -142,7 +162,12 @@ export function keepsItsCard(input: {
   readonly payload?: Readonly<Record<string, unknown>> | undefined;
 }): boolean {
   if (input.actionClass !== "CONFIRM_REQUIRED") return true;
-  if (!input.actionType.startsWith("app.")) return false;
+  // Not known what it is (voice falls back to ""): as the strictest.
+  if (input.actionType.trim() === "") return true;
+  if (!input.actionType.startsWith("app.")) {
+    const consequence = NON_APP_CONSEQUENCES.get(input.actionType);
+    return consequence !== undefined && CARD_ONLY_CONSEQUENCES.has(consequence);
+  }
   const name = input.actionType.slice("app.".length);
   const action = DECLARED.find((candidate) => candidate.name === name);
   if (action === undefined) return false;

@@ -20,8 +20,9 @@ import type { ArtifactRepository } from "../application/ports.js";
  * and then checked: an artifact belonging to another tenant or another
  * organisation is never selected, so it is never in this process's memory
  * and "not yours" and "not found" are indistinguishable to a caller. The
- * organisation is the unit of ownership, so a colleague sees the
- * organisation's artifacts and a stranger sees nothing.
+ * person who asked for it owns it (SEC-01, audit 2026-11-04): a colleague
+ * in the same organisation selects nothing either. Sharing does not exist
+ * yet; when it does it is an explicit grant, never organisation membership.
  *
  * **Appending a version is `on conflict do nothing`, returning nothing on
  * a loss.** The unique constraint on (artifact_id, version) decides who
@@ -185,6 +186,7 @@ export function createPostgresArtifactRepository(options: {
          where id = ${artifactId}
            and tenant_id = ${actor.tenantId}
            and organisation_id = ${actor.organisationId ?? null}
+           and created_by_user_id = ${actor.userId}
            and archived_at is null
          limit 1
       `;
@@ -196,6 +198,7 @@ export function createPostgresArtifactRepository(options: {
         select * from artifacts.artifacts
          where tenant_id = ${actor.tenantId}
            and organisation_id = ${actor.organisationId ?? null}
+           and created_by_user_id = ${actor.userId}
            and archived_at is null
            and (${query.before ?? null}::timestamptz is null
                 or updated_at < ${query.before ?? null}::timestamptz)
@@ -253,6 +256,7 @@ export function createPostgresArtifactRepository(options: {
            and v.version = ${version}
            and a.tenant_id = ${actor.tenantId}
            and a.organisation_id = ${actor.organisationId ?? null}
+           and a.created_by_user_id = ${actor.userId}
            and a.archived_at is null
          limit 1
       `;
@@ -267,6 +271,7 @@ export function createPostgresArtifactRepository(options: {
          where v.artifact_id = ${artifactId}
            and a.tenant_id = ${actor.tenantId}
            and a.organisation_id = ${actor.organisationId ?? null}
+           and a.created_by_user_id = ${actor.userId}
            and a.archived_at is null
          order by v.version desc
          limit 200

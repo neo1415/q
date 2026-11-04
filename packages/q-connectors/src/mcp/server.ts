@@ -118,7 +118,15 @@ export function createQMcpServer(options: QMcpServerOptions): McpServer {
         // the arguments against the tool's own schema and answers a bad
         // one with INVALID_ARGUMENTS, exactly as it answers a model.
         inputSchema: z.object({}).passthrough(),
-        annotations: { readOnlyHint: true, destructiveHint: false },
+        // SEC-04: the hint follows the tool's own classification. A host
+        // may auto-run what it is told is read-only; a SIDE_EFFECT tool
+        // (LOW_RISK_INTERNAL by registry rule) must never be told so.
+        // Consequential acts are approval-engine actions, never tools, so
+        // nothing listed here is destructive.
+        annotations: {
+          readOnlyHint: definition.classification === "READ_ONLY",
+          destructiveHint: false,
+        },
       },
       async (args, extra) => {
         const outcome = await tools.execute(

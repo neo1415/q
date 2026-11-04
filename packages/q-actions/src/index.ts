@@ -87,6 +87,7 @@ export {
 } from "./domain/errors.js";
 export {
   createQActionService,
+  EXECUTION_INTERRUPTED_AFTER_MS,
   envelopeOf,
   idempotencyKeyFor,
   projectedApprovalStatus,
