@@ -32,7 +32,9 @@ import { greetingSeed, warmGreeting } from "@/features/briefing/greeting";
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
 import { bindAttachmentsTo } from "./q-attachments";
+import { plainFromMarkdown } from "./markdown";
 import {
+  deliveredPlanLine,
   deliverWork,
   promisedJobs,
   Q_WORK_SETTLED_EVENT,
@@ -427,10 +429,31 @@ export function QSessionProvider({
   useEffect(() => {
     voiceRef.current = voice;
   }, [voice]);
+  // Owner 2026-11-04: a plan that lands while a live line is open is said
+  // on the line (its offer: a summary, the whole plan, or run it now) once
+  // the reread holds Q's plan-ready message; otherwise it stays written.
+  const plansToSay = useRef(new Set<string>());
+  useEffect(() => {
+    for (const jobId of plansToSay.current) {
+      const line = deliveredPlanLine(turns, jobId);
+      if (line === null) continue;
+      plansToSay.current.delete(jobId);
+      const now = voiceRef.current;
+      if (now.active && isLineLive(now.client)) {
+        now.client.narrate?.(plainFromMarkdown(line));
+      }
+    }
+  }, [turns]);
   useEffect(() => {
     const settled = (event: Event) => {
       reread();
       const detail = settledDetail(event);
+      if (detail?.state === "DONE" && detail.document === null) {
+        const now = voiceRef.current;
+        if (now.active && isLineLive(now.client)) {
+          plansToSay.current.add(detail.jobId);
+        }
+      }
       const delivered = detail?.state === "DONE" ? detail.document : null;
       if (delivered == null) return;
       deliverWork(delivered, {

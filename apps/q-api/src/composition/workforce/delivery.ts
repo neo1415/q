@@ -19,7 +19,13 @@ import {
 import { TenantIdSchema, UserIdSchema } from "@capital-q/security";
 import { z } from "zod";
 
+import {
+  PLAN_OFFER_OPTIONS,
+  PLAN_OFFER_QUESTION,
+} from "@capital-q/q-specialists";
+
 import type { WorkforcePorts } from "./jobs.js";
+import { PLAN_WAYS_ON } from "./plan-job.js";
 import type { WorkRow } from "./queue.js";
 import { doneOutputs, filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
@@ -143,6 +149,27 @@ export function withoutSourceIds(text: string): string {
     .trim();
 }
 
+/**
+ * Owner 2026-11-04: "when the plan finishes there's nothing to trigger Q to
+ * talk to me ... it should offer a summary, or to read the whole thing, or
+ * to just go ahead and execute the whole thing and give updates." The
+ * plan-ready line closes on that offer (code's copy), and the choices sit
+ * under it as Q's question, answerable by a tap, typing or voice. Running
+ * it is the waiting execute card's approval of that exact version.
+ */
+export function planOfferText(line: string): string {
+  const ways = `${PLAN_OFFER_QUESTION} You can also put it on your board, or tell me what to change.`;
+  return line.endsWith(PLAN_WAYS_ON)
+    ? `${line.slice(0, line.length - PLAN_WAYS_ON.length)}${ways}`
+    : `${line}\n\n${ways}`;
+}
+
+export const PLAN_OFFER_BLOCK: QResultBlock = {
+  kind: "CLARIFICATION_REQUEST",
+  question: "What would you like to do with your plan?",
+  options: [...PLAN_OFFER_OPTIONS],
+};
+
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
@@ -245,6 +272,19 @@ export function createWorkforceDelivery(dependencies: {
   >;
   readonly notify: WorkforcePorts["notify"];
   readonly logger?: Logger | undefined;
+  /**
+   * Owner 2026-11-04: once the plan-ready message is in the conversation,
+   * the execute card for that exact version is prepared (Recommend), so the
+   * offer's "go ahead" and the card's Execute approve one payload. Absent:
+   * the plan lands with its card's three affordances only, as before.
+   */
+  readonly offerPlan?:
+    | ((
+        owner: Owner,
+        row: WorkRow,
+        plan: { readonly planId: string; readonly version: number },
+      ) => Promise<boolean>)
+    | undefined;
   /**
    * Job 4d1a8b04 (QA 25 Oct): a plain document step records only its
    * artifact id, so it never had an analysis delivery and the thread was
@@ -362,10 +402,17 @@ export function createWorkforceDelivery(dependencies: {
   ): Promise<boolean> => {
     const title =
       "plan" in delivered ? delivered.plan.block.title : "Where things stand";
+    const offering =
+      "plan" in delivered && dependencies.offerPlan !== undefined;
     const text =
-      "plan" in delivered ? delivered.plan.line : delivered.answer.line;
+      "plan" in delivered
+        ? offering
+          ? planOfferText(delivered.plan.line)
+          : delivered.plan.line
+        : delivered.answer.line;
     const blocks: QResultBlock[] = [
       ...("plan" in delivered ? [delivered.plan.block] : []),
+      ...(offering ? [PLAN_OFFER_BLOCK] : []),
       {
         kind: "WORK_IN_PROGRESS",
         jobId: row.job_id,
@@ -379,6 +426,22 @@ export function createWorkforceDelivery(dependencies: {
       text,
       blocks,
     );
+    if ("plan" in delivered && dependencies.offerPlan !== undefined) {
+      // After the offer, so its card's lines follow it; one card per
+      // version, so a retried delivery finds the same one.
+      const prepared = await dependencies
+        .offerPlan(owner, row, {
+          planId: delivered.plan.block.planId,
+          version: delivered.plan.block.version,
+        })
+        .catch(() => false);
+      if (!prepared) {
+        dependencies.logger?.warn(
+          { jobId: row.job_id, planId: delivered.plan.block.planId },
+          "plan offered without its execute card; Execute still prepares it",
+        );
+      }
+    }
     await dependencies
       .notify(owner, {
         key: `wf:${row.job_id}:delivered`,

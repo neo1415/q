@@ -23,6 +23,7 @@ import type { BoardService } from "@capital-q/board";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import { clipAtWord } from "@capital-q/q-core";
+import { PLAN_READ_CLOSE } from "@capital-q/q-specialists";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import { boardKey } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -458,6 +459,19 @@ export function createPlans(dependencies: PlansDependencies) {
     const head = await store.head(owner, planId);
     const trace = await traceOf(owner, head?.jobId ?? null);
     return prepareExecute(actor, stored, trace);
+  };
+
+  /** The offered version read back as its owner (null: not theirs). */
+  const readOffered = async (
+    owner: Owner,
+    input: {
+      readonly planId: string;
+      readonly version: number;
+      readonly part: "SUMMARY" | "WHOLE";
+    },
+  ): Promise<string | null> => {
+    const stored = await store.read(owner, input.planId, input.version);
+    return stored === null ? null : planReadText(stored.plan, input.part);
   };
 
   /** S5: one of the card's three affordances, by the person. */
@@ -1197,6 +1211,7 @@ export function createPlans(dependencies: PlansDependencies) {
     run,
     view,
     offer,
+    readOffered,
     decide,
     execute,
     executeAction,
@@ -1567,6 +1582,79 @@ export function boardMessage(board: BoardPlacement): string {
   }
   if (board.waiting > 0) parts.push("My steps wait until you say go.");
   return parts.join(" ");
+}
+
+/** A fact ref ("(F23)", "P4") is data, never read out (live 2026-10-29). */
+function withoutRefs(text: string): string {
+  return text
+    .replace(
+      /\s*[([]\s*(?:[FP][1-9]\d{0,3}\s*(?:[,;/]|and)?\s*)+[)\]]|\b[FP][1-9]\d{0,3}\b/gu,
+      "",
+    )
+    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
+const sentenceOf = (text: string) => withoutRefs(text).replace(/[.\s]+$/u, "");
+
+function whoDoes(step: Pick<QPlanStep, "owner">): string {
+  switch (step.owner) {
+    case "Q":
+      return "I do it";
+    case "YOU":
+      return "yours";
+    case "TOGETHER":
+      return "I prepare it, you finish it";
+  }
+}
+
+/**
+ * Owner 2026-11-04: the plan Q offered, read back in code's words from the
+ * stored version -- never a model's retelling. SUMMARY: the goal, how many
+ * steps and whose, and the first three. WHOLE: every step, whose it is,
+ * when, whether it asks first, and why. Both end on the same offer to run
+ * it, which the waiting execute card decides.
+ */
+export function planReadText(
+  plan: Pick<QPlan, "goal" | "situationSummary" | "openQuestions"> & {
+    readonly steps: readonly Pick<
+      QPlanStep,
+      "title" | "why" | "owner" | "due" | "needsApproval"
+    >[];
+  },
+  part: "SUMMARY" | "WHOLE",
+): string {
+  const yours = plan.steps.filter((step) => step.owner === "YOU").length;
+  const mine = plan.steps.length - yours;
+  const head = `Your plan: ${sentenceOf(plan.goal)}. ${countWords(plan.steps.length, "step")}: ${String(mine)} I do or prepare, ${String(yours)} for you.`;
+  const close = PLAN_READ_CLOSE;
+  if (part === "SUMMARY") {
+    const first = plan.steps
+      .slice(0, 3)
+      .map((step, index) => `${String(index + 1)}. ${sentenceOf(step.title)}`);
+    const more = plan.steps.length - first.length;
+    return [
+      head,
+      `${sentenceOf(plan.situationSummary)}.`,
+      `First:\n${first.join("\n")}${more > 0 ? `\n…and ${countWords(more, "more step")}.` : ""}`,
+      close,
+    ].join("\n\n");
+  }
+  const steps = plan.steps.map((step, index) => {
+    const when = step.due === null ? "" : `, by ${step.due}`;
+    const asks = step.needsApproval
+      ? "; it comes to you for approval before anything goes out"
+      : "";
+    return `${String(index + 1)}. ${sentenceOf(step.title)} (${whoDoes(step)}${when}${asks}). ${sentenceOf(step.why)}.`;
+  });
+  const open =
+    plan.openQuestions.length === 0
+      ? []
+      : [
+          `Not known yet:\n${plan.openQuestions.map((one) => `- ${sentenceOf(one)}`).join("\n")}`,
+        ];
+  return [head, steps.join("\n"), ...open, close].join("\n\n");
 }
 
 function summaryOf(

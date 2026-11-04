@@ -4836,6 +4836,12 @@ const qIntelligence = composeQIntelligence({
         : started;
     },
     direct: (request, text) => plans.direct(request.actor, request.runId, text),
+    // Owner 2026-11-04: the offered plan read back by code, as its owner.
+    readOffered: (request, input) =>
+      plans.readOffered(
+        { tenantId: request.actor.tenantId, userId: request.actor.userId },
+        input,
+      ),
   },
   // Owner 2026-10-23: a call with one named counterpart, prepared in the
   // answer from the rehearsal's own material (read as them); the name is
@@ -5490,6 +5496,16 @@ const agentWorkRunner = createAgentWorkRunner({
     transactions: database.transactions,
     runtime: repositories,
     notify: workforceNotifier(database.sql),
+    // Owner 2026-11-04: the plan-ready offer's execute card, as the
+    // person resolved now (a revoked membership offers nothing).
+    offerPlan: async (owner, row, plan) => {
+      const actor = await planOwnerActor(
+        owner.userId,
+        row.trace.organisationId ?? null,
+      );
+      if (actor === null) return false;
+      return (await plans.offer(actor, plan.planId, plan.version)) !== null;
+    },
     logger,
   }),
   logger,

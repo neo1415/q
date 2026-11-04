@@ -15,6 +15,7 @@ import {
 } from "./tool-focus.js";
 import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
 import {
+  offeredPlanChoice,
   planAskRoutes,
   type QPlanAskReading,
   type QPlanJobPort,
@@ -5054,6 +5055,29 @@ export function createSpecialistQAnswer(
           preparedSubject: "MANDATE",
           ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
         });
+      }
+    }
+    // Owner 2026-11-04: Q offered the plan it just wrote -- a short summary
+    // or the whole plan read out -- and the person picked one (a tap on the
+    // choice, or the same words typed or spoken). Read back by code from
+    // the stored version, as them, with no model call; nothing approved.
+    const readOffered = dependencies.plan?.readOffered;
+    if (
+      readOffered !== undefined &&
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined
+    ) {
+      const choice = offeredPlanChoice(history, latest);
+      if (choice !== null) {
+        const read = await readOffered(request, choice).catch(() => null);
+        if (read !== null) {
+          logger?.info(
+            { qRunId: request.runId, lane: "PLAN_READ", modelCalls: 0 },
+            "q read the offered plan back by code",
+          );
+          return recordAnswer(request, conversationId, read);
+        }
       }
     }
     // Known-entity instant lane: a plain lookup of a prepared entity is
