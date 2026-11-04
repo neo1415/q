@@ -2,7 +2,12 @@
 
 import { Button } from "@capital-q/ui/button";
 
-import { applyCardsIntent, useCardsSummary } from "./card-visibility";
+import {
+  applyCardsIntent,
+  closedHere,
+  useCardsState,
+  useCardsSummary,
+} from "./card-visibility";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -14,7 +19,12 @@ import { useT } from "@/features/i18n/language";
  */
 export function CardsControls() {
   const t = useT();
-  const { visible, hidden } = useCardsSummary();
+  const summary = useCardsSummary();
+  const state = useCardsState();
+  const visible = summary.visible;
+  // Owner 2026-11-04: "Show again" only after the person closed cards in
+  // this conversation, never on a fresh one or for Q's own replacements.
+  const hidden = closedHere(state) ? summary.hidden : 0;
   if (visible < 2 && hidden === 0) return null;
   return (
     <div

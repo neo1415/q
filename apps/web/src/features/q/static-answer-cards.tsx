@@ -8,6 +8,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { answerCardsOf } from "./answer-canvas-logic";
 import {
   answerCardRef,
+  closedHere,
   hideKey,
   isHiddenIn,
   restoreKeys,
@@ -83,7 +84,9 @@ export function StaticAnswerCards({
           onFollowUp={onAsk}
         />
       </Suspense>
-      {hidden.length === 0 ? null : (
+      {/* Only for cards the person closed in this conversation (owner
+          2026-11-04: "Show again" on a page where nothing was closed). */}
+      {hidden.length === 0 || !closedHere(state) ? null : (
         <div className="flex items-center gap-2" data-q-cards-closed>
           <span className="cq-caption text-(--cq-text-secondary)">
             {hidden.length === block.cards.length

@@ -7,6 +7,7 @@ import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 import {
   applyCardsIntent,
   resetCards,
+  setCardsConversation,
 } from "../src/features/q/cards/card-visibility";
 import { CardsControls } from "../src/features/q/cards/cards-controls";
 
@@ -20,6 +21,8 @@ describe("clearing the answer cards", () => {
 
   it("renders no section at all when every card is cleared, and brings them back", () => {
     const block = demoTop(3);
+    // Inside a conversation, as on the page: Show again is offered there.
+    setCardsConversation("conversation-1");
     const { container } = render(
       <>
         <AnswerCanvas block={block} focus={-1} said="Here." />
