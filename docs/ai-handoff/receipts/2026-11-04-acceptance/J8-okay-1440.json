@@ -1,0 +1,43 @@
+{
+  "tag": "J8-okay-1440",
+  "width": 1440,
+  "steps": [
+    {
+      "prompt": "okay",
+      "seconds": 8,
+      "added": "What I did\nMy agents finished 5 jobs\nQ\n\nRun your plan: Run diligence on Ajopot over the next two weeks and reach a well-supported decision on whether to advance, pause or pass.\n\nWhat Q will do\n\n1. You: Approve, change or decline the pending Clinicrest, pipeline, Maji Loop, Watchly and Ledgerline cards (by 2026-11-05) — on your board, with a reminder when dated\n2. Q: Review Ajopot’s recorded material and define questions on its product, users, bank partner and mandate fit (by 2026-11-07)\n3. Q: Research the Nigerian rotating-savings-app market, operating context and comparable products relevant to Ajopot (by 2026-11-11)\n4. Q: Prepare a focused evidence request to Ajopot in the existing conversation for your approval (by 2026-11-12) — comes to you for approval before anything goes out\n5. You: Approve, change or decline the Ajopot evidence request before it is sent (by 2026-11-13) — on your board, with a reminder when dated\n6. Q: Assess Ajopot’s evidence and mandate fit, including the applicability of the one hard exclusion (by 2026-11-17)\n7. You: Decide whether to advance, pause or pass on Ajopot (by 2026-11-18) — on your board, with a reminder when dated\nApprove\nDismiss\nLater\n\nOr say “send it”, “change the second sentence to…”, “try again”, “skip”, “not now”.\n\nQ\nRun your plan: Keep your investor pipeline moving: clear pending approvals, answer waiting founders, decide which conversations and applications merit attention, and review new prospects against your\nRun your plan: Keep your investor pipeline moving: clear pending approvals, answer waiting founders, decide which conversations and applications merit attention, and review new prospects against your\n: bring this one forward\nQ\nPrepare a meeting proposal for Maji Loop\nPrepare a meeting proposal for Maji Loop\n: bring this one forward\n\n \n\nQ\nApprove a reply to Clinicrest covering your cheque size and whether you lead rounds\nApprove a reply to Clinicrest covering your cheque size and whether you lead rounds\n: bring this one forward\nQ\nRun your plan: Check in this week with the two connected founders you choose who have not yet booked a call, while clearing the replies and approvals already waiting.\nRun your plan: Check in this week with the two connected founders you choose who have not yet booked a call, while clearing the replies and approvals already waiting.\n: bring this one forward\nQ\nPrepare a first message to Watchly for your approval\nPrepare a first message to Watchly for your approval\n: bring this one ",
+      "stages": [
+        "1s  is not booked yet / Open / You're connected with Tallyloom; a call is not booked yet / Open / Clear / Q / Ask Q"
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 0,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 0,
+        "acCompare": 0
+      }
+    }
+  ],
+  "video": "J8-okay-1440.webm"
+}

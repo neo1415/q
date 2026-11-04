@@ -1,0 +1,16 @@
+{
+  "width": 390,
+  "mode": "stay",
+  "answer": "\nYou:\nShow me my investor pipeline\n\nHide from Q\nQ:\n\n12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it?\n\nWhere this lives\n\nRelationships\n\nOpen pipeline\nStay here\nClear\nQ\nAsk Q",
+  "seconds": 9,
+  "openVisible": true,
+  "stayVisible": true,
+  "urlBefore": "https://capital-qweb-production.up.railway.app/home?c=3dcb3c2a-6a9e-42ca-bd94-d0d0a089479c",
+  "urlAfter": "https://capital-qweb-production.up.railway.app/home?c=3dcb3c2a-6a9e-42ca-bd94-d0d0a089479c",
+  "stayStillVisible": false,
+  "openStillVisible": false,
+  "followUp": "You:\nWhich of those is furthest along, and what's the next step there?\n\nHide from Q\nQ:\n\nClinicrest is the furthest along: you’re connected, and they’re waiting for your reply to “What’s your typical cheque size and do you lead?” The next step is to approve the prepared reply covering your typical cheque size and whether you lead rounds.\n\nSources\nInvestor · 1\nClear\nQ\nAsk Q",
+  "followSeconds": 23,
+  "urlAfterFollow": "https://capital-qweb-production.up.railway.app/home?c=3dcb3c2a-6a9e-42ca-bd94-d0d0a089479c",
+  "video": "J2-390.webm"
+}

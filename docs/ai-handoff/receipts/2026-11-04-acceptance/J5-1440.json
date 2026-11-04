@@ -1,0 +1,129 @@
+{
+  "tag": "J5-1440",
+  "width": 1440,
+  "steps": [
+    {
+      "prompt": "Show me the top companies for my mandate",
+      "seconds": 10,
+      "added": "Captions\nBoard\n0\nConversations\n\nRanked by fit with your mandate, the top ten: MedTrail at 9, Mizan at 9, Silo Credit at 9, Duplo at 8.8, Bumpa at 8.8, Ledgerfold at 8.8, Tangible at 8, F2 at 8, Watchly at 8 and Rankpay at 6.8. They're on screen. MedTrail, Mizan and Silo Credit are tied on mandate fit at 9: 6 of 7 measures known for each, and no source documents yet. That's how well they match your mandate, not a judgement of quality.\n\nYou:\nShow me the top companies for my mandate\n\nHide from Q\nQ:\n\nRanked by fit with your mandate, the top ten: MedTrail at 9, Mizan at 9, Silo Credit at 9, Duplo at 8.8, Bumpa at 8.8, Ledgerfold at 8.8, Tangible at 8, F2 at 8, Watchly at 8 and Rankpay at 6.8. They're on screen.\n\nMedTrail, Mizan and Silo Credit are tied on mandate fit at 9: 6 of 7 measures known for each, and no source documents yet. That's how well they match your mandate, not a judgement of quality.\n\n1\nNumber 1:\nM\nMedTrail\n\nseed · Nigeria\n\n6 of 7 measures known · no source documents yet\n\nTied with Mizan and Silo Credit on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusiness model\nStrong\nThesis\nStrong\nRound terms\nUnknown\nHow 9.0 is worked out\nOpen profile\nAsk about this\n2\nNumber 2:\nM\nMizan\n\nseed · Egypt\n\n6 of 7 measures known · no source documents yet\n\nTied with MedTrail and Silo Credit on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusiness model\nStrong\nThesis\nStrong\nRound terms\nUnknown\nHow 9.0 is worked out\nOpen profile\nAsk about this\n3\nNumber 3:\nSC\nSilo Credit\n\nseed · Nigeria\n\n6 of 7 measures known · no source documents yet\n\nTied with MedTrail and Mizan on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusiness model\nStrong\nThesis\nStrong\nRound terms\nUnknown\nHow 9.0 is worked out\nOpen profile\nAsk about this\n4\nNumber 4:\nD\nDuplo\n\nseed · Nigeria\n\n5 of 7 measures known · no source documents yet\n\nTied with Bumpa and Ledgerfold on mandate fit (8.8).\n\n8.8\nmandate fit, out of 10\nOpen\nStrong",
+      "stages": [
+        "1s w me the top companies for my mandate /  / Hide from Q / Now / Understanding your request / Clear / Stop / Q / Ask Q",
+        "2s wn / Thesis / Strong / Round terms / Unknown / How 6.8 is worked out / Open profile / Ask about this / Clear / Q / Ask Q"
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 0,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 10,
+        "acCompare": 0
+      }
+    },
+    {
+      "prompt": "Compare the second and third",
+      "seconds": 22,
+      "added": "1\nConversations\n\nMizan and Silo Credit are level on Capital Q's mandate fit, at 9 each. The key distinction is geography and operating model: Mizan is Cairo-based infrastructure for banks and fintechs offering Shariah-compliant SME finance, while Silo Credit is Kano-based agricultural-finance infrastructure—certifying warehouses and issuing digital receipts so grain traders can borrow against stored grain. Both are seed-stage and their stated rounds fit your cheque range. Traction is not known for either, and round terms are still open; Silo’s deck states a $12 million valuation, while whether it needs a lead is not stated. Mizan and Silo Credit are tied on mandate fit at 9: 6 of 7 measures known for each, and no source documents yet. That's how well they match your mandate, not a judgement of quality.\n\nYou:\nCompare the second and third\n\nHide from Q\nQ:\n\nMizan and Silo Credit are level on Capital Q's mandate fit, at 9 each. The key distinction is geography and operating model: Mizan is Cairo-based infrastructure for banks and fintechs offering Shariah-compliant SME finance, while Silo Credit is Kano-based agricultural-finance infrastructure—certifying warehouses and issuing digital receipts so grain traders can borrow against stored grain. Both are seed-stage and their stated rounds fit your cheque range. Traction is not known for either, and round terms are still open; Silo’s deck states a $12 million valuation, while whether it needs a lead is not stated.\n\nMizan and Silo Credit are tied on mandate fit at 9: 6 of 7 measures known for each, and no source documents yet. That's how well they match your mandate, not a judgement of quality.\n\nSources\nInvestor · 1\n1\nNumber 1:\nM\nMizan\n\nseed · Egypt\n\n6 of 7 measures known · no source documents yet\n\nTied with Silo Credit on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusiness model\nStrong\nThesis\nStrong\nRound terms\nUnknown\nHow 9.0 is worked out\nOpen profile\nAsk about this\n2\nNumber 2:\nSC\nSilo Credit\n\nseed · Nigeria\n\n6 of 7 measures known · no source documents yet\n\nTied with Mizan on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusin",
+      "stages": [
+        "1s nown / How 6.8 is worked out / Open profile / Ask about this / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "3s ons\tNot known yet: Round terms\tNot known yet: Round terms / Now / Pulling it together / Clear / Stop / Q / Ask Q",
+        "5s ons\tNot known yet: Round terms\tNot known yet: Round terms / Now / Pulling it together / Clear / Stop / Q / Ask Q",
+        "6s ons\tNot known yet: Round terms\tNot known yet: Round terms / Now / Pulling it together / Clear / Stop / Q / Ask Q",
+        "8s ons\tNot known yet: Round terms\tNot known yet: Round terms / Now / Pulling it together / Clear / Stop / Q / Ask Q",
+        "13s udgement of quality. /  / Sources / Investor · 1 / Now / Pulling it together / Shown recently / Clear / Stop / Q / Ask Q",
+        "14s ce / Open questions\tNot known yet: Round terms\tNot known yet: Round terms / Shown recently / Clear / Q / Ask Q"
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 10,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 1,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 2,
+        "acCards": 2,
+        "acCompare": 0
+      }
+    },
+    {
+      "prompt": "Which has better traction?",
+      "seconds": 18,
+      "added": "2\nConversations\n\nMizan and Silo Credit are level on Capital Q's mandate fit, at 9 each. Neither can be called stronger on the evidence currently recorded. Mizan reports three live banks, EGP 640m originated and a 0.9% non-performing rate; Silo Credit reports 14 certified warehouses, about ₦2.1bn financed and a loss rate under 0.5%. Those measures are not directly comparable, and retention, growth, cohort performance and independent verification are unknown for both. I’d treat this as an open diligence question rather than choosing a winner. The next useful step is to compare repayment cohorts, repeat usage and growth on a like-for-like basis.\n\nCouldn't finish\nDone:\nUnderstanding your request\nDone:\nPulling it together\nDone:\nLooking at the company\nDone:\nComparing them side by side\nDone:\nLooking into it\nStopped at:\nPulling it together\n\nThis request was cancelled.\n\nYou:\nWhich has better traction?\n\nHide from Q\nQ:\n\nMizan and Silo Credit are level on Capital Q's mandate fit, at 9 each. Neither can be called stronger on the evidence currently recorded. Mizan reports three live banks, EGP 640m originated and a 0.9% non-performing rate; Silo Credit reports 14 certified warehouses, about ₦2.1bn financed and a loss rate under 0.5%. Those measures are not directly comparable, and retention, growth, cohort performance and independent verification are unknown for both. I’d treat this as an open diligence question rather than choosing a winner. The next useful step is to compare repayment cohorts, repeat usage and growth on a like-for-like basis.\n\nSources\n1\nNumber 1:\nM\nMizan\n\nGood fit\n\n6 of 7 measures known · no source documents yet\n\nTied with Silo Credit on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusiness model\nStrong\nThesis\nStrong\nRound terms\nUnknown\nHow 9.0 is worked out\nOpen profile\nAsk about this\n2\nNumber 2:\nSC\nSilo Credit\n\nGood fit\n\n6 of 7 measures known · no source documents yet\n\nTied with Mizan on mandate fit (9.0).\n\n9.0\nmandate fit, out of 10\nOpen\nStrong:\nRaising seed; you invest at seed.\nStrong:\nIn one of your sectors.\nNot known yet:\nRound terms not known yet.\nStage\nStrong\nSector\nStrong\nGeography\nPartial\nCheque compatibility\nStrong\nBusiness model\nStrong\nThesis\nStrong\nRound terms\nUnknown\nHow 9.0 is worked out\nOpen profile\nAsk about this\n\nRaising seed; you invest at ",
+      "stages": [
+        "1s  Round terms\tNot known yet: Round terms / Now / Looking at the company / Shown recently / Clear / Stop / Q / Ask Q",
+        "3s wn yet: Round terms\tNot known yet: Round terms / Now / Looking into it / Shown recently / Clear / Stop / Q / Ask Q",
+        "5s et: Round terms\tNot known yet: Round terms / Now / Pulling it together / Shown recently / Clear / Stop / Q / Ask Q",
+        "6s et: Round terms\tNot known yet: Round terms / Now / Pulling it together / Shown recently / Clear / Stop / Q / Ask Q",
+        "7s et: Round terms\tNot known yet: Round terms / Now / Pulling it together / Shown recently / Clear / Stop / Q / Ask Q",
+        "8s et: Round terms\tNot known yet: Round terms / Now / Pulling it together / Shown recently / Clear / Stop / Q / Ask Q",
+        "10s et: Round terms\tNot known yet: Round terms / Now / Pulling it together / Shown recently / Clear / Stop / Q / Ask Q",
+        "11s ly / Q couldn't finish that / This request was cancelled. Ask again whenever you're ready. / Clear / Q / Ask Q"
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 1,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 2,
+        "acCards": 2,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 1,
+        "artifactCards": [],
+        "planCards": [],
+        "work": ["RUN:FAILED"],
+        "resultCards": 1,
+        "acCards": 2,
+        "acCompare": 0
+      }
+    }
+  ],
+  "video": "J5-1440.webm"
+}

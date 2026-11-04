@@ -1,0 +1,30 @@
+{
+  "conversation": "0923cf26-c164-4791-afb9-d20e5a2f5fda",
+  "artifactId": "ee8be71d-b431-4e6b-944f-44c46d7edfd2",
+  "viewer": {
+    "label": null,
+    "text": "Document\nInvestment brief\nInvestment brief — Ledgerline\n\nVersion 1 · 4 Nov 2026, 20:23\n\nEdit with Q\nDownload\nPDF\nSummary\n\nThis brief sets out what Capital Q holds on record about Ledgerline, and what it does not.\n\nWhat the company does\n\nThe company identity is unresolved because public sources describe multiple businesses using the Ledgerline name.\n\nSources\n· 1\nProduct\n\nAnother public source describes software combining POS, inventory, invoicing, returns and financial reporting for Nigerian businesses.\n\nSources\n· 1\nBusiness model\n\nOne public source describes a services business supporting founders with US incorporation, accounting, tax, legal documents and crypto compliance.\n\nSources\n· 1\nCustomers\n\nThe founder-services website claims more than 100 clients, while the software website includes customer-story claims; these are unverified public claims and may relate to different businesses.\n\nSources\n· 1\nStrategy\n\nThe available sources support incompatible strategic descriptions, so Ledgerline's strategy cannot be assessed without identifying the relevant business.\n\nSources\n· 1\nEvidence gaps\nMarket and where it sits\nTraction\nFinancial performance and runway\nTeam\nWhat is being raised, and for what\n\nQ composed this from what Capital Q holds on record. It is a private draft: it is not verified evidence, it does not change your company record, and nothing here has been shared or sent.",
+    "frames": 0,
+    "downloads": ["pdf"]
+  },
+  "download": {
+    "file": "J3-1440-download-Investment-brief-Ledgerline.pdf",
+    "failure": null
+  },
+  "downloadFailureText": null,
+  "api_pdf": {
+    "status": 200,
+    "type": "application/pdf",
+    "bytes": 231684
+  },
+  "api_docx": {
+    "status": 404,
+    "type": "application/json",
+    "bytes": 44
+  },
+  "api_md": {
+    "status": 404,
+    "type": "application/json",
+    "bytes": 44
+  }
+}

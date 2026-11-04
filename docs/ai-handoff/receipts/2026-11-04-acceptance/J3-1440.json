@@ -1,0 +1,1834 @@
+{
+  "width": 1440,
+  "timeline": [
+    {
+      "t": 5,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "DONE:Done:\nWriting your document. This takes a moment.",
+            "CURRENT:Now:\nLooking into it"
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 11,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "DONE:Done:\nWriting your document. This takes a moment.",
+            "CURRENT:Now:\nLooking into it"
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 16,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "DONE:Done:\nWriting your document. This takes a moment.",
+            "CURRENT:Now:\nLooking into it"
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 21,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "DONE:Done:\nWriting your document. This takes a moment.",
+            "DONE:Done:\nLooking into it",
+            "CURRENT:Now:\nBrief for Ledgerline · Writing"
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 26,
+      "ev": "on-discover",
+      "url": "/discover",
+      "streams": [],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 32,
+      "ev": "back-home",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 38,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 43,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 48,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 53,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 58,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 63,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 68,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 73,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 78,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 83,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 88,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 93,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 98,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 103,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 108,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 113,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 118,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 123,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 128,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 133,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 138,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 143,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 148,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 153,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 158,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 163,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 168,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 173,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 178,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 183,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 188,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 193,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 198,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 203,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 208,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 213,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 218,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 223,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 228,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 233,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 238,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 243,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 248,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 253,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 258,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 263,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 268,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 273,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 278,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 283,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 288,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 293,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 298,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 303,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 308,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 313,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 318,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 323,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 328,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 333,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 338,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 343,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 348,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 354,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 359,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 364,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 369,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 374,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 379,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 384,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 389,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 394,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 399,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 404,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 409,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 414,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 419,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 424,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 429,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 434,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 439,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 444,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 449,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 454,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 459,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 464,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 469,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 474,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 479,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 484,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 489,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 494,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 499,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 504,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 509,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 514,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 519,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 524,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 529,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 534,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 539,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 544,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 549,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 554,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 559,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 564,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 569,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 574,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 579,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 584,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 589,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 594,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 599,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 604,
+      "ev": "poll",
+      "url": "/home?c=0923cf26-c164-4791-afb9-d20e5a2f5fda",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Investment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "ee8be71d-b431-4e6b-944f-44c46d7edfd2"
+        }
+      ],
+      "ready": [],
+      "notices": []
+    }
+  ],
+  "seconds": 604,
+  "done": null,
+  "finalText": "Q\nInvestor private · Savanna Seed Partners\n\nQ can see:\nQ room · nothing open\n\nQ\nChat\nCaptions\nBoard\n1\nConversations\n\nHere's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card.\n\nYou:\nWrite me a one-page memo on Ledgerline\n\nHide from Q\nQ:\n\nHere's the brief for Ledgerline. Built from 5 public sources; what they don't say is marked as not known inside it. Download the PDF from the card.\n\nInvestment brief — Ledgerline\n\nInvestment brief · Private draft, not shared\n\nInvestment brief — Ledgerline\n\nOpen\nDownload\nPDF\nEdit with Q\nClear\nQ\nAsk Q",
+  "video": "J3-1440.webm"
+}

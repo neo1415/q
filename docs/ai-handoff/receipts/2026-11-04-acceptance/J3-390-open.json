@@ -1,0 +1,30 @@
+{
+  "conversation": "ac3aedb8-3630-490d-a4a5-188019f1eab8",
+  "artifactId": "cabd2c0b-c3c8-4d60-abf6-26d48a4e4e1f",
+  "viewer": {
+    "label": null,
+    "text": "Document\nReport\nLedgerline — One-Page Investment Memo\n\nVersion 1 · 4 Nov 2026, 20:35\n\nEdit with Q\nDownload\nPDF\nOverview\n\nLedgerline is a Lagos-based seed company providing VAT compliance software for Nigerian small and medium-sized businesses. It connects to existing invoicing and accounting tools, validates invoices as they are created, and prepares and files monthly VAT returns. The company positions the product around the FIRS e-invoicing rollout and the cost and error risk of spreadsheet-based compliance workflows.\n\nProduct and market\n\nThe product checks TIN, VAT treatment, invoice sequence and totals, then uses validated data to prepare the monthly return. Ledgerline reports a target market of 420,000 VAT-filing businesses, with a serviceable market of 140,000 digitally invoicing businesses in Lagos, Abuja and Port Harcourt. These market figures are company estimates and are not independently verified.\n\nThe stated competitive set includes Sage, QuickBooks Online and Zoho Books, which Ledgerline says do not file Nigerian VAT returns, alongside traditional tax consultants. Its proposed differentiation is validation at the point of invoice creation combined with filing, delivered as software. The deck does not establish a quantified customer outcome, product implementation stage or defensible barrier to copying.\n\nBusiness model and traction\n\nLedgerline charges monthly per-entity subscriptions: ₦18,000 for Starter, ₦42,000 for Growth and ₦12,500 per client entity for its Acc",
+    "frames": 0,
+    "downloads": ["pdf"]
+  },
+  "download": {
+    "file": "J3-390-download-Ledgerline-One-Page-Investment-Memo.pdf",
+    "failure": null
+  },
+  "downloadFailureText": null,
+  "api_pdf": {
+    "status": 200,
+    "type": "application/pdf",
+    "bytes": 234679
+  },
+  "api_docx": {
+    "status": 404,
+    "type": "application/json",
+    "bytes": 44
+  },
+  "api_md": {
+    "status": 404,
+    "type": "application/json",
+    "bytes": 44
+  }
+}

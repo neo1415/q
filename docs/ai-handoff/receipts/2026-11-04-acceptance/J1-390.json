@@ -1,0 +1,15 @@
+{
+  "width": 390,
+  "mode": "open",
+  "answer": "\nYou:\nShow me my investor pipeline\n\nHide from Q\nQ:\n\n12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it?\n\nWhere this lives\n\nRelationships\n\nOpen pipeline\nStay here\nClear\nQ\nAsk Q",
+  "seconds": 8,
+  "openVisible": true,
+  "stayVisible": true,
+  "urlBefore": "https://capital-qweb-production.up.railway.app/home?c=ec28b32f-062f-4665-b0e6-e866e091acd2",
+  "urlAfter": "https://capital-qweb-production.up.railway.app/relationships?view=pipeline",
+  "heading": "Investment Hub",
+  "dockButton": 1,
+  "dockHasQuestion": true,
+  "dockHasAnswerStart": true,
+  "video": "J1-390.webm"
+}

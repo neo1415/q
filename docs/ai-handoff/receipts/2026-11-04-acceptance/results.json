@@ -1,0 +1,63 @@
+{
+  "date": "2026-11-04",
+  "web": "https://capital-qweb-production.up.railway.app",
+  "deploy": {
+    "commit": "8967c4fd4",
+    "contains": "8fa327a04",
+    "web": "SUCCESS",
+    "api": "SUCCESS",
+    "qApi": "SUCCESS",
+    "workers": "SUCCESS",
+    "createdAt": "2026-11-04T20:08:52Z",
+    "successBy": "20:20:47Z"
+  },
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link; service key read from Railway api variables in memory, never stored in repo",
+  "outwardActions": 0,
+  "qTurnsSent": 17,
+  "qTurnLog": [
+    "2026-11-04T20:21:07.287Z J1-1440 pipeline",
+    "2026-11-04T20:21:45.796Z J2-1440 pipeline",
+    "2026-11-04T20:21:59.474Z J2-1440 follow-up",
+    "2026-11-04T20:23:03.749Z J1-390 pipeline",
+    "2026-11-04T20:23:33.965Z J3-1440 memo",
+    "2026-11-04T20:34:48.377Z J3-390 memo",
+    "2026-11-04T20:34:56.145Z J5-1440 Show me the top companies for my mandate",
+    "2026-11-04T20:35:08.287Z J5-1440 Compare the second and third",
+    "2026-11-04T20:35:32.172Z J5-1440 Which has better traction?",
+    "2026-11-04T20:37:01.356Z J4-1440 Create a plan to run diligence on Ajopot over the next two weeks",
+    "2026-11-04T20:37:29.091Z J6-1440 Show me Ledgerline's pitch video",
+    "2026-11-04T20:40:49.816Z J6b-1440 Chart Ledgerline's revenue",
+    "2026-11-04T20:41:10.393Z J7 refresh mid-answer",
+    "2026-11-04T20:41:11.960Z J6b-1440 Show me Ledgerline's pitch deck",
+    "2026-11-04T20:42:19.260Z J8-okay-1440 okay",
+    "2026-11-04T20:42:39.739Z J2-390 pipeline",
+    "2026-11-04T20:42:51.712Z J2-390 follow-up"
+  ],
+  "results": {
+    "J1": "PASS",
+    "J2": "PASS",
+    "J3": "PARTIAL",
+    "J4": "PARTIAL",
+    "J5": "PARTIAL",
+    "J6": "FAIL",
+    "J7": "PASS",
+    "J8_okay": "FAIL"
+  },
+  "detailFiles": [
+    "J1-1440.json",
+    "J1-390.json",
+    "J2-1440.json",
+    "J2-390.json",
+    "J3-1440-open.json",
+    "J3-1440.json",
+    "J3-390-open.json",
+    "J3-390.json",
+    "J4-1440.json",
+    "J5-1440.json",
+    "J6-1440.json",
+    "J6b-1440.json",
+    "J7-1440.json",
+    "J8-okay-1440.json"
+  ]
+}

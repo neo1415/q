@@ -1,0 +1,16 @@
+{
+  "width": 1440,
+  "mode": "stay",
+  "answer": "Captions\nBoard\n0\nConversations\n\n12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it?\n\nYou:\nShow me my investor pipeline\n\nHide from Q\nQ:\n\n12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it?\n\nWhere this lives\n\nRelationships\n\nOpen pipeline\nStay here\nClear\nQ\nAsk Q",
+  "seconds": 10,
+  "openVisible": true,
+  "stayVisible": true,
+  "urlBefore": "https://capital-qweb-production.up.railway.app/home?c=db322f53-7da2-4df4-9b23-20468a40af98",
+  "urlAfter": "https://capital-qweb-production.up.railway.app/home?c=db322f53-7da2-4df4-9b23-20468a40af98",
+  "stayStillVisible": false,
+  "openStillVisible": false,
+  "followUp": "Earlier in this conversation\n\nWorking\nDone:\nUnderstanding your request\nNow:\nPulling it together\n\nYou:\nWhich of those is furthest along, and what's the next step there?\n\nHide from Q\nQ:\n\nLooking into that now.\n\nNow\nPulling it together\nClear\nStop\nQ\nAsk Q",
+  "followSeconds": 8,
+  "urlAfterFollow": "https://capital-qweb-production.up.railway.app/home?c=db322f53-7da2-4df4-9b23-20468a40af98",
+  "video": "J2-1440.webm"
+}

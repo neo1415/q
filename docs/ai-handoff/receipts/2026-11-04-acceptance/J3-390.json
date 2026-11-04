@@ -1,0 +1,137 @@
+{
+  "width": 390,
+  "timeline": [
+    {
+      "t": 2,
+      "ev": "poll",
+      "url": "/home?c=ac3aedb8-3630-490d-a4a5-188019f1eab8",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "CURRENT:Now:\nLooking at the company"
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 4,
+      "ev": "poll",
+      "url": "/home?c=ac3aedb8-3630-490d-a4a5-188019f1eab8",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "CURRENT:Now:\nWriting your document. This takes a moment."
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 15,
+      "ev": "on-discover",
+      "url": "/discover",
+      "streams": [],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 21,
+      "ev": "back-home",
+      "url": "/home?c=ac3aedb8-3630-490d-a4a5-188019f1eab8",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "DONE:Done:\nWriting your document. This takes a moment.",
+            "DONE:Done:\nReading Ledgerline's deck and documents",
+            "DONE:Done:\nLooking at Ledgerline",
+            "CURRENT:Now:\nWriting your document. This takes a moment."
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 23,
+      "ev": "poll",
+      "url": "/home?c=ac3aedb8-3630-490d-a4a5-188019f1eab8",
+      "streams": [
+        {
+          "s": "RUN",
+          "st": "WORKING",
+          "steps": [
+            "DONE:Done:\nUnderstanding your request",
+            "DONE:Done:\nPulling it together",
+            "DONE:Done:\nLooking at the company",
+            "DONE:Done:\nWriting your document. This takes a moment.",
+            "DONE:Done:\nReading Ledgerline's deck and documents",
+            "DONE:Done:\nLooking at Ledgerline",
+            "CURRENT:Now:\nWriting your document. This takes a moment."
+          ]
+        }
+      ],
+      "cards": [],
+      "ready": [],
+      "notices": []
+    },
+    {
+      "t": 25,
+      "ev": "poll",
+      "url": "/home?c=ac3aedb8-3630-490d-a4a5-188019f1eab8",
+      "streams": [],
+      "cards": [
+        {
+          "st": "READY",
+          "text": "Report · Private draft, not shared\n\nLedgerline — One-Page Investment Memo\n\nOpen\nDownload\nPDF\nEdit with Q",
+          "id": "cabd2c0b-c3c8-4d60-abf6-26d48a4e4e1f"
+        }
+      ],
+      "ready": [
+        {
+          "id": "cabd2c0b-c3c8-4d60-abf6-26d48a4e4e1f",
+          "st": "READY",
+          "label": "Report: Ledgerline — One-Page Investment Memo. Ready."
+        }
+      ],
+      "notices": [
+        "TOAST:DONE:Report · Ready\n\nLedgerline — One-Page Investment Memo\n\nOpen\nDownload\nPDF"
+      ]
+    }
+  ],
+  "seconds": 25,
+  "done": {
+    "st": "READY",
+    "text": "Report · Private draft, not shared\n\nLedgerline — One-Page Investment Memo\n\nOpen\nDownload\nPDF\nEdit with Q",
+    "id": "cabd2c0b-c3c8-4d60-abf6-26d48a4e4e1f"
+  },
+  "finalText": "ing $1.8m through a post-money SAFE at a $14m valuation cap, with a $50,000 minimum cheque. The proposed use of funds is 35% engineering and FIRS integration, 30% sales and partner channels, 20% customer success and 15% compliance reserve and working capital. The deck does not establish committed investors or round milestones.\n\nKey diligence questions\nCan Ledgerline provide bank- or accounting-supported evidence for MRR, customer count, retention and gross margin?\nWhat are logo and revenue retention by cohort, customer concentration and the split between direct and accountant-led customers?\nWhat measurable reduction in penalties, filing errors or compliance cost do customers achieve?\nHow defensible are the integrations, data, workflow and regulatory relationships?\nWhich runway figure is correct, and how does the planned burn support the stated milestones?\nPreliminary view\n\nLedgerline presents a clear regulatory workflow problem, a recurring subscription model and reported early commercial traction with high six-month logo retention. The central open questions are verification of the operating metrics, evidence of customer outcomes and defensibility, and reconciliation of the financing and runway assumptions. Those points should be resolved before relying on the growth projections or financing case.\n\nPDF\nQ:\n\nHere it is as a document. Download the PDF from the card.\n\nReport · Private draft, not shared\n\nLedgerline — One-Page Investment Memo\n\nOpen\nDownload\nPDF\nEdit with Q\nQ\nAsk Q",
+  "artifactId": "cabd2c0b-c3c8-4d60-abf6-26d48a4e4e1f",
+  "viewer": {
+    "text": "Document\nReport\nLedgerline — One-Page Investment Memo\n\nVersion 1 · 4 Nov 2026, 20:35\n\nEdit with Q\nDownload\nPDF\nOverview\n\nLedgerline is a Lagos-based seed company providing VAT compliance software for Nigerian small and medium-sized businesses. It connects to existing invoicing and accounting tools, validates invoices as they are created, and prepares and files monthly VAT returns. The company positions the product around the FIRS e-invoicing rollout and the cost and error risk of spreadsheet-based compliance workflows.\n\nProduct and market\n\nThe product checks TIN, VAT treatment, invoice sequenc",
+    "iframes": 0,
+    "downloads": ["pdf"]
+  },
+  "error": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-q-artifact-download]').first()\u001b[22m\n\u001b[2m    - locator resolved to <a aria-busy=\"false\" aria-disabled=\"false\" data-q-artifact-download=\"pdf\" href=\"/api/q-artifact/cabd2c0b-c3c8-4d60-abf6-26d48a4e4e1f/pdf\" class=\"inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md fo",
+  "video": "J3-390.webm"
+}

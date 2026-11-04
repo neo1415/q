@@ -1,0 +1,46 @@
+{
+  "tag": "J6-1440",
+  "width": 1440,
+  "steps": [
+    {
+      "prompt": "Show me Ledgerline's pitch video",
+      "seconds": 10,
+      "added": "Discover\nLedgerfold\n\nWorking-capital loans for Lagos market traders, underwritten from the bookkeeping app they already use every day.\n\nSeed\nLagos, Nigeria\n$2.5M priced seed\nConnected\nYour relationship\nOverview\nDiligence\nElevator\n2\nData room\n4\nPitch deck\nTeam\n2\n\nQ\nNext step\n\nSend 3 questions to Adaeze Nwachukwu\n\nThey close the gaps Q found: historical financial statements, market source and customer acquisition cost.\n\nReview first\nSend questions\n2 videos and pitches from the founders\nLedgerfold: pitch summary (AI presenter, AI-generated) · 0:36\nL\nLedgerfold\nLedgerfold: pitch summary (AI presenter, AI-generated)\n0:36\n\nWhat they say, moment by moment. Tap one to play from there.\n\n0:00\nTarget customer\nLagos market traders need working capital loans.\nClaim\n0:00\nWorking capital loans\nLedgerFold offers working capital loans to Lagos market traders.\nClaim\n0:00\nEligibility period\nLedgerFold can offer a working capital loan after 90 days of bookkeeping.\nClaim\n0:06\nStock turnover\nTraders turn their stock every few weeks.\nClaim\n0:06\nCredit mismatch\nTraders turn their stock every few weeks with no credit to match.\nClaim\n0:06\nFounder\nAdezen Wachukwu founded LedgerFold.\nClaim\n0:06\nRelevant experience\nAdezen Wachukwu founded LedgerFold after years in microfinance.\nClaim\n0:14\nFree bookkeeping\nTraders keep their books free in the app.\nClaim\n0:14\nLoan duration\nTraders borrow for 14 to 60 days.\nClaim\n0:14\nRepayment method\nTraders repay from daily sales.\nClaim\n0:28\nThe raise\n“Ledger Fold is raising $2.5 million in a price seed round.”\nClaim\n0:28\nStage\n“Ledger Fold is raising $2.5 million in a price seed round.”\nClaim\n0:28\nFundraising\nLedgerFold is raising $2.5 million in a price seed round.\nClaim\n\nThe company’s own claims, from its pitch video. Not verified.\n\nLedgerfold: pitch summary (AI presenter, AI-generated) · 0:36\nVideo 2 · 1:27\nNot said in the pitch\nInstrument\nUse of funds\nHistorical financial statements\nMarket source\nCustomer acquisition cost\nHeadcount\n\nUnknown is not negative. These stay open until Ledgerfold answers or shares a document.\n\nQ\nQ’s read, not verified\n\nThe pitch says $2.5M; the deck says USD 2,500,000. Both stand as stated until the company reconciles them.\n\nThe pitch doesn’t mention instrument or use of funds, the first things to ask.\n\nAbout this video\nTitle\nLedgerfold: pitch summary (AI presenter, AI-generated)\nLength\n0:36\nCaptions\nOn\nSound\nOff until you turn it on\nWhere the Overview’s $2.5M comes from: this video at 0:28.",
+      "stages": [
+        "1s You: / Show me Ledgerline's pitch video /  / Hide from Q / Now / Understanding your request / Clear / Stop / Q / Ask Q",
+        "2s Loading",
+        "3s aptions / On / Sound / Off until you turn it on / Where the Overview’s $2.5M comes from: this video at 0:28."
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 0,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 1,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 0,
+        "acCompare": 0
+      }
+    }
+  ],
+  "error": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByPlaceholder('Message Q').first()\u001b[22m\n",
+  "video": "J6-1440.webm"
+}

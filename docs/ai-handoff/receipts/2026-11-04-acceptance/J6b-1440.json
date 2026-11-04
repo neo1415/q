@@ -1,0 +1,88 @@
+{
+  "tag": "J6b-1440",
+  "width": 1440,
+  "steps": [
+    {
+      "prompt": "Chart Ledgerline's revenue",
+      "seconds": 20,
+      "added": "Captions\nBoard\n0\nConversations\n\nI can’t chart Ledgerline’s revenue from the figures currently available here: no published figures were returned for Ledgerline. The company profile does state a self-reported monthly recurring revenue of about ₦38m from 1,140 paying businesses, but it doesn’t provide a time series or dated revenue points, so I can’t construct a reliable chart. The earlier Ledgerline revenue figures in our conversation referred to a different record and shouldn’t be applied here. The most useful next step is to read Ledgerline’s pitch deck for dated revenue figures. Want me to pull that up?\n\nYou:\nChart Ledgerline's revenue\n\nHide from Q\nQ:\n\nI can’t chart Ledgerline’s revenue from the figures currently available here: no published figures were returned for Ledgerline. The company profile does state a self-reported monthly recurring revenue of about ₦38m from 1,140 paying businesses, but it doesn’t provide a time series or dated revenue points, so I can’t construct a reliable chart. The earlier Ledgerline revenue figures in our conversation referred to a different record and shouldn’t be applied here.\n\nThe most useful next step is to read Ledgerline’s pitch deck for dated revenue figures.\n\nWant me to pull that up?\n\nSources\nCompany · 1\nClear\nQ\nAsk Q",
+      "stages": [
+        "1s it together /  / You: / Chart Ledgerline's revenue /  / Hide from Q / Now / Pulling it together / Clear / Stop / Q / Ask Q",
+        "2s  company /  / You: / Chart Ledgerline's revenue /  / Hide from Q / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "3s e /  / Hide from Q / Q: /  / Looking into Chart Ledgerline now. /  / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "6s enue /  / Hide from Q / Q: /  / Looking into Chart Ledgerline now. /  / Now / Pulling it together / Clear / Stop / Q / Ask Q",
+        "8s e /  / Hide from Q / Q: /  / Looking into Chart Ledgerline now. /  / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "9s , so I can’t construct a reliable chart. /  / L / Ledgerline / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "10s  deck for dated revenue figures. /  / Sources / L / Ledgerline / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "12s s pitch deck for dated revenue figures. /  / Want me to pull that up? /  / Sources / Company · 1 / Clear / Q / Ask Q"
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 0,
+        "acCards": 0,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 1,
+        "acCards": 0,
+        "acCompare": 0
+      }
+    },
+    {
+      "prompt": "Show me Ledgerline's pitch deck",
+      "seconds": 10,
+      "added": "Opening Ledgerfold's pitch deck…\n\nYou:\nShow me Ledgerline's pitch deck\n\nHide from Q\nQ:\n\nOpening Ledgerfold's pitch deck…\n\nWhere this lives\nOpen the document\nLedgerfold investor deck\nView only\nPage 1 of 11\n\nAmara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only   ·   Amara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only\n\nAmara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only   ·   Amara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only\n\nAmara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only   ·   Amara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only\n\nAmara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only   ·   Amara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only\n\nClear\nQ\nAsk Q",
+      "stages": [
+        "1s any /  / You: / Show me Ledgerline's pitch deck /  / Hide from Q / Now / Looking at the company / Clear / Stop / Q / Ask Q",
+        "2s  view only   ·   Amara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only /  / Clear / Q / Ask Q",
+        "3s  view only   ·   Amara Diallo-Benson · Savanna Seed Partners · 2026-11-04 · view only /  / Clear / Q / Ask Q"
+      ],
+      "censusBefore": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 2,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 1,
+        "acCards": 0,
+        "acCompare": 0
+      },
+      "censusAfter": {
+        "video": 0,
+        "iframe": 0,
+        "svgCharts": 0,
+        "canvas": 3,
+        "img": 0,
+        "tables": 0,
+        "artifactCards": [],
+        "planCards": [],
+        "work": [],
+        "resultCards": 1,
+        "acCards": 0,
+        "acCompare": 0
+      }
+    }
+  ],
+  "video": "J6b-1440.webm"
+}
