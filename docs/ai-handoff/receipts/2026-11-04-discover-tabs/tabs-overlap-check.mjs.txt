@@ -1,0 +1,111 @@
+import { createRequire } from "node:module";
+import { readFileSync, mkdirSync } from "node:fs";
+const req = createRequire(
+  new URL("../../../../apps/web/package.json", import.meta.url),
+);
+const { chromium } = req("playwright");
+const { createServerClient } = req("@supabase/ssr");
+const SEC = process.env.SEC,
+  OUT = process.env.OUTDIR;
+mkdirSync(OUT, { recursive: true });
+const WEB = "http://localhost:3000";
+const session = JSON.parse(readFileSync(`${SEC}/session.json`, "utf8"));
+const cookies = new Map();
+const cl = createServerClient(
+  readFileSync(`${SEC}/sburl.txt`, "utf8").trim(),
+  readFileSync(`${SEC}/pub.txt`, "utf8").trim(),
+  {
+    cookieOptions: { httpOnly: true, sameSite: "lax", secure: true, path: "/" },
+    cookies: {
+      getAll: () => [...cookies.values()],
+      setAll: (i) => i.forEach((c) => cookies.set(c.name, c)),
+    },
+  },
+);
+if ((await cl.auth.setSession(session)).error) throw new Error("refused");
+const b = await chromium.launch({
+  executablePath: "/opt/pw-browsers/chromium",
+  proxy: { server: process.env.HTTPS_PROXY, bypass: "localhost,127.0.0.1" },
+  args: ["--no-sandbox"],
+});
+const inter = (a, c) =>
+  a &&
+  c &&
+  a.left < c.right &&
+  c.left < a.right &&
+  a.top < c.bottom &&
+  c.top < a.bottom;
+for (const [w, tab] of [
+  [1440, "yours"],
+  [1440, "foryou"],
+  [390, "yours"],
+  [1280, "yours"],
+  [1024, "yours"],
+]) {
+  const ctx = await b.newContext({
+    viewport: { width: w, height: w > 500 ? 900 : 844 },
+    deviceScaleFactor: 2,
+    isMobile: w < 500,
+    hasTouch: w < 500,
+  });
+  await ctx.addCookies(
+    [...cookies.values()].map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax",
+    })),
+  );
+  await ctx.addInitScript(() => {
+    try {
+      sessionStorage.setItem("cq.splash.seen", "1");
+      localStorage.setItem("cq.theme", "light");
+    } catch {}
+  });
+  const p = await ctx.newPage();
+  await p.goto(WEB + (tab === "yours" ? "/discover?tab=yours" : "/discover"), {
+    waitUntil: "domcontentloaded",
+    timeout: 120000,
+  });
+  await p.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+  await p.waitForTimeout(2500);
+  const r = await p.evaluate((tab) => {
+    const box = (s) => {
+      const e = [...document.querySelectorAll(s)].find(
+        (x) => x.getClientRects().length && x.offsetParent !== null,
+      );
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    };
+    return {
+      tabs: box(".cq-discover-tabs"),
+      media: box(
+        tab === "yours"
+          ? ".cq-yours-media"
+          : ".cq-feed-media, [data-feed-media], video",
+      ),
+      info: box(".cq-yours-info"),
+    };
+  }, tab);
+  await p.screenshot({ path: `${OUT}/${tab}-${w}.png` });
+  console.log(
+    w,
+    tab,
+    "tabs",
+    JSON.stringify(
+      r.tabs && [Math.round(r.tabs.left), Math.round(r.tabs.right)],
+    ),
+    "media",
+    JSON.stringify(
+      r.media && [Math.round(r.media.left), Math.round(r.media.right)],
+    ),
+    "overlap:",
+    inter(r.tabs, r.media),
+  );
+  await ctx.close();
+}
+await b.close();

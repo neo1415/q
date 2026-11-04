@@ -3280,6 +3280,16 @@
       );
       transform: none;
     }
+    /* Your companies has its own grid (.cq-yours-card: the stage, then a
+       440px panel), so the For you offset above lands on its video (live
+       2026-11-04, 1440). Here the tabs sit at the top of that panel, in
+       its 72px top padding, lined up with its 28px content inset. */
+    .cq-discover[data-discover-tab="YOURS"]:has(
+        > div[data-feed-immersive]:not([hidden])
+      )
+      .cq-discover-tabs {
+      inset-inline-start: calc(100% - 440px + 18px);
+    }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
       .cq-discover-tab,
     .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
