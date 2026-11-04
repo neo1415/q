@@ -68,6 +68,16 @@ export function promisedWork(
   return out;
 }
 
+/** The promised jobs less those named (a comma-joined key, for memo deps). */
+export function withoutJobs(
+  jobs: readonly WorkInProgress[],
+  exceptKey: string,
+): readonly WorkInProgress[] {
+  if (exceptKey === "") return jobs;
+  const except = new Set(exceptKey.split(","));
+  return jobs.filter((job) => !except.has(job.jobId));
+}
+
 function runStageLabel(
   labels: Parameters<typeof stageLineText>[1] | undefined,
 ): (stage: QWorkingStage) => string {
@@ -84,6 +94,11 @@ function runStageLabel(
 export function useWorkStreams(options: {
   readonly run: boolean;
   readonly jobs: boolean;
+  /**
+   * N2 leftover (N3): jobs this surface already draws as their own work
+   * card (the dock's latest answer), so each job is drawn once.
+   */
+  readonly except?: ReadonlySet<string> | undefined;
 }): {
   readonly streams: readonly WorkStream[];
   /** The live line of each job's step in progress, by job id. */
@@ -92,9 +107,13 @@ export function useWorkStreams(options: {
   const session = useQSessionOptional();
   const labels = useWire()?.Q_VISIBLE_STAGE_LABELS;
   const turns = session?.turns;
+  const exceptKey = [...(options.except ?? [])].sort().join(",");
   const work = useMemo(
-    () => (turns === undefined || !options.jobs ? [] : promisedWork(turns)),
-    [turns, options.jobs],
+    () =>
+      turns === undefined || !options.jobs
+        ? []
+        : withoutJobs(promisedWork(turns), exceptKey),
+    [turns, options.jobs, exceptKey],
   );
   const lives = useWorkLives(work.map((job) => job.jobId));
   const q = session?.q;
@@ -134,8 +153,11 @@ export function QWorkProgress({
   run = true,
   jobs = true,
   compact = false,
+  except,
   className,
 }: {
+  /** Jobs this surface already draws as their own card (N3: drawn once). */
+  readonly except?: ReadonlySet<string> | undefined;
   /** Show the answer being worked out (its trail of stages). */
   readonly run?: boolean | undefined;
   /** Show deep work Q took on (documents, research, plans). */
@@ -144,7 +166,7 @@ export function QWorkProgress({
   readonly compact?: boolean | undefined;
   readonly className?: string | undefined;
 }) {
-  const { streams, details } = useWorkStreams({ run, jobs });
+  const { streams, details } = useWorkStreams({ run, jobs, except });
   return (
     <WorkProgressList
       streams={streams}

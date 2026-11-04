@@ -15,6 +15,7 @@ import {
   type CardRef,
   type CardsState,
 } from "./card-visibility-store";
+import type { QTurnObjectBlock } from "../conversation";
 
 // The plain controller lives in card-visibility-store (no React), so the
 // server-reachable client-actions module can import it; the hooks are here.
@@ -35,6 +36,21 @@ export function answerCardRef(
     key: `answer:${answerKey}:${card.key}`,
     names: [card.name],
   };
+}
+
+/**
+ * D7 (N3): the keys of every answer card these blocks carry, under the
+ * one key the stage, Chat and the dock all close and reopen them by.
+ */
+export function answerCardKeys(
+  answerKey: string,
+  blocks: readonly QTurnObjectBlock[],
+): readonly string[] {
+  return blocks.flatMap((block) =>
+    block.kind === "ANSWER_CARDS"
+      ? block.cards.map((card) => answerCardRef(answerKey, card).key)
+      : [],
+  );
 }
 
 function useCardsVersion(): CardsState {

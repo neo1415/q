@@ -5,7 +5,12 @@ import type { ReactNode } from "react";
 import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { AnswerCanvas } from "./answer-canvas";
-import { hideKey, useCardsState } from "./cards/card-visibility";
+import {
+  answerCardRef,
+  hideKey,
+  isHiddenIn,
+  useCardsState,
+} from "./cards/card-visibility";
 import type { QTurn } from "./conversation";
 import { useAnswerPlayback } from "./use-answer-playback";
 import { useSpotlight } from "./use-spotlight";
@@ -63,19 +68,21 @@ export function StageCanvas({
     saidFocus: live ? playback.focus : -1,
   });
   // Lane A: a card's X is kept by the one presentation controller, so a
-  // closed card stays closed on the way back from another page.
-  const { keys } = useCardsState();
-  const prefix = `card:${answerId}:`;
-  const closed: ReadonlySet<string> = new Set(
-    keys
-      .filter((key) => key.startsWith(prefix))
-      .map((key) => key.slice(prefix.length)),
-  );
+  // closed card stays closed on the way back from another page. D7 (N3):
+  // under the same key as Chat and the dock (answerCardRef), so a card
+  // closed here is closed there too, and "Show again" there brings it back
+  // here. AnswerCanvas leaves out the cards that key hides.
+  const state = useCardsState();
   const closeCard = (key: string) => {
-    const next = new Set([...closed, key]);
-    // The last card closed closes the answer.
-    if (block.cards.every((card) => next.has(card.key))) onCloseAll();
-    else hideKey(`${prefix}${key}`);
+    const card = block.cards.find((one) => one.key === key);
+    if (card === undefined) return;
+    hideKey(answerCardRef(answerId, card).key);
+    // The last card closed closes the answer ("Shown recently" reopens it).
+    const open = block.cards.filter(
+      (one) =>
+        one.key !== key && !isHiddenIn(state, answerCardRef(answerId, one)),
+    );
+    if (open.length === 0) onCloseAll();
   };
   return (
     <div className="w-full" data-q-canvas={answerId}>
@@ -88,7 +95,6 @@ export function StageCanvas({
         focus={playback.focus}
         walking={playback.walking}
         presence={presence}
-        dismissed={closed}
         spotlight={spot.spotlight}
         onFocus={(index) => {
           playback.choose(index);

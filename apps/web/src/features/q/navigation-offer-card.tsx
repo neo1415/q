@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import type { QNavigationOfferBlock } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -8,6 +8,8 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { useT } from "@/features/i18n/language";
 
 import { openOfferedPage } from "./client-actions";
+import { offerAnsweredLater, offerKey } from "./navigation-offers";
+import { useQSessionOptional } from "./q-session";
 
 /**
  * N1 (owner 2026-11-04): Q answered where the person is and offers the page
@@ -15,12 +17,15 @@ import { openOfferedPage } from "./client-actions";
  * through the one navigation lifecycle (the conversation stays in the
  * dock); Stay settles the offer without moving. Either way the offer is
  * done: settled per message on this device, so it does not come back on a
- * re-render, a remount or a reload of the same conversation.
+ * re-render, a remount or a reload of the same conversation, and (N3) once
+ * a later Q message answered it, everywhere.
  */
 
 const SETTLED_PREFIX = "cq.q.offer.";
 /** This tab's settled offers, for when storage is blocked. */
 const settledHere = new Set<string>();
+/** N3: every view of the same offer (stage, Chat, dock) settles together. */
+const listeners = new Set<() => void>();
 
 function isSettled(key: string): boolean {
   if (settledHere.has(key)) return true;
@@ -38,32 +43,53 @@ function settle(key: string, how: "OPENED" | "STAYED"): void {
   } catch {
     // Private window or blocked storage: this tab still remembers.
   }
+  for (const listener of [...listeners]) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /** Test seam: forget every settled offer. */
 export function resetSettledOffers(): void {
   settledHere.clear();
+  for (const listener of [...listeners]) listener();
 }
+
+const NO_TURNS: readonly never[] = [];
 
 export function NavigationOfferCard({
   block,
   href,
-  settleKey,
+  turnId,
 }: {
   readonly block: QNavigationOfferBlock;
   /** The registered route for the offered move; null renders nothing. */
   readonly href: string | null;
-  /** The message and position this offer belongs to; absent: this mount only. */
-  readonly settleKey?: string | undefined;
+  /** The Q message this offer belongs to; absent: this mount only. */
+  readonly turnId?: string | undefined;
 }) {
   const t = useT();
-  const [settled, setSettled] = useState(
+  const settleKey = turnId === undefined ? undefined : offerKey(turnId, block);
+  const [settledHereNow, setSettledHereNow] = useState(false);
+  const settledOnDevice = useSyncExternalStore(
+    subscribe,
     () => settleKey !== undefined && isSettled(settleKey),
+    () => false,
   );
-  if (href === null || settled) return null;
+  // N3: a typed or spoken yes/no is answered by a later Q message; from the
+  // durable conversation, so the card goes on every device and on reload.
+  const turns = useQSessionOptional()?.turns ?? NO_TURNS;
+  const answered = turnId !== undefined && offerAnsweredLater(turns, turnId);
+  if (href === null || settledHereNow || settledOnDevice || answered) {
+    return null;
+  }
   const done = (how: "OPENED" | "STAYED") => {
     if (settleKey !== undefined) settle(settleKey, how);
-    setSettled(true);
+    setSettledHereNow(true);
   };
   return (
     <section
