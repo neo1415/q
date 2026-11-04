@@ -53,6 +53,17 @@ export type ReferenceAsk =
       /** "not that one, the second": the current focus is excluded. */
       readonly correction: boolean;
     }
+  /**
+   * A2 (audit 2026-11-04): several places in one list, in the order said:
+   * "the second and third", "the first two", "first and third", "the last
+   * two". 1-based; negative counts from the end (-1 the last, -2 the one
+   * before it). Explicit places always win over a generic "those two".
+   */
+  | {
+      readonly kind: "POSITIONS";
+      readonly positions: readonly number[];
+      readonly entityKind: EntityKind | null;
+    }
   | { readonly kind: "PAIR" }
   /** Lane W: "this one", "this company", "the one I'm looking at". */
   | { readonly kind: "THIS"; readonly entityKind: EntityKind | null }
@@ -120,10 +131,70 @@ const COUNTERPART =
 const THIS =
   /\bthis\s+(one|compan(?:y)|startup|business|investor|fund|firm|pitch|video)\b|\bthe\s+one\s+(?:i'?m|i\s+am)\s+(?:looking\s+at|watching|on)\b/iu;
 
+const PLACE =
+  /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-9]th)\b/giu;
+
+/** "the first two", "top three", "the last two": a run of places. */
+const RUN =
+  /\b(first|top|last)\s+(two|three|four|five|2|3|4|5)\b(?:\s+(investors?|funds?|firms?|compan(?:y|ies)|startups?|documents?|docs?|decks?|cards?|results?|options?|ones?))?/iu;
+
+const COUNT: Readonly<Record<string, number>> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+};
+
+function kindNear(text: string): EntityKind | null {
+  return KIND_WORDS.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+}
+
+/**
+ * A2: several places at once. Two or more distinct ordinals, or a run
+ * ("first two"). Ordinal order is the order said ("the third and the
+ * first" compares the third with the first); duplicates collapse.
+ */
+function positionsAskOf(said: string): ReferenceAsk | null {
+  const run = RUN.exec(said);
+  if (run !== null) {
+    const count =
+      COUNT[(run[2] ?? "").toLowerCase()] ?? Number.parseInt(run[2] ?? "", 10);
+    if (Number.isInteger(count) && count >= 2) {
+      const fromEnd = (run[1] ?? "").toLowerCase() === "last";
+      const positions = Array.from({ length: count }, (_, index) =>
+        fromEnd ? index - count : index + 1,
+      );
+      return {
+        kind: "POSITIONS",
+        positions,
+        entityKind: kindNear(`${run[3] ?? ""} ${said}`),
+      };
+    }
+  }
+  const places: number[] = [];
+  for (const match of said.matchAll(PLACE)) {
+    const word = (match[1] ?? "").toLowerCase();
+    const position =
+      ORDINALS[word] ??
+      (/^[4-9]th$/u.test(word) ? Number.parseInt(word, 10) : undefined);
+    if (position !== undefined && !places.includes(position)) {
+      places.push(position);
+    }
+  }
+  if (places.length < 2) return null;
+  return { kind: "POSITIONS", positions: places, entityKind: kindNear(said) };
+}
+
 /** What the words point at, if they point at all. */
 export function referenceAskOf(text: string): ReferenceAsk | null {
   const said = text.replace(/[’]/gu, "'");
-  if (PAIR.test(said)) return { kind: "PAIR" };
+  // A2: explicit places first. "Compare the second and third" once fell to
+  // the generic pair below and compared the first two.
+  const positions = positionsAskOf(said);
+  if (positions !== null) return positions;
+  // "Compare Kestrel to the first one": a single explicit place is that
+  // place, never the generic first two.
+  if (PAIR.test(said) && !ORDINAL_WORD.test(said)) return { kind: "PAIR" };
   if (BACK.test(said)) return { kind: "BACK" };
   const self = ORDINAL_WORD.test(said) ? null : THIS.exec(said);
   if (self !== null) {
@@ -367,6 +438,26 @@ export function resolveReference(
           continue;
         }
         return { kind: "ONE", entity, via: list.via };
+      }
+      return null;
+    }
+    case "POSITIONS": {
+      for (const list of lists) {
+        const items = list.items.filter(
+          (item) => ask.entityKind === null || item.kind === ask.entityKind,
+        );
+        const picked = ask.positions.map(
+          (position) =>
+            items[position < 0 ? items.length + position : position - 1],
+        );
+        // Every place must exist in the same list, or this is not the list
+        // meant: never a partial set, never a substitute.
+        if (picked.some((entity) => entity === undefined)) continue;
+        const entities = picked.filter(
+          (entity): entity is ConversationEntity => entity !== undefined,
+        );
+        if (new Set(entities.map((entity) => entity.id)).size < 2) continue;
+        return { kind: "PAIR", entities };
       }
       return null;
     }
@@ -640,6 +731,12 @@ function described(entity: ConversationEntity): string {
   return `${name}(${KIND_LABEL[entity.kind]} ${entity.id})`;
 }
 
+function placeWord(position: number): string {
+  if (position === -1) return "the last";
+  if (position < -1) return `${String(-position)} from the end`;
+  return String(position);
+}
+
 /**
  * Capital Q's note of what the turn points at, for the reader and the
  * answer: trusted (code-made from records the person already saw), with
@@ -654,11 +751,13 @@ export function resolutionNote(
       ? `${ask.position === -1 ? "the last" : `number ${String(ask.position)}`}${ask.entityKind === null ? "" : ` ${KIND_LABEL[ask.entityKind]}`}${ask.correction ? " (a correction: not the one before)" : ""}`
       : ask.kind === "THIS"
         ? "what they are looking at on their screen"
-        : ask.kind === "PAIR"
-          ? "the two to compare"
-          : ask.kind === "BACK"
-            ? "what was being discussed before"
-            : "the person they mean";
+        : ask.kind === "POSITIONS"
+          ? `numbers ${ask.positions.map(placeWord).join(" and ")}${ask.entityKind === null ? "" : ` (${KIND_LABEL[ask.entityKind]})`}, in that order`
+          : ask.kind === "PAIR"
+            ? "the two to compare"
+            : ask.kind === "BACK"
+              ? "what was being discussed before"
+              : "the person they mean";
   const bound =
     resolved.kind === "ONE"
       ? described(resolved.entity)

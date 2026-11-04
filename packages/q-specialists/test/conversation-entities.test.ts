@@ -987,3 +987,134 @@ describe("ordinals over the pipeline on screen (lane S)", () => {
     expect(run.delegatedWith[0]?.references).toContain(TENSORGATE);
   });
 });
+
+/**
+ * A2 (audit 2026-11-04, production): after Q ranked MedTrail, Duplo,
+ * Bumpa, "compare the second and third" compared MedTrail with Duplo. The
+ * generic pair rule ran before the ordinals. Explicit places now win, in
+ * the order said, from the newest list the person was shown.
+ */
+describe("explicit places bind the records shown at those places (A2)", () => {
+  const MEDTRAIL = "33333333-3333-4333-8333-000000000001";
+  const DUPLO = "33333333-3333-4333-8333-000000000002";
+  const BUMPA = "33333333-3333-4333-8333-000000000003";
+  const KESTREL = "33333333-3333-4333-8333-000000000004";
+  const slate: QResultBlock = {
+    kind: "ANSWER_CARDS",
+    title: "Closest to your mandate",
+    cards: [
+      ["MedTrail", MEDTRAIL],
+      ["Duplo", DUPLO],
+      ["Bumpa", BUMPA],
+    ].map(([name, id]) => ({
+      name: name ?? "",
+      subject: { kind: "COMPANY", companyId: id ?? "" },
+      facts: [],
+    })),
+  } as unknown as QResultBlock;
+  const ranked = [
+    message("USER", "find three companies that fit my mandate"),
+    message("Q", "Here are three.", [slate]),
+  ];
+  const ids = (said: string, history = ranked, page?: QPageManifest) => {
+    const result = resolve(said, history, page);
+    return result?.kind === "PAIR"
+      ? result.entities.map((entity) => entity.id)
+      : result?.kind === "ONE"
+        ? [result.entity.id]
+        : null;
+  };
+
+  it.each([
+    ["compare the second and third", [DUPLO, BUMPA]],
+    ["Compare the second and third.", [DUPLO, BUMPA]],
+    ["compare the first two", [MEDTRAIL, DUPLO]],
+    ["compare the first and third", [MEDTRAIL, BUMPA]],
+    ["compare the third and the first", [BUMPA, MEDTRAIL]],
+    ["compare the last two", [DUPLO, BUMPA]],
+    ["compare the top three", [MEDTRAIL, DUPLO, BUMPA]],
+    ["how do the 2nd and 3rd companies differ?", [DUPLO, BUMPA]],
+    ["the second one", [DUPLO]],
+    ["tell me about the third one", [BUMPA]],
+    ["compare those two", [MEDTRAIL, DUPLO]],
+  ])("%j", (said, expected) => {
+    expect(ids(said)).toEqual(expected);
+  });
+
+  it("'compare Kestrel to the first one' binds the first place, not the first two", () => {
+    const ask = referenceAskOf("compare Kestrel to the first one");
+    expect(ask).toEqual(
+      expect.objectContaining({ kind: "ORDINAL", position: 1 }),
+    );
+    expect(ids("compare Kestrel to the first one")).toEqual([MEDTRAIL]);
+    expect(KESTREL).not.toBe(MEDTRAIL);
+  });
+
+  it("a place the list does not have binds nothing (Q asks), never a substitute", () => {
+    expect(ids("compare the third and fifth")).toBeNull();
+    const single = [
+      message("Q", "One fits.", [
+        {
+          ...slate,
+          cards: (slate as { cards: unknown[] }).cards.slice(0, 1),
+        } as unknown as QResultBlock,
+      ]),
+    ];
+    expect(ids("compare the first two", single)).toBeNull();
+  });
+
+  it("missing context binds nothing", () => {
+    expect(ids("compare the second and third", [])).toBeNull();
+  });
+
+  it("survives a refreshed conversation: the slate is read from the durable messages", () => {
+    // A new read of the same messages (another instance, a refresh).
+    const reloaded = ranked.map((one) => ({ ...one }));
+    expect(ids("compare the second and third", reloaded)).toEqual([
+      DUPLO,
+      BUMPA,
+    ]);
+  });
+
+  it("uses only what the person was shown: a record no longer listed is never bound", () => {
+    // Access revoked: the next slate no longer shows Bumpa. The newest
+    // list is meant; its third place does not exist, and older lists are
+    // only tried when they have every place.
+    const revoked = [
+      ...ranked,
+      message("USER", "refresh my list"),
+      message("Q", "Two now.", [
+        {
+          ...slate,
+          cards: (slate as { cards: unknown[] }).cards.slice(0, 2),
+        } as unknown as QResultBlock,
+      ]),
+    ];
+    expect(ids("compare the first two", revoked)).toEqual([MEDTRAIL, DUPLO]);
+  });
+
+  it("writes the note in the order said, by name and id", () => {
+    const ask = referenceAskOf("compare the second and third");
+    const result = resolve("compare the second and third", ranked);
+    expect(ask).not.toBeNull();
+    expect(result).not.toBeNull();
+    if (ask === null || result === null) return;
+    expect(resolutionNote(ask, result)).toBe(
+      `RESOLVED: numbers 2 and 3, in that order = "Duplo" (company ${DUPLO}) and "Bumpa" (company ${BUMPA}).`,
+    );
+  });
+
+  it("tells the answer the right pair end to end", async () => {
+    const run = seam(ranked);
+    await run.say("compare the second and third");
+    expect(run.delegatedWith[0]?.references).toBe(
+      `RESOLVED: numbers 2 and 3, in that order = "Duplo" (company ${DUPLO}) and "Bumpa" (company ${BUMPA}).`,
+    );
+  });
+
+  it("tells the answer to ask when the places are not on any list", async () => {
+    const run = seam(ranked);
+    await run.say("compare the fourth and fifth");
+    expect(run.delegatedWith[0]?.references ?? "").toMatch(/^UNRESOLVED:/u);
+  });
+});

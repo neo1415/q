@@ -354,6 +354,15 @@ function pointedAt(
     if (resolved !== null) {
       return { ask, resolved, note: resolutionNote(ask, resolved) };
     }
+    // A2: explicit places with no list that has them all. Never a guess at
+    // which records were meant: Q asks.
+    if (ask.kind === "POSITIONS" && control === null) {
+      return {
+        ask,
+        resolved: null,
+        note: "UNRESOLVED: they named places in a list, but no list they were shown has all of them. Ask which ones they mean; do not pick records.",
+      };
+    }
   }
   // C's request: the page's own controls ("open the readiness tab", "the
   // second one" on a list the page registered without record refs).
