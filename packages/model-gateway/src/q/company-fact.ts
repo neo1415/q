@@ -183,3 +183,118 @@ export function companyFiguresFacts(
   }
   return facts;
 }
+
+/** At most this many of one deck's figures go to the model. */
+const DECK_FIGURES_MAX = 8;
+/** The deck sections whose figures the profile's Key numbers draw on. */
+const DECK_FIGURE_SECTIONS: ReadonlySet<string> = new Set([
+  "FINANCIALS",
+  "TRACTION",
+  "THE_ASK",
+  "BUSINESS_MODEL",
+]);
+
+/**
+ * A4 (rehearsal 2026-11-04): an investor on Ledgerline's profile saw "Current
+ * monthly net burn: About $39,000" under Key numbers ("From the deck,
+ * founder's claims"), and Q said the profile gave no burn rate. The Key
+ * numbers come from the deck as Q read it, which the profile serves to
+ * this reader; Q read only the company's published figures and never the
+ * deck. These are the deck's figures from read_company_deck's own output
+ * -- the same read, authorize step and plan as the person's Deck tab, so
+ * nothing beyond what their screen may show -- each the founder's claim
+ * with the deck's own truth class, evidence status, date and slide.
+ * Anything malformed is dropped rather than repaired.
+ */
+export function companyDeckFiguresFacts(
+  data: unknown,
+  companyName: string,
+): readonly AuthorisedFact[] {
+  if (typeof data !== "object" || data === null) return [];
+  const sections = (data as { readonly sections?: unknown }).sections;
+  if (!Array.isArray(sections)) return [];
+  const facts: AuthorisedFact[] = [];
+  for (const section of sections as readonly unknown[]) {
+    if (typeof section !== "object" || section === null) continue;
+    const s = section as Record<string, unknown>;
+    if (s["status"] !== "PRESENT" || typeof s["section"] !== "string") {
+      continue;
+    }
+    if (!DECK_FIGURE_SECTIONS.has(s["section"])) continue;
+    const listed = Array.isArray(s["facts"])
+      ? (s["facts"] as readonly unknown[])
+      : [];
+    for (const fact of listed) {
+      if (facts.length >= DECK_FIGURES_MAX) return facts;
+      if (typeof fact !== "object" || fact === null) continue;
+      const f = fact as Record<string, unknown>;
+      const label = text(f["label"]);
+      const value = text(f["value"]);
+      // A deck fact with no value is unknown, never a figure (deck.ts).
+      if (label === null || value === null) continue;
+      const pages = Array.isArray(f["pages"])
+        ? (f["pages"] as readonly unknown[]).filter(
+            (page): page is number => typeof page === "number",
+          )
+        : [];
+      const slide =
+        pages.length === 0 ? "" : `, slide ${String(Math.min(...pages))}`;
+      const asOf = text(f["asOf"]);
+      const parsed = AuthorisedFactSchema.safeParse({
+        scope: "COMPANY_DECK_FIGURES",
+        statement:
+          `${companyName}'s pitch deck states (the founder's claim): ${label}: ${value}${
+            asOf === null ? "" : ` (as of ${asOf})`
+          }${slide}.`.slice(0, 2_000),
+        truthClass: f["truthClass"],
+        evidenceStatus: f["evidenceStatus"],
+        source: "The company's pitch deck, as Q read it (founder's claims)",
+        ...(asOf === null ? {} : { asOf: asOf.slice(0, 40) }),
+      });
+      if (parsed.success) facts.push(parsed.data);
+    }
+  }
+  return facts;
+}
+
+/**
+ * A4: what an unlisted figure means. Q is given the figures it could read
+ * for this person; one it was not given is unknown to Q, never absent from
+ * the company. Said by code, beside the figures, so the answer says "I
+ * can't see or verify that figure" instead of "the profile has no burn
+ * rate" -- and, when the deck was not available to Q for this person,
+ * that figures their screen may show from it cannot be confirmed here.
+ * Nothing is disclosed by it: it names no value and widens no read.
+ */
+export function companyFiguresLimitFact(
+  companyName: string,
+  reads: {
+    /** read_company_figures returned (AVAILABLE or NONE) for them. */
+    readonly published: boolean;
+    /**
+     * read_company_deck: READ (its figures are above), NOT_AVAILABLE (asked
+     * and refused or failed), or NOT_ASKED (not offered to this run).
+     */
+    readonly deck: "READ" | "NOT_AVAILABLE" | "NOT_ASKED";
+  },
+): AuthorisedFact {
+  const read = [
+    ...(reads.published ? ["its published figures on Capital Q"] : []),
+    ...(reads.deck === "READ" ? ["the figures its pitch deck states"] : []),
+  ];
+  const what =
+    read.length === 0
+      ? `Q could not read ${companyName}'s figures for this person.`
+      : `What Q could read of ${companyName}'s figures for this person is ${read.join(" and ")}, given as facts here.`;
+  const deck =
+    reads.deck === "NOT_AVAILABLE"
+      ? ` Its pitch deck was not available to Q for this person, so a figure their screen shows from the deck cannot be read or confirmed by Q: say so, never that it does not exist.`
+      : "";
+  return {
+    scope: "COMPANY_FIGURES",
+    statement: `${what} Any figure about ${companyName} not given here (burn, runway, payroll or any other) is unknown to Q, not absent: say you can't see or verify it, and never that ${companyName}, its profile or its deck has no such figure.${deck}`,
+    truthClass: "UNKNOWN",
+    evidenceStatus: "NO_EVIDENCE",
+    source: "Capital Q's record of what Q read for this answer",
+  };
+}
