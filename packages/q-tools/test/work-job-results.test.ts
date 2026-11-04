@@ -125,6 +125,22 @@ describe("list_q_work: a finished job's reviewer changes and diligence questions
     });
   });
 
+  it("says where a job's plan stands (live5 g: ready, not 'still running')", async () => {
+    const plan = {
+      state: "READY_FOR_THEIR_DECISION",
+      goal: "Complete a first-pass diligence review of Ledgerline",
+      done: 0,
+      total: 5,
+    };
+    const outcome = await world(() =>
+      Promise.resolve([{ ...JOB, state: plan.state, plan }]),
+    )(actorA, ownPlan(actorA, actorA.userId));
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { jobs: [{ state: "READY_FOR_THEIR_DECISION", plan }] },
+    });
+  });
+
   it("keeps an unrecorded review or questions null (unknown), never filled in", async () => {
     const outcome = await world(() =>
       Promise.resolve([{ ...JOB, review: null, diligence: null }]),
