@@ -7977,6 +7977,9 @@ const { app, logger: appLogger } = createApp(
       plans,
       page: createWorkforcePage({
         store: workforceStore,
+        // live5: a plan job's plan, once approved or running, is moving work.
+        planStatusOf: async (owner, jobId) =>
+          (await planStore.forJob?.(owner, jobId))?.status ?? null,
         // Recovery D6: each job's durable work state, why it stopped, trace.
         work: agentWorkQueue,
         deliverables: workforceDeliverables,

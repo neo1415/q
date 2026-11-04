@@ -227,8 +227,40 @@ export function createWorkforcePage(dependencies: {
         readonly approvals: readonly QApprovalView[];
       }>)
     | undefined;
+  /**
+   * live5 (2026-11-04): the status of the situation plan a plan job made
+   * (ACCEPTED, EXECUTING, ...); null when it made none. A plan job's own
+   * work is done once its plan is handed over, so after Execute the plan
+   * ran under no "Moving" row at all.
+   */
+  readonly planStatusOf?:
+    ((owner: Owner, jobId: string) => Promise<string | null>) | undefined;
 }) {
   const { store } = dependencies;
+
+  /**
+   * A plan job whose plan is approved or running is moving work: listed
+   * as running, without the job's finished work state (whose Stop would
+   * act on the finished job, not the plan).
+   */
+  async function withRunningPlans(
+    owner: Owner,
+    items: readonly WorkforceJobSummaryDto[],
+    work: ReadonlyMap<string, WorkRow>,
+  ): Promise<WorkforceJobSummaryDto[]> {
+    const planStatusOf = dependencies.planStatusOf;
+    if (planStatusOf === undefined) return [...items];
+    return Promise.all(
+      items.map(async (item) => {
+        const row = work.get(item.id);
+        if (row === undefined || !isPlanJobPayload(row.plan)) return item;
+        const status = await planStatusOf(owner, item.id).catch(() => null);
+        if (status !== "ACCEPTED" && status !== "EXECUTING") return item;
+        const { workState: _done, stoppedBecause: _why, ...rest } = item;
+        return { ...rest, status: "RUNNING" };
+      }),
+    );
+  }
 
   /** The work rows behind these jobs; unreadable is simply absent. */
   async function workOf(
@@ -343,8 +375,12 @@ export function createWorkforcePage(dependencies: {
       );
       const last = shown.at(-1);
       return {
-        items: shown.map((row) =>
-          summary(row, row, usd(byJob.get(row.id) ?? 0), work.get(row.id)),
+        items: await withRunningPlans(
+          owner,
+          shown.map((row) =>
+            summary(row, row, usd(byJob.get(row.id) ?? 0), work.get(row.id)),
+          ),
+          work,
         ),
         nextCursor:
           rows.length > page.limit && last !== undefined
@@ -631,18 +667,26 @@ export function createWorkforcePage(dependencies: {
         );
 
       const plan = progressOf(work, detail.runs);
+      const [job] = await withRunningPlans(
+        owner,
+        [
+          summary(
+            detail.job,
+            {
+              agents: detail.runs.length,
+              drafts: detail.drafts.length,
+              held: held.length,
+            },
+            usd(byJob.get(detail.job.id) ?? 0),
+            work,
+          ),
+        ],
+        work === undefined ? new Map() : new Map([[detail.job.id, work]]),
+      );
+      if (job === undefined) return null;
       return {
         ...(plan === undefined ? {} : { plan }),
-        job: summary(
-          detail.job,
-          {
-            agents: detail.runs.length,
-            drafts: detail.drafts.length,
-            held: held.length,
-          },
-          usd(byJob.get(detail.job.id) ?? 0),
-          work,
-        ),
+        job,
         agents: detail.runs.slice(0, 200).map((run) => ({
           id: run.id,
           role: oneOf(WORKFORCE_AGENT_ROLES, run.role, "AD_HOC"),
