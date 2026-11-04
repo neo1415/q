@@ -7,7 +7,7 @@ import { pipelineSummaryLine } from "../src/pipeline-summary.js";
  * "Opening your pipeline…". The move says what is in it first.
  */
 describe("what is in their pipeline, in one line", () => {
-  it("a founder's three investors, the one waiting on them named", () => {
+  it("a founder's three investors, each counted in its own state", () => {
     expect(
       pipelineSummaryLine("COMPANY", [
         {
@@ -27,7 +27,7 @@ describe("what is in their pipeline, in one line", () => {
         },
       ]),
     ).toBe(
-      "3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply.",
+      "3 investors: Savanna Seed Partners and Rift Valley connected; Zino Aviation awaiting reply.",
     );
   });
 
@@ -48,7 +48,30 @@ describe("what is in their pipeline, in one line", () => {
       state: i < 5 ? "CONNECTED" : "INTEREST_EXPRESSED",
     }));
     expect(pipelineSummaryLine("COMPANY", rows)).toBe(
-      "8 investors: 5 connected; 3 interest expressed.",
+      "8 investors: 5 connected; 3 awaiting reply.",
     );
+  });
+
+  it("counts match the Relationships page's chips (acceptance 4 Nov 2026)", () => {
+    // The page: All 12 · Awaiting reply 3 · Connected 8 · In diligence 1.
+    // One connected company's last message was theirs; Q used to drop it
+    // from "connected" and say "7 connected; 1 waiting for your reply".
+    const rows = [
+      { counterpart: { name: "Ajopot" }, state: "IN_DILIGENCE" },
+      ...Array.from({ length: 8 }, (_, i) => ({
+        counterpart: { name: `Connected ${String(i)}` },
+        state: "CONNECTED",
+        lastMessage: { from: i === 0 ? ("THEM" as const) : ("YOU" as const) },
+      })),
+      ...Array.from({ length: 3 }, (_, i) => ({
+        counterpart: { name: `Awaiting ${String(i)}` },
+        state: "INTEREST_EXPRESSED",
+      })),
+    ];
+    const line = pipelineSummaryLine("INVESTOR", rows);
+    expect(line).toBe(
+      "12 companies: 1 in diligence; 8 connected; 3 awaiting reply.",
+    );
+    expect(line).not.toMatch(/waiting (?:for|on) you/u);
   });
 });

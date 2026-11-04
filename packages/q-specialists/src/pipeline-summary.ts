@@ -2,8 +2,8 @@
  * Coordinator 23 Oct 2026 (live: "Show me my fundraising pipeline" said
  * only "Opening your pipeline…"): a move to their pipeline says what is in
  * it, in one line, from their own relationships as their side may see
- * them ("3 investors: Savanna Seed Partners connected; Zino Aviation and
- * Rift Valley waiting for your reply."), and then opens it. Counts and
+ * them ("3 investors: Savanna Seed Partners and Rift Valley connected;
+ * Zino Aviation awaiting reply."), and then opens it. Counts and
  * states only: no judgement. A read that fails says nothing extra.
  */
 
@@ -13,14 +13,19 @@ export type PipelineRow = {
   readonly lastMessage?: { readonly from: "THEM" | "YOU" } | null | undefined;
 };
 
+/**
+ * The Relationships page's own words for each state (its chips and stage
+ * strip), so Q's line and the page read the same (acceptance 4 Nov 2026:
+ * Q said "3 interest expressed", the page "Awaiting reply 3").
+ */
 const STATE_WORDS: Readonly<Record<string, string>> = {
   DISCOVERED: "discovered",
-  INTEREST_EXPRESSED: "interest expressed",
+  INTEREST_EXPRESSED: "awaiting reply",
   CONNECTED: "connected",
   MEETING_HELD: "met",
   IN_DILIGENCE: "in diligence",
   PAUSED: "paused",
-  PASSED: "passed",
+  PASSED: "not proceeding for now",
   INVESTED: "invested",
   DECLINED: "not taken forward",
 };
@@ -62,10 +67,14 @@ export function pipelineSummaryLine(
       : "No companies in your pipeline yet.";
   }
   const byName = rows.length <= NAMES_MAX;
-  const waiting = rows.filter((row) => row.lastMessage?.from === "THEM");
-  const rest = rows.filter((row) => row.lastMessage?.from !== "THEM");
-  const groups = STATE_ORDER.flatMap((state) => {
-    const here = rest.filter((row) => row.state === state);
+  // Every row counts once, in its own state, exactly as the page's chips
+  // count them (acceptance 4 Nov 2026: Q said "7 connected; 1 waiting for
+  // your reply", the page "Connected 8 · Needs you 2"). Q used to take rows
+  // whose last message was theirs out of their state; that is a different
+  // measure from the page's "Needs you" (the person's own next steps), so
+  // the line leaves it to the page rather than give a second, clashing count.
+  const parts = STATE_ORDER.flatMap((state) => {
+    const here = rows.filter((row) => row.state === state);
     if (here.length === 0) return [];
     const words = STATE_WORDS[state] ?? state.toLowerCase();
     return [
@@ -74,23 +83,13 @@ export function pipelineSummaryLine(
         : `${String(here.length)} ${words}`,
     ];
   });
-  const unknown = rest.filter((row) => !STATE_ORDER.includes(row.state));
+  const unknown = rows.filter((row) => !STATE_ORDER.includes(row.state));
   if (unknown.length > 0) {
-    groups.push(
+    parts.push(
       byName
         ? `${listed(unknown.map((row) => row.counterpart.name))} in progress`
         : `${String(unknown.length)} in progress`,
     );
   }
-  const parts = [
-    ...groups,
-    ...(waiting.length === 0
-      ? []
-      : [
-          byName
-            ? `${listed(waiting.map((row) => row.counterpart.name))} waiting for your reply`
-            : `${String(waiting.length)} waiting for your reply`,
-        ]),
-  ];
   return `${String(rows.length)} ${noun(rows.length)}: ${parts.join("; ")}.`;
 }

@@ -116,6 +116,15 @@ export type QOrchestrationRuntime = {
     metadata?: {
       readonly modelPolicyVersion?: string | undefined;
       readonly promptBundleVersion?: string | undefined;
+      /**
+       * The run's answer is already stored and delivered. A Stop that
+       * arrived while it was being written cannot take it back, so the
+       * run completes (CANCEL_REQUESTED → COMPLETED) rather than being
+       * recorded, and shown, as cancelled over an answer the person has
+       * (acceptance 2026-11-04 J5). Every other end still honours the
+       * request.
+       */
+      readonly answered?: boolean | undefined;
     },
   ) => Promise<QLifecycleOutcome>;
   readonly fail: (
@@ -145,6 +154,8 @@ type Move = {
   readonly modelPolicyVersion?: string | undefined;
   readonly promptBundleVersion?: string | undefined;
   readonly failureCode?: QFailureDiagnosticCode | undefined;
+  /** COMPLETED over a pending cancellation: the answer already exists. */
+  readonly answered?: boolean | undefined;
   readonly event?:
     | ((run: Pick<QRunRecord, "id" | "completedAt">) => QRunEventInput)
     | undefined;
@@ -239,7 +250,9 @@ export function createQOrchestrationRuntime(
       (status) =>
         status !== first.to &&
         !isTerminalQRunStatus(status) &&
-        (status !== "CANCEL_REQUESTED" || first.to === "CANCELLED") &&
+        (status !== "CANCEL_REQUESTED" ||
+          first.to === "CANCELLED" ||
+          (first.to === "COMPLETED" && first.answered === true)) &&
         canTransition(status, first.to),
     );
     if (allowedFrom.length === 0) return null;
@@ -321,8 +334,13 @@ export function createQOrchestrationRuntime(
     if (isTerminalQRunStatus(run.status)) {
       return { kind: "TERMINAL", run };
     }
-    // A pending cancellation is only ever completed, never worked past.
-    if (run.status === "CANCEL_REQUESTED" && request.to !== "CANCELLED") {
+    // A pending cancellation is only ever completed, never worked past --
+    // except by an answer that is already written and delivered.
+    if (
+      run.status === "CANCEL_REQUESTED" &&
+      request.to !== "CANCELLED" &&
+      !(request.to === "COMPLETED" && request.answered === true)
+    ) {
       return { kind: "CANCEL_REQUESTED", run };
     }
     if (!canTransition(run.status, request.to)) {
@@ -408,6 +426,7 @@ export function createQOrchestrationRuntime(
     complete: (ref, metadata = {}) =>
       move(ref, {
         to: "COMPLETED",
+        answered: metadata.answered,
         modelPolicyVersion: metadata.modelPolicyVersion,
         promptBundleVersion: metadata.promptBundleVersion,
         event: (run) => ({
