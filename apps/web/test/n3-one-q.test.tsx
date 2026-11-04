@@ -12,9 +12,12 @@ import {
 
 import {
   answerCardRef,
+  hideAllCards,
   hideKey,
   isCardHidden,
+  noteSeen,
   resetCards,
+  setCardsConversation,
 } from "../src/features/q/cards/card-visibility";
 import type { QTurn, QTurnObjectBlock } from "../src/features/q/conversation";
 import {
@@ -34,6 +37,8 @@ const { replyParts } = await import("../src/features/q/q-answer");
 const { StaticAnswerCards } =
   await import("../src/features/q/static-answer-cards");
 const { AnswerCanvas } = await import("../src/features/q/answer-canvas");
+const { CardsControls } =
+  await import("../src/features/q/cards/cards-controls");
 
 /**
  * N3 (owner 2026-11-04): Q Chat, the Q page's presence view (stage and
@@ -361,6 +366,7 @@ describe("D7: one dismiss key and one store for every view", () => {
 
   it("a card closed in Chat is closed under the key the stage hides by, and Show again brings it back", async () => {
     if (card === undefined) throw new Error("fixture");
+    setCardsConversation("conversation-1");
     const user = userEvent.setup();
     render(<StaticAnswerCards block={cards} />);
     await user.click(
@@ -385,6 +391,48 @@ describe("D7: one dismiss key and one store for every view", () => {
     expect(
       screen.queryByRole("button", { name: `Close ${card.name}` }),
     ).toBeNull();
+  });
+});
+
+describe("Show again only after the person closed cards here (owner 2026-11-04)", () => {
+  const cards = objectBlock("ANSWER_CARDS") as QAnswerCardsBlock;
+  const card = cards.cards[0];
+
+  it("is not offered in a conversation where nothing was closed", () => {
+    if (card === undefined) throw new Error("fixture");
+    // A clear in another conversation, earlier in the tab.
+    setCardsConversation("conversation-1");
+    noteSeen([answerCardRef(cards.title, card).key]);
+    hideAllCards();
+    // A fresh conversation shows an older answer's cards (hidden by that clear).
+    setCardsConversation("conversation-2");
+    render(
+      <>
+        <StaticAnswerCards block={cards} />
+        <CardsControls />
+      </>,
+    );
+    expect(isCardHidden(answerCardRef(cards.title, card))).toBe(true);
+    expect(screen.queryByRole("button", { name: "Show again" })).toBeNull();
+  });
+
+  it("is never offered before a conversation exists", () => {
+    if (card === undefined) throw new Error("fixture");
+    hideKey(answerCardRef(cards.title, card).key);
+    render(<StaticAnswerCards block={cards} />);
+    expect(screen.queryByRole("button", { name: "Show again" })).toBeNull();
+  });
+
+  it("is offered, quietly, once the person closed a card in this conversation", async () => {
+    if (card === undefined) throw new Error("fixture");
+    setCardsConversation("conversation-3");
+    const user = userEvent.setup();
+    render(<StaticAnswerCards block={cards} />);
+    await user.click(
+      await screen.findByRole("button", { name: `Close ${card.name}` }),
+    );
+    const again = screen.getByRole("button", { name: "Show again" });
+    expect(again.className).toContain("bg-transparent");
   });
 });
 

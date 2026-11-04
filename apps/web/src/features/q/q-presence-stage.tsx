@@ -234,7 +234,9 @@ export function QPresenceStage({
   // Artifacts live: the cards for what Q is naming, up while it talks.
   const livePreview = livePreviewOf(turns, shown, spokenPreview);
   const previewing = livePreview !== null;
-  const note = stageNoteOf(items, turns, pick, (item) =>
+  // Only this conversation's own objects: one from another conversation
+  // (the shelf) is not something this conversation "moved on" from.
+  const note = stageNoteOf(own, turns, pick, (item) =>
     isHiddenIn(cards, stageCardRef(item)),
   );
   // F-35: what is on the stage now is not listed again beside it.
@@ -563,15 +565,9 @@ export function QPresenceStage({
           role="status"
           data-q-stage-note={note.id}
         >
+          {/* Owner 2026-11-04: no "Show again" here. Q moved on; the person
+              closed nothing, and the object stays in "Shown recently". */}
           <span>{note.text}</span>
-          <button
-            type="button"
-            className="cq-stage-quiet min-h-11"
-            onClick={() => reopen(note.item)}
-            data-q-stage-note-reopen={note.item.id}
-          >
-            {t("Show again")}
-          </button>
         </p>
       )}
 

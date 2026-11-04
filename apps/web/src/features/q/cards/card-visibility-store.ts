@@ -57,6 +57,12 @@ export type CardsState = {
    * rather than a store of its own. Presentation only, like the rest.
    */
   readonly board: Readonly<Record<string, BoardMarks>>;
+  /**
+   * Owner 2026-11-04 ("why are these things still here"): the
+   * conversations in which the person closed cards themselves. "Show
+   * again" is offered only there, never on a fresh or untouched one.
+   */
+  readonly closedIn: readonly string[];
 };
 
 export type BoardMarks = {
@@ -80,6 +86,7 @@ export const EMPTY: CardsState = {
   reopened: null,
   hiddenAt: {},
   board: {},
+  closedIn: [],
 };
 
 // v2 (2026-10-17): v1 hid every later answer that reused a title or a name
@@ -127,6 +134,7 @@ function load(): CardsState {
           : {},
       keys: strings(loaded.keys),
       shownKeys: strings(loaded.shownKeys),
+      closedIn: strings(loaded.closedIn),
       reopened:
         typeof reopened === "object" &&
         reopened !== null &&
@@ -147,6 +155,35 @@ const listeners = new Set<() => void>();
 /** The same request heard by the screen and by Q's answer acts once. */
 let last: { readonly signature: string; readonly at: number } | null = null;
 const SAME_REQUEST_MS = 4_000;
+
+/** The conversation on screen, set by the conversation surface. */
+let activeConversation: string | null = null;
+const CLOSED_IN_MAX = 40;
+
+/** The person closed something: remembered for the conversation on screen. */
+function closedNow(s: CardsState): readonly string[] {
+  if (activeConversation === null || s.closedIn.includes(activeConversation)) {
+    return s.closedIn;
+  }
+  return [...s.closedIn, activeConversation].slice(-CLOSED_IN_MAX);
+}
+
+export function setCardsConversation(conversation: string | null): void {
+  if (activeConversation === conversation) return;
+  activeConversation = conversation;
+  // A new snapshot, so what reads closedHere draws again.
+  state = { ...state };
+  for (const listener of [...listeners]) listener();
+}
+
+/**
+ * Whether "Show again" may be offered: the person closed cards in the
+ * conversation on screen. A clear in another conversation, or Q replacing
+ * what it showed, is not the person closing anything here.
+ */
+export function closedHere(s: CardsState): boolean {
+  return activeConversation !== null && s.closedIn.includes(activeConversation);
+}
 
 function commit(next: CardsState): void {
   state = next;
@@ -257,6 +294,7 @@ export function hideAllCards(): void {
   commit({
     ...state,
     clearedAt: state.tick,
+    closedIn: closedNow(state),
     shownNames: [],
     shownCategories: [],
     shownKeys: [],
@@ -275,6 +313,7 @@ export function hideKey(key: string): void {
       ? state.keys
       : [...state.keys, key].slice(-KEYS_MAX),
     shownKeys: state.shownKeys.filter((one) => one !== key),
+    closedIn: closedNow(state),
     reopened:
       state.reopened !== null && `stage:${state.reopened.run}` === key
         ? null
@@ -323,6 +362,7 @@ export function hideCategory(category: QCardCategory): void {
       ? state.categories
       : [...state.categories, category],
     shownCategories: state.shownCategories.filter((c) => c !== category),
+    closedIn: closedNow(state),
     hiddenAt: { ...state.hiddenAt, [`category:${category}`]: state.tick },
   });
 }
@@ -334,6 +374,7 @@ export function hideOne(name: string): void {
     ...state,
     ones: state.ones.includes(key) ? state.ones : [...state.ones, key],
     shownNames: state.shownNames.filter((n) => cardNameKey(n) !== key),
+    closedIn: closedNow(state),
     hiddenAt: { ...state.hiddenAt, [`one:${key}`]: state.tick },
   });
 }
@@ -443,6 +484,7 @@ export function setBoardMarks(conversation: string, marks: BoardMarks): void {
 /** Tests: a clean controller and a forgotten "just applied". */
 export function resetCards(): void {
   last = null;
+  activeConversation = null;
   mounted.clear();
   commit(EMPTY);
 }

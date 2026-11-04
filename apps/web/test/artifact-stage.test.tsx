@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -317,7 +316,7 @@ describe("QA U2: a document on the stage is drawn once", () => {
 });
 
 describe("replaced explicitly, never silently (FAIL-3)", () => {
-  it("says what it replaced, and what it put away", async () => {
+  it("says what it replaced, and what it put away", () => {
     const replaced = [
       ...TOP3,
       person("p2", "Put Norrland and Kestrel in a table"),
@@ -340,12 +339,12 @@ describe("replaced explicitly, never silently (FAIL-3)", () => {
     expect(note?.textContent).toContain(
       "Put “Top three for your mandate” away as we moved on.",
     );
-    await userEvent.click(screen.getByRole("button", { name: "Show again" }));
-    await waitFor(
-      () =>
-        expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
-      { timeout: 10_000 },
-    );
+    // Owner 2026-11-04: Q moved on and the person closed nothing, so the
+    // note offers no "Show again" (the set stays in "Shown recently").
+    expect(
+      note?.querySelector("button") ??
+        screen.queryByRole("button", { name: "Show again" }),
+    ).toBeNull();
   });
 });
 

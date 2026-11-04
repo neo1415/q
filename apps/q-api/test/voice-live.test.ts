@@ -391,6 +391,32 @@ describe("GPT-Live provider adapter", () => {
 });
 
 describe("GPT-Live prompt", () => {
+  it("hands a question about their task or plan to the backend, never answers it alone (owner 2026-11-04)", () => {
+    const prompt = livePrompt({ role: "investor" });
+    // "How far with the task that I gave you to do" was answered by the
+    // voice itself ("I don't have a task from you yet") while the Board
+    // showed the plan done: "how far" read as a greeting, the question as
+    // a nudge or the person's own planning.
+    expect(prompt).toContain(
+      '"How far" followed by what it is about ("how far with the task I gave you", "how far with that plan") is not a greeting',
+    );
+    const delegateWhen = prompt.slice(
+      prompt.indexOf("Delegate to the backend when:"),
+      prompt.indexOf("Do not delegate to the backend when:"),
+    );
+    expect(delegateWhen).toContain(
+      "they ask about a task, plan or piece of work they gave you or Q",
+    );
+    expect(delegateWhen).toContain("Never say they have not given you a task");
+    const notWhen = prompt.slice(
+      prompt.indexOf("Do not delegate to the backend when:"),
+    );
+    expect(notWhen).toContain("(not a plan or task on Capital Q)");
+    expect(notWhen).toContain(
+      "A question about a task or plan from before this call is not a nudge: delegate it.",
+    );
+  });
+
   it("has the three policies and no scripted filler", () => {
     const prompt = livePrompt({ role: "investor" });
     for (const heading of [

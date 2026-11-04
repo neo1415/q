@@ -79,6 +79,7 @@ import {
 } from "./q-attachments";
 import { WorkingLine } from "@/components/working/working-line";
 import { CardsControls } from "./cards/cards-controls";
+import { setCardsConversation } from "./cards/card-visibility-store";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
 
@@ -711,6 +712,10 @@ export function QConversationPanel({
   const [boardOpen, setBoardOpen] = useState(openBoard);
   const boardDocked = wide && boardOpen;
   const boardMarks = useBoardMarks(q.conversationId);
+  // "Show again" belongs to the conversation the person closed cards in.
+  useEffect(() => {
+    setCardsConversation(q.conversationId);
+  }, [q.conversationId]);
   // G-D18: the Board holds every set shown in this tab, also after a
   // reconnect moved the page to another conversation.
   const shelf = useResultShelf();
