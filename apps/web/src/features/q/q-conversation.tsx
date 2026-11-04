@@ -62,6 +62,10 @@ import { QAperture, QLumen, useStageApertureSize } from "../q-aperture";
 import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
+import {
+  speakTypedAnswer,
+  useReadAloudChoice,
+} from "../voice/read-aloud-choice";
 import { expectDocument } from "@/features/documents/document-ready";
 import { failureMessage, recoveryHint, type QTurn } from "./conversation";
 import { interceptTyped } from "./typed-intercept";
@@ -411,9 +415,12 @@ export function QConversationPanel({
   // wherever the site already had microphone permission).
   const voiceActive = voice.active;
 
-  // An answer that arrived while the line was closed is read aloud all the
-  // same (one-way speech, no microphone): answers on this page are heard.
+  // A6 (owner 2026-11-04): a typed answer is written, not spoken, unless
+  // the viewer turned on "Read answers aloud" (read-aloud-choice.ts). This
+  // replaces the earlier rule that every answer on this page is heard.
+  // A live call speaks its own lines; "Play" on a blocked line stays.
   const speech = useQSpeech();
+  const [readAloud, setReadAloud] = useReadAloudChoice();
   const say = speech.say;
   const queueSpeech = speech.queue;
   const stopSpeech = speech.stop;
@@ -460,7 +467,11 @@ export function QConversationPanel({
     const spoken = spokenSoFar.current.get(latest.id) ?? 0;
     // Row 18: each finished sentence is said as it arrives; the rest of
     // the answer when it settles. An answer that arrives whole is one line.
-    const next = written
+    const next = !speakTypedAnswer({
+      readAloud,
+      voiceActive: voice.active,
+      written,
+    })
       ? null
       : nextSpokenPiece({
           text: plain,
@@ -482,10 +493,18 @@ export function QConversationPanel({
       gestures: latest.gestures ?? [],
       spoken: false,
     });
-  }, [turns, q.loading, voice.active, voice.voice, say, queueSpeech]);
+  }, [
+    turns,
+    q.loading,
+    voice.active,
+    voice.voice,
+    say,
+    queueSpeech,
+    readAloud,
+  ]);
   useEffect(() => {
-    if (voice.active) stopSpeech();
-  }, [voice.active, stopSpeech]);
+    if (voice.active || !readAloud) stopSpeech();
+  }, [voice.active, readAloud, stopSpeech]);
 
   // --- The thread -------------------------------------------------------------
 
@@ -1110,6 +1129,8 @@ export function QConversationPanel({
               <VoiceMenu
                 voice={voice.voice}
                 onChoose={(choice) => void voice.chooseVoice(choice)}
+                readAloud={readAloud}
+                onReadAloud={setReadAloud}
               />
               <button
                 key={`board-${String(boardBump)}`}

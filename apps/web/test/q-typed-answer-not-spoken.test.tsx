@@ -16,7 +16,12 @@ import { createQStreamState } from "@capital-q/api-client";
  * the turn a written one, yet its answer was read aloud by the one-way
  * voice -- not the call's voice -- and heard as Q's voice turning into
  * Deepgram's. The answer to a typed turn that closed the call is written,
- * not spoken; an answer with no call involved is still read aloud.
+ * not spoken.
+ *
+ * A6 (owner 2026-11-04): 16 paid speech requests for 5 typed turns. A typed
+ * answer is now silent by default and read aloud only when the viewer
+ * turned on "Read answers aloud" (this supersedes "an answer with no call
+ * involved is still read aloud").
  */
 
 const say = vi.fn(() => Promise.resolve());
@@ -126,9 +131,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
+  resetReadAloudChoiceForTests();
 });
 
 const { QConversationPanel } = await import("../src/features/q/q-conversation");
+const { resetReadAloudChoiceForTests, writeReadAloudOn } =
+  await import("../src/features/voice/read-aloud-choice");
 
 const QUESTION = "i need companies to invest in";
 const person = { kind: "PERSON", id: "p1", text: QUESTION, unconfirmed: false };
@@ -160,6 +169,8 @@ const settle = () =>
 
 describe("an answer to a typed turn that closed the call (owner 2026-11-03)", () => {
   it("is written, never read aloud by the one-way voice", async () => {
+    // Even with read-aloud on: the typed turn made the call a written one.
+    writeReadAloudOn(true);
     session.active = true;
     session.connected = true;
     session.turns = [];
@@ -181,8 +192,10 @@ describe("an answer to a typed turn that closed the call (owner 2026-11-03)", ()
     expect(say).not.toHaveBeenCalled();
     expect(queue).not.toHaveBeenCalled();
   });
+});
 
-  it("an answer with no call involved is still read aloud", async () => {
+describe("typed answers are silent by default (A6, owner 2026-11-04)", () => {
+  async function typedTurn() {
     session.active = false;
     session.connected = false;
     session.turns = [];
@@ -191,6 +204,25 @@ describe("an answer to a typed turn that closed the call (owner 2026-11-03)", ()
     session.turns = [person, answer];
     view.rerender(panel());
     await settle();
+  }
+
+  it("sends no speech request for a typed answer", async () => {
+    await typedTurn();
+    expect(say).not.toHaveBeenCalled();
+    expect(queue).not.toHaveBeenCalled();
+  });
+
+  it("reads the answer aloud once when the viewer turned on Read answers aloud", async () => {
+    writeReadAloudOn(true);
+    await typedTurn();
+    expect(say).toHaveBeenCalledTimes(1);
+    expect(queue).not.toHaveBeenCalled();
+  });
+
+  it("a remembered choice from an earlier visit applies", async () => {
+    window.localStorage.setItem("cq.q.readAloud", "on");
+    resetReadAloudChoiceForTests();
+    await typedTurn();
     expect(say).toHaveBeenCalledTimes(1);
   });
 });

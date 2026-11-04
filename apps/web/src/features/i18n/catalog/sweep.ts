@@ -298,6 +298,8 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   Quiet: "هادئة",
   "Female voice": "صوت نسائي",
   "Male voice": "صوت رجالي",
+  "Read answers aloud": "قراءة الإجابات بصوت عالٍ",
+  "Answers in writing only": "الإجابات مكتوبة فقط",
   Subtle: "خفيف",
   Natural: "طبيعي",
   Warm: "دافئ",
