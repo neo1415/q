@@ -89,8 +89,8 @@ select throws_ok($$
 $$, '23514', null, 'visibility scopes are ADR-001''s eight values, persisted lowercase');
 
 select is((select visibility_scope from artifacts.artifacts where id = '00000000-0000-4000-8000-00000000cc01'),
-  'organisation_private',
-  'and an artifact starts visible to the organisation that owns it and to nobody else');
+  'personal_private',
+  'and an artifact starts private to the person who asked for it (20261231220000)');
 
 -- Capabilities ----------------------------------------------------------------------------
 select is((select count(*)::int from permissions.capabilities
