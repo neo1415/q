@@ -1442,3 +1442,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Lesson repeated: fake-model tests passed while live failed because a second code path (warmed prepare + compareTargets) built the visible result. Trace production logs before fixing.
 - Owner actions: set CQ_SEED_ACCOUNT_PASSWORD as an environment secret; replace SUPABASE_ACCESS_TOKEN (401) and rotate tokens pasted in chat.
 - Open: B-cause (needs one real voice call), E (Hey Q), C residuals, N4 remaining journeys.
+
+## 2026-11-04 — Back on every interior page (feat/back-everywhere, Claude)
+
+- Owner ask "the back icon in all pages". Branch `feat/back-everywhere` from `fix/resume-asking-cv9ru3`; not merged or deployed (integration owner deploys).
+- One shared `BackLink` (UX-04 history logic from 332501631): top-left, 44 px at every width, RTL arrow, accessible name "Back to {parent}". Hand-rolled back links (account head, relationship hero, investor profile, work audit/report, rehearsal lobby/review, pitch video, founder team, company) now use it; added where missing (interest, visibility, Daily edition, top companies, Capital Q pitch, rehearsal unavailable states, search, messages, reviews, verification).
+- `apps/web/test/back-everywhere.test.ts` classifies every `app/(app)` page (root / redirect / own exit / interior); a new unclassified page fails it. Out of scope: `(onboarding)`, auth, `dev`, public `g/` and `u/` pages.
+- Receipts: `docs/ai-handoff/receipts/2026-11-04-back/` (dev fixture pages at 1440 and 390).
