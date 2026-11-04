@@ -627,3 +627,72 @@ describe("a company with only a full description", () => {
     expect(cells("Traction")?.[0] ?? "").not.toMatch(/B2B payments platform/u);
   });
 });
+
+// Acceptance 2026-11-04 (J5, production 8967c4fd4): after comparing Mizan
+// and Silo Credit (level at 9.0), "which has better traction?" came back
+// as Mizan's figures followed by "That gives Silo the stronger visible
+// operating footprint": the model's opening sentence, Silo Credit's own
+// figures, was dropped as a "competing lead", so the conclusion lost the
+// figures it was drawn from.
+describe("acceptance J5: each company's figures stay with it", () => {
+  const TRACTION =
+    "Silo Credit reports 14 certified warehouses, ₦2.1bn financed and a loss rate under 0.5%. Mizan reports three live banks, EGP 640m originated and a 0.9% non-performing rate. That gives Silo the stronger visible operating footprint and the lower reported credit-loss figure.";
+  it("a level verdict has no competing lead: nothing the model said is dropped", () => {
+    const text = ledByVerdict(TRACTION, {
+      leader: "Mizan",
+      other: "Silo Credit",
+      leaderScore: "9.0",
+      otherScore: "9.0",
+      level: true,
+    });
+    expect(text).toContain("Silo Credit reports 14 certified warehouses");
+    expect(text).toContain("Mizan reports three live banks");
+    expect(text.indexOf("14 certified warehouses")).toBeLessThan(
+      text.indexOf("stronger visible operating footprint"),
+    );
+  });
+  it("a sentence stating one company's figures is never taken for a competing lead", () => {
+    const text = ledByVerdict(TRACTION, {
+      leader: "Mizan",
+      other: "Silo Credit",
+      leaderScore: "9.0",
+      otherScore: "8.4",
+      level: false,
+    });
+    expect(text.startsWith("On Capital Q's mandate fit, Mizan leads")).toBe(
+      true,
+    );
+    expect(text).toContain("Silo Credit reports 14 certified warehouses");
+  });
+});
+
+describe("acceptance J5: a lender's stated traction is in the table", () => {
+  it("reads originated, financed and loss figures from each one's own description", () => {
+    const { read, fits } = run();
+    const mizan = read.companyFacts.get(MIZAN);
+    const silo = read.companyFacts.get(SILO);
+    if (mizan === undefined || silo === undefined) throw new Error("fixture");
+    read.companyFacts.set(MIZAN, {
+      ...mizan,
+      description:
+        "Mizan is infrastructure for Shariah-compliant small-business financing. Three banks are live, EGP 640m has been originated, and the non-performing rate is 0.9%.",
+    });
+    read.companyFacts.set(SILO, {
+      ...silo,
+      description:
+        "Silo Credit runs warehouse-receipt finance for grain traders. Silo works with 14 certified warehouses, has financed about ₦2.1bn, and has a loss rate under 0.5%.",
+    });
+    const block = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit side by side",
+      read,
+      fits,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    const traction = block.rows.find((row) => row.label === "Traction")?.cells;
+    // Each column holds its own company's figures, never the other's.
+    expect(traction?.[0]).toContain("EGP 640m");
+    expect(traction?.[0]).not.toContain("₦2.1bn");
+    expect(traction?.[1]).toContain("₦2.1bn");
+    expect(traction?.[1]).not.toContain("EGP 640m");
+  });
+});

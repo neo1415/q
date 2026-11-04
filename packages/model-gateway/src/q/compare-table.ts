@@ -90,6 +90,11 @@ const TRACTION_KEYS: readonly RegExp[] = [
   /\b(customers?|clients?|users?|merchants?)\b/iu,
   /margin/iu,
   /\b(gmv|volume|transactions?)\b/iu,
+  // Acceptance 2026-11-04 (J5): a lender's traction is what it has lent
+  // and how it is repaid ("EGP 640m originated", "₦2.1bn financed", "0.9%
+  // non-performing"); without these the table said "Not known" for Mizan
+  // and Silo Credit while the answer quoted their own figures.
+  /\b(originat\w*|financed|disburs\w*|loan book|non-performing|npl|loss rate|default rate)\b/iu,
 ];
 
 function tractionRank(figure: ReadCompanyFigure): number {
@@ -684,9 +689,18 @@ export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
   const [first, ...rest] = sentences;
   const names = (sentence: string, name: string) =>
     containsCompanyName(sentence, name);
+  // Acceptance 2026-11-04 (J5): "which has better traction?" after a
+  // level Mizan / Silo Credit comparison lost Silo Credit's own figures
+  // (its opening sentence) and kept the conclusion drawn from them. A
+  // level verdict has no leader to compete with, and a sentence stating a
+  // company's figures is that company's evidence, never a competing lead:
+  // each figure stays with the company it belongs to.
   const competing =
     first !== undefined &&
-    ((names(first, verdict.other) && !names(first, verdict.leader)) ||
+    ((!verdict.level &&
+      !/\p{N}/u.test(first) &&
+      names(first, verdict.other) &&
+      !names(first, verdict.leader)) ||
       // Live 2026-10-26 (run 0adc1c1e): the model's opening said the
       // verdict again in its own words; it is said once.
       restatesVerdict(first, verdict));
