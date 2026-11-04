@@ -405,8 +405,13 @@ export function QConversationPanel({
   }, [sessionTalk, openingWords, turns.length, spoken.length]);
 
   const endVoice = voice.end;
+  // The End button: the person's own choice.
   const end = useCallback(() => {
-    void endVoice();
+    void endVoice("user");
+  }, [endVoice]);
+  // QO-12: typing closes the line; logged as such, not as End.
+  const endForTyping = useCallback(() => {
+    void endVoice("typed");
   }, [endVoice]);
 
   // QA QO-46 (privacy, owner 2026-10-23): the microphone opens only on
@@ -845,12 +850,12 @@ export function QConversationPanel({
       if (lineOpen) {
         // Its answer is written, not read by another voice (writtenFrom).
         writtenFrom.current = turnCount;
-        end();
+        endForTyping();
       }
       await qAsk(text);
       markAttachmentsSent();
     },
-    [lineOpen, end, qAsk, turnCount],
+    [lineOpen, endForTyping, qAsk, turnCount],
   );
 
   // The same answer, said on a voice line: the person's own transcript,

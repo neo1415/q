@@ -3,6 +3,7 @@ import {
   type QVoiceLiveTrial,
 } from "@capital-q/contracts";
 
+import type { VoiceEndDetail } from "../session";
 import {
   navigationHeard,
   navigationHeardFor,
@@ -118,7 +119,15 @@ export type LiveCallOptions = {
 export type LiveCall = {
   readonly voiceSessionId: string;
   /** Silent and closing when it resolves (see `finished`). */
-  readonly end: (reason?: LiveCallEnd) => Promise<void>;
+  /**
+   * `detail` names who or what ended it (B, audit 2026-11-04: every end
+   * was logged "ended", so lines closing 3-28 s in could not be traced).
+   * It is what the Q API logs; `reason` still decides ended vs dropped.
+   */
+  readonly end: (
+    reason?: LiveCallEnd,
+    detail?: VoiceEndDetail,
+  ) => Promise<void>;
   /** The session closed (or gave up waiting) and its usage was reported. */
   readonly finished: Promise<void>;
   readonly typed: (text: string) => void;
@@ -659,7 +668,7 @@ export async function startLiveCall(
     // "Hey Q, pitch yourself" (owner, 23 Oct): taken by code, and the call
     // ends, so the model's own answer never plays over what starts.
     if (interceptHeard(done.text)) {
-      void end();
+      void end("ended", "pitch_intercept");
       return;
     }
     keep("USER", done.text);
@@ -1110,7 +1119,7 @@ export async function startLiveCall(
           performance.now() - lastSpeechAt >= GOODBYE_QUIET_MS);
       if (!done) return;
       clearInterval(watch);
-      void end("ended").then(() => {
+      void end("ended", "goodbye").then(() => {
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event(VOICE_LEAVE_EVENT));
         }
@@ -1118,7 +1127,10 @@ export async function startLiveCall(
     }, 250);
   };
 
-  const end = (reason: LiveCallEnd = "ended"): Promise<void> => {
+  const end = (
+    reason: LiveCallEnd = "ended",
+    detail?: VoiceEndDetail,
+  ): Promise<void> => {
     if (ended) return Promise.resolve();
     ended = true;
     // Silent first: the speaker and the microphone stop now; closing the
@@ -1140,7 +1152,7 @@ export async function startLiveCall(
         mine.channel.send(JSON.stringify({ type: "session.close" }));
       }
     }
-    finished = finish(mine, reason);
+    finished = finish(mine, reason, detail);
     let waited: ReturnType<typeof setTimeout> | undefined;
     return Promise.race([
       flushed,
@@ -1153,6 +1165,7 @@ export async function startLiveCall(
   const finish = async (
     mine: Connection | null,
     reason: LiveCallEnd,
+    detail?: VoiceEndDetail,
   ): Promise<void> => {
     if (mine !== null) {
       // Ended before the data channel opened (superseded or ended in the
@@ -1185,9 +1198,15 @@ export async function startLiveCall(
     }
     await flushTranscript();
     if (id !== null) {
-      await post(doFetch, `end/${id}`, { reason }, token).catch(
-        () => undefined,
-      );
+      await post(
+        doFetch,
+        `end/${id}`,
+        {
+          reason:
+            reason === "ended" && typeof detail === "string" ? detail : reason,
+        },
+        token,
+      ).catch(() => undefined);
     }
     update();
     options.onEnded(reason);

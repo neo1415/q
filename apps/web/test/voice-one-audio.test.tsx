@@ -147,8 +147,9 @@ function microphone() {
 const relayCalls: string[] = [];
 let leaveOnDelegate = false;
 const transcriptPosts: {
-  segments: { role: string; text: string; at: number }[];
+  segments: { role: string; text: string; at: number; delegated?: boolean }[];
 }[] = [];
+const endBodies: unknown[] = [];
 const relay: typeof fetch = (input, init) => {
   const url =
     typeof input === "string"
@@ -157,6 +158,11 @@ const relay: typeof fetch = (input, init) => {
         ? input.href
         : input.url;
   relayCalls.push(url);
+  if (url.includes("/end/")) {
+    endBodies.push(
+      JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+    );
+  }
   if (url.includes("/transcript/")) {
     transcriptPosts.push(
       JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
@@ -410,6 +416,13 @@ describe("one voice line produces audio in a tab", () => {
       ["Q", "It's coming up now."],
       ["USER", "Thanks"],
     ]);
+    // B1: the delegated request and the reply after it are marked (Q's run
+    // wrote them); the person's next words are theirs again.
+    expect(segments.map((one) => one.delegated === true)).toEqual([
+      true,
+      true,
+      false,
+    ]);
     // Stored before the line is ended on the server (it is gone after).
     const transcriptAt = relayCalls.findIndex((url) =>
       url.includes("/transcript/"),
@@ -417,6 +430,20 @@ describe("one voice line produces audio in a tab", () => {
     const endAt = relayCalls.findLastIndex((url) => url.includes("/end/"));
     expect(transcriptAt).toBeGreaterThanOrEqual(0);
     expect(transcriptAt, relayCalls.join(" ")).toBeLessThan(endAt);
+  });
+
+  it("B: tells the Q API who ended the line, not only that it ended", async () => {
+    const call = await standalone();
+    endBodies.length = 0;
+    const ending = call.end("ended", "handoff_chat");
+    peers.at(-1)?.channel.emit({
+      type: "session.closed",
+      reason: "close_requested",
+      usage: { seconds: 2 },
+    });
+    await ending;
+    await call.finished;
+    expect(endBodies.at(-1)).toEqual({ reason: "handoff_chat" });
   });
 
   it("ends the call after Q's goodbye and takes them into Capital Q when they stop for now (owner 2026-10-28)", async () => {

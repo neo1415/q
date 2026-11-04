@@ -601,7 +601,7 @@ export function QSessionProvider({
   const voiceEnd = voice.end;
   useFollowTurn(voice.turn, voice.client, (followed) => {
     if (followed.handoff === "CHAT") {
-      void voiceEnd();
+      void voiceEnd("handoff_chat");
       return;
     }
     // R20/R33: theme, reload or their website, carried by Q's answer.

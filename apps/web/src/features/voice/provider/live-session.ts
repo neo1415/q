@@ -1,5 +1,6 @@
 "use client";
 
+import type { VoiceEndDetail } from "../session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { liveUnavailableForTab } from "../live/availability";
@@ -129,7 +130,7 @@ export function useLiveVoiceSession(
     () => () => {
       const call = callRef.current;
       callRef.current = null;
-      void call?.end("ended");
+      void call?.end("ended", "unmount");
     },
     [],
   );
@@ -213,7 +214,7 @@ export function useLiveVoiceSession(
         });
         came = true;
         if (startsRef.current !== mine) {
-          void call.end("ended");
+          void call.end("ended", "superseded_start");
           return "FAILED";
         }
         callRef.current = call;
@@ -234,13 +235,13 @@ export function useLiveVoiceSession(
     [onTranscript, startCall, options.audioOwner, showStatus],
   );
 
-  const end = useCallback(async () => {
+  const end = useCallback(async (detail?: VoiceEndDetail) => {
     startsRef.current += 1;
     const call = callRef.current;
     callRef.current = null;
     setConnected(false);
     setState("IDLE");
-    await call?.end("ended");
+    await call?.end("ended", detail ?? "user");
   }, []);
 
   // QO-18: typed words on the call are the person's own line in the

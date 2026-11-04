@@ -1,5 +1,6 @@
 "use client";
 
+import type { VoiceEndDetail } from "./session";
 import { createContext, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
@@ -107,7 +108,8 @@ export type VoiceInterview = {
      */
     readonly automatic?: boolean | undefined;
   }) => Promise<void>;
-  readonly end: () => Promise<void>;
+  /** `detail`: who or what ended the line (logged by the Q API). */
+  readonly end: (detail?: VoiceEndDetail) => Promise<void>;
   readonly chooseVoice: (voice: QVoiceChoice) => Promise<void>;
   readonly clearNotice: () => void;
   /**
@@ -539,13 +541,13 @@ export function useVoiceInterview(
   }));
 
   /** The transport and the polling stop; the thread is kept. */
-  const closeTransport = useCallback(async () => {
+  const closeTransport = useCallback(async (detail?: VoiceEndDetail) => {
     liveGeneration.current = null;
     clearReconnect();
     setVoiceSessionId(null);
     sessionToken.current = undefined;
     upSince.current = null;
-    await clientRef.current.end();
+    await clientRef.current.end(detail);
   }, []);
 
   /** Everything about this line is let go: the person, or another surface, ended it. */
@@ -577,7 +579,7 @@ export function useVoiceInterview(
   useEffect(() => {
     releaseRef.current = async (reopening) => {
       if (!reopening) reset();
-      await closeTransport();
+      await closeTransport(reopening ? "reopen" : "released");
     };
   }, [reset, closeTransport]);
 
@@ -737,15 +739,18 @@ export function useVoiceInterview(
     };
   }, [holder]);
 
-  const end = useCallback(async () => {
-    // Ended while connecting: the next press opens a new line, never joins
-    // the one that was ended.
-    connecting.current = null;
-    reset();
-    // After any open still in progress, so an End pressed while connecting
-    // is never followed by the line coming up.
-    await endVoiceLine(holder, () => clientRef.current.end());
-  }, [holder, reset]);
+  const end = useCallback(
+    async (detail?: VoiceEndDetail) => {
+      // Ended while connecting: the next press opens a new line, never joins
+      // the one that was ended.
+      connecting.current = null;
+      reset();
+      // After any open still in progress, so an End pressed while connecting
+      // is never followed by the line coming up.
+      await endVoiceLine(holder, () => clientRef.current.end(detail ?? "user"));
+    },
+    [holder, reset],
+  );
 
   // While talking, follow what Q is asking; a stale read is dropped.
   useEffect(() => {
@@ -867,7 +872,7 @@ export function useVoiceInterview(
         cancelled = true;
         personAsked.current = false;
         const replaced = generation.current;
-        void clientRef.current.end().then(() => {
+        void clientRef.current.end("replaced").then(() => {
           if (generation.current !== replaced) return;
           endedRef.current("ended");
           setNotice(VOICE_MOVED_NOTICE);
@@ -879,7 +884,7 @@ export function useVoiceInterview(
         // line is ended as dropped, which is what brings it back.
         cancelled = true;
         const gone = generation.current;
-        void clientRef.current.end().then(() => {
+        void clientRef.current.end("gone").then(() => {
           // Only if this is still the current line: a newer one is not
           // ended because an older session was let go.
           if (generation.current === gone) endedRef.current("dropped");

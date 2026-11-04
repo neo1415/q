@@ -179,7 +179,8 @@ export type VoiceSessionClient = {
   readonly pausedAway?: boolean | undefined;
   readonly transcript: readonly VoiceTranscriptLine[];
   readonly start: (input: VoiceSessionStart) => Promise<void>;
-  readonly end: () => Promise<void>;
+  /** `detail`: who or what ended the line, for the server's log. */
+  readonly end: (detail?: VoiceEndDetail) => Promise<void>;
   /** Typed text while voice is active: the same Q turn, answered aloud (C §41). */
   readonly sendText: (text: string) => void;
   /**
@@ -213,3 +214,21 @@ export function isLineLive(
 ): boolean {
   return client.connected && client.state !== "ERROR";
 }
+
+/**
+ * B (audit 2026-11-04): who or what ended a voice line, logged by the Q
+ * API. Distinct, so a line that closes seconds in names its cause.
+ */
+export type VoiceEndDetail =
+  | "user"
+  | "typed"
+  | "handoff_chat"
+  | "unmount"
+  | "released"
+  | "reopen"
+  | "replaced"
+  | "gone"
+  | "superseded_start"
+  | "pitch_intercept"
+  | "goodbye"
+  | "surface";
