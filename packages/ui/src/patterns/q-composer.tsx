@@ -3,6 +3,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type DragEvent,
@@ -146,6 +147,36 @@ export function QComposer({
   const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /**
+   * A1 (4 Nov rehearsal): the server-rendered field is on screen seconds
+   * before React attaches, and people type into it. React 19 hydrates a
+   * controlled textarea without touching what the browser holds (it sets
+   * defaultValue, which leaves a dirty field alone), so their words stayed
+   * on screen while state was still empty: Send stayed off and Enter sent
+   * nothing. On the first client commit the field's own words become the
+   * state. Until then Send stays disabled, so no native form submit (a GET
+   * reload with ?question=) can take the page and the words with it.
+   */
+  const [hydrated, setHydrated] = useState(false);
+  useLayoutEffect(() => {
+    setHydrated(true);
+    const element = textareaRef.current;
+    if (element === null) return;
+    // Without JS, Enter in a textarea writes a line break instead of
+    // sending; a break at the very end was meant as Send, so it is
+    // dropped and the question waits, ready, rather than being sent on a
+    // guess (a deliberate Shift+Enter looks the same).
+    if (element.value === latestValue.current) return;
+    const typed = element.value.replace(/[\r\n]+$/u, "");
+    // Written back too: when only the break differs, state does not change
+    // and React would leave the stray line on screen.
+    element.value = typed;
+    latestValue.current = typed;
+    setValue(typed);
+    onValueChange?.(typed);
+    resize(element);
+    // Mount only: this adopts what was typed before React was listening.
+  }, []);
 
   const trimmed = value.trim();
   const attached = attachments.filter(
@@ -156,7 +187,11 @@ export function QComposer({
   const uploading = attached.some((entry) => entry.state === "uploading");
   const ready = attached.some((entry) => entry.state === "ready");
   const canSubmit =
-    (trimmed.length > 0 || ready) && !uploading && !disabled && !submitting;
+    hydrated &&
+    (trimmed.length > 0 || ready) &&
+    !uploading &&
+    !disabled &&
+    !submitting;
   /**
    * Enter or Send pressed while the composer is held (Q still working, a
    * send in flight, a document uploading): the words wait in the field and
@@ -304,6 +339,7 @@ export function QComposer({
             // words, and Enter queues them (above).
             aria-disabled={disabled ? true : undefined}
             data-q-composer-held={held ? "" : undefined}
+            data-q-composer-hydrated={hydrated ? "" : undefined}
             placeholder={t(placeholder)}
             enterKeyHint="send"
             autoComplete="off"

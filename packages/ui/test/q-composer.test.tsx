@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { act, type ReactElement } from "react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   Q_COMPOSER_PLACEHOLDER,
@@ -217,5 +220,115 @@ describe("QComposer", () => {
     await vi.waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+/**
+ * A1 (4 Nov production rehearsal): the server-rendered composer is visible
+ * seconds before React hydrates. Words typed in that window must survive
+ * hydration whole, and be sent exactly once.
+ */
+describe("QComposer before hydration", () => {
+  let unmount: (() => void) | undefined;
+  afterEach(() => {
+    unmount?.();
+    unmount = undefined;
+    document.body.innerHTML = "";
+  });
+
+  async function hydrateAfterTyping(element: ReactElement, typed: string) {
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(element);
+    document.body.append(container);
+    const field = container.querySelector("textarea");
+    if (field === null) throw new Error("no composer field rendered");
+    // The browser's own typing: sets the field's value (and dirty flag)
+    // with nothing listening yet.
+    field.value = typed;
+    const send = container.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    );
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    await act(async () => {
+      root = hydrateRoot(container, element);
+      await Promise.resolve();
+    });
+    unmount = () => {
+      act(() => root?.unmount());
+      container.remove();
+    };
+    return { field, send };
+  }
+
+  it("server markup keeps Send disabled, so no native submit can reload the page", () => {
+    const markup = renderToString(
+      <QComposer initialValue="A draft" onSubmit={() => undefined} />,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const send = container.querySelector('button[type="submit"]');
+    expect(send?.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("keeps every word typed before hydration and sends it once", async () => {
+    const onSubmit = vi.fn();
+    const question = "Which seed-stage climate companies fit my mandate?";
+    const { field, send } = await hydrateAfterTyping(
+      <QComposer onSubmit={onSubmit} />,
+      question,
+    );
+    expect(field.value).toBe(question);
+    expect(send?.hasAttribute("disabled")).toBe(false);
+    const user = userEvent.setup();
+    await user.type(field, "{Enter}", {
+      initialSelectionStart: question.length,
+      initialSelectionEnd: question.length,
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(question);
+  });
+
+  it("an Enter pressed before hydration keeps the text ready to send, without a stray line", async () => {
+    const onSubmit = vi.fn();
+    const { field, send } = await hydrateAfterTyping(
+      <QComposer onSubmit={onSubmit} />,
+      "What is the runway?\n",
+    );
+    expect(field.value).toBe("What is the runway?");
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(send?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      send?.click();
+      await Promise.resolve();
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith("What is the runway?");
+  });
+
+  it("typing more after hydration continues the pre-hydration words", async () => {
+    const onSubmit = vi.fn();
+    const onValueChange = vi.fn();
+    const { field } = await hydrateAfterTyping(
+      <QComposer onSubmit={onSubmit} onValueChange={onValueChange} />,
+      "Compare the",
+    );
+    expect(onValueChange).toHaveBeenLastCalledWith("Compare the");
+    const user = userEvent.setup();
+    await user.type(field, " two founders{Enter}", {
+      initialSelectionStart: field.value.length,
+      initialSelectionEnd: field.value.length,
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith("Compare the two founders");
+  });
+
+  it("an untouched draft is left as it was", async () => {
+    const onValueChange = vi.fn();
+    const { field } = await hydrateAfterTyping(
+      <QComposer initialValue="A draft" onValueChange={onValueChange} />,
+      "A draft",
+    );
+    expect(field.value).toBe("A draft");
+    expect(onValueChange).not.toHaveBeenCalled();
   });
 });
