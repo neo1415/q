@@ -108,7 +108,7 @@ import { readTypedDraft } from "./control/fast-navigation";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
 import { earlierWork, jobIdsIn, PinnedWorkLines } from "./pinned-work";
-import { QWorkProgress } from "./work-progress-view";
+import { QWorkProgress, useWorkStreams } from "./work-progress-view";
 import { promisedJobs } from "./work-live";
 
 /*
@@ -777,6 +777,11 @@ export function QConversationPanel({
       (presence.label ?? null);
 
   const turnCount = turns.length;
+  // live5 d: the answer's Working list is on this screen (QWorkProgress
+  // below), so Now does not repeat its step as a second chip.
+  const runListed = useWorkStreams({ run: true, jobs: false }).streams.some(
+    (stream) => stream.source === "RUN",
+  );
   const [historyOpen, setHistoryOpen] = useState(false);
   // W7: the sheet's code loads the first time it is opened, then stays.
   const [historyUsed, setHistoryUsed] = useState(false);
@@ -1507,6 +1512,7 @@ export function QConversationPanel({
                             onAct={sayOrAsk}
                             quietWhenIdle
                             withStop={false}
+                            taskShownElsewhere={runListed}
                           />
                         )
                       }
@@ -1685,6 +1691,7 @@ export function QConversationPanel({
                     onAct={sayOrAsk}
                     quietWhenIdle
                     withStop={false}
+                    taskShownElsewhere={runListed}
                   />
                 )}
                 {notices}
@@ -1842,6 +1849,7 @@ export function QConversationPanel({
                       onAct={sayOrAsk}
                       quietWhenIdle
                       withStop={false}
+                      taskShownElsewhere={runListed}
                     />
                   </div>
                 )}

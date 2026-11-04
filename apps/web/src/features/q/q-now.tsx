@@ -71,8 +71,15 @@ export function QNow({
   quietWhenIdle = false,
   showProgress = false,
   withStop = true,
+  taskShownElsewhere = false,
 }: {
   readonly session: QSessionValue;
+  /**
+   * live5 d (2026-11-04): this screen's work list already shows what Q is
+   * doing (its Working list, "Looking at the company"), so Now does not
+   * repeat it as a second "Now · Looking at the company" chip under it.
+   */
+  readonly taskShownElsewhere?: boolean | undefined;
   /**
    * Round 5: Now is its own column here (the desktop Q page with the
    * Board docked), so a durable task's progress shows here and only here.
@@ -99,7 +106,10 @@ export function QNow({
   const { approval, proposal } = nowApproval(q.state);
   const questions = nowQuestions(turns);
   const nothing = !q.working && approval === null && questions.length === 0;
-  if (nothing && quietWhenIdle) return null;
+  const task = q.working && !taskShownElsewhere;
+  if (quietWhenIdle && !task && approval === null && questions.length === 0) {
+    return null;
+  }
 
   return (
     <section
@@ -114,7 +124,7 @@ export function QNow({
         </p>
       ) : null}
 
-      {q.working ? (
+      {task ? (
         <div className="cq-q-now-item" data-q-now-task>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="cq-body-sm font-medium text-(--cq-text-primary)">
