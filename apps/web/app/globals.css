@@ -3512,6 +3512,13 @@
     pointer-events: none;
     transition: opacity var(--cq-motion-fast) var(--cq-ease);
   }
+  /* The shortcut beside "Ask Q" (UX-05): quieter than the words. */
+  .cq-q-dock-kbd {
+    margin-inline-start: 8px;
+    font-family: var(--cq-font-ui);
+    font-size: 11px;
+    opacity: 0.75;
+  }
   [data-q-dock-placement^="left"] .cq-q-dock-tip {
     inset-inline-end: auto;
     inset-inline-start: calc(100% + 8px);
