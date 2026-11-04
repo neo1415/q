@@ -643,7 +643,7 @@ export function QConversationPanel({
     (view === "presence" && stageCards);
   // Presence view is Q's presence only (founder request 2026-10-03): a
   // laid-out answer is shown over it (QPresenceStage), not as a thread.
-  const bigPresence = !conversing || view === "presence";
+  const bigPresence = view === "presence";
   const captions = useSyncExternalStore(
     subscribeCaptions,
     readCaptions,
@@ -1064,30 +1064,30 @@ export function QConversationPanel({
               <QCanSee className="max-sm:hidden" />
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-              {conversing ? (
-                <div
-                  role="group"
-                  aria-label={t("View")}
-                  className="flex items-center rounded-md border border-(--cq-border-subtle) p-0.5"
-                  data-q-control="view"
-                >
-                  {(["presence", "chat"] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={view === option}
-                      onClick={() => chooseView(option)}
-                      className={
-                        view === option
-                          ? "cq-stage-quiet is-active"
-                          : "cq-stage-quiet"
-                      }
-                    >
-                      {option === "presence" ? "Q" : t("Chat")}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              {/* Owner 2026-11-04: Q and Chat are always there, not only
+                  once a conversation has begun. */}
+              <div
+                role="group"
+                aria-label={t("View")}
+                className="flex items-center rounded-md border border-(--cq-border-subtle) p-0.5"
+                data-q-control="view"
+              >
+                {(["presence", "chat"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={view === option}
+                    onClick={() => chooseView(option)}
+                    className={
+                      view === option
+                        ? "cq-stage-quiet is-active"
+                        : "cq-stage-quiet"
+                    }
+                  >
+                    {option === "presence" ? "Q" : t("Chat")}
+                  </button>
+                ))}
+              </div>
               {conversing && view === "presence" && !voice.active ? (
                 <button
                   type="button"
@@ -1622,78 +1622,83 @@ export function QConversationPanel({
                   room.filled && "lg:max-w-6xl",
                 )}
               >
-                <ArrivalRoom>
-                  {room.filled ? (
-                    <div data-q-room-presence="filled">
-                      <ViewTransition
-                        name="q-aperture"
-                        share="cq-q-morph"
-                        default="none"
+                {/* Chat before the first word: the greeting, as a chat app's first screen; Q is in the corner. */}
+                {view === "chat" ? null : (
+                  <ArrivalRoom>
+                    {room.filled ? (
+                      <div data-q-room-presence="filled">
+                        <ViewTransition
+                          name="q-aperture"
+                          share="cq-q-morph"
+                          default="none"
+                        >
+                          <QAperture
+                            state={presence.state}
+                            size="stage"
+                            inputLevel={client.inputLevel}
+                            outputLevel={client.outputLevel}
+                            stage
+                          />
+                        </ViewTransition>
+                      </div>
+                    ) : (
+                      // The voice room (owner 2026-10-19): with nothing beside
+                      // Q, the room at rest is a large, dim Q that gathers
+                      // into the stage's cloud the moment Q listens or works.
+                      <div
+                        ref={fitRoomPresence}
+                        className={cx(
+                          "cq-room-presence",
+                          roomGathered && "is-gathered",
+                        )}
+                        style={{
+                          ["--cq-room-box" as string]: `${String(stagePixels)}px`,
+                          ["--cq-room-gather" as string]: String(ROOM_GATHER),
+                        }}
+                        data-q-room-presence={
+                          roomGathered ? "gathered" : "field"
+                        }
                       >
-                        <QAperture
-                          state={presence.state}
-                          size="stage"
-                          inputLevel={client.inputLevel}
-                          outputLevel={client.outputLevel}
-                          stage
-                        />
-                      </ViewTransition>
-                    </div>
-                  ) : (
-                    // The voice room (owner 2026-10-19): with nothing beside
-                    // Q, the room at rest is a large, dim Q that gathers
-                    // into the stage's cloud the moment Q listens or works.
-                    <div
-                      ref={fitRoomPresence}
-                      className={cx(
-                        "cq-room-presence",
-                        roomGathered && "is-gathered",
-                      )}
-                      style={{
-                        ["--cq-room-box" as string]: `${String(stagePixels)}px`,
-                        ["--cq-room-gather" as string]: String(ROOM_GATHER),
-                      }}
-                      data-q-room-presence={roomGathered ? "gathered" : "field"}
-                    >
-                      <ViewTransition
-                        name="q-aperture"
-                        share="cq-q-morph"
-                        default="none"
-                      >
-                        <QAperture
-                          state={presence.state}
-                          size={Math.round(stagePixels / ROOM_GATHER)}
-                          inputLevel={client.inputLevel}
-                          outputLevel={client.outputLevel}
-                          stage
-                          room={!roomGathered}
-                        />
-                      </ViewTransition>
-                    </div>
-                  )}
-                  <div className="flex min-h-6 flex-col items-center gap-2">
-                    {stateLabel === null ? null : (
-                      // A dot and a word ("Listening", "Speaking"), quiet.
-                      <span
-                        className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
-                        role="status"
-                        data-q-state-pill
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={cx(
-                            "size-2 rounded-full bg-(--cq-accent)",
-                            voice.active && "motion-safe:animate-pulse",
-                          )}
-                        />
-                        {t(stateLabel)}
-                      </span>
+                        <ViewTransition
+                          name="q-aperture"
+                          share="cq-q-morph"
+                          default="none"
+                        >
+                          <QAperture
+                            state={presence.state}
+                            size={Math.round(stagePixels / ROOM_GATHER)}
+                            inputLevel={client.inputLevel}
+                            outputLevel={client.outputLevel}
+                            stage
+                            room={!roomGathered}
+                          />
+                        </ViewTransition>
+                      </div>
                     )}
-                    {/* Round 4: where Q is, one line, its height kept so
+                    <div className="flex min-h-6 flex-col items-center gap-2">
+                      {stateLabel === null ? null : (
+                        // A dot and a word ("Listening", "Speaking"), quiet.
+                        <span
+                          className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                          role="status"
+                          data-q-state-pill
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cx(
+                              "size-2 rounded-full bg-(--cq-accent)",
+                              voice.active && "motion-safe:animate-pulse",
+                            )}
+                          />
+                          {t(stateLabel)}
+                        </span>
+                      )}
+                      {/* Round 4: where Q is, one line, its height kept so
                         the stage never moves as it changes. */}
-                    <StageLine current={presence.stage} reserve />
-                  </div>
-                </ArrivalRoom>
+                      <StageLine current={presence.stage} reserve />
+                    </div>
+                  </ArrivalRoom>
+                )}
 
                 {showWelcome ? (
                   <div

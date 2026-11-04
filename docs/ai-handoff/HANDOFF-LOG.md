@@ -1426,3 +1426,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Live (fictional `investor.savanna-seed`, "Write me an IC memo on Kycana Hub", job `12e184e4`, $0.053):** the investor's mandate is labelled "(your mandate)" — e.g. "Savanna's active mandate is seed-only (company record, self-reported; your mandate)"; company facts "(company record)". **Search providers answer again** (38 sources, 16 lines of enquiry), so item 3's no-research line was correctly absent; that case stays test-covered.
 - **Not live-checked:** items 1 and 2 (need a fresh onboarding; fresh fictional accounts were not created in this session) and chat cards (need a signed-in browser). Owner asked to check these, or the next session with a browser.
 - **Rotate:** the Railway token and `CQ_SEED_ACCOUNT_PASSWORD` were pasted in chat on 2026-11-02.
+
+## 2026-11-04 — Q page opens clean; Q / Chat always shown (Claude, local session)
+
+- **Owner:** the switch only appeared after Talk to Q, and the opening lists they had asked to remove were back.
+- **Cause (live check as fictional investor):** fresh page switch=0, with a conversation switch=1; the switch rendered only when `conversing`. The lists came from `519f41625` (30 Oct), which took the owner's remark as "force them open" and overrode the 17 Oct rule (greet, one question). Not caused by the 2 Nov work, whose only production change to that file was `cardsInline`.
+- **Fix:** removed the auto `chooseOpener("SHOW")` and the on-open discovery cards; restored the tests `519f41625` replaced; the switch always renders; Chat before the first word shows the greeting with Q in the corner. DECISIONS 54; MVP item 7 reworded.
+- **Also ships:** `f137cfdf3` (a typed turn that closes a call is answered in writing).
+- **Behaviour change to check:** a phone's default view is Chat, so a fresh phone now opens on the greeting without the large Q.

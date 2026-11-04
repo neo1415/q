@@ -1,5 +1,7 @@
 # Capital Q — Current shared engineering state
 
+> **Pending deploy note (2026-11-04):** see the newest entry in HANDOFF-LOG. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing.
+
 ## DEPLOYED c53a08055 — 2 November 2026, 20:42 UTC (Claude, local session)
 
 - **web + q-api SUCCESS on `c53a08055`** (CI run 41518159421 green: build, lint, typecheck, test, pgTAP). **api + workers unchanged on `b10cd6c87`.** No migrations (still 268/268). Also pushed to `build/int-rc`.

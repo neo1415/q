@@ -192,3 +192,4 @@ Core Seven remains the governing assessment framework. The new directive authori
 51. **The conversation-first, transcript-reader onboarding design stays (DECISIONS 39).** Going back to one model call that both replies and saves is the pre-27 Oct design. Fix the seams between reply and reader instead.
 52. **An IC memo on a company is always the researched memo** (web research, sources, competitors). A founder's own one-pager or memo stays quick.
 53. **Cities are not collected in onboarding.** Owner, 2026-10-30.
+54. **The Q page opens clean, and Q / Chat is always there.** Owner, 2026-11-04 (restoring 2026-10-17): Q greets and asks one open question. No "What I did", "Needs you", "In your feed" or discovery-gap lists unasked; they come up when the person asks. Do not read MVP item 7's earlier wording, or the owner's 2026-10-30 remark, as a reason to list them on open.

@@ -218,18 +218,16 @@ export function ReturningWelcome({
       {/* The arrival briefing carries what waits on them; not said twice. */}
       {briefing === undefined ? null : !arrived ? (
         <QBriefing briefing={briefing} />
-      ) : (
-        // Owner 2026-10-30 (MVP item 7): what keeps investors from finding
-        // them is shown as Q opens, from the same marketplace readiness the
-        // answer to "what should I do next?" leads with; with the reminder
-        // once they look. The rest of what waits is on the stage, not said
-        // twice.
+      ) : looking ? (
+        // Owner 2026-11-04 (restoring 2026-10-17): the page greets and asks
+        // one question. What keeps investors from finding them comes up
+        // with the rest of what waits, once they ask for it; not said twice.
         <QBriefing
           briefing={briefing}
           onlyDiscovery
-          onlyReminder={looking && setupReminders > 0}
+          onlyReminder={setupReminders > 0}
         />
-      )}
+      ) : null}
 
       {shownCards.length > 0 ? (
         <ul

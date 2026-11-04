@@ -36,7 +36,6 @@ import {
   isHandled,
   leftIn,
   markArrivalSaid,
-  chooseOpener,
   refreshArrival,
   setOpenerOffered,
   useArrival,
@@ -508,11 +507,6 @@ export function ArrivalStage({
   const nudged = ready?.nudge === true;
   useEffect(() => {
     if (offers !== null && !nudged) setOpenerOffered(offers);
-    // Owner 2026-10-30 (MVP item 7): opening Q shows what needs them
-    // without asking -- approvals, replies, requests, Q's questions -- so
-    // "What should I do today?" is rarely needed. The stage is the Q
-    // page's; the dock elsewhere still asks first.
-    if (offers === true && !nudged) chooseOpener("SHOW");
   }, [offers, nudged]);
 
   const activity =

@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, render } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createQStreamState } from "@capital-q/api-client";
@@ -126,5 +132,29 @@ describe("loading /home (QO-46)", () => {
     expect(talk).not.toHaveBeenCalled();
     expect(voiceTalk).not.toHaveBeenCalled();
     expect(getUserMedia).not.toHaveBeenCalled();
+  });
+});
+
+describe("Q and Chat before the first word (owner 2026-11-04)", () => {
+  it("the switch is there on a fresh page, and Chat really changes the view", async () => {
+    render(
+      <QConversationPanel
+        connected
+        context={{ scope: "unset", suggestions: [] }}
+        welcomeLine="Welcome back, Ada."
+      />,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    const chat = screen.getByRole("button", { name: "Chat" });
+    screen.getByRole("button", { name: "Q" });
+    expect(document.querySelector(".cq-room-presence")).not.toBeNull();
+    fireEvent.click(chat);
+    expect(chat.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector(".cq-room-presence")).toBeNull();
+    expect(document.querySelector("[data-q-presence='corner']")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Q" }));
+    expect(document.querySelector(".cq-room-presence")).not.toBeNull();
   });
 });

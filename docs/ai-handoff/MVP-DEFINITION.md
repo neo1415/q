@@ -15,7 +15,7 @@ This list is the bar. "Done" means each item passed **on production**, on a **fr
 
 ## B. Q page (founder and investor)
 
-7. **Opening Q shows what needs you, without asking:** pending approvals, replies waiting, gaps that block discovery, and next steps.
+7. **Opening Q greets and asks one open question; nothing is listed unasked.** What needs you (pending approvals, replies waiting, gaps that block discovery, next steps) comes up when you ask. The Q / Chat switch is always there. Owner 2026-11-04 (DECISIONS 54), replacing the 2026-10-30 reading of this item.
 8. Any question shows something on screen within 1 s and answer text within about 3 s. Long jobs (plans, research) show live stages, and the person can leave and come back.
 9. Q navigates when asked ("take me to my mandate"). A "yes" to Q's own offer does exactly what was offered.
 10. Artifacts open and download: memo, one-pager, deep research with every citation resolving, and the founder financial model (Excel).
