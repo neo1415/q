@@ -308,7 +308,7 @@ export function brandStyleSheet(palette: BrandPalette): string {
  */
 export const PREVIEW_SURFACES = {
   light: {
-    canvas: "oklch(0.985 0.004 92)",
+    canvas: "oklch(0.993 0.002 92)",
     border: "oklch(0.91 0.006 258)",
     text: "oklch(0.19 0.012 258)",
     muted: "oklch(0.43 0.012 258)",

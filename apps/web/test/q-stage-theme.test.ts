@@ -271,7 +271,7 @@ describe("the Q stage follows the theme", () => {
   it("writes black and gold's paper stage for light and its night for dark", () => {
     const css = presetStyleSheet(BLACK_GOLD);
     const root = /^:root\{([^}]*)\}/u.exec(css)?.[1] ?? "";
-    expect(root).toContain("--cq-stage-canvas:#f6f4ef;");
+    expect(root).toContain("--cq-stage-canvas:#fcfbf8;");
     expect(root).toContain("--cq-stage-accent:#8a6a12;");
     expect(root).toContain("--cq-night-canvas:#0b0a08;");
     expect(root).toContain("--cq-night-q-light:#e2b858;");
