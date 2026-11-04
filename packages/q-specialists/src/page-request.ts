@@ -26,8 +26,21 @@ export type PageTarget =
   | { readonly kind: "DESTINATION"; readonly destination: QNavigateDestination }
   | { readonly kind: "SETTINGS"; readonly section: QSettingsSection };
 
+/**
+ * N1 (owner 2026-11-04): how the request asks for the page. GO: "take me
+ * to", "open", "go to" -- the person asked to move, and moves. SHOW: "show
+ * me", "pull up", "I want to see" -- they asked to see what is there, so
+ * where Q can say it (ANSWERED_IN_PLACE) it is said here and the page is
+ * offered, not opened.
+ */
+export type PageMode = "GO" | "SHOW";
+
 export type PageRequest =
-  | { readonly kind: "PAGE"; readonly target: PageTarget }
+  | {
+      readonly kind: "PAGE";
+      readonly target: PageTarget;
+      readonly mode: PageMode;
+    }
   | { readonly kind: "UNKNOWN"; readonly named: string };
 
 const d = (destination: QNavigateDestination): PageTarget => ({
@@ -290,6 +303,86 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
 export const PAGE_VERB =
   /^(?:(?:hey|ok|okay)\s+q[,\s]+)?(?:(?:can|could|would|will)\s+you\s+|please\s+|q[,\s]+)*(?:take\s+me\s+(?:back\s+)?(?:to|into)|bring\s+me\s+to|go\s+(?:back\s+)?to|navigate\s+to|switch\s+to|jump\s+to|head\s+to|open(?:\s+up)?|pull\s+up|bring\s+up|show\s+me|show(?=\s+(?:my|our)\s)|let'?s\s+go\s+to|i\s+(?:want|need|would\s+like|'d\s+like)\s+to\s+(?:go\s+to|see|open))\s+(.+)$/iu;
 
+/**
+ * N1: the verb PAGE_VERB matched, read for whether it asks to see (SHOW)
+ * rather than to go (GO). Only the verb the page reader already isolated
+ * is read, never the rest of the sentence.
+ */
+const SHOW_VERB =
+  /(?:^|\s)(?:show(?:\s+me)?|pull\s+up|bring\s+up|i\s+(?:want|need|would\s+like|'d\s+like)\s+to\s+see)\s*$/iu;
+
+function modeOfVerb(verb: RegExpExecArray): PageMode {
+  const object = verb[1] ?? "";
+  const lead = verb[0].slice(0, verb[0].length - object.length);
+  return SHOW_VERB.test(lead) ? "SHOW" : "GO";
+}
+
+/**
+ * N1: the pages whose content Q can say in the conversation from the
+ * person's own authorised reads (the answer's `destinationSummary`). A
+ * SHOW request for one is answered here and the page is offered; any
+ * other page still opens at once. The fast paths read the same set, so
+ * the screen never moves early on a request Q will answer in place.
+ */
+export const ANSWERED_IN_PLACE: ReadonlySet<QNavigateDestination> = new Set([
+  "CRM_PIPELINE",
+  "RELATIONSHIPS",
+]);
+
+/** Whether a page request is answered in place first, with the page offered. */
+export function offeredFirst(request: PageRequest | null): boolean {
+  return (
+    request?.kind === "PAGE" &&
+    request.mode === "SHOW" &&
+    request.target.kind === "DESTINATION" &&
+    ANSWERED_IN_PLACE.has(request.target.destination)
+  );
+}
+
+/**
+ * N1: whether any sentence plainly asks to GO somewhere ("take me to my
+ * pipeline", "open it"), by the page reader's own verb. A move the turn
+ * reader read without such a sentence ("where's my pipeline?") is
+ * optional, so it is offered where Q can answer in place.
+ */
+export function asksToGoExplicitly(text: string): boolean {
+  return text.split(/(?<=[.!?])\s+/u).some((sentence) => {
+    const said = withoutLeadIn(selfCorrected(sentence)).replace(/[.!?]+$/u, "");
+    const verb = PAGE_VERB.exec(said);
+    return verb !== null && modeOfVerb(verb) === "GO";
+  });
+}
+
+export type OfferReply = "OPEN" | "STAY";
+
+const STAY_REPLY =
+  /^(?:(?:no+|nope|nah)(?:\s+thanks?(?:\s+you)?)?[\s,]*)?(?:(?:i'?ll|let'?s|we'?ll|i'?d\s+rather|i\s+want\s+to|i'?d\s+like\s+to)\s+)?(?:stay(?:\s+(?:here|put|on\s+this\s+page|where\s+i\s+am))?|not\s+now|not\s+yet|keep\s+me\s+here|maybe\s+later|later)?(?:[\s,]*thanks?(?:\s+you)?)?$/iu;
+const OPEN_REPLY =
+  /^(?:(?:yes|yeah|yep|yup|sure|ok|okay|alright|please|definitely|absolutely|go\s+ahead|do\s+it|sounds\s+good)\b[\s,]*)*(?:(?:please\s+)?(?:open(?:\s+(?:it|that|it\s+up|that\s+up|them|there))?|take\s+me\s+(?:there|to\s+it)|go(?:\s+there)?|let'?s\s+go(?:\s+there)?|show\s+me|do\s+it|go\s+ahead)(?:\s+please)?)?$/iu;
+
+/**
+ * N1: a short reply to Q's offer to open a page -- "yes, open it", "sure",
+ * "stay here", "no thanks". Null for anything else (a question, a new
+ * request), which the answer handles as any other turn. Read only when
+ * Q's last answer carries the offer. Navigation is harmless and
+ * reversible, so this is a reply to an offer, never an approval: nothing
+ * here reaches the Approval Engine.
+ */
+export function offerReplyOf(text: string): OfferReply | null {
+  const said = text
+    .trim()
+    .toLowerCase()
+    .replace(/[’]/gu, "'")
+    .replace(/[.!?…]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .replace(/^(?:hey\s+q|ok\s+q|q)[,\s]+/u, "")
+    .trim();
+  if (said.length === 0 || said.length > 60) return null;
+  if (STAY_REPLY.test(said)) return "STAY";
+  if (OPEN_REPLY.test(said)) return "OPEN";
+  return null;
+}
+
 /** Words that only frame a page's name. */
 const FRAME = /\b(?:page|screen|tab|section|view|area)\b/giu;
 const PAGE_WORD = /\b(?:page|screen|tab|section)\s*$/iu;
@@ -426,10 +519,15 @@ const COMPANY_DOCUMENTS =
 export function pageRequestOf(text: string): PageRequest | null {
   const said = withoutLeadIn(selfCorrected(text)).replace(/[.!?]+$/u, "");
   if (said.length === 0 || said.length > 160) return null;
-  if (HOME.test(said)) return { kind: "PAGE", target: d("HOME") };
+  if (HOME.test(said)) {
+    return { kind: "PAGE", target: d("HOME"), mode: "GO" };
+  }
   const verb = PAGE_VERB.exec(said);
   const object = verb?.[1]?.trim();
-  if (object === undefined || object.length === 0) return null;
+  if (verb === null || object === undefined || object.length === 0) {
+    return null;
+  }
+  const mode = modeOfVerb(verb);
   // Owner 2026-10-15: "show me a map of where Tensorgate is" asks for a
   // drawing, answered where they are; it names no page to go to.
   if (isDrawingObject(object) || asksForDrawing(said)) return null;
@@ -443,7 +541,7 @@ export function pageRequestOf(text: string): PageRequest | null {
     ...candidates(key),
   ]) {
     const target = PAGE_NAMES[candidate];
-    if (target !== undefined) return { kind: "PAGE", target };
+    if (target !== undefined) return { kind: "PAGE", target, mode };
   }
   const bare = object.replace(PAGE_WORD, "").trim();
   // "show me that section", "open this page": a pointer back at what Q

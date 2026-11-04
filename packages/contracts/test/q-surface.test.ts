@@ -261,6 +261,12 @@ const completedRun = {
       affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
     },
     {
+      kind: "NAVIGATION_OFFER",
+      intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      place: "Relationships",
+      openLabel: "Open pipeline",
+    },
+    {
       kind: "TIMELINE",
       title: "Your relationship",
       events: [
@@ -439,6 +445,8 @@ describe("type-level guarantees", () => {
           return block.jobId;
         case "PLAN":
           return block.planId;
+        case "NAVIGATION_OFFER":
+          return block.intent.kind;
         default: {
           const unreachable: never = block;
           return unreachable;

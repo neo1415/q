@@ -73,6 +73,7 @@ export function replyParts(
       case "SUMMARY":
       case "SCHEDULE":
       case "PLAN":
+      case "NAVIGATION_OFFER":
         // What the answer produced or needs from the person, and (E4) its
         // laid-out data: in view.
         inline.push(block);
@@ -243,6 +244,7 @@ export function QAnswer({
               blocks={leading}
               onAsk={onAsk}
               onOpenArtifact={onOpenArtifact}
+              turnId={turn.id}
             />
           ) : null}
         </div>
@@ -259,6 +261,7 @@ export function QAnswer({
           blocks={trailing}
           onAsk={onAsk}
           onOpenArtifact={onOpenArtifact}
+          turnId={turn.id}
         />
       ) : null}
       {/* Q Story: "what is Capital Q?" asked alone, the story one tap away. */}

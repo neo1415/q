@@ -295,6 +295,16 @@ export function cardPagePath(subject: QSubjectRef | null): string | null {
 }
 
 /**
+ * N1: the page Q offered ("Open pipeline"), opened by their click: a move
+ * of their own through the one navigation lifecycle, like a card's Open.
+ * The Q conversation lives in the app layout, so it stays in the dock.
+ */
+export function openOfferedPage(path: string): void {
+  beginNavigationTurn();
+  requestMove({ path });
+}
+
+/**
  * W4: "Rehearse with <name>" on a person's identity card: a move of their
  * own to that entity's rehearsal lobby, through the one navigation
  * lifecycle (the same path as a card's Open button).

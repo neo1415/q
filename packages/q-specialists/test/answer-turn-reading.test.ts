@@ -738,35 +738,145 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
   });
 
   // Coordinator 23 Oct 2026: "Show me my fundraising pipeline" said only
-  // "Opening your pipeline…". The move says what is in it, then opens it.
-  it("a move to their pipeline says what is in it first", async () => {
-    const asked: string[] = [];
+  // "Opening your pipeline…". N1 (owner 2026-11-04): it is answered here,
+  // with what is in it, and the pipeline is offered, not opened.
+  const PIPELINE_OFFER = {
+    kind: "NAVIGATION_OFFER",
+    intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    place: "Relationships",
+    openLabel: "Open pipeline",
+  } as const;
+  const SUMMARY =
+    "3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply.";
+
+  it("'show me my investor pipeline' says what is in it and offers the page (N1)", async () => {
+    for (const spoken of [false, true]) {
+      const asked: string[] = [];
+      const run = seam({
+        said: "Show me my investor pipeline",
+        spoken,
+        reading: toolReading({
+          kind: "NAVIGATE",
+          destination: "CRM_PIPELINE",
+          visibility: null,
+        }),
+        outcomes: [],
+        destinationSummary: (_request, destination) => {
+          asked.push(destination);
+          return Promise.resolve(SUMMARY);
+        },
+      });
+      expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+      expect(asked).toEqual(["CRM_PIPELINE"]);
+      expect(run.stored[0]?.content).toBe(
+        `${SUMMARY} Your full pipeline is in Relationships. Would you like to open it?`,
+      );
+      // Offered, never a UI_INTENT the screen would follow on its own.
+      expect(run.stored[0]?.blocks).toEqual([PIPELINE_OFFER]);
+      // Answered by code: no turn reading, no model.
+      expect(run.reads()).toBe(0);
+    }
+  });
+
+  it("'take me to my pipeline' moves at once, with no offer (N1)", async () => {
+    for (const spoken of [false, true]) {
+      const run = seam({
+        said: "Take me to my pipeline",
+        spoken,
+        reading: null,
+        outcomes: [],
+        destinationSummary: () => Promise.resolve(SUMMARY),
+      });
+      expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+      expect(run.stored[0]?.content).toMatch(/Opening your pipeline/u);
+      expect(run.stored[0]?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+        },
+      ]);
+    }
+  });
+
+  it("a move the reader read from words that do not ask to go is offered (N1)", async () => {
     const run = seam({
-      said: "Show me my fundraising pipeline",
+      said: "Where does my pipeline stand?",
       reading: toolReading({
         kind: "NAVIGATE",
         destination: "CRM_PIPELINE",
         visibility: null,
       }),
       outcomes: [],
-      destinationSummary: (_request, destination) => {
-        asked.push(destination);
-        return Promise.resolve(
-          "3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply.",
-        );
-      },
+      destinationSummary: () => Promise.resolve(SUMMARY),
     });
     expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
-    expect(asked).toEqual(["CRM_PIPELINE"]);
-    expect(run.stored[0]?.content).toMatch(
-      /^3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply\. Opening your pipeline/u,
-    );
+    expect(run.stored[0]?.blocks).toEqual([PIPELINE_OFFER]);
+  });
+
+  it("with nothing to say in place, 'show me my pipeline' still opens it (N1)", async () => {
+    const run = seam({
+      said: "Show me my investor pipeline",
+      reading: null,
+      outcomes: [],
+      destinationSummary: () => Promise.resolve(null),
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
         intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
       },
     ]);
+  });
+
+  it("'yes, open it' after the offer opens the offered page; 'stay here' stays (N1)", async () => {
+    const earlier = [
+      { role: "USER" as const, content: "Show me my investor pipeline" },
+      {
+        role: "Q" as const,
+        content: `${SUMMARY} Your full pipeline is in Relationships. Would you like to open it?`,
+        blocks: [PIPELINE_OFFER],
+      },
+    ];
+    for (const [said, spoken] of [
+      ["Yes, open it.", false],
+      ["yeah", true],
+    ] as const) {
+      const run = seam({ said, spoken, earlier, reading: null, outcomes: [] });
+      expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+      expect(run.stored[0]?.content).toMatch(/Opening your pipeline/u);
+      expect(run.stored[0]?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+        },
+      ]);
+      expect(run.reads()).toBe(0);
+    }
+    for (const said of ["Stay here", "no thanks"]) {
+      const run = seam({ said, earlier, reading: null, outcomes: [] });
+      expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+      expect(run.stored[0]?.content).toMatch(/stay here/iu);
+      expect(run.stored[0]?.blocks ?? []).toEqual([]);
+    }
+  });
+
+  it("a 'yes' with no offer before it is not read as one (N1)", async () => {
+    const run = seam({
+      said: "yes",
+      earlier: [
+        { role: "USER", content: "Take me to my pipeline" },
+        { role: "Q", content: "Opening your pipeline." },
+      ],
+      reading: null,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    for (const message of run.stored) {
+      expect(message.blocks ?? []).not.toContainEqual(
+        expect.objectContaining({ kind: "UI_INTENT" }),
+      );
+    }
   });
 
   // QA F-96 (24 Oct 2026): code's English lines ("Opening your pipeline…",
@@ -820,7 +930,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
   // QA 2026-10-24: an investor's "Show my pipeline" (no "me") was left to
   // the reader and answered with their capital commitments. It is the same
   // page request as "show me my pipeline", whatever the reading says.
-  it("'show my pipeline' opens their pipeline by code, with what is in it", async () => {
+  it("'show my pipeline' is read by code, with what is in it and the page offered", async () => {
     const asked: string[] = [];
     const run = seam({
       said: "Show my pipeline",
@@ -835,12 +945,10 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     });
     expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
     expect(asked).toEqual(["CRM_PIPELINE"]);
-    expect(run.stored[0]?.blocks).toEqual([
-      {
-        kind: "UI_INTENT",
-        intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
-      },
-    ]);
+    expect(run.stored[0]?.content).toMatch(
+      /^2 companies: Ledgerfold and Mizan in diligence\. /u,
+    );
+    expect(run.stored[0]?.blocks).toEqual([PIPELINE_OFFER]);
   });
 
   it("an investor's data room requests open the CRM, said where they are and what they asked (QO-15)", async () => {

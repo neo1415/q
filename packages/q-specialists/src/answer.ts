@@ -437,6 +437,10 @@ import {
   cardAt,
   cardsOnScreen,
   asksToGo,
+  ANSWERED_IN_PLACE,
+  asksToGoExplicitly,
+  offerReplyOf,
+  offeredFirst,
   ordinalOf,
   pageRequestOf,
   takenBack,
@@ -1702,6 +1706,36 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   BOARD: "Opening your board.",
   MANDATE: "Opening your mandate.",
 };
+
+/**
+ * N1 (owner 2026-11-04): what Q says after answering in place, and the
+ * offer card's words, for each page it answers in place first
+ * (ANSWERED_IN_PLACE). Code's words, never a model's.
+ */
+const OFFER_WORDS: Readonly<
+  Record<
+    string,
+    {
+      readonly line: string;
+      readonly place: string;
+      readonly openLabel: string;
+    }
+  >
+> = {
+  CRM_PIPELINE: {
+    line: "Your full pipeline is in Relationships. Would you like to open it?",
+    place: "Relationships",
+    openLabel: "Open pipeline",
+  },
+  RELATIONSHIPS: {
+    line: "Everything with each of them is in Relationships. Would you like to open it?",
+    place: "Relationships",
+    openLabel: "Open Relationships",
+  },
+};
+
+/** N1: what Q says when they choose to stay where they are. */
+const STAY_HERE_LINE = "Sure, we'll stay here. Ask me anything about it.";
 
 /**
  * A founder's own data room: never where an investor is taken (QO-15). The
@@ -3548,6 +3582,24 @@ export function createSpecialistQAnswer(
         );
         return null;
       }
+      // N1: a move the reader read from words that do not plainly ask to
+      // go ("where's my pipeline?") is optional: answered in place, with
+      // the page offered, where Q can say what is there.
+      if (!asksToGoExplicitly(words)) {
+        const offered = await offeredInPlace(request, destination);
+        if (offered !== null) {
+          logger?.info(
+            { qRunId: request.runId, destination },
+            "q answered in place and offered the page",
+          );
+          return recordAnswer(
+            request,
+            conversationId,
+            offered.said,
+            offered.blocks,
+          );
+        }
+      }
       logger?.info(
         { qRunId: request.runId, destination },
         "q is taking the person to a screen",
@@ -3738,6 +3790,81 @@ export function createSpecialistQAnswer(
     return summary === null ? said : `${summary} ${said}`;
   };
 
+  /**
+   * N1 (owner 2026-11-04): "Show me my investor pipeline" is answered here,
+   * with what is in it from their own authorised reads, and the page is
+   * offered (Open pipeline / Stay here) instead of opened. Null when there
+   * is nothing to say in place (no summary, or a read that failed): the
+   * page then opens as before, so a request is never left with neither.
+   */
+  const offeredInPlace = async (
+    request: QAnswerRequest,
+    destination: QNavigateDestination,
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+  } | null> => {
+    const words = OFFER_WORDS[destination];
+    if (
+      words === undefined ||
+      !ANSWERED_IN_PLACE.has(destination) ||
+      dependencies.destinationSummary === undefined
+    ) {
+      return null;
+    }
+    const summary = await dependencies
+      .destinationSummary(request, destination)
+      .catch(() => null);
+    if (summary === null) return null;
+    return {
+      said: `${summary} ${words.line}`,
+      blocks: [
+        {
+          kind: "NAVIGATION_OFFER",
+          intent: { kind: "NAVIGATE", destination },
+          place: words.place,
+          openLabel: words.openLabel,
+        },
+      ],
+    };
+  };
+
+  /**
+   * N1: their reply to Q's last offer to open a page. "Yes, open it" makes
+   * the offered move (the same registered intent, through the same follow
+   * path as any move); "stay here" keeps them where they are. Anything
+   * else is not a reply to the offer and goes the normal way. Never an
+   * approval: the offer is navigation, which is harmless and reversible.
+   */
+  const offerReplyAnswer = (
+    history: readonly QConversationMessage[],
+    text: string,
+  ): {
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly log: "OPEN" | "STAY";
+  } | null => {
+    const before = [...history];
+    if (before.at(-1)?.role === "USER") before.pop();
+    const lastQ = before.reverse().find((m) => m.role === "Q");
+    const offer = (lastQ?.blocks ?? []).findLast(
+      (block) => block.kind === "NAVIGATION_OFFER",
+    );
+    if (offer?.kind !== "NAVIGATION_OFFER") return null;
+    const reply = offerReplyOf(text);
+    if (reply === null) return null;
+    if (reply === "STAY")
+      return { said: STAY_HERE_LINE, blocks: [], log: reply };
+    return {
+      said:
+        offer.intent.kind === "NAVIGATE"
+          ? DESTINATION_LINES[offer.intent.destination]
+          : `Opening ${offer.place}.`,
+      blocks: [{ kind: "UI_INTENT", intent: offer.intent }],
+      log: reply,
+    };
+  };
+
   const pageAnswer = (
     text: string,
     history: readonly QConversationMessage[],
@@ -3746,6 +3873,8 @@ export function createSpecialistQAnswer(
     readonly said: string;
     readonly blocks: readonly QResultBlock[];
     readonly log: string;
+    /** N1: answered in place with this page offered, when Q can say it. */
+    readonly offer?: QNavigateDestination;
   } | null => {
     const navigable = manifestOf(capabilities).navigate;
     if (navigable.length === 0) return null;
@@ -3822,6 +3951,8 @@ export function createSpecialistQAnswer(
         },
       ],
       log: target.destination,
+      // N1: asked to see (not to go to) a page Q can answer in place.
+      ...(offeredFirst(asked) ? { offer: target.destination } : {}),
     };
   };
 
@@ -4842,6 +4973,24 @@ export function createSpecialistQAnswer(
     // that is nothing but a pleasantry is answered by code: no reader, no
     // prefetch, no analyst. Spoken, only when it names Q or opens the
     // conversation, since words to the room are the reader's to judge.
+    // N1: "yes, open it" / "stay here" right after Q offered a page is the
+    // reply to that offer, by code, before anything reads "yes" as a reply
+    // to something else (a pleasantry, a waiting change).
+    if (conversationId !== undefined && latest !== undefined) {
+      const replied = offerReplyAnswer(history, latest.content);
+      if (replied !== null) {
+        logger?.info(
+          { qRunId: request.runId, reply: replied.log },
+          "a reply to Q's offer to open a page",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          replied.said,
+          replied.blocks.length === 0 ? undefined : replied.blocks,
+        );
+      }
+    }
     if (conversationId !== undefined && latest !== undefined) {
       const pleasantry = pleasantryOf(latest.content);
       const spokenTurn = latest.utteranceRef !== undefined;
@@ -5433,6 +5582,24 @@ export function createSpecialistQAnswer(
         "a page and a question: the move goes with the answer",
       );
     } else if (paged !== null) {
+      // N1: "show me my pipeline": what is in it, here, with the page
+      // offered; "take me to my pipeline" still moves at once.
+      const offered =
+        paged.offer === undefined
+          ? null
+          : await offeredInPlace(request, paged.offer);
+      if (offered !== null) {
+        logger?.info(
+          { qRunId: request.runId, page: paged.log },
+          "q answered in place and offered the page",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          offered.said,
+          offered.blocks,
+        );
+      }
       logger?.info(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",

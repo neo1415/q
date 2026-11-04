@@ -22,6 +22,9 @@ import { QSubjectRefSchema } from "./subject.js";
 import {
   Q_COMPARISON_SUBJECTS_MAX,
   Q_COMPARISON_SUBJECTS_MIN,
+  QNavigateIntentSchema,
+  QOpenRecordPageIntentSchema,
+  QOpenSettingsIntentSchema,
   QUiIntentSchema,
 } from "./ui-intent.js";
 
@@ -75,6 +78,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "SCHEDULE",
   // Situation-first planning (owner 2026-10-28): a plan Q wrote for them.
   "PLAN",
+  // N1 (owner 2026-11-04): a page Q offers to open, never opened by itself.
+  "NAVIGATION_OFFER",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -715,6 +720,35 @@ export const QPlanBlockSchema = z
   .strict();
 export type QPlanBlock = z.infer<typeof QPlanBlockSchema>;
 
+/**
+ * N1 (owner 2026-11-04): "Show me my investor pipeline" is answered where
+ * the person is, with what is in it, and the page that holds the rest is
+ * OFFERED -- "Open pipeline" / "Stay here" -- never opened on its own. A
+ * UI_INTENT is a move the screen makes as the answer lands; this is a
+ * separate kind precisely so nothing that follows UI_INTENT moves on it.
+ *
+ * The target is one of the registered moves (a named destination, a
+ * Settings section or a record page by id); the browser builds the path
+ * from its own route map, and the page authorises itself, as for a click.
+ * Labels are code's words for that destination, never a model's.
+ */
+export const Q_NAVIGATION_OFFER_LABEL_MAX = 48;
+export const QNavigationOfferBlockSchema = z
+  .object({
+    kind: z.literal("NAVIGATION_OFFER"),
+    intent: z.union([
+      QNavigateIntentSchema,
+      QOpenSettingsIntentSchema,
+      QOpenRecordPageIntentSchema,
+    ]),
+    /** Where the rest lives, by the page's own name ("Relationships"). */
+    place: z.string().trim().min(1).max(Q_NAVIGATION_OFFER_LABEL_MAX),
+    /** The Open button's words ("Open pipeline"). */
+    openLabel: z.string().trim().min(1).max(Q_NAVIGATION_OFFER_LABEL_MAX),
+  })
+  .strict();
+export type QNavigationOfferBlock = z.infer<typeof QNavigationOfferBlockSchema>;
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -740,6 +774,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QWorkInProgressBlockSchema,
   QScheduleBlockSchema,
   QPlanBlockSchema,
+  QNavigationOfferBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

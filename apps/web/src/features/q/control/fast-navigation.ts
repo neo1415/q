@@ -7,6 +7,7 @@ import type {
 import { contextAskOf } from "@capital-q/q-specialists/context-request";
 import {
   asksToGo,
+  offeredFirst,
   pageRequestOf,
   takenBack,
 } from "@capital-q/q-specialists/page-request";
@@ -212,6 +213,9 @@ function readHere(text: string): { path: string | null } | "ASK_SERVER" {
   const page = pageRequestOf(said);
   if (page === null) return asksToGo(said) ? "ASK_SERVER" : { path: null };
   if (page.kind === "UNKNOWN") return { path: null };
+  // N1: "show me my pipeline" is answered where they are and the page is
+  // offered (Open / Stay); nothing moves before Q has said what is there.
+  if (offeredFirst(page)) return { path: null };
   return {
     path:
       page.target.kind === "SETTINGS"

@@ -49,6 +49,21 @@ describe("resolveFastNavigation", () => {
     expect(opened).toEqual([]);
   });
 
+  // N1: "show me my pipeline" is answered where they are, with the page
+  // offered; the screen never moves before Q says what is in it.
+  it("leaves 'show me my pipeline' to Q, and moves on 'take me to' it", async () => {
+    const { input } = reader([]);
+    expect(
+      await resolveFastNavigation(input("Show me my investor pipeline")),
+    ).toEqual({ kind: "LEAVE_TO_Q" });
+    expect(
+      await resolveFastNavigation(input("take me to my pipeline")),
+    ).toEqual({
+      kind: "NAVIGATE",
+      intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    });
+  });
+
   it("moves on settings by section", async () => {
     const { input } = reader([]);
     const decided = await resolveFastNavigation(input("open privacy settings"));

@@ -216,6 +216,12 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       readAt: "2026-10-08T09:05:00.000Z",
     },
   },
+  NAVIGATION_OFFER: {
+    kind: "NAVIGATION_OFFER",
+    intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    place: "Relationships",
+    openLabel: "Open pipeline",
+  },
   PLAN: {
     kind: "PLAN",
     planId: UUID,
@@ -353,6 +359,44 @@ describe("QResultBlock", () => {
         ...(BLOCK_FIXTURES["PICTURE"] as Record<string, unknown>),
         url: "https://cdn.nairametrics.com/a.jpg",
       }).success,
+    ).toBe(false);
+  });
+
+  // N1: an offered page is a registered move, never a path or a URL, and
+  // never a UI_INTENT (which the screen performs as the answer lands).
+  it("offers only a registered move, by name", () => {
+    const offer = {
+      kind: "NAVIGATION_OFFER",
+      intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      place: "Relationships",
+      openLabel: "Open pipeline",
+    };
+    expect(QResultBlockSchema.safeParse(offer).success).toBe(true);
+    for (const intent of [
+      { kind: "OPEN_SETTINGS", section: "notifications" },
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },
+    ]) {
+      expect(QResultBlockSchema.safeParse({ ...offer, intent }).success).toBe(
+        true,
+      );
+    }
+    for (const intent of [
+      { kind: "NAVIGATE", destination: "/relationships" },
+      { kind: "NAVIGATE", destination: "CRM_PIPELINE", path: "/x" },
+      { kind: "OPEN_WEBSITE", url: "https://example.com" },
+      { kind: "SIGN_OUT" },
+    ]) {
+      expect(
+        QResultBlockSchema.safeParse({ ...offer, intent }).success,
+        JSON.stringify(intent),
+      ).toBe(false);
+    }
+    expect(
+      QResultBlockSchema.safeParse({ ...offer, href: "/relationships" })
+        .success,
+    ).toBe(false);
+    expect(
+      QResultBlockSchema.safeParse({ ...offer, openLabel: "" }).success,
     ).toBe(false);
   });
 

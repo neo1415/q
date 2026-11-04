@@ -132,7 +132,9 @@ export type QTurnObjectBlock = Extract<
       // Live 2026-10-28: their day as a card.
       | "SCHEDULE"
       // Situation-first planning (2026-10-28): a plan Q wrote for them.
-      | "PLAN";
+      | "PLAN"
+      // N1: a page Q offers to open (Open / Stay), never opened by itself.
+      | "NAVIGATION_OFFER";
   }
 >;
 
@@ -183,6 +185,7 @@ function objectBlocksOf(
       case "WORK_IN_PROGRESS":
       case "SCHEDULE":
       case "PLAN":
+      case "NAVIGATION_OFFER":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block

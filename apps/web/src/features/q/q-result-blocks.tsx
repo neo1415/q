@@ -41,6 +41,7 @@ import { useSubjectNames } from "./blocks/use-subject-names";
 import { useWire } from "./use-wire";
 import { PlanCard } from "./plan-card";
 import { WorkInProgressCard } from "./work-canvas";
+import { NavigationOfferCard } from "./navigation-offer-card";
 import { wireNow } from "./wire";
 import { useT } from "@/features/i18n/language";
 
@@ -398,12 +399,18 @@ export type QResultBlocksProps = {
   readonly onAsk?: ((question: string) => void) | undefined;
   /** Open what Q composed. Absent on a surface with no viewer. */
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
+  /**
+   * N1: the Q message these blocks belong to, so an offer they settled
+   * (Open / Stay) stays settled for that message on this device.
+   */
+  readonly turnId?: string | undefined;
 };
 
 export function QResultBlocks({
   blocks,
   onAsk,
   onOpenArtifact,
+  turnId,
 }: QResultBlocksProps) {
   const t = useT();
   // W7: drawn again once the wire's contracts are in (safeWebsite).
@@ -607,6 +614,19 @@ export function QResultBlocks({
                 block={block}
                 onOpen={onOpenArtifact}
                 onAsk={onAsk}
+              />
+            );
+
+          case "NAVIGATION_OFFER":
+            // N1: the page offered, Open / Stay; never opened by itself.
+            return (
+              <NavigationOfferCard
+                key={key}
+                block={block}
+                href={intentHref(block.intent)}
+                settleKey={
+                  turnId === undefined ? undefined : `${turnId}:${key}`
+                }
               />
             );
 

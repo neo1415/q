@@ -151,6 +151,7 @@ describe("the CRM by its name and tabs", () => {
     expect(pageRequestOf(said)).toEqual({
       kind: "PAGE",
       target: { kind: "DESTINATION", destination },
+      mode: "GO",
     });
   });
 

@@ -523,6 +523,10 @@ export {
   // Situation-first planning (2026-10-28): the plan card.
   QPlanBlockSchema,
   type QPlanBlock,
+  // N1: a page Q offers to open.
+  Q_NAVIGATION_OFFER_LABEL_MAX,
+  QNavigationOfferBlockSchema,
+  type QNavigationOfferBlock,
   type QPictureSource,
   chartableSeries,
   parseQResultBlocks,

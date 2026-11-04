@@ -20,7 +20,7 @@ import {
   whichOneLine,
 } from "./named-record-request.js";
 import { documentAskOf, type DocumentAsk } from "./instant-request.js";
-import { pageRequestOf, takenBack } from "./page-request.js";
+import { offeredFirst, pageRequestOf, takenBack } from "./page-request.js";
 import { tabAskOf, type TabAsk } from "./tab-request.js";
 
 /**
@@ -200,6 +200,9 @@ export async function resolveFastNavigation(input: {
     return { kind: "LEAVE_TO_Q" };
   }
   const page = pageRequestOf(text);
+  // N1: "show me my pipeline" is answered where they are, with the page
+  // offered; the screen does not move before Q has said what is there.
+  if (offeredFirst(page)) return { kind: "LEAVE_TO_Q" };
   if (page?.kind === "PAGE") {
     return page.target.kind === "SETTINGS"
       ? {

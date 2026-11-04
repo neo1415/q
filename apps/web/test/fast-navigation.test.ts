@@ -168,6 +168,18 @@ describe("fast navigation at the end of the sentence", () => {
     expect(pushed).toHaveLength(1);
   });
 
+  // N1: Q answers "show me my pipeline" where they are and offers the
+  // page; the screen does not move before it has said what is there.
+  it("'show me my pipeline' never moves early; 'take me to' it does", async () => {
+    const { asked } = stub(server);
+    expect(await navigationHeard("Show me my investor pipeline")).toBeNull();
+    expect(pushed).toEqual([]);
+    expect(asked).toEqual([]);
+    const timing = await navigationHeard("Take me to my pipeline");
+    expect(timing?.path).toBe("/relationships?view=pipeline");
+    expect(pushed).toEqual(["/relationships?view=pipeline"]);
+  });
+
   it("an ambiguous or unknown name never moves early: Q's answer asks", async () => {
     stub(server);
     expect(await navigationHeard("Open Shiftwell")).toBeNull();

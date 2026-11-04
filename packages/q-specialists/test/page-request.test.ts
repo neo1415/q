@@ -7,8 +7,11 @@ import {
 import type { QConversationMessage } from "@capital-q/q-runtime";
 
 import {
+  asksToGoExplicitly,
   cardAt,
   cardsOnScreen,
+  offerReplyOf,
+  offeredFirst,
   ordinalOf,
   PAGE_NAMES,
   pageRequestOf,
@@ -257,6 +260,7 @@ describe("self-corrections (founder acceptance: 'Open Discover, no, actually Reh
     expect(pageRequestOf("Open Discover, no, actually Rehearsals")).toEqual({
       kind: "PAGE",
       target: { kind: "DESTINATION", destination: "REHEARSALS" },
+      mode: "GO",
     });
     expect(selfCorrected("Open Discover... sorry, Rehearsals")).toBe(
       "Open Rehearsals",
@@ -302,5 +306,84 @@ describe("a pointer is not a page name (live 2026-10-11)", () => {
     expect(pageRequestOf("show me that section")).toBeNull();
     expect(pageRequestOf("open this page")).toBeNull();
     expect(pageRequestOf("take me to that section")).toBeNull();
+  });
+});
+
+// N1 (owner 2026-11-04): asked to see a page Q can answer in place, Q
+// answers here and offers the page; asked to go, it goes.
+describe("show versus go (N1)", () => {
+  it("reads the verb the page reader isolated, never the rest", () => {
+    for (const said of [
+      "Show me my investor pipeline",
+      "show my pipeline",
+      "Can you pull up my pipeline?",
+      "I want to see my pipeline",
+      "Okay, show me the pipeline please",
+    ]) {
+      const asked = pageRequestOf(said);
+      expect(asked?.kind === "PAGE" && asked.mode, said).toBe("SHOW");
+      expect(offeredFirst(asked), said).toBe(true);
+    }
+    for (const said of [
+      "Take me to my pipeline",
+      "Open my pipeline",
+      "go to the investor pipeline",
+      "Navigate to my pipeline",
+      "I want to go to my pipeline",
+    ]) {
+      const asked = pageRequestOf(said);
+      expect(asked?.kind === "PAGE" && asked.mode, said).toBe("GO");
+      expect(offeredFirst(asked), said).toBe(false);
+    }
+  });
+
+  it("offers only pages Q can answer in place", () => {
+    expect(offeredFirst(pageRequestOf("Show me Discover"))).toBe(false);
+    expect(offeredFirst(pageRequestOf("show me my settings"))).toBe(false);
+    expect(offeredFirst(pageRequestOf("show me the CRM"))).toBe(true);
+    expect(offeredFirst(null)).toBe(false);
+  });
+
+  it("tells an explicit move from an optional one", () => {
+    expect(asksToGoExplicitly("Take me to my pipeline.")).toBe(true);
+    expect(asksToGoExplicitly("Thanks. Open the pipeline")).toBe(true);
+    expect(asksToGoExplicitly("Show me my pipeline")).toBe(false);
+    expect(asksToGoExplicitly("Where's my pipeline at?")).toBe(false);
+  });
+
+  it("reads a short reply to the offer, and nothing else", () => {
+    for (const said of [
+      "yes",
+      "Yes, open it.",
+      "sure",
+      "yeah please",
+      "Okay, take me there",
+      "open it",
+      "go ahead",
+      "yes please open it",
+      "Let's go",
+    ]) {
+      expect(offerReplyOf(said), said).toBe("OPEN");
+    }
+    for (const said of [
+      "stay here",
+      "No thanks",
+      "no",
+      "Not now.",
+      "I'll stay here",
+      "no, let's stay here",
+      "maybe later",
+    ]) {
+      expect(offerReplyOf(said), said).toBe("STAY");
+    }
+    for (const said of [
+      "who is waiting for my reply?",
+      "yes, and who is waiting?",
+      "no, open Discover",
+      "tell me more about Savanna",
+      "",
+    ]) {
+      expect(offerReplyOf(said), said).toBeNull();
+    }
   });
 });

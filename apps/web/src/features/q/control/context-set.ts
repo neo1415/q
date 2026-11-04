@@ -173,6 +173,7 @@ function subjectsOfBlock(block: QTurnObjectBlock): Subject[] {
     case "WORK_IN_PROGRESS": // the person's own job, not a subject
     case "SCHEDULE": // the person's own day, not a subject
     case "PLAN": // the person's own plan, not a subject
+    case "NAVIGATION_OFFER": // N1: a page offered, not a subject
       // Names without a record (comparison cards), or no record at all.
       return [];
   }
