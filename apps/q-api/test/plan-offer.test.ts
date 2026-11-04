@@ -240,15 +240,24 @@ describe("the choices are read by code", () => {
   });
 });
 
+/** The founder example as stored: code decides needsApproval per step. */
+const READ_PLAN = {
+  ...FOUNDER_PLAN,
+  steps: FOUNDER_PLAN.steps.map((step) => ({
+    ...step,
+    needsApproval: step.owner !== "YOU",
+  })),
+};
+
 describe("the plan read back is the stored plan's own words", () => {
   it("summary: goal, counts and the first three; whole: every step", () => {
-    const summary = planReadText(FOUNDER_PLAN, "SUMMARY");
+    const summary = planReadText(READ_PLAN, "SUMMARY");
     expect(summary).toContain(`${String(FOUNDER_PLAN.steps.length)} steps`);
     for (const step of FOUNDER_PLAN.steps.slice(0, 3)) {
       expect(summary).toContain(step.title.replace(/[.\s]+$/u, ""));
     }
     expect(summary.endsWith(PLAN_READ_CLOSE)).toBe(true);
-    const whole = planReadText(FOUNDER_PLAN, "WHOLE");
+    const whole = planReadText(READ_PLAN, "WHOLE");
     for (const step of FOUNDER_PLAN.steps) {
       expect(whole).toContain(step.title.replace(/[.\s]+$/u, ""));
     }
