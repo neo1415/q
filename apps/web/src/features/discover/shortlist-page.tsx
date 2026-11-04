@@ -1,4 +1,5 @@
 import { PageContainer } from "@/components/app-shell/page-container";
+import { BackLink } from "@/features/company/back-link";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 
@@ -43,6 +44,8 @@ export async function ShortlistPage({
               : t("companies you saved")
         }
       >
+        {/* UX-04: the shortlist sits under Discover, not in the main nav. */}
+        <BackLink fallbackHref="/discover" />
         <h1 className="cq-title-xl mb-2.5 text-(--cq-text-primary)">
           {t("Saved")}
         </h1>

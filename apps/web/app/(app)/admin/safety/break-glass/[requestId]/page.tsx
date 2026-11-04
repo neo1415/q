@@ -6,6 +6,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
+import { BackLink } from "@/features/company/back-link";
 import { when } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
@@ -39,6 +40,7 @@ export default async function BreakGlassChatPage({
       title={t(`${chat.companyName} ↔ ${chat.investorName}`)}
     >
       <div className="flex flex-col gap-4">
+        <BackLink fallbackHref="/admin/safety" />
         <InlineNotice tone="warning" title={t("Private conversation")}>
           {t("Opened for: “")}
           {t(chat.reason)}

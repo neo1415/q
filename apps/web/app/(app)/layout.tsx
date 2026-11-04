@@ -20,6 +20,7 @@ import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { adminContext } from "@/features/admin/admin-context";
 import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
+import { InAppNavigationMark } from "@/features/company/back-link";
 import { SearchPalette } from "@/features/search/search-palette";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { CapabilitiesProvider } from "@/features/organisation/capabilities";
@@ -145,6 +146,8 @@ export default async function ApplicationLayout({
           verifyNudge={verifyNudgeState}
         >
           <BrandStyle css={brandCss} />
+          {/* UX-04: lets Back use the real history after in-app moves. */}
+          <InAppNavigationMark />
           {children}
           <InstallPrompt />
           {/* Search as a palette (app prototype "search", option 2): / from
