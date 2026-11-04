@@ -654,6 +654,24 @@ describe("approval by the person's own words (owner 2026-10-16)", () => {
     expect(approvals).toEqual([row.proposalId]);
   });
 
+  it("decision 55: an 'okay' approves running a plan; nothing said, nothing approved", async () => {
+    const row = pending({ actionType: "q.plan.execute" });
+    const okay = harness([row], { said: { text: "okay" } });
+    expect(await okay.port.approve(at(OWNER), row.proposalId)).toEqual({
+      status: "SAVED",
+    });
+    expect(okay.approvals).toEqual([row.proposalId]);
+    // Words said before the card was shown never approve it.
+    const earlyRow = pending({ actionType: "q.plan.execute" });
+    const early = harness([earlyRow], {
+      said: { text: "okay", beforeCard: true },
+    });
+    expect(
+      (await early.port.approve(at(OWNER), earlyRow.proposalId)).status,
+    ).toBe("PENDING");
+    expect(early.approvals).toEqual([]);
+  });
+
   it("approves a message, a meeting or a diligence request by words", async () => {
     for (const kind of [
       { actionType: "app.chat.message.send" },

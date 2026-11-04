@@ -239,7 +239,10 @@ import {
 import { createAgentWorkRunner } from "./composition/workforce/runner.js";
 // Situation-first planning (S4-S6): the plan job, its card and its thread.
 import { createActivityRead } from "./composition/workforce/activity.js";
-import { createPlanCardAsk } from "./composition/workforce/plan-ask.js";
+import {
+  createPlanCardApprove,
+  createPlanCardAsk,
+} from "./composition/workforce/plan-ask.js";
 import {
   createDeckRead,
   planStartLine,
@@ -4184,6 +4187,11 @@ const plans = createPlans({
     runtime: () => qRuntime,
     orchestration: () => orchestrationRuntime,
     actions: () => qActions,
+  }),
+  // Owner 2026-11-04: the card's Execute is the approval of that version.
+  approve: createPlanCardApprove({
+    actions: () => qActions,
+    continueApproved: () => continueApproved,
   }),
   invalidate: (tenantId) => situationAssembler.invalidateTenant?.(tenantId),
   actorFor: (owner) => planOwnerActor(owner.userId, null),

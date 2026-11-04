@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { QPlanExecutePayloadSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { PLAN_F03_ASK } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -77,6 +78,12 @@ function world(
     readonly writes?: Parameters<typeof fakePlanModels>[0]["writes"];
     /** The board refuses every add (as Postgres did, live 2026-10-29). */
     readonly boardDown?: boolean;
+    /**
+     * Owner 2026-11-04: Execute approves its card as the person. The fake
+     * engine approves the card's own stored payload and runs it once per
+     * action (the execution gate's claim).
+     */
+    readonly approve?: boolean;
   } = {},
 ) {
   const options_ = options;
@@ -115,6 +122,8 @@ function world(
       },
     });
   const cards: Parameters<PlanCardAsk>[1][] = [];
+  const approvals: string[] = [];
+  const executed = new Set<string>();
   const board: { title: string; dueOn?: string; key: string }[] = [];
   const reminders: { title: string; key: string }[] = [];
   const own: string[] = [];
@@ -168,11 +177,33 @@ function world(
       return Promise.resolve("rem_1");
     },
     ask: (_actor, card) => {
-      cards.push(card);
+      // One card per key, as the run's idempotency key makes it.
+      const seen = cards.findIndex((one) => one.key === card.key);
+      if (seen === -1) cards.push(card);
+      const index = seen === -1 ? cards.length - 1 : seen;
       return Promise.resolve({
-        qActionId: "5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a",
+        qActionId: `5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a${String(index).padStart(2, "0")}`,
       });
     },
+    ...(options.approve === true
+      ? {
+          approve: async (actor: ActorContext, actionId: string) => {
+            approvals.push(actionId);
+            if (executed.has(actionId)) return "STARTED" as const;
+            const index = Number(actionId.slice(-2));
+            const card = cards[index];
+            if (card === undefined) return "FAILED" as const;
+            executed.add(actionId);
+            const ran = await plans.execute(
+              actor,
+              QPlanExecutePayloadSchema.parse(card.payload),
+            );
+            return ran === "EXECUTED"
+              ? ("STARTED" as const)
+              : ("CHANGED" as const);
+          },
+        }
+      : {}),
   });
   const delivered: unknown[] = [];
   const runner = createAgentWorkRunner({
@@ -196,6 +227,7 @@ function world(
     delivered,
     calls,
     cards,
+    approvals,
     board,
     reminders,
     own,
@@ -574,6 +606,116 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     expect(
       lines?.some((line) => line.startsWith("Your part: Add a Business")),
     ).toBe(false);
+  });
+});
+
+describe("owner 2026-11-04: Execute is the approval, once", () => {
+  it("a press of Execute approves its one card and starts the plan, with no second prompt", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(decided.outcome).toBe("EXECUTING");
+    expect(decided.message).toMatch(/^Running it now/u);
+    // One card, approved once, bound to the version the card showed.
+    expect(w.cards).toHaveLength(1);
+    expect(w.cards[0]?.payload).toEqual(
+      executePayloadOf(founder.userId, view.plan, view.bodySha256),
+    );
+    expect(w.approvals).toEqual([decided.actionId]);
+    expect(w.plansStore.plans.get(block.planId)?.status).toBe("EXECUTING");
+    expect(w.board).toHaveLength(3);
+    // A second press: already running; nothing prepared, approved or run.
+    const again = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(again.outcome).toBe("EXECUTING");
+    expect(w.cards).toHaveLength(1);
+    expect(w.approvals).toHaveLength(1);
+    expect(w.board).toHaveLength(3);
+  });
+
+  it("a card already waiting for this version (the plan-ready offer) is the one approved", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const offer = await w.plans.offer(founder, block.planId, 1);
+    expect(offer).not.toBeNull();
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(decided.outcome).toBe("EXECUTING");
+    expect(decided.actionId).toBe(offer?.qActionId);
+    expect(w.cards).toHaveLength(1);
+  });
+
+  it("a press on a card showing another body approves nothing", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: "0".repeat(64),
+    });
+    expect(decided.outcome).toBe("STALE");
+    expect(w.cards).toHaveLength(0);
+    expect(w.approvals).toHaveLength(0);
+  });
+
+  it("a changed plan needs its own approval: the old version's press approves nothing", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const before = await w.plans.view(owner, block.planId);
+    if (before === null) throw new Error("no view");
+    await w.plans.decide(founder, block.planId, {
+      affordance: "CHANGE",
+      version: 1,
+      note: "Leave Baobab out; focus on Kestrel first.",
+    });
+    await w.runner.pass();
+    const stale = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: before.bodySha256,
+    });
+    expect(stale.outcome).toBe("STALE");
+    expect(w.approvals).toHaveLength(0);
+    // The new version is approved on its own card when pressed.
+    const after = await w.plans.view(owner, block.planId);
+    if (after === null) throw new Error("no view");
+    const ran = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 2,
+      bodySha256: after.bodySha256,
+    });
+    expect(ran.outcome).toBe("EXECUTING");
+    expect(w.cards.map((card) => card.key)).toEqual([
+      `plan-execute:${block.planId}:2`,
+    ]);
+  });
+
+  it("without the approval port, Execute only prepares the card (as before)", async () => {
+    const w = world();
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(decided.outcome).toBe("AWAITING_APPROVAL");
+    expect(w.plansStore.plans.get(block.planId)?.status).not.toBe("EXECUTING");
   });
 });
 

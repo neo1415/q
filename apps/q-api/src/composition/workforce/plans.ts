@@ -109,6 +109,12 @@ export type PlanCardAsk = (
   },
 ) => Promise<{ readonly qActionId: string } | null>;
 
+/** The person's press of Execute, standing as their approval (plan-ask.ts). */
+export type PlanCardApprove = (
+  actor: ActorContext,
+  qActionId: string,
+) => Promise<"STARTED" | "CHANGED" | "EXPIRED" | "FAILED">;
+
 export type PlansDependencies = {
   readonly sql: DatabaseExecutor;
   readonly store: PlanStore;
@@ -142,6 +148,13 @@ export type PlansDependencies = {
     | undefined;
   /** An approval card on a new run in the plan's conversation. */
   readonly ask?: PlanCardAsk | undefined;
+  /**
+   * Owner 2026-11-04: the card's Execute IS the person's approval of the
+   * version it showed. The execute card for it is approved as them (CARD
+   * channel, payload-bound) and run once (plan-ask.ts). Absent: Execute
+   * only prepares the card, as before.
+   */
+  readonly approve?: PlanCardApprove | undefined;
 
   /** S6: the tenant's cached situations are dropped when its records change. */
   readonly invalidate?: ((tenantId: string) => void) | undefined;
@@ -390,6 +403,63 @@ export function createPlans(dependencies: PlansDependencies) {
     ...(extra.actionId === undefined ? {} : { actionId: extra.actionId }),
   });
 
+  /**
+   * The ONE approval card that runs this exact version (its body hash and
+   * steps), in the plan's conversation: one per version (its key), so the
+   * card's Execute, the plan-ready offer and a repeat all find the same one.
+   */
+  const prepareExecute = async (
+    actor: ActorContext,
+    stored: NonNullable<Awaited<ReturnType<PlanStore["read"]>>>,
+    trace: { readonly conversationId: string | null },
+  ): Promise<{ readonly qActionId: string } | null> => {
+    if (dependencies.ask === undefined) return null;
+    return dependencies
+      .ask(actor, {
+        conversationId: trace.conversationId,
+        actionType: PLAN_EXECUTE,
+        payload: executePayloadOf(actor.userId, stored.plan, stored.bodySha256),
+        // Q's own line on the card's run (the person typed nothing).
+        words: `Here is your plan to approve before anything runs: ${stored.plan.goal}`,
+        key: `plan-execute:${stored.plan.planId}:${String(stored.plan.version)}`,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, planId: stored.plan.planId },
+          "plan execute card not prepared",
+        );
+        return null;
+      });
+  };
+
+  /**
+   * Owner 2026-11-04 (Recommend): the plan-ready offer prepares the same
+   * execute card for the newest version before anyone says anything, so a
+   * typed or spoken "okay" to the offer approves exactly that payload by
+   * the waiting card's own path (decision 55), and a later Execute finds
+   * it. Null: not theirs, not the newest version, or already running.
+   */
+  const offer = async (
+    actor: ActorContext,
+    planId: string,
+    version: number,
+  ): Promise<{ readonly qActionId: string } | null> => {
+    const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const stored = await store.read(owner, planId);
+    if (
+      stored === null ||
+      stored.plan.version !== version ||
+      stored.headVersion !== version ||
+      stored.status === "EXECUTING" ||
+      stored.status === "DONE"
+    ) {
+      return null;
+    }
+    const head = await store.head(owner, planId);
+    const trace = await traceOf(owner, head?.jobId ?? null);
+    return prepareExecute(actor, stored, trace);
+  };
+
   /** S5: one of the card's three affordances, by the person. */
   const decide = async (
     actor: ActorContext,
@@ -433,40 +503,48 @@ export function createPlans(dependencies: PlansDependencies) {
             head.currentVersion,
           );
         }
-        if (dependencies.ask === undefined) {
-          return result(
-            "FAILED",
-            "I can't run plans just now.",
-            head.currentVersion,
-          );
-        }
-        const payload = executePayloadOf(
-          actor.userId,
-          stored.plan,
-          stored.bodySha256,
-        );
-        const card = await dependencies
-          .ask(actor, {
-            conversationId: trace.conversationId,
-            actionType: PLAN_EXECUTE,
-            payload,
-            // Q's own line on the card's run (the person pressed Execute).
-            words: `Here is your plan to approve before anything runs: ${stored.plan.goal}`,
-            key: `plan-execute:${planId}:${String(stored.plan.version)}`,
-          })
-          .catch((error: unknown) => {
-            logger?.warn(
-              { err: error, planId },
-              "plan execute card not prepared",
-            );
-            return null;
-          });
+        const card = await prepareExecute(actor, stored, trace);
         if (card === null) {
           return result(
             "FAILED",
-            "I couldn't prepare the approval for this plan. Try again in a moment.",
+            dependencies.ask === undefined
+              ? "I can't run plans just now."
+              : "I couldn't prepare the approval for this plan. Try again in a moment.",
             head.currentVersion,
           );
+        }
+        // Owner 2026-11-04: pressing Execute on the card that showed this
+        // exact version and body is the approval; no second prompt.
+        if (dependencies.approve !== undefined) {
+          const approved = await dependencies
+            .approve(actor, card.qActionId)
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, planId, actionId: card.qActionId },
+                "plan execute not approved from the card",
+              );
+              return "FAILED" as const;
+            });
+          if (approved === "CHANGED") {
+            return result(
+              "STALE",
+              "This plan has changed since this card was shown; here is the newest version.",
+              head.currentVersion,
+            );
+          }
+          if (approved === "STARTED") {
+            const after = await store.read(owner, planId).catch(() => null);
+            if (after?.status === "EXECUTING" || after?.status === "DONE") {
+              return result(
+                "EXECUTING",
+                "Running it now: my steps have started and yours are on your board. Anything that goes out to someone still comes to you first, and I'll tell you here as each step lands.",
+                head.currentVersion,
+                { actionId: card.qActionId },
+              );
+            }
+          }
+          // Not started (expired, or its run failed): the card still waits,
+          // and the person is told so, never that the plan runs.
         }
         return result(
           "AWAITING_APPROVAL",
@@ -1118,6 +1196,7 @@ export function createPlans(dependencies: PlansDependencies) {
     start,
     run,
     view,
+    offer,
     decide,
     execute,
     executeAction,

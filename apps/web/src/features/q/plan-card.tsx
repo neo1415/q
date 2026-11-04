@@ -30,8 +30,10 @@ import { useWorkLive } from "./work-live";
  * code), when, and whether it will ask them before anything goes out.
  * Three affordances, nothing else:
  *
- *   Execute          prepares ONE approval card bound to this exact version
- *                    (its body hash); nothing runs until they approve it.
+ *   Execute          is the approval of this exact version (its body hash):
+ *                    the one approval card bound to it is approved by the
+ *                    press and the plan starts once (owner 2026-11-04: no
+ *                    second prompt). Outward steps still get their own card.
  *   Put on my board  their steps become board tasks (dated ones reminded);
  *                    Q's steps wait.
  *   Change it        their words, typed, become the next version, which
@@ -363,6 +365,15 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
       }
       // The approval card is a new message of the conversation: read it now.
       if (decided.outcome === "AWAITING_APPROVAL") announceApprovalPrepared();
+      // Owner 2026-11-04: Execute was the approval and the plan started:
+      // the conversation reads Q's lines about it, and this card follows
+      // its steps from now on.
+      if (decided.outcome === "EXECUTING") {
+        announceApprovalPrepared();
+        const now = Date.now();
+        setApprovedUntil(now + PLAN_APPROVAL_WATCH_MS);
+        setClock(now);
+      }
       if (decided.outcome === "CHANGING") {
         setChanging(false);
         setNote("");

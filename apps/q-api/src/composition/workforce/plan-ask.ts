@@ -2,15 +2,25 @@ import { randomUUID } from "node:crypto";
 
 import {
   CorrelationIdSchema,
+  QActionProposalIdSchema,
+  QApprovalIdSchema,
   QConversationIdSchema,
+  type QRunId,
 } from "@capital-q/contracts";
-import type { QActionService } from "@capital-q/q-actions";
+import {
+  QActionPayloadMismatchError,
+  QApprovalAlreadyDecidedError,
+  QApprovalExpiredError,
+  type QActionService,
+} from "@capital-q/q-actions";
 import {
   runRef,
   type QOrchestrationRuntime,
   type QRuntimeService,
 } from "@capital-q/q-runtime";
+import type { ActorContext } from "@capital-q/security";
 
+import type { ApprovedContinuation } from "../approved-continuation.js";
 import type { PlanCardAsk } from "./plans.js";
 
 /**
@@ -84,5 +94,69 @@ export function createPlanCardAsk(dependencies: {
       await orchestration.fail(ref, "INTERNAL_ERROR").catch(() => undefined);
       throw error;
     }
+  };
+}
+
+/**
+ * Owner 2026-11-04: "after I click on execute, I still have to click on
+ * yes or approve ... and it doesn't start." The plan card's Execute is the
+ * person's approval of the exact version it showed (the card sends its
+ * version and body hash; plans.ts refuses any other). So the one execute
+ * card Execute prepares -- or finds already waiting -- is approved here as
+ * the person, on the CARD channel (the button they pressed), through the
+ * Approval Engine's own approve, which binds to that card's stored payload
+ * hash; then the same continuation the card's Approve starts runs it
+ * through the execution gate, which claims the action so a repeated press
+ * or a racing yes never executes twice. Nothing is approved without that
+ * press.
+ */
+export type PlanCardApproval = "STARTED" | "CHANGED" | "EXPIRED" | "FAILED";
+
+export function createPlanCardApprove(dependencies: {
+  readonly actions: () => Pick<
+    QActionService,
+    "findApprovalForAction" | "approve"
+  >;
+  readonly continueApproved: () => ApprovedContinuation;
+}): (actor: ActorContext, qActionId: string) => Promise<PlanCardApproval> {
+  return async (actor, qActionId) => {
+    const actionId = QActionProposalIdSchema.safeParse(qActionId);
+    if (!actionId.success) return "FAILED";
+    const actions = dependencies.actions();
+    const approval = await actions.findApprovalForAction(
+      actor.tenantId,
+      actionId.data,
+    );
+    if (approval === null) return "FAILED";
+    const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
+    let runId: QRunId;
+    try {
+      const decided = await actions.approve({
+        actor,
+        approvalId: QApprovalIdSchema.parse(approval.id),
+        correlationId,
+        via: { channel: "CARD" },
+      });
+      // Approved already and run (a second press): nothing to continue.
+      if (!decided.decided && decided.action.status !== "APPROVED") {
+        return decided.action.status === "EXECUTED" ||
+          decided.action.status === "EXECUTING"
+          ? "STARTED"
+          : "FAILED";
+      }
+      runId = decided.action.runId;
+    } catch (error: unknown) {
+      if (error instanceof QActionPayloadMismatchError) return "CHANGED";
+      if (error instanceof QApprovalExpiredError) return "EXPIRED";
+      if (error instanceof QApprovalAlreadyDecidedError) return "FAILED";
+      throw error;
+    }
+    await dependencies.continueApproved()({
+      actor,
+      runId,
+      actionId: actionId.data,
+      correlationId,
+    });
+    return "STARTED";
   };
 }
