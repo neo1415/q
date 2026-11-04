@@ -1071,6 +1071,14 @@ export {
   type QErrandListDto,
   type QErrandStoppedDto,
 } from "./errands.js";
+export {
+  Q_BLOCK_SURFACES,
+  Q_DRAWN_BLOCK_KINDS,
+  Q_STAGE_OBJECT_KINDS,
+  type QBlockStagePlace,
+  type QBlockSurfaces,
+  type QBlockThreadPlace,
+} from "./block-surfaces.js";
 export * from "./ui-text.js";
 // REHEARSE block (2026-10-01)
 export * from "./rehearsals.js";

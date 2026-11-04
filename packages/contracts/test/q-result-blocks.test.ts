@@ -216,6 +216,11 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       readAt: "2026-10-08T09:05:00.000Z",
     },
   },
+  WORK_IN_PROGRESS: {
+    kind: "WORK_IN_PROGRESS",
+    jobId: UUID,
+    title: "Deck for Nixo",
+  },
   NAVIGATION_OFFER: {
     kind: "NAVIGATION_OFFER",
     intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
