@@ -250,6 +250,10 @@ export function matchOwnCounterpart(
 }
 
 /** Letters and digits only: "Tensor Gate", "tensor-gate" and "Tensorgate" are one name. */
+export function compactName(name: string): string {
+  return compact(name);
+}
+
 function compact(name: string): string {
   return name
     .toLowerCase()

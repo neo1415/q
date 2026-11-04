@@ -366,8 +366,9 @@ describe("R3: a misheard name, matched only within their own set", () => {
       kind: "NAVIGATE",
       intent: { kind: "OPEN_RECORD_PAGE" },
     });
-    // Opened by their own name, never by what was heard.
-    expect(opened.map((one) => one.name)).toEqual(["Tensorgate"]);
+    // Opened by their own name. What was heard is checked once for a
+    // different record bearing it (J6, Ledgerline); none here.
+    expect(opened.map((one) => one.name)).toEqual(["Tensorgate", "TensorFlow"]);
   });
 
   it("caught by stem when the name scorer finds nothing (a long list of theirs)", () => {
@@ -389,7 +390,7 @@ describe("R3: a misheard name, matched only within their own set", () => {
       { kind: "LEAVE_TO_Q" },
     );
     expect(other.opened.map((one) => one.name)).not.toContain("Tensorgate");
-    expect(opened).toHaveLength(1);
+    expect(opened).toHaveLength(2);
   });
 
   it("two of theirs it could mean: no guess (Q's answer asks)", async () => {
@@ -407,5 +408,66 @@ describe("R3: a misheard name, matched only within their own set", () => {
     expect(
       misheardOwnCounterpart("Ledgerline", ["Ledgerfold Partners Group"]),
     ).toBeNull();
+  });
+});
+
+describe("acceptance 2026-11-04 J6: an exact name wins over a close one of theirs", () => {
+  const LEDGERLINE = "6a1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f71";
+  const LEDGERFOLD = "84b9641f-b618-4fa3-8b35-1d19b1c71d82";
+  const ids: Readonly<Record<string, string>> = {
+    Ledgerline: LEDGERLINE,
+    Ledgerfold: LEDGERFOLD,
+  };
+  // Ledgerfold is one of their relationships; Ledgerline is a network
+  // record they may open (open_page's own exact-first name match).
+  function network(visible: readonly string[]) {
+    const opened: string[] = [];
+    return {
+      opened,
+      input: (text: string) => ({
+        text,
+        side: "INVESTOR" as const,
+        counterpartNames: () => Promise.resolve(["Ledgerfold", "Shiftwell"]),
+        open: (page: QRecordPage, name: string) => {
+          opened.push(name);
+          const hit = visible.find(
+            (one) => one.toLowerCase() === name.toLowerCase(),
+          );
+          const id = hit === undefined ? undefined : ids[hit];
+          return Promise.resolve(
+            id === undefined ? null : { kind: "OPEN_RECORD_PAGE", page, id },
+          );
+        },
+      }),
+    };
+  }
+
+  it("'Show me Ledgerline's pitch video' opens Ledgerline, never Ledgerfold", async () => {
+    const { input } = network(["Ledgerline", "Ledgerfold"]);
+    const resolved = await resolveNamedRecord(
+      input("Show me Ledgerline's pitch video"),
+    );
+    expect(resolved).toMatchObject({
+      kind: "OPEN",
+      intent: { id: LEDGERLINE },
+      own: false,
+    });
+    expect(resolved?.said).toContain("Ledgerline");
+    expect(resolved?.said).not.toContain("Ledgerfold");
+    const fast = await resolveFastNavigation(
+      input("Show me Ledgerline's pitch video"),
+    );
+    expect(fast).toMatchObject({ intent: { id: LEDGERLINE } });
+  });
+
+  it("their own exact name still opens directly", async () => {
+    const { input } = network(["Ledgerline", "Ledgerfold"]);
+    const resolved = await resolveNamedRecord(
+      input("Show me Ledgerfold's pitch video"),
+    );
+    expect(resolved).toMatchObject({
+      kind: "OPEN",
+      intent: { id: LEDGERFOLD },
+    });
   });
 });
