@@ -10213,7 +10213,11 @@ export function createModelGatewayQAnswer(
               ? // Guard run 1 (2026-10-25, run b6f9236c): the draft was
                 // written above; "I didn't prepare that" contradicted it.
                 DRAFT_NOT_ON_CARD_LINE
-              : couldNotDoLine(parityGap)
+              : couldNotLineFor(
+                  parityGap,
+                  latest.content,
+                  statusTalk?.text ?? guarded.text,
+                )
             : null;
         if (couldNot !== null) {
           logger?.warn(
@@ -10982,6 +10986,37 @@ export function withoutRememberTalk(
 /** A message they asked for, written in the answer but not put on its card. */
 export const DRAFT_NOT_ON_CARD_LINE =
   "That draft isn't on a card yet, so nothing has been sent. Say \"prepare it\" and I'll put it on a card for your approval.";
+
+/**
+ * Acceptance 2026-11-04 J6: "Show me a chart of Ledgerline's revenue" was
+ * answered with the figures, then "I tried, but it didn't go through". No
+ * chart was ever going to be drawn: a CHART block has no producer yet
+ * (result-blocks visualBlock draws one only from a typed read of evidenced
+ * figures, and none exists), and numbers are never lifted from prose to
+ * fill one. So the ask is answered plainly as not available yet, never as
+ * a failure to retry.
+ */
+const ASKED_FOR_CHART = /\b(?:chart|graph|plot)s?\b/iu;
+const SAID_NO_CHART =
+  /\b(?:couldn['’]?t|could not|can['’]?t|cannot|unable to)\b[^.!?\n]{0,40}\b(?:chart|graph|plot|display|draw)/iu;
+export const CHART_NOT_YET_LINE =
+  "I can't draw a chart of that here yet. I can give you the figures, with where each one comes from.";
+
+/**
+ * The could-not line for a turn with nothing done: a chart they asked for
+ * is said plainly as not available yet (null when the answer already says
+ * so); anything else is the gap's own line.
+ */
+export function couldNotLineFor(
+  gap: string,
+  personText: string,
+  answerText: string,
+): string | null {
+  if (ASKED_FOR_CHART.test(personText)) {
+    return SAID_NO_CHART.test(answerText) ? null : CHART_NOT_YET_LINE;
+  }
+  return couldNotDoLine(gap);
+}
 
 export function couldNotDoLine(gap: string): string {
   switch (gap) {
