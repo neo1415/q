@@ -192,6 +192,9 @@ export const WORKFORCE_LIVE_STAGES = [
 ] as const;
 export type WorkforceLiveStageName = (typeof WORKFORCE_LIVE_STAGES)[number];
 
+/** At most this many earlier stages are kept on a job (the latest win). */
+export const WORKFORCE_LIVE_PASSED_MAX = 16;
+
 /** A document job's step bar, in order. */
 export const WORKFORCE_DOCUMENT_LIVE_STEPS = [
   "SEARCHING",
@@ -257,6 +260,17 @@ export const WorkforceLiveStageSchema = z
      * (plain words, no refs), shown as "What I'm looking into". Additive.
      */
     brief: z.string().max(600).nullable().optional(),
+    /**
+     * Owner 2026-11-04 (N2): the stages this job's work has really been
+     * through before `stage`, oldest first, as code recorded each change
+     * (never a fixed pipeline assumed). Absent on a job whose earlier
+     * stages were not recorded (started before this was kept): the
+     * screen then claims nothing about them. Additive.
+     */
+    passed: z
+      .array(z.enum(WORKFORCE_LIVE_STAGES))
+      .max(WORKFORCE_LIVE_PASSED_MAX)
+      .optional(),
     at: UtcTimestampSchema,
   })
   .strict();

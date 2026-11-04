@@ -1,6 +1,7 @@
-import type {
-  WorkforceLiveStage,
-  WorkforceLiveStageName,
+import {
+  WORKFORCE_LIVE_PASSED_MAX,
+  type WorkforceLiveStage,
+  type WorkforceLiveStageName,
 } from "@capital-q/contracts";
 
 /**
@@ -15,11 +16,11 @@ import type {
  */
 export type LivePatch = {
   readonly stage: WorkforceLiveStageName;
-} & Partial<Omit<WorkforceLiveStage, "stage" | "at">>;
+} & Partial<Omit<WorkforceLiveStage, "stage" | "at" | "passed">>;
 
 export type LiveReport = (patch: LivePatch) => void;
 
-const EMPTY: Omit<WorkforceLiveStage, "stage" | "at"> = {
+const EMPTY: Omit<WorkforceLiveStage, "stage" | "at" | "passed"> = {
   questions: null,
   sources: null,
   facts: null,
@@ -36,12 +37,33 @@ export function mergeLive(
   patch: LivePatch,
   at: string,
 ): WorkforceLiveStage {
-  const base = before ?? { ...EMPTY, stage: patch.stage, at };
+  const base = before ?? { ...EMPTY, stage: patch.stage, at, passed: [] };
   const merged: WorkforceLiveStage = { ...base, at };
   for (const [key, value] of Object.entries(patch)) {
     if (value !== undefined) Object.assign(merged, { [key]: value });
   }
+  const passed = passedAfter(before, patch.stage);
+  if (passed === undefined) delete merged.passed;
+  else merged.passed = passed;
   return merged;
+}
+
+/**
+ * Owner 2026-11-04 (N2): the stages really passed through, recorded as
+ * each change happens, so the screen shows only stages that occurred (a
+ * plan with no public reading never shows one). A job whose history was
+ * not kept from its start (recorded before this existed) keeps none, so
+ * the screen never claims an earlier stage did or did not happen.
+ */
+function passedAfter(
+  before: WorkforceLiveStage | null,
+  next: WorkforceLiveStageName,
+): WorkforceLiveStageName[] | undefined {
+  if (before === null) return [];
+  const kept = before.passed;
+  if (kept === undefined) return undefined;
+  if (before.stage === next) return kept;
+  return [...kept, before.stage].slice(-WORKFORCE_LIVE_PASSED_MAX);
 }
 
 /** A report that cannot throw: showing progress never stops the work. */

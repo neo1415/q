@@ -644,6 +644,11 @@ export function createWorkforceDocuments(dependencies: {
       .slice(0, CRITIQUE_EVIDENCE_MAX);
     if (!(await input.canContinue()))
       return failed("Review stopped before it started.");
+    // N2 (owner 2026-11-04): each real boundary of the review, as it
+    // happens: the critique, then (only when one is needed) the revision
+    // and its filing.
+    const report = safeReport(input.progress);
+    report({ stage: "REVIEWING" });
     const verdict = await dependencies.critic(
       { tenantId: actor.tenantId, userId: actor.userId },
       { jobId: input.jobId, runId: input.runId },
@@ -678,6 +683,7 @@ export function createWorkforceDocuments(dependencies: {
     const instruction = `${REVIEWER_REVISION_PREFIX} ${verdict.issues
       .map((issue) => `${issue.section}: ${issue.problem} Fix: ${issue.fix}`)
       .join(" ")}`.slice(0, 1_900);
+    report({ stage: "REVISING" });
     const revised = await dependencies.preparation.reviser.revise({
       base: {
         title: current.title,
@@ -694,6 +700,7 @@ export function createWorkforceDocuments(dependencies: {
         correlationId,
       },
     });
+    report({ stage: "FILING" });
     const filed = await dependencies.preparation.port.revise({
       actorContext: actor,
       permittedContextPlan: decision.plan,
@@ -840,6 +847,9 @@ export function createWorkforceDocuments(dependencies: {
               request: async (request) => {
                 if (!(await input.canContinue()))
                   throw new Error("Document continuation stopped");
+                // N2: the record has been read; the document is written
+                // from here, by the document pipeline this request starts.
+                safeReport(input.progress)({ stage: "DRAFTING" });
                 const refreshed = await dependencies.freshActor(actor);
                 if (
                   refreshed === null ||

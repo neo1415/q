@@ -6,6 +6,8 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   QRunIdSchema,
   QFindingIdSchema,
+  WorkforceLiveStageSchema,
+  type WorkforceLiveStage,
 } from "@capital-q/contracts";
 import type { ArtifactService } from "@capital-q/q-artifacts";
 import { ActorContextSchema } from "@capital-q/security";
@@ -17,6 +19,10 @@ import {
   createWorkforceDocuments,
   REVIEWER_REVISION_PREFIX,
 } from "../src/composition/workforce/documents.js";
+import {
+  mergeLive,
+  type LivePatch,
+} from "../src/composition/workforce/live.js";
 import type { WorkforceModels } from "../src/composition/workforce/models.js";
 
 const actor = ActorContextSchema.parse({
@@ -450,5 +456,126 @@ describe("investor work: a memo about the named company, and a second specialist
     const result = await w.prepare(critiqueInput(w, randomUUID()));
     expect(result.status).toBe("FAILED");
     expect(critic).not.toHaveBeenCalled();
+  });
+
+  it("N2: a long document job reports each real stage, in order, onto one trail", async () => {
+    const critic = vi.fn<WorkforceModels["critique"]>(() =>
+      Promise.resolve({
+        material: true,
+        issues: [
+          {
+            kind: "UNSUPPORTED",
+            section: "Traction",
+            problem: "States a claim as fact.",
+            fix: "Attribute it.",
+          },
+        ],
+        strengths: [],
+      }),
+    );
+    const w = world(critic);
+    const reported: LivePatch[] = [];
+    const progress = (patch: LivePatch) => {
+      reported.push(patch);
+    };
+    // Step 1: the document itself, through the pipeline.
+    expect((await w.prepare({ ...w.input, progress })).status).toBe(
+      "PREPARING",
+    );
+    // Step 2: a second specialist's review and revision.
+    const current = version();
+    w.currentVersion.mockResolvedValue(current as never);
+    w.reviser.mockResolvedValue({
+      title: current.title,
+      summary: current.summary,
+      content: current.content,
+    } as never);
+    w.revise.mockResolvedValue(
+      QArtifactSummarySchema.parse({
+        ...w.summary,
+        artifactId: current.artifactId,
+        status: "READY",
+        currentVersion: 2,
+      }),
+    );
+    await w.prepare({ ...critiqueInput(w, current.artifactId), progress });
+    expect(reported.map((patch) => patch.stage)).toEqual([
+      "DRAFTING",
+      "REVIEWING",
+      "REVISING",
+      "FILING",
+    ]);
+    // The runner folds each report into the job's row: the trail is the
+    // order they happened, and survives a reload (it is on the row).
+    let shown: WorkforceLiveStage | null = null;
+    reported.forEach((patch, index) => {
+      shown = mergeLive(
+        shown,
+        patch,
+        `2026-11-04T10:00:0${String(index)}.000Z`,
+      );
+    });
+    const kept = WorkforceLiveStageSchema.parse(shown);
+    expect(kept.stage).toBe("FILING");
+    expect(kept.passed).toEqual(["DRAFTING", "REVIEWING", "REVISING"]);
+  });
+
+  it("N2: a review that finds nothing material never says it revised", async () => {
+    const w = world(
+      vi.fn<WorkforceModels["critique"]>(() =>
+        Promise.resolve({ material: false, issues: [], strengths: [] }),
+      ),
+    );
+    const current = version();
+    w.currentVersion.mockResolvedValue(current as never);
+    const reported: string[] = [];
+    await w.prepare({
+      ...critiqueInput(w, current.artifactId),
+      progress: (patch: LivePatch) => {
+        reported.push(patch.stage);
+      },
+    });
+    expect(reported).toEqual(["REVIEWING"]);
+  });
+});
+
+describe("N2: the trail of stages a job really went through", () => {
+  const at = (second: number) =>
+    `2026-11-04T10:00:${String(second).padStart(2, "0")}.000Z`;
+  it("starts empty, adds a stage only when the next one begins, never twice in a row", () => {
+    const a = mergeLive(null, { stage: "GATHERING" }, at(0));
+    expect(a.passed).toEqual([]);
+    const b = mergeLive(a, { stage: "GATHERING", facts: 4 }, at(1));
+    expect(b.passed).toEqual([]);
+    const c = mergeLive(b, { stage: "PLANNING" }, at(2));
+    const d = mergeLive(c, { stage: "REVIEWING_PLAN" }, at(3));
+    // A redraft after the review is a real return to planning.
+    const e = mergeLive(d, { stage: "PLANNING", draft: 2 }, at(4));
+    expect(e.passed).toEqual(["GATHERING", "PLANNING", "REVIEWING_PLAN"]);
+    expect(e.stage).toBe("PLANNING");
+  });
+  it("claims nothing about a job whose earlier stages were never kept", () => {
+    const legacy = WorkforceLiveStageSchema.parse({
+      stage: "READING",
+      questions: 3,
+      sources: 5,
+      facts: 2,
+      draft: null,
+      drafts: null,
+      title: null,
+      sections: [],
+      at: at(0),
+    });
+    const next = mergeLive(legacy, { stage: "DRAFTING" }, at(1));
+    expect(next.passed).toBeUndefined();
+    expect(WorkforceLiveStageSchema.parse(next).stage).toBe("DRAFTING");
+  });
+  it("keeps at most the latest stages", () => {
+    let shown: WorkforceLiveStage | null = null;
+    for (let round = 0; round < 12; round += 1) {
+      shown = mergeLive(shown, { stage: "SEARCHING" }, at(round));
+      shown = mergeLive(shown, { stage: "READING" }, at(round));
+    }
+    expect(WorkforceLiveStageSchema.parse(shown).passed?.length).toBe(16);
   });
 });
