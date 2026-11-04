@@ -395,7 +395,9 @@ import {
 import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
 import {
+  companyDeckFiguresFacts,
   companyFiguresFacts,
+  companyFiguresLimitFact,
   onScreenCompanyFact,
   ownCompanySnapshotFact,
 } from "./company-fact.js";
@@ -4091,6 +4093,9 @@ export function createModelGatewayQAnswer(
     let onScreenCompanyCall: QToolCallObservation | null = null;
     /** Its canonical name, for who "they" is in a research follow-up. */
     let onScreenCompanyName: string | null = null;
+    /** A4: its figures (published and from its deck), and what is unknown. */
+    let onScreenCompanyFigures: readonly AuthorisedFact[] = [];
+    const onScreenCompanyFigureCalls: QToolCallObservation[] = [];
     const companyRead = (async (): Promise<void> => {
       if (
         counterparty?.kind !== "COMPANY" ||
@@ -4103,7 +4108,43 @@ export function createModelGatewayQAnswer(
         name: "get_company",
         arguments: { companyId: counterparty.companyId },
       };
-      const outcome = await tools.execute(call, toolContext);
+      // A4 (rehearsal 2026-11-04): the profile's Key numbers come from the
+      // deck as Q read it; Q answered "no burn rate" beside them having
+      // read neither. Its published figures and its deck are read with the
+      // profile, through the same tools, authorize steps and plan as the
+      // model's own calls (a read refused for them adds nothing), so the
+      // figures their screen shows reach the answer as the founder's claims.
+      const sideRead = (name: string) =>
+        prefetchTools.has(name)
+          ? tools
+              .execute(
+                {
+                  callId: `q-on-screen-company-${name}`,
+                  name,
+                  arguments: { companyId: counterparty.companyId },
+                },
+                toolContext,
+              )
+              .catch(() => null)
+          : Promise.resolve(null);
+      const [outcome, figures, deck] = await Promise.all([
+        tools.execute(call, toolContext),
+        sideRead("read_company_figures"),
+        sideRead("read_company_deck"),
+      ]);
+      for (const [name, side] of [
+        ["read_company_figures", figures],
+        ["read_company_deck", deck],
+      ] as const) {
+        if (side === null) continue;
+        onScreenCompanyFigureCalls.push({
+          toolName: side.toolName,
+          providerName: name,
+          status: side.status,
+          failureCode: side.failureCode,
+          latencyMs: side.latencyMs,
+        });
+      }
       onScreenCompanyCall = {
         toolName: outcome.toolName,
         providerName: call.name,
@@ -4119,6 +4160,30 @@ export function createModelGatewayQAnswer(
             ? (read as { readonly canonicalName?: unknown }).canonicalName
             : undefined;
         onScreenCompanyName = typeof name === "string" ? name : null;
+        if (onScreenCompanyName !== null) {
+          const figuresOk =
+            figures !== null &&
+            figures.status === "SUCCEEDED" &&
+            figures.result.ok;
+          const deckOk =
+            deck !== null && deck.status === "SUCCEEDED" && deck.result.ok;
+          onScreenCompanyFigures = [
+            ...(figuresOk
+              ? companyFiguresFacts(figures.result.data, onScreenCompanyName)
+              : []),
+            ...(deckOk
+              ? companyDeckFiguresFacts(deck.result.data, onScreenCompanyName)
+              : []),
+            companyFiguresLimitFact(onScreenCompanyName, {
+              published: figuresOk,
+              deck: !prefetchTools.has("read_company_deck")
+                ? "NOT_ASKED"
+                : deckOk
+                  ? "READ"
+                  : "NOT_AVAILABLE",
+            }),
+          ];
+        }
       }
     })();
     /**
@@ -4261,6 +4326,15 @@ export function createModelGatewayQAnswer(
           .canonicalName;
         if (typeof name === "string") {
           namedCompanies.push(...companyFiguresFacts(read.figures, name));
+          // A4: the deck's figures, as their Deck tab reads them, and
+          // what any figure not given means (unknown to Q, not absent).
+          namedCompanies.push(
+            ...companyDeckFiguresFacts(read.deck, name),
+            companyFiguresLimitFact(name, {
+              published: read.figures !== null,
+              deck: read.deckRead,
+            }),
+          );
         }
       }
     };
@@ -4650,6 +4724,8 @@ export function createModelGatewayQAnswer(
       onScreenCompany,
       onScreenCompanyCall,
       onScreenCompanyName,
+      onScreenCompanyFigures,
+      onScreenCompanyFigureCalls,
       onScreenDaily,
       onScreenDailyCall,
       onScreenDocument,
@@ -5034,6 +5110,8 @@ export function createModelGatewayQAnswer(
         onScreenCompany,
         onScreenCompanyCall,
         onScreenCompanyName,
+        onScreenCompanyFigures,
+        onScreenCompanyFigureCalls,
         ownCompanyId,
         onScreenDaily,
         onScreenDailyCall,
@@ -5854,6 +5932,7 @@ export function createModelGatewayQAnswer(
           ...(ownCompany === null ? [] : [ownCompany]),
           ...ownFigures,
           ...(onScreenCompany === null ? [] : [onScreenCompany]),
+          ...onScreenCompanyFigures,
           ...w.namedCompanies,
           ...(onScreenDaily === null ? [] : [onScreenDaily]),
           ...(onScreenDocument === null ? [] : [onScreenDocument]),
@@ -8161,6 +8240,7 @@ export function createModelGatewayQAnswer(
       if (onScreenCompanyCall !== null) {
         toolCalls.push(onScreenCompanyCall);
       }
+      toolCalls.push(...onScreenCompanyFigureCalls);
       toolCalls.push(...wideReads.namedCompanyCalls);
       if (onScreenDocumentCall !== null) {
         toolCalls.push(onScreenDocumentCall);

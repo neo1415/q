@@ -13,6 +13,7 @@ import {
   Q_SSE_CONTENT_TYPE,
   QRunIdSchema,
   QStreamEventSchema,
+  type QStreamEvent,
   type CorrelationId,
   type QRunId,
 } from "@capital-q/contracts";
@@ -110,6 +111,35 @@ type OpenStream = {
   readonly runId: string;
   readonly close: (reason: string) => void;
 };
+
+/**
+ * A5: an oversized durable event as only its envelope: which run, which
+ * sequence, what kind, when -- no content at all, so nothing beyond the
+ * event's own identity reaches the wire. `data` is null, which no Q event
+ * schema accepts: a client reads it as an event it could not read and
+ * re-reads the run's durable record.
+ */
+export function oversizedEnvelope(event: QStreamEvent): {
+  readonly contractVersion: number;
+  readonly eventId: string;
+  readonly runId: string;
+  readonly sequence: number;
+  readonly occurredAt: string;
+  readonly type: string;
+  readonly data: null;
+  readonly oversized: true;
+} {
+  return {
+    contractVersion: event.contractVersion,
+    eventId: event.eventId,
+    runId: event.runId,
+    sequence: event.sequence,
+    occurredAt: event.occurredAt,
+    type: event.type,
+    data: null,
+    oversized: true,
+  };
+}
 
 function correlation(): CorrelationId {
   return CorrelationIdSchema.parse(createCorrelationId());
@@ -412,9 +442,31 @@ export function registerQEventRoutes(
         if (Buffer.byteLength(frame, "utf8") > options.maxFrameBytes) {
           metrics.errors.add(1, { stage: "frame_too_large" });
           logger?.warn(
-            { qRunId: run.id, eventType: event.type, sequence: event.sequence },
-            "q stream frame exceeds the bound; not sent",
+            {
+              qRunId: run.id,
+              eventType: event.type,
+              sequence: event.sequence,
+              durable,
+            },
+            "q stream frame exceeds the bound; only its envelope is sent",
           );
+          // A5 (audit D9): a durable event too large for the wire (a long
+          // answer with its cards) used to vanish, and the client never
+          // knew to read it from the record. Its envelope alone is sent --
+          // type, run and sequence, no content -- under its resume id: the
+          // client cannot read it as an event, moves its cursor past it,
+          // and re-reads the durable record when the run ends. A delta is
+          // dropped as before; the completed message that follows it holds
+          // the same words.
+          if (durable) {
+            const envelope = formatSseFrame({
+              event: event.type,
+              id: String(event.sequence),
+              data: JSON.stringify(oversizedEnvelope(event)),
+            });
+            replayedCount += 1;
+            if (!(await send(envelope, "durable"))) return;
+          }
           continue;
         }
         if (firstEventAt === undefined) {

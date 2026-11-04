@@ -5,6 +5,7 @@ import {
   Q_RUN_EVENTS_SUFFIX,
   Q_RUNS_PATH,
   Q_SSE_CONTENT_TYPE,
+  Q_STREAM_TERMINAL_EVENT_TYPES,
   QStreamEventSchema,
   type QStreamEvent,
 } from "@capital-q/contracts";
@@ -59,6 +60,13 @@ export type QRunStreamOptions = {
   /** Resume from this durable sequence; 0 or absent replays from the start. */
   readonly lastEventId?: number | undefined;
   readonly onEvent: (event: QStreamEvent, meta: QStreamEventMeta) => void;
+  /**
+   * A5 (audit D9): a frame this client cannot read -- an event kind or a
+   * block it does not know (a newer server, right after a deploy), or one
+   * that is not JSON. It is never rendered; the caller re-reads the
+   * durable record once the run ends, so nothing it carried is lost.
+   */
+  readonly onUnreadable?: ((frame: QStreamUnreadableFrame) => void) | undefined;
   readonly onStatus?:
     ((status: QStreamTransportStatus, attempt: number) => void) | undefined;
   /** Bounded exponential backoff with jitter (§76). */
@@ -72,12 +80,63 @@ export type QRunStreamOptions = {
     | undefined;
 };
 
+export type QStreamUnreadableFrame = {
+  /** The frame's `type`, when it had one. */
+  readonly type: string | null;
+  /** Its sequence, when it carried one as its resume id (durable). */
+  readonly sequence: number | null;
+  /** It carried a resume id: run history the record holds. */
+  readonly durable: boolean;
+};
+
 export type QRunStreamResult = {
   readonly reason: QStreamCloseReason;
   /** The last durable sequence processed; the cursor to resume from. */
   readonly lastEventId: number;
   readonly reconnects: number;
+  /** A5: frames of this run that could not be read (see `onUnreadable`). */
+  readonly unreadable: number;
 };
+
+const TERMINAL_TYPES: ReadonlySet<string> = new Set(
+  Q_STREAM_TERMINAL_EVENT_TYPES,
+);
+
+/**
+ * A5: what can be said of a frame the schema refused, from its envelope
+ * alone. Durable only when the frame's SSE id is its own sequence (the
+ * server sets an id on durable events only), so an unread durable event
+ * still moves the cursor -- otherwise every reconnect would replay it and
+ * never get past it. Null: not this run's, or no envelope at all.
+ */
+export function unreadableFrameOf(
+  raw: unknown,
+  runId: string,
+  sseId: string,
+): QStreamUnreadableFrame | null {
+  if (typeof raw !== "object" || raw === null) {
+    return { type: null, sequence: null, durable: false };
+  }
+  const envelope = raw as {
+    readonly type?: unknown;
+    readonly runId?: unknown;
+    readonly sequence?: unknown;
+  };
+  if (typeof envelope.runId === "string" && envelope.runId !== runId) {
+    return null;
+  }
+  const sequence =
+    typeof envelope.sequence === "number" &&
+    Number.isSafeInteger(envelope.sequence) &&
+    envelope.sequence > 0
+      ? envelope.sequence
+      : null;
+  return {
+    type: typeof envelope.type === "string" ? envelope.type : null,
+    sequence,
+    durable: sequence !== null && sseId === String(sequence),
+  };
+}
 
 const DEFAULT_BACKOFF = {
   initialMs: 500,
@@ -128,6 +187,7 @@ export async function streamQRunEvents(
   let lastEventId = options.lastEventId ?? 0;
   let attempt = 0;
   let reconnects = 0;
+  let unreadable = 0;
   let serverRetryMs: number | undefined;
   const outerSignal = options.signal;
 
@@ -137,7 +197,7 @@ export async function streamQRunEvents(
   for (;;) {
     if (outerSignal?.aborted) {
       report("CLOSED");
-      return { reason: "ABORTED", lastEventId, reconnects };
+      return { reason: "ABORTED", lastEventId, reconnects, unreadable };
     }
     report(attempt === 0 ? "CONNECTING" : "RECONNECTING");
     const isReconnect = attempt > 0 || (options.lastEventId ?? 0) > 0;
@@ -166,13 +226,13 @@ export async function streamQRunEvents(
     } catch {
       if (outerSignal?.aborted) {
         report("CLOSED");
-        return { reason: "ABORTED", lastEventId, reconnects };
+        return { reason: "ABORTED", lastEventId, reconnects, unreadable };
       }
       // A connection failure: back off and try again.
       attempt += 1;
       if (attempt > backoff.maxAttempts) {
         report("CLOSED");
-        return { reason: "GAVE_UP", lastEventId, reconnects };
+        return { reason: "GAVE_UP", lastEventId, reconnects, unreadable };
       }
       await delay(nextDelay(attempt), outerSignal);
       continue;
@@ -233,10 +293,31 @@ export async function streamQRunEvents(
           try {
             raw = JSON.parse(message.data);
           } catch {
-            continue;
+            raw = null;
           }
           const parsed = QStreamEventSchema.safeParse(raw);
           if (!parsed.success) {
+            // A5 (audit D9): one unknown kind or block used to vanish here
+            // with no trace, and an unread terminal event left the stream
+            // reconnecting until it gave up. Counted and reported; a
+            // durable one moves the cursor; a terminal one ends the run's
+            // stream, so the caller re-reads the record.
+            const frame = unreadableFrameOf(raw, runId, message.lastEventId);
+            if (frame === null) continue;
+            if (frame.durable && frame.sequence !== null) {
+              if (frame.sequence <= lastEventId) continue;
+              lastEventId = frame.sequence;
+            }
+            unreadable += 1;
+            options.onUnreadable?.(frame);
+            if (
+              frame.durable &&
+              frame.type !== null &&
+              TERMINAL_TYPES.has(frame.type)
+            ) {
+              terminal = true;
+              break;
+            }
             continue;
           }
           const event = parsed.data;
@@ -276,18 +357,18 @@ export async function streamQRunEvents(
 
     if (terminal) {
       report("CLOSED");
-      return { reason: "TERMINAL", lastEventId, reconnects };
+      return { reason: "TERMINAL", lastEventId, reconnects, unreadable };
     }
     if (outerSignal?.aborted) {
       report("CLOSED");
-      return { reason: "ABORTED", lastEventId, reconnects };
+      return { reason: "ABORTED", lastEventId, reconnects, unreadable };
     }
     // The server closed without a terminal event (deploy, proxy, error):
     // reconnect from the cursor. Replayed events beyond it are new to us.
     attempt += 1;
     if (attempt > backoff.maxAttempts) {
       report("CLOSED");
-      return { reason: "GAVE_UP", lastEventId, reconnects };
+      return { reason: "GAVE_UP", lastEventId, reconnects, unreadable };
     }
     await delay(nextDelay(attempt), outerSignal);
   }

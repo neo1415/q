@@ -163,6 +163,7 @@ describe("streamQRunEvents", () => {
       reason: "TERMINAL",
       lastEventId: 5,
       reconnects: 0,
+      unreadable: 0,
     });
     expect(seen).toEqual([
       { type: "q.run.started", durable: true, replayed: false },
@@ -198,6 +199,7 @@ describe("streamQRunEvents", () => {
       reason: "TERMINAL",
       lastEventId: 5,
       reconnects: 1,
+      unreadable: 0,
     });
     // The delta at sequence 3 did not move the cursor: the reconnect asks after 2.
     expect(requests[1]?.headers["last-event-id"]).toBe("2");
@@ -301,5 +303,103 @@ describe("streamQRunEvents", () => {
     });
     expect(seen).toEqual(["q.run.started", "q.run.completed"]);
     expect(result.reason).toBe("TERMINAL");
+  });
+
+  it("A5: an unknown durable kind is reported, never rendered, and moves the cursor so a reconnect gets past it", async () => {
+    // A newer server's event kind (right after a deploy), as a durable frame.
+    const unknown = {
+      ...stage2,
+      type: "q.chart.available",
+      data: { chart: {} },
+    };
+    const { doFetch, requests } = scriptedFetch([
+      {
+        body: [
+          frame(started),
+          `event: q.chart.available\nid: 2\ndata: ${JSON.stringify(unknown)}\n\n`,
+        ],
+      },
+      { body: [frame(stage3), frame(completed), frame(done)] },
+    ]);
+    const seen: number[] = [];
+    const unread: unknown[] = [];
+    const result = await streamQRunEvents(session(doFetch), RUN, {
+      onEvent: (e) => seen.push(e.sequence),
+      onUnreadable: (f) => unread.push(f),
+      backoff: NO_WAIT,
+    });
+    expect(unread).toEqual([
+      { type: "q.chart.available", sequence: 2, durable: true },
+    ]);
+    // The reconnect asks after the unread frame, not before it.
+    expect(requests[1]?.headers["last-event-id"]).toBe("2");
+    expect(seen).toEqual([1, 3, 4, 5]);
+    expect(result).toMatchObject({ reason: "TERMINAL", unreadable: 1 });
+  });
+
+  it("A5: a known event with an unknown block is reported, and an unreadable terminal frame still ends the stream", async () => {
+    const badCompleted = {
+      ...completed,
+      data: {
+        message: {
+          ...(completed.data as { message: Record<string, unknown> }).message,
+          blocks: [{ kind: "NEW_BLOCK_KIND", payload: 1 }],
+        },
+      },
+    };
+    const badDone = { ...done, data: { status: "SOMETHING_NEW" } };
+    const { doFetch, requests } = scriptedFetch([
+      {
+        body: [
+          frame(started),
+          `event: q.message.completed\nid: 4\ndata: ${JSON.stringify(badCompleted)}\n\n`,
+          `event: q.run.completed\nid: 5\ndata: ${JSON.stringify(badDone)}\n\n`,
+        ],
+      },
+    ]);
+    const unread: unknown[] = [];
+    const seen: string[] = [];
+    const result = await streamQRunEvents(session(doFetch), RUN, {
+      onEvent: (e) => seen.push(e.type),
+      onUnreadable: (f) => unread.push(f),
+      backoff: NO_WAIT,
+    });
+    expect(seen).toEqual(["q.run.started"]);
+    expect(unread).toEqual([
+      { type: "q.message.completed", sequence: 4, durable: true },
+      { type: "q.run.completed", sequence: 5, durable: true },
+    ]);
+    // Terminal: no reconnect loop until the client gives up.
+    expect(requests).toHaveLength(1);
+    expect(result).toEqual({
+      reason: "TERMINAL",
+      lastEventId: 5,
+      reconnects: 0,
+      unreadable: 2,
+    });
+  });
+
+  it("A5: an unreadable delta is reported but never moves the cursor", async () => {
+    const badDelta = { ...delta, sequence: 3, data: { messageId: MSG } };
+    const { doFetch } = scriptedFetch([
+      {
+        body: [
+          frame(started),
+          `event: q.message.delta\ndata: ${JSON.stringify(badDelta)}\n\n`,
+          frame(completed),
+          frame(done),
+        ],
+      },
+    ]);
+    const unread: { durable: boolean }[] = [];
+    const result = await streamQRunEvents(session(doFetch), RUN, {
+      onEvent: () => undefined,
+      onUnreadable: (f) => unread.push(f),
+      backoff: NO_WAIT,
+    });
+    expect(unread).toEqual([
+      { type: "q.message.delta", sequence: 3, durable: false },
+    ]);
+    expect(result.lastEventId).toBe(5);
   });
 });

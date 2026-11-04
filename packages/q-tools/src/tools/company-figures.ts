@@ -156,7 +156,7 @@ export function createReadCompanyFiguresTool(
     status: "ACTIVE",
     providerName: "read_company_figures",
     description:
-      "Reads a company's current figures as the company published them: revenue (MRR, ARR), growth, customers and users, margins, team size, the raise target and market size, each with its date, truth class and evidence status. Call it for any question about a company's traction, numbers, raise or performance, and when describing a company. Every figure is the company's own claim unless its evidence status says otherwise: say \"self-reported\" and never call it verified. NONE means the company has published no figures: say they are not known, never zero.",
+      "Reads a company's current figures as the company published them: revenue (MRR, ARR), growth, customers and users, margins, team size, the raise target and market size, each with its date, truth class and evidence status. Call it for any question about a company's traction, numbers, raise or performance, and when describing a company. Every figure is the company's own claim unless its evidence status says otherwise: say \"self-reported\" and never call it verified. NONE means the company has published no figures: say they are not known, never zero. A figure not returned (burn, runway or any other) is unknown to this read, not absent: the company's deck (read_company_deck) may state it, and the person's screen may show it from there. Never say the company or its profile has no such figure; say you can't see or verify it.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [capability("company.view")],

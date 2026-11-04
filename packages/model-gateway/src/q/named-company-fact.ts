@@ -104,6 +104,11 @@ const SEARCH_TOOL = "search_companies";
 const GET_TOOL = "get_company";
 /** Read beside the profile when offered (owner 2026-10-23). */
 const FIGURES_TOOL = "read_company_figures";
+/**
+ * A4: the deck as the person's Deck tab reads it, beside the profile when
+ * offered -- the profile's Key numbers come from it (company-fact.ts).
+ */
+const DECK_TOOL = "read_company_deck";
 
 export const nameKey = (name: string): string =>
   name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
@@ -561,6 +566,10 @@ export async function readNamedVisibleCompany(input: {
   readonly data: unknown;
   /** read_company_figures' output when it succeeded; null otherwise. */
   readonly figures: unknown;
+  /** A4: read_company_deck's output when it succeeded; null otherwise. */
+  readonly deck: unknown;
+  /** A4: whether the deck was read, refused or not offered to this run. */
+  readonly deckRead: "READ" | "NOT_AVAILABLE" | "NOT_ASKED";
   readonly calls: readonly {
     readonly providerName: string;
     readonly outcome: QToolCallOutcome;
@@ -593,7 +602,7 @@ export async function readNamedVisibleCompany(input: {
   input.onFound?.();
   // The profile and its published figures, read in parallel through the
   // same tool port and plan; a figures read denied or failed adds nothing.
-  const [got, figures] = await Promise.all([
+  const [got, figures, deck] = await Promise.all([
     tools
       .execute(
         {
@@ -616,13 +625,27 @@ export async function readNamedVisibleCompany(input: {
           )
           .catch(() => null)
       : Promise.resolve(null),
+    available.has(DECK_TOOL)
+      ? tools
+          .execute(
+            {
+              callId: `q-named-visible-deck-${String(input.callIndex)}`,
+              name: DECK_TOOL,
+              arguments: { companyId },
+            },
+            context,
+          )
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
   if (got !== null) calls.push({ providerName: GET_TOOL, outcome: got });
   if (figures !== null) {
     calls.push({ providerName: FIGURES_TOOL, outcome: figures });
   }
+  if (deck !== null) calls.push({ providerName: DECK_TOOL, outcome: deck });
   if (got === null || !got.result.ok) return null;
   if (profileOf(got)?.companyId !== companyId) return null;
+  const deckOk = deck !== null && deck.status === "SUCCEEDED" && deck.result.ok;
   return {
     companyId,
     data: got.result.data,
@@ -630,6 +653,12 @@ export async function readNamedVisibleCompany(input: {
       figures !== null && figures.status === "SUCCEEDED" && figures.result.ok
         ? figures.result.data
         : null,
+    deck: deckOk ? deck.result.data : null,
+    deckRead: !available.has(DECK_TOOL)
+      ? "NOT_ASKED"
+      : deckOk
+        ? "READ"
+        : "NOT_AVAILABLE",
     calls,
   };
 }
