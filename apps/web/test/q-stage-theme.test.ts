@@ -240,8 +240,9 @@ describe("the Q stage follows the theme", () => {
 
   it("keeps today's night in dark mode, through the device's choice too", () => {
     // The values the stage held as one night in both themes (2026-10-19).
+    // Canvas neutral charcoal since 2026-11-04 (no navy).
     const night: Record<string, string> = {
-      canvas: "oklch(0.17 0.02 262)",
+      canvas: "oklch(0.248 0 0)",
       text: "oklch(0.98 0.004 92)",
       "text-muted": "oklch(1 0 0 / 0.62)",
       accent: "oklch(0.76 0.14 258)",
@@ -271,9 +272,9 @@ describe("the Q stage follows the theme", () => {
   it("writes black and gold's paper stage for light and its night for dark", () => {
     const css = presetStyleSheet(BLACK_GOLD);
     const root = /^:root\{([^}]*)\}/u.exec(css)?.[1] ?? "";
-    expect(root).toContain("--cq-stage-canvas:#fcfbf8;");
+    expect(root).toContain("--cq-stage-canvas:#ffffff;");
     expect(root).toContain("--cq-stage-accent:#8a6a12;");
-    expect(root).toContain("--cq-night-canvas:#0b0a08;");
+    expect(root).toContain("--cq-night-canvas:#212121;");
     expect(root).toContain("--cq-night-q-light:#e2b858;");
     // Dark never re-sets the stage: tokens.css points it at the night.
     expect(css.slice(css.indexOf("\n"))).not.toContain("--cq-stage-");
@@ -352,19 +353,20 @@ describe("Q's presence on paper and on the night", () => {
     expect(presenceLighting(true)).toBe(NIGHT_LIGHTING);
     expect(NIGHT_LIGHTING.blend).toBe("add");
     expect(NIGHT_LIGHTING.white).toBe(1);
-    expect(NIGHT_LIGHTING.coreLight).toBe(true);
+    // UX-06: no halo or whitened core, on either surface.
+    expect(NIGHT_LIGHTING.coreLight).toBe(false);
+    expect(NIGHT_LIGHTING.halo).toBe(0);
   });
 
-  it("is ink on paper: normal blending, no whitening, a tight faint bloom", () => {
+  it("is ink on paper: normal blending, no whitening, no halo", () => {
     expect(presenceLighting(false)).toBe(PAPER_LIGHTING);
     expect(PAPER_LIGHTING.blend).toBe("over");
     expect(PAPER_LIGHTING.white).toBe(0);
     expect(PAPER_LIGHTING.coreLight).toBe(false);
+    expect(PAPER_LIGHTING.halo).toBe(0);
     // Ink needs a body light does not: heavier, never fainter than a floor.
     expect(PAPER_LIGHTING.weight).toBeGreaterThan(1);
     expect(PAPER_LIGHTING.floor).toBeGreaterThan(NIGHT_LIGHTING.floor);
-    expect(PAPER_LIGHTING.halo).toBeGreaterThan(0);
-    expect(PAPER_LIGHTING.halo).toBeLessThan(NIGHT_LIGHTING.halo / 2);
     expect(PAPER_LIGHTING.haloReach).toBeLessThan(NIGHT_LIGHTING.haloReach);
   });
 });

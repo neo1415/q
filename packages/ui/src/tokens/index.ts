@@ -7,11 +7,11 @@
 export const THEME_COLORS = {
   light: {
     accent: "#1767d1",
-    canvas: "#fdfdfb",
+    canvas: "#ffffff",
   },
   dark: {
     accent: "#66a5ff",
-    canvas: "#0b0d12",
+    canvas: "#212121",
   },
 } as const;
 
@@ -22,7 +22,7 @@ export const THEME_COLORS = {
  * can read `--cq-*` should use these.
  */
 export const RASTER_COLORS = {
-  surface: "#fefdfb",
+  surface: "#ffffff",
   textPrimary: "#0f141b",
   textSecondary: "#50565f",
   border: "#d3d6db",

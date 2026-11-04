@@ -14,8 +14,8 @@ import { DEFAULT_BRAND_HEX, contrastRatio } from "./brand-colour";
  * are black and gold... anybody should be able to change the branding at
  * any time" (founder, 2026-10-06).
  *
- * Black and gold is design B's brand board: warm ivory paper and near-black
- * in light, near-black and ivory in dark, a black menu bar in dark, and
+ * Black and gold is design B's brand board, neutralised 2026-11-04: clean
+ * white and near-black ink in light, charcoal and soft white in dark, a black menu bar in dark, and
  * gold used two ways. Gold is a fill or a deep bronze for text: classic
  * gold #C9A227 reads on black (8:1) but fails on white (2.4:1), so light
  * mode's accent is bronze #8A6A12 (5.1:1 on white) with #6E5410 for hover.
@@ -100,8 +100,9 @@ const GOLD = "#c9a227";
 const BRONZE = "#8a6a12";
 const DEEP_BRONZE = "#6e5410";
 const CHAMPAGNE = "#e2b858";
-const INK = "#16140f";
-const IVORY = "#f4efe2";
+const INK = "#0d0d0d";
+/** Dark-theme text: neutral, not ivory (boss 2026-11-04). */
+const PAPER_TEXT = "#ececec";
 
 export const BLACK_GOLD: BrandPreset = {
   key: "black_gold",
@@ -110,75 +111,79 @@ export const BLACK_GOLD: BrandPreset = {
   swatch: [INK, GOLD],
   palette: {
     light: {
-      // Near-white (client feedback UX-03, 2026-11-04); text and borders
-      // keep AA on every light surface (contrast checked against #fcfbf8).
-      canvas: "#fcfbf8",
-      surface: "#fefdfb",
+      // Clean neutral white (client feedback UX-03, boss 2026-11-04):
+      // no cream or ivory in the surfaces; gold stays the accent and Q's
+      // light only. Text and borders keep AA on every light surface,
+      // including the #f4f4f4 sunken well (brand-presets.test.ts).
+      canvas: "#ffffff",
+      surface: "#ffffff",
       "surface-raised": "#ffffff",
-      "surface-subtle": "#f6f3ec",
-      "surface-strong": "#ebe6db",
-      "surface-sunken": "#f3f0e9",
+      "surface-subtle": "#f9f9f9",
+      "surface-strong": "#ececec",
+      "surface-sunken": "#f4f4f4",
       "text-primary": INK,
-      "text-secondary": "#4f4a40",
-      "text-tertiary": "#6b6457",
+      "text-secondary": "#4d4d4d",
+      "text-tertiary": "#666666",
       "text-inverse": "#ffffff",
-      "border-subtle": "#e7e1d5",
-      border: "#d9d1c1",
-      "border-strong": "#8f8673",
+      "border-subtle": "#ececec",
+      border: "#e0e0e0",
+      "border-strong": "#8f8f8f",
       accent: BRONZE,
       "accent-hover": DEEP_BRONZE,
       "accent-soft": "#f3ead2",
       "q-light": BRONZE,
-      "q-ember": "#7a705c",
+      "q-ember": "#737373",
       "q-bloom": "#c9a22757",
-      "qcard-surface": "#fbf8ef",
+      "qcard-surface": "#f9f9f9",
       "qcard-text": INK,
-      "qcard-muted": "#5f5848",
+      "qcard-muted": "#5d5d5d",
       "qcard-edge": BRONZE,
       "qcard-glow": "#c9a22729",
       "qcard-arc": "#c9a2271a",
     },
     dark: {
-      canvas: "#0f0e0b",
-      surface: "#17150f",
-      "surface-raised": "#1d1a13",
-      "surface-subtle": "#232017",
-      "surface-strong": "#2e2a1f",
-      "surface-sunken": "#0b0a08",
-      "text-primary": IVORY,
-      "text-secondary": "#c9c0ab",
-      "text-tertiary": "#a59c87",
+      // Neutral charcoal (boss 2026-11-04): no navy and no brown in the
+      // blacks. Page #212121, sunken/sidebar #171717, raised #2f2f2f.
+      canvas: "#212121",
+      surface: "#262626",
+      "surface-raised": "#2f2f2f",
+      "surface-subtle": "#2a2a2a",
+      "surface-strong": "#383838",
+      "surface-sunken": "#171717",
+      "text-primary": PAPER_TEXT,
+      "text-secondary": "#c4c4c4",
+      "text-tertiary": "#a3a3a3",
       "text-inverse": INK,
-      "border-subtle": "#2a261c",
-      border: "#3a3427",
-      "border-strong": "#7a715c",
+      "border-subtle": "#333333",
+      border: "#424242",
+      "border-strong": "#757575",
       accent: GOLD,
       "accent-hover": "#d9b45a",
       "accent-soft": "#2e2714",
       "q-light": CHAMPAGNE,
-      "q-ember": "#9c917a",
+      "q-ember": "#9e9e9e",
       "q-bloom": "#e2b8587a",
-      "qcard-surface": "#1a170f",
-      "qcard-text": IVORY,
-      "qcard-muted": "#c9c0ab",
+      "qcard-surface": "#262626",
+      "qcard-text": PAPER_TEXT,
+      "qcard-muted": "#c4c4c4",
       "qcard-edge": GOLD,
       "qcard-glow": "#c9a22738",
       "qcard-arc": "#c9a22733",
     },
     chrome: {
-      surface: INK,
-      subtle: "#26231b",
-      border: "#2f2b22",
-      text: IVORY,
-      muted: "#bfb6a2",
+      surface: "#171717",
+      subtle: "#262626",
+      border: "#2a2a2a",
+      text: PAPER_TEXT,
+      muted: "#b4b4b4",
       accent: CHAMPAGNE,
       soft: "#2e2714",
     },
     stage: {
-      canvas: "#0b0a08",
+      canvas: "#212121",
       accent: CHAMPAGNE,
       qLight: CHAMPAGNE,
-      qEmber: "#9c917a",
+      qEmber: "#9e9e9e",
       qBloom: "#e2b8587a",
     },
   },

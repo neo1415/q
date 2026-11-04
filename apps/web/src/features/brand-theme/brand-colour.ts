@@ -190,8 +190,8 @@ const REFERENCE = {
     surface: oklchToHex({ l: 1, c: 0, h: 0 }),
   },
   dark: {
-    inverse: oklchToHex({ l: 0.17, c: 0.01, h: 258 }),
-    surface: oklchToHex({ l: 0.24, c: 0.01, h: 258 }),
+    inverse: oklchToHex({ l: 0.205, c: 0, h: 0 }),
+    surface: oklchToHex({ l: 0.285, c: 0, h: 0 }),
   },
 } as const;
 
@@ -308,17 +308,17 @@ export function brandStyleSheet(palette: BrandPalette): string {
  */
 export const PREVIEW_SURFACES = {
   light: {
-    canvas: "oklch(0.993 0.002 92)",
+    canvas: "oklch(1 0 0)",
     border: "oklch(0.91 0.006 258)",
     text: "oklch(0.19 0.012 258)",
     muted: "oklch(0.43 0.012 258)",
     inverse: REFERENCE.light.inverse,
   },
   dark: {
-    canvas: "oklch(0.16 0.01 258)",
-    border: "oklch(0.28 0.01 258)",
+    canvas: "oklch(0.248 0 0)",
+    border: "oklch(0.31 0 0)",
     text: "oklch(0.95 0.005 92)",
-    muted: "oklch(0.75 0.008 258)",
+    muted: "oklch(0.8 0 0)",
     inverse: REFERENCE.dark.inverse,
   },
 } as const;

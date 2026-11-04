@@ -81,36 +81,10 @@
   }
 
   /*
-   * Two faint blooms of the brand blue behind everything (founder
-   * direction 2026-09-29), painted once on a fixed layer so scrolling moves
-   * none of it. The tiled grain and the dot grid that sat with them were
-   * removed (client feedback UX-02, 2026-11-04): no repeated pattern behind
-   * text, a quiet canvas. Tokens only: light and dark have their own values.
+   * No blooms, grain or dot grid behind the page (client feedback UX-02/03,
+   * owner 2026-11-04): the canvas is one flat neutral colour, like a clean
+   * document; brand colour lives in Q and the accent, not the background.
    */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-image:
-      radial-gradient(
-        60rem 40rem at 100% -10%,
-        var(--cq-qcard-arc),
-        transparent 70%
-      ),
-      radial-gradient(
-        50rem 36rem at -10% 110%,
-        var(--cq-qcard-arc),
-        transparent 70%
-      );
-  }
-  /* More contrast or forced colours: a flat canvas, nothing behind text. */
-  @media (prefers-contrast: more), (forced-colors: active) {
-    body::before {
-      display: none;
-    }
-  }
 
   @media (min-width: 1024px) {
     html {
@@ -4281,11 +4255,11 @@
 @layer components {
   .cq-splash {
     /* Black and gold (founder, 2026-10-07): the brand preset's stage
-       black, ivory type, gold mark. The canvas particles read
+       charcoal, soft-white type, gold mark (neutralised 2026-11-04). The canvas particles read
        --cq-splash-particle-* and --cq-splash-glow (splash-engine.ts). */
-    --cq-splash-bg: #0b0a08;
-    --cq-splash-ink: #f4efe2;
-    --cq-splash-muted: #bfb6a2;
+    --cq-splash-bg: #212121;
+    --cq-splash-ink: #ececec;
+    --cq-splash-muted: #b4b4b4;
     --cq-splash-accent: #e2b858;
     --cq-splash-haze: rgba(201, 162, 39, 0.16);
     --cq-splash-silk: rgba(226, 184, 88, 0.07);
@@ -4331,9 +4305,9 @@
     }
   }
   .cq-splash[data-theme="light"] {
-    --cq-splash-bg: #fcfbf8;
-    --cq-splash-ink: #16140f;
-    --cq-splash-muted: #6b6457;
+    --cq-splash-bg: #ffffff;
+    --cq-splash-ink: #0d0d0d;
+    --cq-splash-muted: #666666;
     --cq-splash-accent: #8a6a12;
     --cq-splash-haze: rgba(201, 162, 39, 0.14);
     --cq-splash-silk: rgba(255, 255, 255, 0.65);
@@ -4346,9 +4320,9 @@
   }
   @media (prefers-color-scheme: light) {
     .cq-splash[data-theme="system"] {
-      --cq-splash-bg: #fcfbf8;
-      --cq-splash-ink: #16140f;
-      --cq-splash-muted: #6b6457;
+      --cq-splash-bg: #ffffff;
+      --cq-splash-ink: #0d0d0d;
+      --cq-splash-muted: #666666;
       --cq-splash-accent: #8a6a12;
       --cq-splash-haze: rgba(201, 162, 39, 0.14);
       --cq-splash-silk: rgba(255, 255, 255, 0.65);
@@ -5401,18 +5375,18 @@
  */
 @layer components {
   .cq-preview-light {
-    --cq-preview-canvas: oklch(0.993 0.002 92);
+    --cq-preview-canvas: oklch(1 0 0);
     --cq-preview-surface: oklch(1 0 0);
     --cq-preview-accent: var(--cq-gold-deep);
   }
   .cq-preview-dark {
-    --cq-preview-canvas: oklch(0.16 0.01 258);
-    --cq-preview-surface: oklch(0.22 0.011 258);
+    --cq-preview-canvas: oklch(0.248 0 0);
+    --cq-preview-surface: oklch(0.302 0 0);
     --cq-preview-accent: var(--cq-gold-mid);
   }
   .cq-preview-auto {
-    --cq-preview-canvas: oklch(0.993 0.002 92);
-    --cq-preview-surface: oklch(0.16 0.01 258);
+    --cq-preview-canvas: oklch(1 0 0);
+    --cq-preview-surface: oklch(0.248 0 0);
     --cq-preview-accent: var(--cq-gold-deep);
   }
 }

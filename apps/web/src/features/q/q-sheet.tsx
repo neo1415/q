@@ -25,7 +25,7 @@ import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ViewTransition } from "@/components/view-transition";
 
-import { QAperture, QLumen } from "../q-aperture";
+import { QAperture } from "../q-aperture";
 import { useDockMenu } from "../q-dock/use-dock-menu";
 import { interceptTyped } from "./typed-intercept";
 import {
@@ -113,13 +113,6 @@ export function QSheetConversation({
 
   return (
     <div className="flex min-h-full flex-col gap-4" data-q-sheet>
-      {/* Q is listening: the edge light on the panel's side. */}
-      <QLumen
-        active={voice.active}
-        input={voice.client.inputLevel}
-        output={voice.client.outputLevel}
-        side="right"
-      />
       {inline ? null : (
         <div className="flex items-center gap-4">
           <ViewTransition name="q-aperture" share="cq-q-morph" default="none">

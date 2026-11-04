@@ -37,7 +37,6 @@ import {
   type QSubject,
 } from "@/features/q/q-subject";
 import { QSounds } from "@/features/q-sound/q-sounds";
-import { QEdgeFlow } from "@/features/q-swarm/q-edge-flow";
 import { WakeWord } from "@/features/wake/wake-word";
 import { useT } from "@/features/i18n/language";
 import { opensQ } from "./q-shortcut";
@@ -282,8 +281,8 @@ export function GlobalQProvider({
           {/* The arrival briefing beside the dock on every other page. */}
           <ArrivalDock />
           <QSounds />
-          {/* ADR 0062: particles around the page edge while Q works. */}
-          <QEdgeFlow />
+          {/* No particles around the page edge (UX-06, owner 2026-11-04):
+              Q's own presence and its state label say Q is working. */}
           {/* D1: "Hey Q"; off by default, and nothing loads while off. */}
           <WakeWord openQ={openQ} />
           {dock}

@@ -116,7 +116,7 @@ describe("brand presets", () => {
 
   it("writes black and gold's whole look, and nothing for classic blue", () => {
     const css = presetStyleSheet(BLACK_GOLD);
-    expect(css).toContain("--cq-canvas:#fcfbf8");
+    expect(css).toContain("--cq-canvas:#ffffff");
     expect(css).toContain("--cq-accent:#8a6a12");
     expect(css).toContain(':root[data-theme="dark"]');
     expect(css).toContain("prefers-color-scheme: dark");
@@ -128,10 +128,10 @@ describe("brand presets", () => {
     // The night (dark theme, and the cinema in both) is gold light; the
     // light theme's stage is the preset's own paper, Q drawn in bronze ink.
     expect(css).toContain("--cq-night-q-light:#e2b858");
-    expect(css).toContain("--cq-night-canvas:#0b0a08");
-    expect(css).toContain("--cq-stage-canvas:#fcfbf8");
+    expect(css).toContain("--cq-night-canvas:#212121");
+    expect(css).toContain("--cq-stage-canvas:#ffffff");
     expect(css).toContain("--cq-stage-q-light:#8a6a12");
-    expect(css).toContain("--cq-stage-text:#16140f");
+    expect(css).toContain("--cq-stage-text:#0d0d0d");
     expect(css).not.toMatch(/<\/style|<script/iu);
     expect(presetStyleSheet(CLASSIC_BLUE)).toBe("");
   });
