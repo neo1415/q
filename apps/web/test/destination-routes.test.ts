@@ -80,6 +80,8 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
  * open_page tool from the record's name, or by the card on screen.
  */
 const NOT_BY_NAME: Readonly<Record<string, string>> = {
+  "/documents/unavailable":
+    "the not-found landing for a refused document link (J7); never a destination",
   "/admin": "platform operators only",
   "/settings/security":
     "two-step sign-in: Q never opens it, so a secret or code never passes through Q",

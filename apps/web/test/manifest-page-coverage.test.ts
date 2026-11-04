@@ -48,6 +48,8 @@ const EXEMPT_TREES: Readonly<Record<string, string>> = {
 };
 
 const EXEMPT: Readonly<Record<string, string>> = {
+  "documents/unavailable/page.tsx":
+    "the not-found landing for a refused document link (J7): it shows nothing to describe",
   "page.tsx": "the public landing page: signed out, no Q session",
   "paused/page.tsx":
     "the account-paused notice: Q is switched off for a paused account",

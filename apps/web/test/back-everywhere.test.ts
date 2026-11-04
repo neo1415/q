@@ -70,7 +70,12 @@ const REDIRECTS = [
  * Pages whose own controls are the way out: the invitation card's
  * "Not now" and Decline.
  */
-const OWN_EXIT = ["join/[token]"] as const;
+const OWN_EXIT = [
+  "join/[token]",
+  // The not-found landing for refused document links (J7): the app's own
+  // not-found page carries the way out.
+  "documents/unavailable",
+] as const;
 
 type Interior = {
   readonly parent: string;
