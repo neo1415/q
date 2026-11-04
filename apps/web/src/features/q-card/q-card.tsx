@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { cx } from "@capital-q/ui";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
+import { initials } from "@/features/investors/investor-labels";
 
 /**
  * The Q Card (BIZ-004, R26; founder design 2026-09-28): the shareable
@@ -18,6 +19,12 @@ import { QNavIcon } from "@/components/app-shell/q-nav-icon";
  * Every colour is a `--cq-qcard-*` token with a light and a dark value, so
  * the card follows the theme. The name never truncates silently: it wraps
  * to two lines and the card grows.
+ *
+ * Client feedback UX-07 (2026-11-04): read like a professional ID card.
+ * A portrait (the photo or logo the audience may see, else initials)
+ * beside the name; a person's role and organisation on their own lines.
+ * No verified mark on the card itself: what Capital Q verified is said in
+ * words beside it, from the record, and only when it is so.
  */
 
 export type CardBrand = {
@@ -42,6 +49,15 @@ export type QCardProps = {
   readonly qrSvg?: string | undefined;
   readonly verifiedLabels?: readonly string[] | undefined;
   readonly brand?: CardBrand | undefined;
+  /**
+   * The portrait: a photo or logo this audience may see (a signed URL);
+   * absent or null shows the name's initials.
+   */
+  readonly portraitUrl?: string | null | undefined;
+  /** A person's role and organisation; when either is given they replace
+      the descriptor line. */
+  readonly role?: string | null | undefined;
+  readonly organisation?: string | null | undefined;
   readonly className?: string | undefined;
   /** The page's own heading when the card leads a page (the public card). */
   readonly nameAs?: "p" | "h1" | undefined;
@@ -56,9 +72,15 @@ export function QCard({
   qrSvg,
   verifiedLabels = [],
   brand,
+  portraitUrl = null,
+  role = null,
+  organisation = null,
   className,
   nameAs = "p",
 }: QCardProps) {
+  const identityLines = [role, organisation].filter(
+    (line): line is string => line !== null && line.length > 0,
+  );
   const Name = nameAs;
   const style = {
     "--cq-card-edge": brand?.accent ?? "var(--cq-qcard-edge)",
@@ -102,24 +124,51 @@ export function QCard({
               width={24}
               height={24}
               className="ms-auto size-10 object-cover"
-              data-card-photo
+              data-card-logo
             />
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-1">
-          <Name className="line-clamp-2 text-[clamp(1.35rem,4.2vw,2rem)] leading-tight font-semibold tracking-tight break-words">
-            {name}
-          </Name>
-          {descriptor === null || descriptor.length === 0 ? null : (
-            <p className="cq-body line-clamp-2 text-(--cq-qcard-muted)">
-              {descriptor}
-            </p>
-          )}
-          <span aria-hidden="true" className="mt-2 flex h-px w-24">
-            <span className="w-1/3 bg-(--cq-card-edge)" />
-            <span className="flex-1 bg-(--cq-qcard-muted)/40" />
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span
+            className="inline-flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-base font-semibold text-(--cq-card-edge) sm:size-16 sm:text-lg"
+            data-card-portrait
+          >
+            {portraitUrl === null ? (
+              <span aria-hidden="true">{initials(name)}</span>
+            ) : (
+              // A signed, short-lived storage URL the browser loads
+              // directly; decorative, the name is the text.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={portraitUrl}
+                alt=""
+                width={64}
+                height={64}
+                className="size-full object-cover"
+                data-card-photo
+              />
+            )}
           </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <Name className="line-clamp-2 text-[clamp(1.25rem,4vw,1.875rem)] leading-tight font-semibold tracking-tight break-words">
+              {name}
+            </Name>
+            {identityLines.length > 0 ? (
+              identityLines.map((line) => (
+                <p
+                  key={line}
+                  className="cq-body-sm line-clamp-1 break-words text-(--cq-qcard-muted)"
+                >
+                  {line}
+                </p>
+              ))
+            ) : descriptor === null || descriptor.length === 0 ? null : (
+              <p className="cq-body-sm line-clamp-2 text-(--cq-qcard-muted)">
+                {descriptor}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-col gap-1">

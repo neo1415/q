@@ -110,12 +110,14 @@ export const BLACK_GOLD: BrandPreset = {
   swatch: [INK, GOLD],
   palette: {
     light: {
-      canvas: "#f6f4ef",
-      surface: "#fbfaf7",
+      // Near-white (client feedback UX-03, 2026-11-04); text and borders
+      // keep AA on every light surface (contrast checked against #fcfbf8).
+      canvas: "#fcfbf8",
+      surface: "#fefdfb",
       "surface-raised": "#ffffff",
-      "surface-subtle": "#f1ede4",
-      "surface-strong": "#e6e0d3",
-      "surface-sunken": "#efebe2",
+      "surface-subtle": "#f6f3ec",
+      "surface-strong": "#ebe6db",
+      "surface-sunken": "#f3f0e9",
       "text-primary": INK,
       "text-secondary": "#4f4a40",
       "text-tertiary": "#6b6457",

@@ -7,7 +7,7 @@
 export const THEME_COLORS = {
   light: {
     accent: "#1767d1",
-    canvas: "#fbfaf7",
+    canvas: "#fdfdfb",
   },
   dark: {
     accent: "#66a5ff",

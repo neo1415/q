@@ -20,6 +20,11 @@ import { ICON_SIZE, ICON_STROKE, Mic, Square } from "@capital-q/ui/icons";
 import { MenuContent, MenuItem } from "@capital-q/ui/menu";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import {
+  isApplePlatform,
+  qShortcutHint,
+  Q_SHORTCUT_ARIA,
+} from "@/components/app-shell/q-shortcut";
 import { ViewTransition } from "@/components/view-transition";
 import {
   Q_APERTURE_LABELS,
@@ -345,6 +350,15 @@ export function QDock() {
   const announcement = useAnnouncement(
     presence?.state === "IDLE" ? undefined : presence?.label,
   );
+  // UX-05: the shortcut, visible on the trigger in the platform's words.
+  // The server and the first paint say "Ctrl K"; a Mac corrects it after.
+  const shortcut = qShortcutHint(
+    useSyncExternalStore(
+      noSubscribe,
+      () => isApplePlatform(navigator.platform, navigator.userAgent),
+      () => false,
+    ),
+  );
 
   if (!visible || session === null || presence === undefined) return null;
 
@@ -396,6 +410,7 @@ export function QDock() {
         aria-label={name}
         aria-describedby={hintId}
         aria-expanded={panelOpen}
+        aria-keyshortcuts={Q_SHORTCUT_ARIA}
         onClick={openPanel}
         data-q-dock-button
       >
@@ -450,12 +465,16 @@ export function QDock() {
       aria-label={name}
       aria-describedby={hintId}
       aria-expanded={panelOpen}
+      aria-keyshortcuts={Q_SHORTCUT_ARIA}
       onClick={openPanel}
       data-q-dock-button
     >
       {aperture}
       <span className="cq-q-dock-tip" aria-hidden="true">
         {word === "ready" ? "Ask Q" : word}
+        <kbd className="cq-q-dock-kbd" data-q-shortcut-hint>
+          {shortcut}
+        </kbd>
       </span>
     </button>
   );
@@ -508,4 +527,9 @@ export function QDock() {
       </div>
     </aside>
   );
+}
+
+/** The platform never changes while the page is open: nothing to watch. */
+function noSubscribe(): () => void {
+  return () => undefined;
 }

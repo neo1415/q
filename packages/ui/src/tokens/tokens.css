@@ -26,13 +26,15 @@
   --cq-font-editorial: Georgia, "Times New Roman", Times, serif;
 
   /* Surfaces: canvas → section → surface → raised overlay. */
-  --cq-canvas: oklch(0.985 0.004 92);
-  --cq-surface: oklch(0.995 0.002 92);
+  /* Near-white and almost neutral (client feedback UX-03, 2026-11-04):
+     the conversation reads on a clean page, still a hair warm. */
+  --cq-canvas: oklch(0.993 0.002 92);
+  --cq-surface: oklch(0.998 0.001 92);
   --cq-surface-raised: oklch(1 0 0);
-  --cq-surface-subtle: oklch(0.965 0.005 92);
-  --cq-surface-strong: oklch(0.925 0.007 92);
+  --cq-surface-subtle: oklch(0.975 0.004 92);
+  --cq-surface-strong: oklch(0.935 0.006 92);
   /* Below the canvas: a person's own message, a well an answer sits in. */
-  --cq-surface-sunken: oklch(0.955 0.005 92);
+  --cq-surface-sunken: oklch(0.965 0.004 92);
 
   --cq-text-primary: oklch(0.19 0.012 258);
   --cq-text-secondary: oklch(0.43 0.012 258);
@@ -172,7 +174,7 @@
    * (globals.css), which pins the stage tokens to the night in both themes,
    * so a video on a light page sits in its own dark frame.
    */
-  --cq-stage-canvas: oklch(0.985 0.004 92);
+  --cq-stage-canvas: oklch(0.993 0.002 92);
   /* The Q Card (founder design 2026-09-28): a card with a thin lit edge
      and one soft arc of light. Light theme: paper card, blue edge. */
   --cq-qcard-surface: oklch(0.985 0.006 258);
@@ -193,7 +195,7 @@
   --cq-stage-star: oklch(0.32 0.02 258 / 0.2);
   --cq-stage-star-faint: oklch(0.32 0.02 258 / 0.1);
   /* A label or caption laid over a stage tile: paper on paper, night on night. */
-  --cq-stage-veil: oklch(0.985 0.004 92 / 0.88);
+  --cq-stage-veil: oklch(0.993 0.002 92 / 0.88);
   --cq-stage-scheme: light;
   /*
    * The night (the dark theme's stage, and the cinema in both themes).

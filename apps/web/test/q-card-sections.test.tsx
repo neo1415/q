@@ -281,9 +281,10 @@ describe("a person's card (owner 2026-10-22)", () => {
     const { container } = render(
       <PublicCardView card={card("PUBLIC", PERSON_FIELDS, "PERSON")} />,
     );
-    expect(
-      screen.getByText("Managing Partner · Savanna Ventures"),
-    ).toBeTruthy();
+    // UX-07: role and organisation each on their own line of the card.
+    const figure = screen.getByRole("figure");
+    expect(within(figure).getByText("Managing Partner")).toBeTruthy();
+    expect(within(figure).getByText("Savanna Ventures")).toBeTruthy();
     expect(screen.getByText("Backing East African logistics")).toBeTruthy();
     // No company sections on a person.
     expect(container.querySelector('[data-card-section="numbers"]')).toBeNull();

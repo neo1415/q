@@ -15,6 +15,7 @@ import { AssignPlan, OverrideLimit } from "@/features/admin/billing-controls";
 import { allowanceLine, sourceLine } from "@/features/billing/plan-words";
 import { when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -59,6 +60,7 @@ export default async function AdminOrganisationPage({
   ];
   return (
     <div className="flex flex-col gap-8">
+      <BackLink fallbackHref="/admin/organisations" />
       <PageSection id="organisation" title={org.name}>
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">

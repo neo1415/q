@@ -40,6 +40,7 @@ import { QSounds } from "@/features/q-sound/q-sounds";
 import { QEdgeFlow } from "@/features/q-swarm/q-edge-flow";
 import { WakeWord } from "@/features/wake/wake-word";
 import { useT } from "@/features/i18n/language";
+import { opensQ } from "./q-shortcut";
 
 /**
  * P9: the side panel's conversation is code most page views never run,
@@ -213,11 +214,10 @@ export function GlobalQProvider({
   }
 
   // Control/Command+K opens Q from anywhere (doc 17 §164); on the Q page
-  // it goes to the command bar.
+  // it goes to the command bar. Never Command+Q (UX-05): see q-shortcut.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k") return;
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (!opensQ(event)) return;
       event.preventDefault();
       if (window.location.pathname === Q_PAGE) {
         document.getElementById("home-q")?.focus();

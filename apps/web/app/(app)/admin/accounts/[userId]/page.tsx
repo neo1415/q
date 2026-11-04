@@ -10,6 +10,7 @@ import { adminContext } from "@/features/admin/admin-context";
 import { AccountSuspension } from "@/features/admin/suspension-controls";
 import { ROLE_WORDS, when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -57,6 +58,7 @@ export default async function AdminAccountPage({
   ];
   return (
     <div className="flex flex-col gap-8">
+      <BackLink fallbackHref="/admin/accounts" />
       <PageSection id="account" title={name}>
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
