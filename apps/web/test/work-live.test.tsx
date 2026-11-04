@@ -27,6 +27,7 @@ import {
 } from "../src/features/q/work-canvas";
 import { earlierWork, PinnedWorkLines } from "../src/features/q/pinned-work";
 import {
+  deliveredPlanLine,
   elapsedWords,
   liveFraction,
   liveKey,
@@ -661,5 +662,41 @@ describe("owner 2026-10-28: long work, visible and announced", () => {
     expect(idleEnds(idle + 1, idle, false)).toBe(true);
     expect(idleEnds(idle + 1, idle, true)).toBe(false);
     expect(idleEnds(idle + LINE_HOLD_MAX_MS + 1, idle, true)).toBe(true);
+  });
+});
+
+describe("a plan that lands while a live line is open (owner 2026-11-04)", () => {
+  const PLAN = "6d2a1f00-0000-4000-8000-000000000001";
+  const JOB = "6d2a1f00-0000-4000-8000-000000000002";
+  const blocks = [
+    {
+      kind: "PLAN",
+      planId: PLAN,
+      version: 1,
+      title: "Raise a seed round",
+      steps: 3,
+      reviewed: true,
+      affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
+    },
+    { kind: "WORK_IN_PROGRESS", jobId: JOB, title: "Your plan" },
+  ] as unknown as QTurnObjectBlock[];
+  it("says Q's own plan-ready message for that job, once it is in the thread", () => {
+    expect(deliveredPlanLine([], JOB)).toBeNull();
+    expect(
+      deliveredPlanLine(
+        [
+          { kind: "Q", text: "Working on it.", blocks: [blocks[1]] },
+          { kind: "Q", text: "Your plan is ready: 3 steps.", blocks },
+        ] as never,
+        JOB,
+      ),
+    ).toBe("Your plan is ready: 3 steps.");
+    // Another job's plan is not this one's.
+    expect(
+      deliveredPlanLine(
+        [{ kind: "Q", text: "Your plan is ready.", blocks }] as never,
+        "6d2a1f00-0000-4000-8000-000000000003",
+      ),
+    ).toBeNull();
   });
 });

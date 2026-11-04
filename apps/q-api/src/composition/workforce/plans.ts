@@ -23,11 +23,13 @@ import type { BoardService } from "@capital-q/board";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import { clipAtWord } from "@capital-q/q-core";
+import { PLAN_READ_CLOSE } from "@capital-q/q-specialists";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import { boardKey } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
+import { deliveredDocument } from "./delivery.js";
 import type { WorkforceJobs } from "./jobs.js";
 import type { LiveReport } from "./live.js";
 import {
@@ -44,6 +46,7 @@ import {
   type StepRuntime,
 } from "./plan-thread.js";
 import type { AgentWorkQueue, EndState, WorkRow } from "./queue.js";
+import { filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -106,8 +109,25 @@ export type PlanCardAsk = (
     readonly payload: unknown;
     readonly words: string;
     readonly key: string;
+    /** No line of its own: the plan card on screen stands for it. */
+    readonly quiet?: boolean | undefined;
   },
 ) => Promise<{ readonly qActionId: string } | null>;
+
+/**
+ * P3: one line in the plan's conversation, on its run, said once per key
+ * (the message id is derived from it). False: not said.
+ */
+export type PlanSay = (
+  owner: Owner,
+  line: { readonly runId: string; readonly key: string; readonly text: string },
+) => Promise<boolean>;
+
+/** The person's press of Execute, standing as their approval (plan-ask.ts). */
+export type PlanCardApprove = (
+  actor: ActorContext,
+  qActionId: string,
+) => Promise<"STARTED" | "CHANGED" | "EXPIRED" | "FAILED">;
 
 export type PlansDependencies = {
   readonly sql: DatabaseExecutor;
@@ -142,6 +162,15 @@ export type PlansDependencies = {
     | undefined;
   /** An approval card on a new run in the plan's conversation. */
   readonly ask?: PlanCardAsk | undefined;
+  /**
+   * Owner 2026-11-04: the card's Execute IS the person's approval of the
+   * version it showed. The execute card for it is approved as them (CARD
+   * channel, payload-bound) and run once (plan-ask.ts). Absent: Execute
+   * only prepares the card, as before.
+   */
+  readonly approve?: PlanCardApprove | undefined;
+  /** P3: progress lines in the plan's conversation. Absent: none said. */
+  readonly say?: PlanSay | undefined;
 
   /** S6: the tenant's cached situations are dropped when its records change. */
   readonly invalidate?: ((tenantId: string) => void) | undefined;
@@ -390,6 +419,78 @@ export function createPlans(dependencies: PlansDependencies) {
     ...(extra.actionId === undefined ? {} : { actionId: extra.actionId }),
   });
 
+  /**
+   * The ONE approval card that runs this exact version (its body hash and
+   * steps), in the plan's conversation: one per version (its key), so the
+   * card's Execute, the plan-ready offer and a repeat all find the same one.
+   */
+  const prepareExecute = async (
+    actor: ActorContext,
+    stored: NonNullable<Awaited<ReturnType<PlanStore["read"]>>>,
+    trace: { readonly conversationId: string | null },
+  ): Promise<{ readonly qActionId: string } | null> => {
+    if (dependencies.ask === undefined) return null;
+    return dependencies
+      .ask(actor, {
+        conversationId: trace.conversationId,
+        actionType: PLAN_EXECUTE,
+        payload: executePayloadOf(actor.userId, stored.plan, stored.bodySha256),
+        // The run's objective; never stored as a line (quiet): the plan
+        // card on screen is what the person decides on.
+        words: `Here is your plan to approve before anything runs: ${stored.plan.goal}`,
+        key: `plan-execute:${stored.plan.planId}:${String(stored.plan.version)}`,
+        quiet: true,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, planId: stored.plan.planId },
+          "plan execute card not prepared",
+        );
+        return null;
+      });
+  };
+
+  /**
+   * Owner 2026-11-04 (Recommend): the plan-ready offer prepares the same
+   * execute card for the newest version before anyone says anything, so a
+   * typed or spoken "okay" to the offer approves exactly that payload by
+   * the waiting card's own path (decision 55), and a later Execute finds
+   * it. Null: not theirs, not the newest version, or already running.
+   */
+  const offer = async (
+    actor: ActorContext,
+    planId: string,
+    version: number,
+  ): Promise<{ readonly qActionId: string } | null> => {
+    const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const stored = await store.read(owner, planId);
+    if (
+      stored === null ||
+      stored.plan.version !== version ||
+      stored.headVersion !== version ||
+      stored.status === "EXECUTING" ||
+      stored.status === "DONE"
+    ) {
+      return null;
+    }
+    const head = await store.head(owner, planId);
+    const trace = await traceOf(owner, head?.jobId ?? null);
+    return prepareExecute(actor, stored, trace);
+  };
+
+  /** The offered version read back as its owner (null: not theirs). */
+  const readOffered = async (
+    owner: Owner,
+    input: {
+      readonly planId: string;
+      readonly version: number;
+      readonly part: "SUMMARY" | "WHOLE";
+    },
+  ): Promise<string | null> => {
+    const stored = await store.read(owner, input.planId, input.version);
+    return stored === null ? null : planReadText(stored.plan, input.part);
+  };
+
   /** S5: one of the card's three affordances, by the person. */
   const decide = async (
     actor: ActorContext,
@@ -433,40 +534,48 @@ export function createPlans(dependencies: PlansDependencies) {
             head.currentVersion,
           );
         }
-        if (dependencies.ask === undefined) {
-          return result(
-            "FAILED",
-            "I can't run plans just now.",
-            head.currentVersion,
-          );
-        }
-        const payload = executePayloadOf(
-          actor.userId,
-          stored.plan,
-          stored.bodySha256,
-        );
-        const card = await dependencies
-          .ask(actor, {
-            conversationId: trace.conversationId,
-            actionType: PLAN_EXECUTE,
-            payload,
-            // Q's own line on the card's run (the person pressed Execute).
-            words: `Here is your plan to approve before anything runs: ${stored.plan.goal}`,
-            key: `plan-execute:${planId}:${String(stored.plan.version)}`,
-          })
-          .catch((error: unknown) => {
-            logger?.warn(
-              { err: error, planId },
-              "plan execute card not prepared",
-            );
-            return null;
-          });
+        const card = await prepareExecute(actor, stored, trace);
         if (card === null) {
           return result(
             "FAILED",
-            "I couldn't prepare the approval for this plan. Try again in a moment.",
+            dependencies.ask === undefined
+              ? "I can't run plans just now."
+              : "I couldn't prepare the approval for this plan. Try again in a moment.",
             head.currentVersion,
           );
+        }
+        // Owner 2026-11-04: pressing Execute on the card that showed this
+        // exact version and body is the approval; no second prompt.
+        if (dependencies.approve !== undefined) {
+          const approved = await dependencies
+            .approve(actor, card.qActionId)
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, planId, actionId: card.qActionId },
+                "plan execute not approved from the card",
+              );
+              return "FAILED" as const;
+            });
+          if (approved === "CHANGED") {
+            return result(
+              "STALE",
+              "This plan has changed since this card was shown; here is the newest version.",
+              head.currentVersion,
+            );
+          }
+          if (approved === "STARTED") {
+            const after = await store.read(owner, planId).catch(() => null);
+            if (after?.status === "EXECUTING" || after?.status === "DONE") {
+              return result(
+                "EXECUTING",
+                "Running it now: my steps have started and yours are on your board. Anything that goes out to someone still comes to you first, and I'll tell you here as each step lands.",
+                head.currentVersion,
+                { actionId: card.qActionId },
+              );
+            }
+          }
+          // Not started (expired, or its run failed): the card still waits,
+          // and the person is told so, never that the plan runs.
         }
         return result(
           "AWAITING_APPROVAL",
@@ -735,10 +844,9 @@ export function createPlans(dependencies: PlansDependencies) {
         .catch(() => null);
     }
     const action = step.action;
-    if (action.kind === "WORKFORCE") {
-      const outward = action.roles.some(
-        (role) => OUTWARD_TOOLS[role] !== undefined,
-      );
+    const roles = stepRoles(step);
+    if (roles !== null) {
+      const outward = roles.some((role) => OUTWARD_TOOLS[role] !== undefined);
       const payload = stepJobPayload(actor.userId, plan, step);
       if (payload === null) {
         await thread.move(owner, plan, step, "PROPOSED", { prepared: false });
@@ -798,10 +906,14 @@ export function createPlans(dependencies: PlansDependencies) {
       }
       return;
     }
-    // A single proposal Q prepares when they say go: its card names the
-    // exact message, meeting or change, approved on its own. Nothing is
-    // prepared yet, so it is never said to be ready for approval.
-    await thread.move(owner, plan, step, "PROPOSED", { prepared: false });
+    // Coordinator 2026-11-04: nothing existing prepares this kind's card
+    // (an email, a reminder, a connection request or an answer to one, Q's
+    // own task): it needs the person's words first, and is said so --
+    // never "Q will prepare it", never sent. Nothing is prepared.
+    await thread.move(owner, plan, step, "PROPOSED", {
+      prepared: false,
+      needsYou: true,
+    });
   };
 
   /**
@@ -836,7 +948,34 @@ export function createPlans(dependencies: PlansDependencies) {
       await fireStep(approver, plan, step, trace);
     }
     await store.setStatus(owner, plan.planId, "EXECUTING");
+    // P3 (owner 2026-11-04): what this start actually did, counted from
+    // the thread's own record of each step, said once in the conversation.
+    const started = await thread.runtimes(owner, plan.planId).catch(() => null);
+    if (started !== null) {
+      await sayLine(
+        owner,
+        trace.runId,
+        `plan-run:${plan.planId}:${String(plan.version)}:started`,
+        planStartedLine(plan, started),
+      );
+    }
     return "EXECUTED";
+  };
+
+  /** One progress line in the plan's conversation, said once per key. */
+  const sayLine = async (
+    owner: Owner,
+    runId: string | null,
+    key: string,
+    text: string,
+  ): Promise<void> => {
+    if (dependencies.say === undefined || runId === null) return;
+    await dependencies
+      .say(owner, { runId, key, text })
+      .catch((error: unknown) => {
+        logger?.warn({ err: error, key }, "plan progress line not said");
+        return false;
+      });
   };
 
   /** The q.plan.execute action: one approval bound to the exact version. */
@@ -1010,6 +1149,11 @@ export function createPlans(dependencies: PlansDependencies) {
     let runtimes = await thread.runtimes(owner, planId);
     const facts = await linkedState(owner, runtimes);
     let moved = 0;
+    const finished: {
+      readonly step: QPlanStep;
+      readonly verified: string;
+      readonly output: string | null;
+    }[] = [];
     // 1. Work that finished, verified from its own record.
     for (const step of plan.steps) {
       const runtime = runtimeOf(runtimes, step.key);
@@ -1044,9 +1188,57 @@ export function createPlans(dependencies: PlansDependencies) {
         verified,
         `${String(plan.version)}:${step.key}:done`,
       );
+      finished.push({
+        step,
+        verified,
+        output:
+          runtime.jobId === null
+            ? null
+            : (facts.outputs.get(runtime.jobId) ?? null),
+      });
       moved += 1;
     }
     if (moved > 0) runtimes = await thread.runtimes(owner, planId);
+    // P3 (owner 2026-11-04): each step that finished, and the plan once
+    // every step has, said in the conversation with what it really
+    // produced (from the step's own records), once per step and version.
+    let lineTrace: { readonly runId: string | null } | null = null;
+    const traceForLines = async () => {
+      lineTrace ??= await traceOf(
+        owner,
+        (await store.head(owner, planId))?.jobId ?? null,
+      );
+      return lineTrace;
+    };
+    if (finished.length > 0 && dependencies.say !== undefined) {
+      const { runId } = await traceForLines();
+      const done = plan.steps.filter(
+        (step) => runtimeOf(runtimes, step.key).status === "DONE",
+      ).length;
+      for (const one of finished) {
+        await sayLine(
+          owner,
+          runId,
+          `plan-run:${planId}:${String(plan.version)}:${one.step.key}:done`,
+          stepDoneLine(plan, one, done),
+        );
+      }
+    }
+    const settled = plan.steps.every((step) => {
+      const status = runtimeOf(runtimes, step.key).status;
+      return status === "DONE" || status === "SKIPPED";
+    });
+    if (finished.length > 0 && settled && stored.status === "EXECUTING") {
+      await store.setStatus(owner, planId, "DONE");
+      const { runId } = await traceForLines();
+      await sayLine(
+        owner,
+        runId,
+        `plan-run:${planId}:${String(plan.version)}:all-done`,
+        planRunLine(plan, runtimes),
+      );
+      return moved;
+    }
     // 2. Steps whose wait now holds are fired (as the person, now).
     const waiting = plan.steps.filter(
       (step) =>
@@ -1068,6 +1260,18 @@ export function createPlans(dependencies: PlansDependencies) {
         `${String(plan.version)}:${step.key}:ready`,
       );
       await fireStep(actor, plan, step, trace);
+      const standing = runtimeOf(
+        await thread
+          .runtimes(owner, planId)
+          .catch(() => new Map<string, StepRuntime>()),
+        step.key,
+      );
+      await sayLine(
+        owner,
+        trace.runId,
+        `plan-run:${planId}:${String(plan.version)}:${step.key}:started`,
+        `What it waited for is done. Next: ${sentenceOf(clipAtWord(step.title, 160))}, which ${standingWords(standing)}.`,
+      );
       moved += 1;
     }
     return moved;
@@ -1096,8 +1300,8 @@ export function createPlans(dependencies: PlansDependencies) {
                and id = any(${boardIds}::uuid[])`,
       jobIds.length === 0
         ? Promise.resolve([])
-        : sql<{ id: string; status: string }[]>`
-            select job_id as id, state as status from q_runtime.agent_work_queue
+        : sql<{ id: string; status: string; results: unknown }[]>`
+            select job_id as id, state as status, results from q_runtime.agent_work_queue
              where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
                and job_id = any(${jobIds}::uuid[])`,
       actionIds.length === 0
@@ -1110,6 +1314,13 @@ export function createPlans(dependencies: PlansDependencies) {
       board: new Map(board.map((row) => [row.id, row.status])),
       jobs: new Map(jobs.map((row) => [row.id, row.status])),
       actions: new Map(actions.map((row) => [row.id, row.status])),
+      outputs: new Map(
+        jobs.flatMap((row) => {
+          if (row.status !== "COMPLETED") return [];
+          const line = jobOutputLine(row.results);
+          return line === null ? [] : [[row.id, line] as const];
+        }),
+      ),
     };
   };
 
@@ -1118,6 +1329,8 @@ export function createPlans(dependencies: PlansDependencies) {
     start,
     run,
     view,
+    offer,
+    readOffered,
     decide,
     execute,
     executeAction,
@@ -1134,6 +1347,8 @@ export type Plans = ReturnType<typeof createPlans>;
 type LinkedState = {
   readonly board: ReadonlyMap<string, string>;
   readonly jobs: ReadonlyMap<string, string>;
+  /** What a finished job produced, in code's words (P3); absent: nothing filed. */
+  readonly outputs: ReadonlyMap<string, string>;
   readonly actions: ReadonlyMap<string, string>;
 };
 
@@ -1191,7 +1406,7 @@ const UUID_TEXT =
 /** A step's own record says it is done: what was verified, in plain words. */
 export function verifiedDone(
   runtime: StepRuntime,
-  state: LinkedState,
+  state: Omit<LinkedState, "outputs">,
   owner?: QPlanStep["owner"],
 ): string | null {
   if (
@@ -1210,7 +1425,7 @@ export function verifiedDone(
 /** Q's own part of a step finished, verified from its record. */
 export function qPartDone(
   runtime: StepRuntime,
-  state: LinkedState,
+  state: Omit<LinkedState, "outputs">,
 ): string | null {
   if (runtime.jobId !== null && state.jobs.get(runtime.jobId) === "COMPLETED") {
     return "Q's work on it finished.";
@@ -1293,12 +1508,49 @@ export function executePayloadOf(
  * its roles need; a specialist's (addendum 1) mapped to the executor that
  * runs them and named as the specialist -- never wider than its own tools.
  */
+type StepRole = Extract<
+  QPlanStep["action"],
+  { readonly kind: "WORKFORCE" }
+>["roles"][number];
+
+/**
+ * Coordinator 2026-11-04: a proposal step whose card the workforce already
+ * prepares -- a message in a conversation they have, interest in a
+ * company, a meeting -- runs as that same outward workforce work, through
+ * its own q.workforce.job.start card (Prepare, Recommend, their approval,
+ * then Execute; nothing is sent before it). Other proposal kinds have no
+ * preparer and wait on the person's words.
+ */
+const PROPOSAL_ROLES: Readonly<Record<string, StepRole>> = {
+  propose_chat_message: "CONVERSATION",
+  propose_express_interest: "OUTREACH",
+  propose_meeting: "SCHEDULER",
+};
+
+/** The workforce roles a step runs as; null: no workforce work prepares it. */
+export function stepRoles(
+  step: Pick<QPlanStep, "action">,
+): readonly StepRole[] | null {
+  switch (step.action.kind) {
+    case "WORKFORCE":
+      return step.action.roles;
+    case "TOOL_PROPOSAL": {
+      const role = PROPOSAL_ROLES[step.action.tool];
+      return role === undefined ? null : [role];
+    }
+    case "APP_ACTION":
+    case "TASK":
+      return null;
+  }
+}
+
 export function stepJobPayload(
   ownerUserId: string,
   plan: QPlan,
   step: QPlanStep,
 ): WorkforceJobStartPayload | null {
-  if (step.action.kind !== "WORKFORCE") return null;
+  const roles = stepRoles(step);
+  if (roles === null) return null;
   const specialist = plan.specialists?.find((one) => one.stepKey === step.key);
   const goal = `${step.title}. ${step.why}`.slice(0, 400);
   type DraftStep = {
@@ -1313,7 +1565,7 @@ export function stepJobPayload(
     readonly why: string;
     readonly document?: unknown;
   };
-  const steps = step.action.roles.flatMap((role, index): DraftStep[] => {
+  const steps = roles.flatMap((role, index): DraftStep[] => {
     const key = `${step.key.slice(0, 30)}_${String(index + 1)}`;
     const base = {
       key,
@@ -1488,6 +1740,195 @@ export function boardMessage(board: BoardPlacement): string {
   }
   if (board.waiting > 0) parts.push("My steps wait until you say go.");
   return parts.join(" ");
+}
+
+/**
+ * P3 (owner 2026-11-04): "as it's doing stuff ... report results so we can
+ * see measurable results." Every figure below is counted from the plan's
+ * own thread (each step's state and links) or the step job's own record;
+ * nothing is estimated, and nothing is said that did not happen.
+ */
+export function jobOutputLine(results: unknown): string | null {
+  const row = {
+    results: (typeof results === "object" && results !== null
+      ? results
+      : {}) as WorkRow["results"],
+  };
+  const document = deliveredDocument(row);
+  if (document !== null) {
+    return `It filed “${clipAtWord(document.delivery.title, 120)}”.`;
+  }
+  const filed = filedDocumentIds(row).length;
+  return filed === 0
+    ? null
+    : `It filed ${countWords(filed, "document")} to your documents.`;
+}
+
+/** Where a step stands now, as the rest of a sentence ("which …"). */
+export function standingWords(runtime: StepRuntime): string {
+  switch (runtime.status) {
+    case "DOING":
+      return "has started";
+    case "DONE":
+      return "is done";
+    case "WAITING_YOU":
+      return "is on your board for you";
+    case "PROPOSED":
+      return runtime.actionId === null
+        ? "needs you first: tell Q what to prepare"
+        : "is waiting for your approval on its card";
+    case "SKIPPED":
+      return "was skipped";
+    case "TODO":
+      return "waits on what comes before it";
+  }
+}
+
+/** What Execute started, counted from the steps' own records. */
+export function planStartedLine(
+  plan: Pick<QPlan, "steps">,
+  runtimes: ReadonlyMap<string, StepRuntime>,
+): string {
+  const of = plan.steps.map((step) => runtimeOf(runtimes, step.key));
+  const count = (test: (one: StepRuntime) => boolean) => of.filter(test).length;
+  const doing = count((one) => one.status === "DOING");
+  const board = count((one) => one.boardItemId !== null);
+  const reminders = count((one) => one.reminderId !== null);
+  const cards = count(
+    (one) => one.status === "PROPOSED" && one.actionId !== null,
+  );
+  const unprepared = count(
+    (one) => one.status === "PROPOSED" && one.actionId === null,
+  );
+  const done = count((one) => one.status === "DONE");
+  const waiting = count((one) => one.status === "TODO");
+  const parts = [
+    `Your plan is running: ${countWords(plan.steps.length, "step")}.`,
+    doing === 0 ? null : `Started now: ${countWords(doing, "step")} of mine.`,
+    board === 0
+      ? null
+      : `On your board: ${countWords(board)}${reminders === 0 ? "" : `, ${String(reminders)} with a reminder`}.`,
+    done === 0 ? null : `Already done: ${countWords(done, "step")}.`,
+    cards === 0
+      ? null
+      : `Waiting for your approval on their own cards: ${countWords(cards, "step")}.`,
+    unprepared === 0
+      ? null
+      : `Needs you first: ${countWords(unprepared, "step")} -- tell me what to prepare.`,
+    waiting === 0
+      ? null
+      : `${countWords(waiting, "step")} ${waiting === 1 ? "waits" : "wait"} on an earlier one.`,
+    "I'll tell you here as each step lands.",
+  ];
+  return parts.filter((part): part is string => part !== null).join(" ");
+}
+
+/** One step done: which, what verified it, what it produced, how far. */
+export function stepDoneLine(
+  plan: Pick<QPlan, "steps">,
+  one: {
+    readonly step: Pick<QPlanStep, "key" | "title">;
+    readonly verified: string;
+    readonly output: string | null;
+  },
+  done: number,
+): string {
+  const at = plan.steps.findIndex((step) => step.key === one.step.key) + 1;
+  return [
+    `Step ${String(at)} done: ${sentenceOf(clipAtWord(one.step.title, 160))}.`,
+    one.verified,
+    one.output,
+    `${String(done)} of ${String(plan.steps.length)} steps done.`,
+  ]
+    .filter((part): part is string => part !== null && part.length > 0)
+    .join(" ");
+}
+
+/** Every step settled: the plan has run. */
+export function planRunLine(
+  plan: Pick<QPlan, "steps">,
+  runtimes: ReadonlyMap<string, StepRuntime>,
+): string {
+  const skipped = plan.steps.filter(
+    (step) => runtimeOf(runtimes, step.key).status === "SKIPPED",
+  ).length;
+  const done = plan.steps.length - skipped;
+  return skipped === 0
+    ? `Your plan has run: all ${countWords(done, "step")} done.`
+    : `Your plan has run: ${countWords(done, "step")} done, ${String(skipped)} skipped.`;
+}
+
+/** A fact ref ("(F23)", "P4") is data, never read out (live 2026-10-29). */
+function withoutRefs(text: string): string {
+  return text
+    .replace(
+      /\s*[([]\s*(?:[FP][1-9]\d{0,3}\s*(?:[,;/]|and)?\s*)+[)\]]|\b[FP][1-9]\d{0,3}\b/gu,
+      "",
+    )
+    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
+const sentenceOf = (text: string) => withoutRefs(text).replace(/[.\s]+$/u, "");
+
+function whoDoes(step: Pick<QPlanStep, "owner">): string {
+  switch (step.owner) {
+    case "Q":
+      return "I do it";
+    case "YOU":
+      return "yours";
+    case "TOGETHER":
+      return "I prepare it, you finish it";
+  }
+}
+
+/**
+ * Owner 2026-11-04: the plan Q offered, read back in code's words from the
+ * stored version -- never a model's retelling. SUMMARY: the goal, how many
+ * steps and whose, and the first three. WHOLE: every step, whose it is,
+ * when, whether it asks first, and why. Both end on the same offer to run
+ * it, which the waiting execute card decides.
+ */
+export function planReadText(
+  plan: Pick<QPlan, "goal" | "situationSummary" | "openQuestions"> & {
+    readonly steps: readonly Pick<
+      QPlanStep,
+      "title" | "why" | "owner" | "due" | "needsApproval"
+    >[];
+  },
+  part: "SUMMARY" | "WHOLE",
+): string {
+  const yours = plan.steps.filter((step) => step.owner === "YOU").length;
+  const mine = plan.steps.length - yours;
+  const head = `Your plan: ${sentenceOf(plan.goal)}. ${countWords(plan.steps.length, "step")}: ${String(mine)} I do or prepare, ${String(yours)} for you.`;
+  const close = PLAN_READ_CLOSE;
+  if (part === "SUMMARY") {
+    const first = plan.steps
+      .slice(0, 3)
+      .map((step, index) => `${String(index + 1)}. ${sentenceOf(step.title)}`);
+    const more = plan.steps.length - first.length;
+    return [
+      head,
+      `${sentenceOf(plan.situationSummary)}.`,
+      `First:\n${first.join("\n")}${more > 0 ? `\n…and ${countWords(more, "more step")}.` : ""}`,
+      close,
+    ].join("\n\n");
+  }
+  const steps = plan.steps.map((step, index) => {
+    const when = step.due === null ? "" : `, by ${step.due}`;
+    const asks = step.needsApproval
+      ? "; it comes to you for approval before anything goes out"
+      : "";
+    return `${String(index + 1)}. ${sentenceOf(step.title)} (${whoDoes(step)}${when}${asks}). ${sentenceOf(step.why)}.`;
+  });
+  const open =
+    plan.openQuestions.length === 0
+      ? []
+      : [
+          `Not known yet:\n${plan.openQuestions.map((one) => `- ${sentenceOf(one)}`).join("\n")}`,
+        ];
+  return [head, steps.join("\n"), ...open, close].join("\n\n");
 }
 
 function summaryOf(

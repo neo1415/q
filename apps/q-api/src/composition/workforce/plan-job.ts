@@ -3183,9 +3183,13 @@ export function planReadyLine(
       `I went with ${clarification.default.replace(/[.\s]+$/u, "")}. ${clarification.question}`,
     );
   }
-  lines.push("Execute it, put it on your board, or tell me what to change.");
+  lines.push(PLAN_WAYS_ON);
   return lines.join("\n\n");
 }
+
+/** The three ways on, closing the plan-ready line (the card's own three). */
+export const PLAN_WAYS_ON =
+  "Execute it, put it on your board, or tell me what to change.";
 
 /**
  * Planning failed: what Q holds, said plainly from the situation (code's

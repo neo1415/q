@@ -15,6 +15,7 @@ import {
   PLAN_APPROVAL_WATCH_MS,
   PLAN_POINTS_SHOWN,
   planFollowed,
+  planProgress,
   planRunning,
   planViewKey,
   shownPoints,
@@ -78,6 +79,10 @@ describe("each step says where it stands", () => {
     expect(stepStatusWords(step("s1", "PROPOSED"))).toBe(
       "Q prepares it for your approval",
     );
+    // Coordinator 2026-11-04: running, with no card, it waits on them.
+    expect(stepStatusWords(step("s1", "PROPOSED"), true)).toBe(
+      "Needs you: tell Q what to prepare",
+    );
     expect(
       stepStatusWords(step("s1", "PROPOSED", { proposalId: BOARD_ITEM })),
     ).toBe("Ready for your approval");
@@ -105,6 +110,16 @@ describe("the card follows its plan while it moves", () => {
     expect(
       planFollowed(view("EXECUTING", [step("s1", "DOING")], false), 0, 0),
     ).toBe(false);
+  });
+
+  it("P3: while any step has not settled (a board task, a card), with its real count", () => {
+    const waiting = view("EXECUTING", [
+      step("s1", "DONE"),
+      step("s2", "WAITING_YOU"),
+    ]);
+    expect(planFollowed(waiting, 0, 0)).toBe(true);
+    expect(planProgress(waiting)).toEqual({ done: 1, total: 2 });
+    expect(planProgress(view("OFFERED", [step("s1", "TODO")]))).toBeNull();
   });
 
   it("for a bounded while after an approval, until the plan runs", () => {

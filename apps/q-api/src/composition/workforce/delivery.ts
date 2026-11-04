@@ -19,7 +19,16 @@ import {
 import { TenantIdSchema, UserIdSchema } from "@capital-q/security";
 import { z } from "zod";
 
+import {
+  PLAN_OFFER_OPTIONS,
+  PLAN_OFFER_QUESTION,
+  PLAN_OFFER_SUMMARY,
+  PLAN_OFFER_WHOLE,
+  PLAN_OFFER_WITHOUT_CARD,
+} from "@capital-q/q-specialists";
+
 import type { WorkforcePorts } from "./jobs.js";
+import { PLAN_WAYS_ON } from "./plan-job.js";
 import type { WorkRow } from "./queue.js";
 import { doneOutputs, filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
@@ -143,6 +152,35 @@ export function withoutSourceIds(text: string): string {
     .trim();
 }
 
+/**
+ * Owner 2026-11-04: "when the plan finishes there's nothing to trigger Q to
+ * talk to me ... it should offer a summary, or to read the whole thing, or
+ * to just go ahead and execute the whole thing and give updates." The
+ * plan-ready line closes on that offer (code's copy), and the choices sit
+ * under it as Q's question, answerable by a tap, typing or voice. Running
+ * it is the waiting execute card's approval of that exact version.
+ */
+export function planOfferText(line: string, prepared = true): string {
+  // Without its execute card waiting, nothing would take a "go ahead":
+  // the offer names the plan's own Execute instead (coordinator 2026-11-04).
+  const ways = prepared
+    ? `${PLAN_OFFER_QUESTION} You can also put it on your board, or tell me what to change.`
+    : PLAN_OFFER_WITHOUT_CARD;
+  return line.endsWith(PLAN_WAYS_ON)
+    ? `${line.slice(0, line.length - PLAN_WAYS_ON.length)}${ways}`
+    : `${line}\n\n${ways}`;
+}
+
+export function planOfferBlock(prepared = true): QResultBlock {
+  return {
+    kind: "CLARIFICATION_REQUEST",
+    question: "What would you like to do with your plan?",
+    options: prepared
+      ? [...PLAN_OFFER_OPTIONS]
+      : [PLAN_OFFER_SUMMARY, PLAN_OFFER_WHOLE],
+  };
+}
+
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
@@ -246,6 +284,19 @@ export function createWorkforceDelivery(dependencies: {
   readonly notify: WorkforcePorts["notify"];
   readonly logger?: Logger | undefined;
   /**
+   * Owner 2026-11-04: once the plan-ready message is in the conversation,
+   * the execute card for that exact version is prepared (Recommend), so the
+   * offer's "go ahead" and the card's Execute approve one payload. Absent:
+   * the plan lands with its card's three affordances only, as before.
+   */
+  readonly offerPlan?:
+    | ((
+        owner: Owner,
+        row: WorkRow,
+        plan: { readonly planId: string; readonly version: number },
+      ) => Promise<boolean>)
+    | undefined;
+  /**
    * Job 4d1a8b04 (QA 25 Oct): a plain document step records only its
    * artifact id, so it never had an analysis delivery and the thread was
    * told nothing. The filed documents, read as the job's owner (READY
@@ -261,61 +312,16 @@ export function createWorkforceDelivery(dependencies: {
       >)
     | undefined;
 }) {
+  const say = createRunLine(dependencies);
   /** One Q message on the job's own run, deduplicated by its id. */
-  const post = async (
+  const post = (
     owner: Owner,
     row: WorkRow,
     id: ReturnType<typeof messageIdFor>,
     text: string,
     blocks: readonly QResultBlock[] | undefined,
-  ): Promise<boolean> => {
-    const runId = QRunIdSchema.safeParse(row.trace.runId);
-    if (!runId.success) return false;
-    try {
-      // The run is read as its owner: someone else's run is not found.
-      const run = await dependencies.runtime.runs.findForActor(
-        dependencies.sql,
-        TenantIdSchema.parse(owner.tenantId),
-        UserIdSchema.parse(owner.userId),
-        runId.data,
-      );
-      if (run === null || run.conversationId === null) return false;
-      const conversationId = run.conversationId;
-      await dependencies.transactions.run(async (tx) => {
-        const stored = await dependencies.runtime.messages.insert(tx, {
-          id,
-          tenantId: run.tenantId,
-          conversationId,
-          runId: run.id,
-          role: "Q",
-          content: text,
-          ...(blocks === undefined ? {} : { blocks }),
-        });
-        await appendRunEvent(
-          dependencies.runtime,
-          tx,
-          { id: run.id, tenantId: run.tenantId },
-          {
-            type: "q.message.completed",
-            data: {
-              message: {
-                ...(toQMessage(stored) as QResponseMessage),
-                ...(blocks === undefined ? {} : { blocks: [...blocks] }),
-              },
-            },
-          },
-        );
-      });
-      return true;
-    } catch (error: unknown) {
-      // Most often: already said (the message id is the job's).
-      dependencies.logger?.info(
-        { err: error, jobId: row.job_id },
-        "workforce delivery not posted to the conversation",
-      );
-      return false;
-    }
-  };
+  ): Promise<boolean> =>
+    say(owner, { runId: row.trace.runId ?? null, id, text, blocks });
 
   /** A finished job's plain document: one line and its card. */
   const announceFiled = async (owner: Owner, row: WorkRow) => {
@@ -362,10 +368,35 @@ export function createWorkforceDelivery(dependencies: {
   ): Promise<boolean> => {
     const title =
       "plan" in delivered ? delivered.plan.block.title : "Where things stand";
+    const offering =
+      "plan" in delivered && dependencies.offerPlan !== undefined;
+    // The execute card first (quiet: it posts no line), so the offer says
+    // "go ahead" only when a card is really waiting for it. One card per
+    // version, so a retried delivery finds the same one.
+    let prepared = false;
+    if ("plan" in delivered && dependencies.offerPlan !== undefined) {
+      prepared = await dependencies
+        .offerPlan(owner, row, {
+          planId: delivered.plan.block.planId,
+          version: delivered.plan.block.version,
+        })
+        .catch(() => false);
+      if (!prepared) {
+        dependencies.logger?.warn(
+          { jobId: row.job_id, planId: delivered.plan.block.planId },
+          "plan offered without its execute card; Execute still prepares it",
+        );
+      }
+    }
     const text =
-      "plan" in delivered ? delivered.plan.line : delivered.answer.line;
+      "plan" in delivered
+        ? offering
+          ? planOfferText(delivered.plan.line, prepared)
+          : delivered.plan.line
+        : delivered.answer.line;
     const blocks: QResultBlock[] = [
       ...("plan" in delivered ? [delivered.plan.block] : []),
+      ...(offering ? [planOfferBlock(prepared)] : []),
       {
         kind: "WORK_IN_PROGRESS",
         jobId: row.job_id,
@@ -465,3 +496,86 @@ export function createWorkforceDelivery(dependencies: {
 }
 
 export type WorkforceDelivery = ReturnType<typeof createWorkforceDelivery>;
+
+/**
+ * One Q message on a run of the owner's (read as them: someone else's run
+ * is not found), with its completion event, deduplicated by its id: the
+ * workforce delivery's lines and a running plan's progress lines alike.
+ */
+export function createRunLine(dependencies: {
+  readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
+  readonly runtime: Pick<
+    QRuntimeRepositories,
+    "runs" | "runEvents" | "messages"
+  >;
+  readonly logger?: Logger | undefined;
+}) {
+  return async (
+    owner: Owner,
+    input: {
+      readonly runId: string | null;
+      readonly id: ReturnType<typeof messageIdFor>;
+      readonly text: string;
+      readonly blocks?: readonly QResultBlock[] | undefined;
+    },
+  ): Promise<boolean> => {
+    const { id, text, blocks } = input;
+    const runId = QRunIdSchema.safeParse(input.runId);
+    if (!runId.success) return false;
+    try {
+      // The run is read as its owner: someone else's run is not found.
+      const run = await dependencies.runtime.runs.findForActor(
+        dependencies.sql,
+        TenantIdSchema.parse(owner.tenantId),
+        UserIdSchema.parse(owner.userId),
+        runId.data,
+      );
+      if (run === null || run.conversationId === null) return false;
+      const conversationId = run.conversationId;
+      await dependencies.transactions.run(async (tx) => {
+        const stored = await dependencies.runtime.messages.insert(tx, {
+          id,
+          tenantId: run.tenantId,
+          conversationId,
+          runId: run.id,
+          role: "Q",
+          content: text,
+          ...(blocks === undefined ? {} : { blocks }),
+        });
+        await appendRunEvent(
+          dependencies.runtime,
+          tx,
+          { id: run.id, tenantId: run.tenantId },
+          {
+            type: "q.message.completed",
+            data: {
+              message: {
+                ...(toQMessage(stored) as QResponseMessage),
+                ...(blocks === undefined ? {} : { blocks: [...blocks] }),
+              },
+            },
+          },
+        );
+      });
+      return true;
+    } catch (error: unknown) {
+      // Most often: already said (the message id is derived from its key).
+      dependencies.logger?.info(
+        { err: error, qRunId: runId.data },
+        "workforce line not posted to the conversation",
+      );
+      return false;
+    }
+  };
+}
+
+/** A line's message id, from its idempotency key: said once, ever. */
+export function lineMessageId(key: string): ReturnType<typeof messageIdFor> {
+  const hex = createHash("sha256")
+    .update(`workforce-line:${key}`)
+    .digest("hex");
+  return QMessageIdSchema.parse(
+    `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`,
+  );
+}

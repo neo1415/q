@@ -102,6 +102,32 @@ export function deliverWork(
   });
 }
 
+/**
+ * Owner 2026-11-04: a plan that finished while a live line was open is
+ * told, not only written. Q's own plan-ready message for that job (its
+ * PLAN card and the job's card on one message, from the Q API), as the
+ * words the line says; null until the conversation holds it.
+ */
+export function deliveredPlanLine(
+  turns: readonly {
+    readonly kind: string;
+    readonly text?: string | undefined;
+    readonly blocks?: readonly QTurnObjectBlock[] | undefined;
+  }[],
+  jobId: string,
+): string | null {
+  const turn = turns.findLast(
+    (one) =>
+      one.kind === "Q" &&
+      (one.blocks ?? []).some((block) => block.kind === "PLAN") &&
+      (one.blocks ?? []).some(
+        (block) => block.kind === "WORK_IN_PROGRESS" && block.jobId === jobId,
+      ),
+  );
+  const text = turn?.text?.trim() ?? "";
+  return text.length === 0 ? null : text;
+}
+
 /** "Usually 2–4 minutes", from the job's kind; null when not known. */
 export function usualLength(live: WorkforceLive | null): string | null {
   const expected = live?.expected ?? null;

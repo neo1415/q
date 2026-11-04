@@ -99,6 +99,7 @@ export function statusLine(
   step: QPlanStep,
   status: QPlanStepStatus,
   prepared = true,
+  needsYou = false,
 ): string {
   const title = step.title.replace(/[.\s]+$/u, "");
   switch (status) {
@@ -107,9 +108,14 @@ export function statusLine(
     case "DONE":
       return `Done: ${title}`;
     case "PROPOSED":
+      // Coordinator 2026-11-04: a step no existing preparer can turn into
+      // a card (an email, a reminder, Q's own task) is never "Q will
+      // prepare it": nothing would. It needs the person's words first.
       return prepared
         ? `Ready for your approval: ${title}`
-        : `Q will prepare it for your approval: ${title}`;
+        : needsYou
+          ? `Needs you: tell Q what to prepare: ${title}`
+          : `Q will prepare it for your approval: ${title}`;
     case "WAITING_YOU":
       return `Your part: ${title}`;
     case "SKIPPED":
@@ -151,9 +157,14 @@ export function createPlanThread(
       plan: Pick<QPlan, "planId" | "version">,
       step: QPlanStep,
       status: QPlanStepStatus,
-      options: { readonly prepared?: boolean } = {},
+      options: {
+        readonly prepared?: boolean;
+        /** Unprepared, and nothing will prepare it: it needs their words. */
+        readonly needsYou?: boolean;
+      } = {},
     ): Promise<void> => {
       const prepared = options.prepared ?? true;
+      const needsYou = !prepared && options.needsYou === true;
       await note(owner, plan, step.key, `state ${status}`);
       await store.appendThread(owner, {
         planId: plan.planId,
@@ -162,8 +173,8 @@ export function createPlanThread(
         author: "WORKER",
         stepKey: step.key,
         factRef: null,
-        text: statusLine(step, status, prepared),
-        idempotencyKey: `plan-status:${plan.planId}:${String(plan.version)}:${step.key}:${status}${prepared || status !== "PROPOSED" ? "" : ":unprepared"}`,
+        text: statusLine(step, status, prepared, needsYou),
+        idempotencyKey: `plan-status:${plan.planId}:${String(plan.version)}:${step.key}:${status}${prepared || status !== "PROPOSED" ? "" : needsYou ? ":needs-you" : ":unprepared"}`,
       });
     },
     /** A step of theirs that could not be put on their board: said plainly. */

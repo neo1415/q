@@ -30,8 +30,10 @@ import { useWorkLive } from "./work-live";
  * code), when, and whether it will ask them before anything goes out.
  * Three affordances, nothing else:
  *
- *   Execute          prepares ONE approval card bound to this exact version
- *                    (its body hash); nothing runs until they approve it.
+ *   Execute          is the approval of this exact version (its body hash):
+ *                    the one approval card bound to it is approved by the
+ *                    press and the plan starts once (owner 2026-11-04: no
+ *                    second prompt). Outward steps still get their own card.
  *   Put on my board  their steps become board tasks (dated ones reminded);
  *                    Q's steps wait.
  *   Change it        their words, typed, become the next version, which
@@ -161,6 +163,8 @@ export function factNote(fact: Pick<CitedFact, "truthClass">): string | null {
  */
 export function stepStatusWords(
   step: Pick<QPlanStep, "status" | "proposalId" | "boardItemId">,
+  /** The plan is running: an unprepared step is waiting on the person. */
+  running = false,
 ): string | null {
   switch (step.status) {
     case "DOING":
@@ -168,9 +172,14 @@ export function stepStatusWords(
     case "DONE":
       return "Done";
     case "PROPOSED":
+      // Coordinator 2026-11-04: once the plan runs, a step with no card was
+      // left for the person (nothing existing prepares its kind): never
+      // "Q prepares it", which nothing would.
       return step.proposalId !== null
         ? "Ready for your approval"
-        : "Q prepares it for your approval";
+        : running
+          ? "Needs you: tell Q what to prepare"
+          : "Q prepares it for your approval";
     case "WAITING_YOU":
       return step.boardItemId !== null
         ? "Your part, on your board"
@@ -209,9 +218,27 @@ export function planFollowed(
 ): boolean {
   if (view === null || !view.current) return false;
   if (view.status === "EXECUTING") {
-    return view.plan.steps.some((step) => step.status === "DOING");
+    // P3 (owner 2026-11-04): the card (in the thread and on the Board)
+    // follows a running plan until every step has settled -- a board task
+    // marked done, a card approved -- not only while a job runs; the paced
+    // poll slows while nothing moves, and PLAN_FOLLOW_MAX_MS bounds it.
+    return view.plan.steps.some(
+      (step) => step.status !== "DONE" && step.status !== "SKIPPED",
+    );
   }
   return !planRunning(view.status) && now < approvedUntil;
+}
+
+/** P3: how far a running plan is, counted from its steps (null: not running). */
+export function planProgress(view: QPlanView | null): {
+  readonly done: number;
+  readonly total: number;
+} | null {
+  if (view === null || !planRunning(view.status)) return null;
+  return {
+    done: view.plan.steps.filter((step) => step.status === "DONE").length,
+    total: view.plan.steps.length,
+  };
 }
 
 /** How long after an approval the card watches for its plan to start. */
@@ -363,6 +390,15 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
       }
       // The approval card is a new message of the conversation: read it now.
       if (decided.outcome === "AWAITING_APPROVAL") announceApprovalPrepared();
+      // Owner 2026-11-04: Execute was the approval and the plan started:
+      // the conversation reads Q's lines about it, and this card follows
+      // its steps from now on.
+      if (decided.outcome === "EXECUTING") {
+        announceApprovalPrepared();
+        const now = Date.now();
+        setApprovedUntil(now + PLAN_APPROVAL_WATCH_MS);
+        setClock(now);
+      }
       if (decided.outcome === "CHANGING") {
         setChanging(false);
         setNote("");
@@ -392,6 +428,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   );
   const stillWanted = review.points;
   const running = view !== null && planRunning(view.status);
+  const progress = planProgress(view);
   const runningJobs = current
     ? (plan?.steps ?? []).flatMap((step) =>
         step.status === "DOING" && step.jobId !== null ? [step.jobId] : [],
@@ -504,7 +541,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
           >
             {plan.steps.map((step, index) => {
               const noteText = stepNote(step);
-              const standing = stepStatusWords(step);
+              const standing = stepStatusWords(step, running);
               const cited = step.cites.flatMap((ref) => {
                 const fact = facts.get(ref);
                 return fact === undefined ? [] : [fact];
@@ -617,6 +654,14 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
               {view?.status === "DONE"
                 ? t("This plan has run.")
                 : t("Running: each step shows here as it lands.")}
+              {progress === null ? null : (
+                <span
+                  className="cq-numeric"
+                  data-q-plan-progress={`${String(progress.done)}/${String(progress.total)}`}
+                >
+                  {` · ${t(`${String(progress.done)} of ${String(progress.total)} steps done`)}`}
+                </span>
+              )}
             </p>
           ) : (
             <>

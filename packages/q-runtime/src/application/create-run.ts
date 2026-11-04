@@ -56,7 +56,17 @@ export type CreateQRunCommand = {
    * as the founder's own message.
    */
   readonly openedBy?: "Q" | undefined;
+  /**
+   * Server-internal, only with `openedBy: "Q"`: the run records no opening
+   * line at all. Owner 2026-11-04: a plan's execute card is prepared behind
+   * the plan card already on screen (its Execute is the one visible
+   * control); a Q line for it read as a second prompt to approve.
+   */
+  readonly quiet?: true | undefined;
 };
+
+/** A quiet run (see `quiet`): everything but an opening message. */
+export type CreateQQuietRunResult = Omit<CreateQRunResult, "message">;
 
 export type CreateQRunResult = {
   readonly run: QRunRecord;
@@ -153,7 +163,21 @@ async function withOwnContext(
 export function createCreateQRun(dependencies: QRuntimeDependencies) {
   const { transactions, repositories, subjects } = dependencies;
 
-  return async (command: CreateQRunCommand): Promise<CreateQRunResult> => {
+  function createRun(
+    command: CreateQRunCommand & { readonly quiet: true },
+  ): Promise<CreateQQuietRunResult>;
+  function createRun(command: CreateQRunCommand): Promise<CreateQRunResult>;
+  function createRun(
+    command: CreateQRunCommand,
+  ): Promise<CreateQRunResult | CreateQQuietRunResult> {
+    return accept(command);
+  }
+  return createRun;
+
+  async function accept(
+    command: CreateQRunCommand,
+  ): Promise<CreateQRunResult | CreateQQuietRunResult> {
+    const quiet = command.quiet === true && command.openedBy === "Q";
     const input = CreateQRunRequestSchema.parse(command.input);
     const { actor } = command;
     const organisationId = actor.organisationId ?? null;
@@ -342,21 +366,23 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         });
       }
 
-      const message = await repositories.messages.insert(tx, {
-        tenantId: actor.tenantId,
-        conversationId: conversation.id,
-        runId: run.id,
-        role: command.openedBy === "Q" ? "Q" : "USER",
-        // A spoken turn is stored as said, without the recogniser's
-        // non-speech tags ("(laughter)"): production 2026-10-23.
-        content:
-          input.modality === "VOICE"
-            ? withoutNonSpeechTags(input.message.text)
-            : input.message.text,
-        ...(command.utteranceRef === undefined
-          ? {}
-          : { utteranceRef: command.utteranceRef }),
-      });
+      const message = quiet
+        ? null
+        : await repositories.messages.insert(tx, {
+            tenantId: actor.tenantId,
+            conversationId: conversation.id,
+            runId: run.id,
+            role: command.openedBy === "Q" ? "Q" : "USER",
+            // A spoken turn is stored as said, without the recogniser's
+            // non-speech tags ("(laughter)"): production 2026-10-23.
+            content:
+              input.modality === "VOICE"
+                ? withoutNonSpeechTags(input.message.text)
+                : input.message.text,
+            ...(command.utteranceRef === undefined
+              ? {}
+              : { utteranceRef: command.utteranceRef }),
+          });
 
       await appendRunEvent(repositories, tx, run, {
         type: "q.run.started",
@@ -387,11 +413,13 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         "q run accepted",
       );
 
-      return { run, conversation, message, created: true };
+      return message === null
+        ? { run, conversation, created: true }
+        : { run, conversation, message, created: true };
 
       async function replay(
         runId: QRunRecord["id"],
-      ): Promise<CreateQRunResult> {
+      ): Promise<CreateQRunResult | CreateQQuietRunResult> {
         // The retry is answered from what the first request created. Every
         // read still carries tenant and owner: an idempotency record is a
         // pointer, not a bypass.
@@ -410,6 +438,10 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           actor.userId,
           run.conversationId,
         );
+        if (quiet) {
+          if (conversation === null) throw new QRunCreationConflictError();
+          return { run, conversation, created: false };
+        }
         // The person's question; a surface's opening line, when the run
         // was given one, is recorded before it.
         const recorded = await repositories.messages.listForRun(
@@ -429,7 +461,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         return { run, conversation, message, created: false };
       }
     });
-  };
+  }
 }
 
 /**

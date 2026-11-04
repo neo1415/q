@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { QPlanExecutePayloadSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { PLAN_F03_ASK } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -15,9 +16,14 @@ import { createOutwardReview } from "../src/composition/workforce/review.js";
 import { createAgentWorkRunner } from "../src/composition/workforce/runner.js";
 import { stepRuntimes } from "../src/composition/workforce/plan-thread.js";
 import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
+import type { StepRuntime } from "../src/composition/workforce/plan-thread.js";
 import {
   createPlans,
   executePayloadOf,
+  jobOutputLine,
+  planStartedLine,
+  stepRoles,
+  stepDoneLine,
   type PlanCardAsk,
 } from "../src/composition/workforce/plans.js";
 import {
@@ -45,11 +51,24 @@ import {
  */
 
 /** The few reads plans.ts makes itself, answered by the shape of the query. */
-function fakeSql(input: { readonly conversationId?: string } = {}) {
+function fakeSql(
+  input: {
+    readonly conversationId?: string;
+    /** P3: every board task the plan placed reads DONE. */
+    readonly boardDone?: () => boolean;
+  } = {},
+) {
   const queries: string[] = [];
-  const sql = ((strings: TemplateStringsArray) => {
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join("?");
     queries.push(text);
+    if (
+      text.includes("from workspace.board_items") &&
+      input.boardDone?.() === true
+    ) {
+      const ids = (values[2] ?? []) as string[];
+      return Promise.resolve(ids.map((id) => ({ id, status: "DONE" })));
+    }
     if (text.includes("from core.companies")) {
       return Promise.resolve([{ side: "FOUNDER", id: COMPANY }]);
     }
@@ -77,8 +96,16 @@ function world(
     readonly writes?: Parameters<typeof fakePlanModels>[0]["writes"];
     /** The board refuses every add (as Postgres did, live 2026-10-29). */
     readonly boardDown?: boolean;
+    /**
+     * Owner 2026-11-04: Execute approves its card as the person. The fake
+     * engine approves the card's own stored payload and runs it once per
+     * action (the execution gate's claim).
+     */
+    readonly approve?: boolean;
   } = {},
 ) {
+  const said: { runId: string; key: string; text: string }[] = [];
+  let boardDone = false;
   const options_ = options;
   const queue = createInMemoryAgentWorkQueue();
   const workforce = createInMemoryWorkforceStore();
@@ -115,11 +142,20 @@ function world(
       },
     });
   const cards: Parameters<PlanCardAsk>[1][] = [];
+  const approvals: string[] = [];
+  const executed = new Set<string>();
   const board: { title: string; dueOn?: string; key: string }[] = [];
   const reminders: { title: string; key: string }[] = [];
   const own: string[] = [];
-  const { sql } = fakeSql();
+  const { sql } = fakeSql({ boardDone: () => boardDone });
   const plans = createPlans({
+    say: (_owner, line) => {
+      if (said.some((one) => one.key === line.key)) {
+        return Promise.resolve(false);
+      }
+      said.push(line);
+      return Promise.resolve(true);
+    },
     sql,
     store: plansStore.store,
     jobsFor,
@@ -168,11 +204,33 @@ function world(
       return Promise.resolve("rem_1");
     },
     ask: (_actor, card) => {
-      cards.push(card);
+      // One card per key, as the run's idempotency key makes it.
+      const seen = cards.findIndex((one) => one.key === card.key);
+      if (seen === -1) cards.push(card);
+      const index = seen === -1 ? cards.length - 1 : seen;
       return Promise.resolve({
-        qActionId: "5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a",
+        qActionId: `5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a${String(index).padStart(2, "0")}`,
       });
     },
+    ...(options.approve === true
+      ? {
+          approve: async (actor: ActorContext, actionId: string) => {
+            approvals.push(actionId);
+            if (executed.has(actionId)) return "STARTED" as const;
+            const index = Number(actionId.slice(-2));
+            const card = cards[index];
+            if (card === undefined) return "FAILED" as const;
+            executed.add(actionId);
+            const ran = await plans.execute(
+              actor,
+              QPlanExecutePayloadSchema.parse(card.payload),
+            );
+            return ran === "EXECUTED"
+              ? ("STARTED" as const)
+              : ("CHANGED" as const);
+          },
+        }
+      : {}),
   });
   const delivered: unknown[] = [];
   const runner = createAgentWorkRunner({
@@ -196,6 +254,11 @@ function world(
     delivered,
     calls,
     cards,
+    approvals,
+    said,
+    markBoardDone: () => {
+      boardDone = true;
+    },
     board,
     reminders,
     own,
@@ -385,14 +448,23 @@ describe("S5: Execute is one approval bound to the exact version", () => {
     const status = (await w.plans.view(owner, block.planId))?.lines.map(
       (one) => one.text,
     );
-    // No card is prepared for it yet, so it is never "ready for your
-    // approval" (live 2026-10-29: said with no approval behind it).
+    // Coordinator 2026-11-04: a message step is prepared by the existing
+    // outward workforce card (q.workforce.job.start), approved on its own;
+    // "ready" only because that card exists. A connection request has no
+    // preparer: it needs the person's words, and says so.
     expect(status).toContain(
-      "Q will prepare it for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
+      "Ready for your approval: Reply to Kestrel Ventures with revenue per clinic, as their note asked",
     );
     expect(
-      status?.some((line) => line.startsWith("Ready for your approval")),
-    ).toBe(false);
+      w.cards.filter((card) => card.actionType === "q.workforce.job.start")
+        .length,
+    ).toBeGreaterThan(0);
+    expect(status).toContain(
+      "Needs you: tell Q what to prepare: Request a connection with Savanna Health Fund",
+    );
+    expect(status?.some((line) => line.startsWith("Q will prepare"))).toBe(
+      false,
+    );
     expect(status).toContain(
       "Your part: Add a Business model slide showing revenue per clinic",
     );
@@ -577,6 +649,216 @@ describe("S5: Execute is one approval bound to the exact version", () => {
   });
 });
 
+/** The plan's execute cards (a step's own outward card is another kind). */
+const executeCards = (w: ReturnType<typeof world>) =>
+  w.cards.filter((card) => card.actionType === "q.plan.execute");
+
+describe("owner 2026-11-04: Execute is the approval, once", () => {
+  it("a press of Execute approves its one card and starts the plan, with no second prompt", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(decided.outcome).toBe("EXECUTING");
+    expect(decided.message).toMatch(/^Running it now/u);
+    // One card, approved once, bound to the version the card showed.
+    expect(executeCards(w)).toHaveLength(1);
+    expect(executeCards(w)[0]?.payload).toEqual(
+      executePayloadOf(founder.userId, view.plan, view.bodySha256),
+    );
+    expect(w.approvals).toEqual([decided.actionId]);
+    expect(w.plansStore.plans.get(block.planId)?.status).toBe("EXECUTING");
+    expect(w.board).toHaveLength(3);
+    // A second press: already running; nothing prepared, approved or run.
+    const again = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(again.outcome).toBe("EXECUTING");
+    expect(executeCards(w)).toHaveLength(1);
+    expect(w.approvals).toHaveLength(1);
+    expect(w.board).toHaveLength(3);
+  });
+
+  it("a card already waiting for this version (the plan-ready offer) is the one approved", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const offer = await w.plans.offer(founder, block.planId, 1);
+    expect(offer).not.toBeNull();
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(decided.outcome).toBe("EXECUTING");
+    expect(decided.actionId).toBe(offer?.qActionId);
+    expect(executeCards(w)).toHaveLength(1);
+  });
+
+  it("a press on a card showing another body approves nothing", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: "0".repeat(64),
+    });
+    expect(decided.outcome).toBe("STALE");
+    expect(w.cards).toHaveLength(0);
+    expect(w.approvals).toHaveLength(0);
+  });
+
+  it("a changed plan needs its own approval: the old version's press approves nothing", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const before = await w.plans.view(owner, block.planId);
+    if (before === null) throw new Error("no view");
+    await w.plans.decide(founder, block.planId, {
+      affordance: "CHANGE",
+      version: 1,
+      note: "Leave Baobab out; focus on Kestrel first.",
+    });
+    await w.runner.pass();
+    const stale = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: before.bodySha256,
+    });
+    expect(stale.outcome).toBe("STALE");
+    expect(w.approvals).toHaveLength(0);
+    // The new version is approved on its own card when pressed.
+    const after = await w.plans.view(owner, block.planId);
+    if (after === null) throw new Error("no view");
+    const ran = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 2,
+      bodySha256: after.bodySha256,
+    });
+    expect(ran.outcome).toBe("EXECUTING");
+    expect(executeCards(w).map((card) => card.key)).toEqual([
+      `plan-execute:${block.planId}:2`,
+    ]);
+  });
+
+  it("without the approval port, Execute only prepares the card (as before)", async () => {
+    const w = world();
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    const decided = await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    expect(decided.outcome).toBe("AWAITING_APPROVAL");
+    expect(w.plansStore.plans.get(block.planId)?.status).not.toBe("EXECUTING");
+  });
+});
+
+describe("P3 (owner 2026-11-04): a running plan reports what really happened", () => {
+  it("says what Execute started, each step that lands, and when the plan has run", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    const started = w.said.find((one) => one.key.endsWith(":started"));
+    expect(started?.runId).toBe(RUN);
+    // Counted from the thread: 3 board tasks (all dated, so reminded).
+    expect(started?.text).toMatch(
+      /^Your plan is running: \d+ steps\. .*On your board: 3 tasks, 3 with a reminder\./u,
+    );
+    // Said once: a replayed start says nothing new.
+    await w.plans.execute(
+      founder,
+      executePayloadOf(founder.userId, view.plan, view.bodySha256),
+    );
+    expect(w.said.filter((one) => one.key.endsWith(":started"))).toHaveLength(
+      1,
+    );
+    // The person marks their tasks done: each lands with the real count.
+    w.markBoardDone();
+    await w.plans.evaluatePlan(owner, block.planId);
+    const done = w.said.filter((one) => one.key.endsWith(":done"));
+    expect(done.length).toBeGreaterThan(0);
+    expect(done[0]?.text).toMatch(
+      /^Step \d+ done: .+\. You marked it done on your board\. \d+ of \d+ steps done\.$/u,
+    );
+    // Nothing is said twice for the same step.
+    await w.plans.evaluatePlan(owner, block.planId);
+    expect(w.said.filter((one) => one.key.endsWith(":done"))).toHaveLength(
+      done.length,
+    );
+  });
+});
+
+describe("P3 lines are counted, never estimated", () => {
+  const runtime = (over: Partial<StepRuntime>): StepRuntime => ({
+    status: "TODO",
+    boardItemId: null,
+    jobId: null,
+    reminderId: null,
+    actionId: null,
+    ...over,
+  });
+  const steps = [
+    { key: "S1", title: "Draft the update" },
+    { key: "S2", title: "Upload the model" },
+    { key: "S3", title: "Write to Kestrel" },
+  ] as const;
+  it("the start line says only the parts that happened", () => {
+    const line = planStartedLine(
+      { steps: steps as never },
+      new Map([
+        ["S1", runtime({ status: "DOING", jobId: "j1" })],
+        ["S2", runtime({ status: "WAITING_YOU", boardItemId: "b1" })],
+        ["S3", runtime({ status: "PROPOSED" })],
+      ]),
+    );
+    expect(line).toBe(
+      "Your plan is running: 3 steps. Started now: 1 step of mine. On your board: 1 task. Needs you first: 1 step -- tell me what to prepare. I'll tell you here as each step lands.",
+    );
+  });
+
+  it("a step's line names what its job filed, from the job's record", () => {
+    expect(
+      jobOutputLine({
+        documents: {
+          status: "DONE",
+          summary: "Filed",
+          outputs: { artifactId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b" },
+        },
+      }),
+    ).toBe("It filed 1 document to your documents.");
+    expect(jobOutputLine({})).toBeNull();
+    expect(
+      stepDoneLine(
+        { steps: steps as never },
+        {
+          step: steps[0],
+          verified: "Q's work on it finished.",
+          output: "It filed 1 document to your documents.",
+        },
+        1,
+      ),
+    ).toBe(
+      "Step 1 done: Draft the update. Q's work on it finished. It filed 1 document to your documents. 1 of 3 steps done.",
+    );
+  });
+});
+
 describe("a plan that could not be written", () => {
   it("ends FAILED (never 'Two reviews · Ready · Filed') and still answers from what Q holds", async () => {
     const w = world({ writes: [null] });
@@ -598,5 +880,25 @@ describe("a plan that could not be written", () => {
     expect(answer !== null && "answer" in answer).toBe(true);
     if (answer === null || !("answer" in answer)) return;
     expect(answer.answer.line).toContain("here is where things stand");
+  });
+});
+
+describe("coordinator 2026-11-04: which proposal steps the workforce prepares", () => {
+  it("a message, an interest or a meeting runs as outward workforce work; others need you", () => {
+    const of = (tool: string) =>
+      stepRoles({ action: { kind: "TOOL_PROPOSAL", tool } } as never);
+    expect(of("propose_chat_message")).toEqual(["CONVERSATION"]);
+    expect(of("propose_express_interest")).toEqual(["OUTREACH"]);
+    expect(of("propose_meeting")).toEqual(["SCHEDULER"]);
+    for (const tool of [
+      "propose_email",
+      "propose_reminder",
+      "propose_connection_request",
+      "propose_interest_answer",
+      "propose_connection_request_answer",
+    ]) {
+      expect(of(tool)).toBeNull();
+    }
+    expect(stepRoles({ action: { kind: "TASK" } } as never)).toBeNull();
   });
 });

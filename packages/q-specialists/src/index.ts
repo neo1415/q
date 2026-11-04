@@ -452,8 +452,18 @@ export { pipelineSummaryLine, type PipelineRow } from "./pipeline-summary.js";
 export * from "./situation/index.js";
 // Situation-first planning (S5, S6): the answer's port to the plan job.
 export {
+  offeredPlanChoice,
   planAskRoutes,
+  PLAN_OFFER_OPTIONS,
+  PLAN_OFFER_QUESTION,
+  PLAN_OFFER_RUN,
+  PLAN_OFFER_SUMMARY,
+  PLAN_OFFER_WHOLE,
+  PLAN_OFFER_WITHOUT_CARD,
+  PLAN_READ_CLOSE,
+  readPlanChoice,
   type QPlanAskReading,
   type QPlanJobPort,
+  type QPlanReadPart,
   type QPlanStartOutcome,
 } from "./plan-job-port.js";

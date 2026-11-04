@@ -28,7 +28,11 @@ import {
   createNamedResearchSubject,
   createOwnResearchSubject,
 } from "./composition/workforce/own-subject.js";
-import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
+import {
+  createRunLine,
+  createWorkforceDelivery,
+  lineMessageId,
+} from "./composition/workforce/delivery.js";
 import { createOwnContextReader } from "./composition/workforce/own-context.js";
 import { withWaitingPlans } from "./composition/workforce/waiting-plans.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
@@ -239,7 +243,10 @@ import {
 import { createAgentWorkRunner } from "./composition/workforce/runner.js";
 // Situation-first planning (S4-S6): the plan job, its card and its thread.
 import { createActivityRead } from "./composition/workforce/activity.js";
-import { createPlanCardAsk } from "./composition/workforce/plan-ask.js";
+import {
+  createPlanCardApprove,
+  createPlanCardAsk,
+} from "./composition/workforce/plan-ask.js";
 import {
   createDeckRead,
   planStartLine,
@@ -4186,6 +4193,26 @@ const plans = createPlans({
     orchestration: () => orchestrationRuntime,
     actions: () => qActions,
   }),
+  // Owner 2026-11-04: the card's Execute is the approval of that version.
+  approve: createPlanCardApprove({
+    actions: () => qActions,
+    continueApproved: () => continueApproved,
+  }),
+  // P3: what each step really did, said in the plan's conversation once.
+  say: (() => {
+    const line = createRunLine({
+      sql: database.sql,
+      transactions: database.transactions,
+      runtime: repositories,
+      logger,
+    });
+    return (owner, input) =>
+      line(owner, {
+        runId: input.runId,
+        id: lineMessageId(input.key),
+        text: input.text,
+      });
+  })(),
   invalidate: (tenantId) => situationAssembler.invalidateTenant?.(tenantId),
   actorFor: (owner) => planOwnerActor(owner.userId, null),
   logger,
@@ -4837,6 +4864,12 @@ const qIntelligence = composeQIntelligence({
         : started;
     },
     direct: (request, text) => plans.direct(request.actor, request.runId, text),
+    // Owner 2026-11-04: the offered plan read back by code, as its owner.
+    readOffered: (request, input) =>
+      plans.readOffered(
+        { tenantId: request.actor.tenantId, userId: request.actor.userId },
+        input,
+      ),
   },
   // Owner 2026-10-23: a call with one named counterpart, prepared in the
   // answer from the rehearsal's own material (read as them); the name is
@@ -5491,6 +5524,16 @@ const agentWorkRunner = createAgentWorkRunner({
     transactions: database.transactions,
     runtime: repositories,
     notify: workforceNotifier(database.sql),
+    // Owner 2026-11-04: the plan-ready offer's execute card, as the
+    // person resolved now (a revoked membership offers nothing).
+    offerPlan: async (owner, row, plan) => {
+      const actor = await planOwnerActor(
+        owner.userId,
+        row.trace.organisationId ?? null,
+      );
+      if (actor === null) return false;
+      return (await plans.offer(actor, plan.planId, plan.version)) !== null;
+    },
     logger,
   }),
   logger,

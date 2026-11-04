@@ -3,6 +3,7 @@ import {
   QActionProposalIdSchema,
   QApprovalIdSchema,
   QRunIdSchema,
+  Q_PLAN_EXECUTE,
   type QActionProposal,
   type QApprovalView,
 } from "@capital-q/contracts";
@@ -302,7 +303,7 @@ export function createConversationApprovalPort(
   };
 
   /** This run's conversation, read as the person; empty without one. */
-  const messagesOf = async (context: PendingProposalContext) => {
+  const conversationOf = async (context: PendingProposalContext) => {
     const { actor } = context;
     const correlationId = CorrelationIdSchema.parse(context.correlationId);
     const { run } = await runtime.getRun({
@@ -310,14 +311,18 @@ export function createConversationApprovalPort(
       runId: QRunIdSchema.parse(context.runId),
       correlationId,
     });
-    if (run.conversationId === null) return [];
+    if (run.conversationId === null) {
+      return { conversationId: null, messages: [] };
+    }
     const { messages } = await runtime.getConversation({
       actor,
       conversationId: run.conversationId,
       correlationId,
     });
-    return messages;
+    return { conversationId: run.conversationId, messages };
   };
+  const messagesOf = async (context: PendingProposalContext) =>
+    (await conversationOf(context)).messages;
 
   /**
    * The person's own words that stand as their decision on this card, by
@@ -381,7 +386,7 @@ export function createConversationApprovalPort(
     context: PendingProposalContext,
   ): Promise<readonly ConversationProposal[]> => {
     const { actor } = context;
-    const messages = await messagesOf(context);
+    const { conversationId, messages } = await conversationOf(context);
     const seen = new Map<string, QActionProposal>();
     for (const message of messages) {
       for (const block of message.blocks ?? []) {
@@ -391,6 +396,36 @@ export function createConversationApprovalPort(
       }
     }
     const proposals: ConversationProposal[] = [];
+    // Owner 2026-11-04: a plan's execute card waits in this conversation
+    // with no card of its own (the plan card on screen stands for it), so
+    // it is found by its approval, asked for here, never by a block. Only
+    // that kind: every other card is found where it was shown.
+    if (conversationId !== null) {
+      const rows = await late()
+        .actions.listPendingApprovals({ actor })
+        .catch(() => []);
+      for (const row of rows) {
+        if (
+          row.conversationId !== conversationId ||
+          row.actionType !== Q_PLAN_EXECUTE
+        ) {
+          continue;
+        }
+        const view = await late()
+          .actions.getApproval({
+            actor,
+            approvalId: row.approvalId,
+            correlationId: CorrelationIdSchema.parse(context.correlationId),
+          })
+          .catch(() => null);
+        if (view === null || seen.has(view.action.actionId)) continue;
+        proposals.push({
+          proposalId: view.action.actionId,
+          summary: view.action.summary,
+          status: plainProposalStatus(view),
+        });
+      }
+    }
     for (const [proposalId, proposal] of [...seen].slice(-PROPOSALS_MAX)) {
       const view = await viewOf(actor, proposalId, context.correlationId);
       if (view === null) continue;
