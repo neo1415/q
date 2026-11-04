@@ -12,6 +12,7 @@ import {
 } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Your top three" };
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function FitTopPage() {
   return (
     <PageContainer>
       <QSection id="top" kind="COMPANY_LIST" label={t("your top companies")}>
+        <BackLink fallbackHref="/investors" label={t("Company requests")} />
         <FitTopView state={await topState(context.investorOrganisationId)} />
       </QSection>
     </PageContainer>

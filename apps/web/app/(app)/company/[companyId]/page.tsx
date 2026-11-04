@@ -36,7 +36,6 @@ import {
 } from "@/features/company/profile-tabs";
 import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
-import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
 import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Company" };
@@ -88,7 +87,7 @@ export default async function CompanyPage({
       const join = claimable.members > 0;
       return (
         <PageContainer>
-          <BackToDiscover />
+          <BackLink fallbackHref="/discover" label={t("Discover")} />
           <EmptyState
             title={
               join
@@ -121,7 +120,7 @@ export default async function CompanyPage({
   if (profile === null || session === null) {
     return (
       <PageContainer>
-        <BackToDiscover />
+        <BackLink fallbackHref="/discover" label={t("Discover")} />
         <EmptyState
           title={t("This company isn't available to you.")}
           description={t(
@@ -285,9 +284,9 @@ export default async function CompanyPage({
         )}
         {/* Their own company is not something they found in Discover. */}
         {profile.viewer === "OWNER" ? (
-          <BackLink fallbackHref="/home" />
+          <BackLink fallbackHref="/home" label="Q" />
         ) : (
-          <BackToDiscover />
+          <BackLink fallbackHref="/discover" label={t("Discover")} />
         )}
         <CompanyProfileView
           translate={t}
@@ -317,17 +316,5 @@ export default async function CompanyPage({
         />
       </ProfileTabs>
     </PageContainer>
-  );
-}
-
-function BackToDiscover() {
-  return (
-    <Link
-      href="/discover"
-      className={buttonClassName("quiet", "compact", "self-start")}
-    >
-      <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-      Discover
-    </Link>
   );
 }

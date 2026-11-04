@@ -52,7 +52,10 @@ export function VerificationView({
     <AccountToastProvider>
       <AccountColumn width="form">
         <QSection id="verification" kind="VERIFICATION" label="verification">
-          <AccountHead title={t("Verification")} />
+          <AccountHead
+            title={t("Verification")}
+            back={{ href: "/profile", label: t("Profile") }}
+          />
           {fromSetup && kyb !== null ? (
             <p className="mt-0 mb-4 text-sm text-(--cq-text-secondary)">
               {t(

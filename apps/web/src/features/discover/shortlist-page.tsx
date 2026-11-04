@@ -45,7 +45,7 @@ export async function ShortlistPage({
         }
       >
         {/* UX-04: the shortlist sits under Discover, not in the main nav. */}
-        <BackLink fallbackHref="/discover" />
+        <BackLink fallbackHref="/discover" label={t("Discover")} />
         <h1 className="cq-title-xl mb-2.5 text-(--cq-text-primary)">
           {t("Saved")}
         </h1>

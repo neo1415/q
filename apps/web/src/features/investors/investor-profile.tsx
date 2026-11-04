@@ -12,7 +12,6 @@ import type {
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import {
-  ArrowLeft,
   CircleHelp,
   DoorOpen,
   ExternalLink,
@@ -50,6 +49,7 @@ import {
   type MatchDimension,
   type PublishedMandate,
 } from "./published-focus";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * One investor as a founder may see them (app prototype "investor",
@@ -204,13 +204,7 @@ export async function InvestorProfile({
 
   return (
     <div className="flex flex-col">
-      <Link
-        href="/discover"
-        className="cq-body-sm inline-flex min-h-10 items-center gap-1.5 self-start text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-      >
-        <ArrowLeft size={16} aria-hidden="true" />
-        {t("Investors")}
-      </Link>
+      <BackLink fallbackHref="/discover" label={t("Discover")} />
       <QControl id="section.investor-actions" kind="SECTION">
         <div data-qp-anchor="fdr.04.investor.hero">
           <div className="mt-1 mb-[18px] flex items-center gap-4 max-sm:items-start">

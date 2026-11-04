@@ -12,6 +12,7 @@ import { readRehearsalRoom } from "@/features/rehearsal/read-rehearsal-room";
 import { RehearsalReview } from "@/features/rehearsal/rehearsal-review";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Rehearsal review" };
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ export default async function RehearsalReviewPage({
           total={1}
           label={t("a rehearsal review")}
         >
+          <BackLink fallbackHref="/rehearsals" label={t("Rehearsals")} />
           <EmptyState
             title={t("This rehearsal isn't available.")}
             description={t(

@@ -60,6 +60,7 @@ export function ReviewsView({
         <QSection id="reviews" kind="REVIEW_LIST" label="reviews">
           <AccountHead
             title={t("Ask for a review")}
+            back={{ href: "/settings", label: t("Settings") }}
             sub={t(
               "If something Q said or did looks wrong, a person can look at it.",
             )}

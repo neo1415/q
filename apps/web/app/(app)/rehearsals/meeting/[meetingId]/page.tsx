@@ -10,6 +10,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { BackLink } from "@/features/company/back-link";
 
 export const metadata: Metadata = { title: "Rehearse" };
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ export default async function MeetingRehearsalPage({
         total={1}
         label={t("a rehearsal for a meeting")}
       >
+        <BackLink fallbackHref="/rehearsals" label={t("Rehearsals")} />
         <EmptyState
           title={t("That call has passed or isn't yours.")}
           description={t(

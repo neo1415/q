@@ -25,6 +25,7 @@ import { ownRelationships, unreadByRelationship } from "./relationship-data";
 import type { CounterpartProfile } from "./relationship-page-data";
 import { inboxRows, type InboxRow } from "./inbox-rows";
 import { TILE } from "./record-parts";
+import { BackLink } from "@/features/company/back-link";
 
 /**
  * Messages as the CRM prototype's inbox split (messages option 3, owner
@@ -301,6 +302,7 @@ export async function RelationshipInbox({
       )}
     >
       <div className={showList ? "contents" : "contents max-lg:hidden"}>
+        <BackLink fallbackHref="/relationships" label={t("CRM")} />
         {side === "NONE" ? null : <HubHeader side={side} view="pipeline" />}
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-(--cq-text-primary)">

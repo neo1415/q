@@ -40,7 +40,7 @@ export default async function BreakGlassChatPage({
       title={t(`${chat.companyName} ↔ ${chat.investorName}`)}
     >
       <div className="flex flex-col gap-4">
-        <BackLink fallbackHref="/admin/safety" />
+        <BackLink fallbackHref="/admin/safety" label={t("Safety")} />
         <InlineNotice tone="warning" title={t("Private conversation")}>
           {t("Opened for: “")}
           {t(chat.reason)}

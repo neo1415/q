@@ -60,7 +60,10 @@ export default async function AdminOrganisationPage({
   ];
   return (
     <div className="flex flex-col gap-8">
-      <BackLink fallbackHref="/admin/organisations" />
+      <BackLink
+        fallbackHref="/admin/organisations"
+        label={t("Organisations")}
+      />
       <PageSection id="organisation" title={org.name}>
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
