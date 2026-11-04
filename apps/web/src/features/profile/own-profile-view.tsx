@@ -302,6 +302,24 @@ export function OwnProfileView({
   // An investor's role answers; a founder's background has its own rows.
   const role = journey === "investor" ? kv(["role"]) : kv([]);
 
+  // The person's own card (owner 2026-10-22): theirs alone. The design
+  // review page gives no card for it, so it shows live only.
+  const personalCard =
+    person !== null && given === undefined ? (
+      <QCardSection
+        subjectType="PERSON"
+        subjectId={person.userId}
+        name={person.displayName ?? t("You")}
+        tagline={person.headline}
+        portraitUrl={personImages?.avatar?.url ?? null}
+        values={{
+          headline: person.headline,
+          photo: (personImages?.avatar ?? null) === null ? null : "Added",
+          cover: (personImages?.cover ?? null) === null ? null : "Added",
+        }}
+      />
+    ) : null;
+
   return (
     <AccountToastProvider>
       <div className="mx-auto w-full max-w-[calc(820px+4rem)] px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-8">
@@ -578,32 +596,10 @@ export function OwnProfileView({
             <ProfileTeamSection given={given?.team} />
           </Suspense>
 
-          {/* The person's own card (owner 2026-10-22): theirs alone. The
-              design review page gives no card for it, so it shows live only. */}
-          {person !== null && given === undefined ? (
-            <ProfileSectionShell
-              id="my-q-card"
-              variant="brief"
-              title={t("Your personal Q Card")}
-              visibility={vis("link")}
-            >
-              <QCardSection
-                subjectType="PERSON"
-                subjectId={person.userId}
-                name={person.displayName ?? t("You")}
-                tagline={person.headline}
-                values={{
-                  headline: person.headline,
-                  photo:
-                    (personImages?.avatar ?? null) === null ? null : "Added",
-                  cover:
-                    (personImages?.cover ?? null) === null ? null : "Added",
-                }}
-              />
-            </ProfileSectionShell>
-          ) : null}
-
-          {/* The shareable identity (BIZ-004). */}
+          {/* One Q Card section (owner 2026-11-04: two cards stacked read as
+              a duplicate). The company's or firm's card leads; the person's
+              own card is a secondary, collapsed choice beneath it. With no
+              organisation, the personal card is the section. */}
           {company !== null || investor !== null ? (
             <ProfileSectionShell
               id="q-card"
@@ -623,6 +619,7 @@ export function OwnProfileView({
                       (orgImages?.avatar ?? null) === null ? null : "Added",
                     cover: (orgImages?.cover ?? null) === null ? null : "Added",
                   }}
+                  portraitUrl={orgImages?.avatar?.url ?? null}
                   given={given?.qCard}
                 />
               ) : investor !== null ? (
@@ -637,9 +634,31 @@ export function OwnProfileView({
                       (orgImages?.avatar ?? null) === null ? null : "Added",
                     cover: (orgImages?.cover ?? null) === null ? null : "Added",
                   }}
+                  portraitUrl={orgImages?.avatar?.url ?? null}
                   given={given?.qCard}
                 />
               ) : null}
+              {personalCard !== null ? (
+                <details
+                  id="my-q-card"
+                  className="group border-t border-(--cq-border-subtle) pt-4"
+                  data-personal-q-card
+                >
+                  <summary className="cq-label min-h-11 cursor-pointer py-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary)">
+                    {t("Your personal Q Card")}
+                  </summary>
+                  <div className="pt-3">{personalCard}</div>
+                </details>
+              ) : null}
+            </ProfileSectionShell>
+          ) : personalCard !== null ? (
+            <ProfileSectionShell
+              id="my-q-card"
+              variant="brief"
+              title={t("Your personal Q Card")}
+              visibility={vis("link")}
+            >
+              {personalCard}
             </ProfileSectionShell>
           ) : null}
 
