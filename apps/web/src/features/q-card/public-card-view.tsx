@@ -198,6 +198,8 @@ export function PublicCardView({
         : byKey("deploymentState");
   const company = card.subjectType === "COMPANY";
   const person = card.subjectType === "PERSON";
+  // UX-07: a person's role and organisation, each on its own line.
+  const roleField = person ? byKey("roleTitle") : undefined;
   const storyEmpty =
     tagline === null && status === undefined && location === undefined;
   const more = facts.filter(
@@ -264,9 +266,11 @@ export function PublicCardView({
       )}
       <QCard
         nameAs="h1"
-        brand={photo === null ? undefined : { logoUrl: photo }}
+        portraitUrl={photo}
         name={card.name}
         descriptor={descriptor}
+        role={roleField === undefined ? null : cardFieldValue(roleField)}
+        organisation={employer}
         handle={card.handle}
         displayUrl={displayUrl ?? `@${card.handle}`}
         href={`/@${card.handle}`}

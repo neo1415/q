@@ -173,6 +173,50 @@ describe("the card", () => {
       }),
     ).toBeTruthy();
   });
+
+  // UX-07 (2026-11-04): an ID card's hierarchy, nothing it was not handed.
+  it("reads like an ID card: initials without a photo, role and organisation on their own lines", () => {
+    const { container } = render(
+      <QCard
+        name="Wanjiku Kamau"
+        descriptor="Managing Partner · Savanna Ventures"
+        role="Managing Partner"
+        organisation="Savanna Ventures"
+        handle="wanjiku"
+        displayUrl="capitalq.example/@wanjiku"
+      />,
+    );
+    const portrait = container.querySelector("[data-card-portrait]");
+    expect(portrait?.textContent).toBe("WK");
+    expect(container.querySelector("[data-card-photo]")).toBeNull();
+    const card = screen.getByRole("figure", {
+      name: "Q Card for Wanjiku Kamau",
+    });
+    expect(within(card).getByText("Managing Partner")).toBeTruthy();
+    expect(within(card).getByText("Savanna Ventures")).toBeTruthy();
+    expect(
+      within(card).queryByText("Managing Partner · Savanna Ventures"),
+    ).toBeNull();
+    // No verified mark on the card unless the record says so (none here).
+    expect(card.textContent).not.toMatch(/verified/iu);
+    // No QR when none was rendered for it.
+    expect(within(card).queryByRole("img")).toBeNull();
+  });
+
+  it("shows the portrait the audience may see, decoratively", () => {
+    const photo = "https://storage.example/sign/p.webp?token=t";
+    const { container } = render(
+      <QCard
+        name="Kivu Freight"
+        portraitUrl={photo}
+        handle="kivu"
+        displayUrl="capitalq.example/@kivu"
+      />,
+    );
+    const img = container.querySelector("[data-card-photo]");
+    expect(img?.getAttribute("src")).toBe(photo);
+    expect(img?.getAttribute("alt")).toBe("");
+  });
 });
 
 describe("the profile panel", () => {
