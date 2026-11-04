@@ -122,3 +122,47 @@ describe("BIZ-001 · the artifact file route", () => {
     expect(asked).toEqual([]);
   });
 });
+
+describe("J7 · a document link opened in the browser", () => {
+  function navigate(id: string, format = "pdf") {
+    return GET(
+      new NextRequest(`http://web.test/api/q-artifact/${id}/${format}`, {
+        headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate" },
+      }),
+      { params: Promise.resolve({ artifactId: id, format }) },
+    );
+  }
+
+  it("lands on the not-found page, never raw JSON, for a document that isn't there", async () => {
+    upstream = problem(404, { code: "RESOURCE_NOT_FOUND" });
+    const response = await navigate("3f9c2b1e-7a4d-4e8b-9c6f-1d2e3a4b5c6d");
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://web.test/documents/unavailable",
+    );
+    expect(response.headers.get("content-type") ?? "").not.toMatch(/json/u);
+  });
+
+  it("the same page for an address that is not a document at all", async () => {
+    const response = await navigate("not-a-uuid");
+    expect(response.status).toBe(303);
+    expect(asked).toEqual([]);
+  });
+
+  it("other refusals read as a plain sentence, not JSON", async () => {
+    upstream = problem(409, { code: "ARTIFACT_NOT_READY" });
+    const response = await navigate(ARTIFACT);
+    expect(response.status).toBe(409);
+    expect(response.headers.get("content-type")).toMatch(/^text\/plain/u);
+    expect(await response.text()).toBe(
+      "That document isn't ready yet. Q is still preparing it.",
+    );
+  });
+
+  it("a script's read keeps the JSON sentence it shows in place", async () => {
+    upstream = problem(404, { code: "RESOURCE_NOT_FOUND" });
+    const response = await call("pdf");
+    expect(response.status).toBe(404);
+    expect(await message(response)).toBe("I couldn't find that document.");
+  });
+});
