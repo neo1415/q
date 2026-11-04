@@ -981,6 +981,19 @@ export function QConversationPanel({
       {q.notice !== null && q.state.failure === null ? (
         <StageNotice title={t("That didn't go through")}>
           {q.notice}
+          {q.streamLost === true && q.reconnect !== undefined ? (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="cq-stage-quiet"
+                onClick={q.reconnect}
+                data-q-reconnect
+              >
+                {t("Try again")}
+              </button>
+            </>
+          ) : null}
         </StageNotice>
       ) : null}
       {voiceNotice !== null ? (

@@ -199,6 +199,7 @@ export {
   type QStreamCloseReason,
   type QStreamEventMeta,
   type QStreamTransportStatus,
+  type QStreamUnreadableFrame,
 } from "./q-stream.js";
 export {
   createQStreamState,

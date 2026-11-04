@@ -11,6 +11,7 @@ import {
 import type {
   QMessage,
   QPendingApproval,
+  QRunHandle,
   QViewingMoment,
 } from "@capital-q/contracts";
 
@@ -120,6 +121,12 @@ export type QConversation = {
   readonly loading: boolean;
   /** Something that went wrong outside the stream. Plain wording only. */
   readonly notice: string | null;
+  /**
+   * A5: the open run's stream ended before the run did (it gave up or was
+   * refused). `reconnect` follows that same run again; no run is started.
+   */
+  readonly streamLost?: boolean | undefined;
+  readonly reconnect?: (() => void) | undefined;
   readonly runId: string | null;
   /** The conversation this surface is in, once the server has named it. */
   readonly conversationId: string | null;
@@ -288,6 +295,21 @@ export function useQConversation(
   const abort = useRef<AbortController | null>(null);
   /** Recovers a question a reload interrupted (H1); set below, once `begin` exists. */
   const recoverRef = useRef<() => void>(() => undefined);
+  /**
+   * A5 (audit D9/D10): the run whose stream ended without its terminal
+   * event (gave up, refused), while the record still shows it running.
+   * Its next turn re-follows it rather than appending to a run nobody is
+   * listening to; `reconnect` does the same on request.
+   */
+  const lostRun = useRef<string | null>(null);
+  const [streamLost, setStreamLost] = useState(false);
+  /** Set below, once the record readers exist. */
+  const resyncRef = useRef<
+    (run: string, controller: AbortController) => Promise<void>
+  >(() => Promise.resolve());
+  const recoverStreamRef = useRef<
+    (run: string, controller: AbortController) => Promise<void>
+  >(() => Promise.resolve());
   const onConversation = useRef(options.onConversation);
   useEffect(() => {
     onConversation.current = options.onConversation;
@@ -306,7 +328,12 @@ export function useQConversation(
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
+    lostRun.current = null;
+    setStreamLost(false);
     setStreaming(true);
+    // A5: what this stream could not carry, so its end re-reads the record.
+    let unreadable = 0;
+    let answered = false;
     // The answer's cards arrive with its completed message and stay hidden
     // until their code and contracts are in. Those load as the run starts,
     // so a card shows the moment it lands, rather than after the stage's
@@ -323,7 +350,11 @@ export function useQConversation(
           onStatus: (status) => {
             setTransport(status);
           },
+          onUnreadable: () => {
+            unreadable += 1;
+          },
           onEvent: (event) => {
+            if (event.type === "q.message.completed") answered = true;
             setRunState((current) => reduceQStream(current, event));
             if (isTerminalQStreamEvent(event)) {
               finished.current = true;
@@ -339,11 +370,43 @@ export function useQConversation(
           },
         }),
       )
-      .catch(() => {
-        // A refusal on the stream is not a failed run — the run may still
-        // be recorded and answered. Say so plainly; do not claim it failed.
-        setNotice("I lost the connection to Q. Try again.");
-      })
+      .then(
+        (
+          // Undefined only from a stand-in transport that says nothing.
+          result:
+            | { readonly reason: string; readonly reconnects: number }
+            | undefined,
+        ) => {
+          if (
+            result === undefined ||
+            abort.current !== controller ||
+            result.reason === "ABORTED"
+          ) {
+            return;
+          }
+          if (result.reason === "TERMINAL") {
+            finished.current = true;
+            // A5 (audit D9): a frame over the server's bound is not sent,
+            // and one this client cannot read is not shown; either can be
+            // the answer itself. The record is authoritative: read what
+            // came after the last read, once, and fold in what the stream
+            // did not carry (by message id, so nothing shows twice).
+            if (unreadable > 0 || !answered || result.reconnects > 0) {
+              void resyncRef.current(run, controller);
+            }
+            return;
+          }
+          // GAVE_UP or SERVER_CLOSED: the stream ended, the run may not have.
+          void recoverStreamRef.current(run, controller);
+        },
+        () => {
+          // A refusal on the stream is not a failed run — the run may still
+          // be recorded and answered. The record says which (A5, D10).
+          if (abort.current === controller) {
+            void recoverStreamRef.current(run, controller);
+          }
+        },
+      )
       .finally(() => {
         if (abort.current === controller) {
           setStreaming(false);
@@ -364,6 +427,8 @@ export function useQConversation(
     openRun.current = null;
     finished.current = true;
     readCursor.current = null;
+    lostRun.current = null;
+    setStreamLost(false);
   }, []);
 
   // Open the conversation the caller named, or start clean when it named
@@ -571,6 +636,11 @@ export function useQConversation(
           if (!appended.ok) {
             drop();
             setNotice(appended.message);
+          } else if (lostRun.current === open) {
+            // A5 (audit D10): nobody was listening to this run any more;
+            // follow it again so this turn's answer arrives (no new run).
+            setNotice(null);
+            follow(open);
           }
           return;
         }
@@ -620,6 +690,7 @@ export function useQConversation(
     },
     [
       begin,
+      follow,
       options.companyId,
       options.investorOrganisationId,
       options.relationshipId,
@@ -782,6 +853,90 @@ export function useQConversation(
     return recordSettled(read.latestRun);
   }, []);
 
+  /**
+   * A5: the record after a stream ended (terminal, gave up, refused). Only
+   * what came after the last read; what the stream already rendered is
+   * left to the stream (by message id), so a completed answer shows once.
+   * Null when the read failed, the conversation moved, or another run is
+   * now followed; otherwise the conversation's latest run as recorded.
+   */
+  const readBack = useCallback(
+    async (
+      run: string,
+      controller: AbortController,
+    ): Promise<{ readonly latestRun: QRunHandle | null } | null> => {
+      const id = conversationId.current;
+      if (id === null) return null;
+      const after = readCursor.current;
+      const result = await readQConversationAction(id, after ?? undefined);
+      if (
+        !result.ok ||
+        conversationId.current !== id ||
+        openRun.current !== run ||
+        (abort.current !== controller && abort.current !== null)
+      ) {
+        return null;
+      }
+      const read = result.value;
+      const streamed = new Set(
+        streamedMessages.current.map((message) => message.messageId),
+      );
+      setHistory((current) =>
+        withDelta(
+          current,
+          read.messages.filter((message) => !streamed.has(message.messageId)),
+          read.withdrawnRunIds ?? [],
+        ),
+      );
+      readCursor.current = nextCursor(after, read.messages);
+      return { latestRun: read.latestRun };
+    },
+    [],
+  );
+
+  useEffect(() => {
+    resyncRef.current = async (run, controller) => {
+      await readBack(run, controller);
+    };
+    recoverStreamRef.current = async (run, controller) => {
+      const read = await readBack(run, controller);
+      if (abort.current !== controller && abort.current !== null) return;
+      const latest = read?.latestRun ?? null;
+      if (
+        read !== null &&
+        (latest === null ||
+          latest.runId !== run ||
+          FINISHED_STATUSES.has(latest.status))
+      ) {
+        // The run is over: what it recorded is now shown, and the next
+        // question starts the conversation's next run, not a dead one.
+        finished.current = true;
+        if (
+          latest?.runId === run &&
+          (latest.status === "FAILED" || latest.status === "EXPIRED")
+        ) {
+          setNotice("Q couldn't finish that answer. Ask again to retry.");
+        }
+        return;
+      }
+      // Still running (or the record could not be read): say so, and let
+      // them follow it again; nothing new is started on their behalf.
+      lostRun.current = run;
+      setStreamLost(true);
+      setNotice(
+        "I lost the connection while Q was answering. Try again to reconnect.",
+      );
+    };
+  }, [readBack]);
+
+  /** A5: follow the run whose stream was lost again (no new run). */
+  const reconnect = useCallback(() => {
+    const run = lostRun.current;
+    if (run === null) return;
+    setNotice(null);
+    follow(run);
+  }, [follow]);
+
   // A card on this page prepared an approval as a new message (a plan's
   // Execute): read the thread so the approval shows without a reload.
   useEffect(() => {
@@ -902,6 +1057,8 @@ export function useQConversation(
     working: submitting || (streaming && !awaitingPerson),
     loading,
     notice,
+    streamLost,
+    reconnect,
     runId,
     conversationId: conversationIdState,
     decisions,
