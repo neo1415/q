@@ -11,6 +11,11 @@ export type Recognition = {
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
+  /**
+   * Chrome's on-device recognition (Web Speech API, `processLocally`).
+   * Absent in browsers without it; set only after `supportsProcessLocally`.
+   */
+  processLocally?: boolean;
   onresult: ((event: RecognitionResultEvent) => void) | null;
   onerror: ((event: { readonly error: string }) => void) | null;
   onend: (() => void) | null;
@@ -37,6 +42,25 @@ export function recognitionConstructor(): RecognitionConstructor | null {
   if (isConstructor(standard)) return standard;
   const prefixed: unknown = Reflect.get(window, "webkitSpeechRecognition");
   return isConstructor(prefixed) ? prefixed : null;
+}
+
+/** The wake words are English; an English device keeps its own accent. */
+export function recognitionLanguage(language: string | undefined): string {
+  return language?.toLowerCase().startsWith("en") === true ? language : "en-US";
+}
+
+/**
+ * Whether this recogniser has the `processLocally` attribute. A WebIDL
+ * attribute lives on the prototype, so this is true only where the
+ * browser implements it, never because a script assigned the property.
+ */
+export function supportsProcessLocally(Ctor: RecognitionConstructor): boolean {
+  const prototype: unknown = Reflect.get(Ctor, "prototype");
+  return (
+    typeof prototype === "object" &&
+    prototype !== null &&
+    "processLocally" in prototype
+  );
 }
 
 export function wakeSupported(): boolean {

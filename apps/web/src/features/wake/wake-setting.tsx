@@ -2,6 +2,11 @@
 
 import { useId, useState, useSyncExternalStore } from "react";
 
+import {
+  requestOnDeviceInstall,
+  useOnDeviceInstallFailed,
+  useOnDeviceStatus,
+} from "./on-device";
 import { WAKE_PHRASES } from "./phrases";
 import { wakeSupported } from "./support";
 import { storeWakePreference, useWakePreference } from "./wake-preference";
@@ -78,6 +83,65 @@ export function useWakeControl() {
   } as const;
 }
 
+/**
+ * Where "Hey Q" hears the words, truthfully: on this device only when the
+ * browser says its on-device recogniser is installed for the language;
+ * otherwise today's disclosure. Where the pack can be downloaded, the
+ * person may ask for it; nothing downloads without that click.
+ */
+export function WakeListeningNote() {
+  const t = useT();
+  const status = useOnDeviceStatus();
+  const installFailed = useOnDeviceInstallFailed();
+  return (
+    <span className="block" data-wake-listening={status ?? "checking"}>
+      <span className="block">
+        {status === "available"
+          ? t(
+              "Heard on this device: your browser recognises the words here and is told not to send the audio to a speech service. Capital Q never receives or keeps that audio.",
+            )
+          : // Today's disclosure, unchanged, wherever on-device is not ready.
+            t(
+              "Quiet sounds never leave this device. When speech starts, a few seconds may go to your browser’s speech service (Google in Chrome, Apple in Safari) to catch the words; Capital Q never receives or keeps that audio.",
+            )}
+      </span>
+      {status === "downloadable" ? (
+        <span className="mt-1 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              void requestOnDeviceInstall();
+            }}
+            className="inline-flex min-h-11 items-center rounded-full border border-(--cq-border-subtle) px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            data-wake-on-device-install
+          >
+            {t("Use on-device listening")}
+          </button>
+          <span>
+            {t(
+              "Your browser downloads its speech pack for this language once, then hears “Hey Q” on this device.",
+            )}
+          </span>
+        </span>
+      ) : null}
+      {status === "downloading" ? (
+        <span role="status" className="mt-1 block">
+          {t(
+            "Downloading on-device listening. Until it finishes, your browser’s speech service is used.",
+          )}
+        </span>
+      ) : null}
+      {installFailed && status !== "available" ? (
+        <span role="status" className="mt-1 block">
+          {t(
+            "On-device listening couldn’t be set up. Your browser’s speech service is still used.",
+          )}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function WakeSetting() {
   const t = useT();
   const id = useId();
@@ -116,8 +180,14 @@ export function WakeSetting() {
       </div>
       <p id={`${id}-help`} className="cq-caption text-(--cq-text-secondary)">
         {supported
-          ? `Say ${PHRASE_LIST} to open Q while Capital Q is open on screen. Off by default. It pauses when the tab is hidden, on low battery and while Q is on a call, and the top of the page shows whenever it is listening. Quiet sounds never leave this device. When speech starts, a few seconds may go to your browser’s speech service (Google in Chrome, Apple in Safari) to catch the words; Capital Q never receives or keeps that audio.`
+          ? `Say ${PHRASE_LIST} to open Q while Capital Q is open on screen. Off by default. It pauses when the tab is hidden, on low battery and while Q is on a call, and the top of the page shows whenever it is listening.`
           : "This browser can’t listen for “Hey Q”. Chrome, Edge and Safari can. The Q button and Ctrl/Cmd+K always open Q."}
+        {supported ? (
+          <>
+            {" "}
+            <WakeListeningNote />
+          </>
+        ) : null}
       </p>
       {shown === null ? null : (
         <p role="alert" className="cq-caption text-(--cq-text-primary)">

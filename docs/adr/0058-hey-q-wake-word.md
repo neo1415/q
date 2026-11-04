@@ -23,3 +23,14 @@ Training was not feasible in this session: the build VM is shared by four builde
 - Firefox has no recogniser: the toggle is disabled there with a reason. iOS and Android listen only while the page is on screen.
 - The first word of a sentence can be lost while the recogniser starts (a few hundred ms); saying the phrase again works. A trained model with a pre-roll buffer removes this.
 - Next: train with livekit-wakeword on a machine with a GPU, licensed multi-accent voices (including Nigerian, Kenyan, South African, Ghanaian English) and hard negatives; ship the .onnx under `public/models/` with onnxruntime-web in a Web Worker.
+
+## Addendum 2026-11-04: on-device recognition where the browser offers it
+
+Owner directive 2026-11-04 §5 (locally processed if viable, no paid SDK, no false claims).
+
+- **API.** The Web Speech API draft (webaudio.github.io/web-speech-api, checked 2026-11-04) adds `SpeechRecognition.processLocally` (boolean attribute) and statics `available({ langs, processLocally })` → `"unavailable" | "downloadable" | "downloading" | "available"` and `install({ langs, processLocally })` → boolean, which rejects without a user gesture. Chrome ships them; nothing is assumed: `wake/on-device.ts` feature-detects the prototype attribute and each static, and any absence, throw, rejection or unexpected value is "unavailable".
+- **On-device path.** Before the microphone opens, the listener asks `available()` for the wake language. Only on "available" does the detector set `processLocally = true`; Settings then says "Heard on this device" and the indicator says "· on this device". Silence still never leaves the gate, and the gate, windows and phrase matching are unchanged.
+- **Fallback.** Otherwise today's behaviour and today's disclosure, word for word (now shown on the live Settings row too, which lacked it). If an on-device window fails with `language-not-supported` (the pack went away), the detector returns to the browser service and the indicator changes to "· browser speech service" at once; this is covered by the disclosure shown before the toggle was turned on.
+- **Install.** A language pack is a download, so it is never started automatically: on "downloadable" Settings offers "Use on-device listening", which calls `install()` synchronously in the click, then re-checks; a refusal says the service is still used.
+- **Stop and sessions.** The indicator has "Turn off" in every state it shows, beside Pause/Resume. A wake that arrives while any voice line is open (the voice-line holder, a playing line, or Q's session on a call) does nothing; otherwise Q's existing session talks through the tab's one line owner.
+- **Still unverified.** On-device accuracy for the wake phrases (and for Nigerian, Kenyan, South African and Ghanaian English) has not been measured; no accuracy claim is made. The trained-model plan above stands.

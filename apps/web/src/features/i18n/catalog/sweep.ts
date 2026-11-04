@@ -822,4 +822,34 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   "go back to sign in": "عُد إلى تسجيل الدخول",
   "an invitation to join": "دعوة للانضمام",
   "Your gateway": "بوابتك",
+
+  // "Hey Q": where the words are heard (ADR 0058 addendum 2026-11-04)
+  "Use on-device listening": "استخدم الاستماع على الجهاز",
+  "Your browser downloads its speech pack for this language once, then hears “Hey Q” on this device.":
+    "ينزّل متصفحك حزمة الكلام لهذه اللغة مرة واحدة، ثم يسمع «Hey Q» على هذا الجهاز.",
+  "Downloading on-device listening. Until it finishes, your browser’s speech service is used.":
+    "جارٍ تنزيل الاستماع على الجهاز. إلى أن يكتمل، تُستخدم خدمة الكلام في متصفحك.",
+  "On-device listening couldn’t be set up. Your browser’s speech service is still used.":
+    "تعذّر إعداد الاستماع على الجهاز. ما زالت خدمة الكلام في متصفحك مستخدمة.",
+  "Heard on this device: your browser recognises the words here and is told not to send the audio to a speech service. Capital Q never receives or keeps that audio.":
+    "يُسمع على هذا الجهاز: يتعرّف متصفحك على الكلمات هنا، وقد طُلب منه ألا يرسل الصوت إلى خدمة كلام. لا يتلقى Capital Q هذا الصوت ولا يحتفظ به أبداً.",
+  "Quiet sounds never leave this device. When speech starts, a few seconds may go to your browser’s speech service (Google in Chrome, Apple in Safari) to catch the words; Capital Q never receives or keeps that audio.":
+    "الأصوات الهادئة لا تغادر هذا الجهاز أبداً. عندما يبدأ الكلام، قد تذهب بضع ثوانٍ إلى خدمة الكلام في متصفحك (Google في Chrome وApple في Safari) لالتقاط الكلمات؛ لا يتلقى Capital Q هذا الصوت ولا يحتفظ به أبداً.",
+  "This browser can listen for it. The Q button and Ctrl/Cmd+K always open Q.":
+    "يستطيع هذا المتصفح الاستماع إليها. زر Q وCtrl/Cmd+K يفتحان Q دائماً.",
+  "This browser can’t listen for “Hey Q”. Chrome, Edge and Safari can. The Q button and Ctrl/Cmd+K always open Q.":
+    "لا يستطيع هذا المتصفح الاستماع إلى «Hey Q». يستطيع ذلك Chrome وEdge وSafari. زر Q وCtrl/Cmd+K يفتحان Q دائماً.",
+  "Listening for “Hey Q”": "يستمع إلى «Hey Q»",
+  "Listening for “Hey Q” · on this device":
+    "يستمع إلى «Hey Q» · على هذا الجهاز",
+  "Listening for “Hey Q” · browser speech service":
+    "يستمع إلى «Hey Q» · خدمة الكلام في المتصفح",
+  "Listening for “Hey Q” · checking": "يستمع إلى «Hey Q» · يتحقق",
+  "Listening for “Hey Q” · checking on this device":
+    "يستمع إلى «Hey Q» · يتحقق على هذا الجهاز",
+  "Listening for “Hey Q” · checking with browser speech service":
+    "يستمع إلى «Hey Q» · يتحقق عبر خدمة الكلام في المتصفح",
+  "“Hey Q” paused": "«Hey Q» متوقف مؤقتاً",
+  "“Hey Q” paused: low battery": "«Hey Q» متوقف مؤقتاً: البطارية منخفضة",
+  "“Hey Q” can’t use the microphone": "لا يستطيع «Hey Q» استخدام الميكروفون",
 };

@@ -1,9 +1,14 @@
 import { matchWakePhrase, type WakePhraseId } from "./phrases";
 import {
   recognitionConstructor,
+  recognitionLanguage,
+  supportsProcessLocally,
   type Recognition,
   type RecognitionResultEvent,
 } from "./support";
+import type { WakeProcessing } from "./wake-status";
+
+export { recognitionLanguage };
 
 /**
  * The shipped wake-word detector (ADR 0058): the browser's own speech
@@ -11,9 +16,12 @@ import {
  * when the window closes. A trained on-device model replaces this behind
  * the same three calls once one meets the bar.
  *
- * Privacy: in Chrome and Safari the recogniser may send the window's audio
- * to the browser vendor's speech service. Capital Q never receives it; the
- * transcript is matched here and dropped.
+ * Privacy: where the browser offers on-device recognition for the
+ * language (`processLocally`, ADR 0058 addendum 2026-11-04) and the caller
+ * checked it is installed, the recogniser is told to stay on the device.
+ * Otherwise, in Chrome and Safari it may send the window's audio to the
+ * browser vendor's speech service. Capital Q never receives it either way;
+ * the transcript is matched here and dropped.
  */
 
 export type WakeDetector = {
@@ -23,11 +31,6 @@ export type WakeDetector = {
 };
 
 export type DetectorFailure = "blocked" | "unavailable";
-
-/** The wake words are English; an English device keeps its own accent. */
-export function recognitionLanguage(language: string | undefined): string {
-  return language?.toLowerCase().startsWith("en") === true ? language : "en-US";
-}
 
 /** The phrase in any alternative of any result from `resultIndex` on. */
 export function wakeInResults(
@@ -49,10 +52,19 @@ export function wakeInResults(
 export function createSpeechDetector(input: {
   readonly onWake: (phrase: WakePhraseId) => void;
   readonly onFailure: (failure: DetectorFailure) => void;
+  /**
+   * Ask for on-device recognition. Honoured only where the recogniser has
+   * the attribute; the caller checks `available()` said "available".
+   */
+  readonly processLocally?: boolean | undefined;
+  /** Where the words are recognised, said at creation and on any change. */
+  readonly onProcessing?: ((processing: WakeProcessing) => void) | undefined;
 }): WakeDetector | null {
   const Ctor = recognitionConstructor();
   if (Ctor === null) return null;
   let recognition: Recognition | null = null;
+  let local = input.processLocally === true && supportsProcessLocally(Ctor);
+  input.onProcessing?.(local ? "DEVICE" : "SERVICE");
 
   const stop = () => {
     const current = recognition;
@@ -72,6 +84,7 @@ export function createSpeechDetector(input: {
     next.continuous = true;
     next.interimResults = true;
     next.maxAlternatives = 3;
+    if (local) next.processLocally = true;
     next.onresult = (event) => {
       const phrase = wakeInResults(event);
       if (phrase === null) return;
@@ -87,7 +100,15 @@ export function createSpeechDetector(input: {
         input.onFailure("blocked");
       } else if (event.error === "language-not-supported") {
         stop();
-        input.onFailure("unavailable");
+        if (local) {
+          // The on-device pack went away (removed, or not yet usable).
+          // Today's behaviour resumes, and the indicator says so at once,
+          // under the disclosure shown before the toggle was turned on.
+          local = false;
+          input.onProcessing?.("SERVICE");
+        } else {
+          input.onFailure("unavailable");
+        }
       }
       // "no-speech", "aborted", "network": the window just ends.
     };

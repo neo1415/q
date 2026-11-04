@@ -27,7 +27,16 @@ export type WakeStatus =
 
 const OFF: WakeStatus = { kind: "OFF" };
 
+/**
+ * Where the running listener's words are recognised: DEVICE when the
+ * browser was told to keep recognition on this device (`processLocally`),
+ * SERVICE when it may use its vendor's speech service. Null while nothing
+ * runs.
+ */
+export type WakeProcessing = "DEVICE" | "SERVICE";
+
 let status: WakeStatus = OFF;
+let processing: WakeProcessing | null = null;
 let pausedByYou = false;
 const listeners = new Set<() => void>();
 
@@ -49,6 +58,20 @@ export function setWakeStatus(next: WakeStatus): void {
 
 export function wakeStatus(): WakeStatus {
   return status;
+}
+
+export function setWakeProcessing(next: WakeProcessing | null): void {
+  if (processing === next) return;
+  processing = next;
+  emit();
+}
+
+export function wakeProcessing(): WakeProcessing | null {
+  return processing;
+}
+
+export function useWakeProcessing(): WakeProcessing | null {
+  return useSyncExternalStore(subscribe, wakeProcessing, () => null);
 }
 
 /** The indicator's tap: pause for this tab, or listen again. */
@@ -78,6 +101,7 @@ export function useWakePausedByYou(): boolean {
 /** Tests only. */
 export function resetWakeStatus(): void {
   status = OFF;
+  processing = null;
   pausedByYou = false;
   emit();
 }

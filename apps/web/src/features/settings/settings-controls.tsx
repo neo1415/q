@@ -60,7 +60,10 @@ import {
   storeVoicePreference,
   useVoicePreference,
 } from "@/features/voice/voice-preference";
-import { useWakeControl } from "@/features/wake/wake-setting";
+import {
+  useWakeControl,
+  WakeListeningNote,
+} from "@/features/wake/wake-setting";
 import {
   disablePush,
   enablePush,
@@ -396,13 +399,18 @@ export function WakeRow() {
       title={t("Say “Hey Q” to start")}
       description={
         <>
-          {supported
-            ? t(
+          {supported ? (
+            <>
+              {t(
                 "This browser can listen for it. The Q button and Ctrl/Cmd+K always open Q.",
-              )
-            : t(
-                "This browser can’t listen for “Hey Q”. Chrome, Edge and Safari can. The Q button and Ctrl/Cmd+K always open Q.",
-              )}
+              )}{" "}
+              <WakeListeningNote />
+            </>
+          ) : (
+            t(
+              "This browser can’t listen for “Hey Q”. Chrome, Edge and Safari can. The Q button and Ctrl/Cmd+K always open Q.",
+            )
+          )}
           {notice === null ? null : (
             <span role="alert" className="mt-1 block text-(--cq-text-primary)">
               {t(notice)}

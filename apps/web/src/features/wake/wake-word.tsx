@@ -9,10 +9,12 @@ import { readSoundPreference } from "../q-sound/sound-preference";
 import { voiceAudioOwner, watchVoiceAudio } from "../voice/voice-audio";
 import { voiceLineHolder, watchVoiceLine } from "../voice/voice-line";
 import type { EngineFailure, WakeEngine } from "./engine";
+import { useOnDeviceStatus } from "./on-device";
 import { WAKE_GREETING } from "./phrases";
 import { wakeSupported } from "./support";
 import { useWakePreference } from "./wake-preference";
 import {
+  setWakeProcessing,
   setWakeStatus,
   useWakePausedByYou,
   type WakePauseReason,
@@ -67,6 +69,41 @@ function usePageVisible(): boolean {
     () => document.visibilityState === "visible",
     () => false,
   );
+}
+
+/**
+ * Whether the tab already has a voice line: one a surface holds (the
+ * voice-line holder), any line playing audio, or Q's own session on a
+ * call. Read at the moment of a wake, not from a render.
+ */
+export function voiceLineOpen(sessionVoiceActive = false): boolean {
+  return (
+    sessionVoiceActive ||
+    voiceLineHolder() !== null ||
+    voiceAudioOwner() !== null
+  );
+}
+
+/**
+ * What a heard wake phrase does. One line per tab: if a line is already
+ * open (a race with a surface that just opened one), the wake does
+ * nothing at all -- no sound, no panel, no second session -- and the
+ * listener is stopped by the line it now sees. Otherwise Q's existing
+ * session talks (`talk` reuses the tab's line owner, voice-line.ts).
+ * Returns whether it acted.
+ */
+export function respondToWake(input: {
+  readonly lineOpen: boolean;
+  readonly onQPage: boolean;
+  readonly sound: () => void;
+  readonly openQ: () => void;
+  readonly talk: () => void;
+}): boolean {
+  if (input.lineOpen) return false;
+  input.sound();
+  if (!input.onQPage) input.openQ();
+  input.talk();
+  return true;
 }
 
 function watchAnyLine(watcher: () => void): () => void {
@@ -157,6 +194,9 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
   const lowBattery = useLowBattery();
   const pausedByYou = useWakePausedByYou();
   const [failed, setFailed] = useState<EngineFailure | null>(null);
+  // Checked before the microphone opens, so the first window already
+  // runs where Settings says it does.
+  const onDevice = useOnDeviceStatus();
   const decision = wakeDecision({
     enabled: true,
     supported: wakeSupported() && failed !== "unavailable",
@@ -172,7 +212,8 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
     latest.current = { session, pathname, openQ };
   });
 
-  const listen = decision === "LISTEN" && failed === null;
+  const listen = decision === "LISTEN" && failed === null && onDevice !== null;
+  const processLocally = onDevice === "available";
   useEffect(() => {
     if (decision === "LISTEN") {
       if (failed === "blocked" || failed === "microphone") {
@@ -192,14 +233,24 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
     void import("./engine").then(async ({ startWakeEngine }) => {
       if (cancelled) return;
       const started = await startWakeEngine({
+        processLocally,
+        onProcessing: (where) => {
+          if (!cancelled) setWakeProcessing(where);
+        },
         onWake: () => {
-          void engine?.stop();
           const { session: q, pathname: path, openQ: open } = latest.current;
-          // The person asked for Q by name: the acknowledgement plays
-          // unless they turned Q's sounds off.
-          if (readSoundPreference() !== "OFF") playSound("wake");
-          if (path !== Q_PAGE) open();
-          void q?.talk({ greeting: WAKE_GREETING });
+          const acted = respondToWake({
+            lineOpen: voiceLineOpen(q?.voice.active === true),
+            onQPage: path === Q_PAGE,
+            // The person asked for Q by name: the acknowledgement plays
+            // unless they turned Q's sounds off.
+            sound: () => {
+              if (readSoundPreference() !== "OFF") playSound("wake");
+            },
+            openQ: open,
+            talk: () => void q?.talk({ greeting: WAKE_GREETING }),
+          });
+          if (acted) void engine?.stop();
         },
         onFailure: (failure) => {
           if (!cancelled) setFailed(failure);
@@ -219,9 +270,10 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
     });
     return () => {
       cancelled = true;
+      setWakeProcessing(null);
       void engine?.stop();
     };
-  }, [listen]);
+  }, [listen, processLocally]);
 
   useEffect(() => () => setWakeStatus({ kind: "OFF" }), []);
   return null;

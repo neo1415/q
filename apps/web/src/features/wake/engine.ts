@@ -7,6 +7,7 @@ import {
 } from "./gate";
 import type { WakePhraseId } from "./phrases";
 import { createSpeechDetector, type DetectorFailure } from "./speech-detector";
+import type { WakeProcessing } from "./wake-status";
 
 /**
  * The "Hey Q" engine (D1/D2, ADR 0058), loaded as its own chunk only when
@@ -26,6 +27,10 @@ export type WakeEngineInput = {
   readonly onFailure: (failure: EngineFailure) => void;
   /** The gate opened or closed: the indicator may show "Hearing you". */
   readonly onWindow?: ((open: boolean) => void) | undefined;
+  /** Recognise on this device: only when `available()` said "available". */
+  readonly processLocally?: boolean | undefined;
+  /** Where the words are recognised, at start and on any change. */
+  readonly onProcessing?: ((processing: WakeProcessing) => void) | undefined;
 };
 
 /** Run the gate's effects against a detector; pure enough to test. */
@@ -57,6 +62,8 @@ export async function startWakeEngine(
       feed({ type: "match", at: performance.now() });
     },
     onFailure: (failure) => input.onFailure(failure),
+    processLocally: input.processLocally,
+    onProcessing: input.onProcessing,
   });
   if (detector === null) {
     input.onFailure("unavailable");
