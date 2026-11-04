@@ -10,7 +10,11 @@ import {
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
 
-import type { QArtifactVersion, QDeck } from "@capital-q/contracts";
+import {
+  QFindingIdSchema,
+  type QArtifactVersion,
+  type QDeck,
+} from "@capital-q/contracts";
 
 import {
   artifactKindName,
@@ -504,5 +508,63 @@ describe("BIZ-001 · a deck is slides, as PDF and as PowerPoint", () => {
     ).toBe(true);
     const light = layOutDeck({ ...deck, background: "#f3e6d4" });
     expect(light.slides[0]?.background).toEqual(["#f3e6d4"]);
+  });
+});
+
+describe("acceptance 2026-11-04 J3 · nothing in a brief prints twice", () => {
+  const SUMMARY =
+    "This brief sets out what Capital Q holds on record about Ledgerline, and what it does not.";
+  const BODY =
+    "The company identity is unresolved because public sources describe three materially different Ledgerline businesses.";
+  const ledgerline = () =>
+    brief({
+      sections: [
+        { heading: "Summary", body: SUMMARY, findings: [] },
+        {
+          heading: "What the company does",
+          body: BODY,
+          findings: [
+            {
+              findingId: QFindingIdSchema.parse(
+                "b0000000-0000-4000-8000-000000000009",
+              ),
+              type: "FACT",
+              // The writer's finding is the body, re-wrapped.
+              statement: BODY.replace(" three ", "\nthree "),
+              truthClass: "UNKNOWN",
+              evidenceStatus: "NO_EVIDENCE",
+              confidence: "INSUFFICIENT_EVIDENCE",
+              subjects: [],
+              evidenceRefs: [],
+            },
+          ],
+        },
+      ],
+    });
+
+  it("prints a finding that repeats its section once, keeping its provenance", async () => {
+    const version = { ...ledgerline(), summary: SUMMARY };
+    const document = documentFromArtifact({
+      type: "INVESTMENT_BRIEF",
+      version,
+    });
+    const text = (await pdfText(await documentToPdf(document, { title: "t" })))
+      .join(" ")
+      .replace(/\s+/g, " ");
+    const count = (needle: string) => text.split(needle).length - 1;
+    expect(count("materially different Ledgerline businesses")).toBe(1);
+    expect(text).toContain("unknown · no evidence");
+    // The summary under the title, not again as a section of its own.
+    expect(count("holds on record about Ledgerline")).toBe(1);
+  });
+
+  it("still prints a finding that says something the body does not", () => {
+    const document = documentFromArtifact({
+      type: "INVESTMENT_BRIEF",
+      version: brief(),
+    });
+    expect(document.sections[0]?.findings[0]?.statement).toContain(
+      "The company is raising",
+    );
   });
 });
