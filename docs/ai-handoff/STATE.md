@@ -1,6 +1,6 @@
 # Capital Q — Current shared engineering state
 
-> **Pending deploy note (2026-11-04):** see the newest entry in HANDOFF-LOG. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing.
+> **DEPLOYED 2026-11-04 09:49 UTC:** web on `d25c0843c` (CI green); q-api on `c53a08055`; api and workers on `b10cd6c87`. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing. Live-checked as a fictional investor: switch on a fresh page, no opening lists. **Newest audit: `Q_MULTIMODAL_DEMO_AUDIT_2026-11-04.md`, including a P0: text typed in the ~3.5 s before hydration is destroyed.**
 
 ## DEPLOYED c53a08055 — 2 November 2026, 20:42 UTC (Claude, local session)
 
