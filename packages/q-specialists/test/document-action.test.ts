@@ -30,6 +30,7 @@ import {
   withoutBoardSave,
   boardReadOut,
   createSpecialistQAnswer,
+  holdingLine,
   type BoardKeeper,
 } from "../src/answer.js";
 import type {
@@ -45,6 +46,7 @@ import {
 } from "../src/company/document-request.js";
 import type { OwnRecordNames } from "../src/company/own-names.js";
 import type { ArtifactPreparation } from "../src/company/prepare-artifact.js";
+import type { QNamedCompanyPort } from "../src/named-company.js";
 import {
   createToolTeamJobPort,
   ownWorkSummary,
@@ -224,6 +226,8 @@ function seam(options: {
   readonly board?: BoardKeeper;
   /** Q's team, for deep work. */
   readonly teamJob?: QTeamJobPort;
+  /** A company named, as the Capital Q record the person may open (J3). */
+  readonly namedCompany?: QNamedCompanyPort;
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -262,6 +266,9 @@ function seam(options: {
     artifacts,
     ...(options.board === undefined ? {} : { board: options.board }),
     ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
+    ...(options.namedCompany === undefined
+      ? {}
+      : { namedCompany: options.namedCompany }),
     ...(options.ownRecords === undefined
       ? {}
       : {
@@ -2446,5 +2453,109 @@ describe("the planner gets the work, the board gets the save", () => {
     });
     await s.run();
     expect(goals).toEqual(["Write me a short 12-month growth plan"]);
+  });
+});
+
+describe("acceptance 2026-11-04 J3 · a memo on a company Capital Q holds", () => {
+  const LEDGERLINE = "d0000000-0000-4000-8000-00000000000d";
+  const ASKED = "Write me a one-page memo on Ledgerline";
+  function memoReading(): TurnReaderV3Result {
+    return {
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: true,
+      tool: {
+        kind: "PREPARE_DOCUMENT",
+        destination: null,
+        unknownScreen: null,
+        visibility: null,
+        documentType: "INVESTMENT_BRIEF",
+        subjectName: "Ledgerline",
+      },
+    };
+  }
+  const onRecord: CompanyIntelligenceResult = {
+    ...publicResult(
+      [
+        finding("DESCRIPTION", "Ledgerline gives Lagos traders free books."),
+        finding("TRACTION", "Ledgerline reports MRR of NGN 38m."),
+      ],
+      2,
+    ),
+    companyId: LEDGERLINE,
+    companyName: "Ledgerline",
+  };
+
+  it("reads Ledgerline's own record first, under the firewall's plan, and makes a one-pager", async () => {
+    const named: string[] = [];
+    const planned = request().plan;
+    const s = seam({
+      history: [message("USER", ASKED)],
+      reading: memoReading(),
+      result: onRecord,
+      namedCompany: (_request, name) => {
+        named.push(name);
+        return Promise.resolve({
+          subject: { kind: "COMPANY", companyId: LEDGERLINE },
+          plan: planned,
+        });
+      },
+    });
+    await s.run();
+    expect(named).toEqual(["Ledgerline"]);
+    expect(s.investigated).toHaveLength(1);
+    // Its Capital Q record, never a public-web lookup by name.
+    expect(s.investigated[0]?.company).toEqual({
+      kind: "COMPANY",
+      companyId: LEDGERLINE,
+    });
+    expect(s.prepared).toHaveLength(1);
+    expect(s.prepared[0]?.["artifactType"]).toBe("ONE_PAGER");
+    expect(s.stored[0]?.content).not.toMatch(/public source/);
+    expect(s.stored[0]?.content).toMatch(/one-page memo for Ledgerline/);
+  });
+
+  it("a record that is not the company named is not used; public research as before", async () => {
+    const s = seam({
+      history: [message("USER", ASKED)],
+      reading: memoReading(),
+      result: { ...onRecord, companyName: "Ledgerfold" },
+      namedCompany: () =>
+        Promise.resolve({
+          subject: { kind: "COMPANY", companyId: LEDGERLINE },
+          plan: request().plan,
+        }),
+    });
+    await s.run();
+    expect(s.investigated.map((one) => one.company.kind)).toEqual([
+      "COMPANY",
+      "PUBLIC_COMPANY",
+    ]);
+  });
+
+  it("an ordinary brief stays a brief", async () => {
+    const s = seam({
+      history: [message("USER", "Write me a memo on Ledgerline")],
+      reading: memoReading(),
+      result: onRecord,
+      namedCompany: () => Promise.resolve(null),
+    });
+    await s.run();
+    expect(s.prepared[0]?.["artifactType"]).toBe("INVESTMENT_BRIEF");
+  });
+});
+
+describe("acceptance 2026-11-04 J3 · Q's first words for a memo", () => {
+  it("a memo on a company is written on it, never a note to it", () => {
+    expect(holdingLine("Ledgerline", true, true)).toBe(
+      "Writing that up on Ledgerline now. ",
+    );
+    expect(holdingLine("Ledgerline", false, true)).not.toMatch(/note to/u);
+    expect(holdingLine("Kestrel", true, false)).toBe(
+      "Drafting that note to Kestrel now. ",
+    );
+    expect(holdingLine(null, false, false)).toBe("Looking into that now. ");
   });
 });

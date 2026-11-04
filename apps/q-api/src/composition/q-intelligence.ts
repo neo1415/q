@@ -67,6 +67,7 @@ import {
   createPlanOfferLine,
   createToolReadinessLead,
   createToolAppActionPort,
+  createNamedCompanyPort,
   createToolOpenRecordPort,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
@@ -550,6 +551,10 @@ export function composeQIntelligence(
     ...(logger === undefined ? {} : { logger }),
   });
 
+  const openRecord = createToolOpenRecordPort({
+    tools,
+    ...(logger === undefined ? {} : { logger }),
+  });
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
@@ -663,10 +668,18 @@ export function composeQIntelligence(
     }),
     // follow-55: the one record a turn names or points at, opened through
     // open_page's own authorize step (their own records only).
-    openRecord: createToolOpenRecordPort({
-      tools,
-      ...(logger === undefined ? {} : { logger }),
-    }),
+    openRecord,
+    // Acceptance 2026-11-04 (J3): a company named in a document request
+    // is read from its Capital Q record first, under a firewall plan.
+    ...(dependencies.firewall === undefined
+      ? {}
+      : {
+          namedCompany: createNamedCompanyPort({
+            open: openRecord.open,
+            firewall: dependencies.firewall,
+            ...(logger === undefined ? {} : { logger }),
+          }),
+        }),
     // Lead 2026-10-03: "what should I do next?" opens with their readiness.
     readinessLead: createToolReadinessLead({
       tools,

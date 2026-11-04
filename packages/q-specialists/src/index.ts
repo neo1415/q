@@ -450,6 +450,11 @@ export { pipelineSummaryLine, type PipelineRow } from "./pipeline-summary.js";
 
 // Situation-first planning (2026-10-28): the situation dossier, read as the asker.
 export * from "./situation/index.js";
+export {
+  createNamedCompanyPort,
+  type NamedCompanyRecord,
+  type QNamedCompanyPort,
+} from "./named-company.js";
 // Situation-first planning (S5, S6): the answer's port to the plan job.
 export {
   offeredPlanAccepted,

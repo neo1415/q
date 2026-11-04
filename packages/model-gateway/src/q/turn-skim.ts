@@ -4,9 +4,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnSkimV8ResultSchema,
+  TurnSkimV10ResultSchema,
   type PromptRegistry,
   type TurnSkimV8Result,
+  type TurnSkimV10Result,
   type TurnSkimV3Variables,
 } from "@capital-q/q-core";
 
@@ -81,6 +82,8 @@ export type QTurnSkim = Omit<
   TurnSkimV8Result,
   "subject" | "writes" | "investors"
 > & {
+  /** v10: they ask Q for a document about someone; absent is false. */
+  readonly document?: boolean | undefined;
   readonly subject?: TurnSkimV8Result["subject"] | undefined;
   /** v7: they ask Q to write or send something to someone; absent is false. */
   readonly writes?: boolean | undefined;
@@ -133,7 +136,7 @@ export function createTurnSkimmer(dependencies: {
             ).slice(0, 1_500),
           },
         });
-        const response = await dependencies.gateway.execute<TurnSkimV8Result>(
+        const response = await dependencies.gateway.execute<TurnSkimV10Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -155,12 +158,12 @@ export function createTurnSkimmer(dependencies: {
             },
           },
           {
-            schema: TurnSkimV8ResultSchema,
+            schema: TurnSkimV10ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const read = TurnSkimV8ResultSchema.safeParse(
+        const read = TurnSkimV10ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return read.success ? read.data : null;

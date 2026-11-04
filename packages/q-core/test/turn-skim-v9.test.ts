@@ -14,8 +14,10 @@ import {
  */
 describe("TURN_SKIM v9: a question of an organisation is not a lookup of it", () => {
   it("is active, v8 kept whole plus the rule, by meaning", () => {
+    // v10 (acceptance 2026-11-04) adds `document`; v9's rule is kept.
     const active = createDefaultPromptRegistry().getActive("TURN_SKIM");
-    expect(active.definition.version).toBe(9);
+    expect(active.definition.version).toBe(10);
+    expect(active.definition.template).toContain(V9_ASKS_OF_IT);
     expect(TURN_SKIM_V9.output).toBe(TURN_SKIM_V8.output);
     expect(TURN_SKIM_V9.template).toContain(V9_ASKS_OF_IT);
     expect(
