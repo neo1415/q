@@ -1,0 +1,170 @@
+
+Audit C: screen awareness, UI actions, approvals, authorization, artifacts
+Repo C:\Users\Dell\Desktop\q, branch fix/resume-asking, HEAD d25c0843c. Static read only: no tests run, no network, nothing edited. The one thing executed was the PAIR regex copied into a scratch script. All candidate paths existed. Severity is what the traced code supports; anything conditional says so.
+
+Top 5 defects
+1. Q artifacts stay readable after access is lost, and by any org member. The code comments claim the opposite. MEDIUM-HIGH (security).
+
+Source to sink: GET /v1/q/artifacts/:id (apps/q-api/src/http/q-artifacts.ts:320), then read (packages/q-artifacts/src/application/service.ts:717-723), then findById (packages/q-artifacts/src/infrastructure/postgres-artifact-repository.ts:182-192). The filter is id + tenant_id + organisation_id + archived_at only.
+Exports use the same read: service.ts:725-738 and the web route apps/web/app/api/q-artifact/[artifactId]/[format]/route.ts:147-158.
+Claims contradicted: q-artifacts.ts:59-63 ("Owner-only", "a person who has lost access to a company loses the brief about it at the same moment") and route.ts:33-36.
+Nothing checks company_id/investor_organisation_id disclosure or created_by_user_id, and no capability is checked on read. visibilityScope is mapped (postgres-artifact-repository.ts:68) but no read path filters on it; a grep of packages/q-artifacts/src/application and q-artifacts.ts finds no use.
+Impact: an investor firm whose relationship or data-room grant was revoked keeps downloading a memo built from that material. Any member of an organisation can open a colleague's artifact by id. The list route has the same org-only scope (postgres-artifact-repository.ts:194-204).
+2. A plain "yes" can approve sharing the raise, though the policy says the card's button must. MEDIUM-HIGH (founder-private disclosure).
+
+keepsItsCard returns false for every non-app. type: apps/q-api/src/composition/conversation-approvals.ts:144-145.
+disclosure.raise.share is such a type (apps/q-api/src/composition/visibility-actions.ts:31-33) with riskClass: "CONFIRM_REQUIRED" (:118).
+The policy comment at conversation-approvals.ts:73-82 names "sharing the raise" among the kinds words never approve. CARD_ONLY_APP_ACTIONS (:84-88) cannot catch it, because line 145 returns first. The test pins the non-app. default (apps/q-api/test/conversation-approvals.test.ts:652-656).
+Sink: approve (:403-417, :434-439), then the executor.
+Same word-approvable path, by the same line: q.instruction.grant (standing authority, instructions/actions.ts:155-157), q.plan.execute (workforce/plans.ts:845-847), company.visibility (company-visibility-action.ts:107-110). Whether those should keep a card is a product call; the raise-share mismatch is not.
+Mitigation that holds: words must be the person's own latest message in this run, after the card, and pass mayStandAsApproval (:327-340). Voice also screens fragments and echoes (apps/q-api/src/voice/approval-reply.ts). This is a policy gap, not an authority bypass.
+3. Invisible dead approvals: the card can no longer be decided, no surface lists it, and it still blocks a new card. MEDIUM (user-visible).
+
+The list requires a waiting run: packages/q-actions/src/infrastructure/postgres-repositories.ts:429 (r.status = 'AWAITING_APPROVAL').
+The de-duplication read has no run filter: postgres-repositories.ts:254-271. So propose returns existing: true with no new card (packages/q-actions/src/application/service.ts:1219-1266).
+Paths that end a run without touching its approval: cancel (packages/q-runtime/src/application/cancel-run.ts, no approval handling) and the orphan sweep (packages/q-runtime/src/application/orphaned-runs.ts:106-121).
+Result: Work and the carried card (apps/web/src/features/q/carried-approval.ts:84-123) show nothing, while a restated request gets "already waiting". The next "yes" only then revokes it (service.ts:1465-1473) and reports EXPIRED. The approval view still says canDecide until then, because plainProposalStatus (conversation-approvals.ts:45-46) reads no run status.
+The 2026-10-16 fix (service.ts:1466-1469) repairs the decide path only.
+4. "Compare the second one" binds the first two. MEDIUM (wrong answer).
+
+The PAIR regex accepts compare ... the: packages/q-specialists/src/conversation-entities.ts:109-110. It is tested before the ordinal: :126. I ran it: "compare the second one", "compare the second and third" and "compare Kestrel to the first one" all match.
+resolveReference then returns the two latest focused records or the first two of a list: :373-386.
+The result becomes a trusted note: resolutionNote :648-666 ("RESOLVED: the two to compare = ..."), via packages/q-specialists/src/answer.ts:5172-5180 and :326. The model is told the wrong pair.
+Tests cover only "those two" and "them" (packages/q-specialists/test/conversation-entities.test.ts:143-144).
+5. Q can silently act without a receipt, and a move-plus-show ask loses its second half. MEDIUM (honesty).
+
+control_screen bypasses the receipt system: apps/web/src/features/q/client-actions.ts:744-750 calls screenAct (:552-593), which returns void. SHOW_SECTION on a missing id is ?.scrollIntoView (:570-576), and PASS_CURRENT/SAVE_CURRENT are a fire-and-forget event (:587-592). This contradicts "every act reports exactly one receipt" (ui-act-controller.ts:24-29), though performUiAct does hold for UI_ACT (client-actions.ts:772-780).
+"open the company profile and show financials": see Part 2. No financials tab exists, and the code has no second-clause handling for "show".
+Next most important
+Action stuck in EXECUTING forever. MEDIUM. A crash between claim (service.ts:1947-1955) and finalise (:2016-2024) leaves it IN_PROGRESS on every later call (:1773-1775), and it reads as "saving" (conversation-approvals.ts:56-58). A repo-wide search for 'EXECUTING' finds no sweep for q_runtime.actions (hits are the migration and plan states in workforce/plan-store.ts:367).
+Open data-room document, investor viewer. CONDITIONAL. See Part 1.
+MCP labels everything read-only. LOW while off. readOnlyHint: true, destructiveHint: false on all eligible tools (packages/q-connectors/src/mcp/server.ts:111-119), and 45 tool definitions are SIDE_EFFECT. Mounted only when configured (apps/q-api/src/app.ts:925, main.ts:8022).
+Part 1: Screen awareness
+What the browser sends (apps/web/src/features/q/screen.ts:244-291):
+
+route: closed list (:16-32), else OTHER (:64).
+companyId: from URL, Discover focus or open material document (:50-52, :252-267).
+investorOrganisationId (:57-61).
+documentId/documentPage: data-room viewer (:259-268).
+artifactId/slide/version (:273-283).
+attachedDocumentIds, max 5, including the open upload (:202-211, :284-287).
+timeZone (:269-270).
+manifest (:289-290).
+The playing pitch goes separately as viewing (:236-241, q-moment.ts:30-44).
+The manifest (apps/web/src/features/q/manifest.ts:402-464, contract packages/contracts/src/q/screen-manifest.ts:305-343): seq, tab, filters, inView, sections with refs and visible, dialogs, focus, controls, drawn kinds, notices, media state.
+
+Ids and closed kinds only. Tab label is letters only (packages/contracts/src/q/ui-act.ts:67-73). No page text, field values or screenshots (manifest.ts:48-54).
+data-q-hidden regions are excluded (manifest.ts:186-188, :226).
+q-can-see.tsx is local display from seeingNow (manifest.ts:519-532); those labels never travel.
+Is the client's claim re-authorised? Yes, for reads:
+
+Named entities: withScreenEntities resolves each or drops it (packages/q-runtime/src/application/create-run.ts:545-584). screenKept strips the unresolved from the record (:446-514). The firewall strips again (packages/q-firewall/src/firewall.ts:178-238, :825-827).
+Manifest refs: passed whole on the plan (firewall.ts:207-210), then each read back through tools.execute under the plan (packages/model-gateway/src/q/index.ts:3662-3693, manifest-fact.ts:78-124). A refused read is dropped (index.ts:3688, manifest-fact.ts:238-245).
+Example gate: get_company authorize re-checks disclosure for an id not on the plan, accepting only NETWORK_VISIBLE or PUBLIC_EXTERNAL (packages/q-tools/src/tools/get-company.ts:124-192).
+viewing: mayPlayPitch before keeping it (apps/q-api/src/main.ts:1085-1095), and on the plan only if the company is bound (firewall.ts:812-821).
+artifactId/attachedDocumentIds ride unresolved, by design. They are read as the actor only (apps/q-api/src/composition/attached-documents.ts:234-235). Artifacts inherit defect 1.
+Voice: binding.thread.screen is set from the client (apps/q-api/src/voice/routes.ts:369-382), then filtered by the same firewall (voice/live/broker.ts:1178-1187).
+Trusted without re-read: controls (packages/q-tools/src/tools/client-actions.ts:1601-1604), notices, inView, seq, filters. A tampered client can only misdescribe its own screen. No cross-user effect traced. controlsLine feeds ids and letter-only labels to the model (manifest-fact.ts:390-417); injection surface is minimal.
+
+References:
+
+Code binding: packages/q-specialists/src/conversation-entities.ts. pointedAt (answer.ts:329-363) reads page lists (:184-202), "here" (:217-239), Q's cards (:267-281) and durable focus (:289-321).
+Ordering rule: :341-347. "Binding is not authority" holds (:27-29); openPointedRecord emits only an intent (answer.ts:3986-4035), and the page authorises.
+fromShown: model reader field (packages/q-core/src/prompts/schemas/turn-reader.ts:731), replayed only from their own conversation (answer.ts:6074-6109). Compare drops it (turn-reader.ts:920-927). Defect 4 is the bug.
+Conditional defect: investor with a data-room document open. Web sends documentId (screen.ts:259-267). The subject resolver only checks tenant (packages/q-runtime/src/domain/subjects.ts:107-117, :259-272). DOCUMENT maps only to EVIDENCE_DOCUMENTS (packages/q-firewall/src/purpose.ts:144-145), with sharedVia: null (catalogue.ts:160-180).
+
+If investor and founder share a tenant: the subject resolves, the scope is OWNER_ONLY, and the whole turn is DENIED (firewall.ts:561-563, :768-779).
+If tenants differ: the document is dropped (create-run.ts:507-512), so dataRoomDocumentReads never marks it open (packages/model-gateway/src/q/data-room-document-fact.ts:55-61) and "what's in this?" loses its target.
+Not confirmed which applies; the tenant model and runtime were not checked. Worth one authenticated test.
+Part 2: UI actions
+What Q can do:
+
+operate_screen (packages/q-tools/src/tools/client-actions.ts:1569-1652): the 19 acts in ui-act.ts:79-110.
+Plus open_page (:355-381), control_screen (:1216-1234), control_document (:1269-1299), set_discover_filters, show, theme, reload, sign-out, voice and motion (:1668-1681).
+No selectors, coordinates or script. Execution is the page's own handler or a click on the registered element (apps/web/src/features/q/control/perform.ts:300-320).
+Consequence guard is by registration, not enforcement: ACTIVATE clicks any registered BUTTON (perform.ts:199-214). The catalog's buttons look benign (packages/q-tools/src/tools/control-catalog.ts:24-28). button.feed-save saves without approval (investor-feed-screen.tsx:421-430), which is allowed by design. I did not audit every useQControl.
+Dialogs: "Opening books nothing" (schedule-dialog.tsx:82-84).
+Receipts:
+
+Real browser-side verification: DONE requires the observed effect, per kind (perform.ts:23-33, :188-289); navigation requires the router to settle and no not-found marker (control/navigation-lifecycle.ts:395-416).
+Server-side they are claims: record never checks an actId was issued (apps/q-api/src/http/ui-act-receipts.ts:84-131). Impact is limited to the actor's own facts (keyed by resolved actor, :79-80).
+Limits: in-process and 10-minute TTL (:32-39, :71-78), so a restart, or a second q-api replica if ever run, loses them. Keyed per person, not per tab or conversation, so another tab's miss can surface in this conversation. lastManifest is unused beyond the ledger (grep: only ui-act-receipts.ts:61, :138).
+On failure:
+
+Statuses TARGET_MISSING, NOT_APPLICABLE, FAILED (ui-act.ts:149-157).
+Q's line before the act must be "doing", never "done" (client-actions.ts:1581, answer.ts:5228-5244).
+The next turn gets facts (main.ts:4854-4863, ui-act-receipts.ts:208-301, model-gateway/src/q/index.ts:1077-1085, :8193).
+Honest only on a next turn: with no further turn the model says nothing (the browser notice onUiActReport in q-conversation.tsx was not traced).
+control_screen has no receipt at all (defect 5).
+Trace: "open the company profile and show financials"
+
+referenceAskOf: nothing (conversation-entities.ts:124-157). controlBindingOf: no tab|section... word (:415-416, :574).
+pageRequestOf: object is "the company profile and show financials", no PAGE_NAMES entry; not a page word, so null (page-request.ts:426-464). namedRecordRequestOf may try it as a record name (named-record-request.ts:186-208); not traced further.
+Then the model reader. If it reads NAVIGATE, questionAfterMove is false because asksAQuestion has no "show" (answer.ts:7915-7932), so the move answers alone and the clause is dropped (answer.ts:3502-3530).
+No financials control exists: profile tabs are overview, diligence, elevator, dataroom, deck, team (apps/web/src/features/company/profile-tabs.tsx:148-155); Q_MANIFEST_TABS likewise (screen-manifest.ts:103-120). open_page drops a tab not on the page, silently (packages/q-tools/src/tools/client-actions.ts:818-823).
+Figures can only come from a model choosing read_company_figures (main.ts:3445, comment). The outcome is therefore model-dependent, with no code guaranteeing the second half is done or said undone. Runtime not exercised.
+Part 3: Approvals
+Solid (traced):
+
+Binding: SHA-256 over canonical tenant, org, run, action, type, version, class, targets, payload (packages/q-actions/src/domain/binding.ts:29-46, service.ts:385-398, :958-972).
+Client supplies no payload or hash (packages/contracts/src/q/approval.ts:36-40, :90). Recomputed at approve (service.ts:1521-1535), and against both stored hashes at execute (:1899-1915, :1940).
+Edit means re-approval: old REVOKED, old action WITHDRAWN, new ids, hash and TTL; target change refused (service.ts:2169-2272). Routes exist for email.send and chat.message.send only (apps/q-api/src/http/q-approvals.ts:339-458, UI q-now.tsx:117-133).
+Execute re-authorises the actor at that instant, approver only (service.ts:1885-1896).
+Duplicate protection: row lock plus version claim (:1925-1970). Unknown outcome never retries (:1999-2013).
+Idempotency key: q_action:<run>:<action> (:377-382), passed at :1985. Executors vary: the inbound reply does not forward it (composition/inbound-email.ts:116-122), but UNKNOWN goes to reconciliation, so there is no auto-resend.
+Repeated approve taps are safe (q-approvals.ts:268-286). Resume-failure fallback through the gate (approved-continuation.ts:56-112).
+Expiry: 24h (packages/q-actions/src/ports.ts:315), enforced at decide (service.ts:1448-1452), at execute (:1814-1834, domain/lifecycle.ts:104-112), plus an eager sweep (:2340).
+Voice vs typed: one engine and port (conversation-approvals.ts:249-584). Provenance is recorded (:349-352, service.ts:1572). CARD_ONLY class is returned to the caller (:409-416); see defect 2 for its hole.
+
+Where visible: QNow (apps/web/src/features/q/q-now.tsx:100-170), mounted in q-conversation.tsx (:1436, :1608, :1765, :1904) and q-sheet.tsx:254; Work "Needs you" (apps/web/src/features/work/decision-queue.tsx).
+
+Invisible or weak cases:
+
+Run ended with a pending card (defect 3).
+movedOn removes the card from Q when another answer lands without repeating its summary (carried-approval.ts:33-51). Still in Work (by design), so the Q surface alone hides it.
+List cap of 20 (service.ts:1393, approval.ts:119): the 21st is on no list.
+Org scoping (postgres-repositories.ts:425): a card from the person's other organisation is invisible until they switch.
+Generic fallback text with a live Approve when the proposal is absent from state (q-now.tsx:109-116). Reachability not traced; the carried path merges it (use-q-conversation.ts:885-893).
+Part 4: Authorization boundaries
+Entry point	Firewall plan	Tool authorize	Note
+Typed run	packages/q-orchestrator/src/graph.ts:243-255, :266; action step re-plans :490-496	packages/q-tools/src/executor.ts:322	Baseline
+Spoken turn	Run via qRuntime.createRun (apps/q-api/src/voice/turn.ts:1205), same graph	same	
+Live voice line	voice/live/broker.ts:1178-1187, provider ceiling :1190-1199	Plan not carried to tools here (turns go through runs)	Plan at session start
+Duplex voice	voice/duplex/broker.ts:893-902	Same executor; READ_ONLY only (:920-922)	One plan for the call; revalidateAfter not enforced by executor (executor.ts:231-385; used only in q-artifacts/service.ts:322, graph.ts:490-492, retrieval envelope). Bounded by per-tool checks
+Onboarding interview	voice/interview-agent.ts:1104-1110		subjects: []
+Hand-over	packages/q-specialists/src/hand-over.ts:456-464	:470-475	
+Fast navigation	composition/fast-navigation.ts (planNow)	:252-264	Page names need no plan (no data)
+Workforce steps	workforce/documents.ts:220,607,760,851, diligence.ts:199, capital-q-records.ts:50-71, own-subject.ts:101-118, main.ts:4037-4051	Through executor	Differs: model calls (workforce/models.ts:470-492, jobs.ts:1204) carry no plan and hard-code sensitivity: "CONFIDENTIAL". Inputs come from plan-bound reads
+Standing instructions	None in composition/instructions/engine.ts	Declaration's own authorize (engine.ts:3270), actor re-resolved (:2269)	Differs: direct gateway call (instructions/planner.ts:94-121), and quarantined reader (quarantine.ts:329, :495). Inputs are people and material ports (main.ts:6228-6234); the comment says network-visible only, but I did not trace createInstructionMaterialReader. No leak shown
+MCP	apps/q-api/src/http/q-mcp.ts:59-65, per request	packages/q-connectors/src/mcp/server.ts:102-124 via executor	Off unless configured; see readOnlyHint
+Workers	None (grep of apps/workers/src)	n/a	Document and daily pipelines call the gateway; not traced as user-facing
+Other direct gateway callers without a plan, not traced: composition/work/composers.ts:145, errands.ts:479, meeting-*, rehearsals.ts:3333, briefing-command.ts:91, memory-learner.ts:281, presence.ts:306, voice/typed-onboarding.ts:769. They use a hard-coded sensitivity. A dedicated pass should confirm each input is actor-scoped; I report no gap there because none was shown.
+
+Executor pipeline is complete and fail-closed: offered, schema, actor equals plan, abort, authorize, sensitivity, execute, output, size (executor.ts:237-468). HUMAN only (:284).
+
+Dangerous tools: no run_sql, execute_sql or generic fetch tools (grep over packages/q-tools/src, apps/q-api/src, packages/q-specialists/src). Public web tools exist, with a URL safety module (packages/q-research/src/domain/url-safety.ts); that module was not audited.
+
+Founder-private on investor surfaces:
+
+discover_companies: declared taxonomy only (packages/q-tools/src/tools/discover-companies.ts:23-27). Every candidate needs ALLOW with NETWORK_VISIBLE or PUBLIC_EXTERNAL (:296-323). Output is six declared fields (:393-400). Raise goes through raisesOf as this reader (:189-209).
+Raise policy keeps the founder-private figure behind disclosure, and a PITCH_CLAIM is labelled as such (packages/discovery/src/company-raise/policy.ts:9-33).
+Catalog ANSWER_CARDS use only those fields (packages/model-gateway/src/q/discover-companies.ts:231-250). Model-written cards are text from firewalled context, subject: null (answer-cards.ts:88-132). No leak found.
+Not traced: ports.fit.rank inputs (discover-companies.ts:362-367), which determine ordering. The release-blocking "private data must not alter investor ranking" invariant deserves its own check there.
+Privileged reads: q-api's pool is request-class (main.ts:893-896, packages/database/src/client.ts:26-33), and RLS on artifacts is "server-only, no policy" (supabase/migrations/20261005090000_q_artifacts.sql:151-160), so authorization lives in code.
+
+Named privileged reads all authorise first as the person: composition/material-documents.ts:117-122, :155-166, :191-205; attached-documents.ts:234-235 before :148-172; own-pictures.ts:7-11.
+High-sensitivity documents are held back from the model (material-documents.ts:38-43, attached-documents.ts:279-287). Note that the firewall ceiling still says HIGHLY_CONFIDENTIAL (q-firewall/src/purpose.ts:183-193), against the "outside every firewall plan" comment (material-documents.ts:31-33).
+A plain request-class sql read scoped only by code is the common pattern; defect 1 is where that scoping is insufficient.
+Part 5: Artifacts, drafts, viewer, playback
+Writing: only inside a run, under the plan: authorise checks run, tenant, actor, org, revalidateAfter, subject (q-artifacts/src/application/service.ts:298-336). Sound.
+Answer export: run read as owner first (apps/q-api/src/http/q-documents.ts:333-375). Sound.
+Reading: defect 1. Version reads and export share it. The web route is a closed non-proxy with UUID and format checks (route.ts:42-64, :137-139), token server-side, and maps 403 to a session message (:166-168).
+Brand kit and logos: actor's organisation (q-documents.ts:49-51, :306); private cache header with a version parameter (:312).
+Email and chat drafts: read through readProposal as approver (q-approvals.ts:339-350, :399-410, service.ts:2306-2319, loadForActor :663-713). Cross-tenant is 404 with a security event (:682-698).
+Data-room viewer: Q opens by intent; the bytes come from the data room's own signed read, every open (apps/web/src/features/q/material-viewer.tsx:156-162, comment packages/q-tools/src/tools/client-actions.ts:825-829, :1266-1270). Text for Q is re-authorised on every call (material-documents.ts:155-166). The minting endpoint itself was not read.
+Pitch video from Q: Q only navigates. COMPANY_PITCH requires a relationship or SAVED (client-actions.ts:780-799), and "the tab plays the pitch only when the company shares it". Playback is minted per call, server-side (apps/web/src/features/discover/feed/playback-source.ts:19, :33), through createAuthorisePlayback with visibility rules (packages/media/src/application/upload-use-cases.ts:930-950, :965-975), TTL 15 min for playback and 5 min for download (:86-88). Sound as traced.
+Transcript and viewing: under the same playback rule (main.ts:1085-1095, :3492, :3511).
+Not verified
+Nothing was executed against a running app, so model-dependent routes (Part 2 trace step 3) are conditional.
+Tenant model for the investor-document case.
+Not traced: createInstructionMaterialReader, fit.rank inputs, every useQControl handler, every SIDE_EFFECT tool under MCP, q-research URL safety, the data-room signed-read endpoint, and the browser notice for failed acts.
