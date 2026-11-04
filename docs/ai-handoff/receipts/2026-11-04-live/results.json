@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-04",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link for the fictional account (owner-approved; seed password not present in env)",
+  "deploy": {
+    "commit": "55936724d",
+    "web": "SUCCESS",
+    "qApi": "SUCCESS",
+    "api": "SUCCESS (after serviceInstanceDeployV2; first build FAILED with empty logs)",
+    "workers": "SUCCESS (same)"
+  },
+  "openAiTurns": 10,
+  "A1": {
+    "expect": "exactly one stored USER message with the full string, typed at 80 ms/char from first composer visibility",
+    "runs": [
+      {
+        "run": 1,
+        "vp": 1440,
+        "composerVisibleMs": 1578,
+        "storedUserMessages": [
+          "Find three companies that fit my mandate"
+        ],
+        "pass": true,
+        "screenshot": "A1-run1-1440.png"
+      },
+      {
+        "run": 2,
+        "vp": 1440,
+        "composerVisibleMs": 908,
+        "storedUserMessages": [
+          "Find three companies that fit my mandate"
+        ],
+        "pass": true,
+        "screenshot": "A1-run2-1440.png"
+      },
+      {
+        "run": 3,
+        "vp": 390,
+        "composerVisibleMs": 862,
+        "storedUserMessages": [
+          "Find three companies that fit my mandate"
+        ],
+        "pass": true,
+        "screenshot": "A1-run3-390.png"
+      },
+      {
+        "run": "rapid (no delay, Enter x3)",
+        "vp": 1440,
+        "composerVisibleMs": 1210,
+        "storedUserMessages": [
+          "Find three companies that fit my mandate"
+        ],
+        "pass": true,
+        "screenshot": "A1-rapid-1440.png"
+      }
+    ],
+    "verdict": "PASS"
+  },
+  "A2": {
+    "displayedRanking": [
+      "MedTrail 9",
+      "Duplo 8.8",
+      "Bumpa 8.8"
+    ],
+    "expected": "Duplo vs Bumpa",
+    "observed1440": "Side-by-side table MedTrail vs Duplo; text: \"MedTrail leads: 9 against Duplo 8.8\" (findings blocks mention Duplo and Bumpa)",
+    "observed390": [
+      "On Capital Q's mandate fit, MedTrail leads: 9 against Duplo's 8.8. Side by side, the differences: MedTrail: medTrail serialises medicine packs at Nigerian distributors and tracks each one, so a recall finds every pack in hours, not weeks, based in Lagos, NG. Duplo: duplo is a Lagos-based platform that helps African businesses collect and make payments to each other, based in Lagos, NG; traction: Total Payment Volume up 4200% in five months (to Aug 2022, company-reported) (company-stated). The full comparison is on screen. What separates them is their customer and product focus: Duplo is a Lagos-based B2B payments platform for African businesses, while Bumpa helps African small businesses run"
+    ],
+    "verdict": "FAIL",
+    "screenshots": [
+      "A2-1440.png",
+      "A2-390.png"
+    ]
+  },
+  "A3": {
+    "urlAfter": "/company/6f075a0b-8372-4458-9060-09afd73a9c37",
+    "navigated": true,
+    "figuresShown": "1,140 paying businesses, ~NGN38m MRR, 78% gross margin, NGN33,300 blended revenue",
+    "answer390": [
+      "Ledgerline’s company profile is open on the Overview tab. I couldn’t open a separate financials control because this page doesn’t expose one by that name. The financial figures available on the profile and deck are: 1,140 paying businesses and about ₦38m MRR as of September 2026; the deck also reports ₦33,300 blended monthly revenue per business and 78% gross margin. These are founder-reported figures, not independently verified. Burn, runway, payroll and cash flow aren’t available here.\n\nDone: Ledgerline’s profile was opened. Would you like me to read the financial figures from its pitch deck in more detail?"
+    ],
+    "verdict": "PASS (navigates + figures; 390 says plainly it could not open a separate financials control)",
+    "defectNote": "Both widths also said burn is not on record while the profile shows \"Current monthly net burn About $39,000\" (same defect as A4)",
+    "screenshots": [
+      "A3-1440.png",
+      "A3-390.png"
+    ]
+  },
+  "A4": {
+    "profileShows": [
+      "heque $50k MRR ₦38m Current monthly net burn About $39,000 Section by section 11 pro"
+    ],
+    "answer1440": [
+      "Ledgerline’s monthly burn isn’t on record. I have revenue, retention and gross margin figures, but not operating expenses, payroll or cash-flow data, so I can’t calculate burn from them.\n\nThe most useful next step is to review its financial slides or request a recent monthly cash-flow summary. Want me to read the financial slides in detail?"
+    ],
+    "answer390": [
+      "Ledgerline’s monthly burn is not known yet; burn, runway, payroll and cash flow weren’t available in the profile or deck. Would you like to focus on the missing operating figures?"
+    ],
+    "verdict": "FAIL",
+    "screenshots": [
+      "A4-1440.png",
+      "A4-390.png"
+    ]
+  },
+  "A6": {
+    "qSpeechRequests": {
+      "390 A1-A3": 0,
+      "1440 A4 dock": 0,
+      "390 A4 dock": 0,
+      "1440 A1-A3": "not recorded (script stopped before writing the counter)"
+    },
+    "verdict": "PASS (0 in every counted run; 1440 A1-A3 uncounted)"
+  },
+  "voice": "live voice call not started (out of scope)",
+  "preDeployVoiceLogs": {
+    "source": "q-api c53a08055 deploymentLogs (raw logs kept out of repo)",
+    "lines": [
+      {
+        "opened": "09:07:01Z",
+        "ended": "09:07:20Z",
+        "durationS": 19,
+        "reason": "ended",
+        "delegations": 0
+      },
+      {
+        "opened": "09:44:50Z",
+        "ended": "09:45:36Z",
+        "durationS": 46,
+        "reason": "ended",
+        "delegations": 1,
+        "turn1": "firstText 6118 ms, model 15518 ms, speculation KIND decided 1625 ms"
+      },
+      {
+        "opened": "09:52:27Z",
+        "ended": "09:52:48Z",
+        "durationS": 21,
+        "reason": "ended",
+        "delegations": 0
+      }
+    ],
+    "note": "All three are the old generic reason \"ended\" (pre-b3e5e34 build); none in the 10:25-12:25 window; web had no voice entries."
+  }
+}
