@@ -7745,10 +7745,18 @@ const liveBroker =
             ),
           };
         },
-        // Both sides of the line, into voice_line_turns (routed 'live').
+        // Both sides of the line, into voice_line_turns (routed 'live');
+        // the turns the voice answered itself into the conversation too
+        // (B1: they were a no-op, so a typed follow-up never knew them).
         transcripts: createPostgresDuplexTranscriptStore({
           sql: database.sql,
-          mirror: () => Promise.resolve(0),
+          mirror: ({ actor, conversationId, messages }) =>
+            qRuntime.recordSpokenExchange({
+              actor,
+              conversationId,
+              messages,
+              correlationId: CorrelationIdSchema.parse(createCorrelationId()),
+            }),
         }),
         onboardingConversation,
         usage: createPostgresModelUsageRepository({ sql: database.sql }),

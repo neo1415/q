@@ -621,6 +621,37 @@ describe("the person's words reach the record (live 2026-10-27)", () => {
       JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
     ).toEqual(body);
   });
+
+  it("B1: relays which turns were handed to Q, so only the rest are mirrored", async () => {
+    const upstream = vi.fn<typeof fetch>(() =>
+      Promise.resolve(Response.json({ recorded: 2 })),
+    );
+    const id = "5f000000-0000-4000-8000-000000000002";
+    const body = {
+      segments: [
+        {
+          role: "USER",
+          text: "compare the second and third",
+          at: 1,
+          delegated: true,
+        },
+        { role: "Q", text: "Duplo leads on traction.", at: 2, delegated: true },
+      ],
+    };
+    const response = await relayLive(
+      new Request(`http://web.test/api/q-voice-live/transcript/${id}`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+      { relay: "transcript", voiceSessionId: id },
+      { doFetch: upstream, enabled: () => true },
+    );
+    expect(response.status).toBe(200);
+    const [, init] = upstream.mock.calls[0] ?? [];
+    expect(
+      JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+    ).toEqual(body);
+  });
 });
 
 describe("GPT-Live requests from the transcript (production 2026-10-09 15:57: '(inaudible)' x3)", () => {

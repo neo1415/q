@@ -1114,6 +1114,93 @@ describe("GPT-Live line", () => {
     expect(stored).toHaveLength(before);
   });
 
+  it("B1: mirrors the turns the voice answered itself into the conversation, never the delegated ones", async () => {
+    let clock = 5_000_000;
+    const mirrored: { conversationId: string; messages: unknown }[] = [];
+    const conversation = QConversationIdSchema.parse(
+      "7f000000-0000-4000-8000-000000000002",
+    );
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({ sessionId: "s", sdp: "v=0 a", model: null }),
+      },
+      firewall: firewall(),
+      turn: () => Promise.resolve({ kind: "SPOKEN", path: "Q" }),
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+      now: () => clock,
+      transcripts: {
+        record: () => Promise.resolve(),
+        mirror: (input) => {
+          expect(input.actor).toEqual(ACTOR);
+          mirrored.push({
+            conversationId: input.conversationId,
+            messages: input.messages,
+          });
+          return Promise.resolve(input.messages.length);
+        },
+      },
+    });
+    const line = binding();
+    await broker.open({
+      binding: {
+        ...line,
+        thread: { ...line.thread, conversationId: conversation },
+      },
+      sdp: "v=0 offer",
+    });
+    clock += 10_000;
+    await broker.transcript({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        segments: [
+          { role: "USER", text: "What does Duplo do?", at: clock - 6_000 },
+          { role: "Q", text: "Duplo runs B2B payments.", at: clock - 5_000 },
+          {
+            role: "USER",
+            text: "Compare the second and third",
+            at: clock - 4_000,
+            delegated: true,
+          },
+          {
+            role: "Q",
+            text: "Duplo leads on traction.",
+            at: clock - 3_000,
+            delegated: true,
+          },
+        ],
+      },
+    });
+    expect(mirrored).toEqual([
+      {
+        conversationId: conversation,
+        messages: [
+          { role: "USER", content: "What does Duplo do?" },
+          { role: "Q", content: "Duplo runs B2B payments." },
+        ],
+      },
+    ]);
+    // Only delegated words: nothing new in the conversation.
+    await broker.transcript({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        segments: [
+          { role: "USER", text: "Open it", at: clock, delegated: true },
+        ],
+      },
+    });
+    expect(mirrored).toHaveLength(1);
+  });
+
   it("marks an approval as waiting, never done", async () => {
     const { broker } = setup({
       answer: `I've drafted the intro to Savanna Seed. ${APPROVAL_QUESTION}`,

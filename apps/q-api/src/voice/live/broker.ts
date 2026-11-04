@@ -368,7 +368,10 @@ export type LiveBrokerDependencies = {
    * q_runtime.voice_line_turns (A's duplex write path): both sides of the
    * line, routed 'live', so what GPT-Live said can be audited.
    */
-  readonly transcripts?: Pick<DuplexTranscriptStore, "record"> | undefined;
+  readonly transcripts?:
+    | (Pick<DuplexTranscriptStore, "record"> &
+        Partial<Pick<DuplexTranscriptStore, "mirror">>)
+    | undefined;
   /**
    * Owner 2026-10-27: an onboarding line is a conversation Q holds itself;
    * this keeps what is said in the onboarding thread and saves it from the
@@ -1615,6 +1618,36 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           logger.warn(
             { err: error, qVoiceSessionId: line.voiceSessionId },
             "live voice transcript could not be stored",
+          );
+        }
+      }
+      // B1 (audit 2026-11-04): a turn the voice answered itself goes into
+      // the conversation too, so a typed follow-up and a refresh see it.
+      // Delegated turns are already there (Q's run wrote them). Not for the
+      // onboarding interview, which keeps its own conversation.
+      const conversationId = line.binding.thread.conversationId;
+      const own = report.segments.filter(
+        (segment) => segment.delegated !== true,
+      );
+      if (
+        store.mirror !== undefined &&
+        conversationId !== undefined &&
+        !line.conversational &&
+        own.length > 0
+      ) {
+        try {
+          await store.mirror({
+            actor: line.actor,
+            conversationId,
+            messages: own.map((segment) => ({
+              role: segment.role,
+              content: segment.text,
+            })),
+          });
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, qVoiceSessionId: line.voiceSessionId },
+            "live voice self-answered turn not mirrored",
           );
         }
       }

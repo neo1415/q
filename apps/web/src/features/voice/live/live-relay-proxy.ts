@@ -133,6 +133,9 @@ const TranscriptBody = z
             role: z.enum(["USER", "Q"]),
             text: z.string().min(1).max(4_000),
             at: z.number().int().min(0),
+            // B1: part of a turn handed to Q (the Q API's own contract);
+            // without it here every marked batch would be refused.
+            delegated: z.boolean().optional(),
           })
           .strict(),
       )

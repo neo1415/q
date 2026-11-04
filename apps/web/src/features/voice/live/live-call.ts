@@ -581,7 +581,15 @@ export async function startLiveCall(
   // V (lead, 2026-10-09: the founder's live lines stored no transcript):
   // each final segment, both sides, goes to the Q API's voice_line_turns
   // (routed 'live') in small ordered batches, and the rest before the end.
-  const kept: { role: "USER" | "Q"; text: string; at: number }[] = [];
+  const kept: {
+    role: "USER" | "Q";
+    text: string;
+    at: number;
+    delegated?: true;
+  }[] = [];
+  // B1: from a delegation until the person speaks again, the turn is Q's
+  // run (already in the conversation); the server mirrors only the rest.
+  let delegating = false;
   let keepTimer: ReturnType<typeof setTimeout> | null = null;
   let flushing: Promise<void> = Promise.resolve();
   // Latency the line measured, reported once with the transcript: the
@@ -630,7 +638,12 @@ export async function startLiveCall(
   const keep = (role: "USER" | "Q", text: string) => {
     const said = text.trim().slice(0, role === "USER" ? 2_000 : 4_000);
     if (said.length === 0) return;
-    kept.push({ role, text: said, at: Date.now() });
+    kept.push({
+      role,
+      text: said,
+      at: Date.now(),
+      ...(delegating ? { delegated: true as const } : {}),
+    });
     if (kept.length >= TRANSCRIPT_BATCH) void flushTranscript();
     else
       keepTimer ??= setTimeout(() => {
@@ -778,6 +791,9 @@ export async function startLiveCall(
         if (reply !== null) keep("Q", reply.text);
         reply = null;
         if (utterance === null) {
+          // A new turn of theirs: whatever the voice answers is its own
+          // until it hands this one to Q.
+          delegating = false;
           utteranceCount += 1;
           utterance = { key: `live_u${String(utteranceCount)}`, text: "" };
         }
@@ -795,9 +811,18 @@ export async function startLiveCall(
         utteranceTimer = setTimeout(finishUtterance, UTTERANCE_END_MS);
         break;
       }
-      case "session.delegation.created":
+      case "session.delegation.created": {
+        delegating = true;
         finishUtterance();
+        // The request is the person's words since the voice last spoke;
+        // they may have been kept before the delegation was announced.
+        for (let index = kept.length - 1; index >= 0; index -= 1) {
+          const segment = kept[index];
+          if (segment === undefined || segment.role !== "USER") break;
+          segment.delegated = true;
+        }
         break;
+      }
       case "session.output_transcript.delta": {
         const delta = typeof event["delta"] === "string" ? event["delta"] : "";
         heardWords(ms);

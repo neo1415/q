@@ -183,6 +183,14 @@ export const LiveTranscriptReportSchema = z
             text: z.string().min(1).max(4_000),
             /** When it was said, epoch ms (clamped to the line's life). */
             at: z.number().int().min(0),
+            /**
+             * B1: part of a turn the voice handed to Q (its request, or the
+             * reply that read Q's answer). Q's run already wrote those to
+             * the conversation, so only unmarked turns are mirrored there.
+             * Browser input: a wrong mark can only duplicate or omit the
+             * person's own turn in their own conversation.
+             */
+            delegated: z.boolean().optional(),
           })
           .strict(),
       )
