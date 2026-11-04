@@ -48,8 +48,19 @@ export function tellLineOpenerAnswer(choice: OpenerChoice): void {
  * were the answer itself ("yes", "something else") and nothing more is
  * sent; false when they go on to Q as ever (a question of its own, a
  * hello, or no question open).
+ *
+ * Once the conversation has turns, the opener is not the question on the
+ * table any more: an "okay" then answers Q, never the welcome (acceptance
+ * 2026-11-04 J4: typed while a plan was drafted, it brought the waiting
+ * cards up and never reached Q; a fresh arrival read had re-opened the
+ * welcome's question under the conversation).
  */
-export function typedOpenerAnswer(words: string, lineOpen: boolean): boolean {
+export function typedOpenerAnswer(
+  words: string,
+  lineOpen: boolean,
+  conversationStarted = false,
+): boolean {
+  if (conversationStarted) return false;
   const reply = answerOpener(words);
   if (reply !== "SHOW" && reply !== "OTHER") return false;
   if (lineOpen) tellLineOpenerAnswer(reply);

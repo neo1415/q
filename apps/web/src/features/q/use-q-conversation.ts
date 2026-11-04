@@ -241,12 +241,30 @@ function subjectInputOf(options: {
         : undefined;
 }
 
+type QAskExtras = {
+  readonly viewing?: QViewingMoment | undefined;
+  /**
+   * What the surface said before this question (Home's welcome), so
+   * a new conversation starts with it; ignored when one is open.
+   */
+  readonly opening?: string | undefined;
+};
+
 export function useQConversation(
   options: QConversationOptions = {},
 ): QConversation {
   const [runState, setRunState] = useState<QStreamState>(createQStreamState);
   const [history, setHistory] = useState<readonly QMessage[]>([]);
   const [pending, setPending] = useState<readonly PendingTurn[]>([]);
+  /** Words typed while Q was busy, in order; each is already on screen. */
+  const typedWhileBusy = useRef<
+    readonly {
+      readonly placeholderId: string;
+      readonly question: string;
+      readonly extras: QAskExtras | undefined;
+    }[]
+  >([]);
+  const [busyTypedCount, setBusyTypedCount] = useState(0);
   const [transport, setTransport] = useState<QStreamTransportStatus | null>(
     null,
   );
@@ -420,6 +438,9 @@ export function useQConversation(
     setRunState(createQStreamState());
     setHistory([]);
     setPending([]);
+    // Words waiting for this conversation do not follow to another.
+    typedWhileBusy.current = [];
+    setBusyTypedCount(0);
     setTransport(null);
     setStreaming(false);
     setNotice(null);
@@ -566,22 +587,27 @@ export function useQConversation(
 
   const awaitingPerson = runState.approval !== null;
   const ask = useCallback(
-    async (
-      question: string,
-      extras?: {
-        readonly viewing?: QViewingMoment | undefined;
-        /**
-         * What the surface said before this question (Home's welcome), so
-         * a new conversation starts with it; ignored when one is open.
-         */
-        readonly opening?: string | undefined;
-      },
-    ) => {
+    async (question: string, extras?: QAskExtras) => {
       const text = question.trim();
+      if (text.length === 0) return;
       // A run paused on an approval is waiting for the person, not busy:
       // what they type starts the conversation's next turn ("go ahead"
       // approves through the Approval Engine, the same as the card).
-      if (text.length === 0 || submitting || (streaming && !awaitingPerson)) {
+      // While Q is busy the words wait, on screen as theirs, and go the
+      // moment it is free (acceptance 2026-11-04 J4: an "okay" typed
+      // while a plan was drafted vanished). Never silently dropped.
+      if (submitting || (streaming && !awaitingPerson)) {
+        const placeholder: PendingTurn = {
+          id: crypto.randomUUID(),
+          text,
+          at: new Date().toISOString(),
+        };
+        typedWhileBusy.current = [
+          ...typedWhileBusy.current,
+          { placeholderId: placeholder.id, question: text, extras },
+        ];
+        setPending((current) => [...current, placeholder]);
+        setBusyTypedCount(typedWhileBusy.current.length);
         return;
       }
       // Lane 7 (owner 2026-10-21): "close it", "go back", "scroll down",
@@ -700,6 +726,25 @@ export function useQConversation(
       awaitingPerson,
     ],
   );
+
+  // The next waiting words go once Q is free: their placeholder gives
+  // way to the turn ask() puts up for them.
+  const askRef = useRef(ask);
+  useEffect(() => {
+    askRef.current = ask;
+  }, [ask]);
+  const free = !submitting && !(streaming && !awaitingPerson);
+  useEffect(() => {
+    if (!free || busyTypedCount === 0) return;
+    const [next, ...rest] = typedWhileBusy.current;
+    if (next === undefined) return;
+    typedWhileBusy.current = rest;
+    setBusyTypedCount(rest.length);
+    setPending((current) =>
+      current.filter((turn) => turn.id !== next.placeholderId),
+    );
+    void askRef.current(next.question, next.extras);
+  }, [free, busyTypedCount]);
 
   /**
    * A reload while the question that started this conversation was still

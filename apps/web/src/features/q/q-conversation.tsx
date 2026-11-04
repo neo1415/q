@@ -857,7 +857,12 @@ export function QConversationPanel({
       // (the plan's execute card) was taken as the welcome's answer and
       // never reached Q. A waiting approval comes first: the words go to
       // the server, whose conversation path decides it (decision 55).
-      if (!approvalWaiting && typedOpenerAnswer(text, lineOpen)) return;
+      if (
+        !approvalWaiting &&
+        typedOpenerAnswer(text, lineOpen, turnCount > 0)
+      ) {
+        return;
+      }
       // QO-12 (QA 2026-10-23): typing is a written turn. The voice room
       // shows no reply (its transcript is Chat), so a typed question sent
       // into the open line left the stage on "Listening" with only a

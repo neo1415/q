@@ -310,6 +310,24 @@ describe("the opener on the page", () => {
     expect(typedOpenerAnswer("what's my score?", false)).toBe(false);
   });
 
+  it("an 'okay' typed once the conversation has turns is for Q, not the welcome (J4)", async () => {
+    render(
+      <ArrivalBriefing
+        variant="page"
+        load={() => Promise.resolve(BUSY)}
+        now={() => MORNING}
+      />,
+    );
+    await landed();
+    let consumed = true;
+    act(() => {
+      consumed = typedOpenerAnswer("okay", false, true);
+    });
+    expect(consumed).toBe(false);
+    expect(openerShowsCards()).toBe(false);
+    expect(document.querySelector("[data-arrival-card]")).toBeNull();
+  });
+
   it("a typed question instead of a choice is just answered (and the cards stay away)", async () => {
     render(
       <ArrivalBriefing
