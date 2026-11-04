@@ -243,6 +243,30 @@ type StoredLine = {
 };
 
 /**
+ * Q's first words while a turn is read (QA F-23, acceptance 2026-11-04
+ * J3): a note to someone is drafted TO them; a document about someone is
+ * written ON them, so it never sounds as if something were going to them.
+ */
+export function holdingLine(
+  name: string | null,
+  writes: boolean,
+  document: boolean,
+): string {
+  const who = name?.slice(0, 60) ?? null;
+  if (document) {
+    return who === null
+      ? "Writing that up now. "
+      : `Writing that up on ${who} now. `;
+  }
+  if (writes) {
+    return who === null
+      ? "Drafting that now. "
+      : `Drafting that note to ${who} now. `;
+  }
+  return who === null ? "Looking into that now. " : `Looking into ${who} now. `;
+}
+
+/**
  * The plan offer Q's last stored answer closed with, read from history:
  * the answer ends with code's own offer copy (PLAN_OFFER_LINES, any
  * language), and the plan is for their turn in that same run. Only Q's
@@ -479,6 +503,8 @@ import {
   resolveOwnRecord,
   type OwnRecordMatch,
 } from "./company/own-names.js";
+import type { QNamedCompanyPort } from "./named-company.js";
+import { asksForOnePage } from "./company/document-length.js";
 import type {
   CompanyIntelligenceRequest,
   CompanyIntelligenceResult,
@@ -1103,6 +1129,13 @@ export type SpecialistQAnswerDependencies = {
    * is resolved and the reading is used as said.
    */
   readonly ownRecords?: QOwnRecordsPort | undefined;
+  /**
+   * Acceptance 2026-11-04 (J3): a company named in a document request,
+   * resolved to the Capital Q record the person may open and planned by
+   * the Context Firewall (named-company.ts). Absent or null: the document
+   * is built from public sources, as before.
+   */
+  readonly namedCompany?: QNamedCompanyPort | undefined;
   /**
    * Voice speculation (latency2): a spoken turn's answer starts at once
    * under a conservative default reading, beside the turn reader, and is
@@ -2317,8 +2350,7 @@ export function createSpecialistQAnswer(
     readonly content: string;
     readonly blocks?: readonly QResultBlock[] | undefined;
   }> {
-    const noun = ask.documentType === "PITCH_DECK" ? "deck" : "brief";
-    const record = request.subjects.find(
+    let record = request.subjects.find(
       (subject): subject is Extract<typeof subject, { kind: "COMPANY" }> =>
         subject.kind === "COMPANY",
     );
@@ -2335,10 +2367,24 @@ export function createSpecialistQAnswer(
     const subjectName = ownCompany
       ? null
       : (mine?.recordedName ?? ask.subjectName);
+    const latest = [...history].reverse().find((m) => m.role === "USER");
+    const said = latest?.content ?? "";
+    // Acceptance 2026-11-04 (J3): "a one-page memo" is a one-pager, not a
+    // multi-page brief. The length asked for is read from their words.
+    const artifactType =
+      ask.documentType === "INVESTMENT_BRIEF" && asksForOnePage(said)
+        ? ("ONE_PAGER" as const)
+        : ask.documentType;
+    const noun =
+      artifactType === "PITCH_DECK"
+        ? "deck"
+        : artifactType === "ONE_PAGER"
+          ? "one-page memo"
+          : "brief";
     // Asked for again: the one already made.
     const existing = existingDocumentCard({
       history,
-      documentType: ask.documentType,
+      documentType: artifactType,
       subjectName,
     });
     if (existing !== null) {
@@ -2349,9 +2395,27 @@ export function createSpecialistQAnswer(
         blocks: [existing],
       };
     }
-    const latest = [...history].reverse().find((m) => m.role === "USER");
-    const said = latest?.content ?? "";
     const personsWords = personsRecentWords(history);
+    // Acceptance 2026-11-04 (J3): a company they named, with nothing open,
+    // is first looked for on Capital Q (the record they may open, planned
+    // by the firewall); its own record is the primary source, and public
+    // research only adds to it. The record's name must still be the name
+    // they said (sameCompanyName below), or it is not used.
+    let plan = request.plan;
+    if (
+      record === undefined &&
+      subjectName !== null &&
+      mine === null &&
+      namedByPerson(subjectName, personsWords)
+    ) {
+      const named = await dependencies
+        .namedCompany?.(request, subjectName)
+        .catch(() => null);
+      if (named !== null && named !== undefined) {
+        record = named.subject;
+        plan = named.plan;
+      }
+    }
     if (subjectName === null && record === undefined) {
       return { content: `Which company should the ${noun} be about?` };
     }
@@ -2369,15 +2433,18 @@ export function createSpecialistQAnswer(
     // research behind it, so the voice line knows it is durable work and
     // never cancels it when the person carries on talking.
     await showStage(request, "PREPARING_DOCUMENT");
-    const context = {
+    const contextUnder = (planned: QAnswerRequest["plan"]) => ({
       actor: request.actor,
       runId: request.runId,
       correlationId: request.correlationId,
       capability: request.capability,
-      plan: request.plan,
+      plan: planned,
       ...(request.signal === undefined ? {} : { signal: request.signal }),
       showStage: (stage: QVisibleStage) => showStage(request, stage),
-    };
+    });
+    // Public research runs under the run's own plan, never one bound to a
+    // record that turned out not to be the company named.
+    const context = contextUnder(request.plan);
     const investigatePublic = (name: string) =>
       specialist.investigate(
         {
@@ -2400,7 +2467,7 @@ export function createSpecialistQAnswer(
     if (record !== undefined) {
       const onRecord = await specialist.investigate(
         { company: record, question: said, publicResearch: true },
-        context,
+        contextUnder(plan),
       );
       // Their company, unless they named another one.
       const theirs =
@@ -2430,7 +2497,11 @@ export function createSpecialistQAnswer(
     const name = result.companyName ?? subjectName ?? "your company";
     const preparation = await prepareOrReviseArtifact({
       artifacts: artifacts as ArtifactPreparation,
-      request,
+      // A record found by its name is filed under the plan that read it.
+      request:
+        subject === undefined || plan === request.plan
+          ? request
+          : { ...request, plan, subjects: [...request.subjects, subject] },
       company: subject,
       companyName: name,
       saidVerbatim: said,
@@ -2442,7 +2513,7 @@ export function createSpecialistQAnswer(
         ...result,
         artifactRequest: {
           kind: "PREPARE",
-          artifactType: ask.documentType,
+          artifactType,
           instruction: said.slice(0, 2_000),
           visualDirection: result.artifactRequest?.visualDirection ?? null,
           quote: said.slice(0, 400),
@@ -4604,6 +4675,8 @@ export function createSpecialistQAnswer(
     name: string | null,
     /** v7 skim: they asked Q to write or send something (QA F-23). */
     writes = false,
+    /** v10 skim: a document about someone, nothing sent (J3). */
+    document = false,
   ): void => {
     const deltas = dependencies.deltas;
     if (deltas === undefined) return;
@@ -4633,13 +4706,7 @@ export function createSpecialistQAnswer(
       runId: request.runId,
       tenantId: request.tenantId,
       messageId: QMessageIdSchema.parse(randomUUID()),
-      text: writes
-        ? name === null
-          ? "Drafting that now. "
-          : `Drafting that note to ${name.slice(0, 60)} now. `
-        : name === null
-          ? "Looking into that now. "
-          : `Looking into ${name.slice(0, 60)} now. `,
+      text: holdingLine(name, writes, document),
       holding: true,
     });
   };
@@ -5893,14 +5960,16 @@ export function createSpecialistQAnswer(
           const name =
             skimmed?.subject?.name ??
             (skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null);
-          const writes = skimmed?.writes === true;
+          const document = skimmed?.document === true;
+          // A document about someone is not a note to them (J3).
+          const writes = skimmed?.writes === true || document;
           // F-76: "add … to my board" heard "Reading Ledgerfold's
           // profile": their own board is no one's profile.
           if (mentionsOwnBoard(latest.content)) return;
           if (!readingLanded && typeof name === "string") {
-            sayHolding(request, name.trim().slice(0, 60), writes);
+            sayHolding(request, name.trim().slice(0, 60), writes, document);
           } else if (!readingLanded && writes) {
-            sayHolding(request, null, true);
+            sayHolding(request, null, true, document);
           }
         },
         () => undefined,

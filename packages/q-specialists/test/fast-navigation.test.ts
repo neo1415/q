@@ -428,7 +428,10 @@ describe("acceptance 2026-11-04 J6: an exact name wins over a close one of their
         text,
         side: "INVESTOR" as const,
         counterpartNames: () => Promise.resolve(["Ledgerfold", "Shiftwell"]),
-        open: (page: QRecordPage, name: string) => {
+        open: (
+          page: QRecordPage,
+          name: string,
+        ): Promise<OpenRecordIntent | null> => {
           opened.push(name);
           const hit = visible.find(
             (one) => one.toLowerCase() === name.toLowerCase(),

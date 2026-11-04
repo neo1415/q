@@ -234,3 +234,18 @@ export const TurnSkimV8ResultSchema = TurnSkimV7ResultSchema.extend({
   investors: SkimInvestorsV8Schema.nullable().optional(),
 }).strict();
 export type TurnSkimV8Result = z.infer<typeof TurnSkimV8ResultSchema>;
+
+export const TURN_SKIM_V10_SCHEMA_VERSION = 10;
+
+/**
+ * v10 (acceptance 2026-11-04, J3: "Write me a one-page memo on Ledgerline"
+ * was held with "Drafting that note to Ledgerline now.", which reads as a
+ * message going to the company): `document` is true when the turn asks Q
+ * to write a document ABOUT someone (a memo, brief, one-pager, report or
+ * deck), read by meaning in any language; `writes` stays a note TO
+ * someone. Lenient: a malformed value reads as false.
+ */
+export const TurnSkimV10ResultSchema = TurnSkimV8ResultSchema.extend({
+  document: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnSkimV10Result = z.infer<typeof TurnSkimV10ResultSchema>;
