@@ -463,8 +463,22 @@ function settledAnswers(turns: readonly QTurn[]): readonly SettledAnswer[] {
     // An answer still arriving decides nothing: the stage holds still.
     if (turn.streaming) continue;
     const run = resultKey(turn);
-    // The same run again (room feed, read-back) is the same answer.
-    if (out.some((one) => one.run === run)) continue;
+    // Live 2026-11-04 (live5 d, 1440): a job's delivery (the plan, the
+    // document) is stored on the run of the "I'm on it" turn that started
+    // it, often after other answers ("okay" typed while it drafted). It
+    // is that run's answer now, at its own place in time: counted at the
+    // "I'm on it" turn, the later "okay" answer read as the conversation
+    // moving on and the plan card was put away with its Execute.
+    const delivered =
+      turn.kind === "Q" && (turn.deliveredJobs?.length ?? 0) > 0;
+    const seen = out.findIndex((one) => one.run === run);
+    if (seen !== -1) {
+      // The same run again (room feed, read-back) is the same answer.
+      if (!delivered) continue;
+      const [was] = out.splice(seen, 1);
+      out.push({ run, turn, question: was?.question });
+      continue;
+    }
     out.push({ run, turn, question: asked ? question : undefined });
     asked = false;
   }

@@ -243,3 +243,59 @@ describe("Now shows no second 'Q asks' for the plan's own offer (J4)", () => {
     ]);
   });
 });
+
+describe("live5 d (1440): an answer between 'I'm on it' and the plan never puts the plan away", () => {
+  const OKAY_RUN = "529e3ae5-6504-4158-af22-5b96f443dab0";
+  const okay: QMessage[] = [
+    {
+      messageId: "349173e0-0000-4000-8000-000000000010",
+      runId: OKAY_RUN,
+      role: "USER",
+      text: "okay",
+      createdAt: "2026-11-04T17:53:30.000Z",
+    },
+    {
+      messageId: "349173e0-0000-4000-8000-000000000011",
+      runId: OKAY_RUN,
+      role: "Q",
+      text: "Your plan is still being drafted; I'll tell you when it's ready.",
+      createdAt: "2026-11-04T17:53:40.000Z",
+    },
+  ].map((message) => QMessageSchema.parse(message));
+  // Plan ask, "I'm on it", then "okay" and its answer, then the delivery.
+  const ordered = [messages[0], messages[1], ...okay, messages[2]].filter(
+    (message): message is QMessage => message !== undefined,
+  );
+
+  it("the delivered plan is on the stage, with no 'moved on' note", async () => {
+    const { stageNoteOf } = await import("../src/features/q/shown");
+    const turns = turnsFrom({ ...createQStreamState(), messages: ordered }, []);
+    const items = shownItems(turns);
+    const pick = stageOf(items, turns);
+    expect(pick.why).toBe("SHOWN");
+    expect(pick.item?.blocks.some((block) => block.kind === "PLAN")).toBe(true);
+    expect(stageNoteOf(items, turns, pick, () => false)).toBeNull();
+  });
+
+  it("a question after the delivery still moves the stage on as before", () => {
+    const later = QMessageSchema.parse({
+      messageId: "349173e0-0000-4000-8000-000000000012",
+      runId: "529e3ae5-6504-4158-af22-5b96f443dab1",
+      role: "USER",
+      text: "What's the weather in Lagos?",
+      createdAt: "2026-11-04T17:58:00.000Z",
+    });
+    const reply = QMessageSchema.parse({
+      messageId: "349173e0-0000-4000-8000-000000000013",
+      runId: "529e3ae5-6504-4158-af22-5b96f443dab1",
+      role: "Q",
+      text: "I can't check the weather.",
+      createdAt: "2026-11-04T17:58:05.000Z",
+    });
+    const turns = turnsFrom(
+      { ...createQStreamState(), messages: [...ordered, later, reply] },
+      [],
+    );
+    expect(stageOf(shownItems(turns), turns).why).toBe("NONE");
+  });
+});
