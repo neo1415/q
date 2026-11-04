@@ -1967,19 +1967,46 @@ export function createSpecialistQAnswer(
    * U4/F8: a move the words asked for alongside a question, per run; the
    * answer to the question carries it (QAnswerRequest.leadBlocks).
    */
-  const movesWithQuestion = new Map<string, readonly QResultBlock[]>();
+  const movesWithQuestion = new Map<string, MoveWithQuestion>();
+  const queueMoveWithAnswer = (runId: string, move: MoveWithQuestion): void => {
+    movesWithQuestion.set(runId, move);
+    while (movesWithQuestion.size > PREREADS_MAX) {
+      const oldest = movesWithQuestion.keys().next().value;
+      if (oldest === undefined) break;
+      movesWithQuestion.delete(oldest);
+    }
+  };
   const delegate: typeof answerPath = {
     ...answerPath,
-    answer: (request) => {
+    answer: async (request) => {
       const moves = movesWithQuestion.get(request.runId);
       movesWithQuestion.delete(request.runId);
-      return answerPath.answer(
-        moves === undefined
-          ? request
-          : {
-              ...request,
-              leadBlocks: [...(request.leadBlocks ?? []), ...moves],
-            },
+      if (moves === undefined) return answerPath.answer(request);
+      const outcome = await answerPath.answer({
+        ...request,
+        leadBlocks: [...(request.leadBlocks ?? []), ...moves.blocks],
+      });
+      // A3: the move was asked for and authorised; the rest of the ask was
+      // not answered. Said plainly, with the move, never left as silence
+      // or as a bare "Opening …" that implies the rest was done. A run
+      // that was cancelled or expired says nothing (nobody is waiting).
+      if (
+        outcome.kind !== "FAILED" ||
+        moves.conversationId === undefined ||
+        outcome.diagnosticCode === "RUN_CANCELLED" ||
+        outcome.diagnosticCode === "RUN_EXPIRED"
+      ) {
+        return outcome;
+      }
+      logger?.info(
+        { qRunId: request.runId, code: outcome.diagnosticCode },
+        "the move was made; the rest of the ask was not answered, and Q says so",
+      );
+      return recordAnswer(
+        request,
+        moves.conversationId,
+        movedButNotAnsweredLine(moves.opened, outcome.diagnosticCode),
+        moves.blocks,
       );
     },
   };
@@ -3509,9 +3536,12 @@ export function createSpecialistQAnswer(
       }
       // U4/F8: a move with a question after it goes with the answer.
       if (questionAfterMove(askedIn(history))) {
-        movesWithQuestion.set(request.runId, [
-          { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
-        ]);
+        queueMoveWithAnswer(request.runId, {
+          blocks: [
+            { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
+          ],
+          conversationId,
+        });
         logger?.info(
           { qRunId: request.runId, destination },
           "a screen and a question: the move goes with the answer",
@@ -3912,6 +3942,8 @@ export function createSpecialistQAnswer(
     readonly said: string;
     readonly blocks: readonly QResultBlock[];
     readonly log: string;
+    /** The record opened, as Q says it; absent when nothing opened. */
+    readonly name?: string;
   } | null> => {
     const port = dependencies.openRecord;
     if (port === undefined) return null;
@@ -3940,6 +3972,7 @@ export function createSpecialistQAnswer(
     );
     return {
       ...spoken,
+      name: resolved.name,
       log: spoken.refused
         ? "DECK_NOT_SHARED"
         : `${resolved.own ? "OWN" : "REACHABLE"}_${resolved.page}`,
@@ -4687,6 +4720,23 @@ export function createSpecialistQAnswer(
         );
         return null;
       }
+      // A3: more asked after the move ("… and show the financials"): the
+      // record opens with the answer to the rest, never alone.
+      if (
+        page !== "EXTERNAL_REHEARSAL" &&
+        questionAfterMove(askedIn(history))
+      ) {
+        queueMoveWithAnswer(request.runId, {
+          blocks: [{ kind: "UI_INTENT", intent }],
+          conversationId,
+          ...(target.name === undefined ? {} : { opened: target.name }),
+        });
+        logger?.info(
+          { qRunId: request.runId, page },
+          "the record the turn pointed at and more asked: the move goes with the answer",
+        );
+        return null;
+      }
       logger?.info(
         { qRunId: request.runId, page, byName: target.id === undefined },
         "q opened the record the turn pointed at",
@@ -5343,25 +5393,41 @@ export function createSpecialistQAnswer(
         );
       }
     }
-    if (byName !== null) {
+    // A3: "open Ledgerline's profile and show the financials" -- the
+    // record opens with the answer to the rest, never alone with a line
+    // that implies the rest was done.
+    const openedByName =
+      byName !== null &&
+      byName.name !== undefined &&
+      byName.blocks.some((block) => block.kind === "UI_INTENT");
+    if (openedByName && questionAfterMove(latest.content)) {
+      queueMoveWithAnswer(request.runId, {
+        blocks: byName.blocks,
+        conversationId,
+        ...(byName.name === undefined ? {} : { opened: byName.name }),
+      });
+      logger?.info(
+        { qRunId: request.runId, outcome: byName.log },
+        "a record and more asked: the move goes with the answer",
+      );
+    } else if (byName !== null) {
       logger?.info(
         { qRunId: request.runId, outcome: byName.log },
         "q opened a record by its name",
       );
       return recordAnswer(request, conversationId, byName.said, byName.blocks);
     }
-    const paged = continuesQ
-      ? null
-      : pageAnswer(latest.content, history, capabilities);
+    const paged =
+      continuesQ || movesWithQuestion.has(request.runId)
+        ? null
+        : pageAnswer(latest.content, history, capabilities);
     // U4/F8: "open the data room and tell me what's missing" opened the
     // page and lost the question. The move goes with the answer instead.
     if (paged !== null && questionAfterMove(latest.content)) {
-      movesWithQuestion.set(request.runId, paged.blocks);
-      while (movesWithQuestion.size > PREREADS_MAX) {
-        const oldest = movesWithQuestion.keys().next().value;
-        if (oldest === undefined) break;
-        movesWithQuestion.delete(oldest);
-      }
+      queueMoveWithAnswer(request.runId, {
+        blocks: paged.blocks,
+        conversationId,
+      });
       logger?.info(
         { qRunId: request.runId, page: paged.log },
         "a page and a question: the move goes with the answer",
@@ -6238,6 +6304,9 @@ export function createSpecialistQAnswer(
       reference !== null &&
       reference.open !== null &&
       !continuesByReading &&
+      // A3: the record already goes with this turn's answer (opened by
+      // name above, with more asked after it): never opened twice.
+      !movesWithQuestion.has(request.runId) &&
       (reference.open === "REHEARSAL" ||
         (!asksAboutIt && onlyAMove(latest.content)))
     ) {
@@ -7926,7 +7995,66 @@ export function questionAfterMove(text: string): boolean {
     .split(/\s*(?:,|;|\band\b|\bthen\b)\s*/iu)
     .map((clause) => clause.trim())
     .filter((clause) => clause.length > 0);
-  return clauses.slice(1).some((clause) => asksAQuestion(clause));
+  return clauses
+    .slice(1)
+    .some((clause) => asksAQuestion(clause) || asksToBeShownContent(clause));
+}
+
+/**
+ * U4/F8, A3: a move the words asked for beside more (a question, or
+ * something to be shown), carried by the answer to the rest. The
+ * conversation and the record's name let Q say plainly what was done
+ * when the rest could not be answered.
+ */
+type MoveWithQuestion = {
+  readonly blocks: readonly QResultBlock[];
+  readonly conversationId?: QConversationMessage["conversationId"] | undefined;
+  /** The record opened, as Q says it ("Ledgerline"); absent for a page. */
+  readonly opened?: string | undefined;
+};
+
+/**
+ * A3: the move was made and the rest of the ask was not answered. Says
+ * what was done, what was not, and why, in the person's terms -- never a
+ * provider or a code.
+ */
+export function movedButNotAnsweredLine(
+  opened: string | undefined,
+  code: string,
+): string {
+  const done =
+    opened === undefined
+      ? "I've opened the page you asked for"
+      : `I've opened ${opened}`;
+  const why =
+    code === "POLICY_DENIED"
+      ? "that isn't something I can access for you"
+      : code === "MODEL_PROVIDER_TIMEOUT" ||
+          code === "MODEL_PROVIDER_UNAVAILABLE"
+        ? "my reasoning service didn't answer in time"
+        : code === "TOOL_FAILED" || code === "RETRIEVAL_FAILED"
+          ? "I couldn't read it just now"
+          : "something went wrong on my side";
+  return `${done}, but I couldn't do the rest of what you asked because ${why}. Ask me again and I'll try once more.`;
+}
+
+/**
+ * A3 (rehearsal 2026-11-04: "Open Ledgerline's company profile and show
+ * the financials" opened the profile and said only "Opening Ledgerline."):
+ * a later clause that asks to be shown something which is no page and no
+ * tab of a page ("show the financials", "show me their numbers") is a
+ * request for content, answered after the move. "show me the deck" or
+ * "show me Discover" stay moves: the same tab and page readers decide.
+ */
+function asksToBeShownContent(clause: string): boolean {
+  const said = clause.trim();
+  return (
+    /^(?:show|list|pull up|bring up|read out)(?:\s+(?:me|us))?\s+\S/iu.test(
+      said,
+    ) &&
+    tabAskOf(said) === null &&
+    pageRequestOf(said) === null
+  );
 }
 
 /** A question, not a command to go somewhere. */
