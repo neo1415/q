@@ -28,7 +28,11 @@ import {
   createNamedResearchSubject,
   createOwnResearchSubject,
 } from "./composition/workforce/own-subject.js";
-import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
+import {
+  createRunLine,
+  createWorkforceDelivery,
+  lineMessageId,
+} from "./composition/workforce/delivery.js";
 import { createOwnContextReader } from "./composition/workforce/own-context.js";
 import { withWaitingPlans } from "./composition/workforce/waiting-plans.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
@@ -4193,6 +4197,21 @@ const plans = createPlans({
     actions: () => qActions,
     continueApproved: () => continueApproved,
   }),
+  // P3: what each step really did, said in the plan's conversation once.
+  say: (() => {
+    const line = createRunLine({
+      sql: database.sql,
+      transactions: database.transactions,
+      runtime: repositories,
+      logger,
+    });
+    return (owner, input) =>
+      line(owner, {
+        runId: input.runId,
+        id: lineMessageId(input.key),
+        text: input.text,
+      });
+  })(),
   invalidate: (tenantId) => situationAssembler.invalidateTenant?.(tenantId),
   actorFor: (owner) => planOwnerActor(owner.userId, null),
   logger,

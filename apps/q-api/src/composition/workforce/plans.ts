@@ -29,6 +29,7 @@ import { boardKey } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
+import { deliveredDocument } from "./delivery.js";
 import type { WorkforceJobs } from "./jobs.js";
 import type { LiveReport } from "./live.js";
 import {
@@ -45,6 +46,7 @@ import {
   type StepRuntime,
 } from "./plan-thread.js";
 import type { AgentWorkQueue, EndState, WorkRow } from "./queue.js";
+import { filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -110,6 +112,15 @@ export type PlanCardAsk = (
   },
 ) => Promise<{ readonly qActionId: string } | null>;
 
+/**
+ * P3: one line in the plan's conversation, on its run, said once per key
+ * (the message id is derived from it). False: not said.
+ */
+export type PlanSay = (
+  owner: Owner,
+  line: { readonly runId: string; readonly key: string; readonly text: string },
+) => Promise<boolean>;
+
 /** The person's press of Execute, standing as their approval (plan-ask.ts). */
 export type PlanCardApprove = (
   actor: ActorContext,
@@ -156,6 +167,8 @@ export type PlansDependencies = {
    * only prepares the card, as before.
    */
   readonly approve?: PlanCardApprove | undefined;
+  /** P3: progress lines in the plan's conversation. Absent: none said. */
+  readonly say?: PlanSay | undefined;
 
   /** S6: the tenant's cached situations are dropped when its records change. */
   readonly invalidate?: ((tenantId: string) => void) | undefined;
@@ -928,7 +941,34 @@ export function createPlans(dependencies: PlansDependencies) {
       await fireStep(approver, plan, step, trace);
     }
     await store.setStatus(owner, plan.planId, "EXECUTING");
+    // P3 (owner 2026-11-04): what this start actually did, counted from
+    // the thread's own record of each step, said once in the conversation.
+    const started = await thread.runtimes(owner, plan.planId).catch(() => null);
+    if (started !== null) {
+      await sayLine(
+        owner,
+        trace.runId,
+        `plan-run:${plan.planId}:${String(plan.version)}:started`,
+        planStartedLine(plan, started),
+      );
+    }
     return "EXECUTED";
+  };
+
+  /** One progress line in the plan's conversation, said once per key. */
+  const sayLine = async (
+    owner: Owner,
+    runId: string | null,
+    key: string,
+    text: string,
+  ): Promise<void> => {
+    if (dependencies.say === undefined || runId === null) return;
+    await dependencies
+      .say(owner, { runId, key, text })
+      .catch((error: unknown) => {
+        logger?.warn({ err: error, key }, "plan progress line not said");
+        return false;
+      });
   };
 
   /** The q.plan.execute action: one approval bound to the exact version. */
@@ -1102,6 +1142,11 @@ export function createPlans(dependencies: PlansDependencies) {
     let runtimes = await thread.runtimes(owner, planId);
     const facts = await linkedState(owner, runtimes);
     let moved = 0;
+    const finished: {
+      readonly step: QPlanStep;
+      readonly verified: string;
+      readonly output: string | null;
+    }[] = [];
     // 1. Work that finished, verified from its own record.
     for (const step of plan.steps) {
       const runtime = runtimeOf(runtimes, step.key);
@@ -1136,9 +1181,57 @@ export function createPlans(dependencies: PlansDependencies) {
         verified,
         `${String(plan.version)}:${step.key}:done`,
       );
+      finished.push({
+        step,
+        verified,
+        output:
+          runtime.jobId === null
+            ? null
+            : (facts.outputs.get(runtime.jobId) ?? null),
+      });
       moved += 1;
     }
     if (moved > 0) runtimes = await thread.runtimes(owner, planId);
+    // P3 (owner 2026-11-04): each step that finished, and the plan once
+    // every step has, said in the conversation with what it really
+    // produced (from the step's own records), once per step and version.
+    let lineTrace: { readonly runId: string | null } | null = null;
+    const traceForLines = async () => {
+      lineTrace ??= await traceOf(
+        owner,
+        (await store.head(owner, planId))?.jobId ?? null,
+      );
+      return lineTrace;
+    };
+    if (finished.length > 0 && dependencies.say !== undefined) {
+      const { runId } = await traceForLines();
+      const done = plan.steps.filter(
+        (step) => runtimeOf(runtimes, step.key).status === "DONE",
+      ).length;
+      for (const one of finished) {
+        await sayLine(
+          owner,
+          runId,
+          `plan-run:${planId}:${String(plan.version)}:${one.step.key}:done`,
+          stepDoneLine(plan, one, done),
+        );
+      }
+    }
+    const settled = plan.steps.every((step) => {
+      const status = runtimeOf(runtimes, step.key).status;
+      return status === "DONE" || status === "SKIPPED";
+    });
+    if (finished.length > 0 && settled && stored.status === "EXECUTING") {
+      await store.setStatus(owner, planId, "DONE");
+      const { runId } = await traceForLines();
+      await sayLine(
+        owner,
+        runId,
+        `plan-run:${planId}:${String(plan.version)}:all-done`,
+        planRunLine(plan, runtimes),
+      );
+      return moved;
+    }
     // 2. Steps whose wait now holds are fired (as the person, now).
     const waiting = plan.steps.filter(
       (step) =>
@@ -1160,6 +1253,18 @@ export function createPlans(dependencies: PlansDependencies) {
         `${String(plan.version)}:${step.key}:ready`,
       );
       await fireStep(actor, plan, step, trace);
+      const standing = runtimeOf(
+        await thread
+          .runtimes(owner, planId)
+          .catch(() => new Map<string, StepRuntime>()),
+        step.key,
+      );
+      await sayLine(
+        owner,
+        trace.runId,
+        `plan-run:${planId}:${String(plan.version)}:${step.key}:started`,
+        `What it waited for is done. Next: ${sentenceOf(clipAtWord(step.title, 160))}, which ${standingWords(standing)}.`,
+      );
       moved += 1;
     }
     return moved;
@@ -1188,8 +1293,8 @@ export function createPlans(dependencies: PlansDependencies) {
                and id = any(${boardIds}::uuid[])`,
       jobIds.length === 0
         ? Promise.resolve([])
-        : sql<{ id: string; status: string }[]>`
-            select job_id as id, state as status from q_runtime.agent_work_queue
+        : sql<{ id: string; status: string; results: unknown }[]>`
+            select job_id as id, state as status, results from q_runtime.agent_work_queue
              where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
                and job_id = any(${jobIds}::uuid[])`,
       actionIds.length === 0
@@ -1202,6 +1307,13 @@ export function createPlans(dependencies: PlansDependencies) {
       board: new Map(board.map((row) => [row.id, row.status])),
       jobs: new Map(jobs.map((row) => [row.id, row.status])),
       actions: new Map(actions.map((row) => [row.id, row.status])),
+      outputs: new Map(
+        jobs.flatMap((row) => {
+          if (row.status !== "COMPLETED") return [];
+          const line = jobOutputLine(row.results);
+          return line === null ? [] : [[row.id, line] as const];
+        }),
+      ),
     };
   };
 
@@ -1228,6 +1340,8 @@ export type Plans = ReturnType<typeof createPlans>;
 type LinkedState = {
   readonly board: ReadonlyMap<string, string>;
   readonly jobs: ReadonlyMap<string, string>;
+  /** What a finished job produced, in code's words (P3); absent: nothing filed. */
+  readonly outputs: ReadonlyMap<string, string>;
   readonly actions: ReadonlyMap<string, string>;
 };
 
@@ -1285,7 +1399,7 @@ const UUID_TEXT =
 /** A step's own record says it is done: what was verified, in plain words. */
 export function verifiedDone(
   runtime: StepRuntime,
-  state: LinkedState,
+  state: Omit<LinkedState, "outputs">,
   owner?: QPlanStep["owner"],
 ): string | null {
   if (
@@ -1304,7 +1418,7 @@ export function verifiedDone(
 /** Q's own part of a step finished, verified from its record. */
 export function qPartDone(
   runtime: StepRuntime,
-  state: LinkedState,
+  state: Omit<LinkedState, "outputs">,
 ): string | null {
   if (runtime.jobId !== null && state.jobs.get(runtime.jobId) === "COMPLETED") {
     return "Q's work on it finished.";
@@ -1582,6 +1696,122 @@ export function boardMessage(board: BoardPlacement): string {
   }
   if (board.waiting > 0) parts.push("My steps wait until you say go.");
   return parts.join(" ");
+}
+
+/**
+ * P3 (owner 2026-11-04): "as it's doing stuff ... report results so we can
+ * see measurable results." Every figure below is counted from the plan's
+ * own thread (each step's state and links) or the step job's own record;
+ * nothing is estimated, and nothing is said that did not happen.
+ */
+export function jobOutputLine(results: unknown): string | null {
+  const row = {
+    results: (typeof results === "object" && results !== null
+      ? results
+      : {}) as WorkRow["results"],
+  };
+  const document = deliveredDocument(row);
+  if (document !== null) {
+    return `It filed “${clipAtWord(document.delivery.title, 120)}”.`;
+  }
+  const filed = filedDocumentIds(row).length;
+  return filed === 0
+    ? null
+    : `It filed ${countWords(filed, "document")} to your documents.`;
+}
+
+/** Where a step stands now, as the rest of a sentence ("which …"). */
+export function standingWords(runtime: StepRuntime): string {
+  switch (runtime.status) {
+    case "DOING":
+      return "has started";
+    case "DONE":
+      return "is done";
+    case "WAITING_YOU":
+      return "is on your board for you";
+    case "PROPOSED":
+      return runtime.actionId === null
+        ? "needs its own approval card, not prepared yet"
+        : "is waiting for your approval on its card";
+    case "SKIPPED":
+      return "was skipped";
+    case "TODO":
+      return "waits on what comes before it";
+  }
+}
+
+/** What Execute started, counted from the steps' own records. */
+export function planStartedLine(
+  plan: Pick<QPlan, "steps">,
+  runtimes: ReadonlyMap<string, StepRuntime>,
+): string {
+  const of = plan.steps.map((step) => runtimeOf(runtimes, step.key));
+  const count = (test: (one: StepRuntime) => boolean) => of.filter(test).length;
+  const doing = count((one) => one.status === "DOING");
+  const board = count((one) => one.boardItemId !== null);
+  const reminders = count((one) => one.reminderId !== null);
+  const cards = count(
+    (one) => one.status === "PROPOSED" && one.actionId !== null,
+  );
+  const unprepared = count(
+    (one) => one.status === "PROPOSED" && one.actionId === null,
+  );
+  const done = count((one) => one.status === "DONE");
+  const waiting = count((one) => one.status === "TODO");
+  const parts = [
+    `Your plan is running: ${countWords(plan.steps.length, "step")}.`,
+    doing === 0 ? null : `Started now: ${countWords(doing, "step")} of mine.`,
+    board === 0
+      ? null
+      : `On your board: ${countWords(board)}${reminders === 0 ? "" : `, ${String(reminders)} with a reminder`}.`,
+    done === 0 ? null : `Already done: ${countWords(done, "step")}.`,
+    cards === 0
+      ? null
+      : `Waiting for your approval on their own cards: ${countWords(cards, "step")}.`,
+    unprepared === 0
+      ? null
+      : `${countWords(unprepared, "step")} ${unprepared === 1 ? "needs" : "need"} its own approval card, not prepared yet.`,
+    waiting === 0
+      ? null
+      : `${countWords(waiting, "step")} ${waiting === 1 ? "waits" : "wait"} on an earlier one.`,
+    "I'll tell you here as each step lands.",
+  ];
+  return parts.filter((part): part is string => part !== null).join(" ");
+}
+
+/** One step done: which, what verified it, what it produced, how far. */
+export function stepDoneLine(
+  plan: Pick<QPlan, "steps">,
+  one: {
+    readonly step: Pick<QPlanStep, "key" | "title">;
+    readonly verified: string;
+    readonly output: string | null;
+  },
+  done: number,
+): string {
+  const at = plan.steps.findIndex((step) => step.key === one.step.key) + 1;
+  return [
+    `Step ${String(at)} done: ${sentenceOf(clipAtWord(one.step.title, 160))}.`,
+    one.verified,
+    one.output,
+    `${String(done)} of ${String(plan.steps.length)} steps done.`,
+  ]
+    .filter((part): part is string => part !== null && part.length > 0)
+    .join(" ");
+}
+
+/** Every step settled: the plan has run. */
+export function planRunLine(
+  plan: Pick<QPlan, "steps">,
+  runtimes: ReadonlyMap<string, StepRuntime>,
+): string {
+  const skipped = plan.steps.filter(
+    (step) => runtimeOf(runtimes, step.key).status === "SKIPPED",
+  ).length;
+  const done = plan.steps.length - skipped;
+  return skipped === 0
+    ? `Your plan has run: all ${countWords(done, "step")} done.`
+    : `Your plan has run: ${countWords(done, "step")} done, ${String(skipped)} skipped.`;
 }
 
 /** A fact ref ("(F23)", "P4") is data, never read out (live 2026-10-29). */

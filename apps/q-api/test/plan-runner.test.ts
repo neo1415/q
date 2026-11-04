@@ -16,9 +16,13 @@ import { createOutwardReview } from "../src/composition/workforce/review.js";
 import { createAgentWorkRunner } from "../src/composition/workforce/runner.js";
 import { stepRuntimes } from "../src/composition/workforce/plan-thread.js";
 import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
+import type { StepRuntime } from "../src/composition/workforce/plan-thread.js";
 import {
   createPlans,
   executePayloadOf,
+  jobOutputLine,
+  planStartedLine,
+  stepDoneLine,
   type PlanCardAsk,
 } from "../src/composition/workforce/plans.js";
 import {
@@ -46,11 +50,24 @@ import {
  */
 
 /** The few reads plans.ts makes itself, answered by the shape of the query. */
-function fakeSql(input: { readonly conversationId?: string } = {}) {
+function fakeSql(
+  input: {
+    readonly conversationId?: string;
+    /** P3: every board task the plan placed reads DONE. */
+    readonly boardDone?: () => boolean;
+  } = {},
+) {
   const queries: string[] = [];
-  const sql = ((strings: TemplateStringsArray) => {
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join("?");
     queries.push(text);
+    if (
+      text.includes("from workspace.board_items") &&
+      input.boardDone?.() === true
+    ) {
+      const ids = (values[2] ?? []) as string[];
+      return Promise.resolve(ids.map((id) => ({ id, status: "DONE" })));
+    }
     if (text.includes("from core.companies")) {
       return Promise.resolve([{ side: "FOUNDER", id: COMPANY }]);
     }
@@ -86,6 +103,8 @@ function world(
     readonly approve?: boolean;
   } = {},
 ) {
+  const said: { runId: string; key: string; text: string }[] = [];
+  let boardDone = false;
   const options_ = options;
   const queue = createInMemoryAgentWorkQueue();
   const workforce = createInMemoryWorkforceStore();
@@ -127,8 +146,15 @@ function world(
   const board: { title: string; dueOn?: string; key: string }[] = [];
   const reminders: { title: string; key: string }[] = [];
   const own: string[] = [];
-  const { sql } = fakeSql();
+  const { sql } = fakeSql({ boardDone: () => boardDone });
   const plans = createPlans({
+    say: (_owner, line) => {
+      if (said.some((one) => one.key === line.key)) {
+        return Promise.resolve(false);
+      }
+      said.push(line);
+      return Promise.resolve(true);
+    },
     sql,
     store: plansStore.store,
     jobsFor,
@@ -228,6 +254,10 @@ function world(
     calls,
     cards,
     approvals,
+    said,
+    markBoardDone: () => {
+      boardDone = true;
+    },
     board,
     reminders,
     own,
@@ -716,6 +746,102 @@ describe("owner 2026-11-04: Execute is the approval, once", () => {
     });
     expect(decided.outcome).toBe("AWAITING_APPROVAL");
     expect(w.plansStore.plans.get(block.planId)?.status).not.toBe("EXECUTING");
+  });
+});
+
+describe("P3 (owner 2026-11-04): a running plan reports what really happened", () => {
+  it("says what Execute started, each step that lands, and when the plan has run", async () => {
+    const w = world({ approve: true });
+    const { block } = await offered(w);
+    const view = await w.plans.view(owner, block.planId);
+    if (view === null) throw new Error("no view");
+    await w.plans.decide(founder, block.planId, {
+      affordance: "EXECUTE",
+      version: 1,
+      bodySha256: view.bodySha256,
+    });
+    const started = w.said.find((one) => one.key.endsWith(":started"));
+    expect(started?.runId).toBe(RUN);
+    // Counted from the thread: 3 board tasks (all dated, so reminded).
+    expect(started?.text).toMatch(
+      /^Your plan is running: \d+ steps\. .*On your board: 3 tasks, 3 with a reminder\./u,
+    );
+    // Said once: a replayed start says nothing new.
+    await w.plans.execute(
+      founder,
+      executePayloadOf(founder.userId, view.plan, view.bodySha256),
+    );
+    expect(w.said.filter((one) => one.key.endsWith(":started"))).toHaveLength(
+      1,
+    );
+    // The person marks their tasks done: each lands with the real count.
+    w.markBoardDone();
+    await w.plans.evaluatePlan(owner, block.planId);
+    const done = w.said.filter((one) => one.key.endsWith(":done"));
+    expect(done.length).toBeGreaterThan(0);
+    expect(done[0]?.text).toMatch(
+      /^Step \d+ done: .+\. You marked it done on your board\. \d+ of \d+ steps done\.$/u,
+    );
+    // Nothing is said twice for the same step.
+    await w.plans.evaluatePlan(owner, block.planId);
+    expect(w.said.filter((one) => one.key.endsWith(":done"))).toHaveLength(
+      done.length,
+    );
+  });
+});
+
+describe("P3 lines are counted, never estimated", () => {
+  const runtime = (over: Partial<StepRuntime>): StepRuntime => ({
+    status: "TODO",
+    boardItemId: null,
+    jobId: null,
+    reminderId: null,
+    actionId: null,
+    ...over,
+  });
+  const steps = [
+    { key: "S1", title: "Draft the update" },
+    { key: "S2", title: "Upload the model" },
+    { key: "S3", title: "Write to Kestrel" },
+  ] as const;
+  it("the start line says only the parts that happened", () => {
+    const line = planStartedLine(
+      { steps: steps as never },
+      new Map([
+        ["S1", runtime({ status: "DOING", jobId: "j1" })],
+        ["S2", runtime({ status: "WAITING_YOU", boardItemId: "b1" })],
+        ["S3", runtime({ status: "PROPOSED" })],
+      ]),
+    );
+    expect(line).toBe(
+      "Your plan is running: 3 steps. Started now: 1 step of mine. On your board: 1 task. 1 step needs its own approval card, not prepared yet. I'll tell you here as each step lands.",
+    );
+  });
+
+  it("a step's line names what its job filed, from the job's record", () => {
+    expect(
+      jobOutputLine({
+        documents: {
+          status: "DONE",
+          summary: "Filed",
+          outputs: { artifactId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b" },
+        },
+      }),
+    ).toBe("It filed 1 document to your documents.");
+    expect(jobOutputLine({})).toBeNull();
+    expect(
+      stepDoneLine(
+        { steps: steps as never },
+        {
+          step: steps[0],
+          verified: "Q's work on it finished.",
+          output: "It filed 1 document to your documents.",
+        },
+        1,
+      ),
+    ).toBe(
+      "Step 1 done: Draft the update. Q's work on it finished. It filed 1 document to your documents. 1 of 3 steps done.",
+    );
   });
 });
 

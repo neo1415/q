@@ -301,61 +301,16 @@ export function createWorkforceDelivery(dependencies: {
       >)
     | undefined;
 }) {
+  const say = createRunLine(dependencies);
   /** One Q message on the job's own run, deduplicated by its id. */
-  const post = async (
+  const post = (
     owner: Owner,
     row: WorkRow,
     id: ReturnType<typeof messageIdFor>,
     text: string,
     blocks: readonly QResultBlock[] | undefined,
-  ): Promise<boolean> => {
-    const runId = QRunIdSchema.safeParse(row.trace.runId);
-    if (!runId.success) return false;
-    try {
-      // The run is read as its owner: someone else's run is not found.
-      const run = await dependencies.runtime.runs.findForActor(
-        dependencies.sql,
-        TenantIdSchema.parse(owner.tenantId),
-        UserIdSchema.parse(owner.userId),
-        runId.data,
-      );
-      if (run === null || run.conversationId === null) return false;
-      const conversationId = run.conversationId;
-      await dependencies.transactions.run(async (tx) => {
-        const stored = await dependencies.runtime.messages.insert(tx, {
-          id,
-          tenantId: run.tenantId,
-          conversationId,
-          runId: run.id,
-          role: "Q",
-          content: text,
-          ...(blocks === undefined ? {} : { blocks }),
-        });
-        await appendRunEvent(
-          dependencies.runtime,
-          tx,
-          { id: run.id, tenantId: run.tenantId },
-          {
-            type: "q.message.completed",
-            data: {
-              message: {
-                ...(toQMessage(stored) as QResponseMessage),
-                ...(blocks === undefined ? {} : { blocks: [...blocks] }),
-              },
-            },
-          },
-        );
-      });
-      return true;
-    } catch (error: unknown) {
-      // Most often: already said (the message id is the job's).
-      dependencies.logger?.info(
-        { err: error, jobId: row.job_id },
-        "workforce delivery not posted to the conversation",
-      );
-      return false;
-    }
-  };
+  ): Promise<boolean> =>
+    say(owner, { runId: row.trace.runId ?? null, id, text, blocks });
 
   /** A finished job's plain document: one line and its card. */
   const announceFiled = async (owner: Owner, row: WorkRow) => {
@@ -528,3 +483,86 @@ export function createWorkforceDelivery(dependencies: {
 }
 
 export type WorkforceDelivery = ReturnType<typeof createWorkforceDelivery>;
+
+/**
+ * One Q message on a run of the owner's (read as them: someone else's run
+ * is not found), with its completion event, deduplicated by its id: the
+ * workforce delivery's lines and a running plan's progress lines alike.
+ */
+export function createRunLine(dependencies: {
+  readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
+  readonly runtime: Pick<
+    QRuntimeRepositories,
+    "runs" | "runEvents" | "messages"
+  >;
+  readonly logger?: Logger | undefined;
+}) {
+  return async (
+    owner: Owner,
+    input: {
+      readonly runId: string | null;
+      readonly id: ReturnType<typeof messageIdFor>;
+      readonly text: string;
+      readonly blocks?: readonly QResultBlock[] | undefined;
+    },
+  ): Promise<boolean> => {
+    const { id, text, blocks } = input;
+    const runId = QRunIdSchema.safeParse(input.runId);
+    if (!runId.success) return false;
+    try {
+      // The run is read as its owner: someone else's run is not found.
+      const run = await dependencies.runtime.runs.findForActor(
+        dependencies.sql,
+        TenantIdSchema.parse(owner.tenantId),
+        UserIdSchema.parse(owner.userId),
+        runId.data,
+      );
+      if (run === null || run.conversationId === null) return false;
+      const conversationId = run.conversationId;
+      await dependencies.transactions.run(async (tx) => {
+        const stored = await dependencies.runtime.messages.insert(tx, {
+          id,
+          tenantId: run.tenantId,
+          conversationId,
+          runId: run.id,
+          role: "Q",
+          content: text,
+          ...(blocks === undefined ? {} : { blocks }),
+        });
+        await appendRunEvent(
+          dependencies.runtime,
+          tx,
+          { id: run.id, tenantId: run.tenantId },
+          {
+            type: "q.message.completed",
+            data: {
+              message: {
+                ...(toQMessage(stored) as QResponseMessage),
+                ...(blocks === undefined ? {} : { blocks: [...blocks] }),
+              },
+            },
+          },
+        );
+      });
+      return true;
+    } catch (error: unknown) {
+      // Most often: already said (the message id is derived from its key).
+      dependencies.logger?.info(
+        { err: error, qRunId: runId.data },
+        "workforce line not posted to the conversation",
+      );
+      return false;
+    }
+  };
+}
+
+/** A line's message id, from its idempotency key: said once, ever. */
+export function lineMessageId(key: string): ReturnType<typeof messageIdFor> {
+  const hex = createHash("sha256")
+    .update(`workforce-line:${key}`)
+    .digest("hex");
+  return QMessageIdSchema.parse(
+    `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`,
+  );
+}

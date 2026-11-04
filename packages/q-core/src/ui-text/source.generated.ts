@@ -6427,6 +6427,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "{n} of {m}",
   "{n} of {m} met.",
   "{n} of {m} met; the rest:",
+  "{n} of {m} steps done",
   "{n} of {n2}",
   "{n} of {n2} areas are strong or developing.",
   "{n} of {n2} criteria known",

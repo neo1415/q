@@ -211,9 +211,27 @@ export function planFollowed(
 ): boolean {
   if (view === null || !view.current) return false;
   if (view.status === "EXECUTING") {
-    return view.plan.steps.some((step) => step.status === "DOING");
+    // P3 (owner 2026-11-04): the card (in the thread and on the Board)
+    // follows a running plan until every step has settled -- a board task
+    // marked done, a card approved -- not only while a job runs; the paced
+    // poll slows while nothing moves, and PLAN_FOLLOW_MAX_MS bounds it.
+    return view.plan.steps.some(
+      (step) => step.status !== "DONE" && step.status !== "SKIPPED",
+    );
   }
   return !planRunning(view.status) && now < approvedUntil;
+}
+
+/** P3: how far a running plan is, counted from its steps (null: not running). */
+export function planProgress(view: QPlanView | null): {
+  readonly done: number;
+  readonly total: number;
+} | null {
+  if (view === null || !planRunning(view.status)) return null;
+  return {
+    done: view.plan.steps.filter((step) => step.status === "DONE").length,
+    total: view.plan.steps.length,
+  };
 }
 
 /** How long after an approval the card watches for its plan to start. */
@@ -403,6 +421,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
   );
   const stillWanted = review.points;
   const running = view !== null && planRunning(view.status);
+  const progress = planProgress(view);
   const runningJobs = current
     ? (plan?.steps ?? []).flatMap((step) =>
         step.status === "DOING" && step.jobId !== null ? [step.jobId] : [],
@@ -628,6 +647,14 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
               {view?.status === "DONE"
                 ? t("This plan has run.")
                 : t("Running: each step shows here as it lands.")}
+              {progress === null ? null : (
+                <span
+                  className="cq-numeric"
+                  data-q-plan-progress={`${String(progress.done)}/${String(progress.total)}`}
+                >
+                  {` · ${t(`${String(progress.done)} of ${String(progress.total)} steps done`)}`}
+                </span>
+              )}
             </p>
           ) : (
             <>
