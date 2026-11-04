@@ -32,6 +32,10 @@
   --cq-surface: oklch(1 0 0);
   --cq-surface-raised: oklch(1 0 0);
   --cq-surface-subtle: oklch(0.982 0 0);
+  /* The tile behind a company logo: light in both themes, because logos
+     are made for a light ground (acceptance 2026-11-04: a dark mark with
+     clear pixels vanished on the dark stage). */
+  --cq-logo-tile: oklch(0.985 0 0);
   --cq-surface-strong: oklch(0.94 0 0);
   /* Below the canvas: a person's own message, a well an answer sits in. */
   --cq-surface-sunken: oklch(0.968 0 0);
@@ -288,6 +292,8 @@
     --cq-surface: oklch(0.268 0 0);
     --cq-surface-raised: oklch(0.302 0 0);
     --cq-surface-subtle: oklch(0.285 0 0);
+    /* Still light, a step down so it does not glare on charcoal. */
+    --cq-logo-tile: oklch(0.94 0 0);
     --cq-surface-strong: oklch(0.34 0 0);
     --cq-surface-sunken: oklch(0.205 0 0);
     --cq-text-primary: oklch(0.95 0.005 92);
@@ -373,6 +379,7 @@
   --cq-surface: oklch(0.268 0 0);
   --cq-surface-raised: oklch(0.302 0 0);
   --cq-surface-subtle: oklch(0.285 0 0);
+  --cq-logo-tile: oklch(0.94 0 0);
   --cq-surface-strong: oklch(0.34 0 0);
   --cq-surface-sunken: oklch(0.205 0 0);
   --cq-text-primary: oklch(0.95 0.005 92);

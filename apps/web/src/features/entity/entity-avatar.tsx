@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Building2 } from "@capital-q/ui/icons";
+
+import { probeLogo } from "./logo-legibility";
 
 /**
  * The one picture for anyone or anything named on screen (founder ask
@@ -198,7 +200,9 @@ export function EntityAvatar({
     state.chain === chain ? state : { chain, at: 0, loaded: false };
   const source = sources[current.at] ?? null;
   const showImage = source !== null;
-  // A logo is drawn whole on the plain surface, never cropped: a site's
+  // A logo is drawn whole on the light logo tile (the same in both
+  // themes: logos are made for a light ground, and a dark mark with clear
+  // pixels vanished on the dark stage), never cropped: a site's
   // logo, and a company's own picture, which is its logo (live 23 Oct: a
   // wordmark cropped to a circle read "lo C" for Silo Credit).
   const isLogo = source !== null && kind === "company";
@@ -210,6 +214,27 @@ export function EntityAvatar({
     : { role: "img", "aria-label": name };
   const textClass =
     px <= 24 ? "cq-caption" : px <= 40 ? "cq-label" : "cq-title-sm";
+  // J5 (acceptance 2026-11-04): a logo that is dark all over -- a dark
+  // mark on an opaque black picture -- read as a black square. Once it
+  // has loaded, its pixels are read where the browser allows (CORS) and
+  // such a picture counts as none: the next one, else the initials.
+  const loadedLogo = isLogo && current.loaded ? source : null;
+  const at = current.at;
+  useEffect(() => {
+    if (loadedLogo === null) return;
+    let live = true;
+    void probeLogo(loadedLogo).then((verdict) => {
+      if (!live || verdict !== "unreadable") return;
+      setState((now) =>
+        now.chain === chain && now.at === at
+          ? { chain, at: at + 1, loaded: false }
+          : now,
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [loadedLogo, chain, at]);
 
   return (
     <span
@@ -269,7 +294,7 @@ export function EntityAvatar({
           onError={() => setState({ chain, at: current.at + 1, loaded: false })}
           className={`absolute inset-0 size-full transition-opacity duration-200 motion-reduce:transition-none ${
             isLogo
-              ? "bg-(--cq-surface-raised) object-contain p-[12%]"
+              ? "bg-(--cq-logo-tile) object-contain p-[12%]"
               : "object-cover"
           } ${current.loaded ? "opacity-100" : "opacity-0"}`}
         />
