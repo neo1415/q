@@ -81,22 +81,18 @@
   }
 
   /*
-   * Texture, not decoration (founder direction 2026-09-29; owner directive
-   * 2026-10-15 §D): two faint blooms of the brand blue, a very low-contrast
-   * grain and a fine dot grid that fades out where people read. Painted
-   * once on fixed layers behind everything, so scrolling moves none of it
-   * (a fixed body background repaints the viewport on every scroll in some
-   * browsers). Tokens only: light and dark have their own values.
+   * Two faint blooms of the brand blue behind everything (founder
+   * direction 2026-09-29), painted once on a fixed layer so scrolling moves
+   * none of it. The tiled grain and the dot grid that sat with them were
+   * removed (client feedback UX-02, 2026-11-04): no repeated pattern behind
+   * text, a quiet canvas. Tokens only: light and dark have their own values.
    */
-  body::before,
-  body::after {
+  body::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
-  }
-  body::before {
     background-image:
       radial-gradient(
         60rem 40rem at 100% -10%,
@@ -107,27 +103,11 @@
         50rem 36rem at -10% 110%,
         var(--cq-qcard-arc),
         transparent 70%
-      ),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .55 0 0 0 0 .7 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-  body::after {
-    background-image: radial-gradient(
-      circle at 1px 1px,
-      var(--cq-texture-dot) 1px,
-      transparent 1.5px
-    );
-    background-size: 24px 24px;
-    /* Strongest toward the edges, gone where people read. */
-    mask-image: radial-gradient(
-      ellipse 70% 60% at 50% 45%,
-      transparent 35%,
-      black 100%
-    );
+      );
   }
   /* More contrast or forced colours: a flat canvas, nothing behind text. */
   @media (prefers-contrast: more), (forced-colors: active) {
-    body::before,
-    body::after {
+    body::before {
       display: none;
     }
   }
@@ -3792,83 +3772,15 @@
     text-wrap: balance;
   }
   /*
-   * The voice room's night (Q home, owner 2026-10-19): a sparse field of
-   * stars behind everything on the Q page, at a whisper, so the page has
-   * depth without competing with Q -- the only thing on it that moves with
-   * meaning. Three tiles of co-prime sizes keep the pattern from reading
-   * as a grid; one layer breathes very slowly, and not at all for reduced
-   * motion. Painted on a pseudo-element: no element, no layout, no work
-   * after the first paint beyond one opacity animation.
+   * The Q page's canvas (client feedback UX-02, 2026-11-04): quiet. The
+   * star field that once tiled behind the conversation read as a repeated
+   * pattern behind text, so it is gone; Q itself (the aperture and its
+   * light) is the only mark on the page. The class stays: other rules key
+   * full-height stages to it.
    */
   .cq-q-home {
     position: relative;
     isolation: isolate;
-  }
-  .cq-q-home::before,
-  .cq-q-home::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-  }
-  .cq-q-home::before {
-    background-image:
-      radial-gradient(
-        circle at 23% 31%,
-        var(--cq-stage-star) 0 1px,
-        transparent 1.5px
-      ),
-      radial-gradient(
-        circle at 71% 64%,
-        var(--cq-stage-star-faint) 0 1px,
-        transparent 1.5px
-      ),
-      radial-gradient(
-        circle at 47% 83%,
-        var(--cq-stage-star-faint) 0 0.8px,
-        transparent 1.3px
-      );
-    background-size:
-      293px 293px,
-      211px 211px,
-      157px 157px;
-  }
-  .cq-q-home::after {
-    background-image:
-      radial-gradient(
-        circle at 62% 18%,
-        var(--cq-stage-star) 0 1.2px,
-        transparent 1.8px
-      ),
-      radial-gradient(
-        circle at 12% 77%,
-        var(--cq-stage-star-faint) 0 1px,
-        transparent 1.5px
-      );
-    background-size:
-      389px 389px,
-      251px 251px;
-    opacity: 0.6;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .cq-q-home::after {
-      animation: cq-stars-breathe 9s ease-in-out infinite alternate;
-    }
-  }
-  @keyframes cq-stars-breathe {
-    from {
-      opacity: 0.25;
-    }
-    to {
-      opacity: 0.75;
-    }
-  }
-  @media (forced-colors: active) {
-    .cq-q-home::before,
-    .cq-q-home::after {
-      display: none;
-    }
   }
 
   /*
