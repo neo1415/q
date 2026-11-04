@@ -91,7 +91,7 @@ export function QCard({
       aria-label={`Q Card for ${name}`}
       style={style}
       className={cx(
-        "relative m-0 flex min-h-48 w-full sm:aspect-[1.8/1] max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text)",
+        "relative m-0 flex min-h-48 w-full flex-col sm:aspect-[1.8/1] sm:flex-row max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text)",
         className,
       )}
     >
@@ -148,14 +148,14 @@ export function QCard({
             )}
           </span>
           <div className="flex min-w-0 flex-col gap-0.5">
-            <Name className="line-clamp-2 text-[clamp(1.25rem,4vw,1.875rem)] leading-tight font-semibold tracking-tight break-words">
+            <Name className="text-[clamp(1.25rem,4vw,1.875rem)] sm:line-clamp-2 leading-tight font-semibold tracking-tight break-words">
               {name}
             </Name>
             {identityLines.length > 0 ? (
               identityLines.map((line) => (
                 <p
                   key={line}
-                  className="cq-body-sm line-clamp-1 break-words text-(--cq-qcard-muted)"
+                  className="cq-body-sm break-words text-(--cq-qcard-muted) sm:line-clamp-1"
                 >
                   {line}
                 </p>
@@ -180,7 +180,7 @@ export function QCard({
             >
               @
             </span>
-            <span className="cq-body truncate font-medium underline-offset-4 hover:underline">
+            <span className="cq-body font-medium break-all underline-offset-4 hover:underline sm:truncate sm:break-normal">
               {handle}
             </span>
           </a>
@@ -193,11 +193,18 @@ export function QCard({
       </div>
 
       {qrSvg === undefined ? null : (
-        <div className="relative flex w-[34%] shrink-0 items-center justify-center pe-[6%]">
+        // Phone widths (owner 2026-11-04): the QR sits below the identity
+        // block, so the name and handle get the card's full width and are
+        // never cut off; 144 px stays comfortably scannable. From sm up the
+        // card is the side-by-side ID layout.
+        <div
+          className="relative flex shrink-0 items-center px-[6%] pb-[6%] sm:w-[34%] sm:justify-center sm:ps-0 sm:pe-[6%] sm:pb-0"
+          data-card-qr
+        >
           <span
             role="img"
             aria-label={`QR code linking to ${displayUrl}`}
-            className="cq-cinema block aspect-square w-full rounded-2xl bg-(--cq-stage-text) p-2.5 text-(--cq-stage-canvas) [&>svg]:h-full [&>svg]:w-full"
+            className="cq-cinema block aspect-square w-36 rounded-2xl sm:w-full bg-(--cq-stage-text) p-2.5 text-(--cq-stage-canvas) [&>svg]:h-full [&>svg]:w-full"
             // Our own server-rendered SVG (uqr), never user input.
             dangerouslySetInnerHTML={{ __html: qrSvg }}
           />
