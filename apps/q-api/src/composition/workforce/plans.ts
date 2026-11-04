@@ -312,9 +312,15 @@ export function createPlans(dependencies: PlansDependencies) {
     },
   ): Promise<PlanStartOutcome> => {
     if (actor.actorType !== "HUMAN") return { status: "NOT_OWN" };
-    if (input.planAsk.subject === "NAMED") return { status: "NOT_OWN" };
     const subject = await subjectOf(actor).catch(() => null);
     if (subject === null) return { status: "NOT_OWN" };
+    // live5 (390): an investor's plan for their own work on a company
+    // they name is planned from their own mandate and pipeline, read as
+    // them; a founder's plan for someone else's company is not theirs to
+    // plan, and goes to the team job that writes documents.
+    if (input.planAsk.subject === "NAMED" && subject.side !== "INVESTOR") {
+      return { status: "NOT_OWN" };
+    }
     const ask = input.ask.trim().slice(0, 2_000);
     if (ask.length === 0) return { status: "FAILED" };
     const payload: PlanJobPayload = {

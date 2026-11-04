@@ -58,6 +58,8 @@ function fakeSql(
     readonly conversationId?: string;
     /** P3: every board task the plan placed reads DONE. */
     readonly boardDone?: () => boolean;
+    /** The actor's organisation is an investor's (live5). */
+    readonly investor?: boolean;
   } = {},
 ) {
   const queries: string[] = [];
@@ -72,7 +74,11 @@ function fakeSql(
       return Promise.resolve(ids.map((id) => ({ id, status: "DONE" })));
     }
     if (text.includes("from core.companies")) {
-      return Promise.resolve([{ side: "FOUNDER", id: COMPANY }]);
+      return Promise.resolve([
+        input.investor === true
+          ? { side: "INVESTOR", id: COMPANY }
+          : { side: "FOUNDER", id: COMPANY },
+      ]);
     }
     if (text.includes("select trace from q_runtime.agent_work_queue")) {
       return Promise.resolve([
@@ -104,6 +110,8 @@ function world(
      * action (the execution gate's claim).
      */
     readonly approve?: boolean;
+    /** The actor's organisation is an investor's (live5). */
+    readonly investor?: boolean;
   } = {},
 ) {
   const said: { runId: string; key: string; text: string }[] = [];
@@ -150,7 +158,10 @@ function world(
   const board: { title: string; dueOn?: string; key: string }[] = [];
   const reminders: { title: string; key: string }[] = [];
   const own: string[] = [];
-  const { sql } = fakeSql({ boardDone: () => boardDone });
+  const { sql } = fakeSql({
+    boardDone: () => boardDone,
+    investor: options.investor === true,
+  });
   const plans = createPlans({
     say: (_owner, line) => {
       if (said.some((one) => one.key === line.key)) {
@@ -403,6 +414,21 @@ describe("S4: a plan ask starts a durable plan job and its card lands in the thr
       },
     });
     expect(started.status).toBe("NOT_OWN");
+  });
+
+  it("live5: an investor's plan for their work on a company they name is their plan", async () => {
+    const w = world({ investor: true });
+    const started = await w.plans.start(founder, RUN, {
+      ask: "Make me a plan to check Ledgerline's unit economics this week",
+      planAsk: {
+        kind: "GOAL",
+        research: "NONE",
+        side: "INVESTOR",
+        subject: "NAMED",
+        deliverable: "PLAN",
+      },
+    });
+    expect(started.status).toBe("STARTED");
   });
 });
 

@@ -283,11 +283,19 @@ export function offeredPlanChoice(
  * Whether the reading asks for a plan of their OWN: the deliverable is
  * steps to take. An analysis, a review of their documents (F03) or a
  * document is that work, done by the team job that writes documents --
- * never a plan whose first step is the thing asked (live 2026-10-29). Work
- * for someone they named stays with the team job too.
+ * never a plan whose first step is the thing asked (live 2026-10-29).
+ *
+ * live5 (2026-11-04, 390): "Make me a plan to check Ledgerline's unit
+ * economics this week" names a company, was read NAMED and became a
+ * research job with no plan. An investor's plan for their own work on a
+ * company they name (diligence, a follow-up, its numbers) is theirs, made
+ * from their mandate and pipeline, so it is offered to the plan job,
+ * which decides from the actor's real side (a founder's plan for another
+ * company is NOT_OWN there and falls through to the team job as before).
+ * Only a reading that says it is a founder's stays with the team job.
  */
 export function planAskRoutes(planAsk: QPlanAskReading | null): boolean {
   if (planAsk === null) return false;
-  if (planAsk.subject === "NAMED") return false;
+  if (planAsk.subject === "NAMED" && planAsk.side === "FOUNDER") return false;
   return planAsk.kind !== "NONE" && planAsk.deliverable === "PLAN";
 }

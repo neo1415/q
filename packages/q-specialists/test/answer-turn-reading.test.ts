@@ -6762,18 +6762,57 @@ describe("situation-first planning: the reader's planAsk starts the plan job (S5
     expect(stored.length).toBeGreaterThan(0);
   });
 
-  it("an ask about a company they name is not a plan of their own: the team job takes it", async () => {
+  // live5 (2026-11-04, 390): "Make me a plan to check Ledgerline's unit
+  // economics this week" became a research job with no plan card. An
+  // investor's plan for their own work on a company they name is a plan:
+  // the plan job takes it (it decides from the actor's real side).
+  it("an investor's plan about a company they name is a plan: the plan job takes it", async () => {
     const { plan, started } = planPort();
     let proposed = 0;
     const { answer } = seam({
-      said: "Make me a diligence plan for Ledgerfold",
+      said: "Make me a plan to check Ledgerline's unit economics this week",
+      reading: {
+        ...reading("Ledgerline"),
+        teamJob: true,
+        planAsk: {
+          kind: "GOAL",
+          research: "NONE",
+          side: "INVESTOR",
+          subject: "NAMED",
+          deliverable: "PLAN",
+        },
+      } as TurnReaderResult,
+      outcomes: [],
+      plan,
+      teamJob: {
+        propose: () => {
+          proposed += 1;
+          return Promise.resolve({ status: "UNAVAILABLE" });
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(started).toEqual([
+      {
+        ask: "Make me a plan to check Ledgerline's unit economics this week",
+        deliverable: "PLAN",
+      },
+    ]);
+    expect(proposed).toBe(0);
+  });
+
+  it("a founder's plan for a company they name is not their own: the team job takes it", async () => {
+    const { plan, started } = planPort();
+    let proposed = 0;
+    const { answer } = seam({
+      said: "Make me a growth plan for Ledgerfold",
       reading: {
         ...reading("Ledgerfold"),
         teamJob: true,
         planAsk: {
           kind: "GOAL",
           research: "NONE",
-          side: "INVESTOR",
+          side: "FOUNDER",
           subject: "NAMED",
           deliverable: "PLAN",
         },
