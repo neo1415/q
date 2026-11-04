@@ -300,6 +300,8 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   "Male voice": "صوت رجالي",
   "Read answers aloud": "قراءة الإجابات بصوت عالٍ",
   "Answers in writing only": "الإجابات مكتوبة فقط",
+  "Stay here": "البقاء هنا",
+  "Plan steps finished": "خطوات الخطة المنجزة",
   Subtle: "خفيف",
   Natural: "طبيعي",
   Warm: "دافئ",
