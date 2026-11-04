@@ -278,9 +278,12 @@ export function createLangGraphQOrchestrator(
               // A model never does; nothing here reads what Q said.
               outcome = await settleAction(ref, state);
             } else if (state.answer === "ANSWERED") {
+              // The answer is stored and on screen: a Stop pressed while it
+              // was written does not relabel it "cancelled" (J5).
               await runtime.complete(ref, {
                 modelPolicyVersion: state.modelPolicyVersion ?? undefined,
                 promptBundleVersion: state.promptBundleVersion ?? undefined,
+                answered: true,
               });
               outcome = "completed";
             } else if (state.answer === "FAILED") {
