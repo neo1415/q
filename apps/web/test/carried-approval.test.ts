@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   carriedApproval,
+  planCardStandsFor,
   shownCardsKey,
 } from "../src/features/q/carried-approval";
 
@@ -187,5 +188,80 @@ describe("the cards a thread shows, as one key", () => {
     ] as never);
     expect(once).toBe("p1,p2");
     expect(again).toBe(once);
+  });
+});
+
+/**
+ * Owner 2026-11-04 ("I have to approve again"): a plan's execute card is
+ * never a second control beside the plan card the thread shows. Other
+ * kinds, and a plan this thread does not show, are carried as before.
+ */
+describe("the plan card is the one control for its plan", () => {
+  const planProposal = {
+    proposalId: "p9",
+    runId: "run-9",
+    actionType: "q.plan.execute",
+    summary: "Run your plan: Raise a seed round by March",
+    approval: {
+      required: true,
+      approval: { approvalId: "a9", status: "PENDING" },
+    },
+  } as never;
+  const planBlock = {
+    kind: "PLAN",
+    planId: "6d2a1f00-0000-4000-8000-000000000001",
+    version: 1,
+    title: "Raise a seed round by March",
+    steps: 3,
+    reviewed: true,
+    affordances: ["EXECUTE", "PUT_ON_BOARD", "CHANGE"],
+  };
+  const card = {
+    messageId: "m9",
+    runId: "run-9",
+    role: "Q",
+    text: "Run your plan: Raise a seed round by March.",
+    createdAt: "2026-11-04T10:00:00Z",
+    blocks: [{ kind: "ACTION_PROPOSAL", proposal: planProposal }],
+  };
+  const waiting = [
+    {
+      approvalId: "a9",
+      runId: "run-9",
+      conversationId: "c1",
+      summary: "Run your plan: Raise a seed round by March",
+      requestedAt: "2026-11-04T10:00:00Z",
+      expiresAt: "2026-11-05T10:00:00Z",
+    },
+  ] as never;
+  it("with its plan card on screen, its execute card is not carried", () => {
+    const shown = [
+      {
+        messageId: "m8",
+        runId: "run-8",
+        role: "Q",
+        text: "Your plan is ready.",
+        createdAt: "2026-11-04T09:59:00Z",
+        blocks: [planBlock],
+      },
+      card,
+    ] as never;
+    expect(planCardStandsFor(planProposal, shown)).toBe(true);
+    expect(carriedApproval("c1", shown, waiting)).toBeNull();
+  });
+  it("without its plan card, or for any other kind, it is carried as before", () => {
+    expect(carriedApproval("c1", [card] as never, waiting)).not.toBeNull();
+    expect(
+      planCardStandsFor(
+        {
+          actionType: "email.send",
+          summary: "Run your plan: Raise a seed round by March",
+        },
+        [{ role: "Q", blocks: [planBlock] }] as never,
+      ),
+    ).toBe(false);
+    expect(
+      carriedApproval("c1", [history[0]] as never, pending("c1")),
+    ).not.toBeNull();
   });
 });

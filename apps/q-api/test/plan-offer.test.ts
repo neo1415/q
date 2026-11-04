@@ -10,6 +10,7 @@ import {
   PLAN_OFFER_RUN,
   PLAN_OFFER_SUMMARY,
   PLAN_OFFER_WHOLE,
+  PLAN_OFFER_WITHOUT_CARD,
   PLAN_READ_CLOSE,
   readPlanChoice,
   type PendingDecisionPort,
@@ -78,7 +79,7 @@ function planRow(): WorkRow {
   };
 }
 
-function delivery(offer: boolean) {
+function delivery(offer: boolean, prepares = true) {
   const events: string[] = [];
   const posted: { content: string; blocks: unknown }[] = [];
   const deliver = createWorkforceDelivery({
@@ -120,7 +121,7 @@ function delivery(offer: boolean) {
       ? {
           offerPlan: (_owner, _row, plan) => {
             events.push(`offer:${plan.planId}:${String(plan.version)}`);
-            return Promise.resolve(true);
+            return Promise.resolve(prepares);
           },
         }
       : {}),
@@ -147,8 +148,9 @@ describe("the plan-ready message offers the three ways on", () => {
         },
       ]),
     );
-    // The card's lines follow the offer, never precede it.
-    expect(d.events).toEqual(["posted", `offer:${PLAN_ID}:1`]);
+    // The quiet card is prepared first, so the offer says "go ahead" only
+    // when a card really waits for it.
+    expect(d.events).toEqual([`offer:${PLAN_ID}:1`, "posted"]);
   });
 
   it("without the execute card composed, the plan lands as before", async () => {
@@ -157,6 +159,34 @@ describe("the plan-ready message offers the three ways on", () => {
     expect(d.posted[0]?.content).toContain(PLAN_WAYS_ON);
     expect(JSON.stringify(d.posted[0]?.blocks)).not.toContain(
       "CLARIFICATION_REQUEST",
+    );
+  });
+
+  it("plan lands: exactly one control runs it (Execute); one line, no second prompt", async () => {
+    const d = delivery(true);
+    await d.deliver({ tenantId: TENANT, userId: USER }, planRow());
+    // One message: the plan card (its Execute) and the choices; no card
+    // of the execute action's own, no "Here is your plan to approve".
+    expect(d.posted).toHaveLength(1);
+    const blocks = JSON.stringify(d.posted[0]?.blocks);
+    expect(blocks).not.toContain("ACTION_PROPOSAL");
+    expect(d.posted[0]?.content).not.toMatch(/Here is your plan to approve/u);
+  });
+
+  it("no card could be prepared: the offer never says 'go ahead'; Execute runs it", async () => {
+    const d = delivery(true, false);
+    await d.deliver({ tenantId: TENANT, userId: USER }, planRow());
+    const [message] = d.posted;
+    expect(message?.content).toContain(PLAN_OFFER_WITHOUT_CARD);
+    expect(message?.content).not.toMatch(/go ahead/iu);
+    expect(message?.blocks).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "CLARIFICATION_REQUEST",
+          question: "What would you like to do with your plan?",
+          options: [PLAN_OFFER_SUMMARY, PLAN_OFFER_WHOLE],
+        },
+      ]),
     );
   });
 

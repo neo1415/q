@@ -107,6 +107,8 @@ export function carriedApproval(
         b.at - a.at || b.item.requestedAt.localeCompare(a.item.requestedAt),
     );
   for (const { item, at, proposal } of shown) {
+    // The plan card on screen is the one control for running its plan.
+    if (planCardStandsFor(proposal, history)) continue;
     if (!movedOn(history, at, proposal)) {
       return {
         approval: {
@@ -120,6 +122,33 @@ export function carriedApproval(
     }
   }
   return null;
+}
+
+/**
+ * Owner 2026-11-04 ("I have to approve again"): a plan's execute card
+ * (q.plan.execute) is never a second control beside the plan card this
+ * thread shows -- the card's Execute approves it, and "okay" does on the
+ * server. Matched by the plan the card runs: its summary is code's "Run
+ * your plan: <goal>", the plan card's title is that goal. Any other kind,
+ * or a plan this thread does not show, is carried as before.
+ */
+export function planCardStandsFor(
+  proposal: Pick<QActionProposal, "actionType" | "summary">,
+  history: readonly QMessage[],
+): boolean {
+  if (proposal.actionType !== "q.plan.execute") return false;
+  const runs = proposal.summary.trim().toLowerCase();
+  return history.some(
+    (message) =>
+      message.role === "Q" &&
+      (message.blocks ?? []).some(
+        (block) =>
+          block.kind === "PLAN" &&
+          runs.startsWith(
+            `run your plan: ${block.title.trim().toLowerCase()}`.slice(0, 200),
+          ),
+      ),
+  );
 }
 
 /**

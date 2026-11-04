@@ -15,6 +15,7 @@ import {
 } from "@capital-q/q-actions";
 import {
   runRef,
+  type CreateQRunCommand,
   type QOrchestrationRuntime,
   type QRuntimeService,
 } from "@capital-q/q-runtime";
@@ -48,7 +49,7 @@ export function createPlanCardAsk(dependencies: {
       card.conversationId === null
         ? null
         : QConversationIdSchema.safeParse(card.conversationId);
-    const created = await dependencies.runtime().createRun({
+    const command: CreateQRunCommand = {
       actor,
       input: {
         capability: "PREPARE_ACTION",
@@ -63,7 +64,17 @@ export function createPlanCardAsk(dependencies: {
       // The person pressed a button; they typed nothing. The card's line is
       // Q's own (live 2026-10-29: "Run the plan: …" read as their message).
       openedBy: "Q",
-    });
+    };
+    // Owner 2026-11-04: a plan's execute card sits behind the plan card on
+    // screen (its Execute is the one visible control), so its run records
+    // no line of its own ("Here is your plan to approve…" read as a second
+    // prompt). Its approval stays pending, decided by Execute or by "okay"
+    // (conversation-approvals). A step's own card keeps its line.
+    const runtime = dependencies.runtime();
+    const created =
+      card.quiet === true
+        ? await runtime.createRun({ ...command, quiet: true })
+        : await runtime.createRun(command);
     const ref = runRef(created.run);
     const orchestration = dependencies.orchestration();
     try {

@@ -118,6 +118,7 @@ export {
 export type {
   CreateQRunCommand,
   CreateQRunResult,
+  CreateQQuietRunResult,
 } from "./application/create-run.js";
 export type { GetQRunQuery, GetQRunResult } from "./application/get-run.js";
 export {

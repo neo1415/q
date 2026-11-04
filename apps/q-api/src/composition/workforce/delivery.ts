@@ -22,6 +22,9 @@ import { z } from "zod";
 import {
   PLAN_OFFER_OPTIONS,
   PLAN_OFFER_QUESTION,
+  PLAN_OFFER_SUMMARY,
+  PLAN_OFFER_WHOLE,
+  PLAN_OFFER_WITHOUT_CARD,
 } from "@capital-q/q-specialists";
 
 import type { WorkforcePorts } from "./jobs.js";
@@ -157,18 +160,26 @@ export function withoutSourceIds(text: string): string {
  * under it as Q's question, answerable by a tap, typing or voice. Running
  * it is the waiting execute card's approval of that exact version.
  */
-export function planOfferText(line: string): string {
-  const ways = `${PLAN_OFFER_QUESTION} You can also put it on your board, or tell me what to change.`;
+export function planOfferText(line: string, prepared = true): string {
+  // Without its execute card waiting, nothing would take a "go ahead":
+  // the offer names the plan's own Execute instead (coordinator 2026-11-04).
+  const ways = prepared
+    ? `${PLAN_OFFER_QUESTION} You can also put it on your board, or tell me what to change.`
+    : PLAN_OFFER_WITHOUT_CARD;
   return line.endsWith(PLAN_WAYS_ON)
     ? `${line.slice(0, line.length - PLAN_WAYS_ON.length)}${ways}`
     : `${line}\n\n${ways}`;
 }
 
-export const PLAN_OFFER_BLOCK: QResultBlock = {
-  kind: "CLARIFICATION_REQUEST",
-  question: "What would you like to do with your plan?",
-  options: [...PLAN_OFFER_OPTIONS],
-};
+export function planOfferBlock(prepared = true): QResultBlock {
+  return {
+    kind: "CLARIFICATION_REQUEST",
+    question: "What would you like to do with your plan?",
+    options: prepared
+      ? [...PLAN_OFFER_OPTIONS]
+      : [PLAN_OFFER_SUMMARY, PLAN_OFFER_WHOLE],
+  };
+}
 
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
@@ -359,15 +370,33 @@ export function createWorkforceDelivery(dependencies: {
       "plan" in delivered ? delivered.plan.block.title : "Where things stand";
     const offering =
       "plan" in delivered && dependencies.offerPlan !== undefined;
+    // The execute card first (quiet: it posts no line), so the offer says
+    // "go ahead" only when a card is really waiting for it. One card per
+    // version, so a retried delivery finds the same one.
+    let prepared = false;
+    if ("plan" in delivered && dependencies.offerPlan !== undefined) {
+      prepared = await dependencies
+        .offerPlan(owner, row, {
+          planId: delivered.plan.block.planId,
+          version: delivered.plan.block.version,
+        })
+        .catch(() => false);
+      if (!prepared) {
+        dependencies.logger?.warn(
+          { jobId: row.job_id, planId: delivered.plan.block.planId },
+          "plan offered without its execute card; Execute still prepares it",
+        );
+      }
+    }
     const text =
       "plan" in delivered
         ? offering
-          ? planOfferText(delivered.plan.line)
+          ? planOfferText(delivered.plan.line, prepared)
           : delivered.plan.line
         : delivered.answer.line;
     const blocks: QResultBlock[] = [
       ...("plan" in delivered ? [delivered.plan.block] : []),
-      ...(offering ? [PLAN_OFFER_BLOCK] : []),
+      ...(offering ? [planOfferBlock(prepared)] : []),
       {
         kind: "WORK_IN_PROGRESS",
         jobId: row.job_id,
@@ -381,22 +410,6 @@ export function createWorkforceDelivery(dependencies: {
       text,
       blocks,
     );
-    if ("plan" in delivered && dependencies.offerPlan !== undefined) {
-      // After the offer, so its card's lines follow it; one card per
-      // version, so a retried delivery finds the same one.
-      const prepared = await dependencies
-        .offerPlan(owner, row, {
-          planId: delivered.plan.block.planId,
-          version: delivered.plan.block.version,
-        })
-        .catch(() => false);
-      if (!prepared) {
-        dependencies.logger?.warn(
-          { jobId: row.job_id, planId: delivered.plan.block.planId },
-          "plan offered without its execute card; Execute still prepares it",
-        );
-      }
-    }
     await dependencies
       .notify(owner, {
         key: `wf:${row.job_id}:delivered`,

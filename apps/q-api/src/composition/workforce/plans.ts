@@ -109,6 +109,8 @@ export type PlanCardAsk = (
     readonly payload: unknown;
     readonly words: string;
     readonly key: string;
+    /** No line of its own: the plan card on screen stands for it. */
+    readonly quiet?: boolean | undefined;
   },
 ) => Promise<{ readonly qActionId: string } | null>;
 
@@ -433,9 +435,11 @@ export function createPlans(dependencies: PlansDependencies) {
         conversationId: trace.conversationId,
         actionType: PLAN_EXECUTE,
         payload: executePayloadOf(actor.userId, stored.plan, stored.bodySha256),
-        // Q's own line on the card's run (the person typed nothing).
+        // The run's objective; never stored as a line (quiet): the plan
+        // card on screen is what the person decides on.
         words: `Here is your plan to approve before anything runs: ${stored.plan.goal}`,
         key: `plan-execute:${stored.plan.planId}:${String(stored.plan.version)}`,
+        quiet: true,
       })
       .catch((error: unknown) => {
         logger?.warn(

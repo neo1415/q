@@ -85,6 +85,13 @@ export type QPlanReadPart = "SUMMARY" | "WHOLE";
 export const PLAN_OFFER_QUESTION =
   "Would you like a short summary, the whole plan read out, or shall I run it now and keep you posted? Pick one below, or tell me to go ahead.";
 /**
+ * The same offer when no execute card could be prepared: nothing would
+ * take a "go ahead", so running it is the plan card's own Execute.
+ */
+export const PLAN_OFFER_WITHOUT_CARD =
+  "Would you like a short summary or the whole plan read out? To run it, press Execute on the plan; you can also put it on your board, or tell me what to change.";
+
+/**
  * The line closing a plan read back by code: still the same offer, so the
  * next choice ("the whole plan", "okay") is read as its answer too.
  */
@@ -154,7 +161,9 @@ export function offeredPlanChoice(
   const lastTheirs = before.findLastIndex((message) => message.role === "USER");
   const offer = (readBack ? before : before.slice(lastTheirs + 1)).findLast(
     (message) =>
-      message.role === "Q" && message.content.includes(PLAN_OFFER_QUESTION),
+      message.role === "Q" &&
+      (message.content.includes(PLAN_OFFER_QUESTION) ||
+        message.content.includes(PLAN_OFFER_WITHOUT_CARD)),
   );
   if (offer === undefined) return null;
   const plan = (offer.blocks ?? []).find(
