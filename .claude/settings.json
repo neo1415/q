@@ -5,7 +5,17 @@
       "mcp__Claude_Code_Remote__subscribe_pr_activity",
       "mcp__Claude_Code_Remote__unsubscribe_pr_activity",
       "mcp__github__subscribe_pr_activity",
-      "mcp__github__unsubscribe_pr_activity"
+      "mcp__github__unsubscribe_pr_activity",
+      "mcp__claude-code-remote__send_message",
+      "mcp__claude-code-remote__get_session",
+      "mcp__claude-code-remote__list_events",
+      "mcp__claude-code-remote__get_event",
+      "mcp__claude-code-remote__list_sessions",
+      "mcp__claude-code-remote__read_documentation",
+      "mcp__claude-code-remote__send_later",
+      "mcp__Claude_Code_Remote__send_message",
+      "mcp__Claude_Code_Remote__get_session",
+      "mcp__Claude_Code_Remote__list_events"
     ]
   }
 }

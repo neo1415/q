@@ -435,7 +435,9 @@ describe("acceptance 2026-11-04 J6: an exact name wins over a close one of their
           );
           const id = hit === undefined ? undefined : ids[hit];
           return Promise.resolve(
-            id === undefined ? null : { kind: "OPEN_RECORD_PAGE", page, id },
+            id === undefined
+              ? null
+              : { kind: "OPEN_RECORD_PAGE" as const, page, id },
           );
         },
       }),
