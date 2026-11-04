@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-04",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link for the fictional account, service key read from Railway api variables in memory (never printed or stored in repo)",
+  "deploy": {
+    "commit": "9dc0dcb9b",
+    "from": "55936724d (fast-forward push to recovery/2026-09-12)",
+    "rollback": "55936724d",
+    "web": "SUCCESS", "api": "SUCCESS", "qApi": "SUCCESS", "workers": "SUCCESS",
+    "createdAt": "2026-11-04T14:40:51Z",
+    "notes": "no serviceInstanceDeployV2 fallback needed; q-api finished last (~15:02Z)"
+  },
+  "qTurns": 8,
+  "qTurnLog": [
+    "1440 A2 list", "1440 A2 compare",
+    "390 A2 list (harness crashed after send; answer read back from conversation 49dba705)",
+    "390 A2 compare (same harness bug; answer read back without a new turn)",
+    "1440 A4", "390 A4", "1440 N1 (Stay here)", "390 N1 (Open pipeline)"
+  ],
+  "voiceLogs": {
+    "preDeploy": "q-api 55936724d logs 12:34-14:40Z: no 'live voice line ended' or 'duplex voice line ended' entries",
+    "postDeploy": [
+      { "opened": "15:03:39Z", "ended": "15:08:10Z", "reason": "idle", "delegations": 1, "recordedSeconds": 268, "duplex": true, "note": "another account's session, not part of this verification" }
+    ]
+  },
+  "A2": {
+    "displayedRanking": ["MedTrail 9.0", "Duplo 8.8", "Bumpa 8.8"],
+    "expected": "Duplo vs Bumpa",
+    "table1440": ["Attribute", "Duplo", "Bumpa"],
+    "table390": ["Attribute", "Duplo", "Bumpa"],
+    "answer1440": "Duplo and Bumpa are level on Capital Q's mandate fit, at 8.8 each. The useful difference is traction evidence ...",
+    "verdict": "PASS",
+    "screenshots": ["A2-list-1440.png", "A2-compare-1440.png", "A2-list-390.png", "A2-compare-390.png"]
+  },
+  "A4": {
+    "profileShows": "Current monthly net burn About $39,000",
+    "answer1440": "Ledgerline's deck states a current monthly net burn of about $39,000. It also states planned monthly net burn of near $85,000 after the raise. These are founder-reported figures, not independently verified. The public search did not add a relevant burn figure.",
+    "answer390": "Ledgerline's deck states a current monthly net burn of about $39,000. It also states planned monthly net burn of near $85,000 after the raise. These are founder-reported figures, not independently verified. I didn't find a relevant public source that adds a burn figure.",
+    "verdict": "PASS",
+    "screenshots": ["A4-1440.png", "A4-390.png"]
+  },
+  "N1": {
+    "answer": "12 companies: 1 in diligence; 7 connected; 3 interest expressed; 1 waiting for your reply. Your full pipeline is in Relationships. Would you like to open it?",
+    "card": "Where this lives / Relationships / Open pipeline / Stay here",
+    "stayHere1440": { "cardAfter": 0, "urlBefore": "/home?c=1154d84e…", "urlAfter": "/home?c=1154d84e… (unchanged)", "pass": true },
+    "openPipeline390": { "urlAfter": "/relationships?view=pipeline", "heading": "Investment Hub, Pipeline tab", "dockConversation": "dock opened on the pipeline page shows the same question, answer and offer", "pass": true },
+    "observation": "The settled state is per device. In a fresh browser context the reopened conversation shows the offer card again (by design: settledOnDevice + offerAnsweredLater).",
+    "verdict": "PASS",
+    "screenshots": ["N1-stay-before-1440.png", "N1-stay-after-1440.png", "N1-open-before-390.png", "N1-open-after-390.png", "N1-open-dock-390.png"]
+  },
+  "N2": { "verdict": "NOT RUN", "reason": "8-turn budget fully used by A2 (4), A4 (2) and N1 (2); the harness crashes sent each intended question once and wasted no turns" },
+  "qSpeechRequests": 0
+}
