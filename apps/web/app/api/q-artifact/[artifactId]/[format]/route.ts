@@ -72,6 +72,46 @@ function plain(status: number, message: string): NextResponse {
 }
 
 /**
+ * Acceptance 2026-11-04 J7: a document link opened in the browser itself
+ * (a download link, a pasted address) showed the refusal as raw JSON. A
+ * navigation is answered with a page: the app's own not-found page for a
+ * document that isn't there or isn't theirs (one page for both, so it
+ * never says which), and the sentence as plain text for anything else.
+ * Script reads (fetch) keep the JSON sentence they show in place.
+ */
+const DOCUMENT_UNAVAILABLE_PATH = "/documents/unavailable";
+
+function navigating(request: NextRequest): boolean {
+  return (
+    request.headers.get("sec-fetch-dest") === "document" ||
+    request.headers.get("sec-fetch-mode") === "navigate"
+  );
+}
+
+function refuse(
+  request: NextRequest,
+  status: number,
+  message: string,
+): NextResponse {
+  if (!navigating(request)) return plain(status, message);
+  if (status === 401 || status === 404) {
+    const response = NextResponse.redirect(
+      new URL(DOCUMENT_UNAVAILABLE_PATH, request.url),
+      303,
+    );
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+  return new NextResponse(message, {
+    status,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+/**
  * Which of the two refusals a 409 is, as a sentence this person can act on
  * (BIZ-001). "That document has no slides" was the only 409 sentence, and
  * it was what a founder read when they asked for a PDF of their brief.
@@ -130,17 +170,25 @@ export async function GET(
 ): Promise<NextResponse | Response> {
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return plain(503, "Q isn't available right now. Try again later.");
+    return refuse(
+      request,
+      503,
+      "Q isn't available right now. Try again later.",
+    );
   }
 
   const { artifactId, format } = await context.params;
   if (!UUID.test(artifactId) || !isFormat(format)) {
-    return plain(404, "I couldn't find that document.");
+    return refuse(request, 404, "I couldn't find that document.");
   }
 
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return plain(401, "Your session ended. Sign in again to continue.");
+    return refuse(
+      request,
+      401,
+      "Your session ended. Sign in again to continue.",
+    );
   }
 
   const version = versionOf(request);
@@ -157,22 +205,26 @@ export async function GET(
       signal: request.signal,
     });
   } catch {
-    return plain(502, "I lost the connection to Q. Try again.");
+    return refuse(request, 502, "I lost the connection to Q. Try again.");
   }
 
   if (!upstream.ok || upstream.body === null) {
     // The upstream problem document describes the Q API to an operator,
     // not to this person. One plain sentence per class.
     if (upstream.status === 401 || upstream.status === 403) {
-      return plain(401, "Your session ended. Sign in again to continue.");
+      return refuse(
+        request,
+        401,
+        "Your session ended. Sign in again to continue.",
+      );
     }
     if (upstream.status === 404) {
-      return plain(404, "I couldn't find that document.");
+      return refuse(request, 404, "I couldn't find that document.");
     }
     if (upstream.status === 409) {
-      return plain(409, await refusalSentence(upstream, format));
+      return refuse(request, 409, await refusalSentence(upstream, format));
     }
-    return plain(502, "I couldn't prepare that file. Try again.");
+    return refuse(request, 502, "I couldn't prepare that file. Try again.");
   }
 
   const disposition = upstream.headers.get("content-disposition");

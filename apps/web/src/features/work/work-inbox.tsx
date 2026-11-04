@@ -43,6 +43,10 @@ import {
 } from "@/features/q/actions";
 import { QControl } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
+import {
+  useRunningPlanStream,
+  WorkProgressList,
+} from "@/features/q/work-progress-view";
 import { CrmSheet, QRing, useCrmToast } from "@/features/relationships/crm-kit";
 import { useT } from "@/features/i18n/language";
 
@@ -293,6 +297,9 @@ export function WorkInbox({
   const [stopped, setStopped] = useState<ReadonlySet<string>>(new Set());
   const [allDone, setAllDone] = useState(false);
   const tasks = jobsInProgress(jobs, now);
+  // J4: the conversation's plan, while it runs, is moving work too.
+  const runningPlan = useRunningPlanStream();
+  const planRunning = runningPlan !== null;
   const rows: readonly Row[] = useMemo(
     () => [
       ...needs,
@@ -518,18 +525,26 @@ export function WorkInbox({
                   >
                     {t("Q’s work couldn’t load. Try again in a moment.")}
                   </p>
-                ) : rows.some(
+                ) : planRunning ||
+                  rows.some(
                     (row) => row.kind === "RUNNING" || row.kind === "JOB",
                   ) ? (
                   <QControl
                     id="list.work-jobs"
                     kind="LIST"
                     count={
+                      (planRunning ? 1 : 0) +
                       rows.filter(
                         (row) => row.kind === "RUNNING" || row.kind === "JOB",
                       ).length
                     }
                   >
+                    {runningPlan === null ? null : (
+                      <WorkProgressList
+                        streams={[runningPlan]}
+                        className="px-2.5 py-1"
+                      />
+                    )}
                     {rows.flatMap((row) =>
                       row.kind === "RUNNING"
                         ? [

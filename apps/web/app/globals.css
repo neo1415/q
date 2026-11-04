@@ -4304,7 +4304,12 @@
       pointer-events: none;
     }
   }
-  .cq-splash[data-theme="light"] {
+  /* Acceptance 2026-11-04 (visual after/): the splash is painted before
+     React sets its own data-theme, so a light-theme person saw the
+     charcoal backdrop first. The boot script's choice on <html> (or the
+     device's, when none) decides from the first paint. */
+  .cq-splash[data-theme="light"],
+  :root[data-theme="light"] .cq-splash {
     --cq-splash-bg: #ffffff;
     --cq-splash-ink: #0d0d0d;
     --cq-splash-muted: #666666;
@@ -4319,7 +4324,8 @@
     --cq-splash-glow: 138, 106, 18;
   }
   @media (prefers-color-scheme: light) {
-    .cq-splash[data-theme="system"] {
+    .cq-splash[data-theme="system"],
+    :root:not([data-theme]) .cq-splash:not([data-theme="dark"]) {
       --cq-splash-bg: #ffffff;
       --cq-splash-ink: #0d0d0d;
       --cq-splash-muted: #666666;
