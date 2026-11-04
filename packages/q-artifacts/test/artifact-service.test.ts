@@ -25,6 +25,7 @@ import {
   nextVersion,
   parseContent,
   type ArtifactRepository,
+  type ArtifactSourceRef,
   type ComposedArtifact,
   type StoredArtifact,
   type StoredArtifactVersion,
@@ -615,7 +616,7 @@ describe("SEC-01 · a colleague, or a reader whose access ended", () => {
     ).rejects.toBeInstanceOf(ArtifactNotFoundError);
   });
 
-  it("an entitlement check that fails closes the artifact, never opens it", async () => {
+  it("an entitlement check that fails closes the artifact, never opens it, for its subject", async () => {
     const { repository } = inMemoryRepository();
     const subject = createArtifactService({
       repository,
@@ -626,5 +627,304 @@ describe("SEC-01 · a colleague, or a reader whose access ended", () => {
     await expect(
       subject.read(ACTOR, mine.artifact.artifactId),
     ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+  });
+});
+
+describe("SEC-01 · an artifact closes with the documents it was built from", () => {
+  const DATA_ROOM_DOC = "aa000000-0000-4000-8000-000000000001";
+  const RETRIEVED_DOC = "aa000000-0000-4000-8000-000000000002";
+  const LATER_DOC = "aa000000-0000-4000-8000-000000000003";
+
+  /** The in-memory tables, plus artifact_sources. */
+  function withSources() {
+    const base = inMemoryRepository();
+    const sources = new Map<string, ArtifactSourceRef[]>();
+    let failReads = false;
+    const repository: ArtifactRepository = {
+      ...base.repository,
+      recordSources: (_tx, input) => {
+        const list = sources.get(input.artifactId) ?? [];
+        for (const source of input.sources) {
+          if (
+            !list.some(
+              (one) => one.kind === source.kind && one.id === source.id,
+            )
+          ) {
+            list.push(source);
+          }
+        }
+        sources.set(input.artifactId, list);
+        return Promise.resolve();
+      },
+      sourcesOf: (_actor, ids) =>
+        failReads
+          ? Promise.reject(new Error("database down"))
+          : Promise.resolve(
+              new Map(
+                ids.flatMap((id) => {
+                  const list = sources.get(id);
+                  return list === undefined ? [] : [[id, list] as const];
+                }),
+              ),
+            ),
+    };
+    return {
+      repository,
+      sources,
+      failSourceReads: () => {
+        failReads = true;
+      },
+    };
+  }
+
+  /** The data room's current answer per document, asked as the actor. */
+  function grants(open: Set<string>) {
+    const asked: string[][] = [];
+    return {
+      asked,
+      check: (actor: ActorContext, refs: readonly ArtifactSourceRef[]) => {
+        expect(actor.userId).toBe(ACTOR.userId);
+        asked.push(refs.map((ref) => ref.id));
+        return Promise.resolve(refs.every((ref) => open.has(ref.id)));
+      },
+    };
+  }
+
+  const built = [
+    { kind: "data_room_document" as const, id: DATA_ROOM_DOC },
+    { kind: "retrieved_document" as const, id: RETRIEVED_DOC },
+  ];
+
+  it("records the sources at creation, once each", async () => {
+    const { repository, sources } = withSources();
+    const open = new Set([DATA_ROOM_DOC, RETRIEVED_DOC]);
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      sourceEntitlement: grants(open).check,
+    });
+    const mine = await subject.prepareArtifact(
+      prepareInput({
+        sources: [...built, { kind: "data_room_document", id: DATA_ROOM_DOC }],
+      }),
+    );
+    expect(sources.get(mine.artifact.artifactId)).toEqual(built);
+  });
+
+  it("still granted: readable on every path", async () => {
+    const { repository } = withSources();
+    const open = new Set([DATA_ROOM_DOC, RETRIEVED_DOC]);
+    const access = grants(open);
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      sourceEntitlement: access.check,
+    });
+    const mine = await subject.prepareArtifact(
+      prepareInput({ sources: built }),
+    );
+    const id = mine.artifact.artifactId;
+    expect((await subject.read(ACTOR, id)).artifact.artifactId).toBe(id);
+    expect((await subject.readVersion(ACTOR, id, 1)).current?.version).toBe(1);
+    expect((await subject.summarise(ACTOR, id)).artifactId).toBe(id);
+    expect((await subject.list(ACTOR, { limit: 20 })).items).toHaveLength(1);
+    expect(access.asked).toContainEqual([DATA_ROOM_DOC, RETRIEVED_DOC]);
+  });
+
+  it("a revoked data-room grant hides it from read, version, list, export, revise and edit", async () => {
+    const { repository } = withSources();
+    const open = new Set([DATA_ROOM_DOC, RETRIEVED_DOC]);
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      // The subject itself is still reachable: only the document closed.
+      entitlement: () => Promise.resolve(true),
+      sourceEntitlement: grants(open).check,
+    });
+    const mine = await subject.prepareArtifact(
+      prepareInput({ sources: built }),
+    );
+    const id = mine.artifact.artifactId;
+
+    open.delete(DATA_ROOM_DOC);
+
+    await expect(subject.read(ACTOR, id)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    // Export renders a version read through readVersion.
+    await expect(subject.readVersion(ACTOR, id, 1)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    await expect(subject.summarise(ACTOR, id)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+    expect(await subject.list(ACTOR, { limit: 20 })).toEqual({ items: [] });
+    await expect(
+      subject.reviseArtifact({
+        actorContext: ACTOR,
+        permittedContextPlan: plan(),
+        qRunId: RUN,
+        artifactId: id,
+        instruction: "shorter",
+        content: composed("Shorter."),
+      }),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+    let composedAnything = false;
+    await expect(
+      subject.editOwnDocument({
+        actorContext: ACTOR,
+        artifactId: id,
+        baseVersion: 1,
+        instruction: "shorter",
+        runId: null,
+        compose: () => {
+          composedAnything = true;
+          return composed("Edited.");
+        },
+      }),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+    expect(composedAnything).toBe(false);
+
+    // Granted again: it opens again. Nothing was deleted.
+    open.add(DATA_ROOM_DOC);
+    expect((await subject.read(ACTOR, id)).artifact.artifactId).toBe(id);
+  });
+
+  it("a list hides only the artifact built from the revoked document, and keeps its cursor", async () => {
+    const { repository } = withSources();
+    const open = new Set([DATA_ROOM_DOC, RETRIEVED_DOC]);
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      sourceEntitlement: grants(open).check,
+    });
+    const legacy = await subject.prepareArtifact(prepareInput());
+    const fromRoom = await subject.prepareArtifact(
+      prepareInput({
+        sources: [{ kind: "data_room_document", id: DATA_ROOM_DOC }],
+      }),
+    );
+    open.delete(DATA_ROOM_DOC);
+    const page = await subject.list(ACTOR, { limit: 20 });
+    expect(page.items.map((item) => item.artifactId)).toEqual([
+      legacy.artifact.artifactId,
+    ]);
+    expect(page.items.map((item) => item.artifactId)).not.toContain(
+      fromRoom.artifact.artifactId,
+    );
+  });
+
+  it("a source check that throws hides it", async () => {
+    const { repository } = withSources();
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      sourceEntitlement: () => Promise.reject(new Error("data room down")),
+    });
+    const mine = await subject.prepareArtifact(
+      prepareInput({ sources: built }),
+    );
+    await expect(
+      subject.read(ACTOR, mine.artifact.artifactId),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+    expect(await subject.list(ACTOR, { limit: 20 })).toEqual({ items: [] });
+  });
+
+  it("sources that cannot be read hide it", async () => {
+    const { repository, failSourceReads } = withSources();
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      sourceEntitlement: () => Promise.resolve(true),
+    });
+    const mine = await subject.prepareArtifact(
+      prepareInput({ sources: built }),
+    );
+    failSourceReads();
+    await expect(
+      subject.read(ACTOR, mine.artifact.artifactId),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+    expect(await subject.list(ACTOR, { limit: 20 })).toEqual({ items: [] });
+  });
+
+  it("recorded sources with no check wired hide it: a missing check never opens", async () => {
+    const { repository } = withSources();
+    const subject = createArtifactService({ repository, transactions });
+    const mine = await subject.prepareArtifact(
+      prepareInput({ sources: built }),
+    );
+    await expect(
+      subject.read(ACTOR, mine.artifact.artifactId),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+  });
+
+  it("an artifact with no recorded sources keeps the subject-only rule", async () => {
+    const { repository } = withSources();
+    const access = grants(new Set());
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      entitlement: () => Promise.resolve(true),
+      sourceEntitlement: access.check,
+    });
+    const legacy = await subject.prepareArtifact(prepareInput());
+    const id = legacy.artifact.artifactId;
+    expect((await subject.read(ACTOR, id)).artifact.artifactId).toBe(id);
+    expect((await subject.list(ACTOR, { limit: 20 })).items).toHaveLength(1);
+    // No source was asked about, because there is none.
+    expect(access.asked).toEqual([]);
+  });
+
+  it("a revision that read a new document records it before its version, and closes with it", async () => {
+    const { repository, sources } = withSources();
+    const open = new Set([DATA_ROOM_DOC, LATER_DOC]);
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      sourceEntitlement: grants(open).check,
+    });
+    const mine = await subject.prepareArtifact(
+      prepareInput({
+        sources: [{ kind: "data_room_document", id: DATA_ROOM_DOC }],
+      }),
+    );
+    const id = mine.artifact.artifactId;
+    await subject.reviseArtifact({
+      actorContext: ACTOR,
+      permittedContextPlan: plan(),
+      qRunId: RUN,
+      artifactId: id,
+      instruction: "add the new figures",
+      content: composed("With the new figures."),
+      sources: [{ kind: "retrieved_document", id: LATER_DOC }],
+    });
+    expect(sources.get(id)).toEqual([
+      { kind: "data_room_document", id: DATA_ROOM_DOC },
+      { kind: "retrieved_document", id: LATER_DOC },
+    ]);
+    open.delete(LATER_DOC);
+    // V1 did not use the later document, but the artifact as a whole did:
+    // it closes, every version with it.
+    await expect(subject.readVersion(ACTOR, id, 1)).rejects.toBeInstanceOf(
+      ArtifactNotFoundError,
+    );
+  });
+
+  it("refuses to file sources into a repository that cannot record them", async () => {
+    const { repository, artifacts } = inMemoryRepository();
+    await expect(
+      service(repository).prepareArtifact(prepareInput({ sources: built })),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    // Refused before anything was written.
+    expect(artifacts.size).toBe(0);
+  });
+
+  it("refuses a source that is not a typed document reference", async () => {
+    const { repository } = withSources();
+    await expect(
+      service(repository).prepareArtifact(
+        prepareInput({ sources: [{ kind: "web_page", id: "not-a-uuid" }] }),
+      ),
+    ).rejects.toThrow();
   });
 });

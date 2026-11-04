@@ -1,4 +1,7 @@
-import type { TransactionManager } from "@capital-q/database";
+import type {
+  TransactionContext,
+  TransactionManager,
+} from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import type {
@@ -19,10 +22,12 @@ import {
   type StoredArtifact,
   type StoredArtifactVersion,
 } from "../domain/artifact.js";
-import type {
-  ArtifactRepository,
-  ComposedArtifact,
-  WorkforceDocumentBinding,
+import {
+  ARTIFACT_SOURCE_KINDS,
+  type ArtifactRepository,
+  type ArtifactSourceRef,
+  type ComposedArtifact,
+  type WorkforceDocumentBinding,
 } from "./ports.js";
 import { z } from "zod";
 import {
@@ -127,6 +132,13 @@ export type PrepareArtifactInput = {
   /** Already composed, under that plan, by something that cannot write. */
   readonly content: ComposedArtifact;
   /**
+   * SEC-01: the source documents the content was composed from, as the run
+   * read them. Recorded with the artifact, before any version exists, and
+   * re-checked for the reader on every read. Absent or empty: the artifact
+   * is re-checked against its subject only, as before.
+   */
+  readonly sources?: readonly ArtifactSourceRef[] | undefined;
+  /**
    * A workforce step's document: filed at most once per (job, step). A
    * retry after a crash finds the one already filed and writes nothing.
    */
@@ -141,6 +153,8 @@ export type ReviseArtifactInput = {
   /** The person's own words for what should change. */
   readonly instruction: string;
   readonly content: ComposedArtifact;
+  /** SEC-01: sources this revision read beyond what the artifact already had. */
+  readonly sources?: readonly ArtifactSourceRef[] | undefined;
 };
 
 export type ArtifactService = {
@@ -273,6 +287,38 @@ const WorkforceDocumentBindingSchema = z
   })
   .strict();
 
+/** A V1 bound on one artifact's recorded sources, per write. */
+const ARTIFACT_SOURCES_MAX = 200;
+
+const ArtifactSourcesSchema = z
+  .array(
+    z
+      .object({
+        kind: z.enum(ARTIFACT_SOURCE_KINDS),
+        id: z.string().uuid(),
+      })
+      .strict(),
+  )
+  .max(ARTIFACT_SOURCES_MAX);
+
+/** Validated, lower-cased and de-duplicated; order kept. */
+function sourcesFrom(
+  sources: readonly ArtifactSourceRef[] | undefined,
+): readonly ArtifactSourceRef[] {
+  if (sources === undefined) return [];
+  const parsed = ArtifactSourcesSchema.parse(sources);
+  const seen = new Set<string>();
+  const out: ArtifactSourceRef[] = [];
+  for (const source of parsed) {
+    const ref = { kind: source.kind, id: source.id.toLowerCase() };
+    const key = `${ref.kind}:${ref.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(ref);
+  }
+  return out;
+}
+
 function sameSubject(a: QSubjectRef, b: QSubjectRef): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -295,6 +341,21 @@ export function createArtifactService(dependencies: {
    */
   readonly entitlement?:
     | ((actor: ActorContext, subject: QSubjectRef) => Promise<boolean>)
+    | undefined;
+  /**
+   * SEC-01: whether this actor may still open EVERY one of these recorded
+   * source documents now (a data-room grant revoked, a document archived),
+   * asked at every read of an artifact that has recorded sources. Derived
+   * intelligence inherits the sensitivity of what it was built from, so
+   * one closed source closes the artifact; a refusal or an error closes
+   * it. Absent while an artifact has recorded sources: it is closed, never
+   * opened by a missing check.
+   */
+  readonly sourceEntitlement?:
+    | ((
+        actor: ActorContext,
+        sources: readonly ArtifactSourceRef[],
+      ) => Promise<boolean>)
     | undefined;
 }): ArtifactService {
   const { transactions } = dependencies;
@@ -343,23 +404,94 @@ export function createArtifactService(dependencies: {
           }
         : undefined;
 
-  /** The current source entitlement, re-asked now; fail closed. */
-  const stillEntitled = async (
+  /**
+   * The recorded sources of these artifacts, or null when they could not be
+   * read (which closes every one of them). A repository that records no
+   * sources has none to read: every artifact keeps the subject-only rule.
+   */
+  const sourcesFor = async (
+    actor: ActorContext,
+    artifactIds: readonly string[],
+  ): Promise<ReadonlyMap<string, readonly ArtifactSourceRef[]> | null> => {
+    const read = store.sourcesOf;
+    if (read === undefined || artifactIds.length === 0) return new Map();
+    try {
+      return await read(actor, artifactIds);
+    } catch (error: unknown) {
+      dependencies.logger?.warn(
+        { err: error, artifacts: artifactIds.length },
+        "artifact sources could not be read; not shown",
+      );
+      return null;
+    }
+  };
+
+  /** Every recorded source still open to this actor, asked now; fail closed. */
+  const sourcesStillOpen = async (
     actor: ActorContext,
     artifact: StoredArtifact,
+    sources: readonly ArtifactSourceRef[],
   ): Promise<boolean> => {
-    const check = dependencies.entitlement;
-    const subject = subjectOf(artifact);
-    if (check === undefined || subject === undefined) return true;
+    if (sources.length === 0) return true;
+    const check = dependencies.sourceEntitlement;
+    if (check === undefined) return false;
     try {
-      return await check(actor, subject);
+      return (await check(actor, sources)) === true;
     } catch (error: unknown) {
       dependencies.logger?.warn(
         { err: error, artifactId: artifact.id },
-        "artifact subject entitlement could not be checked; not shown",
+        "artifact source entitlement could not be checked; not shown",
       );
       return false;
     }
+  };
+
+  /**
+   * The current entitlement, re-asked now: its subject, then every source
+   * it was composed from. Fail closed. `known` is the page's sources when
+   * the caller already read them in one query (null: they could not be).
+   */
+  const stillEntitled = async (
+    actor: ActorContext,
+    artifact: StoredArtifact,
+    known?: ReadonlyMap<string, readonly ArtifactSourceRef[]> | null,
+  ): Promise<boolean> => {
+    const check = dependencies.entitlement;
+    const subject = subjectOf(artifact);
+    if (check !== undefined && subject !== undefined) {
+      try {
+        if (!(await check(actor, subject))) return false;
+      } catch (error: unknown) {
+        dependencies.logger?.warn(
+          { err: error, artifactId: artifact.id },
+          "artifact subject entitlement could not be checked; not shown",
+        );
+        return false;
+      }
+    }
+    const sources =
+      known === undefined ? await sourcesFor(actor, [artifact.id]) : known;
+    if (sources === null) return false;
+    return sourcesStillOpen(actor, artifact, sources.get(artifact.id) ?? []);
+  };
+
+  /**
+   * Record sources in the caller's transaction. A repository that cannot
+   * record them is refused rather than handed an artifact whose provenance
+   * would be lost: a lost source is one that is never re-checked.
+   */
+  const recordSources = async (
+    tx: TransactionContext,
+    artifact: StoredArtifact,
+    sources: readonly ArtifactSourceRef[],
+  ): Promise<void> => {
+    if (sources.length === 0) return;
+    if (store.recordSources === undefined) throw new ArtifactAuthorityError();
+    await store.recordSources(tx, {
+      tenantId: artifact.tenantId,
+      artifactId: artifact.id,
+      sources,
+    });
   };
 
   /** An artifact this actor may read now, or null: "not found" either way. */
@@ -538,11 +670,22 @@ export function createArtifactService(dependencies: {
         input.workforce === undefined
           ? undefined
           : WorkforceDocumentBindingSchema.parse(input.workforce);
-      const claimed = await transactions.run(async (tx) =>
-        binding === undefined
-          ? { artifact: await repository.create(tx, fields), created: true }
-          : await repository.createForWorkforce?.(tx, fields, binding),
-      );
+      const sources = sourcesFrom(input.sources);
+      if (sources.length > 0 && store.recordSources === undefined) {
+        throw new ArtifactAuthorityError();
+      }
+      const claimed = await transactions.run(async (tx) => {
+        const made =
+          binding === undefined
+            ? { artifact: await repository.create(tx, fields), created: true }
+            : await repository.createForWorkforce?.(tx, fields, binding);
+        // With the row, before any version: content never exists without
+        // the provenance that is re-checked when it is read.
+        if (made !== undefined && made !== null) {
+          await recordSources(tx, made.artifact, sources);
+        }
+        return made;
+      });
       // A conflicting replay, wrong owner or unsupported repository never
       // falls back to filing a second document.
       if (claimed === undefined || claimed === null)
@@ -637,6 +780,12 @@ export function createArtifactService(dependencies: {
       if (!canRevise(artifact)) {
         throw new ArtifactNotRevisableError();
       }
+      // New material this revision read is recorded before the version
+      // that uses it, so that version is never readable unchecked.
+      const sources = sourcesFrom(input.sources);
+      if (sources.length > 0) {
+        await transactions.run((tx) => recordSources(tx, artifact, sources));
+      }
       await append({
         actor: input.actorContext,
         artifact,
@@ -663,6 +812,10 @@ export function createArtifactService(dependencies: {
         input.workforce === undefined
           ? undefined
           : WorkforceDocumentBindingSchema.parse(input.workforce);
+      const sources = sourcesFrom(input.sources);
+      if (sources.length > 0 && store.recordSources === undefined) {
+        throw new ArtifactAuthorityError();
+      }
       const jobInput = DocumentJobInputSchema.parse({
         ...input.job,
         title: input.content.title,
@@ -700,6 +853,7 @@ export function createArtifactService(dependencies: {
         if (claimed === undefined || claimed === null)
           throw new ArtifactAuthorityError();
         const created = claimed.artifact;
+        await recordSources(tx, created, sources);
         if (!claimed.created) return created;
         await jobs.enqueue(tx, {
           tenantId: input.actorContext.tenantId,
@@ -836,9 +990,14 @@ export function createArtifactService(dependencies: {
       });
       const page = rows.slice(0, query.limit);
       // Entitlement is re-asked per row; the cursor stays the unfiltered
-      // page's, so a hidden row never ends the list early.
+      // page's, so a hidden row never ends the list early. The page's
+      // recorded sources are read in one query.
+      const known = await sourcesFor(
+        actor,
+        page.map((artifact) => artifact.id),
+      );
       const entitled = await Promise.all(
-        page.map((artifact) => stillEntitled(actor, artifact)),
+        page.map((artifact) => stillEntitled(actor, artifact, known)),
       );
       const shown = page.filter((_, index) => entitled[index] === true);
       const items = await Promise.all(

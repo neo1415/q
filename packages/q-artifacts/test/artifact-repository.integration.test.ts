@@ -352,6 +352,71 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
     });
   });
 
+  it("SEC-01: records an artifact's sources once each, reads them only within its tenant", async () => {
+    await rolledBack(async (tx) => {
+      const repository = createPostgresArtifactRepository({ sql: tx.sql });
+      const mine = await createParty(tx, `sources-${randomUUID().slice(0, 8)}`);
+      const stranger = await createParty(
+        tx,
+        `sources-other-${randomUUID().slice(0, 8)}`,
+      );
+      const artifact = await repository.create(tx, {
+        tenantId: mine.tenantId,
+        organisationId: mine.organisationId,
+        type: "INVESTMENT_BRIEF",
+        companyId: null,
+        investorOrganisationId: null,
+        createdByUserId: mine.userId,
+      });
+      const legacy = await repository.create(tx, {
+        tenantId: mine.tenantId,
+        organisationId: mine.organisationId,
+        type: "INVESTMENT_BRIEF",
+        companyId: null,
+        investorOrganisationId: null,
+        createdByUserId: mine.userId,
+      });
+      const room = randomUUID();
+      const retrieved = randomUUID();
+      const sources = [
+        { kind: "data_room_document" as const, id: room },
+        { kind: "retrieved_document" as const, id: retrieved },
+      ];
+      await repository.recordSources?.(tx, {
+        tenantId: mine.tenantId,
+        artifactId: artifact.id,
+        sources,
+      });
+      // Again, as a revision that re-read them would: still one row each.
+      await repository.recordSources?.(tx, {
+        tenantId: mine.tenantId,
+        artifactId: artifact.id,
+        sources,
+      });
+
+      const read = await repository.sourcesOf?.(mine.actor, [
+        artifact.id,
+        legacy.id,
+      ]);
+      expect(read?.get(artifact.id)).toEqual(sources);
+      // An artifact composed before sources were recorded has none.
+      expect(read?.get(legacy.id) ?? []).toEqual([]);
+      // Another tenant selects nothing.
+      expect(
+        (await repository.sourcesOf?.(stranger.actor, [artifact.id]))?.size,
+      ).toBe(0);
+
+      // The composite key: a source cannot be filed under another tenant.
+      await expect(
+        tx.sql.savepoint(
+          (sp) => sp`insert into artifacts.artifact_sources
+            (tenant_id, artifact_id, source_kind, source_id)
+            values (${stranger.tenantId}, ${artifact.id}, 'retrieved_document', ${randomUUID()})`,
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
   it("stores and returns the content through the public contract, gaps and all", async () => {
     await rolledBack(async (tx) => {
       const repository = createPostgresArtifactRepository({ sql: tx.sql });

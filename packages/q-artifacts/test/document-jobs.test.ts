@@ -280,6 +280,51 @@ describe("documents made by a job", () => {
     );
   });
 
+  it("SEC-01: a job's document records its sources with the row, before the worker writes", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const recorded: unknown[] = [];
+    const DOC = "aa000000-0000-4000-8000-000000000001";
+    const svc = createArtifactService({
+      repository: {
+        ...repository,
+        recordSources: (_tx, input) => {
+          // The job is not queued yet: provenance lands first.
+          recorded.push({ queued: jobs.queued.length, ...input });
+          return Promise.resolve();
+        },
+      },
+      transactions,
+      jobs: jobs.repository,
+    });
+    const made = await svc.requestDocument({
+      ...request(),
+      sources: [{ kind: "data_room_document", id: DOC }],
+    });
+    expect(recorded).toEqual([
+      {
+        queued: 0,
+        tenantId: ACTOR.tenantId,
+        artifactId: made.artifact.artifactId,
+        sources: [{ kind: "data_room_document", id: DOC }],
+      },
+    ]);
+    expect(jobs.queued).toHaveLength(1);
+    // Without a repository that can record them, nothing is queued at all.
+    const bare = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await expect(
+      bare.requestDocument({
+        ...request(),
+        sources: [{ kind: "data_room_document", id: DOC }],
+      }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    expect(jobs.queued).toHaveLength(1);
+  });
+
   it("an authorized resume finds the existing identity before recomposition and hides strangers", async () => {
     const { repository } = memory();
     const jobs = queue();

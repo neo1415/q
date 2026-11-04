@@ -24,10 +24,13 @@ export {
   type StoredArtifactVersion,
 } from "./domain/artifact.js";
 
-export type {
-  ArtifactRepository,
-  ComposedArtifact,
-  WorkforceDocumentBinding,
+export {
+  ARTIFACT_SOURCE_KINDS,
+  type ArtifactRepository,
+  type ArtifactSourceKind,
+  type ArtifactSourceRef,
+  type ComposedArtifact,
+  type WorkforceDocumentBinding,
 } from "./application/ports.js";
 
 export {

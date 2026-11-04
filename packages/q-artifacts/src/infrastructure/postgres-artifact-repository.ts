@@ -9,7 +9,11 @@ import type {
   StoredArtifact,
   StoredArtifactVersion,
 } from "../domain/artifact.js";
-import type { ArtifactRepository } from "../application/ports.js";
+import {
+  ARTIFACT_SOURCE_KINDS,
+  type ArtifactRepository,
+  type ArtifactSourceRef,
+} from "../application/ports.js";
 
 /**
  * The two artifact tables behind their port.
@@ -84,6 +88,12 @@ const VersionRow = z.object({
   composed_by_run_id: z.string().uuid().nullable(),
   created_by_user_id: z.string().uuid(),
   created_at: z.unknown(),
+});
+
+const SourceRow = z.object({
+  artifact_id: z.string().uuid(),
+  source_kind: z.enum(ARTIFACT_SOURCE_KINDS),
+  source_id: z.string().uuid(),
 });
 
 function toVersionRow(row: unknown): StoredArtifactVersion {
@@ -261,6 +271,47 @@ export function createPostgresArtifactRepository(options: {
          limit 1
       `;
       return rows.length === 0 ? null : toVersionRow(rows[0]);
+    },
+
+    recordSources: async (tx, input) => {
+      if (input.sources.length === 0) return;
+      const kinds = input.sources.map((source) => source.kind);
+      const ids = input.sources.map((source) => source.id);
+      // The composite key ties each row to the artifact's own tenant; a
+      // source recorded twice is the one row it already is.
+      await tx.sql`
+        insert into artifacts.artifact_sources
+          (tenant_id, artifact_id, source_kind, source_id)
+        select ${input.tenantId}::uuid, ${input.artifactId}::uuid, s.kind, s.id
+          from unnest(${kinds}::text[], ${ids}::uuid[])
+               as s(kind, id)
+        on conflict (artifact_id, source_kind, source_id) do nothing
+      `;
+    },
+
+    sourcesOf: async (actor, artifactIds) => {
+      const found = new Map<string, ArtifactSourceRef[]>();
+      if (artifactIds.length === 0) return found;
+      // Scoped by the artifact's tenant through the join, not by the source
+      // row's own column: the composite key makes them equal, and a read
+      // that could miss a source would be a read that opens an artifact.
+      const rows = await sql`
+        select s.artifact_id, s.source_kind, s.source_id
+          from artifacts.artifact_sources s
+          join artifacts.artifacts a on a.id = s.artifact_id
+         where a.tenant_id = ${actor.tenantId}
+           and s.artifact_id = any(${artifactIds as string[]}::uuid[])
+         order by s.created_at, s.id
+      `;
+      for (const row of rows) {
+        // An unknown kind throws: a source this code cannot check is one
+        // that closes the artifact, never one that is skipped.
+        const r = SourceRow.parse(row);
+        const list = found.get(r.artifact_id) ?? [];
+        list.push({ kind: r.source_kind, id: r.source_id });
+        found.set(r.artifact_id, list);
+      }
+      return found;
     },
 
     history: async (actor, artifactId) => {
