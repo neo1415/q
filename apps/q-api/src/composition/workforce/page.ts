@@ -192,6 +192,19 @@ function integrityOf(value: unknown) {
   return parsed.success ? parsed.data : [];
 }
 
+/**
+ * live8 (2026-11-05): a job filed to carry out one step of a situation
+ * plan (plans.ts enqueueStepJob: its work row names the plan it is a
+ * step of). The plan's own job carries no such link.
+ */
+export function isPlanStepJob(work: WorkRow | undefined): boolean {
+  return (
+    work !== undefined &&
+    isUuid(work.trace.planId) &&
+    !isPlanJobPayload(work.plan)
+  );
+}
+
 /** live7: an approved or running situation plan, as the page lists it. */
 export type RunningPlan = {
   readonly goal: string;
@@ -451,9 +464,19 @@ export function createWorkforcePage(dependencies: {
         items: (
           await withRunningPlans(
             owner,
-            shown.map((row) =>
-              summary(row, row, usd(byJob.get(row.id) ?? 0), work.get(row.id)),
-            ),
+            shown
+              // live8: a job that carries out a plan's step is part of that
+              // plan's row (its steps, with their live state), never a row
+              // of its own beside it.
+              .filter((row) => !isPlanStepJob(work.get(row.id)))
+              .map((row) =>
+                summary(
+                  row,
+                  row,
+                  usd(byJob.get(row.id) ?? 0),
+                  work.get(row.id),
+                ),
+              ),
             work,
           )
         ).map((one) => one.job),

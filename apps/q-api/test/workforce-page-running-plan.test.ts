@@ -122,3 +122,69 @@ describe("a plan job whose plan runs is moving work (live5/live7)", () => {
     expect(asked).toEqual([]);
   });
 });
+
+describe("live8: a plan's step jobs are inside its row, never rows of their own", () => {
+  it("lists the plan once and a job of no plan on its own; its step jobs not at all", async () => {
+    const store = createInMemoryWorkforceStore();
+    const file = (id: string, goal: string) =>
+      store.ensureJob(owner, {
+        source: { kind: "JOB", id },
+        goal,
+        budgetUsd: 0.5,
+        threshold: 80,
+        maxRedrafts: 2,
+        rubricVersion: "rubric/v1",
+      });
+    const planId = randomUUID();
+    const { job: planJob } = await file(
+      "plan",
+      "Your plan: Check Silo Credit's loan book quality this week",
+    );
+    const { job: research } = await file(
+      `plan-step:${planId}:1:s1`,
+      "Check Silo Credit's loan book quality this week: Research public evidence",
+    );
+    const { job: assess } = await file(
+      `plan-step:${planId}:1:s2`,
+      "Check Silo Credit's loan book quality this week: Assess Silo Credit's loan book",
+    );
+    const { job: alone } = await file("memo", "Research Kestrel Heat");
+    const work = (
+      jobId: string,
+      state: WorkRow["state"],
+      plan: unknown,
+      trace: WorkRow["trace"],
+    ): WorkRow => ({
+      job_id: jobId,
+      tenant_id: owner.tenantId,
+      user_id: owner.userId,
+      state,
+      plan,
+      trace,
+      results: {},
+      attempts: 1,
+      max_attempts: 3,
+      reason: null,
+      created_at: at,
+      updated_at: at,
+      finished_at: null,
+    });
+    const rows = [
+      work(planJob.id, "COMPLETED", { kind: "PLAN" }, {}),
+      work(research.id, "RUNNING", { goal: "Research" }, { planId }),
+      work(assess.id, "QUEUED", { goal: "Assess" }, { planId }),
+      work(alone.id, "RUNNING", { goal: "Memo" }, {}),
+    ];
+    const page = createWorkforcePage({
+      store,
+      work: { forOwner: () => Promise.resolve(rows) },
+      runningPlanOf: (_who, jobId) =>
+        Promise.resolve(jobId === planJob.id ? PLAN : null),
+    });
+    const { items } = await page.list(owner, { limit: 20 });
+    expect(items.map((item) => item.id).sort()).toEqual(
+      [planJob.id, alone.id].sort(),
+    );
+    expect(items.find((item) => item.id === planJob.id)?.goal).toBe(PLAN.goal);
+  });
+});
