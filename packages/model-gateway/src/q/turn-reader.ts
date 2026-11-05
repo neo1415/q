@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV77ResultSchema,
+  TurnReaderV78ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -24,6 +24,7 @@ import {
   type TurnReaderV65Result,
   type TurnReaderV70Result,
   type TurnReaderV77Result,
+  type TurnReaderV78Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -213,6 +214,15 @@ export type QTurnReading = Omit<
    * to the person before anything binds. Absent before v77: none.
    */
   readonly references?: TurnReaderV77Result["references"] | undefined;
+  /**
+   * v78 (Q intelligence step 4): the heaviest work the turn asks of the
+   * answer, read by meaning -- the one source of truth for the answer's
+   * task class and comparison handling. Absent or null: not read; code
+   * takes the neutral default, never a word list.
+   */
+  readonly answerKind?: TurnReaderV78Result["answerKind"] | undefined;
+  /** v78: each separate thing a compound ask wants, in order; absent is one ask. */
+  readonly parts?: TurnReaderV78Result["parts"] | undefined;
   /** v28: a time they asked for, in minutes from now. */
   readonly timeWindow?:
     | { readonly fromMinutes: number | null; readonly toMinutes: number | null }
@@ -402,6 +412,9 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "investmentMemo",
   // v77: malformed references bind nothing, never a lost reading.
   "references",
+  // v78: a malformed kind or part costs itself, never the reading.
+  "answerKind",
+  "parts",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -552,8 +565,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV77Result>> =>
-          gateway.execute<TurnReaderV77Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV78Result>> =>
+          gateway.execute<TurnReaderV78Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -569,7 +582,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV77ResultSchema,
+              schema: TurnReaderV78ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -612,7 +625,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV77ResultSchema.safeParse(
+        const parsed = TurnReaderV78ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         // A comparison is never answered from an earlier turn (lane 4).

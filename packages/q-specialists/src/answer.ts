@@ -7669,7 +7669,7 @@ export function createSpecialistQAnswer(
     // Ledgerfold, and a waiting connection request was turned into an
     // "accept and send a message" card. Asking for work products is never
     // a hand-over of a relationship: the answer path plans that work.
-    const askedForWork = asksForWorkProducts(latest.content);
+    const askedForWork = asksForWorkProducts(read?.parts);
     if (askedForWork && read?.handOver != null) {
       logger?.info(
         { qRunId: request.runId },
@@ -7891,6 +7891,15 @@ export function createSpecialistQAnswer(
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
+      // Q intelligence step 4: what was asked comes from the reading alone
+      // (TURN_READER v78) -- the answer's work and every part of a compound
+      // ask. Unread, neither is sent: the answer takes its neutral default.
+      ...(read?.answerKind === undefined || read.answerKind === null
+        ? {}
+        : { answerKind: read.answerKind }),
+      ...(read?.parts === undefined || read.parts.length < 2
+        ? {}
+        : { askParts: read.parts }),
       // K8: a question about a prepared subject.
       ...(read?.kind === "QUESTION_TO_Q" &&
       read.question?.subject !== undefined &&
@@ -8720,23 +8729,28 @@ function asksAQuestion(text: string): boolean {
   );
 }
 
+/** Work-product kinds of a part (TURN_READER v78): judgement, weighing, a document. */
+const WORK_PRODUCT_KINDS: ReadonlySet<string> = new Set([
+  "ANALYSIS",
+  "COMPARISON",
+  "DOCUMENT",
+]);
+
 /**
- * The words ask Q to produce analysis or documents (research, an
- * assessment, a memo or brief, a critique or revision, diligence
- * questions): two or more distinct kinds of work. Handing a relationship
- * over ("handle Kestrel for me") names none of them.
+ * The reading splits the turn into two or more parts that each ask Q for
+ * work (an assessment, a comparison, a memo, diligence questions): a
+ * request for work products. Handing a relationship over ("handle Kestrel
+ * for me") is one ask and names none of them. Q intelligence step 4: read
+ * from the reader's parts (v78), never from the words; no reading, or an
+ * older one, is no work request (the neutral default).
  */
-export function asksForWorkProducts(text: string): boolean {
-  const said = text.toLowerCase();
-  const kinds = [
-    /\bresearch/u,
-    /\b(assess|assessment|evaluat|analy[sz])/u,
-    /\b(memo|brief|report|one-pager|write-?up)\b/u,
-    /\b(critique|second opinion|review it|revise|revision)/u,
-    /\b(diligence questions|due diligence|questions for the founder|founder questions|diligence)/u,
-    /\b(risks?|missing information|red flags)\b/u,
-  ];
-  return kinds.filter((kind) => kind.test(said)).length >= 2;
+export function asksForWorkProducts(
+  parts: readonly { readonly kind: string }[] | undefined,
+): boolean {
+  return (
+    (parts ?? []).filter((part) => WORK_PRODUCT_KINDS.has(part.kind)).length >=
+    2
+  );
 }
 
 /** Q's own question for their city or time zone. */

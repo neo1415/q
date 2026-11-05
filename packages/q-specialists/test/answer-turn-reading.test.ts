@@ -2695,6 +2695,43 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
 
+  it("step 4: a hand-over the reading splits into work parts is answered, not handed over", async () => {
+    const { value, errands } = port(() => null);
+    const { answer, delegated } = seam({
+      said: "Research Ledgerfold, assess the opportunity and write me a memo",
+      reading: {
+        ...reading("Ledgerfold"),
+        answerKind: "DOCUMENT",
+        parts: [
+          { ask: "Research and assess Ledgerfold", kind: "ANALYSIS" },
+          { ask: "Write a memo on Ledgerfold", kind: "DOCUMENT" },
+        ],
+      } as TurnReaderResult,
+      outcomes: [],
+      handOver: value,
+    });
+    await answer.answer(request());
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(1);
+  });
+
+  it("step 4: work words with a single-ask hand-over reading never block the hand-over", async () => {
+    const { value, asked } = port(() => ({
+      status: "PREPARED",
+      awaitingApprovalOf:
+        "Accept Ledgerfold's connection request and send them your message",
+    }));
+    const { answer, delegated } = seam({
+      said: "handle Ledgerfold for me -- research, assessment, memo, the risks",
+      reading: reading("Ledgerfold"),
+      outcomes: [],
+      handOver: value,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual(["Ledgerfold"]);
+    expect(delegated()).toBe(0);
+  });
+
   it("a founder accepting an investor's waiting interest answers it, never an errand that waits for them (QA F-33)", async () => {
     const asked: (string | null)[] = [];
     const { value, errands } = port(() => null);
@@ -2747,7 +2784,16 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     }));
     const { answer, delegated } = seam({
       said: "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.",
-      reading: reading("Ledgerfold"),
+      // Step 4: the reader's parts say it asks for work, never the words.
+      reading: {
+        ...reading("Ledgerfold"),
+        answerKind: "DOCUMENT",
+        parts: [
+          { ask: "Research and assess Ledgerfold", kind: "ANALYSIS" },
+          { ask: "Prepare an investment memo on Ledgerfold", kind: "DOCUMENT" },
+          { ask: "Prepare founder diligence questions", kind: "DOCUMENT" },
+        ],
+      } as TurnReaderResult,
       outcomes: [],
       handOver: value,
     });
@@ -3123,11 +3169,15 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(delegated()).toBe(1);
   });
 
-  it("names the work kinds: two or more is a work request, a hand-over names none", () => {
-    expect(asksForWorkProducts("handle Kestrel for me")).toBe(false);
-    expect(asksForWorkProducts("get me a meeting with Priya")).toBe(false);
+  it("work products are the reading's parts (v78): two or more work parts, never the words", () => {
+    expect(asksForWorkProducts(undefined)).toBe(false);
+    expect(asksForWorkProducts([])).toBe(false);
+    expect(asksForWorkProducts([{ kind: "LOOKUP" }, { kind: "LOOKUP" }])).toBe(
+      false,
+    );
+    expect(asksForWorkProducts([{ kind: "ANALYSIS" }])).toBe(false);
     expect(
-      asksForWorkProducts("research them and write me a memo on the risks"),
+      asksForWorkProducts([{ kind: "ANALYSIS" }, { kind: "DOCUMENT" }]),
     ).toBe(true);
   });
 

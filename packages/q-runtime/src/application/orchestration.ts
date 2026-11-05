@@ -283,6 +283,22 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * readiness leads that answer (QA 2026-10-03, run 2cba241a).
    */
   readonly questionKind?: string | undefined;
+  /**
+   * Q intelligence step 4 (TURN_READER v78): the heaviest work the turn
+   * asks of the answer, read by meaning (CHAT, LOOKUP, FOLLOW_UP, ANALYSIS,
+   * COMPARISON, DOCUMENT). The one source of truth for the answer's task
+   * class and comparison handling. Absent when the turn was not read: the
+   * answer then takes the neutral default, never a word list.
+   */
+  readonly answerKind?: string | undefined;
+  /**
+   * v78: each separate thing a compound ask wants, in the order asked and
+   * made self-standing by the reader, each with its own kind. Absent or
+   * fewer than two: a single ask. The answer is told to answer every part.
+   */
+  readonly askParts?:
+    | readonly { readonly ask: string; readonly kind: string }[]
+    | undefined;
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**

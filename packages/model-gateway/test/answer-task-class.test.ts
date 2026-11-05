@@ -15,46 +15,66 @@ import {
 
 const ANSWER = { capability: "ANSWER" as const };
 
-describe("the answer's task class", () => {
+describe("the answer's task class (Q intelligence step 4: the reader's fields)", () => {
   it.each([
-    ["hi Q, how are you?", "NORMAL_DIALOGUE"],
-    ["what's on my calendar today?", "NORMAL_DIALOGUE"],
-    ["compare Halyard and Savanna for our seed round", "COMPARISON"],
-    ["which of these is better for us?", "COMPARISON"],
-    [
-      "what are the biggest risks in Ajopot's financials?",
-      "EVIDENCE_SYNTHESIS",
-    ],
-    ["break it down into actionable steps", "EVIDENCE_SYNTHESIS"],
-    ["give me the pros and cons of raising now", "EVIDENCE_SYNTHESIS"],
-  ])("%j is %s", (words, expected) => {
-    expect(answerTaskClass(ANSWER, words)).toBe(expected);
+    ["CHAT", "NORMAL_DIALOGUE"],
+    ["LOOKUP", "NORMAL_DIALOGUE"],
+    ["FOLLOW_UP", "NORMAL_DIALOGUE"],
+    ["COMPARISON", "COMPARISON"],
+    ["ANALYSIS", "EVIDENCE_SYNTHESIS"],
+    ["DOCUMENT", "EVIDENCE_SYNTHESIS"],
+  ])("answerKind %s is %s", (answerKind, expected) => {
+    expect(answerTaskClass({ ...ANSWER, answerKind })).toBe(expected);
   });
 
   it("follows the reader's analytical question kinds", () => {
+    expect(answerTaskClass({ ...ANSWER, questionKind: "ADVICE" })).toBe(
+      "EVIDENCE_SYNTHESIS",
+    );
+    expect(answerTaskClass({ ...ANSWER, questionKind: "PUBLIC_FACTS" })).toBe(
+      "NORMAL_DIALOGUE",
+    );
+  });
+
+  it("a compound ask takes its heaviest part", () => {
     expect(
-      answerTaskClass({ ...ANSWER, questionKind: "ADVICE" }, "what now?"),
-    ).toBe("EVIDENCE_SYNTHESIS");
-    expect(
-      answerTaskClass({ ...ANSWER, questionKind: "PUBLIC_FACTS" }, "who won?"),
-    ).toBe("NORMAL_DIALOGUE");
+      answerTaskClass({
+        ...ANSWER,
+        answerKind: "LOOKUP",
+        askParts: [
+          { ask: "What's Silo Credit's runway?", kind: "LOOKUP" },
+          { ask: "How does it compare with Ledgerfold's?", kind: "COMPARISON" },
+        ],
+      }),
+    ).toBe("COMPARISON");
+  });
+
+  it("unread (FAKE mode, a failed reading) is the neutral default, never a word list", () => {
+    expect(answerTaskClass(ANSWER)).toBe("NORMAL_DIALOGUE");
+    // An unknown kind is no kind.
+    expect(answerTaskClass({ ...ANSWER, answerKind: "DEEP_THOUGHT" })).toBe(
+      "NORMAL_DIALOGUE",
+    );
+    // The function takes no words at all: there is nothing to match.
+    expect(answerTaskClass.length).toBe(1);
   });
 
   it("keeps small talk and other capabilities as they were", () => {
     expect(
-      answerTaskClass(
-        { ...ANSWER, turnKind: "SMALL_TALK" },
-        "compare notes with you later, ha",
-      ),
+      answerTaskClass({
+        ...ANSWER,
+        turnKind: "SMALL_TALK",
+        answerKind: "COMPARISON",
+      }),
     ).toBe("NORMAL_DIALOGUE");
-    expect(answerTaskClass({ capability: "INVESTIGATE" }, "hi")).toBe(
-      "DEEP_INVESTIGATION",
-    );
+    expect(
+      answerTaskClass({ capability: "INVESTIGATE", answerKind: "LOOKUP" }),
+    ).toBe("DEEP_INVESTIGATION");
   });
 
   it("gives analysis room to finish its answer", () => {
     expect(
-      budgetForTaskClass(answerTaskClass(ANSWER, "assess the risks"))
+      budgetForTaskClass(answerTaskClass({ ...ANSWER, answerKind: "ANALYSIS" }))
         .maxOutputTokens,
     ).toBeGreaterThan(budgetForTaskClass("NORMAL_DIALOGUE").maxOutputTokens);
   });
