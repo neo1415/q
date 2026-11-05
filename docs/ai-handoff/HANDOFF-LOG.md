@@ -1485,3 +1485,8 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - the voice-note recorder took the microphone without telling the listener.
 - Indicator: the top banner is gone. While listening, a 44px corner mic button opens a popover with Pause and Turn off. Paused, off, blocked or unavailable shows nothing; Resume is in Settings → Q and the Q room. Receipt: `receipts/2026-11-05-wake/`.
 - Not changed, needs the owner or an ADR: the gate's 6-windows-a-minute privacy cap can still mute Hey Q for up to a minute in a talkative room. Recognition also starts about 100–400 ms after speech begins, so “Hey” can be clipped; saying it again within the window works. Still needs a real-device check.
+
+## 2026-11-05 10:30 UTC (integration owner)
+
+- Deployed 3f813b9b9 (web only) at 10:14: fix/wake-reliability f36301292 and fix/plan-card-sticky 581ea4d6a. CI run 41998516971 was all green. live11 PASS on 3/3 at 1440 and 390: no Hey Q banner, corner mic while listening, waiting plan as one folded line shown once. Receipts: chore/live11-3f813b9 @ 7e77738ce.
+- Q Intelligence programme: `docs/specs/q-intelligence/Q_INTELLIGENCE_PLAN.md` (DECISIONS 60). Steps 0, 1 and 6 started at 09:26 in their own sessions; they hit the usage limit and were resumed at 10:14 after the reset.
