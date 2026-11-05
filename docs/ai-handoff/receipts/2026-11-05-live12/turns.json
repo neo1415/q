@@ -1,0 +1,29 @@
+[
+  {
+    "id": "a",
+    "question": "What's today's date, and what day is tomorrow?",
+    "seconds": 11,
+    "answer": " \n\nToday is Thursday, 5 November 2026. Tomorrow is Friday, 6 November 2026.\n\nSources\nInvestor · 1"
+  },
+  {
+    "id": "b",
+    "question": "What monthly revenue does Ledgerfold's pitch deck state?",
+    "seconds": 16,
+    "answer": " \n\nLedgerfold’s pitch deck states monthly revenue of approximately USD 38,000. It is a self-reported company figure, not independently verified.\n\nSources\nCompany · 1"
+  },
+  {
+    "id": "c",
+    "question": "What runway does Ledgerfold's deck state, in months?",
+    "seconds": 10,
+    "answer": " \n\nThe deck does not state Ledgerfold’s runway in months. I have no runway figure on record.\n\nSources\nCompany · 1"
+  },
+  {
+    "id": "d",
+    "question": "Tell me about Ledgerfold.",
+    "seconds": 29,
+    "answer": " \n\nLedgerfold is a seed-stage Lagos fintech serving market traders. It combines a free bookkeeping app with 14- to 60-day working-capital loans, using traders’ cash-flow records for underwriting and collecting repayment through agency-banking partners.\n\nThe company reports 6,400 active bookkeeping users, 2,150 borrowers, a USD 410,000 outstanding loan book in March 2026—up from USD 150,000 in September 2025—30-day portfolio-at-risk of 3.8%, and monthly revenue of around USD 38,000. These figures are self-reported. The team is Adaeze Nwachukwu, who previously led SME lending operations, and Obinna Eze, a technical co-founder, supported by 19 staff including seven field agents.\n\nThe central investment question is whether its bookkeeping data genuinely predicts repayment better than alternative lender signals; that has not yet been tested through a full credit cycle at scale. Runway is not stated, and the market-size estimates are company estimates rather than independently checked.\n\nSources\nCompany · 1"
+  },
+  {
+    "conversationUrl": "/home?new=1&c=57381fd2-d085-4c3a-bf5d-0808c8fd5818"
+  }
+]
