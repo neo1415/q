@@ -240,6 +240,17 @@ export function currentViewing(): QViewingMoment | undefined {
     : undefined;
 }
 
+/**
+ * The Q page's view while it is mounted (presence is the stage, else
+ * chat); null when Q is only the dock beside a page. A hint for Q's
+ * situation line, never authority.
+ */
+let qPageView: "STAGE" | "CHAT" | null = null;
+
+export function noteQPageView(view: "presence" | "chat" | null): void {
+  qPageView = view === null ? null : view === "presence" ? "STAGE" : "CHAT";
+}
+
 /** What is on screen now: the route's context, the focused company, the open document. */
 export function currentScreen(
   pathname: string = window.location.pathname,
@@ -268,6 +279,8 @@ export function currentScreen(
   }
   const zone = deviceTimeZone();
   if (zone !== undefined) screen = { ...screen, timeZone: zone };
+  // Q intelligence step 1: which of Q's surfaces they asked from.
+  screen = { ...screen, surface: qPageView ?? "DOCK" };
   // What Q's viewers show are documents Q made for them (artifacts): they
   // ride as artifactId, read on the server through read_my_document.
   const open = openDocumentId ?? viewerDocumentId;

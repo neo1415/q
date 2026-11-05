@@ -277,6 +277,12 @@ export type QIntelligenceDependencies = {
   readonly ownDay?: ModelGatewayQAnswerDependencies["ownDay"];
   readonly askerOf?: ModelGatewayQAnswerDependencies["askerOf"];
   /**
+   * Q intelligence step 1: who is asking (name, FOUNDER or INVESTOR from
+   * their membership, organisation) and their saved zone, for the
+   * situation header every model step is told.
+   */
+  readonly situationOf?: ModelGatewayQAnswerDependencies["situationOf"];
+  /**
    * What exists on the person's own account, by kind (ADR 0040: QA's read
    * registry composes it). Absent: no index.
    */
@@ -498,6 +504,9 @@ export function composeQIntelligence(
     ...(dependencies.askerOf === undefined
       ? {}
       : { askerOf: dependencies.askerOf }),
+    ...(dependencies.situationOf === undefined
+      ? {}
+      : { situationOf: dependencies.situationOf }),
     ...(dependencies.ownIndex === undefined
       ? {}
       : { ownIndex: dependencies.ownIndex }),
@@ -558,6 +567,10 @@ export function composeQIntelligence(
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
+    // Step 1: the turn reader is told the same situation as the answer.
+    ...(dependencies.situationOf === undefined
+      ? {}
+      : { situationOf: dependencies.situationOf }),
     // F-96: code's own lines in the language of a turn not in English.
     ...(dependencies.localiseWords === undefined
       ? {}

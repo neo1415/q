@@ -8,6 +8,7 @@ import {
 import {
   currentScreen,
   currentViewing,
+  noteQPageView,
   screenOf,
   setOpenDocument,
   setReaderUpload,
@@ -16,7 +17,11 @@ import {
 } from "../src/features/q/screen";
 
 /** The device's zone travels with every screen (live 2026-09-28 #2). */
-const here = { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+// Asked from a page with Q beside it: the dock (Q intelligence step 1).
+const here = {
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  surface: "DOCK",
+};
 
 /**
  * The screen a question is asked from (R21): the route on the closed list
@@ -190,5 +195,20 @@ describe("an upload open in the Documents reader", () => {
   it("a malformed id is ignored", () => {
     setReaderUpload("not-an-id");
     expect(currentScreen("/documents").attachedDocumentIds).toBeUndefined();
+  });
+});
+
+describe("which of Q's surfaces they asked from (Q intelligence step 1)", () => {
+  it("the dock beside a page, else the Q page's stage or chat view", () => {
+    expect(currentScreen("/discover").surface).toBe("DOCK");
+    noteQPageView("presence");
+    expect(currentScreen("/home").surface).toBe("STAGE");
+    noteQPageView("chat");
+    expect(currentScreen("/home").surface).toBe("CHAT");
+    expect(QScreenContextSchema.safeParse(currentScreen("/home")).success).toBe(
+      true,
+    );
+    noteQPageView(null);
+    expect(currentScreen("/home").surface).toBe("DOCK");
   });
 });

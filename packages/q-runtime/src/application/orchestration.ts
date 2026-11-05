@@ -14,8 +14,10 @@ import type {
   QRunHandle,
   QRunId,
   QSensitivityClass,
+  QAskSurface,
   QPageManifest,
   QScreenContext,
+  QScreenRoute,
   QSubjectRef,
   QViewingMoment,
   QToolClassification,
@@ -596,6 +598,18 @@ export type QPrereadInput = {
    * passes on in the plan's screen, so the early reading can choose one.
    */
   readonly screenControls?: QPageManifest["controls"] | undefined;
+  /**
+   * Q intelligence step 1: the screen's route, device zone and surface,
+   * for the early reading's situation header. Closed kinds and their own
+   * clock only; no entity rides here.
+   */
+  readonly situationScreen?:
+    | {
+        readonly route: QScreenRoute;
+        readonly timeZone?: string | undefined;
+        readonly surface?: QAskSurface | undefined;
+      }
+    | undefined;
 };
 
 export function createUnconfiguredQAnswer(): QAnswerPort {

@@ -78,6 +78,13 @@ import {
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
+  personTimeZone,
+  situationHeader,
+  situationSurfaceOf,
+  SITUATION_HEADER_MAX_CHARS,
+  type QSituationPort,
+} from "./situation-header.js";
+import {
   createSentenceCutter,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
@@ -549,6 +556,15 @@ export {
   type DeckPassage,
   type DeckReader,
 } from "./deck-reader.js";
+export {
+  personTimeZone,
+  situationHeader,
+  situationSurfaceOf,
+  SITUATION_HEADER_MAX_CHARS,
+  type QSituationAsker,
+  type QSituationPort,
+  type QSituationSurface,
+} from "./situation-header.js";
 export {
   createQTurnReader,
   readerActions,
@@ -1761,15 +1777,6 @@ export function questionSequenceNote(step: QQuestionSequenceStep): string {
   }
 }
 
-function isKnownZone(zone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function environmentNoteParts(
   facts: readonly AuthorisedFact[],
   tools: readonly QOfferedTool[] = [],
@@ -1816,6 +1823,12 @@ export function environmentNoteParts(
     readonly language?: string | undefined;
     /** Who is asking: their own company, from their record. */
     readonly asker?: string | undefined;
+    /**
+     * Q intelligence step 1: the situation header (situationHeader): the
+     * date and their time, who is asking, the surface and the page. It
+     * leads this turn's notes and is the last thing the bound cuts.
+     */
+    readonly situation?: string | undefined;
     /**
      * Lane 8: documents they attached, read this turn, and what their
      * words ask of them (owner 23 Oct: a summary, not a critique, unless
@@ -1885,7 +1898,15 @@ export function environmentNoteParts(
         ]),
     ...(options.language === undefined ? [] : [options.language]),
   ];
-  const turnNotes = (researchNote: string | null, capabilities: boolean) => [
+  const situation = options.situation?.slice(0, SITUATION_HEADER_MAX_CHARS);
+  const turnNotes = (
+    researchNote: string | null,
+    capabilities: boolean,
+    withSituation = true,
+  ) => [
+    // First of this turn's own (it changes every turn, so it rides in the
+    // tail, after the cached prefix).
+    ...(situation === undefined || !withSituation ? [] : [situation]),
     // This turn's critical notes lead its part: a request for a document
     // read as chat, or a series cut short, are the bugs these prevent
     // (QX-003F, B1, R35).
@@ -1941,9 +1962,10 @@ export function environmentNoteParts(
     researchNote: string | null,
     capabilities = false,
     steadyKept: number = steady.length,
+    withSituation = true,
   ): QEnvironmentNoteParts => ({
     standing: [...steady.slice(0, steadyKept), ...personal].join(" "),
-    turn: turnNotes(researchNote, capabilities).join(" "),
+    turn: turnNotes(researchNote, capabilities, withSituation).join(" "),
   });
   const fits = (parts: QEnvironmentNoteParts) =>
     joinedNotes(parts).length <= ENVIRONMENT_NOTES_MAX_CHARS;
@@ -1964,12 +1986,22 @@ export function environmentNoteParts(
     const brief = compose(briefNote, false, kept);
     if (fits(brief)) return brief;
   }
+  // Nothing fits: the rest is cut, never the situation.
+  if (situation === undefined) {
+    return {
+      standing: joinedNotes(compose(briefNote, false, 0)).slice(
+        0,
+        ENVIRONMENT_NOTES_MAX_CHARS,
+      ),
+      turn: "",
+    };
+  }
   return {
-    standing: joinedNotes(compose(briefNote, false, 0)).slice(
+    standing: joinedNotes(compose(briefNote, false, 0, false)).slice(
       0,
-      ENVIRONMENT_NOTES_MAX_CHARS,
+      Math.max(0, ENVIRONMENT_NOTES_MAX_CHARS - situation.length - 1),
     ),
-    turn: "",
+    turn: situation,
   };
 }
 
@@ -2331,6 +2363,14 @@ export type ModelGatewayQAnswerDependencies = {
    * founded by Priya Khandelwal" was the company she meant, and for a
    * website it had). Trusted server text. Null: nothing known.
    */
+  /**
+   * Q intelligence step 1: who is asking (name, FOUNDER or INVESTOR from
+   * their membership, organisation) and their saved zone, read by the
+   * server for the actor. Absent: the situation says they are unknown.
+   */
+  readonly situationOf?: QSituationPort | undefined;
+  /** The clock for the situation and the own-day read; tests fix it. */
+  readonly now?: (() => Date) | undefined;
   readonly askerOf?:
     | ((request: {
         readonly tenantId: string;
@@ -4499,17 +4539,10 @@ export function createModelGatewayQAnswer(
         read("list_q_work"),
         dependencies.ownDay?.(request.actor).catch(() => null) ?? null,
       ]);
-      const device = plan.screen?.timeZone;
-      const zone =
-        own?.timeZone ??
-        (device !== undefined &&
-        isKnownZone(device) &&
-        !/^(Etc\/)?(UTC|UCT|GMT|Universal|Zulu|Greenwich)$/i.test(device)
-          ? device
-          : null);
+      const zone = personTimeZone(own?.timeZone, plan.screen?.timeZone);
       ownDayReads = { approvals, timeZone: zone };
       ownDay = ownDayFact({
-        now: new Date(),
+        now: (dependencies.now ?? (() => new Date()))(),
         timeZone: zone,
         schedule,
         approvals,
@@ -5273,6 +5306,10 @@ export function createModelGatewayQAnswer(
                 userId: request.actorUserId,
               })
               .catch(() => null);
+      const situationRead =
+        dependencies.situationOf === undefined
+          ? Promise.resolve(null)
+          : dependencies.situationOf(request.actor).catch(() => null);
       const askerRead =
         dependencies.askerOf === undefined
           ? Promise.resolve(null)
@@ -6019,7 +6056,19 @@ export function createModelGatewayQAnswer(
         const personality = await personalityRead;
         const language = await languageRead;
         const asker = await askerRead;
+        // Step 1: the date, their time and who is asking, on every answer.
+        const situation = situationHeader({
+          now: (dependencies.now ?? (() => new Date()))(),
+          asker: await situationRead,
+          deviceTimeZone: plan.screen?.timeZone,
+          surface: situationSurfaceOf(
+            request.spoken === true,
+            plan.screen?.surface,
+          ),
+          page: plan.screen?.route ?? null,
+        });
         let noteParts = environmentNoteParts(facts, offered, request.subjects, {
+          situation,
           // Only when the firewall actually granted it. The plan has
           // said so all along; nothing was reading it.
           generalKnowledge: plan.scopes.some(

@@ -1509,3 +1509,14 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - One-word names are not checked.
   - Cross-source sums are not allowed.
   - The DEEP_ANALYSIS model self-check pass is not built.
+## 2026-11-05 (Q intelligence Step 1, `feat/q-situation-header` from `fix/resume-asking-cv9ru3`; not merged or deployed)
+
+- Every Q model step now gets a code-built situation header: today's date and the time in the person's zone (profile, else device, else "time zone unknown" with UTC); tomorrow's date (calendar day, safe across clock changes); who is asking (name, FOUNDER or INVESTOR, organisation); the surface (chat, dock, stage or voice); and the page.
+- The header is built by `situationHeader` in `packages/model-gateway/src/q/situation-header.ts`. q-api's `situationOfActor` reads the role from the actor's membership, using the rehearsal viewer read, and never from the client. The name is cleaned to one line with no quotes, and the header is capped at 600 characters.
+- Where it goes:
+  - Answers: first in `environmentNoteParts`' turn part. It is the last thing the 10,200-character cap cuts.
+  - Turn reader: in the prompt's tail, beside the `shown` record, not in the charter, so the cached prefix stays the same. No prompt version bump. Also on the early preread, through `QPrereadInput.situationScreen`.
+  - Voice duplex line: in the instructions after the cached prefix, built from the firewall plan's screen.
+- Contract: optional `QScreenContext.surface` (CHAT/DOCK/STAGE), passed through `screenWithin`. The web sends DOCK, or STAGE/CHAT while the Q page is mounted. A spoken turn is always VOICE.
+- Tests: new answer-path tests (prepared context, targeted retrieval, deep analysis, voice) fail on the base and pass here. Also new: header unit tests with a fixed clock, reader tests and duplex tests. Gates are reported to the integration owner.
+- Open: no live Q-IQ date run yet (no live provider calls in this slice).

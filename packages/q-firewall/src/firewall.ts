@@ -196,9 +196,12 @@ export function screenWithin(
     artifactVersion,
     manifest,
     attachedDocumentIds,
+    surface,
   } = screen;
   return {
     route: screen.route,
+    // Which of Q's surfaces they asked from: a closed kind, about no one.
+    ...(surface === undefined ? {} : { surface }),
     // Lane 8: documents they attached in Q's composer, as ids only. It
     // grants nothing: their words are read solely through
     // read_attached_document, as the asker, through Evidence's own

@@ -200,6 +200,11 @@ export function duplexInstructions(input: {
   readonly listening?: boolean | undefined;
   /** Q leads this line (welcome or interview): every word goes to ask_q. */
   readonly guided?: boolean | undefined;
+  /**
+   * Q intelligence step 1: the situation header as the line opened (date,
+   * their time, who is asking, page). Code-built; never the person's words.
+   */
+  readonly situation?: string | undefined;
 }): string {
   const parts = [
     input.listening === true
@@ -207,6 +212,9 @@ export function duplexInstructions(input: {
       : DUPLEX_INSTRUCTIONS_PREFIX,
     ...(input.guided === true ? [GUIDED_CONDUCT] : []),
     "THIS LINE",
+    ...(input.situation === undefined
+      ? []
+      : [`${input.situation} (as this line opened)`]),
   ];
   // Any language: a person who chose one hears it from the first word, not
   // only once they speak it (the note names the language; no branch per

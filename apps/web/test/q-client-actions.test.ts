@@ -244,16 +244,20 @@ describe("the screen includes the document open in Q's viewer (R21)", () => {
     // voiceq-63: Q's viewer shows a document Q made (an artifact): it rides
     // as artifactId, which the server reads through read_my_document. As
     // documentId it was dropped by the firewall (canonical documents only).
-    expect(withDoc).toEqual({ route: "HOME", artifactId: DOC });
+    expect(withDoc).toEqual({
+      route: "HOME",
+      artifactId: DOC,
+      surface: "DOCK",
+    });
     setOpenDocument(null);
     const { timeZone: _closed, ...closed } = currentScreen("/home") ?? {};
-    expect(closed).toEqual({ route: "HOME" });
+    expect(closed).toEqual({ route: "HOME", surface: "DOCK" });
   });
 
   it("ignores an id that is not one", () => {
     setOpenDocument("not-a-uuid");
     const { timeZone: _tz, ...screen } = currentScreen("/profile") ?? {};
-    expect(screen).toEqual({ route: "PROFILE" });
+    expect(screen).toEqual({ route: "PROFILE", surface: "DOCK" });
   });
 });
 
