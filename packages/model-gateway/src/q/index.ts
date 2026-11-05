@@ -245,6 +245,12 @@ import {
   joinExtras,
 } from "./parallel-extras.js";
 import {
+  checkAnswer,
+  claimCorpus,
+  createClaimChecker,
+  type ClaimKind,
+} from "./claim-check.js";
+import {
   corroboratedPictures,
   pageAboutThem,
   type HeldIdentity,
@@ -6510,6 +6516,31 @@ export function createModelGatewayQAnswer(
           runFits.read(request.runId).length >= 2,
         askedToOpen(latest.content),
       );
+      /**
+       * Step 6: what this run was given, for the claim check. Filled in
+       * once the model's messages exist (below); the charter and Capital
+       * Q's own instruction notes are left out, so a number in an
+       * instruction never grounds a figure about a company.
+       */
+      let claimSources: () => readonly string[] = () =>
+        facts.map((fact) => fact.statement);
+      const claims = createClaimChecker(() => claimSources());
+      const logUngrounded = (
+        ungrounded: readonly ClaimKind[],
+        where: "stream" | "answer",
+      ): void => {
+        if (ungrounded.length === 0) return;
+        // Kinds only: the figure itself may be private or echo a private one.
+        logger?.warn(
+          {
+            qRunId: request.runId,
+            where,
+            ungrounded: ungrounded.length,
+            kinds: [...new Set(ungrounded)],
+          },
+          "ungrounded claims left out of a Q answer",
+        );
+      };
       /** One whole sentence through the guards and out; see the note above. */
       const takeSentence = (sentence: string): void => {
         // Code said the comparison's verdict first: a sentence of the
@@ -6541,7 +6572,15 @@ export function createModelGatewayQAnswer(
             ? null
             : artifactClaims.sentence(screenGuarded);
         // One boilerplate disclaimer at most (lead live replay 2026-10-07).
-        const caveated = guarded === null ? null : caveats.sentence(guarded);
+        const caveatedRaw = guarded === null ? null : caveats.sentence(guarded);
+        // No figure, date or name the run was not given is said aloud or
+        // shown (step 6); checked before publish, so voice never speaks it.
+        const claimed =
+          caveatedRaw === null || caveatedRaw.length === 0
+            ? null
+            : claims.sentence(caveatedRaw);
+        if (claimed !== null) logUngrounded(claimed.ungrounded, "stream");
+        const caveated = claimed?.text ?? null;
         if (caveated === null || caveated.length === 0) {
           return;
         }
@@ -8243,6 +8282,26 @@ export function createModelGatewayQAnswer(
                   }
                 : TOOLS_FIRST_NOTE,
             ];
+      // Step 6: the claim check's sources, read live as tool rounds add
+      // their results. Everything the model was given except Capital Q's
+      // own instructions, plus the lines code itself said in this answer.
+      const instructionMessages = new Set<ModelMessage>([
+        ...rendered.messages.filter((message) => message.role === "SYSTEM"),
+        capabilities,
+        ...workNote,
+        CONVERSATION_FINDINGS_NOTE,
+      ]);
+      claimSources = () => [
+        ...facts.map((fact) => fact.statement),
+        latest.content,
+        ...earlier.map((message) => message.content),
+        ...messages
+          .filter((message) => !instructionMessages.has(message))
+          .map((message) => message.content),
+        ...(leadLines === undefined ? [] : [leadLines]),
+        ...(earlyLead === null ? [] : [earlyLead]),
+        ...(compareVerdict === null ? [] : [JSON.stringify(compareVerdict)]),
+      ];
 
       // Owner 2026-10-22: typed answers have their findings and cards
       // written beside them (parallel-extras.ts). Not spoken (three
@@ -9930,7 +9989,7 @@ export function createModelGatewayQAnswer(
         }
         // Natural register (Zino live 2026-10-07): "Capital Q records
         // that you have…" is said in Q's own first person.
-        const guarded = withoutRecommendationClaims(
+        const recommendationGuarded = withoutRecommendationClaims(
           withOneCaveat(
             inFirstPerson(
               citeAuthorisedFacts(
@@ -9941,6 +10000,17 @@ export function createModelGatewayQAnswer(
           ).text,
           groundsNow(),
         );
+        // Step 6: the stored answer is held to the same check the streamed
+        // sentences were, so the screen never shows what voice withheld.
+        const answerClaims = checkAnswer(
+          recommendationGuarded.text,
+          claimCorpus(claimSources()),
+        );
+        logUngrounded(answerClaims.ungrounded, "answer");
+        const guarded = {
+          ...recommendationGuarded,
+          text: answerClaims.text,
+        };
         if (guarded.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: guarded.removed },

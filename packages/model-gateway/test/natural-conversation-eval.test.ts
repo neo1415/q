@@ -543,7 +543,10 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
     });
     expect(cardsOf(q2.blocks)).toEqual([]);
     expect(q2.text).not.toMatch(/on screen/iu);
-    expect(q2.text).toMatch(/^I've reached out to 20 companies so far\./u);
+    // The live model said "20"; the relationships it was given are five.
+    // The claim check (step 6) keeps the invented count from being said.
+    expect(q2.text).not.toMatch(/\b20\b/u);
+    expect(q2.text).toMatch(/^I can't provide mandate scores/u);
 
     const q3 = await replay({
       question: "Which specific companies in Kenya closely match the criteria?",
