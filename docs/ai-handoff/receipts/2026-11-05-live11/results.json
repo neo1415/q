@@ -1,0 +1,96 @@
+{
+  "390": {
+    "item1": {
+      "pausedIndicator": null,
+      "pages": {
+        "/home": [],
+        "/discover": [],
+        "/work": [],
+        "/profile": []
+      },
+      "whileWorking": {
+        "working": true,
+        "banner": []
+      }
+    },
+    "item2": {
+      "toggleFound": true,
+      "toggleDisabled": false,
+      "on": "true",
+      "settingsNote": "",
+      "indicator": "LISTENING",
+      "buttonVisible": true,
+      "button": {
+        "w": 44,
+        "h": 44,
+        "right": 16,
+        "bottomGap": 120
+      },
+      "pauseShown": true,
+      "turnOffShown": true,
+      "restoredOff": true
+    },
+    "item3": {
+      "before": {
+        "lines": 1,
+        "kinds": ["PLAN:WAITING"],
+        "expanded": 0,
+        "stepsVisible": 6
+      },
+      "after": {
+        "lines": 0,
+        "kinds": [],
+        "expanded": 0,
+        "stepsVisible": 6
+      },
+      "lastAnswer": "A SAFE is a contract that lets someone invest money now and receive shares in a future financing, usually on agreed conversion terms rather than immediately.\n\nSources\nInvestor · 1"
+    }
+  },
+  "1440": {
+    "item1": {
+      "pausedIndicator": null,
+      "pages": {
+        "/home": [],
+        "/discover": [],
+        "/work": [],
+        "/profile": []
+      },
+      "whileWorking": {
+        "working": true,
+        "banner": []
+      }
+    },
+    "item2": {
+      "toggleFound": true,
+      "toggleDisabled": false,
+      "on": "true",
+      "settingsNote": "",
+      "indicator": "LISTENING",
+      "buttonVisible": true,
+      "button": {
+        "w": 44,
+        "h": 44,
+        "right": 16,
+        "bottomGap": 120
+      },
+      "pauseShown": true,
+      "turnOffShown": true,
+      "restoredOff": true
+    },
+    "item3": {
+      "before": {
+        "lines": 2,
+        "kinds": ["RUN:AWAITING_APPROVAL", "PLAN:WAITING"],
+        "expanded": 0,
+        "stepsVisible": 7
+      },
+      "after": {
+        "lines": 0,
+        "kinds": [],
+        "expanded": 0,
+        "stepsVisible": 6
+      },
+      "lastAnswer": " \n\nPro rata means allocating something in proportion to each person’s share—for example, allowing an investor to invest enough in a new round to maintain their ownership percentage.\n\nSources · 4 sourc"
+    }
+  }
+}
