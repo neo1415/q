@@ -1,6 +1,7 @@
 import type { ModelMessage, ModelOutputSpec } from "@capital-q/contracts";
 import type { CompanyAnalystV26Result } from "@capital-q/q-core";
 
+import { claimCorpus, figuresGrounded } from "./claim-check.js";
 import { narrowedOutput } from "./compare-answer.js";
 
 /**
@@ -98,51 +99,11 @@ type Extras = Pick<
   "findings" | "answerCards" | "comparisonCards"
 >;
 
-/**
- * The numbers a text states, each in the forms a source might hold it:
- * "$1.2M" is "1.2" and "1200000"; "45%" is "45". Digits only, so a
- * currency sign or a thousands separator never matters.
- */
-export function statedNumbers(text: string): readonly (readonly string[])[] {
-  const found: (readonly string[])[] = [];
-  const pattern =
-    /(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*(k|m|mn|bn|b|million|billion|thousand)?\b/giu;
-  for (const match of text.matchAll(pattern)) {
-    const whole = (match[1] ?? "").replace(/,/gu, "");
-    const fraction = match[2] ?? "";
-    const literal = fraction.length > 0 ? `${whole}.${fraction}` : whole;
-    // A lone digit (a list position, "one of 3") says nothing checkable.
-    if (literal.length < 2) continue;
-    const forms = [literal];
-    const suffix = (match[3] ?? "").toLowerCase();
-    const scale =
-      suffix === "k" || suffix === "thousand"
-        ? 3
-        : suffix === "m" || suffix === "mn" || suffix === "million"
-          ? 6
-          : suffix === "b" || suffix === "bn" || suffix === "billion"
-            ? 9
-            : 0;
-    if (scale > 0) {
-      const digits = `${whole}${fraction}`;
-      const zeros = scale - fraction.length;
-      if (zeros >= 0) forms.push(`${digits}${"0".repeat(zeros)}`);
-    }
-    found.push(forms);
-  }
-  return found;
-}
-
-/**
- * A number the extras' writer stated that is in neither the answer nor
- * anything both writers were given. One writer would have had to invent
- * it, and the two writers then say different things.
- */
-function groundedIn(statement: string, known: ReadonlySet<string>): boolean {
-  return statedNumbers(statement).every((forms) =>
-    forms.some((form) => known.has(form)),
-  );
-}
+// The numbers a text states, in the forms a source might hold them; kept
+// exported here for existing callers. The match itself is the claim
+// check's (claim-check.ts), so the answer and the extras are held to one
+// rule.
+export { statedNumbers } from "./claim-check.js";
 
 /**
  * The answer with the extras' findings and cards, after the pair checks:
@@ -179,14 +140,13 @@ export function joinExtras(
   ) {
     return { value: answer, join: "NO_EXTRAS", ungrounded: 0 };
   }
-  // Every form of every number either writer was given, or the answer said.
-  const known = new Set(
-    statedNumbers(
-      [answer.answer, ...read.map((message) => message.content)].join("\n"),
-    ).flat(),
-  );
+  // Every number either writer was given, or the answer said.
+  const known = claimCorpus([
+    answer.answer,
+    ...read.map((message) => message.content),
+  ]);
   const findings = extras.findings.filter((finding) =>
-    groundedIn(finding.statement, known),
+    figuresGrounded(finding.statement, known),
   );
   return {
     value: {
