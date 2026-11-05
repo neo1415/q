@@ -36,7 +36,10 @@ import { recoverStream, restartPitch, setStreamWarmth } from "./hls-source";
 import { hasBeenActive, onAudioUnlock } from "./sound-policy";
 import { usePitchPlayback } from "./use-pitch-playback";
 import { useT } from "@/features/i18n/language";
-import { useCaptionsChoice } from "../stage/captions-choice";
+import {
+  ownCaptionsAvailable,
+  useCaptionsChoice,
+} from "../stage/captions-choice";
 
 /**
  * The pitch player (CQ-WEB-021; doc 20 §35-§36, §44-§50, §60; ADR-001).
@@ -734,7 +737,7 @@ export function PitchPlayer({
   if (variant === "stage") {
     // The stage is portrait; a landscape pitch is letterboxed, not cropped.
     const [w = 9, h = 16] = frame.aspectRatio.split("/").map(Number);
-    const captions = pitch.captionState === "AVAILABLE";
+    const captions = ownCaptionsAvailable(pitch);
     const problem: "OFFLINE" | "FAILED" | "UNPLAYABLE" | null =
       policy !== "ACTIVE"
         ? null
@@ -943,7 +946,7 @@ export function PitchPlayer({
   // A request-to-play player always offers Play when it is not playing:
   // another player taking the page pauses it, and it must be resumable.
   const explicitPlay = startOnRequest || intent.requiresExplicitPlay;
-  const captions = pitch.captionState === "AVAILABLE";
+  const captions = ownCaptionsAvailable(pitch);
 
   return (
     <div className="cq-pitch flex flex-col gap-3" data-pitch-player>

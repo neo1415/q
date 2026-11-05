@@ -481,6 +481,7 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
       captionState: "NOT_REQUESTED",
       title: null,
       downloadAllowed: false,
+      captionsInPicture: false,
     });
     expect(body.items[1]?.pitch).toBeNull();
     expect(response.payload).not.toContain(FOREIGN);

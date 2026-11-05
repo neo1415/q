@@ -261,6 +261,11 @@ export type MediaAsset = {
    * 0047). False unless the owner turned it on (doc 20 §219).
    */
   readonly downloadable: boolean;
+  /**
+   * The picture already shows captions (burned in; QA F-31). The player
+   * then adds no caption track and no captions switch. Absent means false.
+   */
+  readonly captionsInPicture?: boolean | undefined;
   /** Lineage: the asset this one replaced. Replacement never overwrites. */
   readonly replacesMediaAssetId: MediaAssetId | null;
   /** Set when a successor replaced this asset. Superseded is not deleted. */
@@ -402,6 +407,8 @@ export type DiscoverablePitch = {
   readonly audience: PitchAudience;
   /** ADR 0047: the owner lets viewers save a copy. */
   readonly downloadable: boolean;
+  /** The picture already shows captions (QA F-31). Absent means false. */
+  readonly captionsInPicture?: boolean | undefined;
 };
 
 /**
@@ -441,6 +448,7 @@ export function toDiscoverablePitch(
     title: asset.title,
     audience: asset.audience,
     downloadable: asset.downloadable,
+    captionsInPicture: asset.captionsInPicture === true,
   };
 }
 
@@ -456,6 +464,7 @@ export function pitchSummary(pitch: DiscoverablePitch): {
   readonly captionState: CaptionState;
   readonly title: string | null;
   readonly downloadAllowed: boolean;
+  readonly captionsInPicture: boolean;
 } {
   return {
     mediaAssetId: pitch.mediaAssetId,
@@ -466,6 +475,8 @@ export function pitchSummary(pitch: DiscoverablePitch): {
     // Whether the menu offers Download. A hint for the menu only: the
     // download endpoint decides again on every request.
     downloadAllowed: pitch.downloadable,
+    // The picture already shows captions: the player adds none of its own.
+    captionsInPicture: pitch.captionsInPicture === true,
   };
 }
 

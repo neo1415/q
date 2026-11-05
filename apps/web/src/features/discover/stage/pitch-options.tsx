@@ -15,6 +15,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { authoriseDownloadAction } from "../feed/playback-source";
+import { ownCaptionsAvailable } from "./captions-choice";
 import { formatTime } from "./scrubber";
 import { PLAYBACK_RATES, rateLabel, type PlaybackRate } from "./playback-rate";
 import { useT } from "@/features/i18n/language";
@@ -77,7 +78,9 @@ export function PitchOptionsSheet({
 }) {
   const t = useT();
   const [download, setDownload] = useState<DownloadState>({ kind: "IDLE" });
-  const captionsAvailable = pitch.captionState === "AVAILABLE";
+  const captionsAvailable = ownCaptionsAvailable(pitch);
+  // Captions drawn into the picture cannot be turned off: no switch at all.
+  const captionsInPicture = pitch.captionsInPicture === true;
   const allowed = pitch.downloadAllowed === true;
   const title = pitch.title ?? "Pitch";
   const duration =
@@ -217,35 +220,37 @@ export function PitchOptionsSheet({
               </p>
             ) : null}
 
-            <button
-              type="button"
-              role="switch"
-              aria-checked={captionsAvailable && captionsOn}
-              disabled={!captionsAvailable}
-              className={optionRow}
-              onClick={() => onCaptionsChange(!captionsOn)}
-              data-pitch-captions-toggle
-            >
-              <Captions
-                aria-hidden="true"
-                size={ICON_SIZE.prominent}
-                strokeWidth={ICON_STROKE}
-                className="shrink-0 text-(--cq-text-secondary)"
-              />
-              <span className="flex flex-1 flex-col">
-                <span className="cq-body">{t("Captions")}</span>
-                {captionsAvailable ? null : (
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {t("Not available for this pitch yet")}
-                  </span>
-                )}
-              </span>
-              <span
-                aria-hidden="true"
-                className="cq-switch"
-                data-on={captionsAvailable && captionsOn ? "" : undefined}
-              />
-            </button>
+            {captionsInPicture ? null : (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={captionsAvailable && captionsOn}
+                disabled={!captionsAvailable}
+                className={optionRow}
+                onClick={() => onCaptionsChange(!captionsOn)}
+                data-pitch-captions-toggle
+              >
+                <Captions
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={ICON_STROKE}
+                  className="shrink-0 text-(--cq-text-secondary)"
+                />
+                <span className="flex flex-1 flex-col">
+                  <span className="cq-body">{t("Captions")}</span>
+                  {captionsAvailable ? null : (
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {t("Not available for this pitch yet")}
+                    </span>
+                  )}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="cq-switch"
+                  data-on={captionsAvailable && captionsOn ? "" : undefined}
+                />
+              </button>
+            )}
 
             <button
               type="button"

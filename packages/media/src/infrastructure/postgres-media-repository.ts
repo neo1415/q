@@ -78,6 +78,7 @@ const MediaAssetRow = z.object({
   title: z.string().nullable(),
   audience: PitchAudienceSchema,
   downloadable: z.boolean(),
+  captions_in_picture: z.boolean(),
   replaces_media_asset_id: MediaAssetIdSchema.nullable(),
   superseded_at: Timestamp.nullable(),
   created_by_user_id: UserIdSchema,
@@ -111,6 +112,7 @@ function toAsset(row: unknown): MediaAsset {
     title: r.title,
     audience: r.audience,
     downloadable: r.downloadable,
+    captionsInPicture: r.captions_in_picture,
     replacesMediaAssetId: r.replaces_media_asset_id,
     supersededAt: r.superseded_at,
     createdByUserId: r.created_by_user_id,
@@ -128,7 +130,7 @@ function select(executor: DatabaseExecutor) {
            m.purpose, m.provider, m.provider_asset_id, m.status, m.duration_seconds,
            m.width, m.height, m.aspect_ratio, m.playback_policy, m.thumbnail_reference,
            m.caption_state, m.transcript_state, m.moderation_status,
-           m.title, m.audience, m.downloadable, m.replaces_media_asset_id, m.superseded_at, m.created_by_user_id,
+           m.title, m.audience, m.downloadable, m.captions_in_picture, m.replaces_media_asset_id, m.superseded_at, m.created_by_user_id,
            m.created_at, m.ready_at, m.deleted_at, m.version
       from media.media_assets m`;
 }

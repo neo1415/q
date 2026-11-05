@@ -9,6 +9,19 @@ import { useCallback, useSyncExternalStore } from "react";
  * Oct); a viewer who turns ours off should not have to again on every
  * visit. It never leaves the browser and is not a signal about a company.
  */
+/**
+ * Whether the player may add its own captions to this pitch: generated
+ * captions exist, and the video's own picture does not already show them.
+ * A pitch with captions burned in (QA F-31, `captionsInPicture`) gets no
+ * caption track and no captions switch, so a viewer never sees two layers.
+ */
+export function ownCaptionsAvailable(pitch: {
+  readonly captionState: string;
+  readonly captionsInPicture?: boolean | undefined;
+}): boolean {
+  return pitch.captionState === "AVAILABLE" && pitch.captionsInPicture !== true;
+}
+
 const STORAGE_KEY = "cq.discover.captions";
 const listeners = new Set<() => void>();
 let memory: boolean | null = null;

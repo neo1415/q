@@ -3254,6 +3254,7 @@ export type Database = {
           aspect_ratio: string | null
           audience: string
           caption_state: string
+          captions_in_picture: boolean
           created_at: string
           created_by_user_id: string
           deleted_at: string | null
@@ -3284,6 +3285,7 @@ export type Database = {
           aspect_ratio?: string | null
           audience?: string
           caption_state?: string
+          captions_in_picture?: boolean
           created_at?: string
           created_by_user_id: string
           deleted_at?: string | null
@@ -3314,6 +3316,7 @@ export type Database = {
           aspect_ratio?: string | null
           audience?: string
           caption_state?: string
+          captions_in_picture?: boolean
           created_at?: string
           created_by_user_id?: string
           deleted_at?: string | null

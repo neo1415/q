@@ -18,6 +18,7 @@ import {
   toCompanyPitch,
   toDiscoverablePitch,
   toMediaAssetDto,
+  pitchSummary,
   CreateVideoUploadSessionSchema,
   type CompanyPitch,
   type MediaAsset,
@@ -329,8 +330,24 @@ describe("toDiscoverablePitch", () => {
       title: null,
       audience: "INVESTORS",
       downloadable: false,
+      captionsInPicture: false,
     });
     expect(JSON.stringify(pitch)).not.toContain("cf-uid-private");
+  });
+
+  it("says when the picture already shows captions (QA F-31), and the feed summary carries it", () => {
+    const burned = toDiscoverablePitch(
+      publishable({ captionsInPicture: true }),
+    );
+    expect(burned?.captionsInPicture).toBe(true);
+    expect(
+      burned === null ? null : pitchSummary(burned).captionsInPicture,
+    ).toBe(true);
+    // Absent on an asset means no captions in the picture.
+    const plain = toDiscoverablePitch(publishable());
+    expect(plain === null ? null : pitchSummary(plain).captionsInPicture).toBe(
+      false,
+    );
   });
 
   it.each<[string, Partial<MediaAsset>]>([
