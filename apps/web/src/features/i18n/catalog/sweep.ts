@@ -856,4 +856,11 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   // P3 (owner 2026-11-04): a running plan's measurable progress.
   "{n} of {m} steps done": "أُنجزت {n} من {m} خطوات",
   "Needs you: tell Q what to prepare": "يحتاجك: أخبر Q بما يجهّزه",
+
+  // The Q home like a chat app's (client 2026-11-05)
+  "What's on your mind today, {name}?": "بماذا تفكر اليوم يا {name}؟",
+  "Show captions": "إظهار الترجمة النصية",
+  "Hide captions": "إخفاء الترجمة النصية",
+  "Raising capital": "جمع التمويل",
+  Investing: "الاستثمار",
 };

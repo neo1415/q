@@ -17,8 +17,6 @@ import { describeQStreamTransport } from "@capital-q/api-client";
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
 import {
-  Captions,
-  FileText,
   History,
   PanelRight,
   ICON_SIZE,
@@ -27,13 +25,11 @@ import {
   MicOff,
   Square,
 } from "@capital-q/ui/icons";
-import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { DialogRoot, DialogViewerContent } from "@capital-q/ui/dialog";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
-import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
 import { noticeOf } from "@/features/q/control/q-control-runtime";
 import { onUiActReport } from "@/features/q/ui-act-controller";
@@ -58,10 +54,8 @@ import {
   takeAcceptedDeckOffer,
 } from "@/features/onboarding-conversation/deck-offer";
 
-import { QAperture, useStageApertureSize } from "../q-aperture";
 import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
-import { VoiceMenu } from "../voice/voice-menu";
 import {
   speakTypedAnswer,
   useReadAloudChoice,
@@ -97,7 +91,8 @@ import {
 } from "./turn-disposition";
 import { useBoardMarks } from "./q-board";
 import { QNow } from "./q-now";
-import { QCanSee } from "./q-can-see";
+import { QMoreMenu } from "./q-more-menu";
+import { QStarters, startersOf, type QStarter } from "./q-starters";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { noteQPageView } from "./screen";
 import { useQSession } from "./q-session";
@@ -184,8 +179,17 @@ export type QConversationPanelProps = {
   readonly conversationId?: string | null | undefined;
   /** "New chat": start a new conversation (a bare page keeps the current one). */
   readonly fresh?: boolean | undefined;
-  /** Q's welcome, shown on the stage before the first turn (A, K). */
-  readonly welcome?: ReactNode | undefined;
+  /**
+   * The one line over the empty home's composer (client 2026-11-05):
+   * "What's on your mind today, Ada?". The default line when absent.
+   */
+  readonly greeting?: string | undefined;
+  /**
+   * What genuinely waits on the person (finish setup, verify), set first
+   * among the empty home's at most three starters; the surface's suggested
+   * questions fill the rest.
+   */
+  readonly starters?: readonly QStarter[] | undefined;
   /** The welcome as Q says it: the line Q opens with. */
   readonly welcomeLine?: string | undefined;
   /**
@@ -229,6 +233,9 @@ export function welcomeNow(input: {
 }
 
 const COMPOSER_ID = "home-q";
+/** The empty home's line when the page gives none (client 2026-11-05). */
+const DEFAULT_GREETING = "What's on your mind today?";
+const NO_STARTERS: readonly QStarter[] = [];
 /** How long their spoken words rest before they are read as an answer. */
 const OPENER_SETTLE_MS = 1_200;
 
@@ -319,7 +326,8 @@ export function QConversationPanel({
   context,
   conversationId: openConversationId = null,
   fresh = false,
-  welcome,
+  greeting,
+  starters = NO_STARTERS,
   welcomeLine,
   welcomeLead,
   briefing,
@@ -685,13 +693,6 @@ export function QConversationPanel({
     readCaptions,
     () => true,
   );
-  // The voice room (owner 2026-10-19): the arrival's room-sized Q gathers
-  // into the stage's cloud whenever Q is doing anything at all.
-  const stagePixels = useStageApertureSize();
-  const roomGathered =
-    voice.active ||
-    q.working ||
-    (presence.state !== "IDLE" && presence.state !== "COMPLETE");
   // Before anything is said the top of the stage -- Q -- is what must be
   // in view (R24); the welcome beneath it can scroll. Once there is a
   // conversation, its newest words are followed while the person is at
@@ -762,9 +763,11 @@ export function QConversationPanel({
   useEffect(() => {
     if (documentStage) expectDocument();
   }, [documentStage]);
-  const showWelcome = welcome !== undefined && lines.length === 0 && !q.loading;
+  const shownStarters = useMemo(
+    () => startersOf(starters, context.suggestions),
+    [starters, context.suggestions],
+  );
   const showSuggestions =
-    welcome === undefined &&
     connected &&
     lines.length === 0 &&
     !q.working &&
@@ -1072,6 +1075,97 @@ export function QConversationPanel({
     </>
   );
 
+  // One composer, in the middle of the empty home and at the foot of a
+  // conversation (client 2026-11-05, "like ChatGPT").
+  const composer = (
+    <>
+      {/* Latency: a record named as they type is resolved and its
+                page prefetched before Send (fast-navigation.ts). */}
+      {/* ~768 px, like a reading column (owner 2026-11-04). */}
+      <div className="w-full max-w-3xl" onInput={readTypedDraft}>
+        <QComposer
+          id={COMPOSER_ID}
+          variant="pill"
+          showContext={false}
+          {...(initialAsk === undefined || conversing
+            ? {}
+            : { initialValue: initialAsk })}
+          disabled={q.working && !voice.active}
+          {...(voice.active
+            ? {
+                iconActions: (
+                  <>
+                    <IconButton
+                      type="button"
+                      variant="quiet"
+                      aria-label={t(client.muted ? "Unmute" : "Mute")}
+                      title={t(client.muted ? "Unmute" : "Mute")}
+                      aria-pressed={client.muted}
+                      disabled={!client.connected}
+                      onClick={() => client.setMuted(!client.muted)}
+                      data-q-control="mute"
+                    >
+                      {client.muted ? (
+                        <MicOff
+                          size={ICON_SIZE.prominent}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Mic
+                          size={ICON_SIZE.prominent}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        />
+                      )}
+                    </IconButton>
+                    <IconButton
+                      type="button"
+                      variant="quiet"
+                      aria-label={t("End")}
+                      title={t("End")}
+                      onClick={end}
+                      data-q-control="end"
+                    >
+                      <Square
+                        size={ICON_SIZE.prominent}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </IconButton>
+                  </>
+                ),
+              }
+            : {})}
+          {...(connected && !voice.active
+            ? { onTalk: () => void talk(), talkLabel: "Talk to Q" }
+            : {})}
+          placeholder={voice.active ? "Type instead" : "Ask Q"}
+          attachments={attached.attachments}
+          {...(attached.status === null
+            ? {}
+            : {
+                attachmentStatus: (
+                  <WorkingLine
+                    label={t(attached.status)}
+                    active
+                    data-q-attachment-reading=""
+                  />
+                ),
+              })}
+          {...(connected
+            ? {
+                onAttach: attach,
+                attachLabel: "Attach a document",
+                attachAccept: Q_ATTACH_ACCEPT,
+              }
+            : {})}
+          {...(connected ? { onSubmit: submitTyped } : {})}
+        />
+      </div>
+    </>
+  );
+
   return (
     <QSurfaceToolsContext.Provider value={tools}>
       <div
@@ -1094,103 +1188,44 @@ export function QConversationPanel({
               covered by them. The line keeps its own space below it and,
               on a phone, a hairline where the thread begins. */}
           <div
-            className="cq-q-top-line flex flex-none flex-wrap items-center justify-between gap-x-2 gap-y-1 px-5 pt-4 pb-2 sm:gap-x-3 sm:px-8"
+            className="cq-q-top-line flex flex-none items-center justify-between gap-2 px-3 pt-3 pb-2 sm:px-6"
             data-q-top-line
           >
-            {/* The scope, out of the input (R24). A phone's top bar already
-                carries it, so here it is the desktop's. */}
-            <div className="flex min-w-0 items-center gap-3">
-              {bigPresence ? null : (
-                // Q stepped up to the corner: small, still live. Decorative
-                // here: it never takes a tap meant for a control beside it.
-                <span
-                  className="pointer-events-none flex flex-none items-center gap-2"
-                  data-q-presence="corner"
-                >
-                  <ViewTransition
-                    name="q-aperture"
-                    share="cq-q-morph"
-                    default="none"
-                  >
-                    <QAperture
-                      state={presence.state}
-                      size={40}
-                      inputLevel={client.inputLevel}
-                      outputLevel={client.outputLevel}
-                      showing={showingCards}
-                    />
-                  </ViewTransition>
-                  <span className="cq-caption text-(--cq-text-secondary) max-sm:sr-only">
-                    {t(stateLabel ?? "Q")}
-                  </span>
-                </span>
-              )}
-              <div className="min-w-0 max-lg:hidden" data-q-scope>
-                <ContextIndicator
-                  translate={t}
-                  scope={context.scope}
-                  detail={context.label}
-                />
-              </div>
-              {/* Q room R1: what Q is looking at, quietly. */}
-              <QCanSee className="max-sm:hidden" />
-            </div>
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-              {/* Owner 2026-11-04: Q and Chat are always there, not only
-                  once a conversation has begun. */}
-              <div
-                role="group"
-                aria-label={t("View")}
-                className="flex items-center rounded-md border border-(--cq-border-subtle) p-0.5"
-                data-q-control="view"
-              >
-                {(["presence", "chat"] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={view === option}
-                    onClick={() => chooseView(option)}
-                    className={
-                      view === option
-                        ? "cq-stage-quiet is-active"
-                        : "cq-stage-quiet"
-                    }
-                  >
-                    {option === "presence" ? "Q" : t("Chat")}
-                  </button>
-                ))}
-              </div>
-              {conversing && view === "presence" && !voice.active ? (
+            {/* Client 2026-11-05 ("the top is too cluttered"): no scope
+                chip, no "Q can see", no corner presence. The Q | Chat
+                switch in the middle; Board, Conversations and More at the
+                end. The empty start keeps the line's width so the switch
+                stays centred. */}
+            <div className="flex-1 max-sm:hidden" aria-hidden="true" />
+            {/* Owner 2026-11-04: Q and Chat are always there, not only
+                once a conversation has begun. */}
+            <div
+              role="group"
+              aria-label={t("View")}
+              className="cq-q-switch"
+              data-q-control="view"
+              data-q-view={view}
+            >
+              <span aria-hidden="true" className="cq-q-switch-thumb" />
+              {(["presence", "chat"] as const).map((option) => (
                 <button
+                  key={option}
                   type="button"
-                  aria-pressed={captions}
-                  className={
-                    captions ? "cq-stage-quiet is-active" : "cq-stage-quiet"
-                  }
-                  onClick={() => writeCaptions(!captions)}
-                  data-q-control="captions"
+                  aria-pressed={view === option}
+                  onClick={() => chooseView(option)}
                 >
-                  <Captions
-                    aria-hidden="true"
-                    size={ICON_SIZE.compact}
-                    strokeWidth={ICON_STROKE}
-                  />
-                  {/* An icon on a phone, where the top line is full. */}
-                  <span className="max-sm:sr-only">{t("Captions")}</span>
+                  {option === "presence" ? "Q" : t("Chat")}
                 </button>
-              ) : null}
-              <VoiceMenu
-                voice={voice.voice}
-                onChoose={(choice) => void voice.chooseVoice(choice)}
-                readAloud={readAloud}
-                onReadAloud={setReadAloud}
-              />
+              ))}
+            </div>
+            <div className="flex flex-1 items-center justify-end gap-1">
               <button
                 key={`board-${String(boardBump)}`}
                 type="button"
                 className={`${boardOpen ? "cq-stage-quiet is-active" : "cq-stage-quiet"}${boardBump > 0 ? " cq-board-bump" : ""}`}
                 aria-expanded={boardOpen}
                 aria-label={`Board, ${String(boardCount)} ${boardCount === 1 ? "item" : "items"}`}
+                title={t("Board")}
                 onClick={() => setBoardOpen((current) => !current)}
                 data-q-control="board"
                 data-q-board-count={String(boardCount)}
@@ -1200,15 +1235,18 @@ export function QConversationPanel({
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                <span aria-hidden="true">{t("Board")}</span>
-                <span className="cq-board-count" aria-hidden="true">
-                  {boardCount}
-                </span>
+                {boardCount > 0 ? (
+                  <span className="cq-board-count" aria-hidden="true">
+                    {boardCount}
+                  </span>
+                ) : null}
               </button>
               <button
                 type="button"
                 className="cq-stage-quiet"
                 onClick={() => setHistoryOpen(true)}
+                aria-label={t("Conversations")}
+                title={t("Conversations")}
                 data-q-control="history"
               >
                 <History
@@ -1216,24 +1254,19 @@ export function QConversationPanel({
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                <span className="max-sm:sr-only">{t("Conversations")}</span>
               </button>
-              {hasTranscript ? (
-                <button
-                  type="button"
-                  className="cq-stage-quiet"
-                  onClick={() => setTranscriptOpen(true)}
-                  aria-label={t("Open the transcript")}
-                  aria-haspopup="dialog"
-                  data-q-control="transcript"
-                >
-                  <FileText
-                    aria-hidden="true"
-                    size={ICON_SIZE.compact}
-                    strokeWidth={ICON_STROKE}
-                  />
-                </button>
-              ) : null}
+              <QMoreMenu
+                voice={voice.voice}
+                onChooseVoice={(choice) => void voice.chooseVoice(choice)}
+                readAloud={readAloud}
+                onReadAloud={setReadAloud}
+                {...(conversing && view === "presence" && !voice.active
+                  ? { captions, onCaptions: writeCaptions }
+                  : {})}
+                {...(hasTranscript
+                  ? { onTranscript: () => setTranscriptOpen(true) }
+                  : {})}
+              />
             </div>
           </div>
           {transcriptOpen ? (
@@ -1318,40 +1351,31 @@ export function QConversationPanel({
                       spokenPreview={session.spokenPreview}
                       onBoardLanded={onBoardLanded}
                       onPin={boardMarks.pin}
+                      // Client 2026-11-05: no particle field on the Q home.
+                      // The voice view keeps its words: a dot and the state
+                      // ("Listening", "Speaking"), and the way to the thread.
                       presence={(compact, mini) =>
-                        mini === true ? (
-                          <ViewTransition
-                            name="q-aperture"
-                            share="cq-q-morph"
-                            default="none"
-                          >
-                            <QAperture
-                              state={presence.state}
-                              size={44}
-                              inputLevel={client.inputLevel}
-                              outputLevel={client.outputLevel}
-                              showing={showingCards}
-                            />
-                          </ViewTransition>
-                        ) : (
+                        mini === true ? null : (
                           <div
                             className="flex flex-col items-center gap-2 pt-2"
                             data-q-presence="stage"
                           >
-                            <ViewTransition
-                              name="q-aperture"
-                              share="cq-q-morph"
-                              default="none"
-                            >
-                              <QAperture
-                                state={presence.state}
-                                size={compact ? 64 : 200}
-                                inputLevel={client.inputLevel}
-                                outputLevel={client.outputLevel}
-                                stage
-                                showing={compact || showingCards}
-                              />
-                            </ViewTransition>
+                            {stateLabel === null ? null : (
+                              <span
+                                className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                                role="status"
+                                data-q-state-pill
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={cx(
+                                    "size-2 rounded-full bg-(--cq-accent)",
+                                    voice.active && "motion-safe:animate-pulse",
+                                  )}
+                                />
+                                {t(stateLabel)}
+                              </span>
+                            )}
                             {!compact &&
                             thread.length > latestExchange(thread).length ? (
                               <button
@@ -1707,170 +1731,56 @@ export function QConversationPanel({
                 {notices}
               </div>
             ) : (
+              // Client 2026-11-05, "our Q screen should look like ChatGPT":
+              // one greeting line, the composer in the middle, at most
+              // three starters under it. Nothing else before the first word.
               <div
-                className={cx(
-                  "cq-arrival mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6",
-                  // The arrival room: decision cards either side of Q.
-                  room.filled && "lg:max-w-6xl",
-                )}
+                className="cq-arrival mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center gap-5 py-6"
+                data-q-home-empty
               >
-                {/* Chat before the first word: the greeting, as a chat app's first screen; Q is in the corner. */}
-                {view === "chat" ? null : (
-                  <ArrivalRoom>
-                    {room.filled ? (
-                      <div data-q-room-presence="filled">
-                        <ViewTransition
-                          name="q-aperture"
-                          share="cq-q-morph"
-                          default="none"
-                        >
-                          <QAperture
-                            state={presence.state}
-                            size="stage"
-                            inputLevel={client.inputLevel}
-                            outputLevel={client.outputLevel}
-                            stage
-                          />
-                        </ViewTransition>
-                      </div>
-                    ) : (
-                      // The voice room (owner 2026-10-19): with nothing beside
-                      // Q, the room at rest is a large, dim Q that gathers
-                      // into the stage's cloud the moment Q listens or works.
-                      <div
-                        ref={fitRoomPresence}
-                        className={cx(
-                          "cq-room-presence",
-                          roomGathered && "is-gathered",
-                        )}
-                        style={{
-                          ["--cq-room-box" as string]: `${String(stagePixels)}px`,
-                          ["--cq-room-gather" as string]: String(ROOM_GATHER),
-                        }}
-                        data-q-room-presence={
-                          roomGathered ? "gathered" : "field"
-                        }
-                      >
-                        <ViewTransition
-                          name="q-aperture"
-                          share="cq-q-morph"
-                          default="none"
-                        >
-                          <QAperture
-                            state={presence.state}
-                            size={Math.round(stagePixels / ROOM_GATHER)}
-                            inputLevel={client.inputLevel}
-                            outputLevel={client.outputLevel}
-                            stage
-                            room={!roomGathered}
-                          />
-                        </ViewTransition>
-                      </div>
-                    )}
-                    <div className="flex min-h-6 flex-col items-center gap-2">
-                      {stateLabel === null ? null : (
-                        // A dot and a word ("Listening", "Speaking"), quiet.
-                        <span
-                          className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
-                          role="status"
-                          data-q-state-pill
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={cx(
-                              "size-2 rounded-full bg-(--cq-accent)",
-                              voice.active && "motion-safe:animate-pulse",
-                            )}
-                          />
-                          {t(stateLabel)}
-                        </span>
-                      )}
-                      {/* Round 4: where Q is, one line, its height kept so
-                        the stage never moves as it changes. */}
-                      <StageLine current={presence.stage} reserve />
-                    </div>
-                  </ArrivalRoom>
-                )}
-
-                {showWelcome ? (
-                  <div
-                    className="flex w-full flex-col items-center"
-                    data-q-welcome-line
+                {stateLabel === null ? null : (
+                  // A dot and a word ("Listening", "Speaking"), quiet.
+                  <span
+                    className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                    role="status"
+                    data-q-state-pill
                   >
-                    {welcome}
-                  </div>
-                ) : null}
-
-                {/* The voice room's invitation (owner 2026-10-19, replacing
-                    "the microphone only", 2026-10-17): the same talk() the
-                    composer's microphone starts, so it is one way in with
-                    two doors, never a second voice path. */}
-                {connected && !voice.active && !q.working && !q.loading ? (
-                  <button
-                    type="button"
-                    className="cq-room-talk"
-                    onClick={() => void talk()}
-                    data-q-control="talk"
-                  >
-                    <Mic
+                    <span
                       aria-hidden="true"
-                      size={ICON_SIZE.compact}
-                      strokeWidth={ICON_STROKE}
+                      className={cx(
+                        "size-2 rounded-full bg-(--cq-accent)",
+                        voice.active && "motion-safe:animate-pulse",
+                      )}
                     />
-                    {t("Talk to Q")}
-                  </button>
+                    {t(stateLabel)}
+                  </span>
+                )}
+                <p
+                  className="cq-title-lg m-0 text-center text-balance text-(--cq-text-primary)"
+                  data-q-greeting
+                >
+                  {t(greeting ?? DEFAULT_GREETING)}
+                </p>
+                {composer}
+                {showSuggestions && !voice.active ? (
+                  <div className="w-full max-w-3xl px-2">
+                    <QStarters starters={shownStarters} onAsk={sayOrAsk} />
+                  </div>
                 ) : null}
                 {/* "Hey Q" paused from its corner button: the way back. */}
                 {connected && !voice.active ? <WakeResume /> : null}
-
-                {/* E1: the stage layer's place below Q before the first word. */}
-                <RoomBelow className="max-w-(--cq-layout-narrow)" />
-
-                {showSuggestions ? (
-                  <ul
-                    aria-label={t("Suggested questions")}
-                    className="flex flex-wrap justify-center gap-2"
-                    data-q-suggestions
-                  >
-                    {context.suggestions.map((suggestion) => (
-                      <li key={suggestion}>
-                        <button
-                          type="button"
-                          className="cq-stage-option"
-                          onClick={() => {
-                            sayOrAsk(suggestion);
-                          }}
-                        >
-                          {suggestion}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-
                 {q.loading ? (
                   <p className="cq-body-sm text-(--cq-text-secondary)">
                     {t("Opening your conversation…")}
                   </p>
                 ) : null}
-
-                {boardDocked ? null : (
-                  <div className="w-full max-w-(--cq-layout-narrow)">
-                    <QNow
-                      session={session}
-                      onAct={sayOrAsk}
-                      quietWhenIdle
-                      withStop={false}
-                      taskShownElsewhere={runListed}
-                    />
-                  </div>
-                )}
                 {notices}
               </div>
             )}
             {/* E1: the arrival's cards, rendered once whatever the branch,
                 so they outlive the welcome and stay while Q speaks. */}
-            {stageLayer === undefined ? null : (
+            {stageLayer === undefined ||
+            !(conversing || voice.active) ? null : (
               <StageModeProvider value={stageMode}>
                 {stageLayer}
               </StageModeProvider>
@@ -1883,105 +1793,25 @@ export function QConversationPanel({
               grows with what is typed, clear of the home indicator. The
               microphone is in the field; before the first word it is also
               the stage's own button. */}
-          <div
-            className="cq-q-controls flex flex-none flex-col items-center gap-2 px-3 pt-2 sm:px-8"
-            data-q-voice-stage-controls
-          >
-            <div className="flex flex-wrap items-center justify-center gap-2 empty:hidden">
-              {q.working ? (
-                <Button
-                  variant="quiet"
-                  size="compact"
-                  onClick={() => void q.stop()}
-                >
-                  {t("Stop")}
-                </Button>
-              ) : null}
+          {conversing || q.working ? (
+            <div
+              className="cq-q-controls flex flex-none flex-col items-center gap-2 px-3 pt-2 sm:px-8"
+              data-q-voice-stage-controls
+            >
+              <div className="flex flex-wrap items-center justify-center gap-2 empty:hidden">
+                {q.working ? (
+                  <Button
+                    variant="quiet"
+                    size="compact"
+                    onClick={() => void q.stop()}
+                  >
+                    {t("Stop")}
+                  </Button>
+                ) : null}
+              </div>
+              {conversing ? composer : null}
             </div>
-            {/* Latency: a record named as they type is resolved and its
-                page prefetched before Send (fast-navigation.ts). */}
-            {/* ~768 px, like a reading column (owner 2026-11-04). */}
-            <div className="w-full max-w-3xl" onInput={readTypedDraft}>
-              <QComposer
-                id={COMPOSER_ID}
-                showContext={false}
-                {...(initialAsk === undefined
-                  ? {}
-                  : { initialValue: initialAsk })}
-                disabled={q.working && !voice.active}
-                {...(voice.active
-                  ? {
-                      iconActions: (
-                        <>
-                          <IconButton
-                            type="button"
-                            variant="quiet"
-                            aria-label={t(client.muted ? "Unmute" : "Mute")}
-                            title={t(client.muted ? "Unmute" : "Mute")}
-                            aria-pressed={client.muted}
-                            disabled={!client.connected}
-                            onClick={() => client.setMuted(!client.muted)}
-                            data-q-control="mute"
-                          >
-                            {client.muted ? (
-                              <MicOff
-                                size={ICON_SIZE.prominent}
-                                strokeWidth={2}
-                                aria-hidden="true"
-                              />
-                            ) : (
-                              <Mic
-                                size={ICON_SIZE.prominent}
-                                strokeWidth={2}
-                                aria-hidden="true"
-                              />
-                            )}
-                          </IconButton>
-                          <IconButton
-                            type="button"
-                            variant="quiet"
-                            aria-label={t("End")}
-                            title={t("End")}
-                            onClick={end}
-                            data-q-control="end"
-                          >
-                            <Square
-                              size={ICON_SIZE.prominent}
-                              strokeWidth={2}
-                              aria-hidden="true"
-                            />
-                          </IconButton>
-                        </>
-                      ),
-                    }
-                  : {})}
-                {...(connected && !voice.active
-                  ? { onVoice: () => void talk(), voiceLabel: "Talk with Q" }
-                  : {})}
-                placeholder={voice.active ? "Type instead" : "Message Q"}
-                attachments={attached.attachments}
-                {...(attached.status === null
-                  ? {}
-                  : {
-                      attachmentStatus: (
-                        <WorkingLine
-                          label={t(attached.status)}
-                          active
-                          data-q-attachment-reading=""
-                        />
-                      ),
-                    })}
-                {...(connected
-                  ? {
-                      onAttach: attach,
-                      attachLabel: "Attach a document",
-                      attachAccept: Q_ATTACH_ACCEPT,
-                    }
-                  : {})}
-                {...(connected ? { onSubmit: submitTyped } : {})}
-              />
-            </div>
-          </div>
+          ) : null}
         </section>
 
         {wide ? (
@@ -2145,31 +1975,6 @@ function phoneWidth(): boolean {
  * like the view itself.
  */
 const CAPTIONS_KEY = "cq.q.captions";
-/** The room's Q at rest is drawn this much larger than the stage's cloud. */
-const ROOM_GATHER = 0.64;
-
-/*
- * Live 2026-10-29: the room's box is sized by the arrival's layout, which
- * gives Q only the height the welcome leaves (globals.css, .cq-arrival),
- * so nothing is pushed under the composer. The canvas keeps its pixel size
- * and is scaled to the box it got; the box is square at full size, so the
- * fit is its height over its width. Scale never changes layout, so this
- * cannot feed back into the size it reads.
- */
-function fitRoomPresence(
-  node: HTMLDivElement | null,
-): (() => void) | undefined {
-  if (node === null || typeof ResizeObserver !== "function") return undefined;
-  const observer = new ResizeObserver(() => {
-    const { clientWidth, clientHeight } = node;
-    // Hidden (a phone's Home hides the room): nothing to fit.
-    if (clientWidth === 0 || clientHeight === 0) return;
-    const fit = Math.min(1, clientHeight / clientWidth);
-    node.style.setProperty("--cq-room-fit", fit.toFixed(3));
-  });
-  observer.observe(node);
-  return () => observer.disconnect();
-}
 const CAPTIONS_EVENT = "cq:q-captions";
 let captionsInMemory: boolean | null = null;
 

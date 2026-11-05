@@ -149,12 +149,15 @@ describe("Q and Chat before the first word (owner 2026-11-04)", () => {
     });
     const chat = screen.getByRole("button", { name: "Chat" });
     screen.getByRole("button", { name: "Q" });
-    expect(document.querySelector(".cq-room-presence")).not.toBeNull();
+    // Client 2026-11-05: no Q field and no corner Q in either view; the
+    // switch still changes the view.
+    expect(document.querySelector(".cq-room-presence")).toBeNull();
     fireEvent.click(chat);
     expect(chat.getAttribute("aria-pressed")).toBe("true");
     expect(document.querySelector(".cq-room-presence")).toBeNull();
-    expect(document.querySelector("[data-q-presence='corner']")).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Q" }));
-    expect(document.querySelector(".cq-room-presence")).not.toBeNull();
+    expect(document.querySelector("[data-q-presence='corner']")).toBeNull();
+    const q = screen.getByRole("button", { name: "Q" });
+    fireEvent.click(q);
+    expect(q.getAttribute("aria-pressed")).toBe("true");
   });
 });

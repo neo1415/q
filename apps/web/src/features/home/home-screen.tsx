@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { accountDetails } from "@/auth/account-details";
@@ -12,27 +10,23 @@ import {
   QConversationPanel,
   type QSurfaceContext,
 } from "@/features/q/q-conversation";
-import { PersonaCards } from "@/features/persona/persona-cards";
+import type { QStarter } from "@/features/q/q-starters";
+import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { WorkPanel } from "@/features/work/work-panel";
 import { ArrivalStage } from "@/features/briefing/arrival-stage";
 import { warmArrivalSnapshot } from "@/features/briefing/arrival-warm";
-import type { QSubjectInput } from "@/features/q/actions";
 
 import {
   arrivalFor,
-  chooseReturningCards,
   firstName,
   returningGreeting,
-  setupRemindersWaiting,
   type ReturningFacts,
 } from "./returning";
 import type { Briefing } from "./briefing";
 import { resolveBriefing } from "./briefing-facts";
 import { resolveReturningFacts } from "./returning-facts";
-import { ReturningWelcome } from "./returning-welcome";
 import { resolveSetupReminder } from "./setup-reminder";
 import { serverT, serverUiLanguage } from "@/features/i18n/server";
-import { Words } from "@/features/i18n/language";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63; acceptance A and K).
@@ -93,66 +87,15 @@ function surfaceContext(context: OwnContext): QSurfaceContext {
   }
 }
 
-/** The person's own subject, for a question a welcome card asks Q. */
-function askSubject(context: OwnContext): QSubjectInput | undefined {
-  switch (context.kind) {
-    case "FOUNDER":
-      return { companyId: context.companyId };
-    case "INVESTOR":
-      return { investorOrganisationId: context.investorOrganisationId };
-    case "NONE":
-      return undefined;
-  }
-}
-
-/** The one line under Q, in the person's terms rather than the product's. */
-function openingLine(context: OwnContext): string {
-  if (context.kind === "NONE" && context.unavailable === true) {
-    // Not known to be new: Capital Q did not answer (CQ-VERIFY-001).
-    return "Capital Q didn't answer just now, so I can't show where you left off. Ask me anything, or try again in a moment.";
-  }
-  switch (context.kind) {
-    case "FOUNDER":
-      return "Ask about your company, your raise, or what to do next.";
-    case "INVESTOR":
-      return "Ask about your mandate, what to look at, or what changed.";
-    case "NONE":
-      return "Ask Q anything, or tell Q what you're here to do.";
-  }
+/** The empty home's one line, with their first name when known. */
+function mindLine(name: string | null): string {
+  return name === null
+    ? "What's on your mind today?"
+    : `What's on your mind today, ${name}?`;
 }
 
 /** First-run words, the same ones the arrival welcome uses for its choice. */
 const FIRST_RUN_QUESTION = "Are you here to raise capital, or to invest it?";
-
-/**
- * Somebody Capital Q knows nothing about yet, who came to Home rather than
- * through the first-run welcome: Q introduces itself and asks the one
- * question that decides everything after it, with both answers on screen.
- */
-function FirstRunWelcome({ name }: { readonly name: string | null }) {
-  return (
-    <section
-      aria-labelledby="first-run-headline"
-      className="flex w-full flex-col items-center gap-5"
-      data-q-first-run
-    >
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1
-          id="first-run-headline"
-          className="cq-title-lg text-balance text-(--cq-text-primary)"
-        >
-          <Words>{name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`}</Words>
-        </h1>
-        <p className="cq-body-lg text-balance text-(--cq-text-secondary)">
-          <Words>{FIRST_RUN_QUESTION}</Words>
-        </p>
-      </div>
-      <div className="w-full">
-        <PersonaCards />
-      </div>
-    </section>
-  );
-}
 
 export async function HomeScreen({
   conversationId = null,
@@ -199,10 +142,15 @@ export async function HomeScreen({
     time: who Q is and which side of the table they are on. Otherwise
     the one line under Q.
   */
-  let welcome: ReactNode = undefined;
   let welcomeLine: string | undefined = undefined;
   let welcomeLead: string | undefined = undefined;
-  // Whether the page already has its one visible h1 (the welcomes do).
+  // Client 2026-11-05 ("our Q screen should look like ChatGPT"): the empty
+  // home is one greeting line, the composer, and at most three starters --
+  // what genuinely waits on the person first (finish setup, verify), then
+  // the suggested questions. Q's spoken welcome is unchanged.
+  let greeting: string | undefined = undefined;
+  const starters: QStarter[] = [];
+  // The work panel above the conversation, only for the plain arrival.
   let headed = false;
   let briefing: Promise<Briefing | null> | undefined = undefined;
   if (conversationId === null) {
@@ -213,9 +161,10 @@ export async function HomeScreen({
       // Today's setup reminder, read (never claimed) once and given on one
       // surface only: the briefing's card where there is a briefing, this
       // welcome otherwise. No reminder today: neither mentions the setup.
-      const [read, reminder] = await Promise.all([
+      const [read, reminder, nudge] = await Promise.all([
         resolveReturningFacts(context, unfinished),
         unfinished === null ? null : resolveSetupReminder(),
+        loadVerifyNudge().catch(() => null),
       ]);
       const facts: ReturningFacts = {
         ...read,
@@ -226,36 +175,56 @@ export async function HomeScreen({
               ? "WELCOME"
               : "BRIEFING",
       };
-      const greeting = returningGreeting(facts, language);
-      // Owner 2026-10-17: the greeting and one question, nothing more; a
-      // founder's next steps are Q's to give when asked (and on Readiness).
-      welcome = (
-        <ReturningWelcome
-          greeting={greeting}
-          cards={chooseReturningCards(facts)}
-          subject={askSubject(context)}
-          briefing={briefing}
-          setupReminders={setupRemindersWaiting(facts)}
-          resume={
-            unfinished === null
-              ? undefined
-              : { href: `/onboarding/${unfinished}?from=home` }
-          }
-        />
-      );
-      welcomeLine = greeting.spoken;
-      welcomeLead = greeting.headline;
+      const spoken = returningGreeting(facts, language);
+      welcomeLine = spoken.spoken;
+      welcomeLead = spoken.headline;
+      greeting = mindLine(firstName(facts.name));
+      if (unfinished !== null) {
+        starters.push({
+          id: "resume-setup",
+          label: "Finish setup with Q",
+          icon: "setup",
+          kind: "GO",
+          href: `/onboarding/${unfinished}?from=home`,
+        });
+      }
+      if (nudge !== null) {
+        // The verification item, here rather than over the page's top
+        // line (client 2026-11-05: the top was cluttered).
+        starters.push({
+          id: "verify",
+          label: nudge.title,
+          icon: "verify",
+          kind: "GO",
+          href: "/verification",
+        });
+      }
       headed = true;
     } else if (arrival === "FIRST_TIME" && qConnected) {
       const name = firstName((await accountDetails()).displayName);
-      welcome = <FirstRunWelcome name={name} />;
       headed = true;
       welcomeLine = `${name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`} ${FIRST_RUN_QUESTION}`;
-    } else {
-      welcome = (
-        <p className="cq-body text-center text-balance text-(--cq-text-secondary)">
-          {openingLine(context)}
-        </p>
+      // The one question that decides everything after it, with both
+      // answers as the starters.
+      greeting = FIRST_RUN_QUESTION;
+      // The same two ways in as the persona cards (PERSONAS), written
+      // here because a client module's constants are references on the
+      // server, not values.
+      starters.push(
+        {
+          id: "persona-founder",
+          label: "Raising capital",
+          icon: "persona",
+          kind: "GO",
+          href: "/onboarding/founder",
+        },
+        {
+          id: "persona-investor",
+          label: "Investing",
+          icon: "persona",
+          kind: "GO",
+          href: "/onboarding/investor",
+        },
       );
     }
   }
@@ -290,14 +259,15 @@ export async function HomeScreen({
         data-q-surface
       >
         {/* A conversation view still has a page heading (R30 #34). */}
-        {headed ? null : <h1 className="sr-only">Q</h1>}
+        <h1 className="sr-only">Q</h1>
         <QConversationPanel
           connected={qConnected}
           context={surfaceContext(context)}
           conversationId={conversationId}
           fresh={fresh}
           openBoard={openBoard}
-          welcome={welcome}
+          greeting={greeting}
+          starters={starters}
           welcomeLine={welcomeLine}
           welcomeLead={welcomeLead}
           briefing={briefing}

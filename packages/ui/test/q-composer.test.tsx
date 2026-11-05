@@ -11,6 +11,42 @@ import {
   QComposer,
 } from "../src/patterns/q-composer.js";
 
+describe("QComposer, pill (the Q home, client 2026-11-05)", () => {
+  it("puts attach first and swaps the round Q for Send once there is text", async () => {
+    const user = userEvent.setup();
+    const onTalk = vi.fn();
+    const onSubmit = vi.fn();
+    render(
+      <QComposer
+        variant="pill"
+        onTalk={onTalk}
+        onSubmit={onSubmit}
+        onAttach={() => undefined}
+        placeholder="Ask Q"
+      />,
+    );
+    const row = document.querySelector("[data-q-composer-row]");
+    expect(
+      row?.firstElementChild?.querySelector("[data-q-attach]"),
+    ).not.toBeNull();
+    // No Q mark and no second microphone: the round Q is the voice way in.
+    expect(document.querySelectorAll("[data-q-talk]")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Talk to Q" }));
+    expect(onTalk).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    await user.type(screen.getByRole("textbox", { name: "Ask Q" }), "Hi");
+    expect(screen.queryByRole("button", { name: "Talk to Q" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSubmit).toHaveBeenCalledWith("Hi");
+  });
+
+  it("without a voice path, the trailing button is always Send", () => {
+    render(<QComposer variant="pill" />);
+    expect(screen.queryByRole("button", { name: "Talk to Q" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+});
+
 describe("QComposer", () => {
   it("has a real accessible label, not just a placeholder", () => {
     render(<QComposer />);
