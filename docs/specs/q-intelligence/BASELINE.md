@@ -63,41 +63,46 @@ This checks the graders, not intelligence. With the reference replies, every cat
 
 **Q @ 9f138f135 (steps 0+1+6, before the claim-check fix forward)** vs the **bare model** (same provider, raw conversation plus the same facts, no Q layers). Run 5 Nov 2026, `--budget 4.5`.
 
-| Category                              | Q                                                                             | Bare model    |
-| ------------------------------------- | ----------------------------------------------------------------------------- | ------------- |
-| PRONOUNS_PEOPLE                       | 86.7%                                                                         | 100.0%        |
-| ORDINALS_LISTS                        | 83.1%                                                                         | 98.5%         |
-| FOLLOW_UPS                            | 82.7%                                                                         | 94.7%         |
-| CORRECTIONS                           | 86.7%                                                                         | 100.0%        |
-| COMPOUND                              | 75.6%                                                                         | 80.0%         |
-| UNKNOWN                               | 75.0%                                                                         | 80.0%         |
-| CONTRADICTIONS                        | 95.6%                                                                         | 100.0%        |
-| NUMBERS                               | 64.4%                                                                         | 95.9%         |
-| CROSS_CONVERSATION_MEMORY             | 44.4%                                                                         | 100.0%        |
-| AMBIGUITY                             | 100.0%                                                                        | 64.4%         |
-| **Overall (turns)**                   | **79.2%**                                                                     | **92.1%**     |
-| Cases fully passed                    | 56/126                                                                        | 109/150       |
-| References resolved                   | 92.2%                                                                         | 98.6%         |
-| Wrong-entity turns                    | 7                                                                             | 1             |
-| Turns with an invented figure         | 6                                                                             | 14            |
-| Unknowns said as unknown              | 46.3%                                                                         | 63.4%         |
-| Ambiguous asks clarified              | 100.0%                                                                        | 0.0%          |
-| Multi-part asks fully answered        | 81.3%                                                                         | 86.7%         |
-| Helpfulness (rubric, 1–5)             | 4.67                                                                          | 5.00          |
-| Reply latency p50 / p95 (whole reply) | 6.9 s / 11.9 s                                                                | 1.1 s / 1.8 s |
-| Cost                                  | $3.390                                                                        | $0.086        |
-| Cases run                             | 126/150 (budget stop; the last 24 cases are in AMBIGUITY and late categories) | 150/150       |
+| Category                                | Q                                                                                           | Bare model                 |
+| --------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------- |
+| PRONOUNS_PEOPLE                         | 86.7%                                                                                       | 100.0%                     |
+| ORDINALS_LISTS                          | 83.1%                                                                                       | 98.5%                      |
+| FOLLOW_UPS                              | 82.7%                                                                                       | 94.7%                      |
+| CORRECTIONS                             | 86.7%                                                                                       | 100.0%                     |
+| COMPOUND                                | 75.6%                                                                                       | 80.0%                      |
+| UNKNOWN                                 | 75.0%                                                                                       | 80.0%                      |
+| CONTRADICTIONS                          | 95.6%                                                                                       | 100.0%                     |
+| NUMBERS                                 | 64.4%                                                                                       | 95.9%                      |
+| CROSS_CONVERSATION_MEMORY               | 44.4% (6 of 15 cases, 8/18 turns)                                                           | 100.0%                     |
+| AMBIGUITY                               | not run (0 of 15 cases)                                                                     | 64.4%                      |
+| **Overall (turns)**                     | **79.2%**                                                                                   | **92.1%**                  |
+| Overall, same 126 cases (like-for-like) | 79.2% (397/501)                                                                             | 94.2% (472/501)            |
+| Cases fully passed                      | 56/126                                                                                      | 109/150                    |
+| References resolved                     | 92.2%                                                                                       | 98.6%                      |
+| Wrong-entity turns                      | 7                                                                                           | 1                          |
+| Turns with an invented figure           | 6                                                                                           | 14                         |
+| Unknowns said as unknown                | 46.3%                                                                                       | 63.4%                      |
+| Ambiguous asks clarified                | not run                                                                                     | 0.0% (0/15; it never asks) |
+| Multi-part asks fully answered          | 81.3%                                                                                       | 86.7%                      |
+| Helpfulness (rubric, 1–5)               | 4.67                                                                                        | 5.00                       |
+| Reply latency p50 / p95 (whole reply)   | 6.9 s / 11.9 s                                                                              | 1.1 s / 1.8 s              |
+| Cost                                    | $3.390                                                                                      | $0.086                     |
+| Cases run                               | 126/150 (budget stop; cases ran in category order, so no AMBIGUITY and only 6 memory cases) | 150/150                    |
 
 Reading it:
 
-- Q's layers currently **lose** to the bare model in 9 of 10 categories. The overall gap is 12.9 points.
+- Like-for-like, over the 126 cases Q ran, Q's layers **lose** to the bare model by **15.0 points** (79.2% vs 94.2%). Q loses in every category it ran.
 - The biggest losses:
-  - **numbers**, −31.5 points. This is likely the step-6 claim check before the fix forward (timestamp and minute false positives) plus extraction; it needs a re-run on `fdcf86871`.
-  - **cross-conversation memory**, −55.6 points. This is partly the harness, because the eval world wires no memory recall for Q while the bare model gets the earlier conversation transcripts. Step 9 owns that.
-  - **pronouns, ordinals and follow-ups**, −12 to −15 points. Steps 2 and 3 own those.
-- Q wins **ambiguity** (100% vs 64.4%) and invents fewer figures (6 turns vs 14). Both still miss the bar of 0 invented figures.
-- Q is about 6× slower and 40× more expensive per conversation than the bare model in this harness. Step 11 owns that.
-- The goal bar is Q ≥ bare in every category. Today it is met only for AMBIGUITY.
+  - **numbers**, −31.5 points. This is likely the step-6 claim check before its fix forward (timestamp and minute false positives); it needs a re-run on `fdcf86871`.
+  - **cross-conversation memory**, −55.6 points over only 6 cases. Part of that is the harness: the eval world wires no memory recall for Q, while the bare model gets the earlier transcripts. Step 9 owns that.
+  - **pronouns, ordinals, follow-ups and corrections**, −12 to −15 points. Steps 2 and 3 own those.
+- **Ambiguity is unmeasured for Q.** The bare model never asks a clarifying question (0/15).
+- Q invented a figure in fewer turns (6 vs 14), but over fewer cases. Neither meets the bar of 0.
+- Q is about 6× slower and 40× more expensive per conversation in this harness. Step 11 owns that.
+- The goal bar (Q ≥ bare in every category) is met in **no** category Q ran.
+- A reporter bug scored the empty category as 100%; it is fixed in `43542e006`. Next run:
+  - cases go round-robin across categories, so a budget stop samples all 10;
+  - pass `--out` to keep per-turn JSON.
 
 ## Cost
 
