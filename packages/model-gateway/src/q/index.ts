@@ -544,6 +544,15 @@ export {
   type DeckReader,
 } from "./deck-reader.js";
 export {
+  personTimeZone,
+  situationHeader,
+  situationSurfaceOf,
+  SITUATION_HEADER_MAX_CHARS,
+  type QSituationAsker,
+  type QSituationPort,
+  type QSituationSurface,
+} from "./situation-header.js";
+export {
   createQTurnReader,
   readerActions,
   TURN_READER_ACTIONS_MAX,

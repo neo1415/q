@@ -75,6 +75,11 @@ export const Q_SCREEN_ROUTES = [
   "OTHER",
 ] as const;
 export const QScreenRouteSchema = z.enum(Q_SCREEN_ROUTES);
+
+/** The surface a typed question came from (Q intelligence step 1). */
+export const Q_ASK_SURFACES = ["CHAT", "DOCK", "STAGE"] as const;
+export const QAskSurfaceSchema = z.enum(Q_ASK_SURFACES);
+export type QAskSurface = z.infer<typeof QAskSurfaceSchema>;
 export type QScreenRoute = z.infer<typeof QScreenRouteSchema>;
 
 /**
@@ -139,6 +144,13 @@ export const QScreenContextSchema = z
      * refuses one that is not theirs.
      */
     attachedDocumentIds: z.array(UuidSchema).min(1).max(5).optional(),
+    /**
+     * Q intelligence step 1: which of Q's surfaces they asked from -- the
+     * dock beside a page, or the Q page in its presence (STAGE) or chat
+     * view. A closed kind for Q's situation line, never authority; a
+     * spoken turn is VOICE on the server whatever this says.
+     */
+    surface: QAskSurfaceSchema.optional(),
   })
   .strict();
 export type QScreenContext = z.infer<typeof QScreenContextSchema>;

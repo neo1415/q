@@ -71,6 +71,11 @@ export type QTurnReader = {
      * reader picks the one asked for by meaning.
      */
     readonly screenControls?: readonly ReaderScreenControl[] | undefined;
+    /**
+     * Q intelligence step 1: the situation header (date, their time, who
+     * is asking, surface, page), built by code on the server.
+     */
+    readonly situation?: string | undefined;
     readonly attribution: {
       readonly tenantId: string;
       readonly userId: string;
@@ -500,8 +505,10 @@ export function createQTurnReader(dependencies: {
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
           communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-          environmentNotes:
+          environmentNotes: [
+            ...(input.situation === undefined ? [] : [input.situation]),
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
+          ].join(" "),
           variables,
         });
         const ask = (
