@@ -34,6 +34,7 @@ import {
   type RetrievalPermissionEnvelope,
   type RetrievalScopeConstraint,
 } from "../src/retrieval/contracts.js";
+import { planRetrievalQueries } from "../src/retrieval/query-plan.js";
 import { createAuthorisedRetrievalService } from "../src/retrieval/service.js";
 
 /**
@@ -888,6 +889,87 @@ describe("authorised hybrid retrieval against local PostgreSQL", () => {
       expect(result.hits.length).toBeLessThanOrEqual(
         DEFAULT_RETRIEVAL_CONFIG.finalHits,
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Step 5: a rewritten, multi-query, reranked retrieval keeps the firewall
+  // -------------------------------------------------------------------------
+
+  it("a query rewritten from the ledger cannot reach another tenant's or a founder-private chunk", async () => {
+    await withWorld(async ({ tx }) => {
+      const home = await seedTenant(tx, "S5-A");
+      const other = await seedTenant(tx, "S5-B");
+      const [visible] = await seedDocument(tx, home, [
+        {
+          text: "Monthly burn. The company's net monthly burn is 180k.",
+          visibility: "network_visible",
+          sensitivity: "NETWORK_VISIBLE",
+        },
+      ]);
+      // Both are the best possible matches for the rewritten searches.
+      await seedDocument(tx, home, [
+        {
+          text: `Monthly burn monthly burn Company S5-A ${MARKERS.founderPrivate}`,
+          visibility: "founder_private",
+        },
+      ]);
+      await seedDocument(tx, other, [
+        {
+          text: `Monthly burn monthly burn Company S5-B ${MARKERS.crossTenant}`,
+          visibility: "network_visible",
+          sensitivity: "NETWORK_VISIBLE",
+        },
+      ]);
+      const { retrieval } = world(tx);
+      // An investor in tenant A, network-visible material only. The ledger
+      // holds both companies -- one of them, wrongly, from another tenant --
+      // and the reader bound "their burn" to both.
+      const plan = planRetrievalQueries({
+        words: "and their burn?",
+        previousWords: ["what is the monthly burn?"],
+        focus: {
+          ledger: {
+            entities: [
+              {
+                ref: "E1",
+                kind: "COMPANY",
+                id: home.companyId,
+                name: "Company S5-A",
+                firstTurn: 1,
+                lastTurn: 2,
+                via: ["SAID_BY_Q"],
+                of: null,
+                value: null,
+              },
+              {
+                ref: "E2",
+                kind: "COMPANY",
+                id: other.companyId,
+                name: "Company S5-B",
+                firstTurn: 1,
+                lastTurn: 2,
+                via: ["SAID_BY_Q"],
+                of: null,
+                value: null,
+              },
+            ],
+            lists: [],
+          },
+          boundRefs: ["E1", "E2"],
+        },
+      });
+      expect(plan.queries.length).toBeGreaterThanOrEqual(2);
+      const result = await retrieval.retrieve({
+        query: "and their burn?",
+        queries: plan.queries,
+        ...(plan.focus === null ? {} : { focus: plan.focus }),
+        envelope: envelopeFor(home, [networkConstraint()]),
+      });
+      expect(result.hits.map((hit) => hit.chunkId)).toEqual([visible?.id]);
+      const serialised = JSON.stringify(result);
+      expect(serialised).not.toContain(MARKERS.founderPrivate);
+      expect(serialised).not.toContain(MARKERS.crossTenant);
     });
   });
 });

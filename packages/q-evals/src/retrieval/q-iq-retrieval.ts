@@ -586,22 +586,45 @@ export function configFor(mode: QIqRetrievalMode): RetrievalConfig {
 export function memoryQIqRetrieve(
   chunks: readonly QIqStoredChunk[] = storedQIqCorpus(),
 ): QIqRetrieve {
-  const factOf = new Map(chunks.map((chunk) => [chunk.chunkId, chunk.factId]));
-  const lexical = memoryLexicalSearch(chunks);
-  const hydration = memoryHydration(chunks);
-  const sql = {} as DatabaseExecutor;
+  return serviceQIqRetrieve({
+    sql: {} as DatabaseExecutor,
+    lexical: memoryLexicalSearch(chunks),
+    hydration: memoryHydration(chunks),
+    chunks,
+  });
+}
+
+/**
+ * The retrieve over any ports: in memory above, Postgres in the
+ * integration test. The service, the planner and the reranker are the
+ * production ones; only the storage differs.
+ */
+export function serviceQIqRetrieve(input: {
+  readonly sql: DatabaseExecutor;
+  readonly lexical: LexicalSearchPort;
+  readonly hydration: ChunkHydrationPort;
+  readonly chunks: readonly QIqChunk[];
+  readonly tenantId?: string | undefined;
+}): QIqRetrieve {
+  const factOf = new Map(
+    input.chunks.map((chunk) => [chunk.chunkId, chunk.factId]),
+  );
   const services = new Map(
     Q_IQ_RETRIEVAL_MODES.map((mode) => [
       mode,
       createAuthorisedRetrievalService({
-        sql,
-        lexical,
+        sql: input.sql,
+        lexical: input.lexical,
         semantic: { search: () => Promise.resolve([]) },
-        hydration,
+        hydration: input.hydration,
         config: configFor(mode),
       }),
     ]),
   );
+  const envelope = {
+    ...qIqEnvelope(),
+    tenantId: input.tenantId ?? Q_IQ_TENANT_ID,
+  };
   return async ({ mode, words, previousWords, focus }) => {
     const service = services.get(mode);
     if (service === undefined) throw new Error(`no service for ${mode}`);
@@ -616,7 +639,7 @@ export function memoryQIqRetrieve(
           });
     const result = await service.retrieve({
       query: words,
-      envelope: qIqEnvelope(),
+      envelope,
       ...(planned === null
         ? {}
         : {

@@ -99,6 +99,7 @@ export class RetrievalCancelledError extends Error {
 
 function emptyResult(
   config: RetrievalConfig,
+  reranker: RetrievalReranker,
   requested: RetrievalStrategy,
   executed: RetrievalStrategy,
   degraded: RetrievalDegradation,
@@ -123,6 +124,11 @@ function emptyResult(
       expansionMs: 0,
       totalMs,
       contextCharacters: 0,
+      // The same keys as a searched result, so a denied envelope cannot be
+      // told from no match by the shape of its diagnostics.
+      queries: 0,
+      reranker: reranker.code,
+      rerankMs: 0,
     },
   };
 }
@@ -377,6 +383,7 @@ export function createAuthorisedRetrievalService(
         metrics.empty.add(1, labels);
         return emptyResult(
           config,
+          reranker,
           requested,
           requested,
           {
