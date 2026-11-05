@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-05",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link; service key read from Railway api variables in memory, never printed or stored",
+  "deploy": {
+    "commit": "449301dbe",
+    "from": "7b9a267ce (pushed by integration owner 00:53Z)",
+    "web": "SUCCESS",
+    "api": "SUCCESS",
+    "qApi": "SUCCESS",
+    "workers": "SUCCESS",
+    "allSuccessAt": "2026-11-05T01:09:08Z"
+  },
+  "qTurns": 5,
+  "qTurnLog": [
+    "390 plan",
+    "390 okay",
+    "1440 plan (Q stage)",
+    "1440 okay",
+    "1440 how far"
+  ],
+  "approvals": "none; no step cards approved, nothing sent",
+  "1_planCardWithExecute": {
+    "verdict": "PASS",
+    "390": "Plan card 'Check Ledgerline's unit economics this week ...' with Execute / Put on my board / Change it after ~200 s; no research job. The page opened in the Chat view (the account's remembered view), not the Q stage",
+    "1440": "Q stage: 'Your plan is ready: 6 steps ...' and plan card with Execute; no research job"
+  },
+  "2_okayRuns": {
+    "verdict": "FAIL",
+    "390": "PASS: 'Running it now: my steps have started and yours are on your board. ...' The running plan card stays, with steps Next/Now",
+    "1440": "FAIL on 'card stays on stage': 'Running it now: ...' and steps start, but then: \"Put 'Check Ledgerline's unit economics this week and leave you with an evidence-based view of whether to advance, pause or pass.' away as we moved on.\" The running card moves under 'Earlier in this conversation'"
+  },
+  "3_workMoving": {
+    "verdict": "FAIL",
+    "390plan": "PASS: Moving shows 'Check Ledgerline's unit economics this week and reach a clear, evidence-based view ...' with its steps (Working, later Waiting for you)",
+    "1440plan": "FAIL: Moving lists it twice as 'Your plan: Make me a plan to check Ledgerline's unit economics this week · Working' (the request text, not the plan title, and no steps)"
+  },
+  "4_oneNowChip": {
+    "verdict": "PASS",
+    "observed": "No separate 'Now' chip at either width (max 0 lines reading 'Now' in every 2 s sample). While drafting at 390 the current step appears once as a status line ('Looking at the company') above the Working list"
+  },
+  "5_howFar": {
+    "verdict": "PASS",
+    "answer": "The task is partly complete. The plan has 6 steps; 1 of 6 is complete, and the Ledgerline unit-economics assessment is ready. The remaining work is still open, including the evidence request and the steps needed to reach an evidence-based advance, pause or pass view."
+  }
+}
