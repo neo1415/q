@@ -6,6 +6,7 @@ import {
   type QFailureClass,
   type QTurnDisposition,
   QRunIdSchema,
+  type QScreenContext,
   type QSilenceBeat,
   type QVoiceDuplexHeard,
   type QVoiceDuplexHeardResult,
@@ -427,6 +428,17 @@ export type DuplexBrokerDependencies = {
   readonly logger: Logger;
   /** BACKCHANNEL: the person's remembered listening level. */
   readonly listening?: DuplexListeningStore | undefined;
+  /**
+   * Q intelligence step 1: the situation header for this line (date, their
+   * time, who is asking, page), built by code for the actor as the line
+   * opens. Absent or failing: the line opens without it.
+   */
+  readonly situation?:
+    | ((
+        actor: ActorContext,
+        screen: QScreenContext | undefined,
+      ) => Promise<string | null>)
+    | undefined;
   /** VOICE-BRAIN: the line's transcript, both sides (server-only). */
   readonly transcript?: DuplexTranscriptStore | undefined;
   readonly now?: (() => number) | undefined;
@@ -944,12 +956,21 @@ export function createDuplexBroker(
     const guided =
       binding.thread.welcome === true ||
       binding.thread.onboarding !== undefined;
+    // Step 1: from the firewall's plan screen, never the thread's raw one.
+    let situation: string | null = null;
+    try {
+      situation =
+        (await dependencies.situation?.(actor, decision.plan.screen)) ?? null;
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "duplex situation unreadable");
+    }
     const mint: RealtimeMintRequest = {
       instructions: duplexInstructions({
         firstMessage,
         locale,
         listening: listens,
         guided,
+        ...(situation === null ? {} : { situation }),
       }),
       tools: duplexTools(
         // Every line answers through ask_q alone (founder 2026-10-06):

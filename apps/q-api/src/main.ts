@@ -465,7 +465,11 @@ import {
   type ModelProvider,
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
-import { createReadCache } from "@capital-q/model-gateway/q";
+import {
+  createReadCache,
+  situationHeader,
+  type QSituationPort,
+} from "@capital-q/model-gateway/q";
 import {
   budgetForTaskClass,
   createQDelegationReader,
@@ -4859,6 +4863,23 @@ const arrivalSnapshots = createArrivalSnapshots({
   // P4: their own latest Q Daily edition, for the quiet-day welcome.
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
+// Q intelligence step 1: who is asking, for the situation header every Q
+// model step is told. The role is the side of the organisation their actor
+// context's membership grants (the rehearsal's own viewer read), never
+// anything the client says; the name and zone are their own profile's.
+const situationOfActor: QSituationPort = async (actor) => {
+  if (actor.actorType !== "HUMAN") return null;
+  const [profile, viewer] = await Promise.all([
+    people.read(actor.userId).catch(() => null),
+    rehearsalMaterial.viewer(actor).catch(() => null),
+  ]);
+  return {
+    displayName: profile?.displayName ?? null,
+    role: viewer?.role ?? null,
+    organisation: viewer?.organisationName ?? null,
+    timeZone: profile?.timeZone ?? null,
+  };
+};
 const qIntelligence = composeQIntelligence({
   readCache: qReadCache,
   // Situation-first planning (S5, S6): the reader's planAsk starts the plan
@@ -5085,6 +5106,7 @@ const qIntelligence = composeQIntelligence({
       })),
     };
   },
+  situationOf: situationOfActor,
   askerOf: async ({ tenantId, userId, firstAnswer }) => {
     const rows = await database.sql<
       {
@@ -7731,6 +7753,15 @@ const duplexBroker =
         spend: createPostgresDuplexSpend(database.sql),
         // BACKCHANNEL: the person's listening level, through the Write Gate.
         listening: createMemoryListeningStore(memoryService),
+        // Step 1: the line is told the date, their time and who is asking.
+        situation: async (actor, screen) =>
+          situationHeader({
+            now: new Date(),
+            asker: await situationOfActor(actor).catch(() => null),
+            deviceTimeZone: screen?.timeZone,
+            surface: "VOICE",
+            page: screen?.route ?? null,
+          }),
         // VOICE-BRAIN: both sides of the line, with who answered each turn;
         // a turn the voice answered alone goes into the conversation too.
         transcript: createPostgresDuplexTranscriptStore({

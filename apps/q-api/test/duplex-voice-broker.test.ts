@@ -206,6 +206,7 @@ function harness(
     readonly listening?: DuplexListeningStore;
     readonly routeTurns?: boolean;
     readonly transcript?: DuplexTranscriptStore;
+    readonly situation?: DuplexBrokerDependencies["situation"];
   } = {},
 ) {
   const order: string[] = [];
@@ -320,6 +321,9 @@ function harness(
     },
     logger,
     now: () => clock,
+    ...(options.situation === undefined
+      ? {}
+      : { situation: options.situation }),
   };
   return {
     broker: createDuplexBroker(dependencies),
@@ -427,6 +431,37 @@ describe("opening a duplex line", () => {
       maxSessionMs: 600_000,
       idleMs: 30_000,
     });
+  });
+
+  it("tells the line the situation, after the cached prefix (Q intelligence step 1)", async () => {
+    const asked: unknown[] = [];
+    const h = harness({
+      situation: (actor, screen) => {
+        asked.push({ actor: actor.userId, route: screen?.route });
+        return Promise.resolve(
+          "SITUATION (Capital Q, by code, this turn): Today for them is Thursday, 5 November 2026 (2026-11-05). Surface: voice (spoken aloud).",
+        );
+      },
+    });
+    await h.broker.open({ binding: binding(), firstMessage: "One." });
+    const instructions = h.mints[0]?.instructions ?? "";
+    expect(asked).toEqual([{ actor: ACTOR.userId, route: undefined }]);
+    expect(instructions.startsWith(DUPLEX_INSTRUCTIONS_PREFIX)).toBe(true);
+    expect(instructions).toContain(
+      "Today for them is Thursday, 5 November 2026 (2026-11-05). Surface: voice (spoken aloud). (as this line opened)",
+    );
+  });
+
+  it("opens the line without the situation when it cannot be read", async () => {
+    const h = harness({
+      situation: () => Promise.reject(new Error("db down")),
+    });
+    const opened = await h.broker.open({
+      binding: binding(),
+      firstMessage: "One.",
+    });
+    expect(opened.kind).toBe("DUPLEX");
+    expect(h.mints[0]?.instructions).not.toContain("SITUATION");
   });
 
   it("keeps the instruction prefix identical across lines, for the provider's cache", async () => {

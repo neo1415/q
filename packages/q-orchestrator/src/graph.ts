@@ -303,6 +303,22 @@ export function buildQGraph(
         ...(state.screen?.manifest?.controls === undefined
           ? {}
           : { screenControls: state.screen.manifest.controls }),
+        // Step 1: the reader's situation header. Route, their own clock
+        // and the surface only -- closed kinds the firewall passes on
+        // unchanged (screenWithin); no entity rides here.
+        ...(state.screen === null || state.screen === undefined
+          ? {}
+          : {
+              situationScreen: {
+                route: state.screen.route,
+                ...(state.screen.timeZone === undefined
+                  ? {}
+                  : { timeZone: state.screen.timeZone }),
+                ...(state.screen.surface === undefined
+                  ? {}
+                  : { surface: state.screen.surface }),
+              },
+            }),
       }),
     );
     return { preflight: "PASSED" };

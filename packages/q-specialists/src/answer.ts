@@ -71,11 +71,13 @@ export function recordAudienceTool(utterance: string): string | null {
 import {
   QMessageIdSchema,
   sensitivityWithin,
+  type QAskSurface,
   type QNavigateDestination,
   type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
   type QRunId,
+  type QScreenRoute,
   type QUiIntent,
   type QStageAbout,
   type QVisibleStage,
@@ -527,7 +529,10 @@ import {
   analystResultBlocks,
   askedSubjects,
   provenanceLine,
+  situationHeader,
+  situationSurfaceOf,
   TURN_READER_ATTEMPT_TIMEOUT_MS,
+  type QSituationPort,
   type QTurnReader,
   type QTurnSkim,
   type QTurnSkimmer,
@@ -735,6 +740,8 @@ function turnReaderInput(
   note: string | null = null,
   /** v55: the page's own registered controls (the firewall's manifest). */
   screenControls?: QPageManifest["controls"],
+  /** Q intelligence step 1: the situation header, built by code. */
+  situation?: string,
 ) {
   // Spoken turns carry the recogniser's utterance; typed ones never do.
   // The reader needs to know which: only speech can be overheard.
@@ -757,6 +764,7 @@ function turnReaderInput(
     ],
     modality: spoken ? ("VOICE" as const) : ("TEXT" as const),
     ...(screenControls === undefined ? {} : { screenControls }),
+    ...(situation === undefined ? {} : { situation }),
     attribution: {
       tenantId: context.tenantId,
       userId: context.userId,
@@ -860,6 +868,13 @@ export type SpecialistQAnswerDependencies = {
    * and failures carry no notice — the behaviour before the core.
    */
   readonly turns?: QTurnReader | undefined;
+  /**
+   * Q intelligence step 1: who is asking, read by the server for the
+   * actor, for the reader's situation header. Absent: told as unknown.
+   */
+  readonly situationOf?: QSituationPort | undefined;
+  /** The situation's clock; tests fix it. */
+  readonly now?: (() => Date) | undefined;
   /**
    * K fast lane: a short first read beside the turn reader; a HIGH
    * confidence "companies of a kind" or "fit" is answered by the read-only
@@ -4725,6 +4740,32 @@ export function createSpecialistQAnswer(
     });
   };
 
+  /**
+   * The situation header for the reader (step 1): the same builder the
+   * answer uses, from the person's own records and their screen's route,
+   * zone and surface (closed kinds; about no one else).
+   */
+  const situationFor = async (
+    actor: ActorContext,
+    screen:
+      | {
+          readonly route?: QScreenRoute | undefined;
+          readonly timeZone?: string | undefined;
+          readonly surface?: QAskSurface | undefined;
+        }
+      | null
+      | undefined,
+    spoken: boolean,
+  ): Promise<string> =>
+    situationHeader({
+      now: (dependencies.now ?? (() => new Date()))(),
+      asker:
+        (await dependencies.situationOf?.(actor).catch(() => null)) ?? null,
+      deviceTimeZone: screen?.timeZone,
+      surface: situationSurfaceOf(spoken, screen?.surface),
+      page: screen?.route ?? null,
+    });
+
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
@@ -4802,6 +4843,11 @@ export function createSpecialistQAnswer(
               lastActed.get(conversationId) ?? null,
             ),
             input.screenControls,
+            await situationFor(
+              input.actor,
+              input.situationScreen,
+              latest.utteranceRef !== undefined,
+            ),
           ),
         )
         .catch(() => null);
@@ -5854,7 +5900,12 @@ export function createSpecialistQAnswer(
     // Why this turn's latest reading failed: no reasoning route at all, or
     // a model that answered nothing usable (live 2026-10-31).
     const readFailure = { serviceUnavailable: false };
-    const readTurn = (signal: AbortSignal = readerAbort.signal) =>
+    const situationText = situationFor(
+      request.actor,
+      request.plan.screen,
+      latest.utteranceRef !== undefined,
+    );
+    const readTurn = async (signal: AbortSignal = readerAbort.signal) =>
       turns.read(
         turnReaderInput(
           history,
@@ -5872,6 +5923,7 @@ export function createSpecialistQAnswer(
           },
           withResolution(referenceNote(shown, lastAction), pointed),
           request.plan.screen?.manifest?.controls,
+          await situationText,
         ),
       );
     // Read early, beside the firewall (ADR 0035), with the same words, the

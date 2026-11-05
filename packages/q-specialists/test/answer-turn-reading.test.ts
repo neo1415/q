@@ -158,6 +158,11 @@ function seam(options: {
   readonly teamJob?: QTeamJobPort;
   /** Situation-first planning (S5): a plan of their own. */
   readonly plan?: import("../src/plan-job-port.js").QPlanJobPort;
+  /** Q intelligence step 1: who is asking, and a fixed clock. */
+  readonly situationOf?: Parameters<
+    typeof createSpecialistQAnswer
+  >[0]["situationOf"];
+  readonly now?: () => Date;
   /** A call with one named counterpart, prepared in the answer (v58). */
   readonly callPrep?: QCallPrepPort;
   /** A follow-up answered from what Q already showed (v54 fromShown). */
@@ -413,6 +418,10 @@ function seam(options: {
       : { delegation: options.delegation }),
     ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
     ...(options.plan === undefined ? {} : { plan: options.plan }),
+    ...(options.situationOf === undefined
+      ? {}
+      : { situationOf: options.situationOf }),
+    ...(options.now === undefined ? {} : { now: options.now }),
     ...(options.callPrep === undefined ? {} : { callPrep: options.callPrep }),
     ...(options.conversationRecall === undefined
       ? {}
@@ -7078,5 +7087,47 @@ describe("live 2026-11-04: 'okay' to Q's plan offer runs that plan, never a plan
     });
     await run.answer.answer(request()).catch(() => undefined);
     expect(ran).toEqual([]);
+  });
+});
+
+/**
+ * Q intelligence step 1 (A3): the turn reader is told the date, their time,
+ * who is asking, the surface and the page, built by code.
+ */
+describe("the turn reader is given the situation header", () => {
+  const situationOf = () =>
+    Promise.resolve({
+      displayName: "Ada Obi",
+      role: "FOUNDER" as const,
+      organisation: "Nixo",
+      timeZone: "Africa/Lagos",
+    });
+  const NOW = new Date("2026-11-05T23:30:00.000Z");
+
+  it.each([
+    [false, "Surface: Q chat (typed)."],
+    [true, "Surface: voice (spoken aloud)."],
+  ] as const)("spoken %s: %s", async (spoken, surface) => {
+    const told: (string | undefined)[] = [];
+    const run = seam({
+      said: "Is the call tomorrow?",
+      reading: null,
+      read: (input) => {
+        told.push(input.situation);
+        return Promise.resolve(null);
+      },
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      spoken,
+      situationOf,
+      now: () => NOW,
+      turnRereadDeadlineMs: 40,
+    });
+    await run.answer.answer(request());
+    expect(told.length).toBeGreaterThan(0);
+    for (const situation of told) {
+      expect(situation).toContain("(2026-11-06); their time is 00:30");
+      expect(situation).toContain("Asking: Ada Obi, FOUNDER, of Nixo.");
+      expect(situation).toContain(surface);
+    }
   });
 });

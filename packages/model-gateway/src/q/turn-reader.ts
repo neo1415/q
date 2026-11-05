@@ -494,10 +494,19 @@ export function createQTurnReader(dependencies: {
         // Bounded by the schema; the newest turns are kept by its builder.
         // Nothing shown yet is said so: the rules about SHOWN ("when
         // nothing was shown yet") key on it (PROMPT_EMPTY_CASES).
-        shown: orEmptyCase(
-          (input.shown ?? "").slice(0, 9_000),
-          PROMPT_EMPTY_CASES.TURN_READER.shown,
-        ),
+        // Q intelligence step 1: the situation leads Capital Q's own record
+        // in the tail, not the charter, so the cached prefix stays the same
+        // from turn to turn.
+        shown: [
+          ...(input.situation === undefined ? [] : [input.situation]),
+          orEmptyCase(
+            (input.shown ?? "").slice(
+              0,
+              9_000 - (input.situation === undefined ? 0 : input.situation.length + 1),
+            ),
+            PROMPT_EMPTY_CASES.TURN_READER.shown,
+          ),
+        ].join("\n"),
       };
       try {
         const rendered = renderPrompt<TurnReaderV55Variables>(registry, {
@@ -505,10 +514,8 @@ export function createQTurnReader(dependencies: {
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
           communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-          environmentNotes: [
-            ...(input.situation === undefined ? [] : [input.situation]),
+          environmentNotes:
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
-          ].join(" "),
           variables,
         });
         const ask = (

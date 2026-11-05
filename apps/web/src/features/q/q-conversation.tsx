@@ -99,6 +99,7 @@ import { useBoardMarks } from "./q-board";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
+import { noteQPageView } from "./screen";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
@@ -627,6 +628,14 @@ export function QConversationPanel({
     () => "presence" as const,
   );
   const chooseView = writeStageView;
+  // Q intelligence step 1: questions asked here say the Q page and its
+  // view; once it unmounts, Q is the dock again.
+  useEffect(() => {
+    noteQPageView(view);
+    return () => {
+      noteQPageView(null);
+    };
+  }, [view]);
   const latestAnswer = turns.findLast((turn) => turn.kind === "Q");
   // Q Story S4: the presence forms what the run's own signals name -- a
   // comparison, a chart, a map, a document, a meeting -- for a moment.

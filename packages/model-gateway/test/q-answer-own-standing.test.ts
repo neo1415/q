@@ -1163,3 +1163,135 @@ describe("code's opening lines (lead 2026-10-03)", () => {
     );
   });
 });
+
+/**
+ * Q intelligence step 1 (A3): every answer path is told the date, their
+ * time, who is asking, the surface and the page, built by code.
+ */
+describe("the situation header reaches every answer path", () => {
+  // Thursday, 5 November 2026, 23:30 UTC: already Friday in Lagos? No --
+  // Lagos is UTC+1, so it is 00:30 on Friday, 6 November there.
+  const NOW = new Date("2026-11-05T23:30:00.000Z");
+  const situationOf = () =>
+    Promise.resolve({
+      displayName: "Ada Obi",
+      role: "FOUNDER" as const,
+      organisation: "Nixo",
+      timeZone: "Africa/Lagos",
+    });
+  const logged = () => {
+    const lines: string[] = [];
+    const logger = {
+      debug: (c: unknown, m: string) => lines.push(JSON.stringify([c, m])),
+      info: (c: unknown, m: string) => lines.push(JSON.stringify([c, m])),
+      warn: (c: unknown, m: string) => lines.push(JSON.stringify([c, m])),
+      error: (c: unknown, m: string) => lines.push(JSON.stringify([c, m])),
+      child: () => logger,
+    };
+    const path = () =>
+      lines
+        .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+        .find(([, message]) => message === "q answer path")?.[0]?.path;
+    return { logger, path };
+  };
+
+  it.each([
+    [
+      "TARGETED_RETRIEVAL",
+      { turnKind: "QUESTION_TO_Q", questionKind: "THEIR_OWN_RECORDS" },
+      null,
+    ],
+    [
+      "PREPARED_CONTEXT",
+      {
+        turnKind: "QUESTION_TO_Q",
+        questionKind: "ADVICE",
+        preparedSubject: "ON_SCREEN_RECORD",
+      },
+      { route: "COMPANY", companyId: COMPANY },
+    ],
+    [
+      "DEEP_ANALYSIS",
+      { turnKind: "QUESTION_TO_Q", questionKind: "ADVICE" },
+      null,
+    ],
+  ] as const)(
+    "%s carries the date, their time and who is asking",
+    async (path, reading, screen) => {
+      const { logger, path: pathOf } = logged();
+      const { seam, request, alpha } = build(
+        { status: "SUCCEEDED", data: CONNECTED },
+        undefined,
+        { situationOf, now: () => NOW, logger: logger as never },
+      );
+      const asked = {
+        ...request,
+        ...reading,
+        plan: {
+          ...request.plan,
+          ...(screen === null ? {} : { screen }),
+        },
+      } as typeof request;
+      expect((await seam.answer(asked)).kind).toBe("ANSWERED");
+      expect(pathOf()).toBe(path);
+      const sent = sentTo(alpha);
+      expect(sent).toContain(
+        "Today for them is Friday, 6 November 2026 (2026-11-06); their time is 00:30 (Africa/Lagos).",
+      );
+      expect(sent).toContain("Tomorrow is Saturday, 7 November 2026.");
+      expect(sent).toContain("Asking: Ada Obi, FOUNDER, of Nixo.");
+      expect(sent).toContain("Surface: Q chat (typed).");
+      expect(sent).toContain(
+        screen === null ? "Page: unknown." : "Page: a company profile.",
+      );
+    },
+  );
+
+  it("a spoken turn says voice, and an investor is named as one", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {
+        situationOf: () =>
+          Promise.resolve({
+            displayName: "Tomi",
+            role: "INVESTOR" as const,
+            organisation: "Kestrel Partners",
+            timeZone: null,
+          }),
+        now: () => NOW,
+      },
+    );
+    const spoken = {
+      ...request,
+      spoken: true,
+      plan: {
+        ...request.plan,
+        screen: { route: "DISCOVER", timeZone: "Europe/London" },
+      },
+    } as typeof request;
+    expect((await seam.answer(spoken)).kind).toBe("ANSWERED");
+    const sent = sentTo(alpha);
+    // No saved zone: the device's.
+    expect(sent).toContain(
+      "Today for them is Thursday, 5 November 2026 (2026-11-05); their time is 23:30 (Europe/London).",
+    );
+    expect(sent).toContain("Asking: Tomi, INVESTOR, at Kestrel Partners.");
+    expect(sent).toContain("Surface: voice (spoken aloud).");
+    expect(sent).toContain("Page: Discover.");
+  });
+
+  it("with nothing known it says so rather than guessing", async () => {
+    const { seam, request, alpha } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      { now: () => NOW },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const sent = sentTo(alpha);
+    expect(sent).toContain(
+      "Today is Thursday, 5 November 2026 (2026-11-05) in UTC; the time is 23:30 UTC. Their time zone is unknown",
+    );
+    expect(sent).toContain("Asking: name unknown, role unknown.");
+  });
+});
