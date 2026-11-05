@@ -1509,6 +1509,7 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - One-word names are not checked.
   - Cross-source sums are not allowed.
   - The DEEP_ANALYSIS model self-check pass is not built.
+
 ## 2026-11-05 (Q intelligence Step 1, `feat/q-situation-header` from `fix/resume-asking-cv9ru3`; not merged or deployed)
 
 - Every Q model step now gets a code-built situation header: today's date and the time in the person's zone (profile, else device, else "time zone unknown" with UTC); tomorrow's date (calendar day, safe across clock changes); who is asking (name, FOUNDER or INVESTOR, organisation); the surface (chat, dock, stage or voice); and the page.
