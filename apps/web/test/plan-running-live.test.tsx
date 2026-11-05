@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createQStreamState } from "@capital-q/api-client";
@@ -123,6 +129,10 @@ describe("a running plan shows live (J4)", () => {
     readPlanAction.mockResolvedValue({ ok: true, view: view("EXECUTING") });
     sessionTurns = [...turnsOf([planMessage, running])];
     render(<QWorkProgress jobs={false} />);
+    // Owner 2026-11-05: the plan is one folded line; its steps on a tap.
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Follow up this week/u }),
+    );
     expect(
       await screen.findByText("Prepare a reply to Clinicrest"),
     ).not.toBeNull();
