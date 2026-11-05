@@ -299,3 +299,62 @@ describe("live5 d (1440): an answer between 'I'm on it' and the plan never puts 
     expect(stageOf(shownItems(turns), turns).why).toBe("NONE");
   });
 });
+
+describe("live7 (1440): an answer that runs or reports on the plan keeps it on the stage", () => {
+  const RUNS = "529e3ae5-6504-4158-af22-5b96f443dac0";
+  const said = (
+    id: string,
+    run: string,
+    role: "USER" | "Q",
+    text: string,
+    at: string,
+  ) =>
+    QMessageSchema.parse({
+      messageId: `349173e0-0000-4000-8000-0000000000${id}`,
+      runId: run,
+      role,
+      text,
+      createdAt: at,
+    });
+  const base = messages.filter(
+    (message): message is QMessage => message !== undefined,
+  );
+  const okay = [
+    said("20", RUNS, "USER", "okay", "2026-11-04T17:56:00.000Z"),
+    said(
+      "21",
+      RUNS,
+      "Q",
+      "Running it now: my steps have started and yours are on your board. Anything that goes out to someone still comes to you first, and I'll tell you here as each step lands.",
+      "2026-11-04T17:56:05.000Z",
+    ),
+  ];
+
+  it("'okay' → 'Running it now' keeps the plan up, with no 'moved on' note", async () => {
+    const { stageNoteOf } = await import("../src/features/q/shown");
+    const turns = turnsFrom(
+      { ...createQStreamState(), messages: [...base, ...okay] },
+      [],
+    );
+    const items = shownItems(turns);
+    const pick = stageOf(items, turns);
+    expect(pick.item?.blocks.some((block) => block.kind === "PLAN")).toBe(true);
+    expect(stageNoteOf(items, turns, pick, () => false)).toBeNull();
+  });
+
+  it("a step's progress line keeps it too", () => {
+    const progress = said(
+      "22",
+      "529e3ae5-6504-4158-af22-5b96f443dac1",
+      "Q",
+      "Step 2 is done: the reply to Clinicrest is ready for your approval.",
+      "2026-11-04T17:58:00.000Z",
+    );
+    const turns = turnsFrom(
+      { ...createQStreamState(), messages: [...base, ...okay, progress] },
+      [],
+    );
+    const pick = stageOf(shownItems(turns), turns);
+    expect(pick.item?.blocks.some((block) => block.kind === "PLAN")).toBe(true);
+  });
+});

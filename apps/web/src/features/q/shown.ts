@@ -200,6 +200,8 @@ export type ItemSubject = {
   readonly kindWords: readonly string[];
   /** A question back is answered, not talked about: it never stays. */
   readonly answeredOnce: boolean;
+  /** A plan is on it: Q's own words about the plan keep it (live7). */
+  readonly plan?: boolean | undefined;
 };
 
 const KIND_WORDS: Readonly<
@@ -343,8 +345,23 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
         break;
     }
   }
-  return { ids, names, kindWords, answeredOnce: onlyQuestions };
+  return {
+    ids,
+    names,
+    kindWords,
+    answeredOnce: onlyQuestions,
+    plan: item.blocks.some((block) => block.kind === "PLAN"),
+  };
 }
+
+/**
+ * live7 (2026-11-05, 1440): after "okay" Q said "Running it now: my steps
+ * have started…" and the stage put the plan away as moved on. Q's own
+ * words that run or report on a plan (running it, its steps, a step that
+ * landed) are about the plan on the stage, so it stays. Read only while a
+ * plan is up, and only to keep it, never to bring one back.
+ */
+const PLAN_TALK = / (?:plan|plans|step|steps) /u;
 
 /**
  * Words in a person's question that point back at what is on screen:
@@ -403,6 +420,7 @@ export function refersTo(
   for (const name of subject.names) {
     if (said.includes(` ${name} `) || asked.includes(` ${name} `)) return true;
   }
+  if (subject.plan === true && PLAN_TALK.test(said)) return true;
   if (question === undefined) return false;
   for (const word of subject.kindWords) {
     if (asked.includes(` ${word} `)) return true;
