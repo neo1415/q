@@ -22,6 +22,10 @@ import type {
   QRunEventRecord,
   QRunRecord,
 } from "../contracts/index.js";
+import type {
+  QConversationState,
+  QConversationSummaryRevision,
+} from "../contracts/conversation-state.js";
 
 /**
  * Persistence ports for the Q runtime.
@@ -436,8 +440,53 @@ export type QMessageCreationRequestStore = {
   ) => Promise<void>;
 };
 
+/**
+ * Q intelligence step 2: the per-conversation state (ledger, open threads)
+ * and the append-only running summary. Every read takes the owner: a state
+ * is the owner's, in their tenant, and nobody else's.
+ */
+export type QConversationStateRepository = {
+  readonly find: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    conversationId: string,
+  ) => Promise<QConversationState | null>;
+  /**
+   * Writes the next version (state.version + 1; 1 inserts). False when
+   * another writer got there first: the caller folds again next turn.
+   */
+  readonly save: (
+    tx: TransactionContext,
+    state: QConversationState,
+  ) => Promise<boolean>;
+  readonly latestSummary: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    conversationId: string,
+  ) => Promise<QConversationSummaryRevision | null>;
+  /** Appends the next revision; returns its number. */
+  readonly appendSummary: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly conversationId: string;
+      readonly summary: string;
+      readonly coversThroughAt: string;
+      readonly coveredMessages: number;
+      readonly gateVersion: string;
+      readonly promptVersion?: string | undefined;
+      readonly runId?: string | undefined;
+    },
+  ) => Promise<number>;
+};
+
 export type QRuntimeRepositories = {
   readonly conversations: QConversationRepository;
+  /** Absent: no durable state; the ledger is built from history alone. */
+  readonly conversationStates?: QConversationStateRepository | undefined;
   readonly runs: QRunRepository;
   readonly messages: QConversationMessageRepository;
   readonly runEvents: QRunEventRepository;

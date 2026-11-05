@@ -457,6 +457,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly references?: string | undefined;
   /**
+   * Q intelligence step 2: Capital Q's conversation state -- the entity
+   * ledger, lists in order, open threads and the summary of earlier turns
+   * -- rendered by code from this conversation's stored turns. Data, not
+   * instructions (names and the summary are fenced). Grants nothing.
+   */
+  readonly conversationState?: string | undefined;
+  /**
    * A2 (live 2026-11-04): the companies `references` bound, in the order the
    * person said them ("the second and third"), as ids. Set only when code
    * bound explicit places to a list they were shown; a comparison uses

@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV75ResultSchema,
+  TurnReaderV77ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -14,14 +14,16 @@ import {
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV54Result,
-  type TurnReaderV55Variables,
+  type TurnReaderV76Variables,
+  TURN_READER_V76_RECENT_TURNS_MAX,
+  TURN_READER_V76_TURN_TEXT_MAX,
   type TurnReaderV58Result,
   type TurnReaderV62Result,
   type TurnReaderV63Result,
   type TurnReaderV64Result,
   type TurnReaderV65Result,
   type TurnReaderV70Result,
-  type TurnReaderV75Result,
+  type TurnReaderV77Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -50,6 +52,13 @@ export type QTurnReader = {
      * conversation's own stored messages. Empty: nothing shown yet.
      */
     readonly shown?: string | undefined;
+    /**
+     * Q intelligence step 2 (v76): Capital Q's conversation state -- the
+     * entity ledger, lists in order, open threads and the summary of turns
+     * older than recentTurns -- rendered by code from the stored
+     * conversation (`renderConversationState`). Absent: none yet.
+     */
+    readonly conversationState?: string | undefined;
     /**
      * The other actions this run can take, from what is offered: a request
      * for one of them is never read as a document (founder live, BIZ-004).
@@ -198,6 +207,12 @@ export type QTurnReading = Omit<
   readonly fromShown?: TurnReaderV54Result["fromShown"] | undefined;
   /** v44: garbled spoken words, read by sound; null when read as written. */
   readonly heardAs?: string | null | undefined;
+  /**
+   * v77 (Q intelligence step 3): what the turn's pointing words mean, as
+   * LEDGER refs read by meaning; code checks each against the ledger shown
+   * to the person before anything binds. Absent before v77: none.
+   */
+  readonly references?: TurnReaderV77Result["references"] | undefined;
   /** v28: a time they asked for, in minutes from now. */
   readonly timeWindow?:
     | { readonly fromMinutes: number | null; readonly toMinutes: number | null }
@@ -385,6 +400,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "acceptsOffer",
   // v75: a malformed memo reading is no memo, never a lost reading.
   "investmentMemo",
+  // v77: malformed references bind nothing, never a lost reading.
+  "references",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -423,9 +440,15 @@ export function readerScreenControls(
 export const TURN_READER_CORRECTION =
   "Your last reading did not match the required JSON schema, so it was refused. Answer again with exactly the schema's fields. A tool carries only its own kind's parameters (NAVIGATE: destination or unknownScreen; SET_VISIBILITY: visibility; PREPARE_DOCUMENT: documentType), the others null. A declared action such as a reminder, a meeting or a message goes in appAction or askedAction, never in tool. Use null for anything you are unsure of.";
 
-/** How much of each recent turn the reader sees (its prompt budget). */
-export const TURN_READER_TURN_TEXT_MAX = 400;
-const TURN_TEXT_TAIL = 140;
+/**
+ * How much of each recent turn the reader sees (its prompt budget). v76
+ * (Q intelligence step 2): 1,600, up from 400 -- the reader routes every
+ * turn and a pronoun's antecedent is often past the first 400 characters.
+ */
+export const TURN_READER_TURN_TEXT_MAX = TURN_READER_V76_TURN_TEXT_MAX;
+/** How many recent turns it sees whole; older ones reach it summarised. */
+export const TURN_READER_RECENT_TURNS_MAX = TURN_READER_V76_RECENT_TURNS_MAX;
+const TURN_TEXT_TAIL = 400;
 
 /**
  * A recent turn as the reader sees it: whole when short; otherwise its
@@ -473,18 +496,24 @@ export function createQTurnReader(dependencies: {
         );
       }
       const variables: Omit<
-        TurnReaderV55Variables,
+        TurnReaderV76Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
         | "environmentNotes"
       > = {
-        recentTurns: input.recentTurns.slice(-6).map((turn) => ({
-          role: turn.role,
-          text: turnTextForReader(turn.text),
-        })),
+        recentTurns: input.recentTurns
+          .slice(-TURN_READER_RECENT_TURNS_MAX)
+          .map((turn) => ({
+            role: turn.role,
+            text: turnTextForReader(turn.text),
+          })),
         utterance,
         modality: input.modality,
+        conversationState: orEmptyCase(
+          (input.conversationState ?? "").slice(0, 8_200),
+          "(nothing yet)",
+        ),
         // What this run offers first, in full; then, briefly, what the
         // registry declares that this run does not offer (v30 askedAction),
         // within TURN_READER_ACTIONS_MAX.
@@ -512,7 +541,7 @@ export function createQTurnReader(dependencies: {
         ].join("\n"),
       };
       try {
-        const rendered = renderPrompt<TurnReaderV55Variables>(registry, {
+        const rendered = renderPrompt<TurnReaderV76Variables>(registry, {
           task: "TURN_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
@@ -523,8 +552,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV75Result>> =>
-          gateway.execute<TurnReaderV75Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV77Result>> =>
+          gateway.execute<TurnReaderV77Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -540,7 +569,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV75ResultSchema,
+              schema: TurnReaderV77ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -583,7 +612,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV75ResultSchema.safeParse(
+        const parsed = TurnReaderV77ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         // A comparison is never answered from an earlier turn (lane 4).

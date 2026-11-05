@@ -350,6 +350,8 @@ describe("Approval flow through the Q orchestrator against local PostgreSQL", ()
       await tx.sql`delete from q_runtime.run_events where tenant_id = ${tenantId}`;
       await tx.sql`alter table q_runtime.run_events enable trigger run_events_append_only`;
       await tx.sql`delete from q_runtime.runs where tenant_id = ${tenantId}`;
+      await tx.sql`delete from q_runtime.conversation_summary_revisions where tenant_id = ${tenantId}`;
+      await tx.sql`delete from q_runtime.conversation_states where tenant_id = ${tenantId}`;
       await tx.sql`delete from q_runtime.conversations where tenant_id = ${tenantId}`;
       await tx.sql`delete from events.outbox where tenant_id = ${tenantId}`;
       await tx.sql`delete from audit.material_actions where tenant_id = ${tenantId}`;

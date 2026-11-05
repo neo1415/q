@@ -1541,3 +1541,19 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - 20:30 UTC: owner relayed the client's UI feedback (ChatGPT-style Q home). Started UI lane `session_01Wncmn4qKqR5tbnhVgPhL3v` on `fix/q-home-chatgpt` (from `fix/resume-asking-cv9ru3`, no migration, deploys independently of the intelligence work). Design call: the composer's right button is a round gold "Q" (Talk to Q) when empty and Send when typing, replacing the separate Talk to Q button. Step 2 lane is in its test gates (eslint fixed). Tokens now work in this session too.
 - 20:56 UTC: UI lane pushed `2d4660cf9` (web tsc, root tsc, eslint, full web vitest 4032 + fixed home-fold, new q-home-chatgpt 6/6, packages/ui 65/65, route coverage, prettier, Arabic). Reviewed screenshots; merged as `789a1ecbd`; CI 42107782084 started.
 - 21:40 UTC: CI 42107782084 green on `789a1ecbd`; deployed 21:26 (fast-forward `recovery/2026-09-12` from `fdcf86871`). live13 PASS at 1440 and 390 (no big Q, no scope chip or corner presence, greeting + pill composer + 3 starters, Talk to Q → Send while typing, thread with composer at bottom after send, 0 page errors). Receipts `receipts/2026-11-05-live13-789a1ec/`.
+## 2026-11-05 (Q intelligence steps 2+3, `feat/q-conversation-state`; not merged or deployed)
+
+- **Step 2 gates green** at `44ada9a`, on top of the merge of `fix/resume-asking-cv9ru3`.
+  - Fixes: lint (×2), an unused import, the TURN_READER pin in q-api, and an empty state note sent to every first-turn answer.
+  - One pre-existing test fix: the answer-seam integration test now expects step 6's findings note.
+  - pgTAP 999: 28/28 on local PG.
+- **Item 5** at `e76bf64`: the claim check grounds derived arithmetic within one sentence, i.e. period conversions and sourced short durations. Scripted Q-IQ went 554 → 571/573.
+- **Step 3** at `f5a6c09`:
+  - TURN_READER v77 returns `references` as LEDGER refs.
+  - Code checks them against the state shown to the reader (Context Firewall), then binds, asks for two readings, or says so and asks for none.
+  - Scripted Q-IQ is unchanged at 571/573.
+- **3c, the regex removal, is held.** Scripted Q-IQ runs no reader in FAKE mode, so it can't measure binding. Removal needs a live Q-IQ in and out. The receipt has the details.
+- **Integration owner:**
+  - Migration `20261231250000` needs CI pgTAP, then a hosted apply before deploy.
+  - The integration tests need `DATABASE_URL` as well as `CQ_TEST_DATABASE_URL`.
+- Receipt: `docs/ai-handoff/receipts/2026-11-05-q-step2-gates.md`.

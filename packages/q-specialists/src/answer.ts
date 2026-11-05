@@ -131,6 +131,7 @@ import {
   reshownBlocks,
   shownTurnOf,
   withoutStatusTalk,
+  TURN_READER_RECENT_TURNS_MAX,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
@@ -171,7 +172,16 @@ import {
   type QToolFocus,
 } from "@capital-q/q-runtime";
 
-import type { ActorContext, TenantId } from "@capital-q/security";
+import type { ActorContext, TenantId, UserId } from "@capital-q/security";
+import type {
+  QConversationState,
+  QConversationSummaryRevision,
+} from "@capital-q/q-runtime";
+import {
+  foldConversationState,
+  renderConversationState,
+  withFetchedRecords,
+} from "./conversation-ledger.js";
 import type {
   QSpecialist,
   QSpecialistProbe,
@@ -224,6 +234,7 @@ import {
   type ReferenceAsk,
   type ResolvedReference,
 } from "./conversation-entities.js";
+import { bindReferences, boundCompanyIds } from "./reference-binding.js";
 
 /** B6: a reference in the turn, bound to records, with its note. */
 /**
@@ -742,6 +753,8 @@ function turnReaderInput(
   screenControls?: QPageManifest["controls"],
   /** Q intelligence step 1: the situation header, built by code. */
   situation?: string,
+  /** Q intelligence step 2: the rendered conversation state. */
+  conversationState?: string,
 ) {
   // Spoken turns carry the recogniser's utterance; typed ones never do.
   // The reader needs to know which: only speech can be overheard.
@@ -755,7 +768,13 @@ function turnReaderInput(
     recentTurns: [
       ...history
         .filter((m) => m.id !== latest.id)
-        .slice(note === null ? -6 : -5)
+        // Step 2 (v76): the recent turns whole; older ones reach the
+        // reader through the state's summary and ledger, never dropped.
+        .slice(
+          note === null
+            ? -TURN_READER_RECENT_TURNS_MAX
+            : -(TURN_READER_RECENT_TURNS_MAX - 1),
+        )
         .map((m) => ({
           role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
           text: m.content,
@@ -765,6 +784,7 @@ function turnReaderInput(
     modality: spoken ? ("VOICE" as const) : ("TEXT" as const),
     ...(screenControls === undefined ? {} : { screenControls }),
     ...(situation === undefined ? {} : { situation }),
+    ...(conversationState === undefined ? {} : { conversationState }),
     attribution: {
       tenantId: context.tenantId,
       userId: context.userId,
@@ -2035,6 +2055,76 @@ function synthesisFromFindings(result: CompanyIntelligenceResult): string {
     : lines.join("\n").trim();
 }
 
+/** Q intelligence step 2: a run's folded conversation state. */
+type RunConversationState = {
+  /** The state as stored after this run's fold (its version included). */
+  readonly state: QConversationState;
+  readonly summary: QConversationSummaryRevision | null;
+  /** False when another writer saved first: this run saves nothing more. */
+  readonly saved: boolean;
+};
+
+/**
+ * Reads the stored state, folds in the messages it does not cover yet and
+ * saves the result in one short transaction (no model call inside it). A
+ * composition with no state store folds from the history alone, so a turn
+ * is never worse off than before.
+ */
+async function loadConversationState(
+  deps: {
+    readonly repositories: QRuntimeRepositories;
+    readonly sql: DatabaseExecutor;
+    readonly transactions: TransactionManager;
+    readonly logger?: Logger | undefined;
+  },
+  who: {
+    readonly tenantId: TenantId;
+    readonly userId: UserId;
+    readonly runId: string;
+  },
+  history: readonly QConversationMessage[],
+): Promise<RunConversationState | null> {
+  const conversationId = history[0]?.conversationId;
+  if (conversationId === undefined) return null;
+  const store = deps.repositories.conversationStates;
+  const [previous, summary] =
+    store === undefined
+      ? [null, null]
+      : await Promise.all([
+          store.find(deps.sql, who.tenantId, who.userId, conversationId),
+          store.latestSummary(
+            deps.sql,
+            who.tenantId,
+            who.userId,
+            conversationId,
+          ),
+        ]);
+  const fold = foldConversationState({
+    previous,
+    identity: { conversationId, tenantId: who.tenantId, userId: who.userId },
+    history,
+  });
+  if (store === undefined || !fold.changed) {
+    return { state: fold.state, summary, saved: store !== undefined };
+  }
+  const saved = await deps.transactions
+    .run((tx) => store.save(tx, fold.state))
+    .catch((error: unknown) => {
+      deps.logger?.warn(
+        { err: error, qRunId: who.runId },
+        "the conversation state was not saved; it is folded again next turn",
+      );
+      return false;
+    });
+  return {
+    state: saved
+      ? { ...fold.state, version: fold.state.version + 1 }
+      : fold.state,
+    summary,
+    saved,
+  };
+}
+
 export function createSpecialistQAnswer(
   dependencies: SpecialistQAnswerDependencies,
 ): SpecialistQAnswer {
@@ -2062,9 +2152,94 @@ export function createSpecialistQAnswer(
       movesWithQuestion.delete(oldest);
     }
   };
+  /**
+   * Q intelligence step 2: each run's conversation state -- the ledger
+   * folded forward from the stored turns and saved (a short transaction,
+   * never across a model call), the latest summary revision -- read once
+   * per run and shared by the early and the full reading. The rendered
+   * text also reaches the answer (QAnswerRequest.conversationState).
+   */
+  const statesInRun = new Map<string, Promise<RunConversationState | null>>();
+  const stateTextInRun = new Map<string, string>();
+  const shownStateInRun = new Map<string, QConversationState>();
+  const conversationStateOf = (
+    who: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly runId: string;
+    },
+    history: readonly QConversationMessage[],
+  ): Promise<RunConversationState | null> => {
+    const kept = statesInRun.get(who.runId);
+    if (kept !== undefined) return kept;
+    const started = loadConversationState(
+      { repositories, sql, transactions, logger },
+      who,
+      history,
+    ).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, qRunId: who.runId },
+        "the conversation state was not read; reading the turn from history alone",
+      );
+      return null;
+    });
+    statesInRun.set(who.runId, started);
+    while (statesInRun.size > PREREADS_MAX) {
+      const oldest = statesInRun.keys().next().value;
+      if (oldest === undefined) break;
+      statesInRun.delete(oldest);
+      stateTextInRun.delete(oldest);
+      shownStateInRun.delete(oldest);
+    }
+    return started;
+  };
+  const conversationStateTextOf = async (
+    who: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly runId: string;
+    },
+    history: readonly QConversationMessage[],
+    fetched?: readonly QConversationFetch[],
+  ): Promise<string | undefined> => {
+    const loaded = await conversationStateOf(who, history);
+    if (loaded === null) return undefined;
+    // Step 3: the very state the reader is shown -- the stored ledger plus
+    // only the reads the firewall kept for this run -- is the one its
+    // references are checked against.
+    const shownState = withFetchedRecords(loaded.state, history, fetched);
+    shownStateInRun.set(who.runId, shownState);
+    const text = renderConversationState({
+      state: shownState,
+      summary: loaded.summary,
+      olderMessages: Math.max(
+        0,
+        loaded.state.messagesFolded - 1 - TURN_READER_RECENT_TURNS_MAX,
+      ),
+    });
+    // The answer gets the note only when the conversation has something in
+    // it; a first turn's empty ledger is no context, only tokens. The reader
+    // always gets the text (its prompt reads an empty state as such).
+    const loadedState = loaded.state;
+    if (
+      loadedState.ledger.entities.length > 0 ||
+      loadedState.ledger.lists.length > 0 ||
+      loadedState.openThreads.length > 0 ||
+      (loaded.summary?.summary.trim().length ?? 0) > 0
+    ) {
+      stateTextInRun.set(who.runId, text);
+    }
+    return text;
+  };
+
   const delegate: typeof answerPath = {
     ...answerPath,
-    answer: async (request) => {
+    answer: async (asked) => {
+      const stateText = stateTextInRun.get(asked.runId);
+      const request =
+        stateText === undefined || asked.conversationState !== undefined
+          ? asked
+          : { ...asked, conversationState: stateText };
       const moves = movesWithQuestion.get(request.runId);
       movesWithQuestion.delete(request.runId);
       if (moves === undefined) return answerPath.answer(request);
@@ -4848,6 +5023,14 @@ export function createSpecialistQAnswer(
               input.situationScreen,
               latest.utteranceRef !== undefined,
             ),
+            await conversationStateTextOf(
+              {
+                tenantId: input.tenantId,
+                userId: input.actor.userId,
+                runId: input.runId,
+              },
+              history,
+            ),
           ),
         )
         .catch(() => null);
@@ -5320,6 +5503,19 @@ export function createSpecialistQAnswer(
       conversationId === undefined ||
       latest === undefined
     ) {
+      // Step 2: with no reader composed, the answer still reads (and the
+      // conversation still keeps) its state.
+      if (conversationId !== undefined) {
+        await conversationStateTextOf(
+          {
+            tenantId: request.tenantId,
+            userId: request.actor.userId,
+            runId: request.runId,
+          },
+          history,
+          request.fetchedInConversation,
+        );
+      }
       return answerOnce(request);
     }
     // A change waiting for their decision is decided by code, from two
@@ -5905,6 +6101,15 @@ export function createSpecialistQAnswer(
       request.plan.screen,
       latest.utteranceRef !== undefined,
     );
+    const stateText = conversationStateTextOf(
+      {
+        tenantId: request.tenantId,
+        userId: request.actor.userId,
+        runId: request.runId,
+      },
+      history,
+      request.fetchedInConversation,
+    );
     const readTurn = async (signal: AbortSignal = readerAbort.signal) =>
       turns.read(
         turnReaderInput(
@@ -5924,6 +6129,7 @@ export function createSpecialistQAnswer(
           withResolution(referenceNote(shown, lastAction), pointed),
           request.plan.screen?.manifest?.controls,
           await situationText,
+          await stateText,
         ),
       );
     // Read early, beside the firewall (ADR 0035), with the same words, the
@@ -6239,6 +6445,70 @@ export function createSpecialistQAnswer(
         return await answerTurn(request);
       } finally {
         reheard.delete(request.runId);
+      }
+    }
+    // Q intelligence step 3: what their pointing words mean, read by the
+    // reader against the conversation's ledger and checked here against
+    // the very state it was shown. One reading binds (it replaces code's
+    // word-pattern binding for the answer); two ask one short question
+    // naming both; none says so and asks -- unless code already bound the
+    // words to their page (a list or a control on it), which the ledger
+    // does not hold. Code's guesses from the conversation itself ("him" as
+    // the last company in focus) never outvote the reader's "nothing
+    // fits". A reply to a waiting card is decided by that card's own exact
+    // payload, never here.
+    const boundToPage =
+      pointed?.control !== undefined ||
+      (pointed?.resolved?.kind === "ONE" && pointed.resolved.via === "PAGE");
+    if (read !== null && read.addressedToQ !== false) {
+      const binding = bindReferences(
+        read.references,
+        shownStateInRun.get(request.runId) ?? null,
+      );
+      if (binding.rejected.length > 0) {
+        logger?.warn(
+          { qRunId: request.runId, rejected: binding.rejected.length },
+          "the turn reading pointed at refs the conversation's ledger does not hold; refused",
+        );
+      }
+      const askable =
+        binding.kind === "CLARIFY" &&
+        read.replyTo?.kind !== "WAITING_CARD" &&
+        !(binding.reason === "NO_READING" && boundToPage);
+      if (binding.kind === "CLARIFY" && askable) {
+        speculative.current?.cancel("ACTED");
+        logger?.info(
+          {
+            qRunId: request.runId,
+            lane: "REFERENCE_CLARIFY",
+            reason: binding.reason,
+          },
+          "q asked which one they meant",
+        );
+        return recordAnswer(request, conversationId, binding.question);
+      }
+      if (binding.kind === "BOUND") {
+        resolvedInRun.set(request.runId, binding.note);
+        while (resolvedInRun.size > PREREADS_MAX) {
+          const oldest = resolvedInRun.keys().next().value;
+          if (oldest === undefined) break;
+          resolvedInRun.delete(oldest);
+          placedInRun.delete(oldest);
+        }
+        const companies = boundCompanyIds(binding);
+        if (companies.length >= 2) placedInRun.set(request.runId, companies);
+        else placedInRun.delete(request.runId);
+        logger?.info(
+          {
+            qRunId: request.runId,
+            phrases: binding.bound.length,
+            entities: binding.bound.reduce(
+              (sum, one) => sum + one.entities.length,
+              0,
+            ),
+          },
+          "q bound a reference by the reader's reading",
+        );
       }
     }
     // A reading the speculation cannot be is known now: stop it at once

@@ -111,6 +111,45 @@ describe("claim check: true claims pass untouched", () => {
     ).toEqual([]);
   });
 
+  it("grounds a rate converted between two periods the sentence states", () => {
+    // $85,000 a month is sourced; x12 is the sentence's own conversion.
+    expect(check("$85,000 a month is $1.02M a year.").ungrounded).toEqual([]);
+    expect(
+      check("Burn of $85k per month is $1.02M annually.").ungrounded,
+    ).toEqual([]);
+    // A wrong product is still caught.
+    expect(check("$85,000 a month is $1.4M a year.").ungrounded).toEqual([
+      "MONEY",
+    ]);
+    // One period named: nothing to convert, the input is not shown.
+    expect(check("Annual burn is $1.02M a year.").ungrounded).toEqual([
+      "MONEY",
+    ]);
+    // The monthly input itself must be grounded.
+    expect(check("$95,000 a month is $1.14M a year.").ungrounded).toContain(
+      "MONEY",
+    );
+  });
+
+  it("uses a sourced short duration as an input, never as a claim", () => {
+    const withRunway = claimCorpus(
+      ["Ledgerline: monthly burn $120,000; runway 9 months."],
+      TODAY,
+    );
+    const at = (sentence: string) => checkSentence(sentence, withRunway);
+    expect(
+      at("9 months at $120,000 a month implies about $1.08M of cash.")
+        .ungrounded,
+    ).toEqual([]);
+    // A duration the sources do not state grounds nothing.
+    expect(
+      at("7 months at $120,000 a month implies about $840k of cash.")
+        .ungrounded,
+    ).toEqual(["MONEY"]);
+    // The lone digit is still not itself checked as a claim.
+    expect(at("Check back in 3 weeks.").ungrounded).toEqual([]);
+  });
+
   it("lets incidental numbers through: list positions, times, planning spans", () => {
     for (const sentence of [
       "1. Confirm the deck.",

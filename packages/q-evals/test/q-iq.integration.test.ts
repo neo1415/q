@@ -40,17 +40,39 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
     await db.close();
   });
 
+  const stateCount = async (): Promise<number> => {
+    const [row] = await db.sql<{ n: number }[]>`
+      select count(*)::int as n from q_runtime.conversation_states`;
+    return row?.n ?? 0;
+  };
+
   it("runs a case per category through the runtime and scores the reference replies", async () => {
-    const cases = Q_IQ_CATEGORIES.flatMap((category) =>
-      Q_IQ_DATASET.cases.filter((c) => c.category === category).slice(0, 1),
+    // CQ_Q_IQ_ALL=1: every case (the scripted regression check for a
+    // change to the conversation machinery); otherwise one per category.
+    const all = process.env["CQ_Q_IQ_ALL"] === "1";
+    const only = process.env["CQ_Q_IQ_CASE"];
+    const cases = all
+      ? Q_IQ_DATASET.cases.filter((c) => only === undefined || c.id === only)
+      : Q_IQ_CATEGORIES.flatMap((category) =>
+          Q_IQ_DATASET.cases.filter((c) => c.category === category).slice(0, 1),
+        );
+    expect(cases).toHaveLength(
+      all
+        ? only === undefined
+          ? Q_IQ_DATASET.cases.length
+          : 1
+        : Q_IQ_CATEGORIES.length,
     );
-    expect(cases).toHaveLength(Q_IQ_CATEGORIES.length);
+    const statesBefore = await stateCount();
     const q = await createQIqWorldSubject({ db, providerMode: "FAKE" });
     try {
       const result = await runQIq(q.subject, cases);
       for (const run of result.cases) {
         expect(run.error, run.caseId).toBeNull();
       }
+      // Q intelligence step 2: each conversation's state was folded from
+      // its stored turns and saved (one row per case's conversation).
+      expect((await stateCount()) - statesBefore).toBe(cases.length);
       // Scripted providers only: any cost here is the gateway's own token
       // estimate priced at catalogue rates, never spend.
       expect(q.world().providerMode).toBe("FAKE");
@@ -85,5 +107,5 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
     } finally {
       await q.close();
     }
-  }, 300_000);
+  }, 1_800_000);
 });

@@ -512,6 +512,17 @@ export {
   TURN_READER_V75_SCHEMA_VERSION,
   TurnReaderV75ResultSchema,
   type TurnReaderV75Result,
+  TURN_READER_V76_RECENT_TURNS_MAX,
+  TURN_READER_V76_TURN_TEXT_MAX,
+  TurnReaderV76VariablesSchema,
+  type TurnReaderV76Variables,
+  TURN_READER_V77_SCHEMA_VERSION,
+  TURN_REFERENCE_CONFIDENCES,
+  TURN_READER_REFERENCES_MAX,
+  TurnReaderReferenceSchema,
+  type TurnReaderReference,
+  TurnReaderV77ResultSchema,
+  type TurnReaderV77Result,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -2024,6 +2035,14 @@ export {
   TURN_READER_V75,
   V75_INVESTMENT_MEMO,
 } from "./prompts/tasks/turn-reader.v75.js";
+export {
+  TURN_READER_V76,
+  V76_CONVERSATION_STATE,
+} from "./prompts/tasks/turn-reader.v76.js";
+export {
+  TURN_READER_V77,
+  V77_REFERENCES,
+} from "./prompts/tasks/turn-reader.v77.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {
