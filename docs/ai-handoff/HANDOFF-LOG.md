@@ -1466,3 +1466,9 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 
 - fad7f0288 deployed 04:30 (q-api only); live9 PASS: /work shows one row per running plan with its steps. All owner and acceptance defects from 4 Nov are now production verified (live5–live9 receipts).
 - Remaining: sweep the other 70 founder pitches for burned-in captions; Harbourline caption/title overlap; real-device voice and Hey Q checks; owner to set CQ_SEED_ACCOUNT_PASSWORD so live rounds don't need per-round approval.
+
+## 2026-11-05 06:20 UTC (integration owner)
+
+- Merged fix/caption-cue-placement (c7536d46d): CI run 41974532102 all green; deployed 06:05 (web only). live10 PASS: Harbourline cue foot 75% at 1440 and 390, above the burned AI-presenter title (was 94%). Receipt chore/live10-c7536d4 @ 083bf707f.
+- All fix branches (chat-render, q-correctness, plan-ui-polish, qcard-portrait, back-everywhere, caption-cue-placement) merged and live verified.
+- Open: 20 unreachable pitch videos; real-device voice / Hey Q; owner's refusal-message fix is not on this remote; owner to set CQ_SEED_ACCOUNT_PASSWORD and rotate pasted tokens.

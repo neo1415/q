@@ -1,21 +1,23 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 5 November 2026, 04:40 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58)
+## Live board — 5 November 2026, 06:20 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58)
 
-Production: q-api on `fad7f0288`, web/api/workers on `a452c84fc` (fad7f02 touches q-api only); rollback `a452c84fc`. Migrations hosted 271 = local 271. URL https://capital-qweb-production.up.railway.app.
+Production: web on `c7536d46d` (web-only change), q-api `fad7f0288`, api/workers `a452c84fc`; rollback web `a452c84fc`. Migrations hosted 271 = local 271. URL https://capital-qweb-production.up.railway.app.
 
-| Area                                                                                                      | State               | Evidence                             |
-| --------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------ |
-| Boss visuals (themes, Talk to Q, patterns, 768px column, Q Card)                                          | PRODUCTION VERIFIED | chore/release-8967c4f-evidence       |
-| Chat prose, Show again, Ledgerline, okay-while-busy, splash, not-found page                               | PRODUCTION VERIFIED | chore/live5-11c36f6                  |
-| Back on 44 interior pages, traction per company, pipeline = CRM, logos, Q Card 390                        | PRODUCTION VERIFIED | chore/live6-7b9a267                  |
-| Plans: card + Execute, make-me-a-plan → plan, one Now chip, task status                                   | PRODUCTION VERIFIED | chore/live7-449301d                  |
-| Memo one page; traction follow-up; Discover tabs + 1024 videos; pitch captions; plan card kept after okay | PRODUCTION VERIFIED | chore/live8-a452c84                  |
-| /work: one row per running plan, steps inside                                                             | PRODUCTION VERIFIED | chore/live9-fad7f02                  |
-| Unswept pitch videos (70 of 110) for burned-in captions                                                   | OPEN                | receipts/2026-11-05-burned-captions/ |
-| Harbourline: our captions over the video's own title text                                                 | OPEN (minor)        | chore/live8-a452c84                  |
-| Hey Q on-device; GPT-Live listening state                                                                 | needs a real device |                                      |
-| Live checks need the owner's yes per round; set CQ_SEED_ACCOUNT_PASSWORD                                  | OWNER ACTION        |                                      |
+| Area                                                                                                                                 | State                                | Evidence                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ---------------------------------------------- |
+| Boss visuals (themes, Talk to Q, patterns, 768px column, Q Card)                                                                     | PRODUCTION VERIFIED                  | chore/release-8967c4f-evidence                 |
+| Chat prose, Show again, Ledgerline, okay-while-busy, splash, not-found page                                                          | PRODUCTION VERIFIED                  | chore/live5-11c36f6                            |
+| Back on 44 interior pages, traction per company, pipeline = CRM, logos, Q Card 390                                                   | PRODUCTION VERIFIED                  | chore/live6-7b9a267                            |
+| Plans: card + Execute, make-me-a-plan → plan, one Now chip, task status                                                              | PRODUCTION VERIFIED                  | chore/live7-449301d                            |
+| Memo one page; traction follow-up; Discover tabs + 1024 videos; pitch captions; plan card kept after okay                            | PRODUCTION VERIFIED                  | chore/live8-a452c84                            |
+| /work: one row per running plan, steps inside                                                                                        | PRODUCTION VERIFIED                  | chore/live9-fad7f02                            |
+| Harbourline / AI-presenter pitches: our captions end above the burned title (foot 94% → 75% at 1440 and 390)                         | PRODUCTION VERIFIED                  | chore/live10-c7536d4 @ 083bf707f               |
+| Burned-in captions sweep: 23 of 108 READY pitches flagged, 65 clear                                                                  | DONE                                 | receipts/2026-11-05-burned-captions/           |
+| 20 pitch videos not reachable in the sweep                                                                                           | OPEN (minor)                         | receipts/2026-11-05-burned-captions/sweep.json |
+| Owner's desktop session "Fix Q chip refusals" says it pushed af8db8a on claude/jolly-gates-e0c3uk; that branch is not on this remote | OWNER ACTION (push it here to merge) |                                                |
+| Hey Q on-device; GPT-Live listening state                                                                                            | needs a real device                  |                                                |
+| Set CQ_SEED_ACCOUNT_PASSWORD; rotate tokens pasted in chat                                                                           | OWNER ACTION                         |                                                |
 
 ## Live board — 29 October 2026, 08:05 UTC (Claude coordinator, session_01Wncmn2hVzNK1rHd5FweHwt)
 
