@@ -2,7 +2,7 @@
 
 Deployed 21:26 UTC 5 Nov by fast-forwarding `recovery/2026-09-12` (`fdcf86871` → `789a1ecbd`) after CI 42107782084 passed (build, typecheck, format+lint, test, pgTAP). Railway web SUCCESS on `789a1ecbd`. Rollback: `fdcf86871`.
 
-Checked 21:34 UTC as the fictional investor `investor.savanna-seed@fictional.capitalq.local` (`check.cjs`, light theme, one Q turn).
+Checked 21:34 UTC as the fictional investor `investor.savanna-seed@fictional.capitalq.local` (a Playwright script, light theme, one Q turn).
 
 | Check                                                             | 1440 | 390  |
 | ----------------------------------------------------------------- | ---- | ---- |
