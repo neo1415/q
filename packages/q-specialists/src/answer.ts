@@ -234,6 +234,7 @@ import {
   type ReferenceAsk,
   type ResolvedReference,
 } from "./conversation-entities.js";
+import { bindReferences, boundCompanyIds } from "./reference-binding.js";
 
 /** B6: a reference in the turn, bound to records, with its note. */
 /**
@@ -2160,6 +2161,7 @@ export function createSpecialistQAnswer(
    */
   const statesInRun = new Map<string, Promise<RunConversationState | null>>();
   const stateTextInRun = new Map<string, string>();
+  const shownStateInRun = new Map<string, QConversationState>();
   const conversationStateOf = (
     who: {
       readonly tenantId: TenantId;
@@ -2187,6 +2189,7 @@ export function createSpecialistQAnswer(
       if (oldest === undefined) break;
       statesInRun.delete(oldest);
       stateTextInRun.delete(oldest);
+      shownStateInRun.delete(oldest);
     }
     return started;
   };
@@ -2201,8 +2204,13 @@ export function createSpecialistQAnswer(
   ): Promise<string | undefined> => {
     const loaded = await conversationStateOf(who, history);
     if (loaded === null) return undefined;
+    // Step 3: the very state the reader is shown -- the stored ledger plus
+    // only the reads the firewall kept for this run -- is the one its
+    // references are checked against.
+    const shownState = withFetchedRecords(loaded.state, history, fetched);
+    shownStateInRun.set(who.runId, shownState);
     const text = renderConversationState({
-      state: withFetchedRecords(loaded.state, history, fetched),
+      state: shownState,
       summary: loaded.summary,
       olderMessages: Math.max(
         0,
@@ -6437,6 +6445,70 @@ export function createSpecialistQAnswer(
         return await answerTurn(request);
       } finally {
         reheard.delete(request.runId);
+      }
+    }
+    // Q intelligence step 3: what their pointing words mean, read by the
+    // reader against the conversation's ledger and checked here against
+    // the very state it was shown. One reading binds (it replaces code's
+    // word-pattern binding for the answer); two ask one short question
+    // naming both; none says so and asks -- unless code already bound the
+    // words to their page (a list or a control on it), which the ledger
+    // does not hold. Code's guesses from the conversation itself ("him" as
+    // the last company in focus) never outvote the reader's "nothing
+    // fits". A reply to a waiting card is decided by that card's own exact
+    // payload, never here.
+    const boundToPage =
+      pointed?.control !== undefined ||
+      (pointed?.resolved?.kind === "ONE" && pointed.resolved.via === "PAGE");
+    if (read !== null && read.addressedToQ !== false) {
+      const binding = bindReferences(
+        read.references,
+        shownStateInRun.get(request.runId) ?? null,
+      );
+      if (binding.rejected.length > 0) {
+        logger?.warn(
+          { qRunId: request.runId, rejected: binding.rejected.length },
+          "the turn reading pointed at refs the conversation's ledger does not hold; refused",
+        );
+      }
+      const askable =
+        binding.kind === "CLARIFY" &&
+        read.replyTo?.kind !== "WAITING_CARD" &&
+        !(binding.reason === "NO_READING" && boundToPage);
+      if (binding.kind === "CLARIFY" && askable) {
+        speculative.current?.cancel("ACTED");
+        logger?.info(
+          {
+            qRunId: request.runId,
+            lane: "REFERENCE_CLARIFY",
+            reason: binding.reason,
+          },
+          "q asked which one they meant",
+        );
+        return recordAnswer(request, conversationId, binding.question);
+      }
+      if (binding.kind === "BOUND") {
+        resolvedInRun.set(request.runId, binding.note);
+        while (resolvedInRun.size > PREREADS_MAX) {
+          const oldest = resolvedInRun.keys().next().value;
+          if (oldest === undefined) break;
+          resolvedInRun.delete(oldest);
+          placedInRun.delete(oldest);
+        }
+        const companies = boundCompanyIds(binding);
+        if (companies.length >= 2) placedInRun.set(request.runId, companies);
+        else placedInRun.delete(request.runId);
+        logger?.info(
+          {
+            qRunId: request.runId,
+            phrases: binding.bound.length,
+            entities: binding.bound.reduce(
+              (sum, one) => sum + one.entities.length,
+              0,
+            ),
+          },
+          "q bound a reference by the reader's reading",
+        );
       }
     }
     // A reading the speculation cannot be is known now: stop it at once

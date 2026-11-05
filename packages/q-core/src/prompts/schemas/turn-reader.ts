@@ -1140,3 +1140,38 @@ export const TURN_READER_V76_UNTRUSTED = [
   ...TURN_READER_V55_UNTRUSTED,
   "conversationState",
 ] as const;
+
+/**
+ * v77 (Q intelligence step 3): what the turn's pointing words mean, bound
+ * by meaning against CONVERSATION STATE. Each entry is one reading of one
+ * phrase ("her", "the other deck", "those two", "the second one"):
+ * `entityIds` are the LEDGER refs (E1, E2…) it means -- a plural set is one
+ * entry with several refs; two plausible readings are two entries with the
+ * same phrase; an entry with no refs says the phrase points at something
+ * earlier that the state does not let the reader tell. Refs only, never
+ * record ids: code maps refs to records, and refuses any ref the ledger
+ * shown to this person does not hold (Context Firewall). Confidence is a
+ * word, never a percentage.
+ */
+export const TURN_READER_V77_SCHEMA_VERSION = 77;
+export const TURN_REFERENCE_CONFIDENCES = ["HIGH", "MEDIUM", "LOW"] as const;
+export const TURN_READER_REFERENCES_MAX = 8;
+export const TurnReaderReferenceSchema = z
+  .object({
+    phrase: z.string().trim().min(1).max(120),
+    entityIds: z
+      .array(z.string().regex(/^E[1-9][0-9]{0,3}$/u))
+      .max(6)
+      .default([]),
+    confidence: z.enum(TURN_REFERENCE_CONFIDENCES).default("MEDIUM"),
+  })
+  .strict();
+export type TurnReaderReference = z.infer<typeof TurnReaderReferenceSchema>;
+export const TurnReaderV77ResultSchema = TurnReaderV75ResultSchema.extend({
+  references: z
+    .array(TurnReaderReferenceSchema)
+    .max(TURN_READER_REFERENCES_MAX)
+    .default([])
+    .catch([]),
+}).strict();
+export type TurnReaderV77Result = z.infer<typeof TurnReaderV77ResultSchema>;

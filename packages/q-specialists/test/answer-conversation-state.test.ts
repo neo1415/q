@@ -99,7 +99,7 @@ function memoryStore() {
   return { store, stored: () => stored };
 }
 
-function conversation() {
+function conversation(references: QTurnReading["references"] = []) {
   const conversationId = randomUUID();
   const lines: QConversationMessage[] = [];
   const at = (offset: number) =>
@@ -122,6 +122,7 @@ function conversation() {
     } as unknown as QConversationMessage);
   const inputs: Parameters<QTurnReader["read"]>[0][] = [];
   const delegatedWith: QAnswerRequest[] = [];
+  const inserted: string[] = [];
   const memory = memoryStore();
   const answer = createSpecialistQAnswer({
     specialist: {
@@ -146,6 +147,19 @@ function conversation() {
       conversationStates: memory.store,
       messages: {
         listRecentForConversationOfRun: () => Promise.resolve([...lines]),
+        insert: (_tx: unknown, row: { content: string }) => {
+          inserted.push(row.content);
+          return Promise.resolve({
+            id: randomUUID(),
+            tenantId: TENANT,
+            conversationId: lines[0]?.conversationId,
+            runId: randomUUID(),
+            role: "Q",
+            content: row.content,
+            contentType: "TEXT",
+            createdAt: new Date().toISOString(),
+          });
+        },
       },
       runs: { allocateEventSequence: () => Promise.resolve(1) },
       runEvents: {
@@ -160,12 +174,13 @@ function conversation() {
         return Promise.resolve({
           ...BASE,
           kind: "QUESTION_TO_Q",
+          references,
         } as unknown as QTurnReading);
       },
     },
     offeredTools: () => Promise.resolve([]),
   });
-  return { add, answer, inputs, delegatedWith, memory };
+  return { add, answer, inputs, delegatedWith, memory, inserted };
 }
 
 const longReply = `Silo Credit lends to SMEs in Lagos. ${"It has steady growth and a clear plan. ".repeat(12)}Its CFO is Ngozi Eze.`;
@@ -211,5 +226,71 @@ describe("the conversation state, read on every turn", () => {
       id: SILO,
       name: "Silo Credit",
     });
+  });
+});
+
+const LEDGERFOLD = "5f0c9a5e-1d1e-4c55-9d2b-3f6c1b7a0a11";
+
+/** Q showed two companies as cards: E1 Silo Credit, E2 Ledgerfold. */
+function twoCards(references: QTurnReading["references"]) {
+  const c = conversation(references);
+  c.add("USER", "Show me SME lenders.");
+  c.add("Q", "Two stand out.", [
+    {
+      kind: "ANSWER_CARDS",
+      title: "SME lenders",
+      cards: [
+        {
+          name: "Silo Credit",
+          subject: { kind: "COMPANY", companyId: SILO },
+          measures: [],
+        },
+        {
+          name: "Ledgerfold",
+          subject: { kind: "COMPANY", companyId: LEDGERFOLD },
+          measures: [],
+        },
+      ],
+    } as unknown as QResultBlock,
+  ]);
+  return c;
+}
+
+describe("step 3: the reader's references, bound by code against the ledger", () => {
+  it("binds one reading and hands the answer the records, in the order said", async () => {
+    const c = twoCards([
+      { phrase: "those two", entityIds: ["E2", "E1"], confidence: "HIGH" },
+    ]);
+    c.add("USER", "Compare those two.");
+    await c.answer.answer(request());
+    const asked = c.delegatedWith.at(-1);
+    expect(asked?.references).toContain('"those two" means E2 "Ledgerfold"');
+    expect(asked?.references).toContain(`COMPANY id ${SILO}`);
+    expect(asked?.referencedCompanyIds).toEqual([LEDGERFOLD, SILO]);
+  });
+
+  it("asks one short question naming both when two readings are plausible, and answers nothing else", async () => {
+    const c = twoCards([
+      { phrase: "it", entityIds: ["E1"], confidence: "MEDIUM" },
+      { phrase: "it", entityIds: ["E2"], confidence: "MEDIUM" },
+    ]);
+    c.add("USER", "What's its runway?");
+    await c.answer.answer(request());
+    expect(c.delegatedWith).toHaveLength(0);
+    expect(c.inserted).toEqual([
+      'By "it", do you mean Silo Credit or Ledgerfold?',
+    ]);
+  });
+
+  it("refuses a ref the ledger does not hold (Context Firewall): says so and asks, never binds it", async () => {
+    const c = twoCards([
+      { phrase: "her", entityIds: ["E9"], confidence: "HIGH" },
+    ]);
+    c.add("USER", "Email her the memo.");
+    await c.answer.answer(request());
+    expect(c.delegatedWith).toHaveLength(0);
+    expect(c.inserted).toEqual([
+      `I'm not sure who or what you mean by "her". Which one do you mean?`,
+    ]);
   });
 });
