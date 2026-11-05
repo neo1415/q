@@ -1,20 +1,20 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 5 November 2026, 01:25 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58)
+## Live board — 5 November 2026, 02:55 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58)
 
-Production: all four services on `449301dbe` (pushed 00:53 UTC; rollback `7b9a267ce`). Next candidate `23451cb58` in CI; integration head `2351a656a`. URL https://capital-qweb-production.up.railway.app. Hourly continuation `trig_01UbYp5iMbDCvK1i4GC8urcA`.
+Production: all four services on `a452c84fc` (pushed 02:35 UTC; rollback `23451cb58`). Migrations: hosted 271 = local 271 (latest `20261231240000` media captions_in_picture; 6 founder pitches flagged). URL https://capital-qweb-production.up.railway.app.
 
-| Area                                                                                                            | State                                                                   | Evidence                        |
-| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------- |
-| Boss visuals (themes, Talk to Q, patterns, 768px column, Q Card)                                                | PRODUCTION VERIFIED                                                     | chore/release-8967c4f-evidence  |
-| Chat prose, Show again, Ledgerline, okay-while-busy, splash, not-found page                                     | PRODUCTION VERIFIED on 11c36f6ea                                        | chore/live5-11c36f6             |
-| Back on 44 interior pages; compare traction per company; pipeline counts = CRM; logos; Q Card 390               | PRODUCTION VERIFIED on 7b9a267ce                                        | chore/live6-7b9a267             |
-| Q Card portrait + single card + demo logo                                                                       | PRODUCTION VERIFIED                                                     | chore/qcard-portrait-prod-shots |
-| Plan flow (card stays on stage, okay starts it, /work Moving, one Now chip, task status, make-me-a-plan → plan) | DEPLOYED 449301dbe; live check running (live7)                          |                                 |
-| Memo: one page, headings in chat, no status sentence, no repeated compare table                                 | IN CI 23451cb58                                                         |                                 |
-| Discover: tabs overlap, Your companies + For you video at 1024                                                  | IN CI 23451cb58 (tabs, Your companies); For you merged 2351a656a        | receipts/2026-11-05-discover-*  |
-| Pitch double captions (burned into Ledgerline's video)                                                          | IN PROGRESS: sweep + captions_in_picture flag (migration + data script) |                                 |
-| Hey Q on-device; GPT-Live listening state                                                                       | needs a real device                                                     |                                 |
+| Area                                                                                       | State                                                                                           | Evidence                             |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Boss visuals (themes, Talk to Q, patterns, 768px column, Q Card)                           | PRODUCTION VERIFIED                                                                             | chore/release-8967c4f-evidence       |
+| Chat prose, Show again, Ledgerline, okay-while-busy, splash, not-found page                | PRODUCTION VERIFIED                                                                             | chore/live5-11c36f6                  |
+| Back on 44 interior pages, traction per company, pipeline = CRM, logos, Q Card 390         | PRODUCTION VERIFIED                                                                             | chore/live6-7b9a267                  |
+| Plan card + Execute, make-me-a-plan → plan, one Now chip, task status                      | PRODUCTION VERIFIED                                                                             | chore/live7-449301d                  |
+| Plan card kept after "okay" (1440), /work one row per plan with steps                      | DEPLOYED a452c84fc; live check pending owner approval                                           |                                      |
+| Memo one page / headings / no status line / no repeated table; Discover tabs + 1024 videos | DEPLOYED 23451cb58 + a452c84fc; live check pending owner approval                               |                                      |
+| Pitch burned-in captions: flag + player skips own track                                    | DEPLOYED a452c84fc; 6 of 110 flagged; 70 pitches not swept                                      | receipts/2026-11-05-burned-captions/ |
+| Live-check sign-in                                                                         | each round needs the owner's "yes" in the live session; set CQ_SEED_ACCOUNT_PASSWORD to stop it |                                      |
+| Hey Q on-device; GPT-Live listening                                                        | needs a real device                                                                             |                                      |
 
 ## Live board — 29 October 2026, 08:05 UTC (Claude coordinator, session_01Wncmn2hVzNK1rHd5FweHwt)
 

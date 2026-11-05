@@ -1455,3 +1455,9 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Deploys: 8967c4fd4 (boss visuals + plan fixes), 11c36f6ea (chat fragments, Show again, Ledgerline, Q Card portrait, plan polish, splash, not-found page), 7b9a267ce (Back everywhere, memo identity, traction, pipeline counts, logos, Q Card narrow, chart wording), 449301dbe (six plan fixes + route-coverage test fix). Each live-checked on the fictional investor (receipts on chore/live5..live7 branches) except 449301dbe (running).
 - Lessons: a CI format/coverage failure on docs or a new route still blocks the deploy branch — run `npx prettier --check apps packages docs` and the route-coverage tests whenever a page is added. Child sessions' safety classifiers block production sign-in/uploads until the owner approves in that session; set CQ_SEED_ACCOUNT_PASSWORD to avoid it. Two sessions hit the 5-hour usage limit at 23:20 and resumed after reset.
 - Open: 23451cb58 deploy (memo, Discover), 2351a656a (For you 1024), pitch burned-in captions flag, real-device voice/Hey Q checks.
+
+## 2026-11-05 02:55 UTC (integration owner)
+
+- Deployed 449301dbe (00:53), 23451cb58 (01:42), a452c84fc (02:35). Migration 20261231240000 applied 02:10 after pgTAP; data script flagged 6 founder pitches with burned-in captions.
+- live7 (449301dbe): 3/5 PASS; both 1440 failures fixed in a452c84fc. live8 (memo, Discover, captions, /work, plan card) waits on the owner's approval in session_01Eyr9vKnZsYRPCqAScSKGb3.
+- Open: unswept 70 pitch videos; real-device voice / Hey Q.
