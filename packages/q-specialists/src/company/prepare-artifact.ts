@@ -538,6 +538,7 @@ export async function prepareOrReviseArtifact(input: {
         },
         onStage: said,
         signal: request.signal,
+        frame: { title: composed.title, summary: composed.summary },
       });
       return {
         kind: "PREPARED",

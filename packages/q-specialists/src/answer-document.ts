@@ -249,6 +249,21 @@ export function tableSection(
   }
 }
 
+/**
+ * live6 2026-11-04 (production 7b9a267ce): the one-page memo's PDF ended
+ * "The memo text is ready for review." -- the answer's closing word about
+ * itself, filed as if it were the memo. A sentence whose subject is the
+ * piece of writing itself and whose news is its state (ready, attached,
+ * below, done, for your review) is about the conversation, not part of
+ * the document. Read over Q's own written answer only.
+ */
+const ABOUT_ITSELF =
+  /^\s*(?:(?:the|this|your|my)\s+)?(?:(?:one[\s-]page|investment|ic|draft|full|final)\s+)*(?:memo|document|draft|brief|report|write-?up|text|pdf|one-pager|note|summary)(?:\s+(?:text|draft|above|below))?\s+(?:is|are|has been|was)\s+(?:now\s+)?(?:ready|attached|below|above|done|complete|finished|prepared|available)\b[^.!?]*[.!?]?\s*$/iu;
+
+export function aboutTheDocumentItself(sentence: string): boolean {
+  return ABOUT_ITSELF.test(sentence);
+}
+
 export function composeAnswerDocument(input: {
   /** The answer, as Q wrote it (markdown). */
   readonly answer: string;
@@ -264,12 +279,13 @@ export function composeAnswerDocument(input: {
   readonly table?: TabularBlock | undefined;
   readonly names?: ReadonlyMap<string, string> | undefined;
 }): AnswerDocument | null {
-  const prose =
-    input.table === undefined
-      ? input.answer
-      : splitSentences(input.answer)
-          .filter((sentence) => !claimsOnScreen(sentence))
-          .join("");
+  const prose = splitSentences(input.answer)
+    .filter(
+      (sentence) =>
+        !aboutTheDocumentItself(sentence) &&
+        (input.table === undefined || !claimsOnScreen(sentence)),
+    )
+    .join("");
   const lines = prose.replace(/\r\n?/g, "\n").split("\n");
   const sections: { heading: string; lines: string[] }[] = [];
   let current: { heading: string; lines: string[] } = {

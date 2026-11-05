@@ -4,6 +4,7 @@ import { QResultBlockSchema } from "@capital-q/contracts";
 
 import { RunRead, createRunCompanies } from "../src/q/card-subjects.js";
 import {
+  comparisonOnScreen,
   asksToCompare,
   comparisonFactStatement,
   ledByVerdict,
@@ -694,5 +695,47 @@ describe("acceptance J5: a lender's stated traction is in the table", () => {
     expect(traction?.[0]).not.toContain("₦2.1bn");
     expect(traction?.[1]).toContain("₦2.1bn");
     expect(traction?.[1]).not.toContain("EGP 640m");
+  });
+});
+
+// live6 2026-11-04 (production 7b9a267ce): "which has better traction?"
+// after the comparison drew the whole table again above its answer.
+describe("live6: the table already on screen is not drawn again", () => {
+  it("knows Q's previous answer showed these companies side by side", () => {
+    const { read, fits } = run();
+    const table = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit side by side",
+      read,
+      fits,
+    });
+    if (table === null) throw new Error("no table");
+    const shown = [
+      { role: "USER", blocks: [] },
+      { role: "Q", blocks: [table] },
+      { role: "USER", blocks: [] },
+    ];
+    expect(comparisonOnScreen(shown, table)).toBe(true);
+    // Not shown yet, or shown before another answer: drawn.
+    expect(comparisonOnScreen([{ role: "USER" }], table)).toBe(false);
+    expect(
+      comparisonOnScreen([...shown, { role: "Q", blocks: [] }], table),
+    ).toBe(false);
+  });
+
+  it("a table of other companies is a new table", () => {
+    const { read, fits } = run();
+    const table = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit side by side",
+      read,
+      fits,
+    });
+    if (table?.kind !== "TABLE") throw new Error("no table");
+    const other = {
+      ...table,
+      columns: table.columns.slice(0, 1),
+    };
+    expect(comparisonOnScreen([{ role: "Q", blocks: [other] }], table)).toBe(
+      false,
+    );
   });
 });

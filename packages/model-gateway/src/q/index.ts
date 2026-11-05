@@ -113,6 +113,8 @@ import {
   ModelFindingSchema,
   inTurnLanguage,
   splitSentences,
+  streamedPiece,
+  asksForOnePage,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -420,6 +422,7 @@ import {
 import {
   asksToCompare,
   comparisonFactStatement,
+  comparisonOnScreen,
   comparisonVerdict,
   ledByVerdict,
   type ComparisonVerdict,
@@ -1711,7 +1714,16 @@ export const LONG_ANSWER_NOTE =
   "TYPED TURN: a few short paragraphs at most, most important first. If the full answer would be long (a deep analysis, a report), give the short answer and offer to write it up as a document.";
 
 export const WRITING_DOCUMENT_NOTE =
-  "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, and never say it is already attached.";
+  "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, never say it is already attached, and never end with a line about the document itself (such as that it is ready for review): every sentence you write is printed in it.";
+
+/**
+ * live6 2026-11-04 (production 7b9a267ce): a "one-page memo" was written
+ * at 440 words in seven sections and printed on two pages. The writer is
+ * given the page's real budget; code still fits the filed document to one
+ * page by the renderer's own count (q-specialists one-page.ts).
+ */
+export const ONE_PAGE_NOTE =
+  "ONE PAGE: they asked for one page. Keep the whole document under 280 words in at most four short sections (a heading and two to four sentences or bullets each), the most decision-relevant first.";
 
 /**
  * A series of questions the person asked for (R35), as trusted text: the
@@ -1769,6 +1781,8 @@ export function environmentNoteParts(
     readonly turnUnread?: boolean | undefined;
     /** They asked for this answer as a document (Q_REPORT). */
     readonly writingDocument?: boolean | undefined;
+    /** That document is to be one page, in their own words (live6). */
+    readonly onePage?: boolean | undefined;
     /** The turn was spoken: the answer is said aloud (2026-10-07). */
     readonly spoken?: boolean | undefined;
     /** A requested series of questions and this turn's step in it (R35). */
@@ -1885,6 +1899,11 @@ export function environmentNoteParts(
 
     ...(options.writingDocument === true && options.turnUnread !== true
       ? [WRITING_DOCUMENT_NOTE]
+      : []),
+    ...(options.writingDocument === true &&
+    options.turnUnread !== true &&
+    options.onePage === true
+      ? [ONE_PAGE_NOTE]
       : []),
     ...(options.questionSequence === undefined
       ? []
@@ -6003,7 +6022,10 @@ export function createModelGatewayQAnswer(
           ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
           ...(request.turnUnread === true ? { turnUnread: true } : {}),
           ...(request.writingDocument === true
-            ? { writingDocument: true }
+            ? {
+                writingDocument: true,
+                ...(asksForOnePage(latest.content) ? { onePage: true } : {}),
+              }
             : {}),
           ...(request.spoken === true ? { spoken: true } : {}),
           ...(request.questionSequence === undefined
@@ -6304,7 +6326,8 @@ export function createModelGatewayQAnswer(
        * Q's words stream in under it. Nothing in it is a model's.
        */
       const tableFirst =
-        compareTable?.kind === "TABLE"
+        compareTable?.kind === "TABLE" &&
+        !comparisonOnScreen(earlier, compareTable)
           ? {
               layout: "TABLE" as const,
               table: compareTable,
@@ -6454,8 +6477,11 @@ export function createModelGatewayQAnswer(
         // lines the stored answer opens with).
         sayLeadLines();
         firstPublishedMs ??= Date.now() - startedAt;
-        streamedText += `${text} `;
-        sendSaid(`${text} `);
+        // A heading or list item opens its own line (live6: "## Key Gaps
+        // and Risks" was glued to the sentence before it).
+        const piece = streamedPiece(text, streamedText.length === 0);
+        streamedText += piece;
+        sendSaid(piece);
       };
       // Backed only by a screen move a tool of this run authorised.
       // Or by cards that will render: the model's own card set begun in
@@ -6871,6 +6897,8 @@ export function createModelGatewayQAnswer(
         // done, never offered.
         const tableHere =
           compareTable !== null &&
+          // live6: the table already on their screen is not drawn again.
+          !comparisonOnScreen(earlier, compareTable) &&
           !(given ?? []).some(
             (block) =>
               block.kind === "TABLE" && block.title !== COMPANIES_TABLE_TITLE,
@@ -10565,9 +10593,15 @@ export function createModelGatewayQAnswer(
         if (answerVerdict === null && comparedTable !== null) {
           answerVerdict = comparisonVerdict(comparedTable, fitsRead);
         }
+        // live6: a follow-up about the companies already side by side on
+        // their screen answers in words; the verdict above still holds.
+        const tableToShow =
+          comparedTable !== null && comparisonOnScreen(earlier, comparedTable)
+            ? null
+            : comparedTable;
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
-          ...(comparedTable === null ? [] : [comparedTable]),
+          ...(tableToShow === null ? [] : [tableToShow]),
           ...fromPages,
           ...(picture === null ? [] : [picture]),
         ];

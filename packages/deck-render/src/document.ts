@@ -919,3 +919,19 @@ export async function documentToPdf(
 
   return pdf.save();
 }
+
+/**
+ * How many pages the document prints on, from the same layout the PDF
+ * download uses (live6 2026-11-04: a "one-page" memo printed on two). The
+ * renderer is the only authority on where a page breaks, so the count is
+ * read from a real render, never estimated from word counts.
+ */
+export async function documentPageCount(
+  document: ArtifactDocument,
+  meta: { readonly title: string; readonly company?: string | undefined },
+  brand?: BrandInput,
+): Promise<number> {
+  const bytes = await documentToPdf(document, meta, brand);
+  const pdf = await PDFDocument.load(bytes);
+  return pdf.getPageCount();
+}

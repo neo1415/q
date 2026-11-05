@@ -707,3 +707,37 @@ export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
   const body = (competing ? rest : sentences).join(" ").trim();
   return `${lead} ${body}`.trim();
 }
+
+/**
+ * live6 2026-11-04 (production 7b9a267ce): after "compare the 2nd and
+ * 3rd", "which has better traction?" kept the comparison as its context
+ * -- rightly -- and drew the whole table again above its answer. The
+ * table already on their screen is not shown twice: a follow-up about
+ * the same companies answers in words, the comparison's facts and code's
+ * verdict still in front of the writer. True when Q's previous answer
+ * carried a table of exactly these companies.
+ */
+export function comparisonOnScreen(
+  earlier: readonly {
+    readonly role: string;
+    readonly blocks?: readonly QResultBlock[] | undefined;
+  }[],
+  table: QResultBlock,
+): boolean {
+  if (table.kind !== "TABLE") return false;
+  const companies = (block: Extract<QResultBlock, { kind: "TABLE" }>) =>
+    block.columns
+      .flatMap((column) =>
+        column.subject?.kind === "COMPANY" ? [column.subject.companyId] : [],
+      )
+      .sort()
+      .join(",");
+  const wanted = companies(table);
+  if (wanted.length === 0) return false;
+  const previous = [...earlier]
+    .reverse()
+    .find((message) => message.role === "Q");
+  return (previous?.blocks ?? []).some(
+    (block) => block.kind === "TABLE" && companies(block) === wanted,
+  );
+}
