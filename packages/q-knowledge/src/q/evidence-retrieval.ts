@@ -166,11 +166,11 @@ export function createQEvidenceRetrieval(
         };
       }
 
+      // The service runs at most its config's number of searches.
       const planned = planRetrievalQueries({
         words: latest.content,
         previousWords,
         focus: request.retrievalFocus,
-        maxQueries: retrieval.config.maxSubQueries,
       });
       const result = await retrieval.retrieve({
         query: latest.content,

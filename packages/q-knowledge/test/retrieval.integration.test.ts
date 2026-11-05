@@ -380,7 +380,7 @@ describe("authorised hybrid retrieval against local PostgreSQL", () => {
       expect(top?.locator).toEqual({ slide: 2 });
       expect(top?.documentVersionId).toEqual(expect.any(String));
       expect(top?.scopeKind).toBe("EVIDENCE_DOCUMENTS");
-      expect(result.configVersion).toBe("capital-q-hybrid-v1");
+      expect(result.configVersion).toBe(DEFAULT_RETRIEVAL_CONFIG.configVersion);
     });
   });
 

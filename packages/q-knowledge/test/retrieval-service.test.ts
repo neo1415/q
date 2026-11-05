@@ -5,6 +5,7 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import {
   createAuthorisedRetrievalService,
   DEFAULT_RETRIEVAL_CONFIG,
+  RETRIEVAL_CONFIG_VERSION,
   RetrievalCancelledError,
   StaleRetrievalEnvelopeError,
   type ChunkHydrationPort,
@@ -432,6 +433,6 @@ describe("authorised retrieval service", () => {
     expect(diagnostics).not.toContain("RAG-QUERY-PRIVATE-DO-NOT-LOG");
     expect(diagnostics).not.toContain("content");
     expect(result.diagnostics.constraintCount).toBe(1);
-    expect(result.configVersion).toBe("capital-q-hybrid-v1");
+    expect(result.configVersion).toBe(RETRIEVAL_CONFIG_VERSION);
   });
 });
