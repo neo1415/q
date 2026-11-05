@@ -2867,12 +2867,20 @@
       container-type: size;
       user-select: auto;
       /* The 9:16 stage's height: the workspace less its gutters, and never
-         so wide that the dossier has less than 560px. */
+         so wide that the dossier has less than --cq-foryou-dossier: 480px
+         from 1024 to 1279px (live 2026-11-04: 560px there left the pitch
+         ~176px wide), 560px from 1280 up (unchanged). */
+      --cq-foryou-dossier: 480px;
       --cq-feed-video-h: min(
         calc(100cqh - 48px),
-        calc((100cqw - 560px - 48px) * 16 / 9)
+        calc((100cqw - var(--cq-foryou-dossier) - 48px) * 16 / 9)
       );
       --cq-feed-video-w: calc(var(--cq-feed-video-h) * 9 / 16);
+    }
+    @media (min-width: 1280px) {
+      .cq-feed-stage {
+        --cq-foryou-dossier: 560px;
+      }
     }
     .cq-feed-stage::before {
       display: none;
@@ -3291,9 +3299,20 @@
       top: 16px;
       /* Over the dossier's column (Discover A's stage-and-dossier grid). */
       inset-inline-start: calc(
-        48px + min(100dvh - 48px, (100% - 608px) * 16 / 9) * 9 / 16 + 14px
+        48px + min(100dvh - 48px, (100% - 528px) * 16 / 9) * 9 / 16 + 14px
       );
       transform: none;
+    }
+    /* From 1280px the dossier keeps 560px (.cq-feed-stage): 560 + 48. */
+    @media (min-width: 1280px) {
+      .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
+        .cq-discover-tabs,
+      .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
+        .cq-discover-tabs {
+        inset-inline-start: calc(
+          48px + min(100dvh - 48px, (100% - 608px) * 16 / 9) * 9 / 16 + 14px
+        );
+      }
     }
     /* Your companies has its own grid (.cq-yours-card: the stage, then a
        440px panel), so the For you offset above lands on its video (live
