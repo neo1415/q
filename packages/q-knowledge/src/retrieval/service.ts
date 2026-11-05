@@ -16,15 +16,17 @@ import {
   type RetrievalHit,
   type RetrievalPermissionEnvelope,
   type RetrievalStrategy,
+  type RetrievalSubQuery,
 } from "./contracts.js";
-import { envelopeIsCurrent } from "./envelope.js";
-import { fuseByReciprocalRank, type FusionInput } from "./fusion.js";
+import { envelopeIsCurrent, narrowEnvelopeToSubjects } from "./envelope.js";
+import { fuseRankedLists, type RankedList } from "./fusion.js";
 import type {
   ChunkHydrationPort,
   HydratedChunk,
   LexicalCandidate,
   LexicalSearchPort,
 } from "./ports.js";
+import { rerankerFor, type RetrievalReranker } from "./reranker.js";
 
 /**
  * The authorised retrieval service (CQ-RAG-004 §6, §8, §23, §41, §65).
@@ -42,9 +44,13 @@ import type {
  * that no constraint admits is not filtered out of a result — it is never a
  * row, so it cannot be counted, timed or accidentally serialised.
  *
+ * Step 5 adds, inside the same order: several searches per retrieval
+ * (each narrowed, never widened, by its subject filter), fused by RRF, and
+ * a reranker over the hydrated candidates before the final bound.
+ *
  * What it deliberately does not do: decide permission, rewrite the query
- * with a model, rerank with a second model, cache, call anything external,
- * write anything, or turn a retrieved passage into a claim.
+ * with a model, cache, call anything external, write anything, or turn a
+ * retrieved passage into a claim.
  */
 
 export type AuthorisedRetrievalDependencies = {
@@ -59,6 +65,11 @@ export type AuthorisedRetrievalDependencies = {
    */
   readonly embeddings?: EmbeddingService | undefined;
   readonly config?: RetrievalConfig | undefined;
+  /**
+   * Step 5: overrides the reranker the config names (a model reranker
+   * through the gateway, later). Absent: `rerankerFor(config.reranker)`.
+   */
+  readonly reranker?: RetrievalReranker | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -88,6 +99,7 @@ export class RetrievalCancelledError extends Error {
 
 function emptyResult(
   config: RetrievalConfig,
+  reranker: RetrievalReranker,
   requested: RetrievalStrategy,
   executed: RetrievalStrategy,
   degraded: RetrievalDegradation,
@@ -112,6 +124,11 @@ function emptyResult(
       expansionMs: 0,
       totalMs,
       contextCharacters: 0,
+      // The same keys as a searched result, so a denied envelope cannot be
+      // told from no match by the shape of its diagnostics.
+      queries: 0,
+      reranker: reranker.code,
+      rerankMs: 0,
     },
   };
 }
@@ -125,6 +142,7 @@ export function createAuthorisedRetrievalService(
   const { sql, lexical, semantic, hydration, embeddings, logger } =
     dependencies;
   const config = dependencies.config ?? DEFAULT_RETRIEVAL_CONFIG;
+  const reranker = dependencies.reranker ?? rerankerFor(config.reranker);
   const meter = getMeter("@capital-q/q-knowledge");
   const metrics = {
     requests: meter.createCounter("q.retrieval.requests"),
@@ -365,6 +383,7 @@ export function createAuthorisedRetrievalService(
         metrics.empty.add(1, labels);
         return emptyResult(
           config,
+          reranker,
           requested,
           requested,
           {
@@ -380,30 +399,93 @@ export function createAuthorisedRetrievalService(
       const wantsLexical = requested !== "SEMANTIC_ONLY";
       const wantsSemantic = requested !== "LEXICAL_ONLY";
 
+      // Step 5: the searches to run. Each sub-query's subject filter only
+      // NARROWS the envelope (narrowEnvelopeToSubjects); one whose
+      // subjects the envelope does not reach has no way in and is not run.
+      const asked: readonly RetrievalSubQuery[] =
+        request.queries === undefined || request.queries.length === 0
+          ? [{ text }]
+          : request.queries.slice(0, Math.max(1, config.maxSubQueries));
+      const searches = asked.flatMap((sub) => {
+        const subText = sub.text
+          .trim()
+          .slice(0, RETRIEVAL_QUERY_MAX_CHARACTERS);
+        if (subText.length === 0) return [];
+        const scoped =
+          sub.subjectIds === undefined
+            ? envelope
+            : narrowEnvelopeToSubjects(envelope, sub.subjectIds);
+        return scoped.constraints.length === 0
+          ? []
+          : [{ text: subText, envelope: scoped, weight: sub.weight ?? 1 }];
+      });
+
       // Lexical and semantic are parallel components of one hybrid step
       // (ADR-001), under the one envelope already resolved above: neither
       // widens what the other may read, and each degrades on its own. Run
       // concurrently, the step costs the slower half (usually the query
-      // embedding) instead of their sum (2026-10-12).
-      const [lexicalOutcome, semanticOutcome] = await Promise.all([
-        wantsLexical
-          ? runLexical(envelope, text)
-          : Promise.resolve({
-              candidates: [] as readonly LexicalCandidate[],
-              state: "NOT_ATTEMPTED" as const,
-              ms: null,
-            }),
-        wantsSemantic
-          ? runSemantic(envelope, text, request.signal)
-          : Promise.resolve({
-              candidates: [] as readonly SemanticCandidate[],
-              state: "NOT_ATTEMPTED" as const,
-              embeddingMs: null,
-              searchMs: null,
-              reason: null,
-            }),
-      ]);
+      // embedding) instead of their sum (2026-10-12). Sub-queries run
+      // concurrently too.
+      const outcomes = await Promise.all(
+        searches.map((search) =>
+          Promise.all([
+            wantsLexical
+              ? runLexical(search.envelope, search.text)
+              : Promise.resolve({
+                  candidates: [] as readonly LexicalCandidate[],
+                  state: "NOT_ATTEMPTED" as const,
+                  ms: null,
+                }),
+            wantsSemantic
+              ? runSemantic(search.envelope, search.text, request.signal)
+              : Promise.resolve({
+                  candidates: [] as readonly SemanticCandidate[],
+                  state: "NOT_ATTEMPTED" as const,
+                  embeddingMs: null,
+                  searchMs: null,
+                  reason: null,
+                }),
+          ]),
+        ),
+      );
       throwIfCancelled(request.signal);
+
+      const combineState = (
+        states: readonly RetrievalComponentState[],
+        wanted: boolean,
+      ): RetrievalComponentState =>
+        !wanted
+          ? "NOT_ATTEMPTED"
+          : states.includes("OK") || states.length === 0
+            ? "OK"
+            : states.includes("UNAVAILABLE")
+              ? "UNAVAILABLE"
+              : "NOT_ATTEMPTED";
+      const longestOrNull = (
+        values: readonly (number | null)[],
+      ): number | null =>
+        values.every((value) => value === null)
+          ? null
+          : Math.max(...values.map((value) => value ?? 0));
+      const lexicalOutcome = {
+        state: combineState(
+          outcomes.map(([lex]) => lex.state),
+          wantsLexical,
+        ),
+        candidates: outcomes.flatMap(([lex]) => lex.candidates),
+        ms: longestOrNull(outcomes.map(([lex]) => lex.ms)),
+      };
+      const semanticOutcome = {
+        state: combineState(
+          outcomes.map(([, sem]) => sem.state),
+          wantsSemantic,
+        ),
+        candidates: outcomes.flatMap(([, sem]) => sem.candidates),
+        embeddingMs: longestOrNull(outcomes.map(([, sem]) => sem.embeddingMs)),
+        searchMs: longestOrNull(outcomes.map(([, sem]) => sem.searchMs)),
+        reason:
+          outcomes.map(([, sem]) => sem.reason).find((r) => r !== null) ?? null,
+      };
 
       const degraded: RetrievalDegradation = {
         lexical: lexicalOutcome.state,
@@ -443,21 +525,30 @@ export function createAuthorisedRetrievalService(
       }
 
       const fusionStarted = Date.now();
-      const lexicalInputs: FusionInput<ChunkId>[] =
-        lexicalOutcome.candidates.map((candidate) => ({
-          key: candidate.chunkId,
-          item: candidate.chunkId,
-          rank: candidate.rank,
-        }));
-      const semanticInputs: FusionInput<ChunkId>[] =
-        semanticOutcome.candidates.map((candidate) => ({
-          key: candidate.chunkId,
-          item: candidate.chunkId,
-          rank: candidate.rank,
-        }));
-      const fused = fuseByReciprocalRank(lexicalInputs, semanticInputs, {
+      const lists: RankedList<ChunkId>[] = outcomes.flatMap(([lex, sem]) => [
+        {
+          side: "lexical" as const,
+          entries: lex.candidates.map((candidate) => ({
+            key: candidate.chunkId,
+            item: candidate.chunkId,
+            rank: candidate.rank,
+          })),
+        },
+        {
+          side: "semantic" as const,
+          entries: sem.candidates.map((candidate) => ({
+            key: candidate.chunkId,
+            item: candidate.chunkId,
+            rank: candidate.rank,
+          })),
+        },
+      ]);
+      // The fused cap is per search: two filtered searches about the same
+      // company would otherwise fill all of one search's places with its
+      // chunks and leave the second company of a comparison none.
+      const fused = fuseRankedLists(lists, {
         rrfK: config.rrfK,
-        limit: config.fusedCandidates,
+        limit: config.fusedCandidates * Math.max(1, searches.length),
       });
       const fusionMs = Date.now() - fusionStarted;
 
@@ -473,22 +564,72 @@ export function createAuthorisedRetrievalService(
       throwIfCancelled(request.signal);
       const byId = new Map(hydrated.map((row) => [row.chunkId, row]));
 
+      // Step 5: the reranker reorders what hydration admitted, and only
+      // that. Ids it returns that are not candidates are ignored; any
+      // candidate it leaves out keeps its fused place after the rest.
+      const rerankStarted = Date.now();
+      const hydratedInFusedOrder = fused.flatMap((entry, at) => {
+        const row = byId.get(entry.item);
+        return row === undefined
+          ? []
+          : [
+              {
+                chunkId: row.chunkId,
+                subjectId: row.subjectId,
+                documentId: row.documentId,
+                documentTitle: row.documentTitle,
+                content: row.content,
+                fusedRank: at + 1,
+              },
+            ];
+      });
+      const reordered =
+        reranker.code === "NONE" || hydratedInFusedOrder.length < 2
+          ? hydratedInFusedOrder.map((candidate) => candidate.chunkId)
+          : await reranker.rerank({
+              queries: searches.map((search) => ({
+                text: search.text,
+                weight: search.weight,
+              })),
+              focus: request.focus ?? null,
+              candidates: hydratedInFusedOrder,
+              signal: request.signal,
+            });
+      const allowed = new Set(
+        hydratedInFusedOrder.map((candidate) => candidate.chunkId),
+      );
+      const order: ChunkId[] = [];
+      for (const id of [
+        ...reordered,
+        ...hydratedInFusedOrder.map((candidate) => candidate.chunkId),
+      ]) {
+        if (allowed.has(id) && !order.includes(id)) order.push(id);
+      }
+      const fusedById = new Map(fused.map((entry) => [entry.item, entry]));
+      const rerankMs = Date.now() - rerankStarted;
+      throwIfCancelled(request.signal);
+
       const expansionStarted = Date.now();
       const hits = await expand(
         envelope,
-        fused.flatMap((entry) => {
-          const row = byId.get(entry.item);
-          return row === undefined
-            ? []
-            : [
-                {
-                  hydrated: row,
-                  lexicalRank: entry.lexicalRank,
-                  semanticRank: entry.semanticRank,
-                  fusedScore: entry.fusedScore,
-                },
-              ];
-        }),
+        order
+          .flatMap((id) => {
+            const entry = fusedById.get(id);
+            return entry === undefined ? [] : [entry];
+          })
+          .flatMap((entry) => {
+            const row = byId.get(entry.item);
+            return row === undefined
+              ? []
+              : [
+                  {
+                    hydrated: row,
+                    lexicalRank: entry.lexicalRank,
+                    semanticRank: entry.semanticRank,
+                    fusedScore: entry.fusedScore,
+                  },
+                ];
+          }),
       );
       const expansionMs = Date.now() - expansionStarted;
       const contextCharacters = hits.reduce(
@@ -550,6 +691,9 @@ export function createAuthorisedRetrievalService(
           expansionMs,
           totalMs,
           contextCharacters,
+          queries: searches.length,
+          reranker: reranker.code,
+          rerankMs,
         },
       };
     },

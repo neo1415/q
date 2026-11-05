@@ -117,6 +117,20 @@ export const QOpenThreadSchema = z
   .strict();
 export type QOpenThread = z.infer<typeof QOpenThreadSchema>;
 
+/**
+ * Q intelligence step 5: what retrieval may use from the conversation to
+ * rewrite "its burn" into "Silo Credit … burn" under that company's
+ * filter. The ledger shown to this person this run (stored ledger plus the
+ * reads the firewall kept), and the refs the reader bound this turn's
+ * pointing words to, already checked against that ledger (step 3).
+ * A search hint only: retrieval still narrows its own envelope and can
+ * never widen it, and every chunk is authorised in SQL as before.
+ */
+export type QRetrievalFocus = {
+  readonly ledger: QConversationLedger;
+  readonly boundRefs: readonly string[];
+};
+
 export const OPEN_THREADS_MAX = 50;
 export const QOpenThreadsSchema = z
   .array(QOpenThreadSchema)

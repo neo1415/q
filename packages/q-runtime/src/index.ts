@@ -63,6 +63,7 @@ export {
   type QLedgerList,
   type QLedgerVia,
   type QOpenThread,
+  type QRetrievalFocus,
 } from "./contracts/conversation-state.js";
 export {
   gateConversationSummary,

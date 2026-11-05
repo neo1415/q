@@ -1,19 +1,20 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 5 November 2026, 21:40 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 5 November 2026, 23:15 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
-Production: **all four services on `789a1ecbd`** (deployed 21:26 UTC; web SUCCESS, api/q-api rebuilt with no code change). Rollback: `fdcf86871`. Hosted migrations 271 = local 271.
+Production: **all four services on `b2c08ab2a`** (deployed 23:07 UTC). Hosted migrations 272 = local 272. Rollback: `789a1ecbd`.
 
-| Area                                                                                                                                                        | State               | Evidence / next                                                                                                           |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Owner UI: ChatGPT-style Q home (no Q presence, greeting + pill composer + 3 starters, gold Q = Talk to Q / Send, sliding Q/Chat switch, decluttered header) | PRODUCTION VERIFIED | CI 42107782084 green; live13 receipts `receipts/2026-11-05-live13-789a1ec/`                                               |
-| UI follow-ups: phone shell top bar, "Hide from Q" and "Clear" after a send                                                                                  | OPEN (owner to say) | live13 index                                                                                                              |
-| Q Intelligence step 2 (conversation state), then step 3                                                                                                     | IN PROGRESS         | Child `session_01Wncmn3GLgXyze4FuxoC9nH` fixing 3 DB-integration test failures; asked to push and report when gates-green |
-| Step 2 release: merge → CI → pgTAP → apply `20261231250000` → deploy → live check                                                                           | WAITING             | On step 2 gates                                                                                                           |
-| Live Q-IQ re-run after step 3 (`--budget 5.5 --out`)                                                                                                        | WAITING             | On step 3                                                                                                                 |
-| Credentials                                                                                                                                                 | OK                  | Railway and Supabase tokens work in this session                                                                          |
-| 2-hourly continuation                                                                                                                                       | ON                  | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                                                                           |
-| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote                                                           | OWNER / OPEN        | HANDOFF-2026-11-05 §6                                                                                                     |
+| Area                                                                                              | State               | Evidence / next                                                                                                      |
+| ------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Q Intelligence steps 2+3 (conversation state, model-led references) + claim-check arithmetic      | PRODUCTION VERIFIED | CI 42125008157 green; live14 `receipts/2026-11-05-live14-b2c08ab/` ("its PAR30" → Ledgerfold 3.8%)                   |
+| OpenAI credit incident (Q could not reach its model, 22:50–23:10)                                 | RESOLVED            | Owner topped up (same key); the deploy restart cleared q-api's block. Lesson: check the balance before any live eval |
+| Live Q-IQ after step 3 (`--budget 5.5 --out`)                                                     | WAITING ON OWNER OK | About $5.5 of the $9.72 balance; the 22:36 attempt was invalid                                                       |
+| Step 3c (remove reference regexes)                                                                | HELD                | Needs live Q-IQ with and without                                                                                     |
+| Step 4: one reader, no regex lanes                                                                | IN PROGRESS         | `session_01Wncmn2xNSZf141cQ3RHQFs` on `feat/q-one-reader`                                                            |
+| Step 5: context-aware retrieval + reranker                                                        | IN PROGRESS         | `session_01Wncmn7LogXnzLfccC3CVMw` on `feat/q-retrieval-context`                                                     |
+| Owner UI: ChatGPT-style Q home                                                                    | PRODUCTION VERIFIED | live13; follow-ups (phone top bar, "Hide from Q", "Clear") await the owner                                           |
+| 2-hourly continuation                                                                             | ON                  | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                                                                      |
+| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN        | HANDOFF-2026-11-05 §6                                                                                                |
 
 ## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
