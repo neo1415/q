@@ -368,8 +368,12 @@ export type QIqCategoryScore = {
   readonly casesPassed: number;
   readonly turns: number;
   readonly turnsPassed: number;
-  /** Turn pass rate, 0..1: the per-category score Q and the bare model are compared on. */
-  readonly score: number;
+  /**
+   * Turn pass rate, 0..1: the per-category score Q and the bare model are
+   * compared on. Null when nothing in the category was run (a budget stop):
+   * nothing measured is never 100%.
+   */
+  readonly score: number | null;
 };
 
 export type QIqSummary = {
@@ -377,18 +381,18 @@ export type QIqSummary = {
   readonly overall: QIqCategoryScore;
   /** The goal-table measures (Q Intelligence Plan). */
   readonly measures: {
-    readonly referencesResolved: number;
+    readonly referencesResolved: number | null;
     readonly wrongEntityTurns: number;
     readonly inventedFigureTurns: number;
-    readonly unknownsSaidUnknown: number;
-    readonly ambiguousClarified: number;
-    readonly compoundAllParts: number;
-    readonly correctionsApplied: number;
-    readonly crossConversationRecall: number;
+    readonly unknownsSaidUnknown: number | null;
+    readonly ambiguousClarified: number | null;
+    readonly compoundAllParts: number | null;
+    readonly correctionsApplied: number | null;
+    readonly crossConversationRecall: number | null;
   };
 };
 
-const rate = (n: number, d: number): number => (d === 0 ? 1 : n / d);
+const rate = (n: number, d: number): number | null => (d === 0 ? null : n / d);
 
 export function summariseQIq(
   cases: readonly QIqCase[],
