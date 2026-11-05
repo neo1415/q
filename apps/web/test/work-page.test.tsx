@@ -455,6 +455,79 @@ describe("Moving holds only what is moving (QA F-104)", () => {
   });
 });
 
+describe("live7: a running plan is one Moving row with its steps", () => {
+  it("is titled by the plan's goal and lists its steps, once", async () => {
+    const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
+    const fixtures = workforceFixtures(Date.now());
+    const base = fixtures.jobs.find(
+      (one) => one.job.goal === "Intro to Kestrel Heat",
+    );
+    if (base === undefined) throw new Error("fixture missing");
+    const step = (key: string, does: string, status: string) => ({
+      key,
+      who: "Q",
+      does,
+      why: null,
+      status: status as "DONE",
+      summary: null,
+      dependsOn: [],
+      fallbackFor: null,
+      evidence: [],
+    });
+    const plan = {
+      ...base,
+      approvals: [],
+      job: {
+        ...base.job,
+        id: "f0000000-0000-4000-8000-0000000000f7",
+        goal: "Check Ledgerline's unit economics this week",
+        status: "RUNNING" as const,
+        workState: undefined,
+      },
+      plan: {
+        outcome: null,
+        done: 1,
+        total: 2,
+        steps: [
+          step("s1", "Read Ledgerline's reported unit economics", "DONE"),
+          step(
+            "s2",
+            "Prepare a Ledgerline request for the evidence",
+            "WAITING",
+          ),
+        ],
+        prerequisites: [],
+        signals: [],
+        nextActions: [],
+        situation: [],
+      },
+    };
+    render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={null}
+        workforce={{ overview: fixtures.overview, jobs: [plan] }}
+      />,
+    );
+    const moving = document.querySelector("[data-work-running]");
+    if (!(moving instanceof HTMLElement)) throw new Error("no Moving");
+    expect(
+      within(moving).getAllByText(
+        "Check Ledgerline's unit economics this week",
+      ),
+    ).toHaveLength(1);
+    const steps = [...moving.querySelectorAll("[data-work-plan-step]")].map(
+      (one) => [one.getAttribute("data-work-plan-step"), one.textContent],
+    );
+    expect(steps).toEqual([
+      ["done", "Read Ledgerline's reported unit economics"],
+      ["now", "Prepare a Ledgerline request for the evidence"],
+    ]);
+  });
+});
+
 describe("How Q is handling it and Cost (options 2 and 3, 2026-10-21)", () => {
   it("shows each piece of Q's work as its plan, and the month day by day", async () => {
     const { workforceFixtures } = await import("../app/dev/workforce/fixtures");

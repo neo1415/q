@@ -19,6 +19,7 @@ import type {
   WorkforceTimelineEntryDto,
   QArtifactDetail,
   QApprovalView,
+  WorkforcePlanProgress,
 } from "@capital-q/contracts";
 
 import type {
@@ -191,6 +192,59 @@ function integrityOf(value: unknown) {
   return parsed.success ? parsed.data : [];
 }
 
+/** live7: an approved or running situation plan, as the page lists it. */
+export type RunningPlan = {
+  readonly goal: string;
+  readonly steps: readonly {
+    readonly key: string;
+    readonly title: string;
+    readonly why: string;
+    readonly owner: string;
+    readonly status: string;
+  }[];
+};
+
+/** A situation plan's step status, as the workforce progress says it. */
+function progressStatus(
+  status: string,
+): WorkforcePlanProgress["steps"][number]["status"] {
+  if (status === "DONE") return "DONE";
+  if (status === "SKIPPED") return "SKIPPED";
+  // A card waiting on their yes, or their own move.
+  if (status === "PROPOSED" || status === "WAITING_YOU") return "HELD";
+  return "WAITING";
+}
+
+/** The running plan's steps as the job's progress (the job sheet's steps). */
+export function runningPlanProgress(plan: RunningPlan): WorkforcePlanProgress {
+  const steps = plan.steps.slice(0, 12).map((step) => ({
+    key: step.key.slice(0, 40),
+    who:
+      step.owner === "Q"
+        ? "Q"
+        : step.owner === "TOGETHER"
+          ? "You and Q"
+          : "You",
+    does: step.title.slice(0, 400),
+    why: step.why.slice(0, 300),
+    status: progressStatus(step.status),
+    summary: null,
+    dependsOn: [],
+    fallbackFor: null,
+    evidence: [],
+  }));
+  return {
+    outcome: null,
+    done: steps.filter((step) => step.status === "DONE").length,
+    total: steps.length,
+    steps,
+    prerequisites: [],
+    signals: [],
+    nextActions: [],
+    situation: [],
+  };
+}
+
 export function createWorkforcePage(dependencies: {
   readonly store: WorkforceStore;
   readonly costs?: WorkforceCosts | undefined;
@@ -228,36 +282,55 @@ export function createWorkforcePage(dependencies: {
       }>)
     | undefined;
   /**
-   * live5 (2026-11-04): the status of the situation plan a plan job made
-   * (ACCEPTED, EXECUTING, ...); null when it made none. A plan job's own
-   * work is done once its plan is handed over, so after Execute the plan
-   * ran under no "Moving" row at all.
+   * live5/live7: the situation plan a plan job made, when it is approved
+   * or running (null otherwise): its goal and its steps as they stand. A
+   * plan job's own work is done once its plan is handed over, so after
+   * Execute the plan ran under no "Moving" row (live5), then under one
+   * titled by the request with no steps (live7).
    */
-  readonly planStatusOf?:
-    ((owner: Owner, jobId: string) => Promise<string | null>) | undefined;
+  readonly runningPlanOf?:
+    ((owner: Owner, jobId: string) => Promise<RunningPlan | null>) | undefined;
 }) {
   const { store } = dependencies;
 
   /**
    * A plan job whose plan is approved or running is moving work: listed
-   * as running, without the job's finished work state (whose Stop would
-   * act on the finished job, not the plan).
+   * as running, titled by its plan's goal, without the job's finished work
+   * state (whose Stop would act on the finished job, not the plan), with
+   * the plan's steps as its progress.
    */
   async function withRunningPlans(
     owner: Owner,
     items: readonly WorkforceJobSummaryDto[],
     work: ReadonlyMap<string, WorkRow>,
-  ): Promise<WorkforceJobSummaryDto[]> {
-    const planStatusOf = dependencies.planStatusOf;
-    if (planStatusOf === undefined) return [...items];
+  ): Promise<
+    readonly {
+      readonly job: WorkforceJobSummaryDto;
+      readonly progress: WorkforcePlanProgress | null;
+    }[]
+  > {
+    const runningPlanOf = dependencies.runningPlanOf;
     return Promise.all(
       items.map(async (item) => {
         const row = work.get(item.id);
-        if (row === undefined || !isPlanJobPayload(row.plan)) return item;
-        const status = await planStatusOf(owner, item.id).catch(() => null);
-        if (status !== "ACCEPTED" && status !== "EXECUTING") return item;
+        if (
+          runningPlanOf === undefined ||
+          row === undefined ||
+          !isPlanJobPayload(row.plan)
+        ) {
+          return { job: item, progress: null };
+        }
+        const plan = await runningPlanOf(owner, item.id).catch(() => null);
+        if (plan === null) return { job: item, progress: null };
         const { workState: _done, stoppedBecause: _why, ...rest } = item;
-        return { ...rest, status: "RUNNING" };
+        return {
+          job: {
+            ...rest,
+            goal: plan.goal.slice(0, 2_000),
+            status: "RUNNING" as const,
+          },
+          progress: runningPlanProgress(plan),
+        };
       }),
     );
   }
@@ -375,13 +448,15 @@ export function createWorkforcePage(dependencies: {
       );
       const last = shown.at(-1);
       return {
-        items: await withRunningPlans(
-          owner,
-          shown.map((row) =>
-            summary(row, row, usd(byJob.get(row.id) ?? 0), work.get(row.id)),
-          ),
-          work,
-        ),
+        items: (
+          await withRunningPlans(
+            owner,
+            shown.map((row) =>
+              summary(row, row, usd(byJob.get(row.id) ?? 0), work.get(row.id)),
+            ),
+            work,
+          )
+        ).map((one) => one.job),
         nextCursor:
           rows.length > page.limit && last !== undefined
             ? last.updated_at.toISOString()
@@ -666,8 +741,7 @@ export function createWorkforcePage(dependencies: {
             index,
         );
 
-      const plan = progressOf(work, detail.runs);
-      const [job] = await withRunningPlans(
+      const [running] = await withRunningPlans(
         owner,
         [
           summary(
@@ -683,7 +757,10 @@ export function createWorkforcePage(dependencies: {
         ],
         work === undefined ? new Map() : new Map([[detail.job.id, work]]),
       );
-      if (job === undefined) return null;
+      if (running === undefined) return null;
+      const job = running.job;
+      const plan =
+        progressOf(work, detail.runs) ?? running.progress ?? undefined;
       return {
         ...(plan === undefined ? {} : { plan }),
         job,

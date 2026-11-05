@@ -43,10 +43,6 @@ import {
 } from "@/features/q/actions";
 import { QControl } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
-import {
-  useRunningPlanStream,
-  WorkProgressList,
-} from "@/features/q/work-progress-view";
 import { CrmSheet, QRing, useCrmToast } from "@/features/relationships/crm-kit";
 import { useT } from "@/features/i18n/language";
 
@@ -60,6 +56,7 @@ import {
 } from "./decisions";
 import { retryHeldAction, sendHeldAsIsAction } from "./held-actions";
 import { jobLine, jobsInProgress } from "./job-state";
+import { jobPlan } from "./work-plan";
 import { noticesRead, refreshNotices } from "./notice-store";
 import type { NoticeGroup } from "./notice-groups";
 import { readChanges, readPlan } from "./plan-words";
@@ -297,9 +294,6 @@ export function WorkInbox({
   const [stopped, setStopped] = useState<ReadonlySet<string>>(new Set());
   const [allDone, setAllDone] = useState(false);
   const tasks = jobsInProgress(jobs, now);
-  // J4: the conversation's plan, while it runs, is moving work too.
-  const runningPlan = useRunningPlanStream();
-  const planRunning = runningPlan !== null;
   const rows: readonly Row[] = useMemo(
     () => [
       ...needs,
@@ -525,26 +519,18 @@ export function WorkInbox({
                   >
                     {t("Q’s work couldn’t load. Try again in a moment.")}
                   </p>
-                ) : planRunning ||
-                  rows.some(
+                ) : rows.some(
                     (row) => row.kind === "RUNNING" || row.kind === "JOB",
                   ) ? (
                   <QControl
                     id="list.work-jobs"
                     kind="LIST"
                     count={
-                      (planRunning ? 1 : 0) +
                       rows.filter(
                         (row) => row.kind === "RUNNING" || row.kind === "JOB",
                       ).length
                     }
                   >
-                    {runningPlan === null ? null : (
-                      <WorkProgressList
-                        streams={[runningPlan]}
-                        className="px-2.5 py-1"
-                      />
-                    )}
                     {rows.flatMap((row) =>
                       row.kind === "RUNNING"
                         ? [
@@ -582,6 +568,26 @@ export function WorkInbox({
                                     <span className="cq-label font-normal text-(--cq-text-tertiary)">
                                       {t(jobLine(row.item.job).state)}
                                     </span>
+                                    {/* live7: a running plan's own steps,
+                                        from the server's job record (one row
+                                        per plan, at every width). */}
+                                    {(row.item.plan?.steps.length ?? 0) > 0 ? (
+                                      <span
+                                        className="mt-1 flex flex-col gap-0.5"
+                                        data-work-plan-steps
+                                      >
+                                        {jobPlan(row.item).steps.map((step) => (
+                                          <span
+                                            key={step.key}
+                                            className="flex items-start gap-1.5 cq-label font-normal text-(--cq-text-secondary)"
+                                            data-work-plan-step={step.state}
+                                          >
+                                            <StepMark state={step.state} />
+                                            <span>{t(step.title)}</span>
+                                          </span>
+                                        ))}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </>,
                               ),

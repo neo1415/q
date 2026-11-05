@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { createWorkforcePage } from "../src/composition/workforce/page.js";
+import {
+  createWorkforcePage,
+  type RunningPlan,
+} from "../src/composition/workforce/page.js";
 import type { WorkRow } from "../src/composition/workforce/queue.js";
 import {
   createInMemoryWorkforceStore,
@@ -9,19 +12,47 @@ import {
 } from "../src/composition/workforce/store.js";
 
 /**
- * live5 (2026-11-04): /work's Moving said "Nothing running" while a plan
- * ran. A plan job's own work is done once it hands over its plan; once
- * that plan is approved or running, the job is listed as running work.
+ * live5/live7 (2026-11-04/05): /work's Moving said "Nothing running" while
+ * a plan ran, then listed it titled by the request ("Your plan: Make me a
+ * plan to…") with no steps. A plan job's own work is done once it hands
+ * over its plan; once that plan is approved or running, the job is listed
+ * as running work, titled by the plan's goal, with the plan's steps.
  */
 
 const owner: Owner = { tenantId: randomUUID(), userId: randomUUID() };
 const at = new Date("2026-11-04T21:00:00Z");
+const PLAN: RunningPlan = {
+  goal: "Check Ledgerline's unit economics this week and reach an evidence-based view",
+  steps: [
+    {
+      key: "s1",
+      title: "Read Ledgerline's reported unit economics",
+      why: "Its figures are self-reported.",
+      owner: "Q",
+      status: "DONE",
+    },
+    {
+      key: "s2",
+      title: "Prepare a Ledgerline request for the evidence",
+      why: "The gaps need its figures.",
+      owner: "Q",
+      status: "PROPOSED",
+    },
+    {
+      key: "s3",
+      title: "Decide whether to advance, pause or pass",
+      why: "Your call once the evidence is in.",
+      owner: "YOU",
+      status: "TODO",
+    },
+  ],
+};
 
-async function listWith(planStatus: string | null, kind = "PLAN") {
+async function listWith(plan: RunningPlan | null, kind = "PLAN") {
   const store = createInMemoryWorkforceStore();
   const { job } = await store.ensureJob(owner, {
     source: { kind: "JOB", id: "live5-plan" },
-    goal: "Make me a plan to follow up with Ledgerline this week",
+    goal: "Your plan: Make me a plan to check Ledgerline's unit economics this week",
     budgetUsd: 0.5,
     threshold: 80,
     maxRedrafts: 2,
@@ -46,41 +77,48 @@ async function listWith(planStatus: string | null, kind = "PLAN") {
   const page = createWorkforcePage({
     store,
     work: { forOwner: () => Promise.resolve([row]) },
-    planStatusOf: (who, jobId) => {
+    runningPlanOf: (who, jobId) => {
       asked.push(`${who.userId}:${jobId}`);
-      return Promise.resolve(planStatus);
+      return Promise.resolve(plan);
     },
   });
-  const [item] = (await page.list(owner, { limit: 20 })).items;
+  const { items } = await page.list(owner, { limit: 20 });
   // /work renders each job's detail: the same standing there.
   const detail = await page.detail(owner, job.id);
-  return { item, detail, asked, jobId: job.id };
+  return { items, detail, asked, jobId: job.id };
 }
 
-describe("a plan job whose plan runs is moving work (live5)", () => {
-  it("is listed as running once its plan is executing, with no finished work state", async () => {
-    const { item, detail, asked, jobId } = await listWith("EXECUTING");
-    expect(item?.status).toBe("RUNNING");
-    expect(item?.workState).toBeUndefined();
-    expect(detail?.job.status).toBe("RUNNING");
+describe("a plan job whose plan runs is moving work (live5/live7)", () => {
+  it("is listed once, as running, titled by the plan's goal, with its steps", async () => {
+    const { items, detail, asked, jobId } = await listWith(PLAN);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.status).toBe("RUNNING");
+    expect(items[0]?.workState).toBeUndefined();
+    expect(items[0]?.goal).toBe(PLAN.goal);
+    expect(detail?.job.goal).toBe(PLAN.goal);
     expect(detail?.job.workState).toBeUndefined();
+    expect(
+      detail?.plan?.steps.map((step) => [step.does, step.who, step.status]),
+    ).toEqual([
+      ["Read Ledgerline's reported unit economics", "Q", "DONE"],
+      ["Prepare a Ledgerline request for the evidence", "Q", "HELD"],
+      ["Decide whether to advance, pause or pass", "You", "WAITING"],
+    ]);
+    expect(detail?.plan?.done).toBe(1);
+    expect(detail?.plan?.total).toBe(3);
     expect(asked).toContain(`${owner.userId}:${jobId}`);
   });
 
-  it("an approved plan about to run is running too", async () => {
-    const { item } = await listWith("ACCEPTED");
-    expect(item?.status).toBe("RUNNING");
-    expect(item?.workState).toBeUndefined();
-  });
-
-  it("an offered plan stays as it was: it waits in Needs you", async () => {
-    const { item } = await listWith("OFFERED");
-    expect(item?.workState).toBe("COMPLETED");
+  it("a plan not approved or running (offered) stays as it was: it waits in Needs you", async () => {
+    const { items, detail } = await listWith(null);
+    expect(items[0]?.workState).toBe("COMPLETED");
+    expect(items[0]?.goal).toMatch(/^Your plan: /u);
+    expect(detail?.plan).toBeUndefined();
   });
 
   it("a job that is not a plan job is never looked up", async () => {
-    const { item, asked } = await listWith("EXECUTING", "RESEARCH");
-    expect(item?.workState).toBe("COMPLETED");
+    const { items, asked } = await listWith(PLAN, "RESEARCH");
+    expect(items[0]?.workState).toBe("COMPLETED");
     expect(asked).toEqual([]);
   });
 });

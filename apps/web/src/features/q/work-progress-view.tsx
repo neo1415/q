@@ -167,32 +167,6 @@ export function useWorkStreams(options: {
   }, [options.run, q, trail, labels, work, lives, plan]);
 }
 
-/**
- * The conversation's running plan as one work stream (J4: /work's Moving
- * said "Nothing running" while it ran). Null when none is running.
- */
-export function useRunningPlanStream(): WorkStream | null {
-  const plan = useRunningPlan(useQSessionOptional()?.turns);
-  return useMemo(
-    () =>
-      plan === null
-        ? null
-        : planStream(plan, (step) => stepStatusWords(step, true)),
-    [plan],
-  );
-}
-
-/** /work's Moving: the running plan's steps, as the stage lists them. */
-export function QRunningPlan({
-  className,
-}: {
-  readonly className?: string | undefined;
-}) {
-  const stream = useRunningPlanStream();
-  if (stream === null) return null;
-  return <WorkProgressList streams={[stream]} className={className} />;
-}
-
 export function QWorkProgress({
   run = true,
   jobs = true,

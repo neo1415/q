@@ -7977,9 +7977,18 @@ const { app, logger: appLogger } = createApp(
       plans,
       page: createWorkforcePage({
         store: workforceStore,
-        // live5: a plan job's plan, once approved or running, is moving work.
-        planStatusOf: async (owner, jobId) =>
-          (await planStore.forJob?.(owner, jobId))?.status ?? null,
+        // live5/live7: a plan job's plan, once approved or running, is
+        // moving work, titled by its goal and listed with its steps.
+        runningPlanOf: async (owner, jobId) => {
+          const head = (await planStore.forJob?.(owner, jobId)) ?? null;
+          if (head?.status !== "ACCEPTED" && head?.status !== "EXECUTING") {
+            return null;
+          }
+          const view = await plans.view(owner, head.planId);
+          return view === null
+            ? null
+            : { goal: view.plan.goal, steps: view.plan.steps };
+        },
         // Recovery D6: each job's durable work state, why it stopped, trace.
         work: agentWorkQueue,
         deliverables: workforceDeliverables,
