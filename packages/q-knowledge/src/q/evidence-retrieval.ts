@@ -5,6 +5,7 @@ import type { AuthorisedFact } from "@capital-q/q-core";
 import type {
   QOrchestrationSubjectContext,
   QRetrievalOutcome,
+  QRetrievalFocus,
   QRetrievalPort,
   QRuntimeRepositories,
 } from "@capital-q/q-runtime";
@@ -16,6 +17,7 @@ import {
 } from "../retrieval/assembler.js";
 import type { AuthorisedRetrievalResult } from "../retrieval/contracts.js";
 import { envelopeFromPlan } from "../retrieval/envelope.js";
+import { planRetrievalQueries } from "../retrieval/query-plan.js";
 import type { ChunkHydrationPort } from "../retrieval/ports.js";
 import type { AuthorisedRetrievalService } from "../retrieval/service.js";
 import type { KnowledgeSubjectRef } from "../knowledge/contracts.js";
@@ -72,6 +74,8 @@ export type QAuthorisedEvidenceContext = {
     readonly tenantId: TenantId;
     readonly plan: PermittedContextPlan;
     readonly signal?: AbortSignal | undefined;
+    /** Step 5: the shown ledger and bound refs, for query rewriting. */
+    readonly retrievalFocus?: QRetrievalFocus | undefined;
   }) => Promise<{
     readonly facts: readonly AuthorisedFact[];
     readonly subjectDescription: string;
@@ -137,10 +141,12 @@ export function createQEvidenceRetrieval(
         };
       }
 
-      // The person's own words are the query. No model is spent rewriting
-      // them: decomposition is a later specialist's job, and a deterministic
-      // query is one fewer place for an injected instruction to be laundered
-      // into a search.
+      // The person's own words are the query, rewritten by CODE from the
+      // conversation ledger (step 5): "its burn" searches as "Silo Credit
+      // … burn" under that company's filter, and a compound ask about two
+      // companies is two searches. No model is spent rewriting them, so
+      // there is no place for an injected instruction to be laundered into
+      // a search; the filter can only narrow this plan's envelope.
       // The conversation, not the run. The query is the person's own
       // words, and on a voice turn the run holds only the newest sentence.
       const history =
@@ -150,7 +156,9 @@ export function createQEvidenceRetrieval(
           request.runId,
           8,
         );
-      const latest = [...history].reverse().find((m) => m.role === "USER");
+      const theirs = [...history].reverse().filter((m) => m.role === "USER");
+      const latest = theirs[0];
+      const previousWords = theirs.slice(1).map((m) => m.content);
       if (latest === undefined) {
         return {
           facts: [],
@@ -158,8 +166,16 @@ export function createQEvidenceRetrieval(
         };
       }
 
+      const planned = planRetrievalQueries({
+        words: latest.content,
+        previousWords,
+        focus: request.retrievalFocus,
+        maxQueries: retrieval.config.maxSubQueries,
+      });
       const result = await retrieval.retrieve({
         query: latest.content,
+        queries: planned.queries,
+        ...(planned.focus === null ? {} : { focus: planned.focus }),
         envelope,
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       });
