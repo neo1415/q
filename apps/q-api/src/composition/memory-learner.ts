@@ -29,10 +29,12 @@ import {
   type MemoryService,
   type PreferenceLearningConsent,
 } from "@capital-q/q-knowledge";
-import type {
-  QConversationMessage,
-  QOrchestrator,
-  QRuntimeRepositories,
+import {
+  CONVERSATION_SUMMARY_GATE_VERSION,
+  gateConversationSummary,
+  type QConversationMessage,
+  type QOrchestrator,
+  type QRuntimeRepositories,
 } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
@@ -60,7 +62,7 @@ export type MemoryLearnerDependencies = {
   readonly memory: MemoryService;
   readonly repositories: Pick<
     QRuntimeRepositories,
-    "conversations" | "messages" | "runs"
+    "conversations" | "messages" | "runs" | "conversationStates"
   >;
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
@@ -424,6 +426,46 @@ export function createMemoryLearner(
           else counts.refused += 1;
         }
         const last = unseen.at(-1);
+        const summaryThrough = UtcTimestampSchema.parse(
+          last?.createdAt ?? new Date().toISOString(),
+        );
+        // Q intelligence step 2: the summary is also kept append-only, one
+        // revision per compaction, once Capital Q's deterministic gate
+        // passed it (no figure that the turns and the previous summary do
+        // not hold). A refused one is not kept; the last revision stands.
+        const states = repositories.conversationStates;
+        const previousRevision =
+          states === undefined
+            ? null
+            : await states
+                .latestSummary(
+                  sql,
+                  actor.tenantId,
+                  actor.userId,
+                  conversation.id,
+                )
+                .catch(() => null);
+        const gated =
+          states === undefined
+            ? null
+            : gateConversationSummary({
+                summary: result.summary,
+                sources: [
+                  ...unseen.map((m) => m.content),
+                  previousRevision?.summary ?? conversation.summary ?? "",
+                ],
+              });
+        if (gated?.kind === "REFUSED") {
+          logger.info(
+            {
+              qRunId: run.id,
+              qConversationId: conversation.id,
+              reason: gated.reason,
+              figures: gated.figures.length,
+            },
+            "the running summary was not kept as a revision",
+          );
+        }
         await transactions.run(async (tx) => {
           await repositories.conversations.setDigest(
             tx,
@@ -432,12 +474,34 @@ export function createMemoryLearner(
             {
               title: conversation.title ?? result.title,
               summary: result.summary.slice(0, 4_000),
-              summaryThrough: UtcTimestampSchema.parse(
-                last?.createdAt ?? new Date().toISOString(),
-              ),
+              summaryThrough,
             },
           );
         });
+        // Its own transaction: a revision that loses a race with another
+        // writer never costs the digest above.
+        if (states !== undefined && gated?.kind === "PASSED") {
+          await transactions
+            .run((tx) =>
+              states.appendSummary(tx, {
+                tenantId: actor.tenantId,
+                userId: actor.userId,
+                conversationId: conversation.id,
+                summary: gated.summary,
+                coversThroughAt: summaryThrough,
+                coveredMessages:
+                  (previousRevision?.coveredMessages ?? 0) + unseen.length,
+                gateVersion: CONVERSATION_SUMMARY_GATE_VERSION,
+                runId: run.id,
+              }),
+            )
+            .catch((error: unknown) => {
+              logger.warn(
+                { err: error, qRunId: run.id },
+                "the running summary revision was not stored",
+              );
+            });
+        }
         logger.info(
           { qRunId: run.id, qConversationId: conversation.id, ...counts },
           "q learned from the conversation",

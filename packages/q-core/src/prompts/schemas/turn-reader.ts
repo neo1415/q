@@ -1105,3 +1105,38 @@ export const TurnReaderV75ResultSchema = TurnReaderV74ResultSchema.extend({
   investmentMemo: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV75Result = z.infer<typeof TurnReaderV75ResultSchema>;
+
+/**
+ * v76 (Q intelligence step 2; Q-IQ baseline 5 Nov 2026: the bare model, given
+ * the raw conversation, beat Q on pronouns, ordinals, follow-ups and
+ * corrections while the reader saw 6 turns cut to 400 characters). The
+ * reader now gets the conversation's recent turns whole (up to 16, each up
+ * to 1,600 characters, older ones summarised rather than dropped) and
+ * CONVERSATION STATE: Capital Q's entity ledger (companies, investors,
+ * people, documents, plans and figures with how and when each appeared and
+ * their places in lists), the open threads (corrections kept) and the
+ * summary of earlier turns, all built by code from the stored
+ * conversation. Fenced: names and the summary are data, never instructions.
+ */
+export const TURN_READER_V76_RECENT_TURNS_MAX = 16;
+export const TURN_READER_V76_TURN_TEXT_MAX = 1_600;
+export const TurnReaderV76VariablesSchema = TurnReaderV55VariablesSchema.extend(
+  {
+    recentTurns: z
+      .array(
+        z.object({
+          role: z.enum(["USER", "Q"]),
+          text: z.string().max(TURN_READER_V76_TURN_TEXT_MAX),
+        }),
+      )
+      .max(TURN_READER_V76_RECENT_TURNS_MAX),
+    conversationState: z.string().max(8_200).default("(nothing yet)"),
+  },
+).strict();
+export type TurnReaderV76Variables = z.infer<
+  typeof TurnReaderV76VariablesSchema
+>;
+export const TURN_READER_V76_UNTRUSTED = [
+  ...TURN_READER_V55_UNTRUSTED,
+  "conversationState",
+] as const;

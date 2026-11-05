@@ -35,6 +35,7 @@ import type {
   QRuntimeRepositories,
 } from "../application/ports.js";
 import { Q_RUN_EVENTS_CHANNEL } from "../application/stream.js";
+import { createPostgresConversationStates } from "./postgres-conversation-states.js";
 import {
   QConversationContextTypeSchema,
   type QConversation,
@@ -402,6 +403,7 @@ export function createPostgresQRuntimeRepositories(
   };
 
   return {
+    conversationStates: createPostgresConversationStates(),
     conversations: {
       insert: async (tx, input) => {
         const rows = await tx.sql`

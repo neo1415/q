@@ -41,6 +41,36 @@ export {
 } from "./contracts/index.js";
 
 export {
+  CONVERSATION_LEDGER_BUILDER_VERSION,
+  CONVERSATION_SUMMARY_GATE_VERSION,
+  EMPTY_CONVERSATION_LEDGER,
+  LEDGER_ENTITIES_MAX,
+  LEDGER_ENTITY_KINDS,
+  LEDGER_LISTS_MAX,
+  LEDGER_VIAS,
+  OPEN_THREADS_MAX,
+  QConversationLedgerSchema,
+  QLedgerEntitySchema,
+  QLedgerListSchema,
+  QLedgerRefSchema,
+  QOpenThreadSchema,
+  QOpenThreadsSchema,
+  type QConversationLedger,
+  type QConversationState,
+  type QConversationSummaryRevision,
+  type QLedgerEntity,
+  type QLedgerEntityKind,
+  type QLedgerList,
+  type QLedgerVia,
+  type QOpenThread,
+} from "./contracts/conversation-state.js";
+export {
+  gateConversationSummary,
+  SUMMARY_MAX_CHARS,
+  type SummaryGateOutcome,
+} from "./domain/conversation-summary-gate.js";
+
+export {
   QConversationArchivedError,
   QConversationNotFoundError,
   QMessageCreationConflictError,
@@ -101,6 +131,7 @@ export type { QRuntimeDependencies } from "./application/dependencies.js";
 export type {
   QConversationMessageRepository,
   QConversationRepository,
+  QConversationStateRepository,
   QConversationSearch,
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
