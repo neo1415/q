@@ -307,6 +307,8 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly rememberAsk?: { readonly fact: string | null } | undefined;
   /** v78: they asked for a chart, graph or plot (read by meaning). */
   readonly asksForChart?: boolean | undefined;
+  /** v78: they asked for the public web, news or press (read by meaning). */
+  readonly asksForWeb?: boolean | undefined;
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**

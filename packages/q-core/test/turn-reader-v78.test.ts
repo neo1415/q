@@ -46,6 +46,7 @@ describe("TURN_READER v78", () => {
       "second person",
       "remember to send the deck",
       "asksForChart",
+      "asksForWeb",
     ]) {
       expect(V78_WHAT_WAS_ASKED).toContain(said);
     }
@@ -72,6 +73,7 @@ describe("TURN_READER v78", () => {
     expect(single.parts).toEqual([]);
     expect(single.remember).toBeNull();
     expect(single.asksForChart).toBe(false);
+    expect(single.asksForWeb).toBe(false);
   });
 
   it("reads a remember ask said back in the second person, and a chart ask", () => {

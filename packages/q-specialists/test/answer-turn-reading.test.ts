@@ -4952,7 +4952,8 @@ describe("a deck's audience is its own action, never the company's visibility (Q
       const noted: unknown[] = [];
       const run = seam({
         said,
-        reading: privateReading(),
+        // Step 4: the reader names the record's own action (askedAction).
+        reading: { ...privateReading(), askedAction: tool } as TurnReaderResult,
         outcomes: [],
         visibility: { noteVisibility: (entry) => noted.push(entry) },
         offeredTools: ["set_deck_audience", "set_pitch_sharing", "get_company"],
@@ -4966,6 +4967,23 @@ describe("a deck's audience is its own action, never the company's visibility (Q
       expect(run.stored.at(-1)?.content).toBe(`Prepared: ${tool}.`);
     },
   );
+
+  it("step 4: deck words without the reader's askedAction stay the company's hand", async () => {
+    const ran: unknown[] = [];
+    const noted: unknown[] = [];
+    const run = seam({
+      said: "Make Ajopot seed deck private to my organisation again",
+      reading: privateReading(),
+      outcomes: [],
+      visibility: { noteVisibility: (entry) => noted.push(entry) },
+      offeredTools: ["set_deck_audience", "set_pitch_sharing", "get_company"],
+      appActions: deckPort(ran),
+      appActionArguments: () => Promise.resolve(null),
+    });
+    await run.answer.answer(companyTurn());
+    expect(ran).toEqual([]);
+    expect(noted).toHaveLength(1);
+  });
 
   it("'make my company private' is still the company's hand", async () => {
     const ran: unknown[] = [];

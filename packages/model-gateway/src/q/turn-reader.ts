@@ -227,6 +227,8 @@ export type QTurnReading = Omit<
   readonly remember?: TurnReaderV78Result["remember"] | undefined;
   /** v78: they ask for a chart, graph or plot. */
   readonly asksForChart?: boolean | undefined;
+  /** v78: they ask for the public web, news or press. */
+  readonly asksForWeb?: boolean | undefined;
   /** v28: a time they asked for, in minutes from now. */
   readonly timeWindow?:
     | { readonly fromMinutes: number | null; readonly toMinutes: number | null }
@@ -421,6 +423,7 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "parts",
   "remember",
   "asksForChart",
+  "asksForWeb",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */

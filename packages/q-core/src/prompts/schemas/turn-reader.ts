@@ -1232,5 +1232,7 @@ export const TurnReaderV78ResultSchema = TurnReaderV77ResultSchema.extend({
   remember: TurnRememberAskSchema.nullable().default(null).catch(null),
   /** They ask for a chart, graph or plot of something. */
   asksForChart: z.boolean().default(false).catch(false),
+  /** They ask for the public web, news or press -- what is said outside Capital Q. */
+  asksForWeb: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV78Result = z.infer<typeof TurnReaderV78ResultSchema>;
