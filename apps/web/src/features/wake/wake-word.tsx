@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 
+import { microphoneHeld, watchMicrophoneHolds } from "../voice/mic-hold";
 import { useQSessionOptional } from "../q/q-session";
 import { playSound } from "../q-sound/sound-engine";
 import { readSoundPreference } from "../q-sound/sound-preference";
@@ -33,6 +34,17 @@ import {
  * first spoken line, so no model composes an opening first.
  */
 
+/**
+ * After a wake the listener closes the microphone for the call. If no line
+ * shows up by then (no Q session, the line failed to open, the person
+ * dismissed it at once), it listens again after this. Before, it stayed
+ * stopped for good while the indicator still said "Listening": the main
+ * "works sometimes" (owner, 5 Nov 2026).
+ */
+export const WAKE_REARM_MS = 3000;
+/** First retry after the microphone was busy or went away; doubles to a cap. */
+export const WAKE_RETRY_MS = 2000;
+const WAKE_RETRY_MAX_MS = 30_000;
 const Q_PAGE = "/home";
 const LOW_BATTERY = 0.2;
 
@@ -109,17 +121,25 @@ export function respondToWake(input: {
 function watchAnyLine(watcher: () => void): () => void {
   const lines = watchVoiceLine(watcher);
   const audio = watchVoiceAudio(watcher);
+  const holds = watchMicrophoneHolds(watcher);
   return () => {
     lines();
     audio();
+    holds();
   };
 }
 
-/** Any line is up: one a surface holds, or any line playing audio (V). */
+/**
+ * Any line is up: one a surface holds, any line playing audio (V), or a
+ * recorder holding the microphone (a voice note).
+ */
 function useLineHeld(): boolean {
   return useSyncExternalStore(
     watchAnyLine,
-    () => voiceLineHolder() !== null || voiceAudioOwner() !== null,
+    () =>
+      voiceLineHolder() !== null ||
+      voiceAudioOwner() !== null ||
+      microphoneHeld(),
     () => false,
   );
 }
@@ -194,6 +214,10 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
   const lowBattery = useLowBattery();
   const pausedByYou = useWakePausedByYou();
   const [failed, setFailed] = useState<EngineFailure | null>(null);
+  // Bumped to start the engine again with nothing else changed: after a
+  // wake that opened no line, and to retry an interrupted microphone.
+  const [generation, setGeneration] = useState(0);
+  const retries = useRef(0);
   // Checked before the microphone opens, so the first window already
   // runs where Settings says it does.
   const onDevice = useOnDeviceStatus();
@@ -211,6 +235,18 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
   useEffect(() => {
     latest.current = { session, pathname, openQ };
   });
+
+  // A refusal stands until the person does something: the tab goes away
+  // and comes back, a call ends, they pause and resume. Before, one refusal
+  // (or a busy microphone right after a call) stopped "Hey Q" until reload.
+  const paused =
+    decision !== "LISTEN" && decision !== "OFF" && decision !== "UNAVAILABLE";
+  const [wasPaused, setWasPaused] = useState(paused);
+  if (wasPaused !== paused) {
+    // Adjusted while rendering (not in an effect): one render, no cascade.
+    setWasPaused(paused);
+    if (paused && failed !== null && failed !== "unavailable") setFailed(null);
+  }
 
   const listen = decision === "LISTEN" && failed === null && onDevice !== null;
   const processLocally = onDevice === "available";
@@ -230,6 +266,13 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
     if (!listen) return;
     let engine: WakeEngine | null = null;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const again = (delayMs: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!cancelled) setGeneration((g) => g + 1);
+      }, delayMs);
+    };
     void import("./engine").then(async ({ startWakeEngine }) => {
       if (cancelled) return;
       const started = await startWakeEngine({
@@ -250,10 +293,29 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
             openQ: open,
             talk: () => void q?.talk({ greeting: WAKE_GREETING }),
           });
-          if (acted) void engine?.stop();
+          if (!acted) return;
+          // The microphone is the call's now. A line that opens pauses
+          // this listener (IN_CALL); one that never opens must not leave
+          // it stopped for good.
+          void engine?.stop();
+          setWakeStatus({ kind: "PAUSED", reason: "IN_CALL" });
+          again(WAKE_REARM_MS);
         },
         onFailure: (failure) => {
-          if (!cancelled) setFailed(failure);
+          if (cancelled) return;
+          if (failure === "interrupted") {
+            void engine?.stop();
+            setWakeProcessing(null);
+            setWakeStatus({ kind: "PAUSED", reason: "RETRYING" });
+            const delay = Math.min(
+              WAKE_RETRY_MS * 2 ** retries.current,
+              WAKE_RETRY_MAX_MS,
+            );
+            retries.current += 1;
+            again(delay);
+            return;
+          }
+          setFailed(failure);
         },
         onWindow: (open) => {
           if (!cancelled) {
@@ -270,10 +332,17 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
     });
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       setWakeProcessing(null);
       void engine?.stop();
     };
-  }, [listen, processLocally]);
+  }, [listen, processLocally, generation]);
+
+  // A pause by the person, a call or a hidden tab is a fresh start: the
+  // next interruption retries quickly again.
+  useEffect(() => {
+    if (paused) retries.current = 0;
+  }, [paused]);
 
   useEffect(() => () => setWakeStatus({ kind: "OFF" }), []);
   return null;

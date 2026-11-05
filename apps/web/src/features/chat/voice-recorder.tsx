@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@capital-q/ui/button";
 import { ICON_SIZE, Mic, Square } from "@capital-q/ui/icons";
 import { useT } from "@/features/i18n/language";
+import { holdMicrophone } from "@/features/voice/mic-hold";
 
 /**
  * A voice note in the chat composer (R34). Tap to record, tap again to
@@ -24,6 +25,8 @@ type Recording = {
   readonly stream: MediaStream;
   readonly startedAt: number;
   readonly chunks: Blob[];
+  /** Lets "Hey Q" listen again once the note is done. */
+  readonly release: () => void;
   cancelled: boolean;
 };
 
@@ -76,6 +79,7 @@ export function VoiceRecorder({
       if (current === null) return;
       current.cancelled = true;
       current.stream.getTracks().forEach((track) => track.stop());
+      current.release();
     },
     [],
   );
@@ -89,21 +93,32 @@ export function VoiceRecorder({
       onError("This browser can't record voice notes.");
       return;
     }
+    // Held before asking, so "Hey Q" lets the microphone go first and does
+    // not hear (and answer) what is said into the note.
+    const release = holdMicrophone();
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      release();
       onError("Allow the microphone to record a voice note.");
       return;
     }
-    const recorder = new MediaRecorder(stream, {
-      mimeType: container.mimeType,
-    });
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: container.mimeType });
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      release();
+      onError("This browser can't record voice notes.");
+      return;
+    }
     const current: Recording = {
       recorder,
       stream,
       startedAt: Date.now(),
       chunks: [],
+      release,
       cancelled: false,
     };
     recorder.addEventListener("dataavailable", (event) => {
@@ -111,6 +126,7 @@ export function VoiceRecorder({
     });
     recorder.addEventListener("stop", () => {
       stream.getTracks().forEach((track) => track.stop());
+      release();
       recording.current = null;
       setElapsedMs(null);
       const durationMs = Math.min(Date.now() - current.startedAt, MAX_MS);

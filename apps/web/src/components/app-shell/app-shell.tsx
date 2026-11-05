@@ -83,13 +83,14 @@ export function AppShell({
               Continue with Q
             </a>
           </header>
-          <WakeIndicator />
           <main id="main" className="cq-shell-main">
             {children}
           </main>
         </div>
         {/* DOCS: a deck made during setup still pops up when it is ready. */}
         <DocumentReadyCenter connected={qConnected} />
+        {/* D2: a small corner button while "Hey Q" has the microphone. */}
+        <WakeIndicator />
       </GlobalQProvider>
     );
   }
@@ -110,7 +111,6 @@ export function AppShell({
         <div className="cq-shell-body">
           <AppHeader context={context} verifyNudge={verifyNudge} />
           <NetworkStatus />
-          <WakeIndicator />
           {verifyNudge === null ? null : (
             <div className="cq-verify-nudge-desktop justify-end px-6 pt-3">
               <VerifyNudgeLink nudge={verifyNudge} />
@@ -126,6 +126,8 @@ export function AppShell({
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}
       <DocumentReadyCenter connected={qConnected} />
+      {/* D2: a small corner button while "Hey Q" has the microphone. */}
+      <WakeIndicator />
     </GlobalQProvider>
   );
 }

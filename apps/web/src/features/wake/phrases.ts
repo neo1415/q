@@ -5,13 +5,14 @@
  * The detector that shipped (ADR 0058) reads a short transcript from the
  * browser's speech recogniser, so a phrase is matched on words, not on
  * sound. A recogniser writes the letter Q as "Q", "cue", "queue" or "kew";
- * those spellings are accepted, nothing else. "you", "view", "few" and
+ * (and, heard on production 2026-11-05, "que", "kiu", "kyoo"; "Hi" as
+ * "high") -- those spellings are accepted, nothing else. "you", "view", "few" and
  * "cool" sound close and are deliberately absent: "hey you" is the most
  * common false wake for this phrase. No edit distance on the Q word for
  * the same reason ("cue" and "you" are one letter apart).
  */
 
-export const WAKE_WORDS_VERSION = "2026-10-06.1";
+export const WAKE_WORDS_VERSION = "2026-11-05.1";
 
 export const WAKE_PHRASES = [
   { id: "HEY_Q", label: "Hey Q", greetings: ["hey", "hay", "hei", "heya"] },
@@ -20,13 +21,23 @@ export const WAKE_PHRASES = [
     label: "Hello Q",
     greetings: ["hello", "hallo", "hullo", "helo"],
   },
-  { id: "HI_Q", label: "Hi Q", greetings: ["hi", "hiya", "hai"] },
+  { id: "HI_Q", label: "Hi Q", greetings: ["hi", "hiya", "hai", "high"] },
   { id: "OK_Q", label: "OK Q", greetings: ["ok", "okay", "okey", "okie"] },
 ] as const;
 
 export type WakePhraseId = (typeof WAKE_PHRASES)[number]["id"];
 
-const Q_WORDS: readonly string[] = ["q", "cue", "queue", "kew", "kyu", "kue"];
+const Q_WORDS: readonly string[] = [
+  "q",
+  "cue",
+  "queue",
+  "kew",
+  "kyu",
+  "kue",
+  "que",
+  "kiu",
+  "kyoo",
+];
 
 /** Lower case, "o.k." as "ok", letters and digits only, single spaces. */
 export function normaliseTranscript(text: string): string {

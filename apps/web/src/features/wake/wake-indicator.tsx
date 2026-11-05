@@ -1,8 +1,11 @@
 "use client";
 
-import Link from "next/link";
-
-import { ICON_SIZE, ICON_STROKE, Mic, MicOff } from "@capital-q/ui/icons";
+import { ICON_SIZE, ICON_STROKE, Mic } from "@capital-q/ui/icons";
+import {
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "@capital-q/ui/popover";
 
 import { storeWakePreference } from "./wake-preference";
 import {
@@ -15,13 +18,15 @@ import {
 import { useT } from "@/features/i18n/language";
 
 /**
- * D2 privacy: whenever "Hey Q" has the microphone, the shell says so in
- * words, beside the browser's own indicator, and says where the words are
- * recognised: on this device, or by the browser's speech service. One tap
- * pauses it for this tab; "Turn off" is always there while it is on.
- * Nothing shows while it is off, hidden or Q is already on a call. No
- * motion: the words change, nothing pulses, so reduced motion needs no
- * special case.
+ * D2 privacy: whenever "Hey Q" has the microphone, the page says so in
+ * words, beside the browser's own indicator, including where the words
+ * are recognised. Owner 5 Nov 2026: not a banner at the top of the page.
+ * A small round microphone button in the bottom corner (inline-end, above
+ * the dock and the composer), named in words; a tap opens Pause and Turn
+ * off. Paused for any reason (by you, battery, a call, Q busy, a hidden
+ * tab), off, blocked or unavailable, the microphone is closed: nothing
+ * shows, and Resume lives in Settings → Q. No motion: nothing pulses, so
+ * reduced motion needs no special case.
  */
 
 export function wakeIndicatorText(
@@ -45,16 +50,15 @@ export function wakeIndicatorText(
       }
       return "Listening for “Hey Q” · checking";
     case "PAUSED":
-      if (status.reason === "BY_YOU") return "“Hey Q” paused";
-      if (status.reason === "BATTERY") return "“Hey Q” paused: low battery";
-      return null;
     case "BLOCKED":
-      return "“Hey Q” can’t use the microphone";
     case "OFF":
     case "UNAVAILABLE":
       return null;
   }
 }
+
+const ACTION_CLASS =
+  "inline-flex min-h-11 items-center rounded-full px-3 cq-body-sm font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-sunken) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)";
 
 export function WakeIndicator() {
   const t = useT();
@@ -62,53 +66,57 @@ export function WakeIndicator() {
   const processing = useWakeProcessing();
   const text = wakeIndicatorText(status, processing);
   if (text === null) return null;
-  const live = status.kind === "LISTENING" || status.kind === "HEARING";
-  const pausedByYou = status.kind === "PAUSED" && status.reason === "BY_YOU";
-  const Icon = live ? Mic : MicOff;
+  const words = t(text);
   return (
     <div
-      className="flex justify-end px-4 pt-2"
+      className="cq-wake-indicator"
       data-wake-indicator={status.kind}
       data-wake-processing={processing ?? undefined}
     >
-      <div
-        role="status"
-        className="inline-flex items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pe-1 ps-3 cq-caption text-(--cq-text-secondary)"
-      >
-        <Icon
-          aria-hidden="true"
-          size={ICON_SIZE.compact}
-          strokeWidth={ICON_STROKE}
-        />
-        <span>{t(text)}</span>
-        {live || pausedByYou ? (
+      {/* The words, for assistive technology, as the state changes. */}
+      <span role="status" className="sr-only">
+        {words}
+      </span>
+      <PopoverRoot>
+        <PopoverTrigger>
           <button
             type="button"
-            onClick={() => setWakePausedByYou(live)}
-            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            aria-label={words}
+            title={words}
+            className="cq-wake-indicator-button"
+            data-wake-indicator-button
           >
-            {live ? t("Pause") : t("Resume")}
+            <Mic
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
           </button>
-        ) : (
-          <Link
-            href="/settings#q"
-            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
-          >
-            {t("Settings")}
-          </Link>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setWakePausedByYou(false);
-            storeWakePreference(false);
-          }}
-          className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
-          data-wake-turn-off
-        >
-          {t("Turn off")}
-        </button>
-      </div>
+        </PopoverTrigger>
+        <PopoverContent title={words} className="w-auto max-w-72 p-3">
+          <span className="mt-1 flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => setWakePausedByYou(true)}
+              className={ACTION_CLASS}
+              data-wake-pause
+            >
+              {t("Pause")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setWakePausedByYou(false);
+                storeWakePreference(false);
+              }}
+              className={ACTION_CLASS}
+              data-wake-turn-off
+            >
+              {t("Turn off")}
+            </button>
+          </span>
+        </PopoverContent>
+      </PopoverRoot>
     </div>
   );
 }

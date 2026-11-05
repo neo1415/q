@@ -3353,6 +3353,37 @@
    * pointer events itself; the dock inside it is placed by transform only
    * (Motion), so moving it never touches layout.
    */
+  /*
+   * "Hey Q" is listening (D2, owner 2026-11-05): a small round microphone
+   * in the bottom corner, inline-end, above the Q dock's default bottom
+   * slot and above Q's composer, never over either. Not a banner.
+   */
+  .cq-wake-indicator {
+    position: fixed;
+    inset-inline-end: 16px;
+    bottom: calc(max(16px, var(--cq-safe-bottom)) + 64px);
+    z-index: var(--cq-z-presence);
+  }
+  body:has(.cq-q-controls) .cq-wake-indicator {
+    bottom: calc(max(16px, var(--cq-safe-bottom)) + 104px);
+  }
+  .cq-wake-indicator-button {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-raised);
+    color: var(--cq-text-primary);
+    box-shadow: var(--cq-shadow-sm);
+    cursor: pointer;
+  }
+  .cq-wake-indicator-button:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
   .cq-q-dock-layer {
     position: fixed;
     inset: 0;

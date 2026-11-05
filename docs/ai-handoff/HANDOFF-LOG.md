@@ -1472,3 +1472,16 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Merged fix/caption-cue-placement (c7536d46d): CI run 41974532102 all green; deployed 06:05 (web only). live10 PASS: Harbourline cue foot 75% at 1440 and 390, above the burned AI-presenter title (was 94%). Receipt chore/live10-c7536d4 @ 083bf707f.
 - All fix branches (chat-render, q-correctness, plan-ui-polish, qcard-portrait, back-everywhere, caption-cue-placement) merged and live verified.
 - Open: 20 unreachable pitch videos; real-device voice / Hey Q; owner's refusal-message fix is not on this remote; owner to set CQ_SEED_ACCOUNT_PASSWORD and rotate pasted tokens.
+
+## 2026-11-05 (fix session, `fix/wake-reliability`; not merged or deployed)
+
+- Owner, 5 Nov: “Hey Q works sometimes”. Root causes fixed, each with a test written to fail first (`apps/web/test/wake-reliability.test.tsx`):
+  - after a wake, the engine stopped and never restarted if no call opened, while the indicator still said Listening;
+  - one microphone or recogniser failure stuck until reload;
+  - the recogniser ending inside an open window was not restarted;
+  - “Hey.” and “Q” split across two results were missed;
+  - a browser on-device check that never settled blocked the start;
+  - a suspended or interrupted AudioContext gave no frames;
+  - the voice-note recorder took the microphone without telling the listener.
+- Indicator: the top banner is gone. While listening, a 44px corner mic button opens a popover with Pause and Turn off. Paused, off, blocked or unavailable shows nothing; Resume is in Settings → Q and the Q room. Receipt: `receipts/2026-11-05-wake/`.
+- Not changed, needs the owner or an ADR: the gate's 6-windows-a-minute privacy cap can still mute Hey Q for up to a minute in a talkative room. Recognition also starts about 100–400 ms after speech begins, so “Hey” can be clipped; saying it again within the window works. Still needs a real-device check.

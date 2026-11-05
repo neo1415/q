@@ -220,7 +220,8 @@ describe("D2 · when Hey Q may listen", () => {
     expect(wakeIndicatorText({ kind: "HEARING" })).toMatch(/Listening/);
     expect(wakeIndicatorText({ kind: "OFF" })).toBeNull();
     expect(wakeIndicatorText({ kind: "PAUSED", reason: "IN_CALL" })).toBeNull();
-    expect(wakeIndicatorText({ kind: "BLOCKED" })).toMatch(/microphone/);
+    // Blocked: the microphone is closed; Settings says how to allow it.
+    expect(wakeIndicatorText({ kind: "BLOCKED" })).toBeNull();
   });
 });
 

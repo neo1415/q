@@ -852,6 +852,7 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   "“Hey Q” paused": "«Hey Q» متوقف مؤقتاً",
   "“Hey Q” paused: low battery": "«Hey Q» متوقف مؤقتاً: البطارية منخفضة",
   "“Hey Q” can’t use the microphone": "لا يستطيع «Hey Q» استخدام الميكروفون",
+  "Resume “Hey Q”": "استئناف «Hey Q»",
   // P3 (owner 2026-11-04): a running plan's measurable progress.
   "{n} of {m} steps done": "أُنجزت {n} من {m} خطوات",
   "Needs you: tell Q what to prepare": "يحتاجك: أخبر Q بما يجهّزه",

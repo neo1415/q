@@ -5,6 +5,8 @@ import {
   type GateEffect,
   type GateState,
 } from "./gate";
+import { keepContextRunning } from "./context-keeper";
+import { microphoneFailure } from "./microphone";
 import type { WakePhraseId } from "./phrases";
 import { createSpeechDetector, type DetectorFailure } from "./speech-detector";
 import type { WakeProcessing } from "./wake-status";
@@ -18,7 +20,12 @@ import type { WakeProcessing } from "./wake-status";
 
 export const CAPTURE_WORKLET_URL = "/wake/capture-worklet.js";
 
-export type EngineFailure = DetectorFailure | "microphone";
+/**
+ * "microphone": refused, the person must allow it. "interrupted": the
+ * microphone was busy, ended (unplugged, taken by another capture) or the
+ * capture worklet failed to load; the listener retries on its own.
+ */
+export type EngineFailure = DetectorFailure | "microphone" | "interrupted";
 
 export type WakeEngine = { readonly stop: () => Promise<void> };
 
@@ -100,29 +107,37 @@ export async function startWakeEngine(
         autoGainControl: true,
       },
     });
-  } catch {
+  } catch (error) {
     detector.dispose();
-    input.onFailure("microphone");
+    input.onFailure(microphoneFailure(error));
     return { stop: () => Promise.resolve() };
   }
 
   const context = new AudioContext();
-  // Safari starts an AudioContext suspended until a tap; the first tap or
-  // key anywhere resumes it.
-  const resume = () => {
-    void context.resume().catch(() => undefined);
+  // Suspended until a tap (autoplay rules), or interrupted by other audio:
+  // a suspended context delivers no frames and the gate never opens.
+  const releaseContext = keepContextRunning(context);
+  // The track ends when the device goes away or another capture takes it
+  // (iOS mutes the first capture): nothing more would ever be heard.
+  const onTrackEnded = () => {
+    if (stopped) return;
+    void stop();
+    input.onFailure("interrupted");
   };
-  window.addEventListener("pointerdown", resume, { once: true });
-  window.addEventListener("keydown", resume, { once: true });
+  for (const track of stream.getTracks()) {
+    track.addEventListener("ended", onTrackEnded);
+  }
 
   const stop = async () => {
     if (stopped) return;
     stopped = true;
-    window.removeEventListener("pointerdown", resume);
-    window.removeEventListener("keydown", resume);
+    releaseContext();
     detector.dispose();
     input.onWindow?.(false);
-    for (const track of stream.getTracks()) track.stop();
+    for (const track of stream.getTracks()) {
+      track.removeEventListener("ended", onTrackEnded);
+      track.stop();
+    }
     await context.close().catch(() => undefined);
   };
 
@@ -142,10 +157,10 @@ export async function startWakeEngine(
     source.connect(node);
     // Silent: the worklet writes zeros. The connection keeps it running.
     node.connect(context.destination);
-    resume();
   } catch {
+    // The worklet did not load (a network blip on its file): try again.
     await stop();
-    input.onFailure("unavailable");
+    input.onFailure("interrupted");
   }
   return { stop };
 }

@@ -60,6 +60,14 @@ function staticMethod(name: "available" | "install"): {
   };
 }
 
+/**
+ * How long the browser's own check may take. It has been seen to never
+ * settle; while it is pending the listener does not start (it waits to
+ * know where words are recognised), so a hung check meant "Hey Q" never
+ * worked in that tab. Past this it counts as "unavailable".
+ */
+export const ON_DEVICE_CHECK_MS = 2500;
+
 /** Whether on-device recognition is ready for `lang` on this browser. */
 export async function onDeviceAvailability(
   lang: string = wakeLanguage(),
@@ -67,10 +75,13 @@ export async function onDeviceAvailability(
   const available = staticMethod("available");
   if (available === null) return "unavailable";
   try {
-    const result: unknown = await available.call({
-      langs: [lang],
-      processLocally: true,
-    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const result: unknown = await Promise.race([
+      Promise.resolve(available.call({ langs: [lang], processLocally: true })),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve("unavailable"), ON_DEVICE_CHECK_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
     return isStatus(result) ? result : "unavailable";
   } catch {
     return "unavailable";

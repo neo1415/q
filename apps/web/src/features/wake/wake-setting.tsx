@@ -10,6 +10,7 @@ import {
 import { WAKE_PHRASES } from "./phrases";
 import { wakeSupported } from "./support";
 import { storeWakePreference, useWakePreference } from "./wake-preference";
+import { WakeResume } from "./wake-resume";
 import { setWakePausedByYou, useWakeStatus } from "./wake-status";
 import { useT } from "@/features/i18n/language";
 
@@ -180,7 +181,7 @@ export function WakeSetting() {
       </div>
       <p id={`${id}-help`} className="cq-caption text-(--cq-text-secondary)">
         {supported
-          ? `Say ${PHRASE_LIST} to open Q while Capital Q is open on screen. Off by default. It pauses when the tab is hidden, on low battery and while Q is on a call, and the top of the page shows whenever it is listening.`
+          ? `Say ${PHRASE_LIST} to open Q while Capital Q is open on screen. Off by default. It pauses when the tab is hidden, on low battery and while Q is on a call, and a small microphone button in the corner shows whenever it is listening.`
           : "This browser can’t listen for “Hey Q”. Chrome, Edge and Safari can. The Q button and Ctrl/Cmd+K always open Q."}
         {supported ? (
           <>
@@ -189,6 +190,7 @@ export function WakeSetting() {
           </>
         ) : null}
       </p>
+      <WakeResume />
       {shown === null ? null : (
         <p role="alert" className="cq-caption text-(--cq-text-primary)">
           {t(shown)}

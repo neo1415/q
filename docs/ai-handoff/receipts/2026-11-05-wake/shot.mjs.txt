@@ -1,0 +1,28 @@
+import { createRequire } from "node:module";
+const req = createRequire("/home/user/q/apps/web/package.json");
+const { chromium } = req("playwright");
+const OUT = "/home/user/q/docs/ai-handoff/receipts/2026-11-05-wake";
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--no-sandbox", "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+for (const w of [1440, 390]) {
+  const ctx = await b.newContext({ viewport: { width: w, height: w > 500 ? 900 : 844 }, deviceScaleFactor: 2, isMobile: w < 500, hasTouch: w < 500, permissions: ["microphone"] });
+  await ctx.addInitScript(() => { try { sessionStorage.setItem("cq.splash.seen", "1"); localStorage.setItem("cq.theme", "light"); localStorage.setItem("cq.q.wake", "on"); } catch {} });
+  const p = await ctx.newPage();
+  await p.goto("http://localhost:3000/dev/explore", { waitUntil: "domcontentloaded", timeout: 240000 });
+  await p.waitForSelector("[data-wake-indicator-button]", { timeout: 60000 });
+  await p.waitForTimeout(1500);
+  const box = await p.locator("[data-wake-indicator-button]").boundingBox();
+  const name = await p.locator("[data-wake-indicator-button]").getAttribute("aria-label");
+  const topBanner = await p.evaluate(() => [...document.querySelectorAll("[data-wake-indicator]")].map((e) => getComputedStyle(e).position));
+  console.log(w, JSON.stringify(box), name, topBanner);
+  await p.screenshot({ path: `${OUT}/listening-${w}.png` });
+  await p.locator("[data-wake-indicator-button]").click();
+  await p.waitForSelector("[data-wake-pause]");
+  await p.waitForTimeout(400);
+  await p.screenshot({ path: `${OUT}/popover-${w}.png` });
+  await p.locator("[data-wake-pause]").click();
+  await p.waitForTimeout(800);
+  console.log(w, "after pause indicator count", await p.locator("[data-wake-indicator]").count());
+  await p.screenshot({ path: `${OUT}/paused-${w}.png` });
+  await ctx.close();
+}
+await b.close();

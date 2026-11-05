@@ -32,7 +32,12 @@ export type WakeDetector = {
 
 export type DetectorFailure = "blocked" | "unavailable";
 
-/** The phrase in any alternative of any result from `resultIndex` on. */
+/**
+ * The phrase in any alternative of any result from `resultIndex` on, or
+ * across the boundary with the result before it: continuous recognition
+ * often finalises "Hey." as one result and starts the next with "Q", and
+ * neither half matches alone.
+ */
 export function wakeInResults(
   event: RecognitionResultEvent,
 ): WakePhraseId | null {
@@ -46,8 +51,24 @@ export function wakeInResults(
       if (phrase !== null) return phrase;
     }
   }
-  return null;
+  const joined: string[] = [];
+  for (
+    let r = Math.max(0, event.resultIndex - 1);
+    r < event.results.length;
+    r += 1
+  ) {
+    const best = event.results[r]?.[0]?.transcript;
+    if (best !== undefined) joined.push(best);
+  }
+  return joined.length > 1 ? matchWakePhrase(joined.join(" ")) : null;
 }
+
+/**
+ * How many times one window may start its recogniser again after it ended
+ * on its own. Bounded so a recogniser that ends at once (offline, a
+ * service refusing) cannot spin; the gate's window caps still apply.
+ */
+export const MAX_RESTARTS_PER_WINDOW = 3;
 
 export function createSpeechDetector(input: {
   readonly onWake: (phrase: WakePhraseId) => void;
@@ -63,10 +84,14 @@ export function createSpeechDetector(input: {
   const Ctor = recognitionConstructor();
   if (Ctor === null) return null;
   let recognition: Recognition | null = null;
+  // True from start() to stop(): the gate's window is open.
+  let wanted = false;
+  let restarts = 0;
   let local = input.processLocally === true && supportsProcessLocally(Ctor);
   input.onProcessing?.(local ? "DEVICE" : "SERVICE");
 
   const stop = () => {
+    wanted = false;
     const current = recognition;
     recognition = null;
     if (current === null) return;
@@ -78,6 +103,12 @@ export function createSpeechDetector(input: {
   };
 
   const start = () => {
+    wanted = true;
+    restarts = 0;
+    begin();
+  };
+
+  const begin = () => {
     if (recognition !== null) return;
     const next = new Ctor();
     next.lang = recognitionLanguage(navigator.language);
@@ -110,12 +141,19 @@ export function createSpeechDetector(input: {
           input.onFailure("unavailable");
         }
       }
-      // "no-speech", "aborted", "network": the window just ends.
+      // "no-speech", "aborted", "network": the session ends; onend
+      // starts it again while the window is open.
     };
-    // Ended on its own (silence, a network blip): the gate opens a new
-    // window when speech comes again.
+    // Ended on its own (silence, a network blip, Android's one-utterance
+    // sessions) while the gate's window is still open. Before, nothing
+    // listened for the rest of the window although the indicator said
+    // "checking", so a "Hey Q" said a moment later was never heard.
     next.onend = () => {
-      if (recognition === next) recognition = null;
+      if (recognition !== next) return;
+      recognition = null;
+      if (!wanted || restarts >= MAX_RESTARTS_PER_WINDOW) return;
+      restarts += 1;
+      begin();
     };
     recognition = next;
     try {

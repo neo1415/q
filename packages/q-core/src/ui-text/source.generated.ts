@@ -3995,6 +3995,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Resume it in In progress",
   "Resume the interview",
   "Resume when ready",
+  "Resume “Hey Q”",
   "Resumed",
   "Resumed.",
   "Resuming…",

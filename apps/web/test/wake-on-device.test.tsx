@@ -42,11 +42,14 @@ import {
   readWakePreference,
   storeWakePreference,
 } from "../src/features/wake/wake-preference";
+import { WakeResume } from "../src/features/wake/wake-resume";
 import { WakeListeningNote } from "../src/features/wake/wake-setting";
 import {
   resetWakeStatus,
+  setWakePausedByYou,
   setWakeProcessing,
   setWakeStatus,
+  wakePausedByYou,
 } from "../src/features/wake/wake-status";
 import { respondToWake, WakeWord } from "../src/features/wake/wake-word";
 
@@ -298,20 +301,69 @@ describe("installing the language pack only on the person's click", () => {
   });
 });
 
-describe("the indicator: truthful state, Stop always there while armed", () => {
+describe("the indicator: a small corner button while the microphone is in use", () => {
+  it.each([[{ kind: "LISTENING" } as const], [{ kind: "HEARING" } as const]])(
+    "%j: a named 44px mic button whose popover has Pause and Turn off",
+    async (status) => {
+      storeWakePreference(true);
+      setWakeStatus(status);
+      setWakeProcessing("DEVICE");
+      const { container } = render(<WakeIndicator />);
+      // Not a banner: no row of words and buttons in the page flow.
+      expect(container.querySelector("[data-wake-indicator]")?.className).toBe(
+        "cq-wake-indicator",
+      );
+      const mic = screen.getByRole("button", {
+        name: /^Listening for “Hey Q” · (checking )?on this device$/,
+      });
+      expect(mic.className).toBe("cq-wake-indicator-button");
+      expect(screen.queryByRole("button", { name: "Turn off" })).toBeNull();
+      await userEvent.click(mic);
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Turn off" }),
+      );
+      expect(readWakePreference()).toBe(false);
+    },
+  );
+
+  it("Pause hides it until Hey Q is resumed", async () => {
+    storeWakePreference(true);
+    setWakeStatus({ kind: "LISTENING" });
+    const { container } = render(<WakeIndicator />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Listening for “Hey Q”" }),
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Pause" }));
+    expect(wakePausedByYou()).toBe(true);
+    // The listener reports the pause; the corner is then empty.
+    act(() => setWakeStatus({ kind: "PAUSED", reason: "BY_YOU" }));
+    expect(container.querySelector("[data-wake-indicator]")).toBeNull();
+  });
+
   it.each([
-    [{ kind: "LISTENING" } as const],
-    [{ kind: "HEARING" } as const],
+    [{ kind: "OFF" } as const],
+    [{ kind: "UNAVAILABLE" } as const],
+    [{ kind: "BLOCKED" } as const],
     [{ kind: "PAUSED", reason: "BY_YOU" } as const],
     [{ kind: "PAUSED", reason: "BATTERY" } as const],
-    [{ kind: "BLOCKED" } as const],
-  ])("%j shows Turn off", async (status) => {
+    [{ kind: "PAUSED", reason: "IN_CALL" } as const],
+    [{ kind: "PAUSED", reason: "HIDDEN" } as const],
+    [{ kind: "PAUSED", reason: "RETRYING" } as const],
+  ])("%j: renders nothing (the microphone is closed)", (status) => {
     storeWakePreference(true);
     setWakeStatus(status);
-    setWakeProcessing("SERVICE");
-    render(<WakeIndicator />);
-    await userEvent.click(screen.getByRole("button", { name: "Turn off" }));
-    expect(readWakePreference()).toBe(false);
+    const { container } = render(<WakeIndicator />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("Resume lives in Settings → Q while paused", async () => {
+    storeWakePreference(true);
+    setWakePausedByYou(true);
+    render(<WakeResume />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Resume “Hey Q”" }),
+    );
+    expect(wakePausedByYou()).toBe(false);
   });
 });
 

@@ -15,7 +15,12 @@ import { useSyncExternalStore } from "react";
  * - UNAVAILABLE: this browser cannot run it.
  */
 
-export type WakePauseReason = "HIDDEN" | "IN_CALL" | "BATTERY" | "BY_YOU";
+/**
+ * RETRYING: the microphone was busy or went away; the listener tries
+ * again on its own in a moment, and has the microphone closed meanwhile.
+ */
+export type WakePauseReason =
+  "HIDDEN" | "IN_CALL" | "BATTERY" | "BY_YOU" | "RETRYING";
 
 export type WakeStatus =
   | { readonly kind: "OFF" }

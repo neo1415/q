@@ -110,6 +110,7 @@ import { useT } from "@/features/i18n/language";
 import { earlierWork, jobIdsIn, PinnedWorkLines } from "./pinned-work";
 import { QWorkProgress, useWorkStreams } from "./work-progress-view";
 import { promisedJobs } from "./work-live";
+import { WakeResume } from "@/features/wake/wake-resume";
 
 /*
  * Q room W7: what opens on request -- a document Q made, the previous
@@ -1810,6 +1811,8 @@ export function QConversationPanel({
                     {t("Talk to Q")}
                   </button>
                 ) : null}
+                {/* "Hey Q" paused from its corner button: the way back. */}
+                {connected && !voice.active ? <WakeResume /> : null}
 
                 {/* E1: the stage layer's place below Q before the first word. */}
                 <RoomBelow className="max-w-(--cq-layout-narrow)" />

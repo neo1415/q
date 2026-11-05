@@ -64,6 +64,7 @@ import {
   useWakeControl,
   WakeListeningNote,
 } from "@/features/wake/wake-setting";
+import { WakeResume } from "@/features/wake/wake-resume";
 import {
   disablePush,
   enablePush,
@@ -405,6 +406,9 @@ export function WakeRow() {
                 "This browser can listen for it. The Q button and Ctrl/Cmd+K always open Q.",
               )}{" "}
               <WakeListeningNote />
+              <span className="mt-1 block">
+                <WakeResume />
+              </span>
             </>
           ) : (
             t(
