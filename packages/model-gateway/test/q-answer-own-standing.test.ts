@@ -1222,7 +1222,7 @@ describe("the situation header reaches every answer path", () => {
       const { seam, request, alpha } = build(
         { status: "SUCCEEDED", data: CONNECTED },
         undefined,
-        { situationOf, now: () => NOW, logger: logger as never },
+        { situationOf, now: () => NOW, logger },
       );
       const asked = {
         ...request,

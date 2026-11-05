@@ -87,7 +87,7 @@ const SURFACE_NAMES: Readonly<Record<QSituationSurface, string>> = {
 function plain(text: string | null, max: number): string | null {
   if (text === null) return null;
   const cleaned = text
-    .replace(/[\u0000-\u001f\u007f"`]/g, " ")
+    .replace(/\p{Cc}|["`]/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max)
