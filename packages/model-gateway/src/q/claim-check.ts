@@ -252,6 +252,30 @@ function normaliseText(text: string): string {
     .replace(/\s+/gu, " ");
 }
 
+/** The length of every list in a JSON source; nothing for prose. */
+function listLengths(source: string): number[] {
+  const trimmed = source.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return [];
+  }
+  const lengths: number[] = [];
+  const visit = (value: unknown, depth: number): void => {
+    if (depth > 6 || value === null || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      if (value.length >= 2) lengths.push(value.length);
+      for (const item of value) visit(item, depth + 1);
+      return;
+    }
+    for (const item of Object.values(value)) visit(item, depth + 1);
+  };
+  visit(parsed, 0);
+  return lengths;
+}
+
 /**
  * Prepare a run's sources once. `today` is grounded too: "this year" and
  * today's date are not claims anyone invented.
@@ -267,6 +291,11 @@ export function claimCorpus(
   const iso = today.toISOString().slice(0, 10);
   const all = [...sources, iso];
   for (const source of all) {
+    // A count of records a tool returned ("you've reached out to 20
+    // companies") is the length of a list it holds.
+    for (const length of listLengths(source)) {
+      numbers.push({ value: length, currency: null });
+    }
     for (const line of source.split(/\n|(?<=[.;!?])\s+(?=[A-Z])/u)) {
       const own = figuresIn(line);
       for (const figure of own) {
@@ -277,7 +306,13 @@ export function claimCorpus(
       if (own.length >= 2 && own.length <= 12) {
         lines.push(own.map((figure) => figure.value));
       }
-      for (const { key } of dateKeysIn(line)) dates.add(key);
+      for (const { key } of dateKeysIn(line)) {
+        dates.add(key);
+        // A date's day and month ground "22 November" said without a year.
+        for (const part of key.split("-").slice(1)) {
+          numbers.push({ value: Number(part), currency: null });
+        }
+      }
       for (const word of line.match(/(?<![\p{L}])[\p{Ll}][\p{L}'-]*/gu) ??
         []) {
         ordinary.add(word);
@@ -411,7 +446,9 @@ const FUNCTION_WORDS = new Set(
     "a an the this that these those it its i we you they he she my our your their his her " +
     "and but or so as if when while where what which who why how here there yes no not " +
     "in on at for with from by to of into over under about after before during based given " +
-    "however also overall finally then"
+    "however also overall finally then " +
+    "shall will can could would should may might must do does did is are was were be been " +
+    "has have had let please want need see consider ask check open compare book send"
   ).split(/\s+/u),
 );
 
@@ -439,7 +476,8 @@ const CORPORATE_SUFFIX =
   /\s+(?:inc|inc\.|ltd|ltd\.|llc|plc|limited|corp|corp\.|co|co\.|group|holdings|gmbh|sa|ag|bv)$/iu;
 
 const CAPITALISED = /^[\p{Lu}][\p{L}\p{M}'’&.-]*$/u;
-const CONNECTOR = /^(?:of|&|and|de|da|van|von|bin|al)$/u;
+// Not "and": "Souqsheet and Maji Loop" is a list of two names.
+const CONNECTOR = /^(?:of|&|de|da|van|von|bin|al)$/u;
 
 function cleanToken(token: string): string {
   return token.replace(/^[("'“‘*_[]+|[)"'”’*_\],:;!?.]+$/gu, "");
@@ -477,10 +515,10 @@ function namesIn(sentence: string): string[] {
     const bare = token.replace(/['’]s$/u, "");
     const possessive = bare !== token;
     if (bare.length > 0 && CAPITALISED.test(bare)) {
-      // A function word starts nothing: "The Acme team" is "Acme".
-      if (!(run.length === 0 && FUNCTION_WORDS.has(bare.toLowerCase()))) {
-        run.push(bare);
-      }
+      // A function word is part of no name: "The Acme team" is "Acme",
+      // and "Shall I" is no one.
+      if (FUNCTION_WORDS.has(bare.toLowerCase())) flush();
+      else run.push(bare);
     } else if (run.length > 0 && CONNECTOR.test(token)) {
       run.push(token);
     } else {
@@ -623,6 +661,10 @@ export function checkSentence(
   };
 }
 
+/** Said when nothing of an answer could be grounded; states no fact. */
+export const NOTHING_SOURCED =
+  "I don't have a sourced answer to that in what I can see yet.";
+
 /** A claim check for one answer: the streamed sentences and its stored text. */
 export interface ClaimChecker {
   sentence(sentence: string): SentenceCheck;
@@ -682,12 +724,15 @@ export function checkAnswer(
     }
     return kept.length === 0 ? null : `${lead}${kept.join(" ")}`;
   });
+  const text = lines
+    .filter((line): line is string => line !== null)
+    .join("\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
   return {
-    text: lines
-      .filter((line): line is string => line !== null)
-      .join("\n")
-      .replace(/\n{3,}/gu, "\n\n")
-      .trim(),
+    // Nothing of the answer was grounded: say so, rather than nothing.
+    text:
+      text.length === 0 && answer.trim().length > 0 ? NOTHING_SOURCED : text,
     ungrounded,
   };
 }

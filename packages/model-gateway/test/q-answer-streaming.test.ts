@@ -58,6 +58,20 @@ function plan(): PermittedContextPlan {
   } as unknown as PermittedContextPlan;
 }
 
+/**
+ * What these scripted answers state, as the run's authorised facts: the
+ * claim check (step 6) removes a figure or name the run was not given.
+ */
+const GROUNDS = [
+  {
+    scope: "company",
+    statement:
+      "Paystack, a Nigerian payments company, was acquired by Stripe in 2020 and serves about 60,000 merchants. Runway is 14 months. The person's company is Zino Aviation.",
+    truthClass: "USER_CLAIM" as const,
+    evidenceStatus: "DOCUMENT_SUPPORTED" as const,
+  },
+];
+
 function build(
   answer: string,
   extras: Record<string, unknown> = {},
@@ -69,7 +83,7 @@ function build(
     evidenceStatus: "DOCUMENT_SUPPORTED";
     source?: string;
     ref?: string;
-  }[] = [],
+  }[] = GROUNDS,
   hold?: { readonly afterChars: number; readonly until: Promise<void> },
 ) {
   const messages: QConversationMessage[] = [
@@ -263,7 +277,7 @@ describe("an answer that arrives as it is written", () => {
     });
     const answer = "Runway is 14 months. Burn has been flat since March.";
     // Cut inside the second sentence: the first is whole, the second is not.
-    const { seam, request, published, stored } = build(answer, {}, {}, [], {
+    const { seam, request, published, stored } = build(answer, {}, {}, GROUNDS, {
       afterChars: `{"answer":"Runway is 14 months. Burn has`.length,
       until,
     });
