@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-05",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "deploy": {
+    "commit": "fad7f0288",
+    "changedService": "q-api (only apps/q-api changed)",
+    "qApi": "SUCCESS 04:35Z",
+    "web": "SUCCESS a452c84fc (unchanged)",
+    "api": "SUCCESS a452c84fc (unchanged)",
+    "workers": "SUCCESS a452c84fc (unchanged)"
+  },
+  "qTurns": 0,
+  "note": "No new plan started: the Silo Credit plan from live8 is still Working",
+  "workMoving": {
+    "verdict": "PASS",
+    "widths": [1440, 390],
+    "rows": [
+      "Check Silo Credit's loan book quality this week and decide whether to revisit your prior pass. · Working · 5 steps inside",
+      "Check Ledgerline’s unit economics this week and leave you with an evidence-based view of whether to advance, pause or pass. · Working · 6 steps inside"
+    ],
+    "standaloneGoalStepRows": 0
+  },
+  "approvals": "none"
+}
