@@ -298,6 +298,12 @@ export const PitchSummaryDtoSchema = z
      * again on every request. Absent from older APIs (treated as false).
      */
     downloadAllowed: z.boolean().optional(),
+    /**
+     * QA F-31: the video's own picture already shows captions (burned in),
+     * so the player attaches no caption track and offers no captions
+     * switch. Absent from older APIs (treated as false).
+     */
+    captionsInPicture: z.boolean().optional(),
   })
   .strict();
 export type PitchSummaryDto = z.infer<typeof PitchSummaryDtoSchema>;

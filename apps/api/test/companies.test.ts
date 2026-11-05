@@ -731,6 +731,7 @@ describe("the company's publishable pitch (CQ-MEDIA-012)", () => {
     captionState: "NOT_REQUESTED",
     title: null,
     downloadAllowed: false,
+    captionsInPicture: false,
   };
 
   function fakePitches(present: boolean): {

@@ -5,11 +5,15 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
-import { resetCaptionsChoiceForTests } from "@/features/discover/stage/captions-choice";
+import {
+  ownCaptionsAvailable,
+  resetCaptionsChoiceForTests,
+} from "@/features/discover/stage/captions-choice";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -1112,5 +1116,115 @@ describe("stage cue placement (live 2026-10-31, Discover at 390 and 360)", () =>
 
   it("an outsized cue stays below the stage's top bar", () => {
     expect(stageCueTop({ ...phone, cueHeight: 600 })).toBe(12);
+  });
+});
+
+describe("captions already in the picture (QA F-31, live 2026-11-05)", () => {
+  // Six seeded pitches carry captions burned into the video itself; the
+  // player's own track drew a second layer over them. With the flag set
+  // there is exactly one caption layer (the picture's), and no switch that
+  // could not turn it off.
+  function withCaptionsInPicture(
+    base: DiscoveredCompanyDto,
+    captionsInPicture: boolean,
+  ): DiscoveredCompanyDto {
+    return {
+      ...base,
+      pitch: base.pitch === null ? null : { ...base.pitch, captionsInPicture },
+    };
+  }
+
+  it("inline: attaches our captions track and switch only when the picture has none", async () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const plain = render(
+      <PitchPlayer
+        company={withCaptionsInPicture(company(1), false)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+      />,
+    );
+    // Control: the ordinary pitch has our one layer and its switch.
+    await waitFor(() =>
+      expect(plain.container.querySelectorAll("track")).toHaveLength(1),
+    );
+    expect(
+      plain.container.querySelector("[data-pitch-captions]"),
+    ).not.toBeNull();
+    plain.unmount();
+
+    const burned = render(
+      <PitchPlayer
+        company={withCaptionsInPicture(company(1), true)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+      />,
+    );
+    await waitFor(() => expect(videoIn(burned.container).src).not.toBe(""));
+    expect(burned.container.querySelectorAll("track")).toHaveLength(0);
+    expect(burned.container.querySelector("[data-pitch-captions]")).toBeNull();
+  });
+
+  it("stage: no captions track and no captions switch for a pitch with captions in its picture", async () => {
+    const onCaptionsChange = vi.fn();
+    const plain = render(
+      <PitchPlayer
+        company={withCaptionsInPicture(company(1), false)}
+        policy="ACTIVE"
+        authorize={() => Promise.resolve(authorization())}
+        reducedMotion={false}
+        variant="stage"
+        initialAuthorization={authorization({ mediaAssetId: FIRST_PITCH_ID })}
+        onCaptionsChange={onCaptionsChange}
+      />,
+    );
+    await waitFor(() =>
+      expect(plain.container.querySelectorAll("track")).toHaveLength(1),
+    );
+    expect(
+      within(plain.container).queryByRole("button", {
+        name: /turn captions (on|off)/iu,
+      }),
+    ).not.toBeNull();
+    plain.unmount();
+
+    const burned = render(
+      <PitchPlayer
+        company={withCaptionsInPicture(company(1), true)}
+        policy="ACTIVE"
+        authorize={() => Promise.resolve(authorization())}
+        reducedMotion={false}
+        variant="stage"
+        initialAuthorization={authorization({ mediaAssetId: FIRST_PITCH_ID })}
+        onCaptionsChange={onCaptionsChange}
+      />,
+    );
+    await waitFor(() => expect(videoIn(burned.container).src).not.toBe(""));
+    expect(burned.container.querySelectorAll("track")).toHaveLength(0);
+    expect(
+      within(burned.container).queryByRole("button", {
+        name: /turn captions (on|off)/iu,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("ownCaptionsAvailable", () => {
+  it("is true only for generated captions on a picture without its own", () => {
+    expect(ownCaptionsAvailable({ captionState: "AVAILABLE" })).toBe(true);
+    expect(
+      ownCaptionsAvailable({
+        captionState: "AVAILABLE",
+        captionsInPicture: false,
+      }),
+    ).toBe(true);
+    expect(
+      ownCaptionsAvailable({
+        captionState: "AVAILABLE",
+        captionsInPicture: true,
+      }),
+    ).toBe(false);
+    expect(ownCaptionsAvailable({ captionState: "PENDING" })).toBe(false);
   });
 });
