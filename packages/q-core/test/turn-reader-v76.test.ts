@@ -6,7 +6,7 @@ import {
   renderPrompt,
   TURN_READER_V75,
   TURN_READER_V76,
-  TurnReaderV77ResultSchema,
+  TurnReaderV78ResultSchema,
   TurnReaderV76VariablesSchema,
   V75_INVESTMENT_MEMO,
   V76_CONVERSATION_STATE,
@@ -24,7 +24,7 @@ describe("TURN_READER v76", () => {
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
     expect(active.version).toBe(78);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV77ResultSchema,
+      TurnReaderV78ResultSchema,
     );
     expect(
       TURN_READER_V76.template

@@ -516,6 +516,8 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
       await seam.answer({
         ...request,
         aboutNamedOther: true,
+        // Step 4: a comparison is the reader's answerKind, never the words.
+        ...(text.startsWith("Compare") ? { answerKind: "COMPARISON" } : {}),
         subjects:
           access === "NO_SELECTED_SUBJECT"
             ? [{ kind: "COMPANY", companyId: otherId }]

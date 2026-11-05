@@ -5,7 +5,7 @@ import {
   TURN_READER_V74,
   TURN_READER_V75,
   TurnReaderV75ResultSchema,
-  TurnReaderV77ResultSchema,
+  TurnReaderV78ResultSchema,
   V62_DEEP_WORK,
   V75_INVESTMENT_MEMO,
 } from "../src/index.js";
@@ -21,7 +21,7 @@ describe("TURN_READER v75", () => {
     const active = registry.getActive("TURN_READER").definition;
     expect(active.version).toBe(78);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV77ResultSchema,
+      TurnReaderV78ResultSchema,
     );
     expect(
       TURN_READER_V75.template.replace(

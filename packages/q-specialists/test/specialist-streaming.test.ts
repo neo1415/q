@@ -207,26 +207,49 @@ describe("the specialist reads the public web only when asked (S7)", () => {
       announceSourceChange: false,
     }),
   };
+  // Step 4: a web ask is the reader's asksForWeb (v78), never the words.
   it.each([
-    ["What are the main risks here?", "QUESTION_TO_Q", "ADVICE", false],
+    ["What are the main risks here?", "QUESTION_TO_Q", "ADVICE", false, false],
     [
       "Search the web for risks with this company.",
       "QUESTION_TO_Q",
       "ADVICE",
       true,
+      true,
     ],
-    ["What does the press say about them?", "QUESTION_TO_Q", "ADVICE", true],
-    ["What has been reported publicly?", "QUESTION_TO_Q", "PUBLIC_FACTS", true],
-    ["Research their competitors.", "RESEARCH_REQUEST", "ADVICE", true],
+    [
+      "What does the press say about them?",
+      "QUESTION_TO_Q",
+      "ADVICE",
+      true,
+      true,
+    ],
+    // The same words with no web ask read: the record, never a word list.
+    [
+      "What does the press say about them?",
+      "QUESTION_TO_Q",
+      "ADVICE",
+      false,
+      false,
+    ],
+    [
+      "What has been reported publicly?",
+      "QUESTION_TO_Q",
+      "PUBLIC_FACTS",
+      false,
+      true,
+    ],
+    ["Research their competitors.", "RESEARCH_REQUEST", "ADVICE", false, true],
   ] as const)(
-    "%s -> publicResearch=%s",
-    async (said, turnKind, questionKind, web) => {
+    "%s (%s %s, asksForWeb %s) -> publicResearch=%s",
+    async (said, turnKind, questionKind, asksForWeb, web) => {
       const s = seam(true, said);
       await s.answer.answer({
         ...request(),
         ...explicit,
         turnKind,
         questionKind,
+        ...(asksForWeb ? { asksForWeb: true } : {}),
       });
       expect(s.investigated.at(-1)?.publicResearch).toBe(web);
     },
