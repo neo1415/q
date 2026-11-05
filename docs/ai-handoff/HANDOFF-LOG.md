@@ -1558,3 +1558,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Migration `20261231250000` needs CI pgTAP, then a hosted apply before deploy.
   - The integration tests need `DATABASE_URL` as well as `CQ_TEST_DATABASE_URL`.
 - Receipt: `docs/ai-handoff/receipts/2026-11-05-q-step2-gates.md`.
+
+## 2026-11-05 22:10–23:00 UTC (integration owner, session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Merged steps 2+3 (`feat/q-conversation-state` @ `195031fcb`) as `906df8178`. CI 42119085341 pgTAP failed: `130_schema_guard` listed the two new tables as unclassified. Fixed in `c2ef9961d` (RLS_REQUIRED, SELECT). CI 42119616083: pgTAP, build, typecheck, test green; format failed on my own docs (fixed `46423ea3e`), then eslint failed on a `.cjs` script in receipts (removed, `b2c08ab2a`). CI 42125008157 running.
+- Applied `20261231250000` to hosted at 22:35 (272 = 272); verified RLS on, one policy per table, no anon select, no authenticated insert.
+- Live Q-IQ on `906df8178` started 22:36 and was stopped at ~$1.25: the OpenAI balance ran out (`credit_balance_exhausted`), so results are invalid. Production Q now answers "I can't reach my reasoning service". The owner's billing page shows $9.72; the key's org is `user-sjwcgterhpea94ekjrhvnmtz`, project `proj_MrnCcT94qJ7YYMC5X8xOQQSP`, so the credit is likely on a different org/project. Lesson: check the provider balance before any live eval.
+- Started step 4 (`session_01Wncmn2xNSZf141cQ3RHQFs`) and step 5 (`session_01Wncmn7LogXnzLfccC3CVMw`) lanes; no live calls.
