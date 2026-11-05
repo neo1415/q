@@ -1,5 +1,20 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 5 November 2026, 20:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, new account, acting admin per DECISIONS 58/60)
+
+Production (last confirmed 13:07 UTC by the previous owner; not re-confirmed, see blockers): web and q-api `fdcf86871`; api and workers `a452c84fc`. Rollback: web `3f813b9b9`, q-api `fad7f0288`. `recovery/2026-09-12` = `recovery/2026-09-12-8y2j4w` = `fdcf86871` (git ls-remote, 19:50). Web `/` returns 200. Migrations: hosted 271 = local 271 per the handover.
+
+| Area                                                                                              | State                       | Evidence / next                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q Intelligence step 2 (conversation state), then step 3 (model-led references)                    | IN PROGRESS                 | Child `session_01Wncmn3GLgXyze4FuxoC9nH` on `feat/q-conversation-state` from `a94d1458b`; gates receipt goes to `receipts/2026-11-05-q-step2-gates.md` |
+| Merge step 2 → CI → pgTAP → apply `20261231250000` → deploy → live check                          | WAITING on gates + Supabase | Needs a working `SUPABASE_ACCESS_TOKEN` before the deploy (code reads the new tables)                                                                  |
+| Live Q-IQ re-run after step 3 (`--budget 5.5 --out`)                                              | WAITING on step 3 + Railway | The OpenAI key is read from Railway q-api variables, so it needs a working `RAILWAY_TOKEN`                                                             |
+| **BLOCKER: `RAILWAY_TOKEN` rejected** ("Not Authorized" on every host and header variant)         | OWNER ACTION                | Replace with a Railway **account** token (Account settings → Tokens), not a project token                                                              |
+| **BLOCKER: `SUPABASE_ACCESS_TOKEN` rejected** (401; value is shorter than a full `sbp_` token)    | OWNER ACTION                | Re-paste the full personal access token into the environment variable                                                                                  |
+| Direct Postgres (`DATABASE_MIGRATION_URL`)                                                        | NOT USABLE                  | TCP to the pooler times out from the sandbox, as documented                                                                                            |
+| 2-hourly continuation                                                                             | ON                          | `trig_01Lw52gWWexsrrMf7kbrPnPc`, bound to this session                                                                                                 |
+| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN (unchanged)    | HANDOFF-2026-11-05 §6                                                                                                                                  |
+
 ## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
 Production: web and q-api run `fdcf86871`; api and workers run `a452c84fc`. Rollback: web `3f813b9b9`, q-api `fad7f0288`. Migrations: hosted 271 = local 271. URL https://capital-qweb-production.up.railway.app.

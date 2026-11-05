@@ -1530,3 +1530,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - live12 PASS 4/4: date, a deck figure kept, runway an honest unknown, company answer intact. Receipts: chore/live12-fdcf868 @ 046b1084f.
 - First live Q-IQ baseline (on 9f138f135), $3.476 total. Q 79.2% vs bare 94.2% over the same 126 cases. The Q run stopped at its budget before AMBIGUITY. The reporter bug that scored that as 100% is fixed in 43542e006. See BASELINE.md.
 - Steps 2+3 started at 12:20 in session_01Eyr9vKfhPKfH6UnEmoUHXv.
+
+## 2026-11-05 20:00 UTC (integration owner, new account, session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Resumed per HANDOFF-2026-11-05 §5/§10. Start state: `fix/resume-asking-cv9ru3` @ `69286dd62`, clean; `recovery/2026-09-12` and `recovery/2026-09-12-8y2j4w` @ `fdcf86871`; `feat/q-conversation-state` @ `a94d1458b`.
+- Started the step 2+3 child `session_01Wncmn3GLgXyze4FuxoC9nH` from brief §10.3 A.
+- Recreated the 2-hourly continuation as `trig_01Lw52gWWexsrrMf7kbrPnPc` (bound to this session). The old `trig_01UbYp5iMbDCvK1i4GC8urcA` is on the old account and unreachable.
+- Blocked: the environment's `RAILWAY_TOKEN` is refused by Railway GraphQL (bearer, project and team headers, .app and .com hosts), so per-service deploy status and the OpenAI key for live Q-IQ can't be read. `SUPABASE_ACCESS_TOKEN` returns 401 and looks truncated, so the step 2 migration can't be applied. Direct Postgres times out. Owner action: replace both values in the environment.
