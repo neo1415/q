@@ -83,3 +83,27 @@ export {
   type PictureCheck,
   type PictureGrade,
 } from "./pictures/grade.js";
+// Q Intelligence Plan step 0: Q-IQ, 150 multi-turn conversations on
+// fictional entities, deterministic graders, Q vs the bare model.
+export * from "./datasets/q-iq/index.js";
+export {
+  extractFigures,
+  gradeQIqCase,
+  gradeQIqTurn,
+  summariseQIq,
+  Q_IQ_HELPFULNESS_RUBRIC,
+  type QIqCaseGrade,
+  type QIqSummary,
+  type QIqTurnGrade,
+} from "./graders/q-iq.js";
+export {
+  bareModelQIqSubject,
+  providerHelpfulnessJudge,
+  runQIq,
+  scriptedQIqSubject,
+  type QIqConversation,
+  type QIqReply,
+  type QIqRunResult,
+  type QIqSubject,
+} from "./runner/q-iq.js";
+export { createQIqWorldSubject } from "./runner/q-iq-world.js";

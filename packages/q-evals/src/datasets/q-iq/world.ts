@@ -457,8 +457,16 @@ export type QIqContradiction = {
   readonly companyId: string;
   readonly metric: string;
   readonly question: string;
-  readonly a: { readonly value: number; readonly source: string; readonly unit: string };
-  readonly b: { readonly value: number; readonly source: string; readonly unit: string };
+  readonly a: {
+    readonly value: number;
+    readonly source: string;
+    readonly unit: string;
+  };
+  readonly b: {
+    readonly value: number;
+    readonly source: string;
+    readonly unit: string;
+  };
 };
 
 export const Q_IQ_CONTRADICTIONS: readonly QIqContradiction[] = [
@@ -468,7 +476,11 @@ export const Q_IQ_CONTRADICTIONS: readonly QIqContradiction[] = [
     metric: "operating mini-grid sites",
     question: "How many sites does Brightwell run?",
     a: { value: 41, source: "pitch deck (October 2026)", unit: "sites" },
-    b: { value: 36, source: "operations report (September 2026)", unit: "sites" },
+    b: {
+      value: 36,
+      source: "operations report (September 2026)",
+      unit: "sites",
+    },
   },
   {
     id: "x-tamarind-churn",
@@ -492,7 +504,11 @@ export const Q_IQ_CONTRADICTIONS: readonly QIqContradiction[] = [
     metric: "paying schools",
     question: "How many schools pay for Nyota?",
     a: { value: 64, source: "founder update (October 2026)", unit: "schools" },
-    b: { value: 52, source: "billing export (September 2026)", unit: "schools" },
+    b: {
+      value: 52,
+      source: "billing export (September 2026)",
+      unit: "schools",
+    },
   },
   {
     id: "x-brightpath-margin",
@@ -505,8 +521,20 @@ export const Q_IQ_CONTRADICTIONS: readonly QIqContradiction[] = [
 ];
 
 export const Q_IQ_INVESTORS = [
-  { id: "inv-baobab-ridge", name: "Baobab Ridge Capital", chequeMin: 250_000, chequeMax: 1_000_000, stage: "seed" },
-  { id: "inv-kestrel-lane", name: "Kestrel Lane Ventures", chequeMin: 2_000_000, chequeMax: 5_000_000, stage: "Series A" },
+  {
+    id: "inv-baobab-ridge",
+    name: "Baobab Ridge Capital",
+    chequeMin: 250_000,
+    chequeMax: 1_000_000,
+    stage: "seed",
+  },
+  {
+    id: "inv-kestrel-lane",
+    name: "Kestrel Lane Ventures",
+    chequeMin: 2_000_000,
+    chequeMax: 5_000_000,
+    stage: "Series A",
+  },
 ] as const;
 
 export function company(id: string): QIqCompany {
@@ -562,17 +590,27 @@ function companyFacts(c: QIqCompany): QIqFact[] {
     [c.founded],
   );
   if (c.arr !== null)
-    add("arr", `${c.name} annual recurring revenue (ARR) is ${usd(c.arr)}.`, [c.arr]);
+    add("arr", `${c.name} annual recurring revenue (ARR) is ${usd(c.arr)}.`, [
+      c.arr,
+    ]);
   if (c.burn !== null)
     add("burn", `${c.name} net monthly burn is ${usd(c.burn)}.`, [c.burn]);
   if (c.runwayMonths !== null)
-    add("runway", `${c.name} cash runway is ${c.runwayMonths} months.`, [c.runwayMonths]);
+    add("runway", `${c.name} cash runway is ${c.runwayMonths} months.`, [
+      c.runwayMonths,
+    ]);
   if (c.customers !== null)
-    add("customers", `${c.name} has ${c.customers} ${c.customerNoun}.`, [c.customers]);
+    add("customers", `${c.name} has ${c.customers} ${c.customerNoun}.`, [
+      c.customers,
+    ]);
   if (c.grossMarginPct !== null)
-    add("margin", `${c.name} gross margin is ${c.grossMarginPct}%.`, [c.grossMarginPct]);
+    add("margin", `${c.name} gross margin is ${c.grossMarginPct}%.`, [
+      c.grossMarginPct,
+    ]);
   if (c.raising !== null)
-    add("raise", `${c.name} is raising a ${usd(c.raising)} ${c.round}.`, [c.raising]);
+    add("raise", `${c.name} is raising a ${usd(c.raising)} ${c.round}.`, [
+      c.raising,
+    ]);
   else add("raise", `${c.name} is not currently raising.`, []);
   return facts;
 }
@@ -605,7 +643,11 @@ function documentFacts(d: QIqDocument): QIqFact {
 function contradictionFacts(x: QIqContradiction): QIqFact[] {
   const c = company(x.companyId);
   const render = (v: { value: number; unit: string }): string =>
-    v.unit === "USD" ? usd(v.value) : v.unit === "%" ? `${v.value}%` : `${v.value} ${v.unit}`;
+    v.unit === "USD"
+      ? usd(v.value)
+      : v.unit === "%"
+        ? `${v.value}%`
+        : `${v.value} ${v.unit}`;
   return [x.a, x.b].map((side, i) => ({
     id: `${x.id}:${i === 0 ? "a" : "b"}`,
     entityId: c.id,

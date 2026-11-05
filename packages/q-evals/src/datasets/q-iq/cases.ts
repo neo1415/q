@@ -37,7 +37,11 @@ const E = (partial: Partial<QIqExpectation>): QIqExpectation => ({
   ...partial,
 });
 
-const T = (user: string, expect: QIqExpectation, reference: string): QIqTurn => ({
+const T = (
+  user: string,
+  expect: QIqExpectation,
+  reference: string,
+): QIqTurn => ({
   user,
   expect,
   reference,
@@ -124,7 +128,11 @@ function fieldTurn(
   );
 }
 
-function personTurn(user: string, p: QIqPerson, forbidden: readonly QIqPerson[]): QIqTurn {
+function personTurn(
+  user: string,
+  p: QIqPerson,
+  forbidden: readonly QIqPerson[],
+): QIqTurn {
   return T(
     user,
     E({
@@ -139,7 +147,11 @@ function personTurn(user: string, p: QIqPerson, forbidden: readonly QIqPerson[])
   );
 }
 
-function joinedTurn(user: string, p: QIqPerson, forbidden: readonly QIqPerson[]): QIqTurn {
+function joinedTurn(
+  user: string,
+  p: QIqPerson,
+  forbidden: readonly QIqPerson[],
+): QIqTurn {
   return T(
     user,
     E({
@@ -198,13 +210,18 @@ function pronounCases(): QIqCase[] {
           `Who are the CEO and the ${officer.role} of ${c.name}?`,
           E({
             entityIds: [ceo.id, officer.id],
-            requiredTerms: [[ceo.name, ceo.first], [officer.name, officer.first]],
+            requiredTerms: [
+              [ceo.name, ceo.first],
+              [officer.name, officer.first],
+            ],
             parts: 2,
           }),
           `${ceo.name} is the CEO and ${officer.name} is the ${officer.role}.`,
         ),
         joinedTurn(`When did ${officer.pronoun} join?`, officer, [ceo]),
-        personTurn(`And what's ${pronounPoss(ceo)} background?`, ceo, [officer]),
+        personTurn(`And what's ${pronounPoss(ceo)} background?`, ceo, [
+          officer,
+        ]),
         T(
           "How big is the round they're raising?",
           E({
@@ -238,7 +255,10 @@ function pronounCases(): QIqCase[] {
           `Tell me about the CEOs of ${heCo.name} and ${sheCo.name}.`,
           E({
             entityIds: [he.id, she.id],
-            requiredTerms: [[he.name, he.first], [she.name, she.first]],
+            requiredTerms: [
+              [he.name, he.first],
+              [she.name, she.first],
+            ],
             parts: 2,
           }),
           `${he.name} runs ${heCo.name}; ${she.name} runs ${sheCo.name}.`,
@@ -272,7 +292,11 @@ function pronounCases(): QIqCase[] {
       ]),
     );
   }
-  for (const companyId of ["co-tamarind-pay", "co-brightpath", "co-ledgerline"]) {
+  for (const companyId of [
+    "co-tamarind-pay",
+    "co-brightpath",
+    "co-ledgerline",
+  ]) {
     const c = company(companyId);
     const ceo = person(c.ceo);
     const cfo = person(c.cfo ?? c.ceo);
@@ -334,7 +358,9 @@ function ordinalCases(): QIqCase[] {
           requiredTerms: list.map((x) => [x.name, x.short]),
           parts: 3,
         }),
-        list.map((x) => `${x.name} is a ${x.sector} company in ${x.city}.`).join(" "),
+        list
+          .map((x) => `${x.name} is a ${x.sector} company in ${x.city}.`)
+          .join(" "),
       ),
       fieldTurn("What's the second one's monthly burn?", b, "burn", others(b)),
       fieldTurn(
@@ -354,7 +380,14 @@ function ordinalCases(): QIqCase[] {
       ),
     ];
     if (i % 3 === 0) {
-      turns.push(fieldTurn("And the one before the last — its gross margin?", b, "margin", others(b)));
+      turns.push(
+        fieldTurn(
+          "And the one before the last — its gross margin?",
+          b,
+          "margin",
+          others(b),
+        ),
+      );
     }
     out.push(caseOf("ORDINALS_LISTS", "ORD", turns));
   }
@@ -374,7 +407,12 @@ function followUpCases(): QIqCase[] {
   for (let i = 0; i < 15; i += 1) {
     const c = company(ORDER[i % 10] ?? "");
     const o = twin(c);
-    const [f1, f2, f3, f4] = shapes[i % 3] ?? ["arr", "burn", "customers", "runway"];
+    const [f1, f2, f3, f4] = shapes[i % 3] ?? [
+      "arr",
+      "burn",
+      "customers",
+      "runway",
+    ];
     out.push(
       caseOf("FOLLOW_UPS", "FUP", [
         fieldTurn(`What's ${c.name}'s ${FIELD_WORDS[f1]}?`, c, f1),
@@ -420,8 +458,15 @@ function correctionCases(): QIqCase[] {
     const ceo = person(right.ceo);
     out.push(
       caseOf("CORRECTIONS", "COR", [
-        fieldTurn(`What's ${wrong.name}'s monthly burn?`, wrong, "burn", [right]),
-        fieldTurn((phrasing[i % 5] ?? phrasing[0])!(right.name), right, "burn", [wrong]),
+        fieldTurn(`What's ${wrong.name}'s monthly burn?`, wrong, "burn", [
+          right,
+        ]),
+        fieldTurn(
+          phrasing[i % phrasing.length]?.(right.name) ?? right.name,
+          right,
+          "burn",
+          [wrong],
+        ),
         fieldTurn("And its ARR?", right, "arr", [wrong]),
         T(
           "Who's the CEO there?",
@@ -467,7 +512,12 @@ function compoundCases(): QIqCase[] {
     const c = company(FULL[i % 5] ?? "");
     const o = company(FULL[(i + 1 + Math.floor(i / 5)) % 5] ?? "");
     const ceo = person(c.ceo);
-    const [arr, burn, runway, margin] = [c.arr, c.burn, c.runwayMonths, c.grossMarginPct];
+    const [arr, burn, runway, margin] = [
+      c.arr,
+      c.burn,
+      c.runwayMonths,
+      c.grossMarginPct,
+    ];
     const [oRunway, oMargin] = [o.runwayMonths, o.grossMarginPct];
     if (
       arr === null ||
@@ -517,22 +567,102 @@ function compoundCases(): QIqCase[] {
 // ---------------------------------------------------------------------------
 function unknownCases(): QIqCase[] {
   const out: QIqCase[] = [];
-  const missing: readonly { id: string; known: Field; ask: string; what: string }[] = [
-    { id: "co-kora-farms", known: "burn", ask: "What's Kora Farms' ARR?", what: "ARR" },
-    { id: "co-kora-farms", known: "customers", ask: "How many months of runway does Kora Farms have?", what: "runway" },
-    { id: "co-kora-farms", known: "raise", ask: "What's Kora Farms' gross margin?", what: "gross margin" },
-    { id: "co-quaywise", known: "arr", ask: "What's Quaywise's runway?", what: "runway" },
-    { id: "co-silo-health", known: "arr", ask: "Who is Silo Health's CFO?", what: "CFO" },
-    { id: "co-brightwell", known: "burn", ask: "Who is Brightwell's CFO?", what: "CFO" },
-    { id: "co-ledgerfold", known: "arr", ask: "What's Ledgerfold's net revenue retention?", what: "net revenue retention" },
-    { id: "co-silo-credit", known: "burn", ask: "How many employees does Silo Credit have?", what: "headcount" },
-    { id: "co-ledgerline", known: "customers", ask: "What's Ledgerline's customer acquisition cost?", what: "customer acquisition cost" },
-    { id: "co-tamarind-pay", known: "arr", ask: "What's Tamarind Pay's total payment volume?", what: "payment volume" },
-    { id: "co-brightpath", known: "arr", ask: "What's Brightpath's gross margin according to its management?", what: "gross margin" },
-    { id: "co-nyota-learn", known: "runway", ask: "What's Nyota Learn's churn?", what: "churn" },
-    { id: "co-silo-health", known: "customers", ask: "What's Silo Health's monthly churn?", what: "churn" },
-    { id: "co-ledgerfold", known: "burn", ask: "What's Ledgerfold's CAC payback period?", what: "CAC payback" },
-    { id: "co-brightwell", known: "arr", ask: "How many employees does Brightwell have?", what: "headcount" },
+  const missing: readonly {
+    id: string;
+    known: Field;
+    ask: string;
+    what: string;
+  }[] = [
+    {
+      id: "co-kora-farms",
+      known: "burn",
+      ask: "What's Kora Farms' ARR?",
+      what: "ARR",
+    },
+    {
+      id: "co-kora-farms",
+      known: "customers",
+      ask: "How many months of runway does Kora Farms have?",
+      what: "runway",
+    },
+    {
+      id: "co-kora-farms",
+      known: "raise",
+      ask: "What's Kora Farms' gross margin?",
+      what: "gross margin",
+    },
+    {
+      id: "co-quaywise",
+      known: "arr",
+      ask: "What's Quaywise's runway?",
+      what: "runway",
+    },
+    {
+      id: "co-silo-health",
+      known: "arr",
+      ask: "Who is Silo Health's CFO?",
+      what: "CFO",
+    },
+    {
+      id: "co-brightwell",
+      known: "burn",
+      ask: "Who is Brightwell's CFO?",
+      what: "CFO",
+    },
+    {
+      id: "co-ledgerfold",
+      known: "arr",
+      ask: "What's Ledgerfold's net revenue retention?",
+      what: "net revenue retention",
+    },
+    {
+      id: "co-silo-credit",
+      known: "burn",
+      ask: "How many employees does Silo Credit have?",
+      what: "headcount",
+    },
+    {
+      id: "co-ledgerline",
+      known: "customers",
+      ask: "What's Ledgerline's customer acquisition cost?",
+      what: "customer acquisition cost",
+    },
+    {
+      id: "co-tamarind-pay",
+      known: "arr",
+      ask: "What's Tamarind Pay's total payment volume?",
+      what: "payment volume",
+    },
+    {
+      id: "co-brightpath",
+      known: "arr",
+      ask: "What's Brightpath's gross margin according to its management?",
+      what: "gross margin",
+    },
+    {
+      id: "co-nyota-learn",
+      known: "runway",
+      ask: "What's Nyota Learn's churn?",
+      what: "churn",
+    },
+    {
+      id: "co-silo-health",
+      known: "customers",
+      ask: "What's Silo Health's monthly churn?",
+      what: "churn",
+    },
+    {
+      id: "co-ledgerfold",
+      known: "burn",
+      ask: "What's Ledgerfold's CAC payback period?",
+      what: "CAC payback",
+    },
+    {
+      id: "co-brightwell",
+      known: "arr",
+      ask: "How many employees does Brightwell have?",
+      what: "headcount",
+    },
   ];
   missing.forEach((m, i) => {
     const c = company(m.id);
@@ -542,12 +672,20 @@ function unknownCases(): QIqCase[] {
       m.id === "co-brightpath"
         ? T(
             m.ask,
-            E({ entityIds: [c.id], forbiddenEntityIds: [twin(c).id], requiredFigures: [22] }),
+            E({
+              entityIds: [c.id],
+              forbiddenEntityIds: [twin(c).id],
+              requiredFigures: [22],
+            }),
             "Brightpath's management accounts put gross margin at 22%; an older investor memo said 17%.",
           )
         : T(
             m.ask,
-            E({ behaviour: "UNKNOWN", entityIds: [c.id], forbiddenEntityIds: [twin(c).id] }),
+            E({
+              behaviour: "UNKNOWN",
+              entityIds: [c.id],
+              forbiddenEntityIds: [twin(c).id],
+            }),
             `${c.name}'s ${m.what} isn't in the evidence I have, so I don't know it.`,
           );
     const pressure =
@@ -562,10 +700,18 @@ function unknownCases(): QIqCase[] {
         unknownTurn,
         T(
           pressure,
-          E({ behaviour: "UNKNOWN", entityIds: [c.id], forbiddenEntityIds: [twin(c).id] }),
+          E({
+            behaviour: "UNKNOWN",
+            entityIds: [c.id],
+            forbiddenEntityIds: [twin(c).id],
+          }),
           `I can't say: the ${m.what} for ${c.name} isn't recorded in the evidence, and missing isn't the same as zero.`,
         ),
-        fieldTurn("OK. What do we know for sure, then — remind me of the first figure?", c, m.known),
+        fieldTurn(
+          "OK. What do we know for sure, then — remind me of the first figure?",
+          c,
+          m.known,
+        ),
       ]),
     );
   });
@@ -579,7 +725,11 @@ function unknownCases(): QIqCase[] {
 // ---------------------------------------------------------------------------
 function render(x: QIqContradiction, side: "a" | "b"): string {
   const v = x[side];
-  return v.unit === "USD" ? usd(v.value) : v.unit === "%" ? `${v.value}%` : `${v.value} ${v.unit}`;
+  return v.unit === "USD"
+    ? usd(v.value)
+    : v.unit === "%"
+      ? `${v.value}%`
+      : `${v.value} ${v.unit}`;
 }
 
 function contradictionCases(): QIqCase[] {
@@ -606,12 +756,20 @@ function contradictionCases(): QIqCase[] {
       caseOf("CONTRADICTIONS", "CON", [
         fieldTurn(`What's ${c.name}'s ARR?`, c, "arr"),
         T(`And its ${x.metric}?`, bothExpect, both),
-        T("Which one is right?", E({ entityIds: [c.id], requiredFigures: [x.a.value, x.b.value] }), `I can't tell from the evidence: ${render(x, "a")} (${x.a.source}) and ${render(x, "b")} (${x.b.source}) conflict until one is reconciled.`),
+        T(
+          "Which one is right?",
+          E({ entityIds: [c.id], requiredFigures: [x.a.value, x.b.value] }),
+          `I can't tell from the evidence: ${render(x, "a")} (${x.a.source}) and ${render(x, "b")} (${x.b.source}) conflict until one is reconciled.`,
+        ),
       ]),
       caseOf("CONTRADICTIONS", "CON", [
         T(
           `What does the ${x.b.source} say about ${c.name}'s ${x.metric}?`,
-          E({ entityIds: [c.id], forbiddenEntityIds: [twin(c).id], requiredFigures: [x.b.value] }),
+          E({
+            entityIds: [c.id],
+            forbiddenEntityIds: [twin(c).id],
+            requiredFigures: [x.b.value],
+          }),
           `The ${x.b.source} says ${render(x, "b")}.`,
         ),
         T(
@@ -660,7 +818,11 @@ function numberCases(): QIqCase[] {
       fieldTurn("And the monthly burn?", c, "burn"),
       T(
         "So what's that burn over a full year?",
-        E({ entityIds: [c.id], requiredFigures: [yearly], derivedFigures: [yearly] }),
+        E({
+          entityIds: [c.id],
+          requiredFigures: [yearly],
+          derivedFigures: [yearly],
+        }),
         `${usd(burn)} a month is ${usd(yearly)} a year.`,
       ),
     ];
@@ -696,7 +858,11 @@ function numberCases(): QIqCase[] {
       turns.push(
         T(
           "Roughly how much cash does that runway imply?",
-          E({ entityIds: [c.id], requiredFigures: [cash], derivedFigures: [cash] }),
+          E({
+            entityIds: [c.id],
+            requiredFigures: [cash],
+            derivedFigures: [cash],
+          }),
           `${c.runwayMonths} months at ${usd(burn)} a month implies about ${usd(cash)} of cash.`,
         ),
       );
@@ -711,12 +877,42 @@ function numberCases(): QIqCase[] {
 // ---------------------------------------------------------------------------
 function memoryCases(): QIqCase[] {
   const out: QIqCase[] = [];
-  const passes: readonly { id: string; reason: string; term: string; field: Field }[] = [
-    { id: "co-ledgerline", reason: "the runway is too short for us", term: "runway", field: "runway" },
-    { id: "co-brightwell", reason: "the site numbers don't reconcile", term: "site", field: "burn" },
-    { id: "co-quaywise", reason: "freight is outside our mandate", term: "mandate", field: "arr" },
-    { id: "co-kora-farms", reason: "it's too early for our fund", term: "early", field: "burn" },
-    { id: "co-silo-health", reason: "the gross margin is too thin", term: "margin", field: "margin" },
+  const passes: readonly {
+    id: string;
+    reason: string;
+    term: string;
+    field: Field;
+  }[] = [
+    {
+      id: "co-ledgerline",
+      reason: "the runway is too short for us",
+      term: "runway",
+      field: "runway",
+    },
+    {
+      id: "co-brightwell",
+      reason: "the site numbers don't reconcile",
+      term: "site",
+      field: "burn",
+    },
+    {
+      id: "co-quaywise",
+      reason: "freight is outside our mandate",
+      term: "mandate",
+      field: "arr",
+    },
+    {
+      id: "co-kora-farms",
+      reason: "it's too early for our fund",
+      term: "early",
+      field: "burn",
+    },
+    {
+      id: "co-silo-health",
+      reason: "the gross margin is too thin",
+      term: "margin",
+      field: "margin",
+    },
   ];
   for (const p of passes) {
     const c = company(p.id);
@@ -727,7 +923,10 @@ function memoryCases(): QIqCase[] {
         [
           T(
             `What did I decide about ${c.short} last week?`,
-            E({ entityIds: [c.id], requiredTerms: [["pass", "passing", "passed"]] }),
+            E({
+              entityIds: [c.id],
+              requiredTerms: [["pass", "passing", "passed"]],
+            }),
             `You decided to pass on ${c.name}.`,
           ),
           T(
@@ -751,12 +950,28 @@ function memoryCases(): QIqCase[] {
       ),
     );
   }
-  const questions: readonly { personId: string; topic: string; term: string }[] = [
-    { personId: "p-ngozi-eze", topic: "the loan default rate", term: "default" },
+  const questions: readonly {
+    personId: string;
+    topic: string;
+    term: string;
+  }[] = [
+    {
+      personId: "p-ngozi-eze",
+      topic: "the loan default rate",
+      term: "default",
+    },
     { personId: "p-amara-osei", topic: "deferred revenue", term: "deferred" },
-    { personId: "p-jason-naidoo", topic: "the bridge note terms", term: "bridge" },
+    {
+      personId: "p-jason-naidoo",
+      topic: "the bridge note terms",
+      term: "bridge",
+    },
     { personId: "p-grace-uwase", topic: "fuel cost hedging", term: "fuel" },
-    { personId: "p-funmi-adeyemi", topic: "chargeback losses", term: "chargeback" },
+    {
+      personId: "p-funmi-adeyemi",
+      topic: "chargeback losses",
+      term: "chargeback",
+    },
   ];
   for (const q of questions) {
     const p = person(q.personId);
@@ -793,7 +1008,13 @@ function memoryCases(): QIqCase[] {
     );
   }
   const cheques = [750_000, 400_000, 1_250_000, 600_000, 2_500_000];
-  const likes = ["co-silo-credit", "co-ledgerfold", "co-tamarind-pay", "co-brightpath", "co-nyota-learn"];
+  const likes = [
+    "co-silo-credit",
+    "co-ledgerfold",
+    "co-tamarind-pay",
+    "co-brightpath",
+    "co-nyota-learn",
+  ];
   cheques.forEach((cheque, i) => {
     const c = company(likes[i] ?? "");
     out.push(
@@ -844,7 +1065,13 @@ function ambiguityCases(): QIqCase[] {
     { stem: "Ledger", a: "co-ledgerfold", b: "co-ledgerline" },
     { stem: "Bright", a: "co-brightwell", b: "co-brightpath" },
   ];
-  const fields: readonly Field[] = ["runway", "arr", "burn", "customers", "raise"];
+  const fields: readonly Field[] = [
+    "runway",
+    "arr",
+    "burn",
+    "customers",
+    "raise",
+  ];
   let n = 0;
   for (const g of groups) {
     for (const f of fields) {

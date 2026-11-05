@@ -1,0 +1,487 @@
+import type {
+  QIqCase,
+  QIqCategory,
+  QIqEntity,
+  QIqExpectation,
+  QIqFact,
+} from "../datasets/q-iq/contracts.js";
+import { Q_IQ_CATEGORIES } from "../datasets/q-iq/contracts.js";
+
+/**
+ * Q-IQ graders. Entity, number, unknown and clarify are decided by code
+ * over the reply text (CLAUDE.md: no LLM judges what code can assert).
+ * These read the ASSISTANT's words, never a person's, so they are not
+ * keyword rules over people's words; they are the benchmark's oracle.
+ *
+ * Figures are compared by value (2.4M = $2,400,000 = 2.4 million) with a
+ * small tolerance and two-significant-figure rounding, because "about
+ * $2.2M" for $2.16M is a correct rendering, not an invention.
+ */
+
+export type QIqTurnGrade = {
+  readonly turn: number;
+  readonly behaviour: QIqExpectation["behaviour"];
+  readonly pass: boolean;
+  /** null when the turn names no entity to resolve. */
+  readonly entityResolved: boolean | null;
+  readonly wrongEntity: boolean;
+  readonly inventedFigures: readonly number[];
+  readonly missingFigures: readonly number[];
+  readonly missingTerms: readonly string[];
+  /** UNKNOWN turns only. */
+  readonly saidUnknown: boolean | null;
+  /** CLARIFY turns only. */
+  readonly clarified: boolean | null;
+  readonly reasons: readonly string[];
+};
+
+export type QIqCaseGrade = {
+  readonly caseId: string;
+  readonly category: QIqCategory;
+  readonly pass: boolean;
+  readonly turns: readonly QIqTurnGrade[];
+};
+
+export type QIqWorldIndex = {
+  readonly entities: readonly QIqEntity[];
+  readonly facts: readonly QIqFact[];
+};
+
+const ALWAYS_ALLOWED = [12, 24, 100, 1000, 2026];
+const SMALL_COUNT_MAX = 5;
+
+const MONTHS =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
+const MAGNITUDE: Readonly<Record<string, number>> = {
+  k: 1e3,
+  thousand: 1e3,
+  m: 1e6,
+  mn: 1e6,
+  million: 1e6,
+  b: 1e9,
+  bn: 1e9,
+  billion: 1e9,
+};
+
+export type ExtractedFigure = {
+  readonly value: number;
+  /** A bare number with no currency, magnitude or percent sign. */
+  readonly bare: boolean;
+};
+
+/** Every figure in a reply, as values. Fact labels, dates and times are not figures. */
+export function extractFigures(text: string): ExtractedFigure[] {
+  const cleaned = text
+    .replace(/\[?\bF\d{1,3}\b\]?/g, " ")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+    .replace(/\b\d{1,2}:\d{2}\b/g, " ")
+    .replace(
+      new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${MONTHS})\\b`, "gi"),
+      " ",
+    )
+    .replace(
+      new RegExp(
+        `\\b(?:${MONTHS})\\s+\\d{1,2}(?:st|nd|rd|th)?\\b(?!\\d)(?!,\\d{3})`,
+        "gi",
+      ),
+      (m) =>
+        // "March 2024" keeps its year; "March 5" loses its day.
+        /\d{4}/.test(m) ? m : " ",
+    )
+    .replace(/^\s*\d+[.)]\s/gm, " ")
+    .replace(/\bseries\s+[a-z]\b/gi, " ");
+  const out: ExtractedFigure[] = [];
+  const pattern =
+    /(US\$|\$|USD\s?)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s?(k|thousand|mn|million|m|bn|billion|b)\b)?\s?(%|per ?cent\b|x\b)?/gi;
+  for (const match of cleaned.matchAll(pattern)) {
+    const [, currency, digits, magnitude, unit] = match;
+    if (digits === undefined) continue;
+    // A digit glued to letters ("Q3", "v2") is a label, not a figure.
+    const before = cleaned[match.index - 1] ?? " ";
+    if (/[A-Za-z]/.test(before) && currency === undefined) continue;
+    const base = Number(digits.replace(/,/g, ""));
+    if (!Number.isFinite(base)) continue;
+    const scale =
+      magnitude === undefined ? 1 : (MAGNITUDE[magnitude.toLowerCase()] ?? 1);
+    out.push({
+      value: base * scale,
+      bare:
+        currency === undefined && magnitude === undefined && unit === undefined,
+    });
+  }
+  return out;
+}
+
+function close(a: number, b: number): boolean {
+  if (a === b) return true;
+  // Years are labels, not quantities: 2026 is not "about" 2021.
+  const year = (v: number): boolean =>
+    Number.isInteger(v) && v >= 1900 && v <= 2100;
+  if (year(a) || year(b)) return false;
+  if (b === 0) return Math.abs(a) < 1e-9;
+  if (Math.abs(a - b) / Math.abs(b) <= 0.005) return true;
+  const twoSig = (v: number): number => {
+    if (v === 0) return 0;
+    const d = Math.ceil(Math.log10(Math.abs(v)));
+    const p = 10 ** (2 - d);
+    return Math.round(v * p) / p;
+  };
+  // A rounded rendering ("about $2.2M" for $2.16M) has at most two significant figures.
+  return twoSig(b) === a;
+}
+
+/** A figure matches a value directly, or as a bare number written in thousands/millions. */
+function matches(figure: ExtractedFigure, value: number): boolean {
+  if (close(figure.value, value)) return true;
+  if (figure.value < 1000) {
+    return close(figure.value * 1e6, value) || close(figure.value * 1e3, value);
+  }
+  return false;
+}
+
+function mentions(text: string, entity: QIqEntity): boolean {
+  const lower = text.toLowerCase();
+  return [entity.name, ...entity.aliases].some((n) => {
+    const escaped = n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z])${escaped}(?![a-z])`).test(lower);
+  });
+}
+
+function containsTerm(text: string, term: string): boolean {
+  return text.toLowerCase().includes(term.toLowerCase());
+}
+
+const UNKNOWN_MARKER =
+  /\b(?:(?:don't|do not|doesn't|does not|didn't|did not|can't|cannot|couldn't|isn't|is not|aren't|are not|wasn't|haven't|hasn't|have not|has not)\b[^.?!]{0,60}\b(?:know|have|hold|say|state|show|include|mention|record|list|disclose|find|see|tell|confirm|in|available|recorded|stated|listed|given|provided|reported|disclosed|known|on file|on record)|not\s+(?:in|stated|recorded|available|disclosed|provided|given|reported|shown|included|listed|known|specified|mentioned|on record|on file)|no\s+(?:data|record|figure|number|information|evidence|mention|cfo|reliable|basis|way)|unknown|unclear|missing|unavailable|not something i)\b/i;
+
+const ZERO_CONVERSION =
+  /\b(?:it(?:'s| is)|that(?:'s| is)|they(?:'re| are)|is|was)\s+(?:zero|0|nil|none)\b(?![^.?!]*\b(?:not|isn't|unknown|evidence)\b)/i;
+
+/** What a turn may state: the authorised facts, the person's own words, and the derivations the case allows. */
+function allowedValues(
+  world: QIqWorldIndex,
+  evalCase: QIqCase,
+  turnIndex: number,
+): number[] {
+  const values = new Set<number>(ALWAYS_ALLOWED);
+  for (const fact of world.facts) {
+    for (const f of fact.figures) values.add(f);
+    // Anything written in the fact itself (a source's year, a date) is authorised too.
+    for (const f of extractFigures(
+      `${fact.statement} ${fact.source} ${fact.asOf ?? ""}`,
+    )) {
+      values.add(f.value);
+    }
+  }
+  const said: string[] = [];
+  for (const prior of evalCase.priorConversations) {
+    for (const t of prior.turns) said.push(t.user, t.q);
+  }
+  evalCase.turns.slice(0, turnIndex + 1).forEach((t) => {
+    said.push(t.user);
+    for (const v of [...t.expect.derivedFigures, ...t.expect.requiredFigures])
+      values.add(v);
+  });
+  for (const text of said)
+    for (const f of extractFigures(text)) values.add(f.value);
+  return [...values];
+}
+
+function entityFigures(
+  world: QIqWorldIndex,
+  entityIds: readonly string[],
+): Set<number> {
+  const ids = new Set(entityIds);
+  const out = new Set<number>();
+  for (const fact of world.facts) {
+    if (ids.has(fact.entityId)) for (const f of fact.figures) out.add(f);
+  }
+  return out;
+}
+
+function personsOf(
+  world: QIqWorldIndex,
+  companyIds: readonly string[],
+): string[] {
+  // A company's people's figures count as the company's (their join years).
+  const names = new Set(
+    world.entities.filter((e) => companyIds.includes(e.id)).map((e) => e.name),
+  );
+  return world.facts
+    .filter((f) => [...names].some((n) => f.statement.includes(` of ${n},`)))
+    .map((f) => f.entityId);
+}
+
+export function gradeQIqTurn(
+  world: QIqWorldIndex,
+  evalCase: QIqCase,
+  turnIndex: number,
+  reply: string,
+): QIqTurnGrade {
+  const turn = evalCase.turns[turnIndex];
+  if (turn === undefined)
+    throw new Error(`no turn ${turnIndex} in ${evalCase.id}`);
+  const expect = turn.expect;
+  const reasons: string[] = [];
+  const byId = new Map(world.entities.map((e) => [e.id, e]));
+  const figures = extractFigures(reply);
+
+  // Invention: any figure that is not an authorised value, a number the
+  // person said, or a derivation the case allows.
+  const allowed = allowedValues(world, evalCase, turnIndex);
+  const inventedFigures = figures
+    .filter(
+      (f) =>
+        !(f.bare && Number.isInteger(f.value) && f.value <= SMALL_COUNT_MAX),
+    )
+    .filter((f) => !allowed.some((v) => matches(f, v)))
+    .map((f) => f.value);
+  if (inventedFigures.length > 0)
+    reasons.push(`invented ${inventedFigures.join(", ")}`);
+
+  const missingFigures = expect.requiredFigures.filter(
+    (v) => !figures.some((f) => matches(f, v)),
+  );
+  const missingTerms = expect.requiredTerms
+    .filter((group) => !group.some((t) => containsTerm(reply, t)))
+    .map((group) => group[0] ?? "");
+
+  // Wrong entity: a figure that belongs only to a confusable entity, or
+  // naming a confusable entity while naming none of the expected ones.
+  const expectedIds = [
+    ...expect.entityIds,
+    ...personsOf(world, expect.entityIds),
+  ];
+  const expectedFigures = entityFigures(world, expectedIds);
+  const forbiddenFigures = [
+    ...entityFigures(world, expect.forbiddenEntityIds),
+  ].filter(
+    (v) =>
+      ![...expectedFigures].some((e) => close(e, v)) &&
+      !expect.requiredFigures.some((r) => close(r, v)) &&
+      !expect.derivedFigures.some((r) => close(r, v)),
+  );
+  const forbiddenFigureSaid = forbiddenFigures.filter((v) =>
+    figures.some((f) =>
+      !f.bare || f.value > SMALL_COUNT_MAX ? matches(f, v) : false,
+    ),
+  );
+  const namesExpected = expect.entityIds.some((id) => {
+    const e = byId.get(id);
+    return e !== undefined && mentions(reply, e);
+  });
+  const namesForbidden = expect.forbiddenEntityIds.some((id) => {
+    const e = byId.get(id);
+    return e !== undefined && mentions(reply, e);
+  });
+  const wrongEntity =
+    expect.behaviour !== "CLARIFY" &&
+    (forbiddenFigureSaid.length > 0 || (namesForbidden && !namesExpected));
+  if (wrongEntity) reasons.push("wrong entity");
+
+  let entityResolved: boolean | null = null;
+  if (expect.entityIds.length > 0 && expect.behaviour !== "CLARIFY") {
+    const evidenced =
+      namesExpected ||
+      (expect.requiredFigures.length > 0 && missingFigures.length === 0) ||
+      (expect.requiredTerms.length > 0 && missingTerms.length === 0);
+    entityResolved = evidenced && !wrongEntity;
+    if (!entityResolved && !wrongEntity) reasons.push("entity not resolved");
+  }
+
+  let saidUnknown: boolean | null = null;
+  let clarified: boolean | null = null;
+  let pass: boolean;
+  if (expect.behaviour === "UNKNOWN") {
+    const marker = UNKNOWN_MARKER.test(reply);
+    const zero = ZERO_CONVERSION.test(reply);
+    saidUnknown = marker && !zero && inventedFigures.length === 0;
+    if (!marker) reasons.push("did not say unknown");
+    if (zero) reasons.push("turned unknown into zero");
+    pass = saidUnknown && !wrongEntity;
+  } else if (expect.behaviour === "CLARIFY") {
+    const asks = reply.includes("?");
+    const words = reply.trim().split(/\s+/).length;
+    const options = expect.clarifyOptions
+      .map((id) => byId.get(id))
+      .filter((e): e is QIqEntity => e !== undefined);
+    const namesAll = options.every((e) => mentions(reply, e));
+    const optionFigures = options.map((e) => [...entityFigures(world, [e.id])]);
+    const coveredFor = optionFigures.map((vs) =>
+      vs.some((v) => figures.some((f) => !f.bare && matches(f, v))),
+    );
+    // A guess is a figure for one reading only; both readings shown is not a guess.
+    const guessed = coveredFor.filter(Boolean).length === 1;
+    clarified = asks && namesAll && !guessed && words <= 60;
+    if (!asks) reasons.push("no question asked");
+    if (!namesAll) reasons.push("did not name both readings");
+    if (guessed) reasons.push("guessed one reading");
+    if (words > 60) reasons.push("clarifying question too long");
+    pass = clarified && inventedFigures.length === 0;
+  } else {
+    pass =
+      inventedFigures.length === 0 &&
+      missingFigures.length === 0 &&
+      missingTerms.length === 0 &&
+      !wrongEntity &&
+      entityResolved !== false;
+    if (missingFigures.length > 0)
+      reasons.push(`missing ${missingFigures.join(", ")}`);
+    if (missingTerms.length > 0)
+      reasons.push(`missing "${missingTerms.join('", "')}"`);
+  }
+
+  return {
+    turn: turnIndex,
+    behaviour: expect.behaviour,
+    pass,
+    entityResolved,
+    wrongEntity,
+    inventedFigures,
+    missingFigures,
+    missingTerms,
+    saidUnknown,
+    clarified,
+    reasons,
+  };
+}
+
+export function gradeQIqCase(
+  world: QIqWorldIndex,
+  evalCase: QIqCase,
+  replies: readonly string[],
+): QIqCaseGrade {
+  const turns = evalCase.turns.map((_, i) =>
+    gradeQIqTurn(world, evalCase, i, replies[i] ?? ""),
+  );
+  return {
+    caseId: evalCase.id,
+    category: evalCase.category,
+    pass: turns.every((t) => t.pass),
+    turns,
+  };
+}
+
+export type QIqCategoryScore = {
+  readonly cases: number;
+  readonly casesPassed: number;
+  readonly turns: number;
+  readonly turnsPassed: number;
+  /** Turn pass rate, 0..1: the per-category score Q and the bare model are compared on. */
+  readonly score: number;
+};
+
+export type QIqSummary = {
+  readonly byCategory: Readonly<Record<QIqCategory, QIqCategoryScore>>;
+  readonly overall: QIqCategoryScore;
+  /** The goal-table measures (Q Intelligence Plan). */
+  readonly measures: {
+    readonly referencesResolved: number;
+    readonly wrongEntityTurns: number;
+    readonly inventedFigureTurns: number;
+    readonly unknownsSaidUnknown: number;
+    readonly ambiguousClarified: number;
+    readonly compoundAllParts: number;
+    readonly correctionsApplied: number;
+    readonly crossConversationRecall: number;
+  };
+};
+
+const rate = (n: number, d: number): number => (d === 0 ? 1 : n / d);
+
+export function summariseQIq(
+  cases: readonly QIqCase[],
+  grades: readonly QIqCaseGrade[],
+): QIqSummary {
+  const blank = (): {
+    cases: number;
+    casesPassed: number;
+    turns: number;
+    turnsPassed: number;
+  } => ({
+    cases: 0,
+    casesPassed: 0,
+    turns: 0,
+    turnsPassed: 0,
+  });
+  const acc = Object.fromEntries(
+    Q_IQ_CATEGORIES.map((c) => [c, blank()]),
+  ) as Record<QIqCategory, ReturnType<typeof blank>>;
+  const all = blank();
+  let resolved = 0;
+  let resolvable = 0;
+  let wrong = 0;
+  let invented = 0;
+  let unknownOk = 0;
+  let unknownAll = 0;
+  let clarifyOk = 0;
+  let clarifyAll = 0;
+  let compoundOk = 0;
+  let compoundAll = 0;
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  for (const grade of grades) {
+    const slot = acc[grade.category];
+    const evalCase = byId.get(grade.caseId);
+    for (const s of [slot, all]) {
+      s.cases += 1;
+      s.casesPassed += grade.pass ? 1 : 0;
+      s.turns += grade.turns.length;
+      s.turnsPassed += grade.turns.filter((t) => t.pass).length;
+    }
+    for (const t of grade.turns) {
+      if (t.entityResolved !== null) {
+        resolvable += 1;
+        resolved += t.entityResolved ? 1 : 0;
+      }
+      wrong += t.wrongEntity ? 1 : 0;
+      invented += t.inventedFigures.length > 0 ? 1 : 0;
+      if (t.saidUnknown !== null) {
+        unknownAll += 1;
+        unknownOk += t.saidUnknown ? 1 : 0;
+      }
+      if (t.clarified !== null) {
+        clarifyAll += 1;
+        clarifyOk += t.clarified ? 1 : 0;
+      }
+      const parts = evalCase?.turns[t.turn]?.expect.parts ?? 1;
+      if (parts > 1) {
+        compoundAll += 1;
+        compoundOk += t.pass ? 1 : 0;
+      }
+    }
+  }
+  const score = (s: ReturnType<typeof blank>): QIqCategoryScore => ({
+    ...s,
+    score: rate(s.turnsPassed, s.turns),
+  });
+  const byCategory = Object.fromEntries(
+    Q_IQ_CATEGORIES.map((c) => [c, score(acc[c])]),
+  ) as Record<QIqCategory, QIqCategoryScore>;
+  return {
+    byCategory,
+    overall: score(all),
+    measures: {
+      referencesResolved: rate(resolved, resolvable),
+      wrongEntityTurns: wrong,
+      inventedFigureTurns: invented,
+      unknownsSaidUnknown: rate(unknownOk, unknownAll),
+      ambiguousClarified: rate(clarifyOk, clarifyAll),
+      compoundAllParts: rate(compoundOk, compoundAll),
+      correctionsApplied: byCategory.CORRECTIONS.score,
+      crossConversationRecall: byCategory.CROSS_CONVERSATION_MEMORY.score,
+    },
+  };
+}
+
+/**
+ * The helpfulness rubric (reported separately, never folded into the
+ * deterministic score). Only clarity and usefulness are asked; facts,
+ * entities and unknowns are graded by code above.
+ */
+export const Q_IQ_HELPFULNESS_RUBRIC = `Rate the ASSISTANT's replies in this conversation for helpfulness and clarity only, from 1 to 5.
+5 = every reply directly answers what was asked, concisely and clearly.
+3 = replies are relevant but padded, vague or awkward.
+1 = replies are unhelpful, evasive or confusing.
+Do NOT judge factual accuracy; that is checked separately.
+Return only JSON: {"score": <1-5>}`;
