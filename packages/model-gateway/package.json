@@ -73,6 +73,7 @@
     "@capital-q/q-core": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
     "@google/genai": "2.21.0",
     "groq-sdk": "1.6.0",
     "openai": "7.21.0",

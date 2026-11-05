@@ -1381,6 +1381,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
+      '@capital-q/taxonomy':
+        specifier: workspace:*
+        version: link:../taxonomy
       '@google/genai':
         specifier: 2.21.0
         version: 2.21.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.5.4))

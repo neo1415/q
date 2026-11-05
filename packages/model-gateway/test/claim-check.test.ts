@@ -173,3 +173,50 @@ describe("claim check: extraction and the whole answer", () => {
     ).toEqual([]);
   });
 });
+
+describe("claim check: CI 42015449549 regressions", () => {
+  // apps/q-api/test/chat-card-turn.test.ts: a chat message read by a tool
+  // carries an ISO timestamp; the answer says its date and time.
+  const thread = JSON.stringify({
+    ok: true,
+    result: {
+      messages: [
+        {
+          senderName: "Amara Diallo-Benson",
+          text: "QA double-send 1",
+          sentAt: "2026-10-03T08:56:00.000Z",
+        },
+      ],
+    },
+  });
+  const chat = claimCorpus([thread], TODAY);
+
+  it("grounds a date and time from a tool result's ISO timestamp", () => {
+    const sentence =
+      'Amara Diallo-Benson wrote at 2026-10-03 08:56 UTC: "QA double-send 1".';
+    expect(checkSentence(sentence, chat)).toEqual({
+      text: sentence,
+      ungrounded: [],
+    });
+    expect(
+      checkSentence("She wrote on 3 October 2026 at 09:56 BST.", chat)
+        .ungrounded,
+    ).toEqual([]);
+  });
+
+  it("still catches an invented time", () => {
+    expect(
+      checkSentence("She wrote at 14:12 on 3 October 2026.", chat).ungrounded,
+    ).toEqual(["DATE"]);
+  });
+
+  it("knows countries from the canonical list, not a copy", () => {
+    expect(
+      checkSentence("Most of the pipeline is in South Africa.", chat)
+        .ungrounded,
+    ).toEqual([]);
+    expect(
+      checkSentence("Expansion into Saudi Arabia is planned.", chat).ungrounded,
+    ).toEqual([]);
+  });
+});

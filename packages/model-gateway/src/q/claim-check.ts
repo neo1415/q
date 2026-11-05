@@ -31,6 +31,8 @@
  * echo one.
  */
 
+import { countryOfName } from "@capital-q/taxonomy/countries";
+
 export type ClaimKind = "NUMBER" | "MONEY" | "PERCENT" | "DATE" | "NAME";
 
 /** One checkable claim in a sentence. */
@@ -62,6 +64,8 @@ export interface ClaimCorpus {
   readonly dates: ReadonlySet<string>;
   /** Words the sources write in lower case: ordinary words, not names. */
   readonly ordinary: ReadonlySet<string>;
+  /** The minutes of every clock time a source states ("56" of 08:56). */
+  readonly minutes: ReadonlySet<string>;
 }
 
 export interface SentenceCheck {
@@ -125,7 +129,8 @@ MONTH_INDEX.set("sept", 9);
  * Not inside a word or an identifier ("B2B", "Q3", "F12", "v2.1").
  */
 const FIGURE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}_.\/-])` +
+  // Not a time's minutes ("08:56"); a JSON value ("customers":1340) is.
+  String.raw`(?<![\p{L}\p{N}_.\/-])(?<!\d:)` +
     String.raw`(?:(?<sign>[$€£₦¥₹₵])|(?<pre>${CURRENCY_CODES})\s?)?` +
     String.raw`(?<int>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?<frac>\d+))?` +
     String.raw`(?:\s?(?<scale>k|mm|mn|m|bn|b|tn|t|thousand|million|billion|trillion)(?![\p{L}]))?` +
@@ -139,8 +144,23 @@ const DATE_PATTERNS: readonly RegExp[] = [
   /\b(?<d>\d{1,2})(?:st|nd|rd|th)?\s+(?<m>[A-Za-z]{3,9})\.?,?\s+(?<y>(?:19|20)\d{2})\b/gu,
   /\b(?<m>[A-Za-z]{3,9})\.?\s+(?<d>\d{1,2})(?:st|nd|rd|th)?,?\s+(?<y>(?:19|20)\d{2})\b/gu,
   /\b(?<m>[A-Za-z]{3,9})\.?,?\s+(?<y>(?:19|20)\d{2})\b/gu,
-  /\b(?<y>(?:19|20)\d{2})-(?<mn>\d{2})(?:-(?<d>\d{2}))?\b/gu,
+  // ISO, alone or as a timestamp's date ("2026-10-03T08:56:00Z").
+  /\b(?<y>(?:19|20)\d{2})-(?<mn>\d{2})(?:-(?<d>\d{2}))?(?!\d)/gu,
 ];
+
+/**
+ * A clock time, "08:56" or "3:30 pm", alone or inside an ISO timestamp.
+ * Its minutes are what is checked: a true time the model converted to the
+ * reader's time zone keeps its minutes and changes its hour.
+ */
+const CLOCK_TIME =
+  /(?<![\d:])(?<h>\d{1,2}):(?<m>[0-5]\d)(?::\d{2}(?:\.\d+)?)?(?!\d)/gu;
+
+function clockMinutesIn(text: string): string[] {
+  return [...text.matchAll(CLOCK_TIME)].map(
+    (match) => match.groups?.["m"] ?? "",
+  );
+}
 
 /** Words that make a figure a span of planning, not a stated fact. */
 const PLANNING_BEFORE =
@@ -285,6 +305,7 @@ export function claimCorpus(
   const lines: number[][] = [];
   const dates = new Set<string>();
   const ordinary = new Set<string>();
+  const minutes = new Set<string>();
   const iso = today.toISOString().slice(0, 10);
   const all = [...sources, iso];
   for (const source of all) {
@@ -303,6 +324,7 @@ export function claimCorpus(
       if (own.length >= 2 && own.length <= 12) {
         lines.push(own.map((figure) => figure.value));
       }
+      for (const minute of clockMinutesIn(line)) minutes.add(minute);
       for (const { key } of dateKeysIn(line)) {
         dates.add(key);
         // A date's day and month ground "22 November" said without a year.
@@ -321,6 +343,7 @@ export function claimCorpus(
     text: normaliseText(all.join("\n")),
     dates,
     ordinary,
+    minutes,
   };
 }
 
@@ -409,30 +432,22 @@ const KNOWN_PHRASES = new Set(
     "microsoft teams",
     "power point",
     "investiq",
-    "south africa",
+    // Regions, cities and blocs. Countries come from the one canonical
+    // list (@capital-q/taxonomy/countries), never a copy here.
     "north africa",
     "west africa",
     "east africa",
+    "southern africa",
     "sub saharan africa",
     "sub-saharan africa",
-    "united states",
-    "united kingdom",
-    "united arab emirates",
-    "new york",
-    "san francisco",
-    "silicon valley",
-    "hong kong",
-    "saudi arabia",
     "middle east",
     "latin america",
     "north america",
     "south america",
     "european union",
-    "ivory coast",
-    "cote d'ivoire",
-    "sierra leone",
-    "costa rica",
-    "new zealand",
+    "new york",
+    "san francisco",
+    "silicon valley",
   ].map(normaliseText),
 );
 
@@ -534,6 +549,7 @@ function namesIn(sentence: string): string[] {
 function nameGrounded(name: string, corpus: ClaimCorpus): boolean {
   const normal = normaliseText(name);
   if (KNOWN_PHRASES.has(normal)) return true;
+  if (countryOfName(name) !== null) return true;
   if (corpus.text.includes(normal)) return true;
   const stripped = normal.replace(CORPORATE_SUFFIX, "");
   if (stripped !== normal && corpus.text.includes(stripped)) return true;
@@ -569,6 +585,15 @@ export function extractClaims(sentence: string): Claim[] {
     claims.push({
       kind: "DATE",
       text: key,
+      value: Number.NaN,
+      precision: 0,
+      currency: null,
+    });
+  }
+  for (const minute of clockMinutesIn(sentence)) {
+    claims.push({
+      kind: "DATE",
+      text: `time:${minute}`,
       value: Number.NaN,
       precision: 0,
       currency: null,
@@ -640,9 +665,11 @@ export function checkSentence(
         ? nameGrounded(claim.text, corpus)
         : Number.isFinite(claim.value)
           ? figureGrounded(claim, corpus, groundedValues)
-          : corpus.dates.has(claim.text) ||
-            // A month without a day matches a source with that day.
-            [...corpus.dates].some((key) => key.startsWith(`${claim.text}-`));
+          : claim.text.startsWith("time:")
+            ? corpus.minutes.has(claim.text.slice("time:".length))
+            : corpus.dates.has(claim.text) ||
+              // A month without a day matches a source with that day.
+              [...corpus.dates].some((key) => key.startsWith(`${claim.text}-`));
     if (!ok) ungrounded.push(claim.kind);
   }
   if (ungrounded.length === 0) return { text: sentence, ungrounded };
