@@ -1449,3 +1449,9 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - One shared `BackLink` (UX-04 history logic from 332501631): top-left, 44 px at every width, RTL arrow, accessible name "Back to {parent}". Hand-rolled back links (account head, relationship hero, investor profile, work audit/report, rehearsal lobby/review, pitch video, founder team, company) now use it; added where missing (interest, visibility, Daily edition, top companies, Capital Q pitch, rehearsal unavailable states, search, messages, reviews, verification).
 - `apps/web/test/back-everywhere.test.ts` classifies every `app/(app)` page (root / redirect / own exit / interior); a new unclassified page fails it. Out of scope: `(onboarding)`, auth, `dev`, public `g/` and `u/` pages.
 - Receipts: `docs/ai-handoff/receipts/2026-11-04-back/` (dev fixture pages at 1440 and 390).
+
+## 2026-11-04 evening → 2026-11-05 (integration owner, acting admin per DECISIONS 58)
+
+- Deploys: 8967c4fd4 (boss visuals + plan fixes), 11c36f6ea (chat fragments, Show again, Ledgerline, Q Card portrait, plan polish, splash, not-found page), 7b9a267ce (Back everywhere, memo identity, traction, pipeline counts, logos, Q Card narrow, chart wording), 449301dbe (six plan fixes + route-coverage test fix). Each live-checked on the fictional investor (receipts on chore/live5..live7 branches) except 449301dbe (running).
+- Lessons: a CI format/coverage failure on docs or a new route still blocks the deploy branch — run `npx prettier --check apps packages docs` and the route-coverage tests whenever a page is added. Child sessions' safety classifiers block production sign-in/uploads until the owner approves in that session; set CQ_SEED_ACCOUNT_PASSWORD to avoid it. Two sessions hit the 5-hour usage limit at 23:20 and resumed after reset.
+- Open: 23451cb58 deploy (memo, Discover), 2351a656a (For you 1024), pitch burned-in captions flag, real-device voice/Hey Q checks.
