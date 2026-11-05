@@ -75,6 +75,16 @@ describe("Q-IQ graders", () => {
     }
   });
 
+  it("reports a category that was not run as not run, never 100%", async () => {
+    const first = Q_IQ_DATASET.cases.filter(
+      (c) => c.category === "PRONOUNS_PEOPLE",
+    );
+    const result = await runQIq(scriptedQIqSubject(), first);
+    expect(result.summary.byCategory.PRONOUNS_PEOPLE.score).toBe(1);
+    expect(result.summary.byCategory.AMBIGUITY.score).toBeNull();
+    expect(result.summary.measures.ambiguousClarified).toBeNull();
+  });
+
   it("catches a wrong-entity answer (Ledgerline's figure for Ledgerfold)", () => {
     const c = find(
       (x) =>

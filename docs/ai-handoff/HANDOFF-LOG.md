@@ -1521,3 +1521,12 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Contract: optional `QScreenContext.surface` (CHAT/DOCK/STAGE), passed through `screenWithin`. The web sends DOCK, or STAGE/CHAT while the Q page is mounted. A spoken turn is always VOICE.
 - Tests: new answer-path tests (prepared context, targeted retrieval, deep analysis, voice) fail on the base and pass here. Also new: header unit tests with a fixed clock, reader tests and duplex tests. Gates are reported to the integration owner.
 - Open: no live Q-IQ date run yet (no live provider calls in this slice).
+
+## 2026-11-05 13:15 UTC (integration owner)
+
+- Merged intelligence steps 6 (claim check), 1 (situation header) and 0 (Q-IQ).
+  - CI 42015449549 went red on two claim-check issues: a timestamp false positive and a private country list. Both were fixed forward in fdcf86871.
+  - CI 42025072557 is green. Deployed fdcf86871 to web and q-api at 12:52.
+  - live12 PASS 4/4: date, a deck figure kept, runway an honest unknown, company answer intact. Receipts: chore/live12-fdcf868 @ 046b1084f.
+- First live Q-IQ baseline (on 9f138f135), $3.476 total. Q 79.2% vs bare 94.2% over the same 126 cases. The Q run stopped at its budget before AMBIGUITY. The reporter bug that scored that as 100% is fixed in 43542e006. See BASELINE.md.
+- Steps 2+3 started at 12:20 in session_01Eyr9vKfhPKfH6UnEmoUHXv.

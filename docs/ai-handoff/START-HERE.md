@@ -2,7 +2,7 @@
 
 **Purpose:** any coding agent (Codex, Claude Code on any account) picks up the same work without this chat. These files are the single shared memory. There are no model-specific project memories: Codex reads `AGENTS.md`, Claude reads `CLAUDE.md`, and both point here.
 
-**Latest handoff (2026-11-01): read [`HANDOFF-2026-11-01.md`](HANDOFF-2026-11-01.md) first: production SHAs, what is live, open defects, what was tried, in-flight work and the release gates.** Earlier: [`HANDOFF-2026-10-27.md`](HANDOFF-2026-10-27.md).
+**Latest handoff (2026-11-05, PAUSED): read [`HANDOFF-2026-11-05.md`](HANDOFF-2026-11-05.md) first. It covers production SHAs, every session, the Q Intelligence programme and exactly how to resume.** Previous: **Latest handoff (2026-11-01): read [`HANDOFF-2026-11-01.md`](HANDOFF-2026-11-01.md) first: production SHAs, what is live, open defects, what was tried, in-flight work and the release gates.** Earlier: [`HANDOFF-2026-10-27.md`](HANDOFF-2026-10-27.md).
 
 **Continuity (2026-10-11):** Codex Cloud is completing the current demo release; Claude Code may continue immediately from the prominent latest status in STATE.md. Shared handoff files and branch SHAs govern continuity; no model-specific memory or replacement application.
 
