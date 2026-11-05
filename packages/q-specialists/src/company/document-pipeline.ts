@@ -16,6 +16,7 @@ import {
 
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
+import { fitToOnePage } from "./one-page.js";
 import { withKickers } from "./deck-shape.js";
 import { tidyDeck } from "./deck-tidy.js";
 import { slideTopic, writeDeckSlides } from "./deck-writer.js";
@@ -610,7 +611,21 @@ export type DocumentPipelineInput = {
   readonly onStage?:
     ((stage: QDocumentPipelineStage) => Promise<void> | void) | undefined;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * The title and summary the document prints above its sections: a
+   * one-pager is fitted to one page with them (one-page.ts). Absent: a
+   * generous stand-in of the same shape is measured instead.
+   */
+  readonly frame?:
+    { readonly title: string; readonly summary: string } | undefined;
 };
+
+/** Measured when no frame is given: longer than most real ones. */
+const STAND_IN_FRAME = {
+  title: "One-pager — a company name of about this length",
+  summary:
+    "Q composed this one-pager from what Capital Q holds on record and the public sources it read. Figures are as the company states them unless marked otherwise.",
+} as const;
 
 export type DocumentPipelineResult = {
   readonly content: QArtifactContent;
@@ -763,6 +778,14 @@ export async function runDocumentPipeline(
     ].slice(0, 24),
     rubric: { ...review.rubric, rounds },
   };
+  // live6 2026-11-04: a one-pager prints on one page, measured by the
+  // renderer the download uses; length gives way, never type size.
+  if (input.kind === "ONE_PAGER") {
+    next = await fitToOnePage(
+      { type: "ONE_PAGER", ...(input.frame ?? STAND_IN_FRAME) },
+      next,
+    );
+  }
   await stage("READY");
   return { content: { ...next, audit }, rounds, passed };
 }

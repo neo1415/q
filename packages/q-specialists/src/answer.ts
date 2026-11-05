@@ -103,6 +103,7 @@ import {
   type TurnToolV14,
   quietlyNoted,
   inTurnLanguage,
+  streamedPiece,
 } from "@capital-q/q-core";
 import {
   buildShownSheet,
@@ -505,6 +506,7 @@ import {
 } from "./company/own-names.js";
 import type { QNamedCompanyPort } from "./named-company.js";
 import { asksForOnePage } from "./company/document-length.js";
+import { fitToOnePage } from "./company/one-page.js";
 import type {
   CompanyIntelligenceRequest,
   CompanyIntelligenceResult,
@@ -2658,6 +2660,18 @@ export function createSpecialistQAnswer(
     }
     await showStage(request, "PREPARING_DOCUMENT");
     try {
+      // live6 2026-11-04: a one-page memo, written as Q's answer, printed
+      // on two pages. Asked for one page, it is filed on one (one-page.ts).
+      const content = asksForOnePage(question ?? "")
+        ? await fitToOnePage(
+            {
+              type: ANSWER_DOCUMENT_ARTIFACT_TYPE,
+              title: document.title,
+              summary: document.summary,
+            },
+            document.content,
+          )
+        : document.content;
       const summary = await preparation.port.prepare({
         actorContext: request.actor,
         permittedContextPlan: request.plan,
@@ -2666,7 +2680,7 @@ export function createSpecialistQAnswer(
         content: {
           title: document.title,
           summary: document.summary,
-          content: document.content,
+          content,
         },
       });
       return {
@@ -7926,12 +7940,13 @@ export function createSpecialistQAnswer(
             if (checked.removed > 0) return;
             const guardedSentence = checked.text.trim();
             if (guardedSentence.length === 0) return;
+            const first = streamedSentences === 0;
             streamedSentences += 1;
             deltas.publish({
               runId: request.runId,
               tenantId: request.tenantId,
               messageId: answerId,
-              text: `${guardedSentence} `,
+              text: streamedPiece(guardedSentence, first),
             });
           };
     const result = await specialist.investigate(

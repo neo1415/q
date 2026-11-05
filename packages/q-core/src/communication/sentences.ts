@@ -157,3 +157,37 @@ export function cutAtWord(text: string, max: number): string {
   const whole = room.replace(/\s+\S*$/u, "");
   return `${(whole.length > 0 ? whole : room).replace(/[\s,;:\-–—]+$/u, "")}…`;
 }
+
+/**
+ * A markdown heading or list item: a block that opens its own line.
+ * The cutter ends a sentence at a paragraph break and trims it, so the
+ * break before "## Key Gaps and Risks" is gone from the piece itself.
+ */
+const OPENS_BLOCK = /^(?:#{1,6}\s|[-*+•]\s|\d{1,2}[.)]\s)/u;
+
+/**
+ * One streamed sentence as it goes onto the live answer (live6 2026-11-04,
+ * production 7b9a267ce: the memo streamed as "...break-even date. ## Key
+ * Gaps and Risks", a heading glued to the sentence before it, because
+ * every piece was joined with a space). A piece that opens a block starts
+ * on its own line after a blank one, so the chat's markdown reads it as
+ * the heading or list it is; any other piece follows with a space.
+ */
+export function streamedPiece(sentence: string, first: boolean): string {
+  return !first && OPENS_BLOCK.test(sentence)
+    ? `\n\n${sentence} `
+    : `${sentence} `;
+}
+
+/**
+ * Acceptance 2026-11-04 (J3) and live6: "Write me a one-page memo on
+ * Ledgerline" came back on two pages. A page count is a length the person
+ * set, not an interpretation of what they meant, so it is read from their
+ * own words: one page (in figures or words, "one-pager", "single page").
+ */
+const ONE_PAGE =
+  /\b(?:one|1|single)[\s-]*pag(?:e|er)s?\b|\bone[\s-]*sheet(?:er)?\b|\bune\s+page\b/iu;
+
+export function asksForOnePage(words: string): boolean {
+  return ONE_PAGE.test(words);
+}

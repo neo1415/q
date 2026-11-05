@@ -1287,7 +1287,9 @@ export {
   clipAtWord,
   createSentenceCutter,
   cutAtWord,
+  asksForOnePage,
   splitSentences,
+  streamedPiece,
   type SentenceCutter,
 } from "./communication/sentences.js";
 

@@ -49,6 +49,7 @@ export { deckToPdf } from "./pdf.js";
 export {
   artifactKindName,
   documentFromArtifact,
+  documentPageCount,
   documentToPdf,
   DOCUMENT_PAGE,
   REVIEW_OPEN_POINT_PREFIX,

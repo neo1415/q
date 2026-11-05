@@ -110,6 +110,7 @@ export function createDocumentJobRunner(dependencies: {
       onStage: (stage) =>
         stage === "READY" ? undefined : jobs.setStage(job.id, stage),
       signal,
+      frame: { title: input.title, summary: input.summary },
     });
     await artifacts.completeDocumentJob(job, {
       title: input.title,
