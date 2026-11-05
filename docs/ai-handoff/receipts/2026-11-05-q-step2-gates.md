@@ -62,3 +62,68 @@ Results:
 - Root tsc exit 0; eslint and prettier clean.
 
 The two left, MEM-134 #0 and MEM-135 #0, aren't arithmetic. The cheque size was said in a previous conversation, and the scripted world has no cross-conversation recall (plan step 9). The other three MEM cheque cases pass only because their amounts happen to appear elsewhere in the fixture corpus.
+
+## Step 3: model-led reference binding (`f5a6c09`)
+
+**Reader (TURN_READER v77).** v76 is kept whole, plus one REFERENCES rule. Output: `references: [{phrase, entityIds, confidence}]`.
+
+- `entityIds` are LEDGER refs (E1…), never record ids. Code maps refs to records.
+- `confidence` is HIGH, MEDIUM or LOW; never a percentage.
+- A plural set is one entry. Two plausible readings are two entries with the same phrase. "Nothing fits" is an entry with no refs.
+- It covers pronouns, people by role, documents ("the other deck"), places in a list and sets.
+- prompts.lock gains only `turn-reader/v77`; v76's hash is unchanged.
+
+**Code (`packages/q-specialists/src/reference-binding.ts`, wired in `answer.ts` after the reading).**
+
+- **Context Firewall.** Every ref is checked against the exact state rendered for the reader: the stored owner-only ledger plus only the reads the firewall kept for this run. A reading with any ref outside it is refused whole and logged.
+- **One reading** binds. It replaces the word-pattern note for the answer, and a set of two or more companies sets `referencedCompanyIds`.
+- **Two readings** get one short question naming both ("By "it", do you mean Silo Credit or Ledgerfold?"). One HIGH reading among guesses binds instead.
+- **None**: Q says so and asks. The exception is words code already bound to their page (a manifest list or control), which the ledger doesn't hold. A code guess from conversation focus ("email her" → last company) never outvotes the reader's "nothing fits".
+- **A reply to a waiting card** is never decided here; the card's exact payload governs.
+- Binding grants nothing: tools still authorize every read and act.
+
+**Gates on `f5a6c09`:**
+
+| Gate                                                                         | Result                 |
+| ---------------------------------------------------------------------------- | ---------------------- |
+| Package build                                                                | 54/54                  |
+| Root tsc                                                                     | exit 0                 |
+| q-api and web tsc                                                            | exit 0                 |
+| eslint: q-core, model-gateway, q-specialists, q-api                          | 0                      |
+| prettier                                                                     | clean                  |
+| vitest, q-api + 7 packages                                                   | 7258 passed, 4 skipped |
+| The 10 touched integration files                                             | 100/100                |
+| New tests: binding (15, incl. firewall negatives), answer-level (3), v77 (3) | pass                   |
+
+**Scripted Q-IQ, all 150, before/after step 3:** 571/573 → 571/573. The same two failures (MEM-134 #0, MEM-135 #0, the cross-conversation recall gap).
+
+### Step 3c (removing the ORDINALS/PAIR/THIS/BACK/COUNTERPART regexes): held, not done
+
+The rule was "remove only after scripted Q-IQ shows no regression". Scripted Q-IQ can't show that:
+
+- The Q-IQ world composes no turn reader in FAKE mode (`q-iq-world.ts`: `turnReader` defaults to LIVE only).
+- Its replies are the cases' reference text.
+- So it never exercises reference binding, by regex or by model. A flat 571/573 there says nothing about binding quality.
+
+Removing the regexes now would also delete lanes that answer before any reader, with zero model calls:
+
+- ordinal recall ("what was the second one?");
+- opening a record by place;
+- page-control binding;
+- explicit list places (A2).
+
+Those would become reader-dependent and slower.
+
+What unblocks it (integration owner or a session allowed live calls, per DECISIONS 60):
+
+1. A live Q-IQ run on this branch with the reader (`--live`, about $4–5.5).
+2. Compare pronouns, ordinals, follow-ups and ambiguity against BASELINE.md, with the regexes in and then out.
+3. Remove them only if the out run is no worse.
+
+This session's rules forbid live model calls.
+
+Known limits:
+
+- The hand-over subject ("book a meeting with him") still comes from the regex COUNTERPART binding.
+- Model-bound people have no record id unless the ledger holds one.
+- The existing `withMentions` and `withThreads` helpers (reader-registered names and open threads) aren't wired yet.

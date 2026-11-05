@@ -4,17 +4,17 @@
 
 Production: web and q-api run `fdcf86871`; api and workers run `a452c84fc`. Rollback: web `3f813b9b9`, q-api `fad7f0288`. Migrations: hosted 271 = local 271. URL https://capital-qweb-production.up.railway.app.
 
-| Area                                                                                                      | State                                  | Evidence                              |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
-| Client fixes from 4–5 Nov (visuals, chat, Back, plans, memo, Discover, /work, captions, Hey Q, plan line) | PRODUCTION VERIFIED                    | chore/live5…live11                    |
-| Q Intelligence step 1: situation header (date, time, role, surface)                                       | PRODUCTION VERIFIED                    | chore/live12-fdcf868 @ 046b1084f      |
-| Q Intelligence step 6: claim check (ungrounded figures removed; true figures kept; honest unknowns)       | PRODUCTION VERIFIED                    | chore/live12-fdcf868                  |
-| Q Intelligence step 0: Q-IQ benchmark + first live baseline. Q 79.2% vs bare 94.2% like-for-like; $3.48   | DONE                                   | docs/specs/q-intelligence/BASELINE.md |
-| Q Intelligence steps 2+3: conversation state + model-led references (session_01Eyr9vKfhPKfH6UnEmoUHXv)    | IN PROGRESS                            | feat/q-conversation-state             |
-| Q-IQ re-run on fdcf86871 or later, all 150 cases, about $5                                                | NEXT, after steps 2+3                  |                                       |
-| Hey Q: pause is per tab; privacy cap                                                                      | OWNER DECISION if either should change |                                       |
-| 20 pitch videos not reachable in the caption sweep                                                        | OPEN (minor)                           |                                       |
-| Owner's refusal-message fix not on this remote; set CQ_SEED_ACCOUNT_PASSWORD; rotate pasted tokens        | OWNER ACTION                           |                                       |
+| Area                                                                                                                | State                                  | Evidence                                                                  |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| Client fixes from 4–5 Nov (visuals, chat, Back, plans, memo, Discover, /work, captions, Hey Q, plan line)           | PRODUCTION VERIFIED                    | chore/live5…live11                                                        |
+| Q Intelligence step 1: situation header (date, time, role, surface)                                                 | PRODUCTION VERIFIED                    | chore/live12-fdcf868 @ 046b1084f                                          |
+| Q Intelligence step 6: claim check (ungrounded figures removed; true figures kept; honest unknowns)                 | PRODUCTION VERIFIED                    | chore/live12-fdcf868                                                      |
+| Q Intelligence step 0: Q-IQ benchmark + first live baseline. Q 79.2% vs bare 94.2% like-for-like; $3.48             | DONE                                   | docs/specs/q-intelligence/BASELINE.md                                     |
+| Q Intelligence steps 2+3 (+ claim-check item 5): state, model-led references; 3c regex removal held for a live Q-IQ | BRANCH GATES GREEN (local), not merged | feat/q-conversation-state @ f5a6c09; receipts/2026-11-05-q-step2-gates.md |
+| Q-IQ re-run on fdcf86871 or later, all 150 cases, about $5                                                          | NEXT, after steps 2+3                  |                                                                           |
+| Hey Q: pause is per tab; privacy cap                                                                                | OWNER DECISION if either should change |                                                                           |
+| 20 pitch videos not reachable in the caption sweep                                                                  | OPEN (minor)                           |                                                                           |
+| Owner's refusal-message fix not on this remote; set CQ_SEED_ACCOUNT_PASSWORD; rotate pasted tokens                  | OWNER ACTION                           |                                                                           |
 
 ## Live board — 29 October 2026, 08:05 UTC (Claude coordinator, session_01Wncmn2hVzNK1rHd5FweHwt)
 
