@@ -1541,6 +1541,7 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - 20:30 UTC: owner relayed the client's UI feedback (ChatGPT-style Q home). Started UI lane `session_01Wncmn4qKqR5tbnhVgPhL3v` on `fix/q-home-chatgpt` (from `fix/resume-asking-cv9ru3`, no migration, deploys independently of the intelligence work). Design call: the composer's right button is a round gold "Q" (Talk to Q) when empty and Send when typing, replacing the separate Talk to Q button. Step 2 lane is in its test gates (eslint fixed). Tokens now work in this session too.
 - 20:56 UTC: UI lane pushed `2d4660cf9` (web tsc, root tsc, eslint, full web vitest 4032 + fixed home-fold, new q-home-chatgpt 6/6, packages/ui 65/65, route coverage, prettier, Arabic). Reviewed screenshots; merged as `789a1ecbd`; CI 42107782084 started.
 - 21:40 UTC: CI 42107782084 green on `789a1ecbd`; deployed 21:26 (fast-forward `recovery/2026-09-12` from `fdcf86871`). live13 PASS at 1440 and 390 (no big Q, no scope chip or corner presence, greeting + pill composer + 3 starters, Talk to Q → Send while typing, thread with composer at bottom after send, 0 page errors). Receipts `receipts/2026-11-05-live13-789a1ec/`.
+
 ## 2026-11-05 (Q intelligence steps 2+3, `feat/q-conversation-state`; not merged or deployed)
 
 - **Step 2 gates green** at `44ada9a`, on top of the merge of `fix/resume-asking-cv9ru3`.
