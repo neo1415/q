@@ -1485,3 +1485,22 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - the voice-note recorder took the microphone without telling the listener.
 - Indicator: the top banner is gone. While listening, a 44px corner mic button opens a popover with Pause and Turn off. Paused, off, blocked or unavailable shows nothing; Resume is in Settings → Q and the Q room. Receipt: `receipts/2026-11-05-wake/`.
 - Not changed, needs the owner or an ADR: the gate's 6-windows-a-minute privacy cap can still mute Hey Q for up to a minute in a talkative room. Recognition also starts about 100–400 ms after speech begins, so “Hey” can be clipped; saying it again within the window works. Still needs a real-device check.
+
+## 2026-11-05 (Step 6 session, `feat/q-claim-check`; not merged or deployed)
+
+- Q Intelligence Plan step 6, the claim verifier. New `packages/model-gateway/src/q/claim-check.ts` is deterministic. It extracts numbers, money with currency, percentages, dates and two-word-plus names, and matches each to the run's authorised facts, the conversation's turns, tool results and code's own lines. Charter and instruction notes are excluded.
+  - Matching is by value (1.2m = 1,200,000 = $1.2M) and allows rounding.
+  - Derived arithmetic counts only when both inputs sit in one source line or the same sentence.
+  - Counts of listed records come from JSON list lengths.
+- An unmatched figure becomes "I don't have a sourced figure for <metric> yet." once per metric; otherwise the sentence is dropped. Absence never becomes zero. A fully stripped answer says it has no sourced answer.
+- Logs record kinds and counts only, never values.
+- Wired into `takeSentence` (before publish, so voice too) and the stored answer. `parallel-extras` joins findings with the same matcher.
+- False positives: CI_CORE eval (59 cases, local PG) removed 0 sentences; results are identical with the check off.
+  - The suite found three true-claim false positives, all fixed: an ISO date not grounding "22 November", "Shall I" read as a name, and "and" joining list names.
+  - Test fixtures updated where scripted answers stated ungrounded figures. One live replay said "20 companies" when 5 were given.
+- Gates: package build, root tsc, prettier (apps packages docs), eslint on touched files, vitest for model-gateway/q-runtime/q-orchestrator/q-evals: 1741/1741.
+- Limits:
+  - Number words ("five") are not checked.
+  - One-word names are not checked.
+  - Cross-source sums are not allowed.
+  - The DEEP_ANALYSIS model self-check pass is not built.
