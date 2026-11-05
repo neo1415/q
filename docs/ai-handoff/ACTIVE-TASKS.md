@@ -1,6 +1,6 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 5 November 2026, 20:30 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, new account, acting admin per DECISIONS 58/60)
+## Live board — 5 November 2026, 20:56 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, new account, acting admin per DECISIONS 58/60)
 
 Production (Railway, read 19:56 UTC): **all four services (web, api, q-api, workers) SUCCESS on `fdcf86871`**, deployed 12:52 UTC. (The handover said api/workers were on `a452c84fc`; Railway shows they were rebuilt on `fdcf86871`.) Hosted migrations 271 = local 271, none pending. Rollback: web `3f813b9b9`, q-api `fad7f0288`.
 
