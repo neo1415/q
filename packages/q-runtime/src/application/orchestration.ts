@@ -299,6 +299,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly askParts?:
     | readonly { readonly ask: string; readonly kind: string }[]
     | undefined;
+  /**
+   * v78: they asked Q to keep something in mind about themselves, with the
+   * fact said back to them in the second person (null when it would not
+   * read back plainly). Absent: no remember ask was read.
+   */
+  readonly rememberAsk?: { readonly fact: string | null } | undefined;
+  /** v78: they asked for a chart, graph or plot (read by meaning). */
+  readonly asksForChart?: boolean | undefined;
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**

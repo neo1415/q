@@ -43,6 +43,9 @@ describe("TURN_READER v78", () => {
       "DOCUMENT",
       "A word alone never decides it",
       "three parts",
+      "second person",
+      "remember to send the deck",
+      "asksForChart",
     ]) {
       expect(V78_WHAT_WAS_ASKED).toContain(said);
     }
@@ -67,6 +70,24 @@ describe("TURN_READER v78", () => {
     );
     expect(single.answerKind).toBeNull();
     expect(single.parts).toEqual([]);
+    expect(single.remember).toBeNull();
+    expect(single.asksForChart).toBe(false);
+  });
+
+  it("reads a remember ask said back in the second person, and a chart ask", () => {
+    const read = TurnReaderV78ResultSchema.parse({
+      ...TurnReaderV75ResultSchema.parse(base),
+      remember: { fact: "you pass on gambling businesses" },
+      asksForChart: true,
+    });
+    expect(read.remember).toEqual({ fact: "you pass on gambling businesses" });
+    expect(read.asksForChart).toBe(true);
+    expect(
+      TurnReaderV78ResultSchema.parse({
+        ...TurnReaderV75ResultSchema.parse(base),
+        remember: {},
+      }).remember,
+    ).toEqual({ fact: null });
   });
 
   it("a malformed answerKind or part costs itself, never the reading", () => {
@@ -74,7 +95,11 @@ describe("TURN_READER v78", () => {
       ...TurnReaderV75ResultSchema.parse(base),
       answerKind: "DEEP_THOUGHT",
       parts: [{ ask: "", kind: "LOOKUP" }],
+      remember: { fact: 7 },
+      asksForChart: "yes",
     });
+    expect(read.remember).toBeNull();
+    expect(read.asksForChart).toBe(false);
     expect(read.kind).toBe("QUESTION_TO_Q");
     expect(read.answerKind).toBeNull();
     expect(read.parts).toEqual([]);

@@ -10414,7 +10414,7 @@ export function createModelGatewayQAnswer(
         // code, the same way every time ("You pass on tobacco
         // businesses." was the model's whole reply on one run, "I'll
         // remember that…" on the one before).
-        const rememberLine = rememberConfirmation(latest.content);
+        const rememberLine = rememberConfirmation(request.rememberAsk);
         const couldNot =
           parityGap !== null &&
           actedLines.length === 0 &&
@@ -10463,7 +10463,7 @@ export function createModelGatewayQAnswer(
                 DRAFT_NOT_ON_CARD_LINE
               : couldNotLineFor(
                   parityGap,
-                  latest.content,
+                  request.asksForChart === true,
                   statusTalk?.text ?? guarded.text,
                 )
             : null;
@@ -11132,69 +11132,37 @@ function repliedInOtherScript(text: string): boolean {
   return /\p{L}/u.test(text) && !/\p{Script=Latin}/u.test(text);
 }
 
-/**
- * They asked Q to remember something about themselves or how they work
- * ("Remember: I pass on gambling", "please remember that I…"), not to do
- * something later ("remember to send…", which is a task).
- */
-const REMEMBER_ASKED =
-  /^\s*(?:(?:hey|ok|okay)\s+)?(?:q[,:\s]+)?(?:please\s+)?(?:remember|keep\s+in\s+mind|don['’]t\s+forget)\b(?!\s+to\b)[\s:,-]*(?:that\b\s*)?/iu;
 /** A sentence of the reply that says it will remember. */
 const REMEMBER_SAID =
   /\b(?:i['’]ll|i\s+will|i['’]ve|i\s+have)\s+(?:remember|noted|note|keep\s+(?:that|it)\s+in\s+mind)/iu;
 /** A sentence that only acknowledges ("Noted.", "Got it."). */
 const ACK_ONLY =
   /^(?:noted|got it|understood|will do|of course|sure|okay|ok|done)$/u;
-/** Their words, said back to them: "I pass on" is "you pass on". */
-const SAID_BACK: readonly (readonly [RegExp, string])[] = [
-  [/\bI['’]m\b/gu, "you're"],
-  [/\bI\s+am\b/gu, "you are"],
-  [/\bI['’]ve\b/gu, "you've"],
-  [/\bI['’]d\b/gu, "you'd"],
-  [/\bI['’]ll\b/gu, "you'll"],
-  [/\bwe['’]re\b/giu, "you're"],
-  [/\bI\b/gu, "you"],
-  [/\bmyself\b/giu, "yourself"],
-  [/\bmine\b/giu, "yours"],
-  [/\bmy\b/giu, "your"],
-  [/\bme\b/giu, "you"],
-  [/\bours\b/giu, "yours"],
-  [/\bour\b/giu, "your"],
-  [/\bwe\b/giu, "you"],
-  [/\bus\b/giu, "you"],
-];
-
 /**
- * The confirmation of a remember ask, from their own words: "I'll remember
- * that you pass on tobacco businesses." Words that would not read back
- * plainly (already "you", several sentences, too long) are confirmed
- * without being repeated. Null when they did not ask Q to remember
- * something, or asked a question.
+ * The confirmation of a remember ask (QA 2026-10-24), said by code the same
+ * way every time. Q intelligence step 4: whether they asked Q to remember
+ * something, and the fact said back to them in the second person, are the
+ * reader's (TURN_READER v78 `remember`), read by meaning in any language --
+ * never a word pattern over what they said, nor a pronoun swap of it. A
+ * fact that would not read back plainly (absent, several sentences, too
+ * long) is confirmed without being repeated. Null when the reader read no
+ * remember ask, or the turn was not read (the neutral default).
  */
 export function rememberConfirmation(
-  said: string,
+  ask: { readonly fact: string | null } | null | undefined,
 ): { readonly line: string; readonly fact: string | null } | null {
-  const asked = REMEMBER_ASKED.exec(said);
-  // A question is answered, not remembered.
-  if (asked === null || said.includes("?")) return null;
-  const words = said
-    .slice(asked[0].length)
-    .trim()
-    .replace(/[.!\s]+$/u, "");
-  // "Remember what I said about Kestrel" asks Q to recall, not to keep.
-  if (
-    /^(?:what|when|where|who|whom|which|how|why|whether|if)\b/iu.test(words)
-  ) {
-    return null;
+  if (ask === null || ask === undefined) return null;
+  let fact = (ask.fact ?? "").trim();
+  while (fact.endsWith(".") || fact.endsWith("!")) {
+    fact = fact.slice(0, -1).trimEnd();
   }
   const plain =
-    words.length > 0 &&
-    words.length <= 200 &&
-    !/[;\n]|[.!]\s/u.test(words) &&
-    !/\b(?:you|your|yours|yourself)\b/iu.test(words);
+    fact.length > 0 &&
+    fact.length <= 200 &&
+    !fact.includes("\n") &&
+    !fact.includes(";") &&
+    !fact.includes(". ");
   if (!plain) return { line: "I'll remember that.", fact: null };
-  let fact = words;
-  for (const [pattern, swap] of SAID_BACK) fact = fact.replace(pattern, swap);
   return { line: `I'll remember that ${fact}.`, fact };
 }
 
@@ -11246,9 +11214,9 @@ export const DRAFT_NOT_ON_CARD_LINE =
  * (result-blocks visualBlock draws one only from a typed read of evidenced
  * figures, and none exists), and numbers are never lifted from prose to
  * fill one. So the ask is answered plainly as not available yet, never as
- * a failure to retry.
+ * a failure to retry. Q intelligence step 4: that they asked for a chart is
+ * the reader's (TURN_READER v78 `asksForChart`), never a word pattern.
  */
-const ASKED_FOR_CHART = /\b(?:chart|graph|plot)s?\b/iu;
 const SAID_NO_CHART =
   /\b(?:couldn['’]?t|could not|can['’]?t|cannot|unable to)\b[^.!?\n]{0,40}\b(?:chart|graph|plot|display|draw)/iu;
 export const CHART_NOT_YET_LINE =
@@ -11261,10 +11229,10 @@ export const CHART_NOT_YET_LINE =
  */
 export function couldNotLineFor(
   gap: string,
-  personText: string,
+  asksForChart: boolean,
   answerText: string,
 ): string | null {
-  if (ASKED_FOR_CHART.test(personText)) {
+  if (asksForChart) {
     return SAID_NO_CHART.test(answerText) ? null : CHART_NOT_YET_LINE;
   }
   return couldNotDoLine(gap);

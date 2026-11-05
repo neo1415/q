@@ -223,6 +223,10 @@ export type QTurnReading = Omit<
   readonly answerKind?: TurnReaderV78Result["answerKind"] | undefined;
   /** v78: each separate thing a compound ask wants, in order; absent is one ask. */
   readonly parts?: TurnReaderV78Result["parts"] | undefined;
+  /** v78: a fact they ask Q to keep in mind, said back in the second person. */
+  readonly remember?: TurnReaderV78Result["remember"] | undefined;
+  /** v78: they ask for a chart, graph or plot. */
+  readonly asksForChart?: boolean | undefined;
   /** v28: a time they asked for, in minutes from now. */
   readonly timeWindow?:
     | { readonly fromMinutes: number | null; readonly toMinutes: number | null }
@@ -415,6 +419,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   // v78: a malformed kind or part costs itself, never the reading.
   "answerKind",
   "parts",
+  "remember",
+  "asksForChart",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */

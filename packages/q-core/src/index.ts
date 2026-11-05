@@ -530,6 +530,8 @@ export {
   TURN_READER_PARTS_MAX,
   TurnReaderPartSchema,
   type TurnReaderPart,
+  TurnRememberAskSchema,
+  type TurnRememberAsk,
   TurnReaderV78ResultSchema,
   type TurnReaderV78Result,
   TURN_REPLY_KINDS,

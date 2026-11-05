@@ -1207,6 +1207,21 @@ export const TurnReaderPartSchema = z
   })
   .strict();
 export type TurnReaderPart = z.infer<typeof TurnReaderPartSchema>;
+/**
+ * v78: they ask Q to keep something in mind about themselves or how they
+ * work ("Remember: I pass on gambling", "don't forget I only do seed") --
+ * not a task for later ("remember to send…") and not a recall question
+ * ("remember what I said about Kestrel?"). `fact` is it said back to them
+ * in the second person ("you pass on gambling businesses"), or null when
+ * it would not read back plainly. Code says the confirmation; the memory
+ * write gate, not this field, decides what is kept.
+ */
+export const TurnRememberAskSchema = z
+  .object({
+    fact: z.string().trim().min(1).max(200).nullable().default(null),
+  })
+  .strict();
+export type TurnRememberAsk = z.infer<typeof TurnRememberAskSchema>;
 export const TurnReaderV78ResultSchema = TurnReaderV77ResultSchema.extend({
   answerKind: TurnAnswerKindSchema.nullable().default(null).catch(null),
   parts: z
@@ -1214,5 +1229,8 @@ export const TurnReaderV78ResultSchema = TurnReaderV77ResultSchema.extend({
     .max(TURN_READER_PARTS_MAX)
     .default([])
     .catch([]),
+  remember: TurnRememberAskSchema.nullable().default(null).catch(null),
+  /** They ask for a chart, graph or plot of something. */
+  asksForChart: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV78Result = z.infer<typeof TurnReaderV78ResultSchema>;

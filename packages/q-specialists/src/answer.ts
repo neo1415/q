@@ -7900,6 +7900,10 @@ export function createSpecialistQAnswer(
       ...(read?.parts === undefined || read.parts.length < 2
         ? {}
         : { askParts: read.parts }),
+      ...(read?.remember === undefined || read.remember === null
+        ? {}
+        : { rememberAsk: read.remember }),
+      ...(read?.asksForChart === true ? { asksForChart: true } : {}),
       // K8: a question about a prepared subject.
       ...(read?.kind === "QUESTION_TO_Q" &&
       read.question?.subject !== undefined &&
