@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("Home: nothing under the composer, whatever the welcome holds", () => {
-  it("Q's room is the arrival's flexible item: basis 0, a floor, its full size as the cap", () => {
+  it("Q's room keeps its flexible-item rules, and the Q home no longer draws it", () => {
     expect(css).toContain(
       ".cq-arrival .cq-room-presence { flex: 1 1 0; height: auto; min-height: calc(var(--cq-room-box) / 3); max-height: var(--cq-room-box); }",
     );
@@ -55,7 +55,10 @@ describe("Home: nothing under the composer, whatever the welcome holds", () => {
     expect(css).toContain(
       "scale(calc(var(--cq-room-gather) * var(--cq-room-fit, 1)));",
     );
-    expect(conversation).toContain("ref={fitRoomPresence}");
+    // Client 2026-11-05: the Q home no longer draws the room's Q at all
+    // (a chat app's home); the presence code stays for other surfaces.
+    expect(conversation).not.toContain("ref={fitRoomPresence}");
+    expect(conversation).not.toContain('"cq-room-presence"');
   });
 
   it("no per-content special case is left", () => {
@@ -64,7 +67,7 @@ describe("Home: nothing under the composer, whatever the welcome holds", () => {
 
   it("the arrival grows past the stage rather than clipping (min-height, not height)", () => {
     expect(conversation).toContain(
-      '"cq-arrival mx-auto flex min-h-full w-full max-w-2xl flex-col',
+      '"cq-arrival mx-auto flex min-h-full w-full max-w-3xl flex-col',
     );
     expect(conversation).toContain(
       'className="cq-stage-scroll min-h-0 flex-1 overflow-y-auto',

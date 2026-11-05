@@ -178,7 +178,7 @@ describe("the empty Q home (client 2026-11-05)", () => {
     );
   });
 
-  it("never shows more than three starters", async () => {
+  it("never shows more than three starters", () => {
     render(
       <QConversationPanel
         connected
