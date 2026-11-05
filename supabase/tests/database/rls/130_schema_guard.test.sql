@@ -187,6 +187,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'checkpoint_migrations',     'INTERNAL_SERVER_ONLY', '{}'),
   -- 2026-10 build (classified by the lead from the live grants + RLS state).
   ('q_runtime', 'errands',                  'RLS_REQUIRED',         '{SELECT}'),
+  -- Q intelligence step 2 (20261231250000): the owner reads; the server writes.
+  ('q_runtime', 'conversation_states',      'RLS_REQUIRED',         '{SELECT}'),
+  ('q_runtime', 'conversation_summary_revisions', 'RLS_REQUIRED',   '{SELECT}'),
   ('q_runtime', 'person_standing',          'RLS_REQUIRED',         '{SELECT}'),
   -- Lane lang: shared machine translations of the interface; suite 974.
   ('q_runtime', 'ui_translations',          'INTERNAL_SERVER_ONLY', '{}'),
