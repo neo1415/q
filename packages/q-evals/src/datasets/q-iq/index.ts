@@ -1,0 +1,70 @@
+import { buildQIqCases } from "./cases.js";
+import {
+  Q_IQ_CATEGORIES,
+  Q_IQ_DATASET_VERSION,
+  QIqCaseSchema,
+  type QIqCase,
+} from "./contracts.js";
+import { Q_IQ_ENTITIES, Q_IQ_FACTS } from "./world.js";
+
+export * from "./contracts.js";
+export {
+  Q_IQ_COMPANIES,
+  Q_IQ_CONTRADICTIONS,
+  Q_IQ_DOCUMENTS,
+  Q_IQ_ENTITIES,
+  Q_IQ_FACTS,
+  Q_IQ_PEOPLE,
+} from "./world.js";
+
+export type QIqDataset = {
+  readonly version: typeof Q_IQ_DATASET_VERSION;
+  readonly synthetic: true;
+  readonly cases: readonly QIqCase[];
+};
+
+/** The fixed benchmark. Every case is validated when the module loads. */
+export const Q_IQ_DATASET: QIqDataset = {
+  version: Q_IQ_DATASET_VERSION,
+  synthetic: true,
+  cases: buildQIqCases().map((c) => QIqCaseSchema.parse(c)),
+};
+
+export const Q_IQ_WORLD = {
+  entities: Q_IQ_ENTITIES,
+  facts: Q_IQ_FACTS,
+} as const;
+
+/** Structural problems with the dataset; empty means it is sound. */
+export function lintQIqDataset(dataset: QIqDataset = Q_IQ_DATASET): string[] {
+  const issues: string[] = [];
+  const ids = new Set<string>();
+  const entityIds = new Set(Q_IQ_ENTITIES.map((e) => e.id));
+  for (const c of dataset.cases) {
+    if (ids.has(c.id)) issues.push(`${c.id}: duplicate id`);
+    ids.add(c.id);
+    c.turns.forEach((t, i) => {
+      for (const id of [
+        ...t.expect.entityIds,
+        ...t.expect.forbiddenEntityIds,
+        ...t.expect.clarifyOptions,
+      ]) {
+        if (!entityIds.has(id))
+          issues.push(`${c.id}#${i}: unknown entity ${id}`);
+      }
+      if (
+        t.expect.behaviour === "CLARIFY" &&
+        t.expect.clarifyOptions.length < 2
+      ) {
+        issues.push(`${c.id}#${i}: a clarify needs two readings`);
+      }
+    });
+  }
+  for (const category of Q_IQ_CATEGORIES) {
+    const n = dataset.cases.filter((c) => c.category === category).length;
+    if (n !== 15) issues.push(`${category}: ${n} cases, want 15`);
+  }
+  if (dataset.cases.length !== 150)
+    issues.push(`${dataset.cases.length} cases, want 150`);
+  return issues;
+}

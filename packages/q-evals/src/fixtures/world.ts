@@ -41,6 +41,7 @@ import {
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
   createModelGatewayQAnswer,
   type ModelGatewayQAnswer,
@@ -231,6 +232,17 @@ export type QEvalWorld = {
   /** Per-case controls. */
   readonly setPreset: (preset: QCommunicationPreset) => void;
   readonly setFacts: (set: QEvalFactSet) => void;
+  /**
+   * Q-IQ: an explicit authorised fact list for the next runs, released
+   * under whatever scopes the firewall plan holds (never when it holds
+   * none). Null returns to the named fact sets.
+   */
+  readonly setFactList: (
+    list: {
+      readonly facts: readonly AuthorisedFact[];
+      readonly description: string;
+    } | null,
+  ) => void;
   readonly setScript: (script: readonly FakeBehaviour[]) => void;
   readonly setProposer: (proposer: QActionProposer | null) => void;
   readonly recorder: {
@@ -657,7 +669,11 @@ export async function createQEvalWorld(
     }
   } else {
     const secrets = options.secrets;
-    if (secrets?.google !== undefined && options.providerFilter !== "groq") {
+    if (
+      secrets?.google !== undefined &&
+      options.providerFilter !== "groq" &&
+      options.providerFilter !== "openai"
+    ) {
       providers.push(
         recordingProvider(
           createGoogleModelProvider({ apiKey: secrets.google.reveal() }),
@@ -665,7 +681,25 @@ export async function createQEvalWorld(
         ),
       );
     }
-    if (secrets?.groq !== undefined && options.providerFilter !== "google") {
+    // OpenAI is every routing policy's primary (gpt-5.6-luna); a live run
+    // that wants production's model needs it. Absent key: not registered.
+    if (
+      secrets?.openai !== undefined &&
+      (options.providerFilter === undefined ||
+        options.providerFilter === "openai")
+    ) {
+      providers.push(
+        recordingProvider(
+          createOpenAIModelProvider({ apiKey: secrets.openai.reveal() }),
+          recorded,
+        ),
+      );
+    }
+    if (
+      secrets?.groq !== undefined &&
+      options.providerFilter !== "google" &&
+      options.providerFilter !== "openai"
+    ) {
       providers.push(
         recordingProvider(
           createGroqModelProvider({
@@ -752,6 +786,10 @@ export async function createQEvalWorld(
   const runtime = createQRuntimeService(runtimeDependencies);
   let currentPreset: QCommunicationPreset = "BALANCED";
   let currentFacts: readonly AuthorisedFact[] = [];
+  let factList: {
+    readonly facts: readonly AuthorisedFact[];
+    readonly description: string;
+  } | null = null;
   const factsFor = (set: QEvalFactSet): readonly AuthorisedFact[] => {
     switch (set) {
       case "NONE":
@@ -782,6 +820,16 @@ export async function createQEvalWorld(
   // filtered by the plan's scope kinds exactly as the smoke world does.
   const context: QAuthorisedContextPort = {
     assemble: (request) => {
+      if (factList !== null) {
+        const scope = request.plan.scopes[0]?.kind as string | undefined;
+        return Promise.resolve({
+          facts:
+            scope === undefined
+              ? []
+              : factList.facts.map((f) => ({ ...f, scope })),
+          subjectDescription: factList.description,
+        });
+      }
       const kinds = new Set(request.plan.scopes.map((s) => s.kind as string));
       return Promise.resolve({
         facts: currentFacts.filter((f) => kinds.has(f.scope)),
@@ -992,6 +1040,9 @@ export async function createQEvalWorld(
     },
     setFacts: (set) => {
       currentFacts = factsFor(set);
+    },
+    setFactList: (list) => {
+      factList = list;
     },
     resetProviderHealth: () => {
       providerHealth = createProcessLocalProviderHealth();
