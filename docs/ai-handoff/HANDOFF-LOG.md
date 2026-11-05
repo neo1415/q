@@ -1461,3 +1461,8 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Deployed 449301dbe (00:53), 23451cb58 (01:42), a452c84fc (02:35). Migration 20261231240000 applied 02:10 after pgTAP; data script flagged 6 founder pitches with burned-in captions.
 - live7 (449301dbe): 3/5 PASS; both 1440 failures fixed in a452c84fc. live8 (memo, Discover, captions, /work, plan card) waits on the owner's approval in session_01Eyr9vKnZsYRPCqAScSKGb3.
 - Open: unswept 70 pitch videos; real-device voice / Hey Q.
+
+## 2026-11-05 04:40 UTC (integration owner)
+
+- fad7f0288 deployed 04:30 (q-api only); live9 PASS: /work shows one row per running plan with its steps. All owner and acceptance defects from 4 Nov are now production verified (live5–live9 receipts).
+- Remaining: sweep the other 70 founder pitches for burned-in captions; Harbourline caption/title overlap; real-device voice and Hey Q checks; owner to set CQ_SEED_ACCOUNT_PASSWORD so live rounds don't need per-round approval.
