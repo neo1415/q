@@ -2209,7 +2209,18 @@ export function createSpecialistQAnswer(
         loaded.state.messagesFolded - 1 - TURN_READER_RECENT_TURNS_MAX,
       ),
     });
-    stateTextInRun.set(who.runId, text);
+    // The answer gets the note only when the conversation has something in
+    // it; a first turn's empty ledger is no context, only tokens. The reader
+    // always gets the text (its prompt reads an empty state as such).
+    const loadedState = loaded.state;
+    if (
+      loadedState.ledger.entities.length > 0 ||
+      loadedState.ledger.lists.length > 0 ||
+      loadedState.openThreads.length > 0 ||
+      (loaded.summary?.summary.trim().length ?? 0) > 0
+    ) {
+      stateTextInRun.set(who.runId, text);
+    }
     return text;
   };
 

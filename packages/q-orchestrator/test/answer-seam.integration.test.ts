@@ -410,12 +410,17 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(groq.calls).toHaveLength(0);
       expect(google.calls[0]?.request.modelCode).toBe("gemini-3.5-flash-lite");
       // Charter, task, then what the run can do and has produced (the
-      // capability note, a trusted SYSTEM message since CQ-QX-008).
+      // capability note, a trusted SYSTEM message since CQ-QX-008), then
+      // where findings go in a conversation (claim check, step 6).
       expect(google.calls[0]?.request.messages.map((m) => m.role)).toEqual([
         "SYSTEM",
         "USER",
         "SYSTEM",
+        "SYSTEM",
       ]);
+      expect(google.calls[0]?.request.messages[3]?.content).toContain(
+        "IN THIS CONVERSATION put each evidence-backed point in findings",
+      );
       expect(google.calls[0]?.request.messages[2]?.content).toContain(
         "You cannot end, clear or start a conversation",
       );
@@ -493,11 +498,12 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(google.calls[0]?.request.output.kind).toBe("STRUCTURED");
       // The tools-first note (a SYSTEM message) travels with every tool
       // round since 1e1c4e1, on every provider.
-      // Charter, task, the capability note (CQ-QX-008), the tools-first
-      // note, then the tool round and its result.
+      // Charter, task, the capability note (CQ-QX-008), the findings note
+      // (step 6), the tools-first note, then the tool round and its result.
       expect(google.calls[1]?.request.messages.map((m) => m.role)).toEqual([
         "SYSTEM",
         "USER",
+        "SYSTEM",
         "SYSTEM",
         "SYSTEM",
         "ASSISTANT",
@@ -506,7 +512,7 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(google.calls[1]?.request.messages[2]?.content).toContain(
         "You cannot end, clear or start a conversation",
       );
-      expect(google.calls[1]?.request.messages[3]?.content).toContain(
+      expect(google.calls[1]?.request.messages[4]?.content).toContain(
         "LOOK IT UP FIRST.",
       );
 

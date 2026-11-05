@@ -18,7 +18,6 @@ import type {
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createSpecialistQAnswer } from "../src/answer.js";
-import type { QAppActionPort, TurnAppAction } from "../src/app-action-turn.js";
 
 /**
  * Q intelligence step 2: every turn reads the conversation's durable state.

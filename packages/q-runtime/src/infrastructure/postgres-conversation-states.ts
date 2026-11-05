@@ -23,7 +23,9 @@ const isoOf = (value: unknown): string | null =>
     ? null
     : value instanceof Date
       ? value.toISOString()
-      : new Date(String(value)).toISOString();
+      : typeof value === "string" || typeof value === "number"
+        ? new Date(value).toISOString()
+        : null;
 
 const StateRow = z.object({
   conversation_id: z.string(),

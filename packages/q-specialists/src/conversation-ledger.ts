@@ -284,7 +284,26 @@ function foldBlocks(
         }
         break;
       }
-      default:
+      // Kinds that name no entity, list or figure the ledger tracks. Listed,
+      // not defaulted, so a new block kind forces a decision here.
+      case "TEXT":
+      case "COMPARISON":
+      case "EVIDENCE":
+      case "FINDING":
+      case "UNCERTAINTY":
+      case "CLARIFICATION_REQUEST":
+      case "ACTION_PROPOSAL":
+      case "PUBLIC_SOURCE":
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
+      case "ATTENTION":
+      case "SUMMARY":
+      case "PICTURE":
+      case "WORK_IN_PROGRESS":
+      case "SCHEDULE":
+      case "NAVIGATION_OFFER":
         break;
     }
   }
