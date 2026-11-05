@@ -35,7 +35,9 @@ describe("situationHeader", () => {
       surface: "CHAT",
       page: "HOME",
     });
-    expect(header).toContain("(2026-11-06); their time is 00:30 (Africa/Lagos)");
+    expect(header).toContain(
+      "(2026-11-06); their time is 00:30 (Africa/Lagos)",
+    );
     expect(header).toMatch(/Tomorrow is Saturday,? 7 November 2026\./);
     expect(header).toContain("Asking: Ada Obi, FOUNDER, of Nixo.");
     expect(header).toContain("Page: Home.");

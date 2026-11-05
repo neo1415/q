@@ -502,7 +502,10 @@ export function createQTurnReader(dependencies: {
           orEmptyCase(
             (input.shown ?? "").slice(
               0,
-              9_000 - (input.situation === undefined ? 0 : input.situation.length + 1),
+              9_000 -
+                (input.situation === undefined
+                  ? 0
+                  : input.situation.length + 1),
             ),
             PROMPT_EMPTY_CASES.TURN_READER.shown,
           ),
