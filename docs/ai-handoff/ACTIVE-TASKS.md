@@ -1,22 +1,20 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 5 November 2026, 10:30 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
+## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
-Production: web on `3f813b9b9`, q-api `fad7f0288`, api/workers `a452c84fc`. Rollback web is `c7536d46d`. Migrations: hosted 271 = local 271. URL https://capital-qweb-production.up.railway.app.
+Production: web and q-api run `fdcf86871`; api and workers run `a452c84fc`. Rollback: web `3f813b9b9`, q-api `fad7f0288`. Migrations: hosted 271 = local 271. URL https://capital-qweb-production.up.railway.app.
 
-| Area                                                                                                                       | State                                              | Evidence                             |
-| -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------ |
-| Boss visuals, chat prose, Back, plans, memo, Discover, /work (live5–live9)                                                 | PRODUCTION VERIFIED                                | chore/live5…live9                    |
-| Harbourline / AI-presenter caption cues above the burned title                                                             | PRODUCTION VERIFIED                                | chore/live10-c7536d4                 |
-| Hey Q: no top banner; corner mic only while listening; re-arms after wakes and failures                                    | PRODUCTION VERIFIED (real-device check still owed) | chore/live11-3f813b9 @ 7e77738ce     |
-| Chat: a waiting plan is one folded line, shown once; no expanded plan under unrelated replies                              | PRODUCTION VERIFIED                                | chore/live11-3f813b9                 |
-| Q Intelligence step 0 (Q-IQ benchmark), session_01Eyr9vLf9Aht326RL9br7cU                                                   | IN PROGRESS                                        | feat/q-iq-benchmark                  |
-| Q Intelligence step 1 (situation header), session_01Eyr9vNJZU8GqrBqW96UMNk                                                 | IN PROGRESS                                        | feat/q-situation-header              |
-| Q Intelligence step 6 (claim verifier), session_01Eyr9vNU3EVLCkXAA8p6Kmi                                                   | IN PROGRESS                                        | feat/q-claim-check                   |
-| Hey Q pause is per tab (D2), so a reload listens again; the 6-windows-a-minute privacy cap can mute it in a talkative room | OWNER DECISION if either should change             |                                      |
-| 20 pitch videos not reachable in the burned-caption sweep                                                                  | OPEN (minor)                                       | receipts/2026-11-05-burned-captions/ |
-| Owner's refusal-message fix (af8db8a, claude/jolly-gates-e0c3uk) is not on this remote                                     | OWNER ACTION                                       |                                      |
-| Set CQ_SEED_ACCOUNT_PASSWORD; rotate tokens pasted in chat                                                                 | OWNER ACTION                                       |                                      |
+| Area                                                                                                      | State                                  | Evidence                              |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
+| Client fixes from 4–5 Nov (visuals, chat, Back, plans, memo, Discover, /work, captions, Hey Q, plan line) | PRODUCTION VERIFIED                    | chore/live5…live11                    |
+| Q Intelligence step 1: situation header (date, time, role, surface)                                       | PRODUCTION VERIFIED                    | chore/live12-fdcf868 @ 046b1084f      |
+| Q Intelligence step 6: claim check (ungrounded figures removed; true figures kept; honest unknowns)       | PRODUCTION VERIFIED                    | chore/live12-fdcf868                  |
+| Q Intelligence step 0: Q-IQ benchmark + first live baseline. Q 79.2% vs bare 94.2% like-for-like; $3.48   | DONE                                   | docs/specs/q-intelligence/BASELINE.md |
+| Q Intelligence steps 2+3: conversation state + model-led references (session_01Eyr9vKfhPKfH6UnEmoUHXv)    | IN PROGRESS                            | feat/q-conversation-state             |
+| Q-IQ re-run on fdcf86871 or later, all 150 cases, about $5                                                | NEXT, after steps 2+3                  |                                       |
+| Hey Q: pause is per tab; privacy cap                                                                      | OWNER DECISION if either should change |                                       |
+| 20 pitch videos not reachable in the caption sweep                                                        | OPEN (minor)                           |                                       |
+| Owner's refusal-message fix not on this remote; set CQ_SEED_ACCOUNT_PASSWORD; rotate pasted tokens        | OWNER ACTION                           |                                       |
 
 ## Live board — 29 October 2026, 08:05 UTC (Claude coordinator, session_01Wncmn2hVzNK1rHd5FweHwt)
 
