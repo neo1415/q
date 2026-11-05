@@ -2265,7 +2265,9 @@ describe("saving work that has to start first, or never started", () => {
     await s.run();
     expect(proposed).toBe(0);
     expect(added).toEqual([]);
-    expect(s.stored[0]?.content ?? "").not.toMatch(/^There's nothing to save yet/u);
+    expect(s.stored[0]?.content ?? "").not.toMatch(
+      /^There's nothing to save yet/u,
+    );
   });
 });
 

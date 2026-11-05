@@ -25,7 +25,9 @@ export const V78_WHAT_WAS_ASKED = `WHAT WAS ASKED: answerKind is the heaviest wo
 `;
 
 if (TURN_READER_V77.template.split(V77_REFERENCES).length !== 2) {
-  throw new Error("TURN_READER v78 extends v77's REFERENCES rule, which changed");
+  throw new Error(
+    "TURN_READER v78 extends v77's REFERENCES rule, which changed",
+  );
 }
 
 export const TURN_READER_V78: PromptDefinition<

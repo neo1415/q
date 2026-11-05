@@ -13,7 +13,10 @@ describe("advice answered from Capital Q's record (S7) reads the reader's asksFo
 
   it("advice without a web ask stays on the record, whatever the words say", () => {
     expect(
-      adviceOnCapitalQRecord(advice, "What are the main risks? Check the news."),
+      adviceOnCapitalQRecord(
+        advice,
+        "What are the main risks? Check the news.",
+      ),
     ).toBe(true);
   });
 

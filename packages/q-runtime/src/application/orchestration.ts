@@ -297,8 +297,7 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * fewer than two: a single ask. The answer is told to answer every part.
    */
   readonly askParts?:
-    | readonly { readonly ask: string; readonly kind: string }[]
-    | undefined;
+    readonly { readonly ask: string; readonly kind: string }[] | undefined;
   /**
    * v78: they asked Q to keep something in mind about themselves, with the
    * fact said back to them in the second person (null when it would not

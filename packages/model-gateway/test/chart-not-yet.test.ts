@@ -36,13 +36,9 @@ describe("a chart they asked for, with none drawn", () => {
   });
 
   it("leaves every other miss with its own line", () => {
-    expect(
-      couldNotLineFor(
-        "CALLED_DID_NOTHING",
-        false,
-        "Okay.",
-      ),
-    ).toBe(couldNotDoLine("CALLED_DID_NOTHING"));
+    expect(couldNotLineFor("CALLED_DID_NOTHING", false, "Okay.")).toBe(
+      couldNotDoLine("CALLED_DID_NOTHING"),
+    );
   });
 
   it("chart words without the reader's asksForChart decide nothing (neutral default)", () => {

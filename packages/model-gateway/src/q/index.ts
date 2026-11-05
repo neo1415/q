@@ -873,8 +873,7 @@ function taskClassForAnswerKind(
 export function readAnswerKinds(request: {
   readonly answerKind?: string | undefined;
   readonly askParts?:
-    | readonly { readonly ask: string; readonly kind: string }[]
-    | undefined;
+    readonly { readonly ask: string; readonly kind: string }[] | undefined;
 }): readonly TurnAnswerKind[] {
   return [
     request.answerKind,
