@@ -11,6 +11,10 @@ import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
 import {
+  BURNED_TITLE_TOP,
+  burnedTitleTop,
+} from "../src/features/discover/player/ai-presenter";
+import {
   ownCaptionsAvailable,
   resetCaptionsChoiceForTests,
 } from "@/features/discover/stage/captions-choice";
@@ -1116,6 +1120,52 @@ describe("stage cue placement (live 2026-10-31, Discover at 390 and 360)", () =>
 
   it("an outsized cue stays below the stage's top bar", () => {
     expect(stageCueTop({ ...phone, cueHeight: 600 })).toBe(12);
+  });
+});
+
+describe("cues clear of an AI presenter's burned-in title (live 2026-11-05, Harbourline)", () => {
+  // The presenter's lower third (label, name, founder line) is part of the
+  // picture from ~78% down; our cue must end above it.
+  const desktop = { frameTop: 0, frameHeight: 800, wordsTop: null };
+
+  it("ends the cue above the title-safe line when the words are beside the pitch (a desktop)", () => {
+    const cueHeight = 60;
+    const top = stageCueTop({
+      ...desktop,
+      cueHeight,
+      burnedTitleTop: BURNED_TITLE_TOP,
+    });
+    const footPct = top + (cueHeight / 800) * 100;
+    expect(footPct).toBeLessThanOrEqual(BURNED_TITLE_TOP);
+    expect(footPct).toBeGreaterThan(BURNED_TITLE_TOP - 4);
+  });
+
+  it("ends above whichever comes first: the app's words or the burned title", () => {
+    // A phone: the words start at 50%, higher than the title.
+    const top = stageCueTop({
+      frameTop: 0,
+      frameHeight: 780,
+      wordsTop: 390,
+      cueHeight: 40,
+      burnedTitleTop: BURNED_TITLE_TOP,
+    });
+    expect((top / 100) * 780 + 40).toBeLessThanOrEqual(390);
+  });
+
+  it("leaves every other pitch exactly where it was", () => {
+    const base = { ...desktop, cueHeight: 40 };
+    expect(stageCueTop({ ...base, burnedTitleTop: null })).toBe(
+      stageCueTop(base),
+    );
+  });
+
+  it("applies only to AI-presented pitches", () => {
+    expect(burnedTitleTop("Pitch summary for founder (AI presenter)")).toBe(
+      BURNED_TITLE_TOP,
+    );
+    expect(burnedTitleTop("AI-presented pitch")).toBe(BURNED_TITLE_TOP);
+    expect(burnedTitleTop("Seed pitch, March")).toBeNull();
+    expect(burnedTitleTop(null)).toBeNull();
   });
 });
 

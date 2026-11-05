@@ -31,6 +31,7 @@ import {
   type PlaybackSource,
 } from "./pitch-playback";
 import { claimActivePlayer, releaseActivePlayer } from "./active-player";
+import { burnedTitleTop } from "./ai-presenter";
 import { reportPlaybackStall } from "../feed/use-feed-budget";
 import { recoverStream, restartPitch, setStreamWarmth } from "./hls-source";
 import { hasBeenActive, onAudioUnlock } from "./sound-policy";
@@ -112,16 +113,22 @@ export function stageCueTop(input: {
   readonly wordsTop: number | null;
   /** The cue's rendered height, in pixels. */
   readonly cueHeight: number;
+  /**
+   * Where text burned into the picture begins (an AI presenter's lower
+   * third), in percent of the pitch's height; null when there is none.
+   */
+  readonly burnedTitleTop?: number | null | undefined;
 }): number {
   if (input.frameHeight <= 0) return CUE_FOOT_MAX;
-  const foot =
+  const clearOfWords =
     input.wordsTop === null
       ? CUE_FOOT_MAX
-      : Math.min(
-          CUE_FOOT_MAX,
-          ((input.wordsTop - input.frameTop) / input.frameHeight) * 100 -
-            CUE_GAP,
-        );
+      : ((input.wordsTop - input.frameTop) / input.frameHeight) * 100 - CUE_GAP;
+  const clearOfTitle =
+    input.burnedTitleTop == null
+      ? CUE_FOOT_MAX
+      : input.burnedTitleTop - CUE_GAP;
+  const foot = Math.min(CUE_FOOT_MAX, clearOfWords, clearOfTitle);
   const height = (Math.max(0, input.cueHeight) / input.frameHeight) * 100;
   return Math.max(CUE_TOP_MIN, foot - height);
 }
@@ -166,7 +173,10 @@ function cueHeight(
  * words where they lie over the pitch (a phone): the cue ends just above
  * them; where they are beside it, at the pitch's foot.
  */
-function placeCues(video: HTMLVideoElement): void {
+function placeCues(
+  video: HTMLVideoElement,
+  burnedTitle: number | null = null,
+): void {
   const frame = video.getBoundingClientRect();
   if (frame.height <= 0) return;
   const words = video
@@ -206,6 +216,7 @@ function placeCues(video: HTMLVideoElement): void {
         frameHeight: frame.height,
         wordsTop: over ? words.top : null,
         cueHeight: cueHeight(video, cue.text, widthPx),
+        burnedTitleTop: burnedTitle,
       });
       if (cue.line === line && cue.size === width) continue;
       cue.snapToLines = false;
@@ -594,10 +605,20 @@ export function PitchPlayer({
   // the stage each cue sits low, just clear of the company's words over
   // the pitch -- never on them -- and at the foot of the pitch where those
   // words are beside it (a desktop). Placed per cue, as each one shows.
+  // An AI presenter's lower third is burned into the picture (live
+  // 2026-11-05, Harbourline): there, in either variant, every cue ends
+  // above it. Other pitches inline keep the browser's own placement.
+  const titleTop = burnedTitleTop(company.pitch?.title);
   useEffect(() => {
     const video = videoRef.current;
-    if (variant !== "stage" || video === null || playbackUrl === null) return;
-    const place = () => placeCues(video);
+    if (
+      (variant !== "stage" && titleTop === null) ||
+      video === null ||
+      playbackUrl === null
+    ) {
+      return;
+    }
+    const place = () => placeCues(video, titleTop);
     const tracks = video.textTracks as TextTrackList | undefined;
     // An engine without text-track events (a test DOM) keeps its cues as
     // they come.
@@ -624,7 +645,7 @@ export function PitchPlayer({
         tracks[i]?.removeEventListener("cuechange", place);
       }
     };
-  }, [variant, playbackUrl]);
+  }, [variant, playbackUrl, titleTop]);
 
   // The card in view hands its element to the feed's progress bar.
   useEffect(() => {

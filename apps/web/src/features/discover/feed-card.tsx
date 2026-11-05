@@ -1,5 +1,6 @@
 "use client";
 
+import { aiPresenterLine } from "./player/ai-presenter";
 import Link from "next/link";
 import {
   useEffect,
@@ -1322,21 +1323,9 @@ export function exploringLine(reasonCodes: readonly string[]): string | null {
     : null;
 }
 
-/**
- * Live 2026-10-31 (Discover at 390): an AI-presented pitch carries its
- * label burned into the video's own lower third, which sits where the
- * caption does, so the label ran through the company's name. The label
- * is said by the app, in the caption's flow above the name, from the
- * provenance recorded with the video (its title names the AI presenter);
- * the caption's scrim then holds the frame's own text beneath it.
- */
-export function aiPresenterLine(
-  pitchTitle: string | null | undefined,
-): string | null {
-  return pitchTitle != null && /\bAI[- ]present(?:er|ed)\b/iu.test(pitchTitle)
-    ? "AI presenter · AI-generated"
-    : null;
-}
+// Moved beside the player, which also reads it for caption placement;
+// re-exported so existing imports keep working.
+export { aiPresenterLine };
 
 /** The line on a passed company offered again (doc 19 §67). */
 export function sinceYouLastSawLine(change: "NEW_PITCH" | null): string {
