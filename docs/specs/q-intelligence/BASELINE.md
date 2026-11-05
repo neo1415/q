@@ -1,6 +1,6 @@
 # Q-IQ baseline
 
-Status: the benchmark exists (step 0, branch `feat/q-iq-benchmark`). The **live baseline has not been run yet**: reading the OpenAI key from Railway was refused by this session's permission policy (5 Nov 2026). Every score below is labelled with how it was produced. Nothing here is a live Q score yet.
+Status: the benchmark exists, and the **first live baseline ran on 5 Nov 2026** (11:02–12:20 UTC, integration owner session, total cost **$3.48**). The Q score is for Q at merged head `9f138f135`, which contains steps 0, 1 and 6 but not the later claim-check fix `fdcf86871`. It is **not** a pre-change score.
 
 ## What Q-IQ is
 
@@ -61,25 +61,47 @@ This checks the graders, not intelligence. With the reference replies, every cat
 
 ### Live baseline — Q vs the bare model (gpt-5.6-luna, reasoning NONE)
 
-**NOT RUN.** It is blocked on access to the provider key. When it runs, its table replaces this paragraph with these rows:
+**Q @ 9f138f135 (steps 0+1+6, before the claim-check fix forward)** vs the **bare model** (same provider, raw conversation plus the same facts, no Q layers). Run 5 Nov 2026, `--budget 4.5`.
 
-- one per category;
-- overall;
-- references resolved;
-- wrong-entity turns;
-- invented-figure turns;
-- unknowns said as unknown;
-- clarified;
-- multi-part asks;
-- helpfulness;
-- latency;
-- cost.
+| Category                              | Q                                                                             | Bare model    |
+| ------------------------------------- | ----------------------------------------------------------------------------- | ------------- |
+| PRONOUNS_PEOPLE                       | 86.7%                                                                         | 100.0%        |
+| ORDINALS_LISTS                        | 83.1%                                                                         | 98.5%         |
+| FOLLOW_UPS                            | 82.7%                                                                         | 94.7%         |
+| CORRECTIONS                           | 86.7%                                                                         | 100.0%        |
+| COMPOUND                              | 75.6%                                                                         | 80.0%         |
+| UNKNOWN                               | 75.0%                                                                         | 80.0%         |
+| CONTRADICTIONS                        | 95.6%                                                                         | 100.0%        |
+| NUMBERS                               | 64.4%                                                                         | 95.9%         |
+| CROSS_CONVERSATION_MEMORY             | 44.4%                                                                         | 100.0%        |
+| AMBIGUITY                             | 100.0%                                                                        | 64.4%         |
+| **Overall (turns)**                   | **79.2%**                                                                     | **92.1%**     |
+| Cases fully passed                    | 56/126                                                                        | 109/150       |
+| References resolved                   | 92.2%                                                                         | 98.6%         |
+| Wrong-entity turns                    | 7                                                                             | 1             |
+| Turns with an invented figure         | 6                                                                             | 14            |
+| Unknowns said as unknown              | 46.3%                                                                         | 63.4%         |
+| Ambiguous asks clarified              | 100.0%                                                                        | 0.0%          |
+| Multi-part asks fully answered        | 81.3%                                                                         | 86.7%         |
+| Helpfulness (rubric, 1–5)             | 4.67                                                                          | 5.00          |
+| Reply latency p50 / p95 (whole reply) | 6.9 s / 11.9 s                                                                | 1.1 s / 1.8 s |
+| Cost                                  | $3.390                                                                        | $0.086        |
+| Cases run                             | 126/150 (budget stop; the last 24 cases are in AMBIGUITY and late categories) | 150/150       |
 
-The runner prints the table in that shape.
+Reading it:
+
+- Q's layers currently **lose** to the bare model in 9 of 10 categories. The overall gap is 12.9 points.
+- The biggest losses:
+  - **numbers**, −31.5 points. This is likely the step-6 claim check before the fix forward (timestamp and minute false positives) plus extraction; it needs a re-run on `fdcf86871`.
+  - **cross-conversation memory**, −55.6 points. This is partly the harness, because the eval world wires no memory recall for Q while the bare model gets the earlier conversation transcripts. Step 9 owns that.
+  - **pronouns, ordinals and follow-ups**, −12 to −15 points. Steps 2 and 3 own those.
+- Q wins **ambiguity** (100% vs 64.4%) and invents fewer figures (6 turns vs 14). Both still miss the bar of 0 invented figures.
+- Q is about 6× slower and 40× more expensive per conversation than the bare model in this harness. Step 11 owns that.
+- The goal bar is Q ≥ bare in every category. Today it is met only for AMBIGUITY.
 
 ## Cost
 
-These are estimates. Nothing has been spent.
+Actual, first live run: **$3.476** ($3.390 Q, $0.086 bare model and judge). The estimate below undercounted Q: Q's actual cost per case was about 2.5× the estimate.
 
 | Item              | Basis                                                                                                                                                                                            | Estimate        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
@@ -97,4 +119,4 @@ The runner enforces a hard cap of `--budget 4.5`:
 
 ## Deltas
 
-Every later step reports its delta against the live table above. That table does not exist until the live baseline has run.
+Every later step reports its delta against the live table above. The next run should be on `fdcf86871` or later, with a budget of about $5 for Q, so all 150 cases complete.
