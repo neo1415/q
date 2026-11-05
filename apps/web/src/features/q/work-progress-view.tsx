@@ -23,9 +23,14 @@ import { useRunningPlan } from "./running-plan";
 import { stageLineText, type QWorkingStage } from "./stage-line";
 import { useWire } from "./use-wire";
 import { promisedJobs, useWorkLives, type WorkInProgress } from "./work-live";
+import { planLineAnchor } from "./plan-line-seen";
 import {
   jobProgress,
   jobStepDetail,
+  planAtRest,
+  planFraction,
+  planLineKey,
+  planLineSpent,
   planStream,
   runProgress,
   WORK_STATUS_WORDS,
@@ -156,15 +161,32 @@ export function useWorkStreams(options: {
         missing: snapshot?.missing ?? false,
       });
     });
-    const planned =
+    const planned = shownPlan(
       plan === null
         ? null
-        : planStream(plan, (step) => stepStatusWords(step, true));
+        : planStream(plan, (step) => stepStatusWords(step, true)),
+      turns ?? [],
+    );
     return {
       streams: workStreams(run, planned === null ? jobs : [planned, ...jobs]),
       details,
     };
-  }, [options.run, q, trail, labels, work, lives, plan]);
+  }, [options.run, q, trail, labels, work, lives, plan, turns]);
+}
+
+/**
+ * Owner 2026-11-05: a plan at rest (waiting only on the person, or done)
+ * is not Q working. Its line is shown once in the conversation -- until
+ * the person speaks again -- and then goes; the Board and /work keep it.
+ * A plan Q is working on keeps its one (folded) line.
+ */
+export function shownPlan(
+  stream: WorkStream | null,
+  turns: readonly { readonly kind: string; readonly id: string }[],
+): WorkStream | null {
+  if (stream === null || !planAtRest(stream)) return stream;
+  const anchor = planLineAnchor(planLineKey(stream), turns);
+  return planLineSpent(turns, anchor) ? null : stream;
 }
 
 export function QWorkProgress({
@@ -275,7 +297,18 @@ function WorkStreamItem({
 }) {
   const t = useT();
   const reduced = useReducedMotion() === true;
-  const steps = compact ? stream.steps.slice(-COMPACT_STEPS) : stream.steps;
+  // Owner 2026-11-05: a plan is one folded line (title, state, bar) on
+  // every turn after its own card; its steps open on a tap.
+  const foldable = stream.source === "PLAN";
+  const [open, setOpen] = useState(false);
+  const folded = foldable && !open;
+  const fraction = foldable ? planFraction(stream) : null;
+  const percent = fraction === null ? null : Math.round(fraction * 100);
+  const steps = folded
+    ? []
+    : compact
+      ? stream.steps.slice(-COMPACT_STEPS)
+      : stream.steps;
   const attention =
     stream.status === "FAILED" ||
     stream.status === "STOPPED" ||
@@ -288,25 +321,70 @@ function WorkStreamItem({
       data-q-work-stream={stream.source}
       data-q-work-status={stream.status}
     >
-      <div className="flex min-w-0 items-baseline justify-between gap-3">
-        {stream.title === null ? null : (
-          <span className="cq-body-sm min-w-0 truncate font-medium text-(--cq-text-primary)">
-            {stream.title}
-          </span>
-        )}
-        <span
-          className={`cq-caption shrink-0 ${
-            attention
-              ? "font-medium text-(--cq-text-primary)"
-              : "text-(--cq-text-secondary)"
-          } ${stream.title === null ? "me-auto" : ""}`}
-          role="status"
-          aria-live="polite"
-          data-q-work-status-word
+      {foldable ? (
+        <button
+          type="button"
+          className="flex min-h-11 w-full flex-col gap-1.5 text-start"
+          aria-expanded={open}
+          onClick={() => setOpen((was) => !was)}
+          data-q-work-plan-toggle
         >
-          {t(WORK_STATUS_WORDS[stream.status])}
-        </span>
-      </div>
+          <span className="flex w-full min-w-0 items-baseline justify-between gap-3">
+            {stream.title === null ? null : (
+              <span className="cq-body-sm min-w-0 truncate font-medium text-(--cq-text-primary)">
+                {stream.title}
+              </span>
+            )}
+            <span
+              className={`cq-caption shrink-0 ${
+                attention
+                  ? "font-medium text-(--cq-text-primary)"
+                  : "text-(--cq-text-secondary)"
+              } ${stream.title === null ? "me-auto" : ""}`}
+              role="status"
+              aria-live="polite"
+              data-q-work-status-word
+            >
+              {t(WORK_STATUS_WORDS[stream.status])}
+            </span>
+          </span>
+          {percent === null ? null : (
+            <span
+              className="block h-1 w-full overflow-hidden rounded-full bg-(--cq-surface-subtle)"
+              role="progressbar"
+              aria-label={t("Plan steps finished")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+            >
+              <span
+                className="block h-full rounded-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none"
+                style={{ width: `${String(percent)}%` }}
+              />
+            </span>
+          )}
+        </button>
+      ) : (
+        <div className="flex min-w-0 items-baseline justify-between gap-3">
+          {stream.title === null ? null : (
+            <span className="cq-body-sm min-w-0 truncate font-medium text-(--cq-text-primary)">
+              {stream.title}
+            </span>
+          )}
+          <span
+            className={`cq-caption shrink-0 ${
+              attention
+                ? "font-medium text-(--cq-text-primary)"
+                : "text-(--cq-text-secondary)"
+            } ${stream.title === null ? "me-auto" : ""}`}
+            role="status"
+            aria-live="polite"
+            data-q-work-status-word
+          >
+            {t(WORK_STATUS_WORDS[stream.status])}
+          </span>
+        </div>
+      )}
       {steps.length === 0 ? null : (
         <ol
           className="m-0 flex list-none flex-col gap-1 p-0"
@@ -385,7 +463,7 @@ function WorkStreamItem({
           ))}
         </ol>
       )}
-      {stream.note === null || compact ? null : (
+      {stream.note === null || compact || folded ? null : (
         <p
           className="cq-caption m-0 text-(--cq-text-secondary)"
           data-q-work-note

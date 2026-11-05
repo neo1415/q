@@ -358,3 +358,47 @@ export function planStream(
     actions: [],
   };
 }
+
+/**
+ * Owner 2026-11-05 (production, Zino Aviation, "that plan stuff is
+ * constantly there no matter what"): a plan whose steps wait only on the
+ * person (their board steps, "tell Q what to prepare", their approvals)
+ * or are all done is not Q working. Nothing is DOING, so no step moves.
+ */
+export function planAtRest(stream: Pick<WorkStream, "source" | "status">) {
+  return stream.source === "PLAN" && stream.status !== "WORKING";
+}
+
+/** What a plan's line stands for: a changed key is news, shown once again. */
+export function planLineKey(
+  stream: Pick<WorkStream, "id" | "status" | "steps">,
+): string {
+  return [
+    stream.id,
+    stream.status,
+    stream.steps.map((step) => `${step.key}:${step.state}`).join(","),
+  ].join("|");
+}
+
+/**
+ * A plan at rest keeps its line once: under the turn it was first shown
+ * after (`anchorId`) and until the person speaks again. Then it goes from
+ * the conversation; the Board and /work keep it. A plan Q is working on
+ * keeps its one line throughout.
+ */
+export function planLineSpent(
+  turns: readonly { readonly kind: string; readonly id: string }[],
+  anchorId: string | null,
+): boolean {
+  if (anchorId === null) return false;
+  const at = turns.findIndex((turn) => turn.id === anchorId);
+  if (at < 0) return false;
+  return turns.slice(at + 1).some((turn) => turn.kind === "PERSON");
+}
+
+/** N2: the plan's real finished steps, as a fraction; null with no steps. */
+export function planFraction(stream: Pick<WorkStream, "steps">): number | null {
+  if (stream.steps.length === 0) return null;
+  const done = stream.steps.filter((step) => step.state === "DONE").length;
+  return done / stream.steps.length;
+}
