@@ -2769,13 +2769,26 @@
       height: 100dvh;
     }
     .cq-yours-card {
+      /* The panel beside the stage, and the room kept round the video for
+         the rail. Narrower from 1024 to 1279 px (live 2026-11-04: at 1024
+         a 440px panel left the video ~112px wide); 440px from 1280 up. */
+      --cq-yours-panel: 320px;
+      --cq-yours-reserve: 204px;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 440px;
+      grid-template-columns: minmax(0, 1fr) var(--cq-yours-panel);
       container-type: size;
       --cq-feed-video-h: min(
         calc(100cqh - 48px),
-        calc((100cqw - 440px - 232px) * 16 / 9)
+        calc(
+          (100cqw - var(--cq-yours-panel) - var(--cq-yours-reserve)) * 16 / 9
+        )
       );
+    }
+    @media (min-width: 1280px) {
+      .cq-yours-card {
+        --cq-yours-panel: 440px;
+        --cq-yours-reserve: 232px;
+      }
     }
     .cq-yours-card::before {
       display: none;
@@ -3127,7 +3140,8 @@
     .cq-feed-rail {
       bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
       inset-inline-start: calc(
-        (100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px
+        (100cqw - var(--cq-yours-panel, 440px)) / 2 + var(--cq-feed-video-h) *
+          9 / 32 + 14px
       );
       inset-inline-end: auto;
       width: 72px;
@@ -3236,7 +3250,8 @@
     .cq-skeleton-rail {
       bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
       inset-inline-start: calc(
-        (100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px
+        (100cqw - var(--cq-yours-panel, 440px)) / 2 + var(--cq-feed-video-h) *
+          9 / 32 + 14px
       );
       inset-inline-end: auto;
       width: 72px;
@@ -3283,12 +3298,21 @@
     /* Your companies has its own grid (.cq-yours-card: the stage, then a
        440px panel), so the For you offset above lands on its video (live
        2026-11-04, 1440). Here the tabs sit at the top of that panel, in
-       its 72px top padding, lined up with its 28px content inset. */
+       its 72px top padding, lined up with its 28px content inset. The
+       panel is 320px below 1280px and 440px from there (.cq-yours-card). */
     .cq-discover[data-discover-tab="YOURS"]:has(
         > div[data-feed-immersive]:not([hidden])
       )
       .cq-discover-tabs {
-      inset-inline-start: calc(100% - 440px + 18px);
+      inset-inline-start: calc(100% - 320px + 18px);
+    }
+    @media (min-width: 1280px) {
+      .cq-discover[data-discover-tab="YOURS"]:has(
+          > div[data-feed-immersive]:not([hidden])
+        )
+        .cq-discover-tabs {
+        inset-inline-start: calc(100% - 440px + 18px);
+      }
     }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
       .cq-discover-tab,
