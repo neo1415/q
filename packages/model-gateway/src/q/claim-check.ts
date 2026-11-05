@@ -409,6 +409,54 @@ function figureGrounded(
   );
 }
 
+/**
+ * The conversion factors between rates the sentence itself states: "$180k
+ * a month is $2.16M a year" states a month and a year, so x12 is part of
+ * its own arithmetic. Both periods must be said in the sentence; a lone
+ * "annual burn is $1.02M" names one period and gains nothing.
+ */
+const PERIODS: readonly (readonly [string, RegExp])[] = [
+  ["week", /\b(?:a|per|each|every)\s+week\b|\bweekly\b|\/\s?wk\b/iu],
+  ["month", /\b(?:a|per|each|every)\s+month\b|\bmonthly\b|\/\s?mo(?:nth)?\b/iu],
+  ["quarter", /\b(?:a|per|each|every)\s+quarter\b|\bquarterly\b/iu],
+  [
+    "year",
+    /\b(?:a|per|each|every)\s+year\b|\b(?:yearly|annual(?:ly|i[sz]ed)?|per\s+annum)\b|\/\s?yr\b/iu,
+  ],
+];
+const PERIOD_FACTORS: readonly (readonly [string, string, number])[] = [
+  ["month", "year", 12],
+  ["quarter", "year", 4],
+  ["week", "year", 52],
+  ["month", "quarter", 3],
+];
+
+function periodFactorsIn(sentence: string): number[] {
+  const said = new Set(
+    PERIODS.filter(([, pattern]) => pattern.test(sentence)).map(([p]) => p),
+  );
+  return PERIOD_FACTORS.filter(([a, b]) => said.has(a) && said.has(b)).map(
+    ([, , factor]) => factor,
+  );
+}
+
+/**
+ * Durations the claim check does not test as claims ("9 months" is a lone
+ * digit) that the sources do state, so "9 months at $120k a month implies
+ * about $1.08M" can show its own arithmetic. Only as inputs, never as a
+ * claim's own grounding.
+ */
+function durationInputsIn(sentence: string, corpus: ClaimCorpus): number[] {
+  return figuresIn(sentence)
+    .filter(
+      (figure) =>
+        isIncidental(sentence, figure) &&
+        DURATION_AFTER.test(sentence.slice(figure.end)) &&
+        corpus.numbers.some((source) => source.value === figure.value),
+    )
+    .map((figure) => figure.value);
+}
+
 // --- Names -------------------------------------------------------------
 
 /**
@@ -655,9 +703,17 @@ export function checkSentence(
       claim.kind === "PERCENT" ||
       (claim.kind === "DATE" && Number.isFinite(claim.value)),
   );
-  const groundedValues = figures
-    .filter((figure) => figureGrounded(figure, corpus, []))
-    .map((figure) => figure.value);
+  // The inputs a derived figure may use: the sentence's own grounded
+  // figures, its stated sourced durations and its stated period
+  // conversions. Every input is said in the sentence, so the arithmetic
+  // is visible to the reader.
+  const groundedValues = [
+    ...figures
+      .filter((figure) => figureGrounded(figure, corpus, []))
+      .map((figure) => figure.value),
+    ...durationInputsIn(sentence, corpus),
+    ...periodFactorsIn(sentence),
+  ];
   const ungrounded: ClaimKind[] = [];
   for (const claim of claims) {
     const ok =

@@ -37,3 +37,28 @@ The integration runs need `DATABASE_URL` set as well as `CQ_TEST_DATABASE_URL`. 
 - All 19 are the claim check refusing derived arithmetic ("$180k a month" → "$2.16M a year"). That predates step 2; item 5 of the plan targets it.
 
 Not done here: CI pgTAP on the Supabase stack, any hosted migration apply, or deploy. Those belong to the integration owner.
+
+## Item 5: claim check grounds derived arithmetic within one sentence (own commit)
+
+`packages/model-gateway/src/q/claim-check.ts`. A derived figure can now also use two more kinds of input, as long as the sentence itself says them:
+
+- **A period conversion.** "$180k a month is $2.16M a year" names a month and a year, so ×12 can be used. Also quarter/year ×4, week/year ×52 and month/quarter ×3.
+- **A short duration the sources state.** In "9 months at $120k a month", the lone digit is still not checked as a claim, but it can be an input.
+
+Still ungrounded:
+
+- "Annual burn is $1.02M": the input isn't in the sentence.
+- A wrong product.
+- An unsourced monthly input.
+- An unsourced duration.
+
+Tests are in `packages/model-gateway/test/claim-check.test.ts`, 22/22.
+
+Results:
+
+- Scripted Q-IQ, all 150 cases: **554 → 571/573**.
+- The default one-per-category Q-IQ integration test now passes, 1/1.
+- model-gateway, q-specialists and q-api vitest: 6106 passed.
+- Root tsc exit 0; eslint and prettier clean.
+
+The two left, MEM-134 #0 and MEM-135 #0, aren't arithmetic. The cheque size was said in a previous conversation, and the scripted world has no cross-conversation recall (plan step 9). The other three MEM cheque cases pass only because their amounts happen to appear elsewhere in the fixture corpus.
