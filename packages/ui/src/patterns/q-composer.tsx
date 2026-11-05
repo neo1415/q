@@ -111,6 +111,20 @@ export type QComposerProps = {
    * the box look cluttered on a phone).
    */
   readonly iconActions?: ReactNode | undefined;
+  /**
+   * "pill" (client 2026-11-05, the Q home): one fully rounded line like a
+   * chat app's home -- "+" at the leading edge, the field, and one round
+   * button at the trailing edge that talks to Q while the field is empty
+   * (`onTalk`) and sends once there is something to send. "default" is the
+   * composer every other surface uses.
+   */
+  readonly variant?: "default" | "pill" | undefined;
+  /**
+   * Pill only: the empty field's round "Q" button. The surface's own voice
+   * path (the same one its microphone opens), never a second one.
+   */
+  readonly onTalk?: (() => void) | undefined;
+  readonly talkLabel?: string | undefined;
 };
 
 export function QComposer({
@@ -134,6 +148,9 @@ export function QComposer({
   showContext = true,
   actions,
   iconActions,
+  variant = "default",
+  onTalk,
+  talkLabel = "Talk to Q",
 }: QComposerProps) {
   const t = useUiText();
   const generatedId = useId();
@@ -279,6 +296,46 @@ export function QComposer({
     }
   }
 
+  const pill = variant === "pill";
+  // The trailing button talks while there is nothing to send, and sends
+  // once there is (never both at once, so one place, one meaning).
+  const talking =
+    pill && onTalk !== undefined && trimmed.length === 0 && !ready;
+
+  const attachControl =
+    onAttach !== undefined ? (
+      <>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          {...(attachAccept === undefined ? {} : { accept: attachAccept })}
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
+            // The input is cleared either way, so choosing the same
+            // file twice still fires.
+            event.target.value = "";
+            for (const file of files.slice(0, 5)) void onAttach(file);
+          }}
+        />
+        <IconButton
+          type="button"
+          variant="quiet"
+          aria-label={attachLabel}
+          title={attachLabel}
+          disabled={disabled}
+          onClick={() => fileRef.current?.click()}
+          className={pill ? "rounded-full" : undefined}
+          data-q-attach
+        >
+          <Plus aria-hidden="true" size={ICON_SIZE.prominent} strokeWidth={2} />
+        </IconButton>
+      </>
+    ) : null;
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -311,8 +368,11 @@ export function QComposer({
             },
           })}
       data-dragging={dragging ? "" : undefined}
+      data-q-composer-variant={variant}
       className={cx(
-        "flex flex-col gap-2 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong) data-[dragging]:border-dashed data-[dragging]:border-(--cq-accent)",
+        pill
+          ? "cq-q-pill flex flex-col gap-1 border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1.5 shadow-(--cq-shadow-sm) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong) data-[dragging]:border-dashed data-[dragging]:border-(--cq-accent)"
+          : "flex flex-col gap-2 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong) data-[dragging]:border-dashed data-[dragging]:border-(--cq-accent)",
         className,
       )}
     >
@@ -320,9 +380,13 @@ export function QComposer({
           with what is typed up to a cap, then scrolls inside itself, so the
           composer never pushes a conversation off a phone's screen. */}
       <div className="flex items-end gap-1" data-q-composer-row>
-        <div className="flex h-11 flex-none items-center ps-1">
-          <QMark size="sm" state={submitting ? "WORKING" : "IDLE"} />
-        </div>
+        {pill ? (
+          <div className="flex flex-none items-center">{attachControl}</div>
+        ) : (
+          <div className="flex h-11 flex-none items-center ps-1">
+            <QMark size="sm" state={submitting ? "WORKING" : "IDLE"} />
+          </div>
+        )}
         <div className="flex min-w-0 flex-1 flex-col">
           <label id={`${inputId}-title`} htmlFor={inputId} className="sr-only">
             {t("Ask Q")}
@@ -359,44 +423,8 @@ export function QComposer({
         </div>
         <div className="flex flex-none items-center gap-1">
           {iconActions}
-          {onAttach !== undefined ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                multiple
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden="true"
-                {...(attachAccept === undefined
-                  ? {}
-                  : { accept: attachAccept })}
-                onChange={(event) => {
-                  const files = Array.from(event.target.files ?? []);
-                  // The input is cleared either way, so choosing the same
-                  // file twice still fires.
-                  event.target.value = "";
-                  for (const file of files.slice(0, 5)) void onAttach(file);
-                }}
-              />
-              <IconButton
-                type="button"
-                variant="quiet"
-                aria-label={attachLabel}
-                title={attachLabel}
-                disabled={disabled}
-                onClick={() => fileRef.current?.click()}
-                data-q-attach
-              >
-                <Plus
-                  aria-hidden="true"
-                  size={ICON_SIZE.prominent}
-                  strokeWidth={2}
-                />
-              </IconButton>
-            </>
-          ) : null}
-          {onVoice !== undefined ? (
+          {pill ? null : attachControl}
+          {onVoice !== undefined && !pill ? (
             <IconButton
               type="button"
               variant="quiet"
@@ -413,18 +441,35 @@ export function QComposer({
               />
             </IconButton>
           ) : null}
-          <IconButton
-            type="submit"
-            variant="primary"
-            aria-label={t("Send to Q")}
-            disabled={!canSubmit}
-          >
-            <ArrowUp
-              aria-hidden="true"
-              size={ICON_SIZE.prominent}
-              strokeWidth={2}
-            />
-          </IconButton>
+          {talking ? (
+            <button
+              type="button"
+              className="cq-q-pill-talk"
+              aria-label={t(talkLabel)}
+              title={t(talkLabel)}
+              disabled={disabled}
+              onClick={onTalk}
+              data-q-talk
+              data-q-control="talk"
+            >
+              <span aria-hidden="true">Q</span>
+            </button>
+          ) : (
+            <IconButton
+              type="submit"
+              variant="primary"
+              aria-label={t(pill ? "Send" : "Send to Q")}
+              disabled={!canSubmit}
+              className={pill ? "rounded-full" : undefined}
+              data-q-send
+            >
+              <ArrowUp
+                aria-hidden="true"
+                size={ICON_SIZE.prominent}
+                strokeWidth={2}
+              />
+            </IconButton>
+          )}
         </div>
       </div>
       {showContext || actions !== undefined ? (

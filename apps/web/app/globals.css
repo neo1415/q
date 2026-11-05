@@ -4026,6 +4026,143 @@
     }
   }
 
+  /*
+   * The Q home's composer (client 2026-11-05, "like ChatGPT"): the empty
+   * field's trailing button is a small round gold Q that talks to Q; it
+   * becomes Send once there is text. Same colours as the primary action.
+   */
+  .cq-q-pill-talk {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--cq-radius-full);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--cq-on-primary-action, var(--cq-text-inverse));
+    background: var(--cq-primary-action, var(--cq-accent));
+    border: 0;
+    cursor: pointer;
+    transition:
+      background-color var(--cq-motion-fast) var(--cq-ease),
+      transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-q-pill-talk:hover {
+    background: var(--cq-primary-action-hover, var(--cq-accent-hover));
+  }
+  .cq-q-pill-talk:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
+  .cq-q-pill-talk:active {
+    transform: scale(0.96);
+  }
+  .cq-q-pill-talk:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+  /* The composer itself: round like a chat app's, still round when it
+     grows to several lines. */
+  .cq-q-pill {
+    border-radius: 28px;
+  }
+  .cq-q-pill [data-q-send],
+  .cq-q-pill [data-q-attach] {
+    border-radius: var(--cq-radius-full);
+  }
+  /* The Q | Chat switch: a rounded track and a thumb that slides. */
+  .cq-q-switch {
+    position: relative;
+    display: inline-grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    padding: 3px;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-sunken);
+    border: 1px solid var(--cq-border-subtle);
+  }
+  .cq-q-switch-thumb {
+    position: absolute;
+    inset-block: 3px;
+    inset-inline-start: 3px;
+    width: calc(50% - 3px);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-raised);
+    box-shadow: var(--cq-shadow-xs);
+    transition: transform var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-q-switch[data-q-view="chat"] .cq-q-switch-thumb {
+    transform: translateX(100%);
+  }
+  [dir="rtl"] .cq-q-switch[data-q-view="chat"] .cq-q-switch-thumb {
+    transform: translateX(-100%);
+  }
+  .cq-q-switch button {
+    position: relative;
+    min-width: 64px;
+    min-height: 36px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: var(--cq-radius-full);
+    background: transparent;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--cq-text-secondary);
+    cursor: pointer;
+    transition: color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-q-switch button[aria-pressed="true"] {
+    color: var(--cq-text-primary);
+  }
+  .cq-q-switch button:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-q-switch-thumb {
+      transition: none;
+    }
+  }
+  /* The empty Q home's starters: list rows under the composer. */
+  .cq-q-starter {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--cq-radius-lg);
+    background: transparent;
+    color: var(--cq-text-secondary);
+    font: inherit;
+    font-size: 15px;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color var(--cq-motion-fast) var(--cq-ease),
+      color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-q-starter:hover {
+    background: var(--cq-surface-subtle);
+    color: var(--cq-text-primary);
+  }
+  .cq-q-starter:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
+  /* On the Q home the verification item is one of the starters instead of
+     a line above the page (client 2026-11-05: the top was cluttered). */
+  .cq-shell:has(.cq-q-home) .cq-verify-nudge-desktop {
+    display: none;
+  }
+
   /* Talk to Q, under the welcome: the room's invitation (one press). */
   .cq-room-talk {
     display: inline-flex;
