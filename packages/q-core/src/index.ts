@@ -523,6 +523,15 @@ export {
   type TurnReaderReference,
   TurnReaderV77ResultSchema,
   type TurnReaderV77Result,
+  TURN_READER_V78_SCHEMA_VERSION,
+  TURN_ANSWER_KINDS,
+  type TurnAnswerKind,
+  TurnAnswerKindSchema,
+  TURN_READER_PARTS_MAX,
+  TurnReaderPartSchema,
+  type TurnReaderPart,
+  TurnReaderV78ResultSchema,
+  type TurnReaderV78Result,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -2043,6 +2052,10 @@ export {
   TURN_READER_V77,
   V77_REFERENCES,
 } from "./prompts/tasks/turn-reader.v77.js";
+export {
+  TURN_READER_V78,
+  V78_WHAT_WAS_ASKED,
+} from "./prompts/tasks/turn-reader.v78.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

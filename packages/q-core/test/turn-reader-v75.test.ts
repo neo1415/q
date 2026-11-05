@@ -19,7 +19,7 @@ describe("TURN_READER v75", () => {
   it("is the active reader: v74 with one INVESTMENT MEMO rule after DEEP WORK, nothing else", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(77);
+    expect(active.version).toBe(78);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
       TurnReaderV77ResultSchema,
     );
