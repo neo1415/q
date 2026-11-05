@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-05",
+  "account": "investor.savanna-seed@fictional.capitalq.local (fictional)",
+  "signIn": "one-time Supabase admin magic link; service key read from Railway api variables in memory, never printed or stored",
+  "deploy": {
+    "commit": "a452c84fc",
+    "from": "23451cb58 (pushed by integration owner 02:35Z)",
+    "web": "SUCCESS",
+    "api": "SUCCESS",
+    "qApi": "SUCCESS",
+    "workers": "SUCCESS",
+    "allSuccessAt": "2026-11-05T03:24:50Z"
+  },
+  "qTurns": 6,
+  "qTurnLog": [
+    "1440 memo",
+    "1440 rank",
+    "1440 compare 2nd and 3rd",
+    "1440 which has better traction",
+    "1440 plan (Silo Credit loan book)",
+    "1440 okay"
+  ],
+  "approvals": "none; no step cards approved, nothing sent",
+  "memo": {
+    "verdict": "PASS",
+    "pdfPages": 1,
+    "readyForReviewLine": 0,
+    "doubledSentences": 0,
+    "chatHeadings": "On their own lines (Business and current evidence / Why it merits diligence / Key risks and gaps / View and next step); 0 inline '## '",
+    "files": [
+      "memo.pdf",
+      "memo-page-1.png",
+      "1-memo-1440.png",
+      "2-memo-doc-1440.png"
+    ]
+  },
+  "tractionFollowUp": {
+    "verdict": "PASS",
+    "observed": "No comparison table re-rendered (the only 'Side by side' table in the thread belongs to the compare turn). Answer: Silo Credit stronger on reported loss rate (<0.5% vs Mizan 0.9% NPL); Mizan stronger on distribution (3 banks, EGP 640m vs 14 warehouses, ~NGN 2.1bn)",
+    "note": "Two ranked fit cards (Number 1 Mizan, Number 2 Silo Credit) render above the prose answer",
+    "files": ["2-rank-1440.png", "2-compare-1440.png", "2-traction-1440.png"]
+  },
+  "discoverLayout": {
+    "verdict": "PASS",
+    "yourCompaniesTabsOverVideo": { "1024": [], "1440": [] },
+    "video": {
+      "foryou1024": "256x455 px, readable",
+      "yours1024": "258x460 px",
+      "foryou1440": "479x852 px",
+      "yours1440": "477x850 px"
+    },
+    "observation": "Harbourline Cargo (Your companies): our caption line overlaps the video's own title text in the picture",
+    "files": [
+      "3-foryou-1024.png",
+      "3-yours-1024.png",
+      "3-foryou-1440.png",
+      "3-yours-1440.png"
+    ]
+  },
+  "captions": {
+    "verdict": "PASS",
+    "ledgerline": "Company pitch (elevator) at 1440 and 1024: 0 tracks, 0 showing, no captions switch; Discover For you 1024: 0 tracks, no switch, burned-in captions visible",
+    "watchly": "Company pitch at 1440 and 1024: 1 track showing, 'Captions' switch present",
+    "files": [
+      "4-ledgerline-1440.png",
+      "4-ledgerline-1024.png",
+      "4-watchly-1440.png",
+      "4-watchly-1024.png"
+    ]
+  },
+  "planCardStaysAfterOkay1440": {
+    "verdict": "PASS",
+    "observed": "'Running it now: my steps have started ...' with the running card and the plan card on the Q stage; no 'away as we moved on' line",
+    "files": ["5-plan-1440-execute.png", "6-okay-1440.png"]
+  },
+  "workMoving": {
+    "verdict": "FAIL",
+    "observed": "The Ledgerline plan (live7, 1440) is now one row titled by its goal with 6 steps. The new Silo Credit plan shows 3 rows: its goal-titled row with 5 steps, plus 'Check Silo Credit's loan book quality this week and decide whether to revisit your prior pass.: Research public evidence on Silo Credit's reported loss rate, ₦2.1bn financed and 14 certified warehouses · Working' and '...: Assess Silo Credit's loan book using public evidence unless specific internal materials arrive by 2026-11-06 · Queued'",
+    "files": ["7-work-1440.png"]
+  }
+}
