@@ -132,3 +132,80 @@ export function fuseByReciprocalRank<T>(
       };
     });
 }
+
+/** One ranked list for N-way fusion; `side` records which half produced it. */
+export type RankedList<T> = {
+  readonly side: "lexical" | "semantic";
+  readonly entries: readonly FusionInput<T>[];
+};
+
+/**
+ * Reciprocal Rank Fusion over any number of already-authorised lists
+ * (Q intelligence step 5: one lexical and one semantic list per
+ * sub-query). Same properties as `fuseByReciprocalRank`, which it equals
+ * for one lexical and one semantic list: pure, deterministic, unable to
+ * admit anything. A chunk found by several sub-queries appears once,
+ * summing its contributions and keeping its best rank per side.
+ */
+export function fuseRankedLists<T>(
+  lists: readonly RankedList<T>[],
+  options: FuseOptions,
+): readonly FusedItem<T>[] {
+  const { rrfK, limit } = options;
+  const merged = new Map<
+    string,
+    {
+      item: T;
+      lexicalRank: number | null;
+      semanticRank: number | null;
+      score: number;
+    }
+  >();
+  const better = (a: number | null, b: number): number =>
+    a === null ? b : Math.min(a, b);
+  for (const list of lists) {
+    for (const entry of list.entries) {
+      const contribution = 1 / (rrfK + entry.rank);
+      const existing = merged.get(entry.key);
+      if (existing === undefined) {
+        merged.set(entry.key, {
+          item: entry.item,
+          lexicalRank: list.side === "lexical" ? entry.rank : null,
+          semanticRank: list.side === "semantic" ? entry.rank : null,
+          score: contribution,
+        });
+        continue;
+      }
+      if (list.side === "lexical") {
+        existing.lexicalRank = better(existing.lexicalRank, entry.rank);
+      } else {
+        existing.semanticRank = better(existing.semanticRank, entry.rank);
+      }
+      existing.score += contribution;
+    }
+  }
+  const best = (entry: {
+    lexicalRank: number | null;
+    semanticRank: number | null;
+  }): number =>
+    Math.min(
+      entry.lexicalRank ?? Number.MAX_SAFE_INTEGER,
+      entry.semanticRank ?? Number.MAX_SAFE_INTEGER,
+    );
+  return [...merged.entries()]
+    .sort(([keyA, a], [keyB, b]) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const rankDelta = best(a) - best(b);
+      if (rankDelta !== 0) return rankDelta;
+      return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
+    })
+    .slice(0, limit)
+    .map(([key, entry], at): FusedItem<T> => ({
+      key,
+      item: entry.item,
+      lexicalRank: entry.lexicalRank,
+      semanticRank: entry.semanticRank,
+      fusedRank: at + 1,
+      fusedScore: entry.score,
+    }));
+}

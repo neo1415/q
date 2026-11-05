@@ -164,3 +164,33 @@ export function envelopeIsCurrent(
 ): boolean {
   return now.getTime() < Date.parse(envelope.revalidateAfter);
 }
+
+/**
+ * The envelope restricted to the given subjects (Q intelligence step 5:
+ * "its burn" searches Silo Credit's material only).
+ *
+ * Strictly a narrowing, constraint by constraint, and never a widening:
+ *   - a constraint already narrowed by subject keeps only the overlap, and
+ *     is dropped when nothing overlaps -- so founder-private material about
+ *     the actor's own company never opens up for someone else's company;
+ *   - a constraint not narrowed by subject (network-visible, public) is
+ *     narrowed to the given subjects, under its own visibility and
+ *     sensitivity, which are unchanged;
+ *   - the tenant, plan, ceiling and expiry are the envelope's own.
+ * A subject from a rewritten query that the envelope does not reach
+ * therefore yields fewer ways in, possibly none, and never a new one.
+ */
+export function narrowEnvelopeToSubjects(
+  envelope: RetrievalPermissionEnvelope,
+  subjectIds: readonly string[],
+): RetrievalPermissionEnvelope {
+  const wanted = [...new Set(subjectIds)];
+  const constraints = envelope.constraints.flatMap((constraint) => {
+    const kept =
+      constraint.subjectIds === null
+        ? wanted
+        : constraint.subjectIds.filter((id) => wanted.includes(id));
+    return kept.length === 0 ? [] : [{ ...constraint, subjectIds: kept }];
+  });
+  return { ...envelope, constraints };
+}

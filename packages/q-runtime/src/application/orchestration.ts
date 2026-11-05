@@ -26,6 +26,7 @@ import type {
 } from "@capital-q/contracts";
 import type { ActorContext, TenantId, UserId } from "@capital-q/security";
 import type { QConversationMessage } from "../contracts/index.js";
+import type { QRetrievalFocus } from "../contracts/conversation-state.js";
 
 /**
  * The Capital Q-owned orchestration port (doc 12 §10.2).
@@ -463,6 +464,11 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * instructions (names and the summary are fenced). Grants nothing.
    */
   readonly conversationState?: string | undefined;
+  /**
+   * Q intelligence step 5: the shown ledger and this turn's bound refs,
+   * structured, for retrieval's query rewriting. Grants nothing.
+   */
+  readonly retrievalFocus?: QRetrievalFocus | undefined;
   /**
    * A2 (live 2026-11-04): the companies `references` bound, in the order the
    * person said them ("the second and third"), as ids. Set only when code

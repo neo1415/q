@@ -2162,6 +2162,8 @@ export function createSpecialistQAnswer(
   const statesInRun = new Map<string, Promise<RunConversationState | null>>();
   const stateTextInRun = new Map<string, string>();
   const shownStateInRun = new Map<string, QConversationState>();
+  /** Step 5: the ledger refs the reader bound this run's words to. */
+  const boundRefsInRun = new Map<string, readonly string[]>();
   const conversationStateOf = (
     who: {
       readonly tenantId: TenantId;
@@ -2190,6 +2192,7 @@ export function createSpecialistQAnswer(
       statesInRun.delete(oldest);
       stateTextInRun.delete(oldest);
       shownStateInRun.delete(oldest);
+      boundRefsInRun.delete(oldest);
     }
     return started;
   };
@@ -2236,10 +2239,23 @@ export function createSpecialistQAnswer(
     ...answerPath,
     answer: async (asked) => {
       const stateText = stateTextInRun.get(asked.runId);
-      const request =
+      const withState =
         stateText === undefined || asked.conversationState !== undefined
           ? asked
           : { ...asked, conversationState: stateText };
+      // Step 5: the same shown ledger and the reader's checked refs, for
+      // retrieval's query rewriting. A search hint; it grants nothing.
+      const shown = shownStateInRun.get(asked.runId);
+      const request =
+        shown === undefined || withState.retrievalFocus !== undefined
+          ? withState
+          : {
+              ...withState,
+              retrievalFocus: {
+                ledger: shown.ledger,
+                boundRefs: boundRefsInRun.get(asked.runId) ?? [],
+              },
+            };
       const moves = movesWithQuestion.get(request.runId);
       movesWithQuestion.delete(request.runId);
       if (moves === undefined) return answerPath.answer(request);
@@ -6488,6 +6504,10 @@ export function createSpecialistQAnswer(
         return recordAnswer(request, conversationId, binding.question);
       }
       if (binding.kind === "BOUND") {
+        boundRefsInRun.set(
+          request.runId,
+          binding.bound.flatMap((one) => one.entities.map((e) => e.ref)),
+        );
         resolvedInRun.set(request.runId, binding.note);
         while (resolvedInRun.size > PREREADS_MAX) {
           const oldest = resolvedInRun.keys().next().value;

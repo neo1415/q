@@ -187,10 +187,24 @@ export type RetrievalConfig = {
   readonly maxCharactersPerHit: number;
   /** Whether a matched leaf may be replaced by its parent section. */
   readonly parentExpansion: boolean;
-  readonly reranker: "NONE";
+  /**
+   * What reorders the authorised, hydrated candidates before the final
+   * bound (Q intelligence step 5). NONE keeps the fused order. The local
+   * reranker is deterministic code (field overlap plus entity match); a
+   * model reranker, when there is one, goes through the Model Gateway by
+   * task class behind the same port, never a provider SDK here.
+   */
+  readonly reranker: RetrievalRerankerCode;
+  /** Sub-queries one retrieval may run (one per part of a compound ask). */
+  readonly maxSubQueries: number;
 };
 
-export const RETRIEVAL_CONFIG_VERSION = "capital-q-hybrid-v1" as const;
+export const RETRIEVAL_RERANKERS = ["NONE", "LOCAL_FIELD_OVERLAP_V1"] as const;
+export type RetrievalRerankerCode = (typeof RETRIEVAL_RERANKERS)[number];
+
+export const RETRIEVAL_CONFIG_VERSION = "capital-q-hybrid-v2" as const;
+/** The step-5 baseline: v1's numbers, fused order, one query. */
+export const RETRIEVAL_CONFIG_VERSION_V1 = "capital-q-hybrid-v1" as const;
 
 // ---------------------------------------------------------------------------
 // Request and result (§9, §31)
@@ -198,9 +212,47 @@ export const RETRIEVAL_CONFIG_VERSION = "capital-q-hybrid-v1" as const;
 
 export const RETRIEVAL_QUERY_MAX_CHARACTERS = 512;
 
+/**
+ * One search of a multi-query retrieval (step 5): the text, and optionally
+ * the subjects it is ABOUT. `subjectIds` can only narrow the envelope (see
+ * `narrowEnvelopeToSubjects`): a subject no constraint admits yields no
+ * way in, never a new one.
+ */
+export type RetrievalSubQuery = {
+  readonly text: string;
+  readonly subjectIds?: readonly string[] | undefined;
+  /**
+   * How much this search's words count in the reranker's overlap, 0-1
+   * (default 1). The previous question carried into a follow-up counts
+   * less than the turn's own words.
+   */
+  readonly weight?: number | undefined;
+};
+
+/**
+ * What the conversation says this turn is about, for the reranker: the
+ * subjects, documents and names already bound by code from the ledger.
+ * Ordering hints only; it admits nothing.
+ */
+export type RetrievalFocusHint = {
+  readonly subjectIds: readonly string[];
+  readonly documentIds: readonly string[];
+  readonly names: readonly string[];
+};
+
+export const RETRIEVAL_SUB_QUERIES_MAX = 4;
+
 export type AuthorisedRetrievalRequest = {
   /** The text to search for. DATA: it is never SQL, tsquery or instruction. */
   readonly query: string;
+  /**
+   * Step 5: the searches to run instead of `query` alone (query rewriting
+   * and multi-query). Each is fused by RRF with the others. Absent: one
+   * search of `query`, unfiltered beyond the envelope.
+   */
+  readonly queries?: readonly RetrievalSubQuery[] | undefined;
+  /** Step 5: reranker hints from the conversation. Admits nothing. */
+  readonly focus?: RetrievalFocusHint | undefined;
   readonly envelope: RetrievalPermissionEnvelope;
   readonly strategy?: RetrievalStrategy | undefined;
   /** Cooperative cancellation from the Q run. */
@@ -305,6 +357,10 @@ export type AuthorisedRetrievalResult = {
     readonly expansionMs: number;
     readonly totalMs: number;
     readonly contextCharacters: number;
+    /** Searches run (1 without step-5 sub-queries). */
+    readonly queries?: number | undefined;
+    readonly reranker?: RetrievalRerankerCode | undefined;
+    readonly rerankMs?: number | undefined;
   };
 };
 
@@ -342,8 +398,8 @@ export const RetrievalHitSchema = z
  * hits sits inside its 5-12, chosen without a reranker so precision comes
  * from the fusion rather than from a second model.
  */
-export const DEFAULT_RETRIEVAL_CONFIG: RetrievalConfig = {
-  configVersion: RETRIEVAL_CONFIG_VERSION,
+export const RETRIEVAL_CONFIG_V1: RetrievalConfig = {
+  configVersion: RETRIEVAL_CONFIG_VERSION_V1,
   lexicalCandidates: 30,
   semanticCandidates: 30,
   queryEmbeddingBudgetMs: 2_500,
@@ -361,4 +417,19 @@ export const DEFAULT_RETRIEVAL_CONFIG: RetrievalConfig = {
   maxCharactersPerHit: 4_000,
   parentExpansion: true,
   reranker: "NONE",
+  maxSubQueries: 1,
+};
+
+/**
+ * V2 (Q intelligence step 5): v1's candidate counts and bounds, plus up to
+ * four sub-queries per retrieval (rewritten from the conversation ledger)
+ * and the deterministic local reranker over the 20 fused candidates before
+ * the final 8. Measured against v1 on the Q-IQ evidence turns
+ * (q-evals `q-iq-retrieval`).
+ */
+export const DEFAULT_RETRIEVAL_CONFIG: RetrievalConfig = {
+  ...RETRIEVAL_CONFIG_V1,
+  configVersion: RETRIEVAL_CONFIG_VERSION,
+  reranker: "LOCAL_FIELD_OVERLAP_V1",
+  maxSubQueries: RETRIEVAL_SUB_QUERIES_MAX,
 };

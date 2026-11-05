@@ -113,10 +113,13 @@ export {
 export {
   envelopeFromPlan,
   envelopeIsCurrent,
+  narrowEnvelopeToSubjects,
   retrievalConstraintsFor,
 } from "./retrieval/envelope.js";
 export {
   fuseByReciprocalRank,
+  fuseRankedLists,
+  type RankedList,
   type FusedItem,
   type FuseOptions,
   type FusionInput,
@@ -130,6 +133,25 @@ export type {
   LexicalSearchPort,
   LexicalSearchQuery,
 } from "./retrieval/ports.js";
+export {
+  askParts,
+  focusEntities,
+  namesInText,
+  planRetrievalQueries,
+  type PlannedFocusEntity,
+  type RetrievalFocusSource,
+  type RetrievalQueryPlan,
+} from "./retrieval/query-plan.js";
+export {
+  createLocalReranker,
+  LOCAL_RERANKER_WEIGHTS,
+  NO_RERANKER,
+  rerankerFor,
+  type RerankCandidate,
+  type RerankRequest,
+  type RetrievalReranker,
+} from "./retrieval/reranker.js";
+export { distinctTerms, searchTerms } from "./retrieval/terms.js";
 export {
   createAuthorisedRetrievalService,
   RetrievalCancelledError,
