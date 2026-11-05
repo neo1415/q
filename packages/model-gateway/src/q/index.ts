@@ -6572,8 +6572,7 @@ export function createModelGatewayQAnswer(
             ? null
             : artifactClaims.sentence(screenGuarded);
         // One boilerplate disclaimer at most (lead live replay 2026-10-07).
-        const caveatedRaw =
-          guarded === null ? null : caveats.sentence(guarded);
+        const caveatedRaw = guarded === null ? null : caveats.sentence(guarded);
         // No figure, date or name the run was not given is said aloud or
         // shown (step 6); checked before publish, so voice never speaks it.
         const claimed =

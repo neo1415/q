@@ -277,10 +277,16 @@ describe("an answer that arrives as it is written", () => {
     });
     const answer = "Runway is 14 months. Burn has been flat since March.";
     // Cut inside the second sentence: the first is whole, the second is not.
-    const { seam, request, published, stored } = build(answer, {}, {}, GROUNDS, {
-      afterChars: `{"answer":"Runway is 14 months. Burn has`.length,
-      until,
-    });
+    const { seam, request, published, stored } = build(
+      answer,
+      {},
+      {},
+      GROUNDS,
+      {
+        afterChars: `{"answer":"Runway is 14 months. Burn has`.length,
+        until,
+      },
+    );
     const running = seam.answer(request);
     await new Promise((resolve) => setTimeout(resolve, 20));
     // Before completion: the first sentence has reached the listener and

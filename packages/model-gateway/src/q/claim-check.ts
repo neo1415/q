@@ -246,10 +246,7 @@ function dateKeysIn(text: string): { key: string; year: number }[] {
 }
 
 function normaliseText(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[’‘`]/gu, "'")
-    .replace(/\s+/gu, " ");
+  return text.toLowerCase().replace(/[’‘`]/gu, "'").replace(/\s+/gu, " ");
 }
 
 /** The length of every list in a JSON source; nothing for prose. */
@@ -313,8 +310,7 @@ export function claimCorpus(
           numbers.push({ value: Number(part), currency: null });
         }
       }
-      for (const word of line.match(/(?<![\p{L}])[\p{Ll}][\p{L}'-]*/gu) ??
-        []) {
+      for (const word of line.match(/(?<![\p{L}])[\p{Ll}][\p{L}'-]*/gu) ?? []) {
         ordinary.add(word);
       }
     }

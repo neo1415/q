@@ -36,8 +36,9 @@ describe("claim check: invented claims", () => {
   it("says a metric's unknown once per answer, then removes the rest", () => {
     const said = new Set<string>();
     expect(checkSentence("ARR is $4.8M.", corpus, said).text).toMatch(/ARR/u);
-    expect(checkSentence("That ARR of $5.1M is strong.", corpus, said).text)
-      .toBeNull();
+    expect(
+      checkSentence("That ARR of $5.1M is strong.", corpus, said).text,
+    ).toBeNull();
   });
 
   it("removes a sentence naming an invented customer", () => {
@@ -47,13 +48,13 @@ describe("claim check: invented claims", () => {
   });
 
   it("removes an invented person", () => {
-    expect(check("The CTO, Michael Brennan, joined last year.").text).toBeNull();
+    expect(
+      check("The CTO, Michael Brennan, joined last year.").text,
+    ).toBeNull();
   });
 
   it("does not ground a figure in a different explicit currency", () => {
-    expect(check("Revenue was ₦1.2M last year.").ungrounded).toEqual([
-      "MONEY",
-    ]);
+    expect(check("Revenue was ₦1.2M last year.").ungrounded).toEqual(["MONEY"]);
   });
 });
 
@@ -79,7 +80,8 @@ describe("claim check: true claims pass untouched", () => {
   });
 
   it("matches a figure and a name from a tool result", () => {
-    const sentence = "Yamfield Agro has 1,340 customers and a 38% gross margin.";
+    const sentence =
+      "Yamfield Agro has 1,340 customers and a 38% gross margin.";
     expect(check(sentence)).toEqual({ text: sentence, ungrounded: [] });
   });
 
@@ -132,8 +134,9 @@ describe("claim check: true claims pass untouched", () => {
   });
 
   it("treats today's date and year as grounded", () => {
-    expect(check("As of November 2026, nothing has changed.").ungrounded)
-      .toEqual([]);
+    expect(
+      check("As of November 2026, nothing has changed.").ungrounded,
+    ).toEqual([]);
   });
 });
 
@@ -165,7 +168,8 @@ describe("claim check: extraction and the whole answer", () => {
       checker.sentence("Yamfield Agro has 1,340 customers.").ungrounded,
     ).not.toEqual([]);
     sources.push(TOOL_RESULT);
-    expect(checker.sentence("Yamfield Agro has 1,340 customers.").ungrounded)
-      .toEqual([]);
+    expect(
+      checker.sentence("Yamfield Agro has 1,340 customers.").ungrounded,
+    ).toEqual([]);
   });
 });
