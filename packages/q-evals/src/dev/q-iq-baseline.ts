@@ -44,7 +44,8 @@ function arg(name: string): string | undefined {
   return at === -1 ? undefined : process.argv[at + 1];
 }
 
-function pct(n: number): string {
+function pct(n: number | null): string {
+  if (n === null) return "not run";
   return `${(n * 100).toFixed(1)}%`;
 }
 
@@ -117,7 +118,15 @@ async function main(): Promise<number> {
   const limit = Number(arg("--limit") ?? Q_IQ_DATASET.cases.length);
   const budget = Number(arg("--budget") ?? "4.5");
   const out = arg("--out");
-  const cases = Q_IQ_DATASET.cases.slice(0, limit);
+  // Round-robin across categories, so a budget stop still samples every
+  // category instead of dropping the last ones (first live run, 5 Nov).
+  const byCategory = Q_IQ_CATEGORIES.map((c) =>
+    Q_IQ_DATASET.cases.filter((x) => x.category === c),
+  );
+  const interleaved = Array.from({ length: 15 }, (_, i) =>
+    byCategory.flatMap((list) => list.slice(i, i + 1)),
+  ).flat();
+  const cases = interleaved.slice(0, limit);
   const progress =
     (name: string) =>
     (run: { caseId: string; grade: { pass: boolean } }, spent: number) =>
