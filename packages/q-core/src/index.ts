@@ -2148,3 +2148,7 @@ export {
   COMPANY_ANALYST_V28,
   V28_TRIMS,
 } from "./prompts/tasks/company-analyst.v28.js";
+export {
+  COMPANY_ANALYST_V29,
+  V29_CHANGES,
+} from "./prompts/tasks/company-analyst.v29.js";

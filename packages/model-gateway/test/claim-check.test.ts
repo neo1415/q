@@ -131,6 +131,81 @@ describe("claim check: true claims pass untouched", () => {
     );
   });
 
+  it("grounds the live NUM-106 derivations whose inputs the sentence shows (live 2026-11-06)", () => {
+    // Live: "So what's that burn over a full year?" after "Silo Credit's
+    // monthly burn is $180k" became "I don't have a sourced figure for
+    // burn yet": a correct, visibly worked $2.16M was stripped.
+    const silo = claimCorpus(
+      [
+        "Silo Credit net monthly burn is $180k. company profile and data room",
+        "Silo Credit annual recurring revenue (ARR) is $2.4M.",
+        "Silo Health annual recurring revenue (ARR) is $1.1M.",
+      ],
+      TODAY,
+    );
+    const at = (sentence: string) => checkSentence(sentence, silo);
+    for (const sentence of [
+      "At $180k a month, Silo Credit's burn over a full year is $2.16M.",
+      "That's about $2.16M over a full year ($180k × 12).",
+      "Silo Credit's annual burn would be $2.16M ($180k × 12 months).",
+      "Silo Credit's burn over a full year is $2.16M, based on its reported $180k monthly burn × 12.",
+    ]) {
+      expect(at(sentence).ungrounded, sentence).toEqual([]);
+    }
+    // No input shown: the figure is not grounded by the sentence.
+    expect(at("Over a full year, that's $2.16M.").ungrounded).toEqual([
+      "MONEY",
+    ]);
+    // A wrong product, a non-calendar multiplier, an unsourced input.
+    expect(
+      at("At $180k a month, the burn over a full year is $2.5M.").ungrounded,
+    ).toEqual(["MONEY"]);
+    expect(at("That's $2.34M ($180k × 13).").ungrounded).toContain("NUMBER");
+    expect(
+      at("At $190k a month, the burn over a full year is $2.28M.").ungrounded,
+    ).toContain("MONEY");
+  });
+
+  it("uses the figures of the sentence just before as a derivation's inputs (live NUM-106 #3)", () => {
+    const silo = claimCorpus(
+      [
+        "Silo Credit annual recurring revenue (ARR) is $2.4M.",
+        "Silo Health annual recurring revenue (ARR) is $1.1M.",
+      ],
+      TODAY,
+    );
+    const answer =
+      "Silo Credit’s ARR is $1.3M higher than Silo Health’s: $2.4M versus $1.1M. That makes it about 2.2 times Silo Health’s ARR.";
+    expect(checkAnswer(answer, silo).text).toBe(answer);
+    const streamed = createClaimChecker(
+      () => [
+        "Silo Credit annual recurring revenue (ARR) is $2.4M.",
+        "Silo Health annual recurring revenue (ARR) is $1.1M.",
+      ],
+      TODAY,
+    );
+    expect(
+      streamed.sentence(
+        "Silo Credit’s ARR is $1.3M higher than Silo Health’s: $2.4M versus $1.1M.",
+      ).ungrounded,
+    ).toEqual([]);
+    expect(
+      streamed.sentence("That makes it about 2.2 times Silo Health’s ARR.")
+        .ungrounded,
+    ).toEqual([]);
+    // Only the sentence just before, and only its grounded figures.
+    expect(
+      checkAnswer(
+        "Silo Credit’s ARR is $2.4M. Silo Health’s is $1.1M. Together that is $9.9M.",
+        silo,
+      ).text,
+    ).not.toContain("$9.9M");
+    expect(
+      checkAnswer("Silo Credit’s ARR is $2.4M. That is 7.3 times more.", silo)
+        .text,
+    ).not.toContain("7.3");
+  });
+
   it("uses a sourced short duration as an input, never as a claim", () => {
     const withRunway = claimCorpus(
       ["Ledgerline: monthly burn $120,000; runway 9 months."],

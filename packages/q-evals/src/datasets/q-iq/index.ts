@@ -9,6 +9,10 @@ import { Q_IQ_ENTITIES, Q_IQ_FACTS } from "./world.js";
 
 export * from "./contracts.js";
 export {
+  Q_IQ_LIVE_GAPS_2026_11_06,
+  type QIqLiveGap,
+} from "./live-2026-11-06.js";
+export {
   Q_IQ_COMPANIES,
   Q_IQ_CONTRADICTIONS,
   Q_IQ_DOCUMENTS,

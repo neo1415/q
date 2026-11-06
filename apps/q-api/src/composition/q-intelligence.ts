@@ -68,6 +68,7 @@ import {
   createToolReadinessLead,
   createToolAppActionPort,
   createNamedCompanyPort,
+  createToolNameCandidatesPort,
   createToolOpenRecordPort,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
@@ -693,6 +694,13 @@ export function composeQIntelligence(
             ...(logger === undefined ? {} : { logger }),
           }),
         }),
+    // Live Q-IQ 2026-11-06 (AMB-136): a heard name that fits two
+    // companies the person may see is asked about, through
+    // search_companies' own authorize step.
+    nameCandidates: createToolNameCandidatesPort({
+      tools,
+      ...(logger === undefined ? {} : { logger }),
+    }),
     // Lead 2026-10-03: "what should I do next?" opens with their readiness.
     readinessLead: createToolReadinessLead({
       tools,

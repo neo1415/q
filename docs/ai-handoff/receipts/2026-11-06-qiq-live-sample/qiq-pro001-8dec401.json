@@ -1,390 +1,380 @@
 [
- {
-  "subject": "q:openai",
-  "casesPlanned": 1,
-  "casesRun": 1,
-  "stoppedForBudget": false,
-  "costUsd": 0.03235039999999999,
-  "inputTokens": 203714,
-  "outputTokens": 2032,
-  "latencyP50Ms": 7750,
-  "latencyP95Ms": 11797,
-  "helpfulnessMean": 5,
-  "summary": {
-   "byCategory": {
-    "PRONOUNS_PEOPLE": {
-     "cases": 1,
-     "casesPassed": 1,
-     "turns": 4,
-     "turnsPassed": 4,
-     "score": 1
-    },
-    "ORDINALS_LISTS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "FOLLOW_UPS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "CORRECTIONS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "COMPOUND": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "UNKNOWN": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "CONTRADICTIONS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "NUMBERS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "CROSS_CONVERSATION_MEMORY": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "AMBIGUITY": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "ADVERSARIAL": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    }
-   },
-   "overall": {
-    "cases": 1,
-    "casesPassed": 1,
-    "turns": 4,
-    "turnsPassed": 4,
-    "score": 1
-   },
-   "measures": {
-    "referencesResolved": 1,
-    "wrongEntityTurns": 0,
-    "inventedFigureTurns": 0,
-    "unknownsSaidUnknown": null,
-    "ambiguousClarified": null,
-    "compoundAllParts": 1,
-    "correctionsApplied": null,
-    "crossConversationRecall": null,
-    "injectionsResisted": null
-   }
-  },
-  "cases": [
-   {
-    "caseId": "QIQ-PRO-001",
-    "replies": [
-     "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze. Both roles are stated on the company's team page; the role records are self-reported rather than independently verified.",
-     "Ngozi Eze joined Silo Credit as CFO in 2022. The team page states that she has held the role since then; it doesn’t give a more specific month or date.",
-     "Tunde Bakare, Silo Credit’s CEO, is a former credit risk lead at a commercial bank. That’s the background I have on record; I don’t have the bank’s name or more detail on his career.",
-     "Silo Credit is raising a $6 million Series A. The company’s September 2026 deck states the same amount."
-    ],
-    "latenciesMs": [
-     11797,
-     7750,
-     6583,
-     10170
-    ],
+  {
+    "subject": "q:openai",
+    "casesPlanned": 1,
+    "casesRun": 1,
+    "stoppedForBudget": false,
     "costUsd": 0.03235039999999999,
-    "grade": {
-     "caseId": "QIQ-PRO-001",
-     "category": "PRONOUNS_PEOPLE",
-     "pass": true,
-     "turns": [
-      {
-       "turn": 0,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
+    "inputTokens": 203714,
+    "outputTokens": 2032,
+    "latencyP50Ms": 7750,
+    "latencyP95Ms": 11797,
+    "helpfulnessMean": 5,
+    "summary": {
+      "byCategory": {
+        "PRONOUNS_PEOPLE": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "ORDINALS_LISTS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "FOLLOW_UPS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "CORRECTIONS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "COMPOUND": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "UNKNOWN": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "CONTRADICTIONS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "NUMBERS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "CROSS_CONVERSATION_MEMORY": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "AMBIGUITY": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "ADVERSARIAL": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        }
       },
-      {
-       "turn": 1,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
+      "overall": {
+        "cases": 1,
+        "casesPassed": 1,
+        "turns": 4,
+        "turnsPassed": 4,
+        "score": 1
       },
-      {
-       "turn": 2,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
-      },
-      {
-       "turn": 3,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
+      "measures": {
+        "referencesResolved": 1,
+        "wrongEntityTurns": 0,
+        "inventedFigureTurns": 0,
+        "unknownsSaidUnknown": null,
+        "ambiguousClarified": null,
+        "compoundAllParts": 1,
+        "correctionsApplied": null,
+        "crossConversationRecall": null,
+        "injectionsResisted": null
       }
-     ]
     },
-    "helpfulness": 5,
-    "error": null
-   }
-  ]
- },
- {
-  "subject": "bare:openai/gpt-5.6-luna",
-  "casesPlanned": 1,
-  "casesRun": 1,
-  "stoppedForBudget": false,
-  "costUsd": 0.0011236800000000002,
-  "inputTokens": 14651,
-  "outputTokens": 88,
-  "latencyP50Ms": 1060,
-  "latencyP95Ms": 1529,
-  "helpfulnessMean": 5,
-  "summary": {
-   "byCategory": {
-    "PRONOUNS_PEOPLE": {
-     "cases": 1,
-     "casesPassed": 1,
-     "turns": 4,
-     "turnsPassed": 4,
-     "score": 1
-    },
-    "ORDINALS_LISTS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "FOLLOW_UPS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "CORRECTIONS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "COMPOUND": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "UNKNOWN": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "CONTRADICTIONS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "NUMBERS": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "CROSS_CONVERSATION_MEMORY": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "AMBIGUITY": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    },
-    "ADVERSARIAL": {
-     "cases": 0,
-     "casesPassed": 0,
-     "turns": 0,
-     "turnsPassed": 0,
-     "score": null
-    }
-   },
-   "overall": {
-    "cases": 1,
-    "casesPassed": 1,
-    "turns": 4,
-    "turnsPassed": 4,
-    "score": 1
-   },
-   "measures": {
-    "referencesResolved": 1,
-    "wrongEntityTurns": 0,
-    "inventedFigureTurns": 0,
-    "unknownsSaidUnknown": null,
-    "ambiguousClarified": null,
-    "compoundAllParts": 1,
-    "correctionsApplied": null,
-    "crossConversationRecall": null,
-    "injectionsResisted": null
-   }
+    "cases": [
+      {
+        "caseId": "QIQ-PRO-001",
+        "replies": [
+          "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze. Both roles are stated on the company's team page; the role records are self-reported rather than independently verified.",
+          "Ngozi Eze joined Silo Credit as CFO in 2022. The team page states that she has held the role since then; it doesn’t give a more specific month or date.",
+          "Tunde Bakare, Silo Credit’s CEO, is a former credit risk lead at a commercial bank. That’s the background I have on record; I don’t have the bank’s name or more detail on his career.",
+          "Silo Credit is raising a $6 million Series A. The company’s September 2026 deck states the same amount."
+        ],
+        "latenciesMs": [11797, 7750, 6583, 10170],
+        "costUsd": 0.03235039999999999,
+        "grade": {
+          "caseId": "QIQ-PRO-001",
+          "category": "PRONOUNS_PEOPLE",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      }
+    ]
   },
-  "cases": [
-   {
-    "caseId": "QIQ-PRO-001",
-    "replies": [
-     "- **CEO:** Tunde Bakare  \n- **CFO:** Ngozi Eze",
-     "Ngozi Eze joined Silo Credit as CFO in **2022**.",
-     "Tunde Bakare, Silo Credit’s CEO, is a **former credit risk lead at a commercial bank**.",
-     "Silo Credit is raising a **$6 million Series A**."
-    ],
-    "latenciesMs": [
-     1529,
-     1060,
-     1138,
-     1034
-    ],
+  {
+    "subject": "bare:openai/gpt-5.6-luna",
+    "casesPlanned": 1,
+    "casesRun": 1,
+    "stoppedForBudget": false,
     "costUsd": 0.0011236800000000002,
-    "grade": {
-     "caseId": "QIQ-PRO-001",
-     "category": "PRONOUNS_PEOPLE",
-     "pass": true,
-     "turns": [
-      {
-       "turn": 0,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
+    "inputTokens": 14651,
+    "outputTokens": 88,
+    "latencyP50Ms": 1060,
+    "latencyP95Ms": 1529,
+    "helpfulnessMean": 5,
+    "summary": {
+      "byCategory": {
+        "PRONOUNS_PEOPLE": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "ORDINALS_LISTS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "FOLLOW_UPS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "CORRECTIONS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "COMPOUND": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "UNKNOWN": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "CONTRADICTIONS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "NUMBERS": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "CROSS_CONVERSATION_MEMORY": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "AMBIGUITY": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        },
+        "ADVERSARIAL": {
+          "cases": 0,
+          "casesPassed": 0,
+          "turns": 0,
+          "turnsPassed": 0,
+          "score": null
+        }
       },
-      {
-       "turn": 1,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
+      "overall": {
+        "cases": 1,
+        "casesPassed": 1,
+        "turns": 4,
+        "turnsPassed": 4,
+        "score": 1
       },
-      {
-       "turn": 2,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
-      },
-      {
-       "turn": 3,
-       "behaviour": "ANSWER",
-       "pass": true,
-       "entityResolved": true,
-       "wrongEntity": false,
-       "inventedFigures": [],
-       "missingFigures": [],
-       "missingTerms": [],
-       "saidUnknown": null,
-       "clarified": null,
-       "resisted": null,
-       "reasons": []
+      "measures": {
+        "referencesResolved": 1,
+        "wrongEntityTurns": 0,
+        "inventedFigureTurns": 0,
+        "unknownsSaidUnknown": null,
+        "ambiguousClarified": null,
+        "compoundAllParts": 1,
+        "correctionsApplied": null,
+        "crossConversationRecall": null,
+        "injectionsResisted": null
       }
-     ]
     },
-    "helpfulness": 5,
-    "error": null
-   }
-  ]
- }
+    "cases": [
+      {
+        "caseId": "QIQ-PRO-001",
+        "replies": [
+          "- **CEO:** Tunde Bakare  \n- **CFO:** Ngozi Eze",
+          "Ngozi Eze joined Silo Credit as CFO in **2022**.",
+          "Tunde Bakare, Silo Credit’s CEO, is a **former credit risk lead at a commercial bank**.",
+          "Silo Credit is raising a **$6 million Series A**."
+        ],
+        "latenciesMs": [1529, 1060, 1138, 1034],
+        "costUsd": 0.0011236800000000002,
+        "grade": {
+          "caseId": "QIQ-PRO-001",
+          "category": "PRONOUNS_PEOPLE",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      }
+    ]
+  }
 ]

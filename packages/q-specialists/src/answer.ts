@@ -519,6 +519,11 @@ import {
   type OwnRecordMatch,
 } from "./company/own-names.js";
 import type { QNamedCompanyPort } from "./named-company.js";
+import {
+  bindHeardName,
+  nameReadings,
+  type QNameCandidatesPort,
+} from "./name-candidates.js";
 import { asksForOnePage } from "./company/document-length.js";
 import { fitToOnePage } from "./company/one-page.js";
 import type {
@@ -1174,6 +1179,13 @@ export type SpecialistQAnswerDependencies = {
    * is built from public sources, as before.
    */
   readonly namedCompany?: QNamedCompanyPort | undefined;
+  /**
+   * Live Q-IQ 2026-11-06 (AMB-136): the companies a name the reader heard
+   * could mean, from the person's own authorised record
+   * (name-candidates.ts). Absent: a heard name is never checked for a
+   * second reading.
+   */
+  readonly nameCandidates?: QNameCandidatesPort | undefined;
   /**
    * Voice speculation (latency2): a spoken turn's answer starts at once
    * under a conservative default reading, beside the turn reader, and is
@@ -6589,10 +6601,49 @@ export function createSpecialistQAnswer(
                 byQ: message.role === "Q",
               })),
             );
-      const binding = bindReferences(
+      let binding = bindReferences(
         named?.references ?? read.references,
         named?.state ?? shown,
       );
+      const shownState = named?.state ?? shown;
+      // A heard name with two readings in their own record (AMB-136):
+      // the reader's name for the company the turn is about, and any
+      // pointing phrase no ledger entry fit, each checked against the
+      // record; two candidates ask, as two readings of a phrase do.
+      const nameCandidates = dependencies.nameCandidates;
+      if (
+        binding.kind !== "CLARIFY" &&
+        nameCandidates !== undefined &&
+        shownState !== null
+      ) {
+        const heard = [
+          ...(read.namedOther?.kind === "COMPANY"
+            ? [read.namedOther.name]
+            : []),
+          ...(binding.kind === "BOUND" ? binding.open : []),
+        ].filter(
+          (name, index, all) =>
+            all.findIndex(
+              (other) => other.toLowerCase() === name.toLowerCase(),
+            ) === index &&
+            // A name the conversation already holds is that entry.
+            !shownState.ledger.entities.some(
+              (entity) => entity.name?.toLowerCase() === name.toLowerCase(),
+            ),
+        );
+        for (const name of heard.slice(0, 2)) {
+          const readings = nameReadings(
+            name,
+            await nameCandidates(request, name),
+            shownState,
+          );
+          const asked = bindHeardName(name, readings, shownState);
+          if (asked !== null) {
+            binding = { ...asked, rejected: binding.rejected };
+            break;
+          }
+        }
+      }
       if (binding.rejected.length > 0) {
         logger?.warn(
           { qRunId: request.runId, rejected: binding.rejected.length },
