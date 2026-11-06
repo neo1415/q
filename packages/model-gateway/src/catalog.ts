@@ -5,6 +5,8 @@ import {
   ModelLatencyClassSchema,
   ModelProviderCodeSchema,
   ModelQualityClassSchema,
+  ModelReasoningKeySchema,
+  ModelReasoningLevelSchema,
   ModelSensitivitySchema,
   ModelStatusSchema,
   ModelTaskClassSchema,
@@ -95,6 +97,15 @@ export const RoutingPolicyRecordSchema = z
      * Absent or null: no hedge.
      */
     hedgeAfterMs: z.number().int().positive().max(60_000).nullable().optional(),
+    /**
+     * Q Intelligence step 7: the reasoning level for each kind of work a
+     * caller names (`reasoningKey`). Absent or null, or a key it does not
+     * list: the request's own level.
+     */
+    reasoningLevels: z
+      .record(ModelReasoningKeySchema, ModelReasoningLevelSchema)
+      .nullable()
+      .optional(),
     costCeilingUsd: z.number().positive().nullable(),
     preferredModels: z.array(UuidSchema).min(1).max(8),
     fallbackModels: z.array(UuidSchema).max(8),

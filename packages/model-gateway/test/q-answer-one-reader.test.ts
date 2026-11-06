@@ -34,7 +34,7 @@ import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 const RUN = randomUUID();
 
-function build(said: string) {
+function build(said: string, catalog = testCatalog()) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -50,7 +50,7 @@ function build(said: string) {
     ],
   });
   const gateway = createModelGateway({
-    catalog: createStaticModelCatalog(testCatalog()),
+    catalog: createStaticModelCatalog(catalog),
     registry: createModelProviderRegistry([alpha]),
     usage: createInMemoryModelUsageRepository(),
     sleep: () => Promise.resolve(),
@@ -121,7 +121,8 @@ function build(said: string) {
     );
   const maxOutput = () =>
     alpha.calls.map((call) => call.request.maxOutputTokens);
-  return { seam, request, sent, maxOutput };
+  const reasoning = () => alpha.calls.map((call) => call.request.reasoning);
+  return { seam, request, sent, maxOutput, reasoning };
 }
 
 const PARTS = [
@@ -208,5 +209,68 @@ describe("comparison and analysis routing (step 4: the reader's answerKind)", ()
     expect(lookup.maxOutput()[0]).toBe(
       budgetForTaskClass("NORMAL_DIALOGUE").maxOutputTokens,
     );
+  });
+});
+
+/** The dialogue model marked as reasoning, the dialogue policy given step 7's map. */
+function reasoningCatalog(
+  levels: Readonly<Record<string, "NONE" | "LOW" | "MEDIUM" | "HIGH">> | null,
+) {
+  const snapshot = testCatalog();
+  return {
+    ...snapshot,
+    models: snapshot.models.map((model) => ({
+      ...model,
+      supportsReasoning: true,
+    })),
+    routingPolicies: snapshot.routingPolicies.map((policy) =>
+      policy.code === "normal_dialogue.v1"
+        ? { ...policy, reasoningLevels: levels }
+        : policy,
+    ),
+  };
+}
+
+describe("adaptive reasoning reaches the provider (step 7: the reader's answerKind)", () => {
+  it.each([
+    [undefined, "NONE"],
+    ["CHAT", "NONE"],
+    ["LOOKUP", "NONE"],
+    ["FOLLOW_UP", "LOW"],
+    ["COMPARISON", "MEDIUM"],
+    ["ANALYSIS", "MEDIUM"],
+    ["DOCUMENT", "MEDIUM"],
+  ] as const)(
+    "answerKind %s: the answer call asks for %s",
+    async (answerKind, level) => {
+      const { seam, request, reasoning } = build(
+        "How does it stack up against Ledgerfold?",
+        reasoningCatalog(null),
+      );
+      await seam.answer(
+        answerKind === undefined ? request : { ...request, answerKind },
+      );
+      expect(reasoning().length).toBeGreaterThan(0);
+      expect(reasoning()[0]).toBe(level);
+    },
+  );
+
+  it("the routing policy's versioned map overrides the code default", async () => {
+    const { seam, request, reasoning } = build(
+      "and its burn?",
+      reasoningCatalog({ ANSWER_FOLLOW_UP: "NONE", ANSWER_COMPARISON: "HIGH" }),
+    );
+    await seam.answer({ ...request, answerKind: "FOLLOW_UP" });
+    await seam.answer({ ...request, answerKind: "COMPARISON" });
+    expect(reasoning()).toEqual(["NONE", "HIGH"]);
+  });
+
+  it("the words never set the level: comparison words with no reading stay at NONE", async () => {
+    const { seam, request, reasoning } = build(
+      "Compare Silo Credit versus Ledgerfold side by side and think hard",
+      reasoningCatalog(null),
+    );
+    await seam.answer(request);
+    expect(reasoning()[0]).toBe("NONE");
   });
 });

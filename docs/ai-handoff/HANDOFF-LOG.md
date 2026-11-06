@@ -1568,3 +1568,12 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - 23:15 UTC: deployed `b2c08ab2a` (steps 2+3, claim-check arithmetic) at 23:07 after CI 42125008157 green; all four services SUCCESS. The restart cleared q-api's OpenAI block after the owner's top-up. live14 PASS: loan book USD 410,000 (up from 150,000), "its PAR30" bound to Ledgerfold, 3.8%. Live Q-IQ re-run waits for the owner's OK on spend.
 - 6 Nov 00:10 UTC: step 5 (`feat/q-retrieval-context` @ `332ba2508`) merged as `347b74a8c`; CI 42130822191 green; deployed 23:58. live15: a compound pronoun follow-up bound "it" correctly but missed Ledgerfold's 2,150 borrowers (a direct ask is correct); sent back for a root cause (`fix/q-compound-retrieval`). Step 4 (`c72583e97`) is gates-green on b2c08ab and re-gating on top of step 5.
 - 6 Nov 00:55 UTC: merged step 4 (`3c1487d`) as `be45024f1` and the compound-follow-up fix (`df233c054`; cause: only named companies were pre-read, so a company bound from "it" wasn't) as `605c76e59`; CI 42138230329 running (it superseded run 42135774131). Step 7 gates-green with additive migration `20261231260000`; merge after this deploy. Steps 7 and 8 lanes started 00:18. The continuation prompt now reads lanes from this board.
+
+## 2026-11-06 (Q intelligence step 7, `feat/q-adaptive-reasoning`; not merged or deployed)
+
+- The reader's answerKind sets the answer's reasoning: NONE for chat and lookups, LOW for follow-ups, MEDIUM for comparison, analysis and documents. With no reading it is NONE.
+- The level per kind lives in `ai_ops.routing_policies.reasoning_levels`. Migration `20261231260000` is additive, with pgTAP 999 at 12/12. The gateway applies it per request and only to reasoning-capable models.
+- The lead-sentence stream was skipped: it would bypass the claim check.
+- Scripted Q-IQ: 571/573, unchanged.
+- **Integration owner:** CI pgTAP, then a hosted apply of `20261231260000`, then deploy. A live Q-IQ is needed for the comparison and number bar and the follow-up p50.
+- Receipt: `docs/ai-handoff/receipts/2026-11-06-q-step7.md`.
