@@ -55,6 +55,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "section.accounts", kind: "SECTION" },
   { id: "section.action-plan", kind: "SECTION" },
   { id: "section.activity", kind: "SECTION" },
+  { id: "section.analytics-settings", kind: "SECTION" },
   { id: "section.attribution", kind: "SECTION" },
   { id: "section.audit", kind: "SECTION" },
   { id: "section.blocks", kind: "SECTION" },
