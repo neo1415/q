@@ -132,6 +132,7 @@ import {
   shownTurnOf,
   withoutStatusTalk,
   TURN_READER_RECENT_TURNS_MAX,
+  priorListings,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
@@ -8125,9 +8126,27 @@ export function createSpecialistQAnswer(
       // or a search: RESEARCH_REQUEST, or a question with asksForWeb), are
       // found by a discovery plan built from the mandate, never one search
       // on the words. Investors asked for keep D1's path.
-      ...(read?.discoverWhom === "COMPANIES" &&
+      // URGENT, live 2026-11-06 on 3547127f2: the reading said
+      // DISCOVER_COMPANIES on a research request without discoverWhom
+      // (run 01bef0a1), and "more online" after a list was read
+      // PUBLIC_FACTS (run f477cbe4); neither was handed over and the early
+      // web search answered. A web ask hands over to discovery when the
+      // reading asks for companies (discoverWhom COMPANIES, or a
+      // DISCOVER_COMPANIES or FIT question), or when Q already listed a
+      // discovery in this conversation (code's own record, not words).
+      // Investors asked for never do.
+      ...(read !== null &&
+      read.discoverWhom !== "INVESTORS" &&
       (read.kind === "RESEARCH_REQUEST" ||
-        (read.kind === "QUESTION_TO_Q" && read.asksForWeb === true))
+        (read.kind === "QUESTION_TO_Q" && read.asksForWeb === true)) &&
+      (read.discoverWhom === "COMPANIES" ||
+        read.question?.kind === "DISCOVER_COMPANIES" ||
+        read.question?.kind === "FIT" ||
+        priorListings(
+          history
+            .filter((message) => message.role === "Q")
+            .map((message) => message.content),
+        ).length > 0)
         ? {
             webDiscovery: {
               text: read.question?.text ?? "",

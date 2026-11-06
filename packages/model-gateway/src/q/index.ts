@@ -691,6 +691,7 @@ export {
   DISCOVERY_QUERIES,
   namedIn,
   planDiscovery,
+  priorListings,
   queryIsPublic,
   runWebDiscovery,
   type DiscoveredCompany,
