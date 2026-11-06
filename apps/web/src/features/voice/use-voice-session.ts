@@ -161,6 +161,9 @@ export function useVoiceSession(
       if (input.credential.duplex !== undefined && !quota) {
         setActive("duplex");
         if (await duplex.start(input)) return;
+        // Ended while the duplex line was trying (it closed itself and let
+        // its microphone go): no standard line comes up after an End.
+        if (!current()) return;
       }
       setActive(provider);
       await (provider === "deepgram" ? deepgram : elevenLabs).start(input);

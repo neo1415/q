@@ -5783,10 +5783,22 @@
   position: sticky;
   top: 0;
   display: flex;
-  width: 100%;
+  /* Its field reaches past the column by the stage's gutter, so the edges
+     of wide cards scrolling under it are covered too. */
+  width: calc(100% + 40px);
+  margin-inline: -20px;
   justify-content: center;
   padding-block: 8px;
   background: var(--cq-stage-canvas);
+  /* Above the cards scrolling under it (they lift on hover and focus). */
+  z-index: var(--cq-z-sticky);
+}
+/* The stage's gutter is 20px on a phone and 32px from 640px (px-5, px-8). */
+@media (min-width: 640px) {
+  .cq-voice-room-presence {
+    width: calc(100% + 64px);
+    margin-inline: -32px;
+  }
 }
 
 /*

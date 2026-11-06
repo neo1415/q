@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQStreamState } from "@capital-q/api-client";
 
 import type { QTurn } from "../src/features/q/conversation";
+import type { SpokenLine } from "../src/features/q/spoken";
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 
 /**
@@ -24,7 +25,8 @@ const talk = vi.fn(() => Promise.resolve());
 const state: {
   turns: readonly QTurn[];
   voiceActive: boolean;
-} = { turns: [], voiceActive: false };
+  spokenOnly: readonly SpokenLine[];
+} = { turns: [], voiceActive: false, spokenOnly: [] };
 const voiceEnd = vi.fn((_reason?: string) => Promise.resolve());
 const voiceTalk = vi.fn(() => Promise.resolve());
 const speechStop = vi.fn();
@@ -86,7 +88,9 @@ vi.mock("@/features/q/q-session", () => ({
       end: voiceEnd,
       setVoice: vi.fn(),
     },
-    spokenOnly: [],
+    get spokenOnly() {
+      return state.spokenOnly;
+    },
     spoken: [],
     voiceOutcomes: [],
     spokenPreview: null,
@@ -110,6 +114,7 @@ let reducedMotion = false;
 beforeEach(() => {
   state.turns = [];
   state.voiceActive = false;
+  state.spokenOnly = [];
   reducedMotion = false;
   talk.mockClear();
   voiceTalk.mockClear();
@@ -394,7 +399,7 @@ function longConversation(): readonly QTurn[] {
 }
 
 describe("the Q view in a conversation is the voice room (owner 2026-11-06, live)", () => {
-  it("pins Q's presence and shows only the current exchange, cards one line each", async () => {
+  it("pins Q's presence and shows the current exchange with its cards in full", async () => {
     state.turns = longConversation();
     localStorage.setItem("cq.q.view", "presence");
     render(
@@ -414,15 +419,14 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
     expect(pinned?.querySelector("[data-q-aperture]")).not.toBeNull();
     expect(pinned?.getAttribute("aria-hidden")).toBe("true");
     expect(room?.firstElementChild).toBe(pinned);
-    // No transcript: no thread, no earlier turns, no full cards.
+    // One presence only: the stage under it draws none of its own.
+    expect(room?.querySelectorAll("[data-q-aperture]")).toHaveLength(1);
+    // No transcript: no thread, no earlier turns.
     expect(document.querySelector("[data-q-thread]")).toBeNull();
     const body =
       document.querySelector("[data-q-voice-stage-body]")?.textContent ?? "";
     expect(body).not.toContain("Earlier question 1");
     expect(body).not.toContain("Earlier answer 5");
-    for (const reason of DISCOVERY.cards[0]?.reasons ?? []) {
-      expect(body).not.toContain(reason);
-    }
     // Their last line and Q's reply as a caption, as plain words.
     expect(
       document.querySelector("[data-q-exchange-person]")?.textContent,
@@ -430,37 +434,93 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
     expect(
       document.querySelector("[data-q-exchange-caption]")?.textContent,
     ).toContain("I found five founders raising now.");
-    // Cards: one line each, at most four, the rest one way to Chat.
-    const lines = document.querySelectorAll("[data-q-card-line]");
-    expect(lines).toHaveLength(4);
-    const first = DISCOVERY.cards[0];
-    expect(lines[0]?.textContent).toBe(
-      first?.line === null || first?.line === undefined
-        ? first?.name
-        : `${first.name} · ${first.line}`,
-    );
-    screen.getByRole("button", { name: "See all in Chat" });
+    // Owner 2026-11-06: the cards in full (the stage's canvas), not lines.
+    expect(document.querySelector("[data-q-card-line]")).toBeNull();
+    for (const name of NAMES) {
+      expect(
+        (await screen.findAllByText(name, {}, { timeout: 4000 })).length,
+      ).toBeGreaterThan(0);
+    }
     screen.getByRole("button", { name: "Earlier in this conversation" });
+    // G-R3: the exchange's rows, with their ids, for screen readers and
+    // the voice scripts; the words on screen are not read twice.
+    const rows = screen.getByRole("list", { name: "Latest exchange" });
+    expect(
+      rows.querySelector('[data-q-turn-role="USER"]')?.textContent,
+    ).toContain("Find me founders raising in fintech");
+    expect(rows.querySelector('[data-q-turn-role="Q"]')).not.toBeNull();
+    expect(
+      document
+        .querySelector("[data-q-exchange-caption]")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
   });
 
-  it("a card line opens Chat, where the whole transcript and the cards are", async () => {
+  it("Earlier in this conversation opens Chat, where the whole transcript is", async () => {
     state.turns = longConversation();
     localStorage.setItem("cq.q.view", "presence");
     render(<QConversationPanel connected context={CONTEXT} />);
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
-    const first =
-      document.querySelector<HTMLButtonElement>("[data-q-card-line]");
-    if (first !== null) fireEvent.click(first);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Earlier in this conversation" }),
+    );
     expect(viewSwitch().getAttribute("data-q-view")).toBe("chat");
     const thread = document.querySelector("[data-q-thread]")?.textContent ?? "";
     expect(thread).toContain("Earlier question 1");
-    // The cards are Chat's again, in full (their canvas loads on demand).
-    expect(
-      (await screen.findAllByText(NAMES.at(-1) ?? "-", {}, { timeout: 4000 }))
-        .length,
-    ).toBeGreaterThan(0);
+    expect(thread).toContain("Find me founders raising in fintech");
     expect(document.querySelector("[data-q-voice-room]")).toBeNull();
+  });
+});
+
+describe("one conversation under both views (owner 2026-11-06)", () => {
+  it("switching to Q mid-conversation carries on from the thread, never the arrival greeting", async () => {
+    state.turns = longConversation();
+    await renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Q" }));
+    expect(talk).toHaveBeenCalledTimes(1);
+    const greeting =
+      (
+        talk.mock.calls[0] as unknown as [{ greeting?: string }] | undefined
+      )?.[0]?.greeting ?? "";
+    expect(greeting).toContain("Find me founders raising in fintech");
+    expect(greeting).toContain("I found five");
+    expect(greeting).not.toContain("Welcome back");
+    expect(greeting).not.toMatch(/things? (are )?waiting/u);
+  });
+
+  it("an empty thread still opens with the arrival greeting", async () => {
+    await renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Q" }));
+    const greeting =
+      (
+        talk.mock.calls[0] as unknown as [{ greeting?: string }] | undefined
+      )?.[0]?.greeting ?? "";
+    expect(greeting).toBe("Welcome back, David.");
+  });
+
+  it("what was said on the voice line is in Chat's transcript", async () => {
+    state.turns = longConversation();
+    state.spokenOnly = [
+      {
+        id: "s1",
+        role: "user",
+        text: "Tell me about the second one",
+        after: "q-6",
+      },
+      {
+        id: "s2",
+        role: "q",
+        text: "Kestrel Heat installs heat pumps in a day.",
+        after: "q-6",
+      },
+    ];
+    localStorage.setItem("cq.q.view", "chat");
+    await renderHome();
+    const thread = document.querySelector("[data-q-thread]")?.textContent ?? "";
+    expect(thread).toContain("Find me founders raising in fintech");
+    expect(thread).toContain("Tell me about the second one");
+    expect(thread).toContain("Kestrel Heat installs heat pumps in a day.");
   });
 });

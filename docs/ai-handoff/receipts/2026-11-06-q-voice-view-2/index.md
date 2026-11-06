@@ -185,3 +185,112 @@ Measured in the page, with no scrolling:
   - That includes `back-everywhere`, `destination-routes` and `manifest-page-coverage`.
 - `packages/q-core` vitest: 149 files passed and 1 skipped; 841 tests passed and 1 skipped.
 - prettier: clean.
+
+## Addendum 3: one conversation, so voice carries on (owner 2026-11-06)
+
+1. **The arrival greeting only opens an empty thread.** In the panel's `talk()`, a thread with turns (typed in Chat or said earlier) no longer gets the arrival words. That applies to the switch, the composer's Q button and Talk to Q alike. The fallback in `q-session.talk()` (`callOpening()`, the briefing) is only reached when the panel hands no line. With turns, the panel now always hands one.
+2. **Q's first words continue the thread** (`continuation.ts`, `continuationLine`). They are built deterministically from the turns the page holds:
+   - after an answer with cards: "You'd asked “Find me founders raising in fintech right now”, and I found five. Want me to go through them, or something else?";
+   - after an answer in words: "We were on “What's Brightwell's runway”. Want to pick up from there, or something else?";
+   - when Q had not answered yet: "You'd asked “…”. Want me to carry on with that, or something else?".
+
+   The person's words are said back at most 90 characters long, cut at a word. There is no waiting-count tail, because the client can't tell what arrived since the last turn without a new read, so none is added.
+
+3. **Same conversation id. This was already true, and is now covered further:**
+   - `q-session.talk()` opens the line with `resume: true` and `thread.conversationId` set to the open conversation. `voice-resume-conversation.test.tsx` already asserts both, and that no arrival greeting is sent.
+   - With a greeting line from the panel, the line still resumes. The server composes no opening on a resumed line (`apps/q-api/src/voice/routes.ts`), and Q says the panel's line.
+   - Spoken lines join Chat's transcript through `spokenOnly` and `threadInOrder`. There is a new test for this.
+
+### What was found about a model-written opener
+
+The owner preferred an opener written by Q itself, about 1.5 s, from `q_runtime.conversation_states`. It is not possible today without a server change:
+
+- On `resume`, the q-api voice session route deliberately composes no opening, and the browser has no read of the conversation state.
+- Adding one means a new step in `apps/q-api/src/voice/routes.ts` (resume branch). It would read the conversation state through q-runtime's repositories and run one bounded model call through the Q Model Gateway, with a timeout of about 1.5 s. This deterministic line would be the fallback.
+- That is a server lane: q-runtime, the model gateway and q-api. It is outside this UI lane, which may not touch q-runtime or the model gateway. It is proposed to the integration owner, not built.
+
+### Tests
+
+- **New:** `test/q-voice-continuation.test.ts` (6 tests):
+  - empty means null;
+  - cards are named with a count;
+  - an answer in words is picked up;
+  - an unanswered question offers to carry on;
+  - long words are cut at a word;
+  - there is never a waiting count or welcome.
+- **New, in `q-voice-view.test.tsx`:**
+  - mid-conversation, the switch speaks the continuation, with no "Welcome back" and no waiting count;
+  - an empty thread still opens with the arrival greeting;
+  - voice lines appear in Chat's transcript.
+- **Failing-first** against the previous panel (`19777b9`): the mid-conversation test failed (it had no line); the others passed there. The empty-thread test and the voice-in-Chat test check behaviour that already existed.
+
+### Gates (exact results)
+
+- Root tsc: exit 0.
+- Web tsc: exit 0.
+- eslint on the 4 touched files: exit 0, with no findings. The first run warned on `talk()`'s dependency list; it now lists `turns` and `spoken`.
+- Full web vitest, re-run after that fix: 468 files and 4071 tests passed, exit 0.
+- `prettier --check apps/web`: clean.
+
+## Addendum 4: the duplex microphone after Chat, and full cards in the Q view (owner 2026-11-06)
+
+### The microphone a stuck duplex line kept
+
+**Live finding** (the integration owner's run on `d3829431a`, with UDP blocked): after switching to Chat, a track opened by `duplex-line.ts` `open()` was still live.
+
+**Cause:** the line itself was sound. Its fallback and close (`#finish`) stop every track. The problem was above it, in two places:
+
+1. `use-voice-interview` `end()` closed the transports only through `endVoiceLine`, which waits for any open still in progress (the voice-line exclusive queue). A duplex line stuck connecting held its stream until its timeouts and its rejoin attempt ran out.
+2. `use-voice-session` `start()`, once ended mid-duplex, could still bring up the standard line after the duplex line gave up.
+
+**Fix:**
+
+1. `end()` now ends this surface's own transports at once, and again after any open in progress. Both are idempotent.
+2. `start()` opens no standard line after an End.
+
+**Tests:**
+
+- `voice-off-line-mid-connect.test.ts` (2 tests): a failed connect falls back and stops the track; a close mid-connect stops it at once.
+- `voice-off-session-mid-start.test.tsx` (1 test): ending mid-duplex-start opens no standard line.
+- `voice-off-interview-mid-open.test.tsx` (1 test): End reaches the transport while the open is still in flight.
+- **Failing-first** against the previous hooks: the session test and the interview test failed. The two line tests passed, which confirms the line was already correct.
+
+### Full cards in the conversation's Q view (owner decision)
+
+This replaces addendum 2's one-line cards.
+
+- **Kept:** the pinned presence (280 / 200 px) and the current exchange (their last line and Q's caption).
+- **Under them:** `QPresenceStage` again, so the answer's cards are drawn in full. Its stage objects work again: the cards canvas, room documents, live previews and the flight to the Board. A company Q names on a live call appears as a full card.
+- **One presence:** the stage draws no presence of its own; the pinned one stays.
+- **Unchanged:** earlier turns are still Chat's.
+- **CSS:** the pinned presence is above the cards scrolling under it (`z-index: var(--cq-z-sticky)`), and its field reaches past the column by the stage's gutter. That is 20 px on a phone and 32 px from 640 px, so there is no sideways scroll; measured, the stage's `scrollWidth` equals its `clientWidth` at both widths.
+
+### The `?c=demo` proof, updated
+
+`after-conversation-q-*` and the new `after-conversation-q-scrolled-*` cover 1440 and 390, light and dark.
+
+- **At rest:** the presence is fully in view (280 / 200 px). All four card names are drawn in full, there are no card lines, there is no thread, and no earlier turn is shown.
+- **Scrolled to the end of the cards:** the presence stays pinned at the top (y = 72 to 352 at 1440, 73 to 273 at 390) and above the cards.
+- **Before:** `before-conversation-q-*` is unchanged (`1501a54`), with no presence in view.
+
+### Tests in `q-voice-view.test.tsx`, updated honestly
+
+- "Pins Q's presence and shows the current exchange with its cards in full": one aperture only, no thread, no earlier turns, every card name drawn, and no card lines.
+- "Earlier in this conversation opens Chat, where the whole transcript is."
+
+### Restored after a review of the full diff against `1501a54`
+
+- **The G-R3 screen-reader rows** of the current exchange (`Latest exchange`, with `data-q-turn-id`, `data-q-turn-role` and `data-q-disposition`). `scripts/recovery/voice/play-clips.mjs` counts the USER rows. The visible exchange words are `aria-hidden` there, so nothing is read twice; its buttons stay reachable.
+- **The pinned work lines** for documents still being made, in the non-voice caption.
+- **The written-answer note** to an open line (`briefLine`), back to its plain call. An earlier splice had appended a stray expression to it. The call still ran, so behaviour was unchanged, but eslint caught it (`no-unused-expressions`). It is fixed in `e4cb224`.
+
+The screenshots were taken at `bbc24c3`. These restorations add only an `sr-only` list and an empty-hidden work-line slot, so the shots are unchanged.
+
+### Gates (exact results, at `e4cb224`)
+
+- Root tsc: exit 0.
+- Web tsc: exit 0.
+- eslint on the 10 touched files: exit 0, with no findings.
+- Full web vitest: 471 files and 4075 tests passed, exit 0.
+  - That includes `back-everywhere` (87), `destination-routes` (52) and `manifest-page-coverage` (3).
+- `prettier --check apps/web` and the receipt: clean.

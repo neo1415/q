@@ -745,9 +745,18 @@ export function useVoiceInterview(
       // the one that was ended.
       connecting.current = null;
       reset();
+      // Owner 2026-11-06 (live): off means off at once. This surface's own
+      // transports stop now, even mid-connect -- a duplex line stuck
+      // connecting (UDP blocked) kept its microphone open until its
+      // timeouts ran out, because the end below waits for the open. The
+      // open in progress sees the new generation and opens nothing more.
+      const closing = clientRef.current
+        .end(detail ?? "user")
+        .catch(() => undefined);
       // After any open still in progress, so an End pressed while connecting
       // is never followed by the line coming up.
       await endVoiceLine(holder, () => clientRef.current.end(detail ?? "user"));
+      await closing;
     },
     [holder, reset],
   );

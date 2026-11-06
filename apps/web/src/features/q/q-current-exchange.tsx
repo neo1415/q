@@ -64,6 +64,8 @@ export function QCurrentExchange({
   captions,
   earlier,
   onOpenChat,
+  cardLines = true,
+  announce = true,
 }: {
   /** The person's last line and what Q said after it. */
   readonly lines: readonly ExchangeLine[];
@@ -76,6 +78,17 @@ export function QCurrentExchange({
   /** The conversation has more before this exchange. */
   readonly earlier: boolean;
   readonly onOpenChat: () => void;
+  /**
+   * The answer's cards as one line each. Off where the stage draws them
+   * in full under this exchange (owner 2026-11-06: full cards in Q).
+   */
+  readonly cardLines?: boolean | undefined;
+  /**
+   * Whether these words are read out. False where a screen-reader list
+   * of the same exchange (with each turn's id and disposition, G-R3) is
+   * on the page, so nothing is read twice; the buttons stay reachable.
+   */
+  readonly announce?: boolean | undefined;
 }) {
   const t = useT();
   const person = lines.findLast((line) => line.role === "person");
@@ -87,7 +100,7 @@ export function QCurrentExchange({
       : reply === undefined
         ? null
         : plainFromMarkdown(reply.text);
-  const cards = cardLinesOf(reply?.turn);
+  const cards = cardLines ? cardLinesOf(reply?.turn) : [];
   const shown = cards.slice(0, CARD_LINES_AT_MOST);
   const more = cards.length - shown.length;
   return (
@@ -98,6 +111,7 @@ export function QCurrentExchange({
       {said === null ? null : (
         <p
           className="cq-body m-0 line-clamp-2 text-(--cq-text-secondary)"
+          aria-hidden={announce ? undefined : true}
           data-q-exchange-person
         >
           <span className="sr-only">{t("You:")} </span>
@@ -107,7 +121,8 @@ export function QCurrentExchange({
       {captions && caption !== null ? (
         <p
           className="cq-body m-0 line-clamp-3 text-(--cq-text-primary)"
-          aria-live="polite"
+          aria-live={announce ? "polite" : undefined}
+          aria-hidden={announce ? undefined : true}
           data-q-exchange-caption
         >
           <span className="sr-only">Q: </span>
