@@ -16,3 +16,16 @@ Branch `fix/q-claude-parity` @ 7aa4bf665. Command: `--live --provider anthropic 
   - Wrong-entity turns: 7.
   - The failures are mostly reference binding (ordinals and pronouns resolved to the wrong company), with the turn reader on claude-haiku-5-5.
 - Files: `claude-calls.log` (per-call debug lines), `failures.json`.
+
+## Run 2: Sonnet throughout plus the answer-scope line (fix/q-claude-parity @ 728606250)
+
+- **Cost: $1.737** ($0.145 per case). The reader now runs on Sonnet: quality before price (DECISIONS 69).
+- **Anthropic test spend running total: about $7.7.** That is today's benchmarks ($4.44), run 1 ($1.556) and this run. The lane's earlier adapter tests are in its own receipt.
+- **Quality, excluding DISCOVERY** (the harness has no web): **39/42 turns, 92.9%** (run 1: 32/42, 76.2%). Over the same 11 cases in Live run 2: Q on OpenAI 39/42, bare OpenAI 40/42. **Quality parity with Q on OpenAI.**
+  - PRONOUNS, FOLLOW_UPS, CORRECTIONS, COMPOUND, UNKNOWN, CONTRADICTIONS, MEMORY and ADVERSARIAL: 100%.
+  - ORDINALS 80%, NUMBERS 80%, AMBIGUITY 66.7%.
+- Wrong-entity turns 7 → 1; invented-figure turns 3 → 1. The remaining failures:
+  - ORD-016 t3: wrong entity.
+  - NUM-106 t3: unrequested working; the claim-check arithmetic slice owns it.
+  - AMB-136 t1: a figure missing.
+- Debug lines: `claude-calls-run2.log`.
