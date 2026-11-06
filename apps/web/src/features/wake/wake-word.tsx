@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { microphoneHeld, watchMicrophoneHolds } from "../voice/mic-hold";
 import { useQSessionOptional } from "../q/q-session";
+import { showQVoiceView } from "../q/stage-view";
 import { playSound } from "../q-sound/sound-engine";
 import { readSoundPreference } from "../q-sound/sound-preference";
 import { voiceAudioOwner, watchVoiceAudio } from "../voice/voice-audio";
@@ -291,7 +292,13 @@ function WakeListener({ openQ }: { readonly openQ: () => void }) {
               if (readSoundPreference() !== "OFF") playSound("wake");
             },
             openQ: open,
-            talk: () => void q?.talk({ greeting: WAKE_GREETING }),
+            talk: () => {
+              // Voice means the Q view (owner 2026-11-06): Chat would end
+              // the line, so the wake chooses Q's voice view first, on the
+              // Q page or the one it is about to open.
+              showQVoiceView();
+              void q?.talk({ greeting: WAKE_GREETING });
+            },
           });
           if (!acted) return;
           // The microphone is the call's now. A line that opens pauses
