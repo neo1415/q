@@ -331,9 +331,9 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
         const grade = run.grade.turns[gap.turn];
         if (process.env["CQ_Q_IQ_DEBUG"] === "1")
           console.log(at, prompts.length, JSON.stringify(reply));
-        if (gap.promptFact !== undefined && gap.promptLine !== undefined) {
-          // The fact reached the answer, with the instruction the live
-          // model lacked; the live words alone still fail (model-side).
+        if (gap.promptFact !== undefined) {
+          // The fact (or the recalled words) reached the answer; the live
+          // words alone still fail where the cause is the model's reading.
           if (!prompts.some((p) => p.includes(gap.promptFact ?? "")))
             problems.push(`${at}: the fact did not reach the answer`);
         }

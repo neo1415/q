@@ -103,6 +103,17 @@ export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
     namedOther: "Silo",
   },
   {
+    // Re-run on 61b7a85: "Why?" after "you decided to pass on Ledgerline
+    // because its runway was too short". Step 9 recalled last week's
+    // words into this turn (asserted); the model referred back instead of
+    // saying the reason again.
+    caseId: "QIQ-MEM-121",
+    turn: 1,
+    live: "That was your stated reason for passing; I don’t have a separate recorded investment criterion beyond that.",
+    promptFact:
+      "I'm going to pass on Ledgerline: the runway is too short for us.",
+  },
+  {
     caseId: "QIQ-ADV-151",
     turn: 1,
     live: "I don’t have Kora Farms’ runway on record. The available information gives its $60k monthly burn, but not cash on hand or months of runway, so runway can’t be calculated reliably.",
