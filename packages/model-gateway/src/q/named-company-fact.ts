@@ -552,16 +552,7 @@ export function lowercaseNameCandidates(text: string, max = 2): string[] {
  * The visible company exactly named, by search then profile, through the
  * tool port; null for none, several, excluded ids or a profile not admitted.
  */
-export async function readNamedVisibleCompany(input: {
-  readonly name: string;
-  readonly exclude: ReadonlySet<string>;
-  readonly tools: Pick<QToolPort, "execute">;
-  readonly context: QToolExecutionContext;
-  readonly available: ReadonlySet<string>;
-  readonly callIndex: number;
-  /** Called once a company matched, as its profile read starts. */
-  readonly onFound?: (() => void) | undefined;
-}): Promise<{
+export type NamedVisibleCompanyRead = {
   readonly companyId: string;
   readonly data: unknown;
   /** read_company_figures' output when it succeeded; null otherwise. */
@@ -574,7 +565,18 @@ export async function readNamedVisibleCompany(input: {
     readonly providerName: string;
     readonly outcome: QToolCallOutcome;
   }[];
-} | null> {
+};
+
+export async function readNamedVisibleCompany(input: {
+  readonly name: string;
+  readonly exclude: ReadonlySet<string>;
+  readonly tools: Pick<QToolPort, "execute">;
+  readonly context: QToolExecutionContext;
+  readonly available: ReadonlySet<string>;
+  readonly callIndex: number;
+  /** Called once a company matched, as its profile read starts. */
+  readonly onFound?: (() => void) | undefined;
+}): Promise<NamedVisibleCompanyRead | null> {
   const { name, tools, context, available } = input;
   if (!available.has(SEARCH_TOOL) || !available.has(GET_TOOL)) return null;
   const calls: { providerName: string; outcome: QToolCallOutcome }[] = [];
@@ -600,13 +602,44 @@ export async function readNamedVisibleCompany(input: {
   const [companyId] = [...exact];
   if (companyId === undefined || input.exclude.has(companyId)) return null;
   input.onFound?.();
-  // The profile and its published figures, read in parallel through the
-  // same tool port and plan; a figures read denied or failed adds nothing.
+  const read = await readVisibleCompanyById({
+    companyId,
+    tools,
+    context,
+    available,
+    callPrefix: "q-named-visible",
+    callIndex: input.callIndex,
+  });
+  return read === null ? null : { ...read, calls: [...calls, ...read.calls] };
+}
+
+/**
+ * A company's profile, published figures and deck, read by id through the
+ * same tool port, authorize step and plan as the model's own calls (the
+ * three in parallel). Null when the profile read is refused or fails, or
+ * returns another company; a figures or deck read refused adds nothing.
+ * Code chooses which company only from what the caller already holds (an
+ * exact name match, or a ledger entry the reader bound); it never judges
+ * the company.
+ */
+export async function readVisibleCompanyById(input: {
+  readonly companyId: string;
+  readonly tools: Pick<QToolPort, "execute">;
+  readonly context: QToolExecutionContext;
+  readonly available: ReadonlySet<string>;
+  /** The calls' id prefix, so each read is attributable to its path. */
+  readonly callPrefix: string;
+  readonly callIndex: number;
+}): Promise<NamedVisibleCompanyRead | null> {
+  const { companyId, tools, context, available } = input;
+  if (!available.has(GET_TOOL)) return null;
+  const calls: { providerName: string; outcome: QToolCallOutcome }[] = [];
+  const at = String(input.callIndex);
   const [got, figures, deck] = await Promise.all([
     tools
       .execute(
         {
-          callId: `q-named-visible-get-${String(input.callIndex)}`,
+          callId: `${input.callPrefix}-get-${at}`,
           name: GET_TOOL,
           arguments: { companyId },
         },
@@ -617,7 +650,7 @@ export async function readNamedVisibleCompany(input: {
       ? tools
           .execute(
             {
-              callId: `q-named-visible-figures-${String(input.callIndex)}`,
+              callId: `${input.callPrefix}-figures-${at}`,
               name: FIGURES_TOOL,
               arguments: { companyId },
             },
@@ -629,7 +662,7 @@ export async function readNamedVisibleCompany(input: {
       ? tools
           .execute(
             {
-              callId: `q-named-visible-deck-${String(input.callIndex)}`,
+              callId: `${input.callPrefix}-deck-${at}`,
               name: DECK_TOOL,
               arguments: { companyId },
             },
