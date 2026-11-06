@@ -16,6 +16,8 @@ import {
   type ModelGatewayRequest,
   type ModelGatewayRequestInput,
   type ModelGatewayResult,
+  type ModelCode,
+  type ModelProviderCode,
   type ModelUsage,
 } from "@capital-q/contracts";
 import { getMeter, getTracer, type Logger } from "@capital-q/observability";
@@ -112,7 +114,35 @@ export type ModelGatewayDependencies = {
   readonly sleep?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
   readonly random?: (() => number) | undefined;
+  /**
+   * How long a request turned away by a blocked provider waits for that
+   * block's in-flight probe before giving up (bounded by its own attempt
+   * timeout). Default `PROBE_WAIT_MS`.
+   */
+  readonly probeWaitMs?: number | undefined;
 };
+
+/** A probe of a fixed account usually answers within a reading's time. */
+const PROBE_WAIT_MS = 8_000;
+
+/** Settles when `promise` does, `ms` passes, or `signal` aborts. Never rejects. */
+function waitAtMost(
+  promise: Promise<void>,
+  ms: number,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const done = (): void => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, Math.max(0, ms));
+    timer.unref?.();
+    signal.addEventListener("abort", done, { once: true });
+    promise.then(done, done);
+  });
+}
 
 export type ModelGatewayExecuteOptions<T> = {
   /** Required for STRUCTURED output: the schema that decides acceptance. */
@@ -296,6 +326,7 @@ export function createModelGateway(
   const clock = dependencies.clock ?? systemModelClock;
   const sleep = dependencies.sleep ?? defaultSleep;
   const random = dependencies.random ?? Math.random;
+  const probeWaitMs = dependencies.probeWaitMs ?? PROBE_WAIT_MS;
   const logger = dependencies.logger;
   const tracer = getTracer("@capital-q/model-gateway");
   const meter = getMeter("@capital-q/model-gateway");
@@ -868,6 +899,33 @@ export function createModelGateway(
     );
   }
 
+  /**
+   * Whether a planned model may be asked now. Behind a block whose probe
+   * another request has in flight, this request waits for that verdict, at
+   * most `probeWaitMs`, and asks again: a fixed account then serves every
+   * call of the turn that noticed it, not only the probe (live 2026-11-05).
+   * An exhausted account refuses in well under a second, so a wait on a
+   * failing probe is short.
+   */
+  async function admitted(
+    code: ModelProviderCode,
+    model: ModelCode,
+    attemptTimeoutMs: number,
+    callerSignal: AbortSignal,
+  ): Promise<boolean> {
+    if (health.admit === undefined) return true;
+    if (health.admit(code, model, clock.now())) return true;
+    const pending = health.probeInFlight?.(code, model, clock.now()) ?? null;
+    if (pending === null || callerSignal.aborted) return false;
+    await waitAtMost(
+      pending,
+      Math.min(probeWaitMs, attemptTimeoutMs),
+      callerSignal,
+    );
+    if (callerSignal.aborted) return false;
+    return health.admit(code, model, clock.now());
+  }
+
   async function route<T>(
     request: ModelGatewayRequest,
     schema: z.ZodType<T> | undefined,
@@ -1034,11 +1092,12 @@ export function createModelGateway(
       // after one of its models just answered "exhausted" in this request,
       // none of its siblings is asked again (live 2026-10-31).
       if (
-        health.admit?.(
+        !(await admitted(
           candidate.provider.code,
           candidate.model.modelCode,
-          clock.now(),
-        ) === false
+          request.budget.attemptTimeoutMs,
+          callerSignal,
+        ))
       ) {
         turnedAway.add(candidate.candidateIndex);
         continue;
@@ -1341,6 +1400,14 @@ export function createModelGateway(
           });
         }
         break; // next eligible candidate, judged by the same rules already
+      }
+      // Admitted (perhaps as a block's probe) but never sent: the probe is
+      // given back rather than spent on a request that asked nothing.
+      if (attemptsOnCandidate === 0) {
+        health.releaseProbe?.(
+          candidate.provider.code,
+          candidate.model.modelCode,
+        );
       }
       if (attemptNumber >= request.budget.maxAttempts) {
         break;

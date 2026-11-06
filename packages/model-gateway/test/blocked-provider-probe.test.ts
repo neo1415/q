@@ -101,31 +101,22 @@ describe("a blocked provider account is probed, and a top-up takes effect", () =
     expect(alpha.calls).toHaveLength(1);
 
     // The owner has topped up. Half a minute on, three turns at once: one
-    // probes, the others are turned away without a call.
+    // probes; the others wait for its verdict (live 2026-11-05: turning
+    // them away failed the turn that noticed the fix) and are then served.
     ms.value = START + 30_000;
     const settled = await Promise.allSettled([
       gateway.execute(request()),
       gateway.execute(request()),
       gateway.execute(request()),
     ]);
-    expect(alpha.calls).toHaveLength(2);
-    expect(settled.filter((s) => s.status === "fulfilled")).toHaveLength(1);
-    const turnedAway = settled.flatMap((s) =>
-      s.status === "rejected" ? [s.reason as unknown] : [],
-    );
-    for (const reason of turnedAway) {
-      expect(reason).toBeInstanceOf(ModelGatewayError);
-      expect((reason as ModelGatewayError).failureClass).toBe(
-        "POLICY_INELIGIBLE",
-      );
-      expect(isModelServiceUnavailable(reason)).toBe(true);
-    }
+    expect(alpha.calls).toHaveLength(4);
+    expect(settled.filter((s) => s.status === "fulfilled")).toHaveLength(3);
 
     // The probe succeeded: the block is gone at once.
     ms.value = START + 31_000;
     const after = await gateway.execute(request());
     expect(after.providerCode).toBe("alpha");
-    expect(alpha.calls).toHaveLength(3);
+    expect(alpha.calls).toHaveLength(5);
   });
 
   it("a probe that finds the account still empty is one call, and the block stays", async () => {
@@ -187,9 +178,11 @@ describe("process-local health, with a fake clock", () => {
     expect(health.state("openai", "gpt-5.6-mini", at(30_000))).toBe("HEALTHY");
     expect(health.admit?.("openai", "gpt-5.6-mini", at(30_000))).toBe(true);
     expect(health.admit?.("openai", "gpt-5.6-luna", at(30_000))).toBe(false);
-    expect(health.state("openai", "gpt-5.6-luna", at(30_001))).toBe(
-      "TEMPORARILY_FAILING",
-    );
+    // While the probe is in flight the others plan as usual and wait on it.
+    expect(health.state("openai", "gpt-5.6-luna", at(30_001))).toBe("HEALTHY");
+    expect(
+      health.probeInFlight?.("openai", "gpt-5.6-luna", at(30_001)),
+    ).not.toBe(null);
     health.recordSuccess("openai", "gpt-5.6-mini", at(30_500));
     expect(health.state("openai", "gpt-5.6-luna", at(30_501))).toBe("HEALTHY");
     expect(health.admit?.("openai", "gpt-5.6-luna", at(30_501))).toBe(true);

@@ -80,6 +80,19 @@ const BLOCKED_PROBE_INTERVAL_MS = 30_000;
  * the model is tried only when no other eligible model is left.
  */
 const RATE_LIMIT_BACKOFF_MS = 15_000;
+
+/**
+ * An attempt that ended in one of these got an answer from the provider's
+ * account: the request was billed-for or judged on its merits, so the
+ * account and the key are serving again. Live 2026-11-05: a probe needs
+ * only proof that the account answers, not a perfect reply.
+ */
+const ACCOUNT_ANSWERED: ReadonlySet<ModelFailureClass> = new Set([
+  "INVALID_MODEL_OUTPUT",
+  "INVALID_REQUEST",
+  "CONTEXT_LIMIT",
+  "RATE_LIMIT",
+]);
 const RATE_LIMIT_BACKOFF_MAX_MS = 60_000;
 
 export type ProviderHealthOptions = {
@@ -115,6 +128,51 @@ export function createProcessLocalProviderHealth(
   const lastProbe = new Map<string, number>();
   /** One model, after a 429: tried only as the last resort until then. */
   const backoffUntil = new Map<string, number>();
+  /**
+   * The probe each open block has in flight, with the waiters for its
+   * verdict. Live 2026-11-05: one turn asks several models at once (skim,
+   * early reading, reading, speculation). Only one could be the probe; the
+   * others were turned away at once, the turn said "I can't reach my
+   * reasoning service", and the probe's own request was then cancelled
+   * with the turn, so no verdict ever arrived and every later turn met the
+   * same block until it lapsed ten minutes after the last refusal.
+   */
+  const inFlight = new Map<
+    string,
+    { readonly settled: Promise<void>; readonly settle: () => void }
+  >();
+  const settle = (key: string): void => {
+    const probe = inFlight.get(key);
+    if (probe === undefined) return;
+    inFlight.delete(key);
+    probe.settle();
+  };
+  /** Every probe this model's attempt could have been. */
+  const settleFor = (code: ModelProviderCode, model: ModelCode): void => {
+    settle(accountKey(code));
+    settle(keyOf(code, model));
+  };
+  /**
+   * The probe ended without a verdict (cancelled, or the caller's own short
+   * budget ran out, or it was never sent): the next request may probe at
+   * once rather than a whole interval later.
+   */
+  const release = (code: ModelProviderCode, model: ModelCode): void => {
+    for (const key of [accountKey(code), keyOf(code, model)]) {
+      if (!inFlight.has(key)) continue;
+      lastProbe.delete(key);
+      settle(key);
+    }
+  };
+  /** The account and this model's key answered: every block on them ends. */
+  const clearBlocks = (code: ModelProviderCode, model: ModelCode): void => {
+    accountOpenUntil.delete(code);
+    lastProbe.delete(accountKey(code));
+    const key = keyOf(code, model);
+    refusedUntil.delete(key);
+    lastProbe.delete(key);
+    settleFor(code, model);
+  };
 
   const keyOf = (code: ModelProviderCode, model: ModelCode): string =>
     `${code}\u0000${model}`;
@@ -154,10 +212,11 @@ export function createProcessLocalProviderHealth(
     if (until !== undefined && until > at.getTime()) {
       return "TEMPORARILY_FAILING";
     }
-    // A block whose probe is due reads healthy, so the model is planned
-    // in its usual place; `admit` lets only one request actually ask.
+    // A block whose probe is due, or in flight, reads healthy, so the model
+    // is planned in its usual place; `admit` lets only one request actually
+    // ask and the others wait for its verdict.
     const block = blockOf(code, model, at.getTime());
-    if (block !== null && !block.probeDue) {
+    if (block !== null && !block.probeDue && !inFlight.has(block.key)) {
       return "TEMPORARILY_FAILING";
     }
     const backoff = backoffUntil.get(keyOf(code, model));
@@ -177,8 +236,20 @@ export function createProcessLocalProviderHealth(
       // Claimed here, synchronously, so concurrent turns that planned the
       // same due probe do not all send it.
       lastProbe.set(block.key, now);
+      settle(block.key);
+      let resolve: () => void = () => undefined;
+      const settled = new Promise<void>((done) => {
+        resolve = done;
+      });
+      inFlight.set(block.key, { settled, settle: resolve });
       return true;
     },
+    probeInFlight: (code, model, at) => {
+      const block = blockOf(code, model, at.getTime());
+      if (block === null) return null;
+      return inFlight.get(block.key)?.settled ?? null;
+    },
+    releaseProbe: release,
     recordFailure: (
       code,
       model,
@@ -195,6 +266,7 @@ export function createProcessLocalProviderHealth(
       if (exhausted === true) {
         accountOpenUntil.set(code, now + accountOpenForMs);
         lastProbe.set(accountKey(code), now);
+        settleFor(code, model);
         return;
       }
       // A key the provider refused (401/403, after the adapter tried its
@@ -204,7 +276,28 @@ export function createProcessLocalProviderHealth(
         const key = keyOf(code, model);
         refusedUntil.set(key, now + accountOpenForMs);
         lastProbe.set(key, now);
+        settleFor(code, model);
         return;
+      }
+      // The account answered (a reply that failed our checks, a request it
+      // judged, a per-minute limit that is not a spent quota): any block on
+      // it was fixed. A probe proves the account, not the reply.
+      if (ACCOUNT_ANSWERED.has(failureClass)) {
+        clearBlocks(code, model);
+      }
+      // No verdict about the account: stopped by the caller, or the
+      // caller's own short budget ran out first.
+      if (
+        failureClass === "CANCELLED" ||
+        (failureClass === "TIMEOUT" &&
+          elapsedMs !== undefined &&
+          elapsedMs < TIMEOUT_MEANS_UNHEALTHY_AFTER_MS)
+      ) {
+        release(code, model);
+      } else {
+        // An outage or transient answer is the probe's verdict: the block
+        // stays and the next probe waits its interval.
+        settleFor(code, model);
       }
       if (failureClass === "RATE_LIMIT") {
         const key = keyOf(code, model);
@@ -237,11 +330,8 @@ export function createProcessLocalProviderHealth(
       }
     },
     recordSuccess: (code, model) => {
-      accountOpenUntil.delete(code);
-      lastProbe.delete(accountKey(code));
+      clearBlocks(code, model);
       const key = keyOf(code, model);
-      refusedUntil.delete(key);
-      lastProbe.delete(key);
       backoffUntil.delete(key);
       failures.delete(key);
       openUntil.delete(key);
