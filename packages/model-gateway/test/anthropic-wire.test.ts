@@ -12,6 +12,7 @@ import type { ModelCatalogSnapshot } from "../src/catalog.js";
 import type { AnthropicExchange } from "../src/providers/anthropic.js";
 import {
   createAnthropicWireDouble,
+  requestRefusal,
   sseOf,
 } from "../src/providers/anthropic-wire-double.js";
 import { request } from "./fixtures.js";
@@ -264,5 +265,22 @@ describe("Claude over the Messages API wire, through the gateway", () => {
       "message_delta",
       "message_stop",
     ]);
+  });
+
+  it("refuses a 1h cache breakpoint after a 5m one, as the API does", () => {
+    const body = (first: unknown, second: unknown) => ({
+      model: "claude-sonnet-5-5",
+      system: [{ type: "text", text: "Charter.", cache_control: first }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "Hi", cache_control: second }],
+        },
+      ],
+    });
+    const long = { type: "ephemeral", ttl: "1h" };
+    const short = { type: "ephemeral" };
+    expect(requestRefusal(body(long, short))).toBeNull();
+    expect(requestRefusal(body(short, long))).toContain("ttl '1h'");
   });
 });

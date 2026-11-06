@@ -169,8 +169,20 @@ export function requestRefusal(body: Record<string, unknown>): string | null {
     }
   }
   let breakpoints = 0;
+  // Render order is tools, system, messages; a longer TTL may not follow a
+  // shorter one.
+  let shortSeen = false;
+  let ttlRefusal: string | null = null;
   const countCache = (block: unknown): void => {
-    if (isRecord(block) && "cache_control" in block) breakpoints += 1;
+    if (!isRecord(block) || !("cache_control" in block)) return;
+    breakpoints += 1;
+    const control = block["cache_control"];
+    const ttl = isRecord(control) ? control["ttl"] : undefined;
+    if (ttl === "1h" && shortSeen) {
+      ttlRefusal =
+        "A cache_control breakpoint with ttl '1h' must not come after one with ttl '5m'.";
+    }
+    if (ttl !== "1h") shortSeen = true;
   };
   const system = body["system"];
   if (Array.isArray(system)) {
@@ -265,6 +277,7 @@ export function requestRefusal(body: Record<string, unknown>): string | null {
   if (breakpoints > 4) {
     return `A maximum of 4 blocks with cache_control may be provided. Found ${breakpoints}.`;
   }
+  if (ttlRefusal !== null) return ttlRefusal;
   const format = isRecord(body["output_config"])
     ? body["output_config"]["format"]
     : undefined;

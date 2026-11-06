@@ -118,6 +118,7 @@ describe("Q on Claude: prompt caching across turns (scripted model, wire double)
       const shares: number[][] = [];
       for (const mark of marks) {
         let cost = 0;
+        const sums = { uncached: 0, write: 0, read: 0, output: 0, calls: 0 };
         const perTurn: number[] = [];
         for (let i = mark.from; i < mark.to; i += 1) {
           const e = exchanges[i];
@@ -132,10 +133,15 @@ describe("Q on Claude: prompt caching across turns (scripted model, wire double)
               o.outputTokens * PRICE.output) /
             1_000_000;
           perTurn.push(o.cacheReadTokens / Math.max(1, o.inputTokens));
+          sums.uncached += uncached;
+          sums.write += o.cacheWriteTokens;
+          sums.read += o.cacheReadTokens;
+          sums.output += o.outputTokens;
+          sums.calls += 1;
         }
         shares.push(perTurn);
         lines.push(
-          `${mark.caseId}: $${cost.toFixed(4)} modelled, read share by turn ${perTurn
+          `${mark.caseId}: $${cost.toFixed(4)} modelled (${String(sums.calls)} calls; tokens uncached ${String(sums.uncached)}, written ${String(sums.write)}, read ${String(sums.read)}, output ${String(sums.output)}), read share by turn ${perTurn
             .map((s) => s.toFixed(2))
             .join(" ")}`,
         );

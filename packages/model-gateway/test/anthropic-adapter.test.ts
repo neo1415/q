@@ -147,7 +147,10 @@ describe("anthropic adapter: request mapping", () => {
       "Second leading instruction.",
     ]);
     expect(system?.[0]?.cache_control).toBeUndefined();
-    expect(system?.[1]?.cache_control).toEqual({ type: "ephemeral" });
+    expect(system?.[1]?.cache_control).toEqual({
+      type: "ephemeral",
+      ttl: "1h",
+    });
     // A late SYSTEM message is a marked note in a user turn, never `system`
     // (audit F-D3: fetched text gets no instruction authority).
     expect(messages).toEqual([
@@ -453,7 +456,10 @@ describe("anthropic adapter: structured output", () => {
     expect(system.at(-1)?.text).toContain(JSON.stringify(many));
     // The stable charter stays first; the breakpoint closes the block list.
     expect(system[0]?.text).toBe(SYSTEM);
-    expect(system.at(-1)?.cache_control).toEqual({ type: "ephemeral" });
+    expect(system.at(-1)?.cache_control).toEqual({
+      type: "ephemeral",
+      ttl: "1h",
+    });
   });
 });
 

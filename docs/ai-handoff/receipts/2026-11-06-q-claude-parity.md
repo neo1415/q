@@ -85,3 +85,54 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --q-
 ```
 
 `--limit 12` takes 12 cases round-robin across categories. Record its exact cost, and the running Anthropic total (about $10 before it), in this receipt.
+
+## Raised bar: cost near OpenAI's; Claude-first staged
+
+**Staged Claude-first routing: `20261231350000_ai_ops_claude_first_staged.sql`** (ordered after the base's `20261231340000`).
+
+- **What it inserts.** Seven v3 policies, RETIRED: Claude (Sonnet for answers and analysis, Haiku for the fast classes) → gpt-5.6-luna → the v2 row's remaining fallbacks. Other columns are copied from v2.
+- **Safety.** Inserts only; no status change to any existing row. v2 (OpenAI first, Claude the backup) stays ACTIVE.
+- **The switch, data only:**
+  - **Claude first:** `update ai_ops.routing_policies set status = 'ACTIVE' where version = 3 and code in ('normal_dialogue.v3', 'evidence_synthesis.v3', 'comparison.v3', 'deep_investigation.v3', 'fast_classification.v3', 'structured_extraction.v3', 'taxonomy_mapping.v3');`
+  - **Back to v2:** the same statement with `'RETIRED'`.
+- **pgTAP:** `999_ai_ops_claude_first_staged.test.sql` passes 8/8.
+- **Q-IQ.** The runner now switches the v3 codes on locally and restores each row's prior status afterwards. The wire world activates v3 too, so offline numbers measure Claude-first.
+
+**One-hour cache lifetime on the long-lived prefix.** The end-of-system and stable-head breakpoints use `ttl: "1h"`; the end-of-message and tool-loop breakpoints keep 5 minutes, and longer lifetimes come first, as the API requires. The wire double now refuses a 1h breakpoint after a 5m one.
+
+- **Why.** People often pause longer than 5 minutes between turns; at the default lifetime each such turn re-wrote about 20k tokens.
+- **Cost.** A 1-hour write bills 2× input instead of 1.25×, once per prefix. The modelled figures below price every write at 1.25×.
+
+**Where the remaining cost is** (offline, a later 4-turn conversation, 8 Sonnet calls, $0.053 modelled):
+
+| Component                        | Tokens            | Cost   | Share of cost |
+| -------------------------------- | ----------------- | ------ | ------------- |
+| Cache reads                      | 146,872           | $0.029 | 55%           |
+| Cache writes (the per-turn tail) | 7,478             | $0.019 | 35%           |
+| Uncached input and output        | 1,453 in, 240 out | —      | 10%           |
+
+The first, cold conversation is $0.149: it writes the shared prefix, 47k tokens.
+
+**The structural gap to OpenAI.** Sonnet's cache-read price ($0.20 per million tokens) is ten times gpt-5.6-luna's cached input price ($0.02). With caching now near its ceiling (90–99% reads), Q on Sonnet can match OpenAI's cost per case only by sending fewer tokens or using a cheaper model:
+
+- **Trim the prompt.** About 19k tokens a call, the analyst prompt alone about 39k characters. That is a q-core prompt change, so it also changes OpenAI's prompt: the reader/prompt lane, one owner at a time.
+- **Haiku 5.5 for answers.** Cache reads at $0.01 per million make it about 20× cheaper, a data-only change (the v3 rows' model). This is a quality decision for the owner, after a live Q-IQ comparison.
+- **Fewer calls a turn.** Each tool round re-reads the whole prompt. The tool-round design is shared by every provider.
+
+**Reader and answer cannot share a prefix.** Tools render first and the reader is offered none.
+
+## Anthropic test spend (DECISIONS 68 amended: $50 cap; slow down at $20, very careful past $40)
+
+This lane has made **no** paid call. These are the live runs the integration owner reported to me, with the Anthropic part of each run's cost:
+
+| Run (integration owner)        | Q on Claude | Bare Claude |
+| ------------------------------ | ----------- | ----------- |
+| `1ae3b64`, 11 cases            | $0.152      | $0.163      |
+| `1ae3b64`, 1 case              | $0.011      | $0.025      |
+| `dc0e244`, 1 case, debug       | $0.818      | —           |
+| `1773825`, 1 case              | $0.490      | —           |
+| `b166e46`, 1 case              | $0.301      | —           |
+| `fa5e455`, 1 case              | $0.354      | —           |
+| Subtotal reported to this lane | **$2.31**   | —           |
+
+Add to that today's benchmark runs, about $4.40 as the owner reported. The total from what was reported is therefore at least about $6.7. The owner's estimate was about $10, which includes runs not reported here. **The Anthropic console's usage figure governs.** This lane has no admin key, and makes no call to check one.

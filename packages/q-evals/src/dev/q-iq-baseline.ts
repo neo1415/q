@@ -37,9 +37,10 @@ import { createQIqWorldSubject } from "../runner/q-iq-world.js";
  * stops and reports the cases it ran. Keys are read from files and never
  * printed. Needs DATABASE_URL (local), NODE_USE_ENV_PROXY=1 in the cloud.
  *
- * The staged Claude routing policies (v2) are switched ON in the LOCAL
- * database for the run and OFF again afterwards -- the same single UPDATE
- * the receipt gives for production -- and Claude is the only adapter
+ * The staged Claude-first routing policies (v3, 20261231350000) are
+ * switched ON in the LOCAL database for the run and back to their prior
+ * status afterwards -- the same single UPDATE the receipt gives for
+ * production -- and Claude is the only adapter
  * registered, so the Q subject measures Claude and never a fallback. The
  * bare subject runs on claude-sonnet-5-5 and the judge on claude-haiku-5-5
  * (--no-judge: none). Claude spend is held to the owner's $20 test cap: a
@@ -65,15 +66,19 @@ const HAIKU_BUDGET_PRICE = {
 const CLAUDE_TEST_CAP_USD = 20;
 /** The cache-write factor: ledger cost times this bounds real Claude spend. */
 const CLAUDE_WRITE_FACTOR = 1.25;
-/** The staged Claude policies; the receipt's switch names the same codes. */
+/**
+ * The staged Claude-FIRST policies (20261231350000); the receipt's switch
+ * names the same codes. v2 (OpenAI first, Claude the backup) is what
+ * production runs; v3 is what is being evaluated.
+ */
 export const CLAUDE_POLICY_CODES = [
-  "normal_dialogue.v2",
-  "evidence_synthesis.v2",
-  "comparison.v2",
-  "deep_investigation.v2",
-  "fast_classification.v2",
-  "structured_extraction.v2",
-  "taxonomy_mapping.v2",
+  "normal_dialogue.v3",
+  "evidence_synthesis.v3",
+  "comparison.v3",
+  "deep_investigation.v3",
+  "fast_classification.v3",
+  "structured_extraction.v3",
+  "taxonomy_mapping.v3",
 ] as const;
 
 function arg(name: string): string | undefined {
@@ -235,18 +240,28 @@ async function main(): Promise<number> {
         price: HAIKU_BUDGET_PRICE,
       });
   const results: QIqRunResult[] = [];
-  // The receipt's switch, on the LOCAL database only (checked above).
-  const setClaudeRoutes = async (
-    status: "ACTIVE" | "RETIRED",
-  ): Promise<void> => {
-    const changed = await db.sql`
-      update ai_ops.routing_policies set status = ${status}
-       where code in ${db.sql([...CLAUDE_POLICY_CODES])}
-      returning code`;
-    if (changed.length !== CLAUDE_POLICY_CODES.length) {
-      throw new Error(
-        `expected ${String(CLAUDE_POLICY_CODES.length)} staged Claude policies, found ${String(changed.length)}: is 20261231280000 applied locally?`,
-      );
+  // The receipt's switch, on the LOCAL database only (checked above):
+  // Claude first for the run, and every row back to the status it had.
+  let before: readonly { code: string; status: string }[] = [];
+  const setClaudeRoutes = async (on: boolean): Promise<void> => {
+    if (on) {
+      before = await db.sql<{ code: string; status: string }[]>`
+        select code, status from ai_ops.routing_policies
+         where code in ${db.sql([...CLAUDE_POLICY_CODES])}`;
+      if (before.length !== CLAUDE_POLICY_CODES.length) {
+        throw new Error(
+          `expected ${String(CLAUDE_POLICY_CODES.length)} staged Claude-first policies, found ${String(before.length)}: is 20261231350000 applied locally?`,
+        );
+      }
+      await db.sql`
+        update ai_ops.routing_policies set status = 'ACTIVE'
+         where code in ${db.sql([...CLAUDE_POLICY_CODES])}`;
+      return;
+    }
+    for (const row of before) {
+      await db.sql`
+        update ai_ops.routing_policies set status = ${row.status}
+         where code = ${row.code}`;
     }
   };
   // For Claude, Q's share is divided by the cache-write factor, so the
@@ -256,7 +271,7 @@ async function main(): Promise<number> {
   // 150 cases within the Anthropic test cap, while Q on Claude is parked).
   const bareOnly = process.argv.includes("--bare-only");
   try {
-    if (claude && !bareOnly) await setClaudeRoutes("ACTIVE");
+    if (claude && !bareOnly) await setClaudeRoutes(true);
     if (!bareOnly)
       try {
         const q = await createQIqWorldSubject({
@@ -278,7 +293,7 @@ async function main(): Promise<number> {
           await q.close();
         }
       } finally {
-        if (claude && !bareOnly) await setClaudeRoutes("RETIRED");
+        if (claude && !bareOnly) await setClaudeRoutes(false);
       }
     if (!qOnly) {
       const bare = bareModelQIqSubject({

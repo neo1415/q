@@ -333,6 +333,15 @@ export function schemaInstruction(
 // --- messages ------------------------------------------------------------------
 
 const CACHE: CacheControlEphemeral = { type: "ephemeral" };
+/**
+ * The long-lived prefix (tools, charter, the stable head and its notes)
+ * is kept an hour: a person often pauses longer than five minutes between
+ * turns, and at the default TTL every such turn re-wrote ~20k tokens. An
+ * hour's write bills 2x input instead of 1.25x, once per prefix. Longer
+ * TTLs precede shorter ones, as the API requires: system and stable head
+ * (1h) come before the end of the first message and the tool-loop tail.
+ */
+const CACHE_LONG: CacheControlEphemeral = { type: "ephemeral", ttl: "1h" };
 
 /**
  * Capital Q's messages as a Messages API request. Nothing else travels.
@@ -386,7 +395,7 @@ export function toMessages(
     system.push({ type: "text", text: extraInstruction });
   }
   const last = system.at(-1);
-  if (last !== undefined) last.cache_control = CACHE;
+  if (last !== undefined) last.cache_control = CACHE_LONG;
 
   const out: MessageParam[] = [];
   // The API combines consecutive turns of one role; doing it here keeps
@@ -452,7 +461,7 @@ export function toMessages(
           ...notes,
         ];
         const lastStable = stableBlocks.at(-1);
-        if (lastStable !== undefined) lastStable.cache_control = CACHE;
+        if (lastStable !== undefined) lastStable.cache_control = CACHE_LONG;
         text.push(...stableBlocks, {
           type: "text",
           text: message.content.slice(head),
