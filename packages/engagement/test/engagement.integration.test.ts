@@ -11,6 +11,7 @@ import {
 } from "@capital-q/database";
 
 import {
+  createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
   type EngagementViewer,
 } from "../src/index.js";
@@ -229,6 +230,61 @@ describe("@capital-q/engagement against local Postgres", () => {
         select visibility_at_view from analytics.engagement_events
          where viewer_user_id = ${investor.viewer.userId}`;
       expect(row?.visibility_at_view).toBe("ANONYMOUS");
+    });
+  });
+
+  it("the founder read names only whom the viewer allowed, and floors aggregates", async () => {
+    await scenario(async (tx) => {
+      const repo = createPostgresEngagementRepository(tx.sql);
+      const reader = createPostgresCompanyEngagementReader(tx.sql);
+      const company = await org(tx, "company");
+      const named = await org(tx, "investment_firm");
+      const quiet = await org(tx, "investment_firm");
+      const third = await org(tx, "investment_firm");
+      const outsider = await org(tx, "company");
+      await repo.setPrivacy(named.viewer.userId, "FULL_IDENTITY");
+      await repo.setPrivacy(quiet.viewer.userId, "ANONYMOUS");
+      const viewOf = (viewer: EngagementViewer) =>
+        repo.append(viewer, {
+          type: "PROFILE_VIEW",
+          clientEventId: clientId(),
+          companyId: company.entityId,
+          occurredAt: at,
+        });
+      await viewOf(named.viewer);
+      await viewOf(quiet.viewer);
+
+      const query = {
+        actorUserId: company.viewer.userId,
+        companyId: company.entityId,
+        since: null,
+      };
+      const below = await reader.read(query);
+      expect(below?.floorMet).toBe(false);
+      expect(below?.daily).toEqual([]);
+      expect(below?.viewers).toHaveLength(1);
+      expect(below?.viewers[0]).toMatchObject({
+        visibility: "FULL_IDENTITY",
+        viewerUserId: named.viewer.userId,
+      });
+
+      await viewOf(third.viewer);
+      const at3 = await reader.read(query);
+      expect(at3?.floorMet).toBe(true);
+      expect(at3?.daily[0]?.viewers).toBe(3);
+      const anonymous = at3?.viewers.filter(
+        (v) => v.visibility === "ANONYMOUS",
+      );
+      // One anonymous viewer cannot reach the floor on their own.
+      expect(anonymous).toEqual([]);
+      expect(
+        at3?.viewers.find((v) => v.visibility === "ORGANISATION_ONLY"),
+      ).toMatchObject({ viewerUserId: null, viewerName: null, people: 1 });
+
+      // Someone outside the company reads nothing.
+      expect(
+        await reader.read({ ...query, actorUserId: outsider.viewer.userId }),
+      ).toBeNull();
     });
   });
 });

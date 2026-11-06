@@ -328,7 +328,9 @@ export type ApiModules = {
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
   // ANALYTICS block (Q Workspace §8)
-  readonly engagement?: EngagementRoutesDependencies["engagement"] | undefined;
+  readonly engagement?:
+    | Pick<EngagementRoutesDependencies, "engagement" | "companyEngagement">
+    | undefined;
   // end ANALYTICS block
   /** Q.03/Q.04/Q.01: the founder's own readiness, plan and follow-ups. */
   readonly readiness?: ReadinessService | undefined;
@@ -898,7 +900,7 @@ export function createApp(
     registerEngagementRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
-      engagement: modules.engagement,
+      ...modules.engagement,
     });
   }
   // end ANALYTICS block

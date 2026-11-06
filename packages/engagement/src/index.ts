@@ -12,3 +12,7 @@ export {
   type EngagementService,
   type EngagementServiceDependencies,
 } from "./service.js";
+export {
+  createPostgresCompanyEngagementReader,
+  type CompanyEngagementReader,
+} from "./postgres-engagement-reader.js";

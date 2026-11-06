@@ -1,6 +1,10 @@
 import type { FastifyInstance } from "fastify";
 
 import {
+  COMPANY_ENGAGEMENT_PATH,
+  CompanyEngagementDtoSchema,
+  CompanyEngagementParamsSchema,
+  CompanyEngagementQuerySchema,
   createProblemDetails,
   ENGAGEMENT_EVENTS_PATH,
   PROBLEM_CONTENT_TYPE,
@@ -10,7 +14,10 @@ import {
   VIEWING_PRIVACY_PATH,
   ViewingPrivacyDtoSchema,
 } from "@capital-q/contracts";
-import type { EngagementService } from "@capital-q/engagement";
+import type {
+  CompanyEngagementReader,
+  EngagementService,
+} from "@capital-q/engagement";
 
 import {
   getActorContext,
@@ -32,6 +39,7 @@ import {
 
 export type EngagementRoutesDependencies = ActorContextDependencies & {
   readonly engagement: EngagementService;
+  readonly companyEngagement: CompanyEngagementReader;
 };
 
 export function registerEngagementRoutes(
@@ -95,6 +103,38 @@ export function registerEngagementRoutes(
       );
       void reply.header("Cache-Control", "no-store");
       return ViewingPrivacyDtoSchema.parse(privacy);
+    },
+  );
+
+  /**
+   * A3: the company's engagement, read by a member of its own
+   * organisation. Identity, the floor and the membership check are all
+   * decided in SQL; a non-member and a missing company get the same 404.
+   */
+  app.get(
+    COMPANY_ENGAGEMENT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const params = CompanyEngagementParamsSchema.safeParse(request.params);
+      const query = CompanyEngagementQuerySchema.safeParse(request.query ?? {});
+      if (!params.success || !query.success) {
+        const problem = invalid(request.id, "Choose a company and a date.");
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      const result = await dependencies.companyEngagement.read({
+        actorUserId: getActorContext(request).userId,
+        companyId: params.data.companyId,
+        since: query.data.since ?? null,
+      });
+      if (result === null) {
+        reply.callNotFound();
+        return undefined;
+      }
+      void reply.header("Cache-Control", "no-store");
+      return CompanyEngagementDtoSchema.parse(result);
     },
   );
 }

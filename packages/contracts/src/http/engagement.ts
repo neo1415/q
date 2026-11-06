@@ -231,3 +231,10 @@ export const CompanyEngagementDtoSchema = z
   })
   .strict();
 export type CompanyEngagementDto = z.infer<typeof CompanyEngagementDtoSchema>;
+
+export const CompanyEngagementParamsSchema = z
+  .object({ companyId: UuidSchema })
+  .strict();
+export const CompanyEngagementQuerySchema = z
+  .object({ since: z.iso.datetime({ offset: true }).optional() })
+  .strict();

@@ -31,6 +31,7 @@ function build(authenticated = true) {
   const appended: { viewer: EngagementViewer; event: EngagementEventInput }[] =
     [];
   let stored: ViewingVisibility | null = null;
+  const reads: { actorUserId: string; companyId: string }[] = [];
   const repository: EngagementRepository = {
     append: (viewer, event) => {
       appended.push({ viewer, event });
@@ -81,9 +82,19 @@ function build(authenticated = true) {
       },
       identities: { lookup: () => Promise.resolve(null) },
     },
-    { engagement: createEngagementService({ repository }) },
+    {
+      engagement: {
+        engagement: createEngagementService({ repository }),
+        companyEngagement: {
+          read: (query) => {
+            reads.push(query);
+            return Promise.resolve(null);
+          },
+        },
+      },
+    },
   ).app;
-  return { app, appended };
+  return { app, appended, reads };
 }
 
 const view = (clientEventId: string) => ({
@@ -200,5 +211,19 @@ describe("viewing privacy", () => {
       payload: { visibility: "PAID_REVEAL" },
     });
     expect(put.statusCode).toBe(422);
+  });
+});
+
+describe("GET /v1/engagement/companies/:companyId", () => {
+  it("reads as the resolved actor and 404s what SQL refuses", async () => {
+    const { app, reads } = build();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/engagement/companies/${COMPANY}`,
+    });
+    expect(response.statusCode).toBe(404);
+    expect(reads).toEqual([
+      { actorUserId: USER, companyId: COMPANY, since: null },
+    ]);
   });
 });
