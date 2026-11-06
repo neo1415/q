@@ -16,6 +16,8 @@ import {
   type ModelGatewayRequest,
   type ModelGatewayRequestInput,
   type ModelGatewayResult,
+  type ModelCode,
+  type ModelProviderCode,
   type ModelUsage,
 } from "@capital-q/contracts";
 import { getMeter, getTracer, type Logger } from "@capital-q/observability";
@@ -112,7 +114,52 @@ export type ModelGatewayDependencies = {
   readonly sleep?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
   readonly random?: (() => number) | undefined;
+  /**
+   * How long a request turned away by a blocked provider waits for that
+   * block's in-flight probe before giving up (bounded by its own attempt
+   * timeout). Default `PROBE_WAIT_MS`.
+   */
+  readonly probeWaitMs?: number | undefined;
+  /**
+   * Told when a provider account or key is set aside (credit or quota
+   * spent, key refused), as the ERROR line is logged: the composition sends
+   * the owner an alert from here (Premium Plan P1). Called again when a
+   * probe finds it still shut; the receiver de-duplicates. Never throws
+   * into the request: a failure here is logged and dropped.
+   */
+  readonly onProviderBlocked?:
+    ((event: ProviderBlockedEvent) => void | Promise<void>) | undefined;
 };
+
+export type ProviderBlockedEvent = {
+  readonly providerCode: ModelProviderCode;
+  readonly modelCode: ModelCode;
+  readonly kind: "ACCOUNT_EXHAUSTED" | "KEY_REFUSED";
+  readonly providerStatus: number | undefined;
+  readonly at: Date;
+};
+
+/** A probe of a fixed account usually answers within a reading's time. */
+const PROBE_WAIT_MS = 8_000;
+
+/** Settles when `promise` does, `ms` passes, or `signal` aborts. Never rejects. */
+function waitAtMost(
+  promise: Promise<void>,
+  ms: number,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const done = (): void => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, Math.max(0, ms));
+    timer.unref?.();
+    signal.addEventListener("abort", done, { once: true });
+    promise.then(done, done);
+  });
+}
 
 export type ModelGatewayExecuteOptions<T> = {
   /** Required for STRUCTURED output: the schema that decides acceptance. */
@@ -296,6 +343,7 @@ export function createModelGateway(
   const clock = dependencies.clock ?? systemModelClock;
   const sleep = dependencies.sleep ?? defaultSleep;
   const random = dependencies.random ?? Math.random;
+  const probeWaitMs = dependencies.probeWaitMs ?? PROBE_WAIT_MS;
   const logger = dependencies.logger;
   const tracer = getTracer("@capital-q/model-gateway");
   const meter = getMeter("@capital-q/model-gateway");
@@ -732,6 +780,27 @@ export function createModelGateway(
                 ? `model provider ${provider.code} account exhausted (credit or quota): every model on it set aside until a probe succeeds`
                 : `model provider ${provider.code} refused the key: this model set aside until a probe succeeds`,
             );
+            if (dependencies.onProviderBlocked !== undefined) {
+              const blocked: ProviderBlockedEvent = {
+                providerCode: provider.code,
+                modelCode: candidate.model.modelCode,
+                kind: exhausted ? "ACCOUNT_EXHAUSTED" : "KEY_REFUSED",
+                providerStatus:
+                  outcome.kind === "FAILURE" &&
+                  outcome.cause instanceof ModelProviderFailure
+                    ? outcome.cause.providerStatus
+                    : undefined,
+                at,
+              };
+              void Promise.resolve()
+                .then(() => dependencies.onProviderBlocked?.(blocked))
+                .catch((error: unknown) => {
+                  logger?.warn(
+                    { err: error, provider: provider.code },
+                    "provider block alert could not be sent",
+                  );
+                });
+            }
           } else if (before === "HEALTHY" && after !== "HEALTHY") {
             logger?.warn(
               {
@@ -866,6 +935,33 @@ export function createModelGateway(
         }
       },
     );
+  }
+
+  /**
+   * Whether a planned model may be asked now. Behind a block whose probe
+   * another request has in flight, this request waits for that verdict, at
+   * most `probeWaitMs`, and asks again: a fixed account then serves every
+   * call of the turn that noticed it, not only the probe (live 2026-11-05).
+   * An exhausted account refuses in well under a second, so a wait on a
+   * failing probe is short.
+   */
+  async function admitted(
+    code: ModelProviderCode,
+    model: ModelCode,
+    attemptTimeoutMs: number,
+    callerSignal: AbortSignal,
+  ): Promise<boolean> {
+    if (health.admit === undefined) return true;
+    if (health.admit(code, model, clock.now())) return true;
+    const pending = health.probeInFlight?.(code, model, clock.now()) ?? null;
+    if (pending === null || callerSignal.aborted) return false;
+    await waitAtMost(
+      pending,
+      Math.min(probeWaitMs, attemptTimeoutMs),
+      callerSignal,
+    );
+    if (callerSignal.aborted) return false;
+    return health.admit(code, model, clock.now());
   }
 
   async function route<T>(
@@ -1034,11 +1130,12 @@ export function createModelGateway(
       // after one of its models just answered "exhausted" in this request,
       // none of its siblings is asked again (live 2026-10-31).
       if (
-        health.admit?.(
+        !(await admitted(
           candidate.provider.code,
           candidate.model.modelCode,
-          clock.now(),
-        ) === false
+          request.budget.attemptTimeoutMs,
+          callerSignal,
+        ))
       ) {
         turnedAway.add(candidate.candidateIndex);
         continue;
@@ -1341,6 +1438,14 @@ export function createModelGateway(
           });
         }
         break; // next eligible candidate, judged by the same rules already
+      }
+      // Admitted (perhaps as a block's probe) but never sent: the probe is
+      // given back rather than spent on a request that asked nothing.
+      if (attemptsOnCandidate === 0) {
+        health.releaseProbe?.(
+          candidate.provider.code,
+          candidate.model.modelCode,
+        );
       }
       if (attemptNumber >= request.budget.maxAttempts) {
         break;

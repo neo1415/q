@@ -215,6 +215,23 @@ export type ProviderHealthPort = {
     model: ModelCode,
     at: Date,
   ) => boolean;
+  /**
+   * While a block's probe is in flight, a promise that settles with its
+   * verdict (success, failure, or released without one); otherwise null.
+   * A request turned away by `admit` may wait on it, briefly, and ask
+   * `admit` again, so one turn's parallel calls ride on one probe.
+   * Absent: never waited on.
+   */
+  readonly probeInFlight?: (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ) => Promise<void> | null;
+  /**
+   * An admitted request ended without asking the provider: a probe it held
+   * is given back, so the next request may probe at once.
+   */
+  readonly releaseProbe?: (code: ModelProviderCode, model: ModelCode) => void;
   readonly recordFailure: (
     code: ModelProviderCode,
     model: ModelCode,

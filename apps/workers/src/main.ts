@@ -135,6 +135,11 @@ import {
   createDiligenceDocumentSummariser,
 } from "@capital-q/model-gateway/q";
 import {
+  createPostgresProviderSpendReader,
+  parseProviderBalanceSettings,
+  providerBlockedAlertText,
+} from "@capital-q/model-gateway";
+import {
   createOnboardingService,
   createPostgresOnboardingInterviewQuestionRepository,
   createPostgresOnboardingResponseRepository,
@@ -227,7 +232,12 @@ import {
   DOCUMENTS_QUEUE,
 } from "./queue/pgmq.js";
 import { createQueueRunner } from "./queue/runner.js";
-import { recordingEmailSender } from "@capital-q/platform-admin";
+import {
+  createOperatorAlerts,
+  createPostgresOperatorEmails,
+  recordingEmailSender,
+  type OperatorAlert,
+} from "@capital-q/platform-admin";
 // ADMIN-4 block
 import {
   createAutoVerificationRequester,
@@ -239,6 +249,7 @@ import { runAutoVerificationRequests } from "./verification/auto-request.js";
 // end ADMIN-4 block
 import { composeDocumentJobs } from "./documents/composition.js";
 import { composeWorkerModelGateway } from "./model-gateway.js";
+import { runProviderBalanceWatch } from "./reliability/provider-balance.js";
 import {
   composeRecommendationEmbedder,
   refreshCompanyEmbeddings,
@@ -318,6 +329,14 @@ const runner = createOutboxPublisherRunner({
  * without a review rather than stalling on one.
  */
 const providerSecrets = config.secrets.modelProviders;
+// Premium Plan P1: alerts to Capital Q's operators. The gateway is composed
+// before the email sender below, so it reaches the sender through this.
+const operatorAlert: { send: (alert: OperatorAlert) => Promise<boolean> } = {
+  send: (alert) => {
+    logger.error({ qAlert: "OPERATOR", alertKey: alert.key }, alert.text);
+    return Promise.resolve(true);
+  },
+};
 const {
   providers: modelProviders,
   syntheticDemo,
@@ -328,6 +347,8 @@ const {
   databaseUrl: databaseConfig.secrets.url,
   sql: database.sql,
   logger,
+  onProviderBlocked: (event) =>
+    operatorAlert.send(providerBlockedAlertText(event)).then(() => undefined),
 });
 
 // One onboarding service for the worker. Its `internal` operations are the
@@ -1331,6 +1352,32 @@ if (appEmail.brevoApi !== undefined) {
 } else {
   logger.info({}, "reminder email enabled: SMTP configured");
 }
+operatorAlert.send = createOperatorAlerts({
+  operatorEmails: createPostgresOperatorEmails(database.sql),
+  email:
+    appEmail.brevoApi !== undefined
+      ? recordingEmailSender(createBrevoApiEmailSender(appEmail.brevoApi), {
+          sql: database.sql,
+          source: "workers.operator_alert",
+          provider: "BREVO_API",
+        })
+      : appEmail.smtp === undefined
+        ? unavailableAppEmailSender
+        : recordingEmailSender(createSmtpAppEmailSender(appEmail.smtp), {
+            sql: database.sql,
+            source: "workers.operator_alert",
+            provider: "SMTP",
+          }),
+  logger,
+}).alert;
+// DECISIONS 63: balance runway alerts, from the owner's stated balances.
+const providerBalances = parseProviderBalanceSettings(process.env);
+if (providerBalances.invalid.length > 0) {
+  logger.error(
+    { invalid: providerBalances.invalid },
+    "provider balance settings ignored: expected <usd>@<ISO time>",
+  );
+}
 const schedule = composeSchedule({
   sql: database.sql,
   transactions: database.transactions,
@@ -1698,6 +1745,17 @@ await Promise.all([
     signal: shutdownController.signal,
     logger,
   }),
+  ...(providerBalances.settings.length === 0
+    ? []
+    : [
+        runProviderBalanceWatch({
+          settings: providerBalances.settings,
+          readSpend: createPostgresProviderSpendReader({ sql: database.sql }),
+          alert: (alert) => operatorAlert.send(alert),
+          signal: shutdownController.signal,
+          logger,
+        }),
+      ]),
   // DAILY block
   ...(daily === undefined
     ? []
