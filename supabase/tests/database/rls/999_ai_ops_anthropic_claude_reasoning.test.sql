@@ -78,24 +78,24 @@ select is(
 
 -- staged, not active
 select is(
-  (select count(*)::int from ai_ops.routing_policies where version = 2 and status = 'RETIRED'),
+  (select count(*)::int from ai_ops.routing_policies where version = 2),
   7,
-  'seven v2 policies, staged (RETIRED)');
+  'seven v2 policies (staged here, switched on by 20261231340000)');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies rp
-    where rp.status = 'ACTIVE'
+    where rp.status = 'ACTIVE' and rp.version = 1
       and exists (select 1 from unnest(rp.preferred_models || rp.fallback_models) m
                    join ai_ops.models mm on mm.id = m
                    join ai_ops.providers p on p.id = mm.provider_id
                   where p.code = 'anthropic')),
   0,
-  'no ACTIVE policy reaches Claude before the switch');
+  'no v1 policy reaches Claude: v1 stays the rollback without it');
 
 select is(
-  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE'),
+  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE' and version = 1),
   8,
-  'the active routes are exactly the eight from before');
+  'the eight v1 routes are all still active');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies

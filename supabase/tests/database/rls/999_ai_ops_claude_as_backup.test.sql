@@ -9,9 +9,9 @@ set local search_path = public, extensions;
 select plan(8);
 
 select is(
-  (select count(*)::int from ai_ops.routing_policies where version = 2 and status = 'RETIRED'),
+  (select count(*)::int from ai_ops.routing_policies where version = 2 and status = 'ACTIVE'),
   7,
-  'the seven v2 policies are still staged (RETIRED)');
+  'the seven v2 policies are switched on (20261231340000)');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies where version = 2
@@ -53,9 +53,9 @@ select is(
   'no model appears twice in a v2 policy');
 
 select is(
-  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE'),
+  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE' and version = 1),
   8,
-  'the active routes are still the eight v1 policies');
+  'the eight v1 policies stay active beside v2 as the rollback');
 
 -- The switch still prefers OpenAI once on.
 update ai_ops.routing_policies set status = 'ACTIVE' where version = 2;

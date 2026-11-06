@@ -31,9 +31,9 @@ select throws_ok(
 
 select is(
   (select count(*)::int from ai_ops.routing_policies
-    where status = 'ACTIVE' and task_class <> 'UI_TRANSLATION'),
+    where status = 'ACTIVE' and version = 1 and task_class <> 'UI_TRANSLATION'),
   7,
-  'no routing policy changed');
+  'the seven v1 Q policies are untouched by the limits');
 
 select * from finish();
 rollback;

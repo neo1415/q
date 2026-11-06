@@ -415,7 +415,10 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       });
       expect(final.run.status).toBe("COMPLETED");
       expect(final.run.orchestrationVersion).toBe(Q_ORCHESTRATION_VERSION);
-      expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v1");
+      // v2 serves since the Claude backup was switched on (20261231340000);
+      // luna and Claude are not registered here, Groq cannot take a full
+      // answer turn (8K limit), so Gemini flash-lite answers this PUBLIC run.
+      expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v2");
       // The bundle of the ACTIVE analyst, read from the registry: a pin to
       // one version (v19) went stale when v22 shipped (F, 2026-10-09).
       const analyst =
