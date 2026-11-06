@@ -108,6 +108,25 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(flash.sensitivityCeiling).toBe("PUBLIC");
   });
 
+  it("loads step 7's reasoning levels from the routing policy (20261231260000)", async () => {
+    const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
+    const dialogue = snapshot.routingPolicies.find(
+      (p) => p.status === "ACTIVE" && p.taskClass === "NORMAL_DIALOGUE",
+    );
+    expect(dialogue?.reasoningLevels).toEqual({
+      ANSWER_CHAT: "NONE",
+      ANSWER_LOOKUP: "NONE",
+      ANSWER_FOLLOW_UP: "LOW",
+      ANSWER_COMPARISON: "MEDIUM",
+      ANSWER_ANALYSIS: "MEDIUM",
+      ANSWER_DOCUMENT: "MEDIUM",
+    });
+    const classification = snapshot.routingPolicies.find(
+      (p) => p.status === "ACTIVE" && p.taskClass === "FAST_CLASSIFICATION",
+    );
+    expect(classification?.reasoningLevels ?? null).toBeNull();
+  });
+
   it("routes and records against the real catalog and ledger", async () => {
     const google = createFakeModelProvider({
       code: "google",

@@ -180,6 +180,18 @@ export const MODEL_REASONING_LEVELS = [
 export const ModelReasoningLevelSchema = z.enum(MODEL_REASONING_LEVELS);
 export type ModelReasoningLevel = z.infer<typeof ModelReasoningLevelSchema>;
 
+/**
+ * Q Intelligence step 7: the kind of work a caller says one call is, so the
+ * routing policy can set its reasoning level from versioned data
+ * (`ai_ops.routing_policies.reasoning_levels`). A label the caller chose,
+ * never the person's words; a policy with no level for it leaves the
+ * request's own `reasoning`.
+ */
+export const ModelReasoningKeySchema = z
+  .string()
+  .regex(/^[A-Z][A-Z0-9_]{0,47}$/);
+export type ModelReasoningKey = z.infer<typeof ModelReasoningKeySchema>;
+
 // ---------------------------------------------------------------------------
 // Provider and model policy vocabulary (persisted in ai_ops, doc 13 §56)
 // ---------------------------------------------------------------------------
@@ -607,6 +619,8 @@ export const ModelGatewayRequestSchema = z
     qualityFloor: ModelQualityClassSchema.optional(),
     latencyTarget: ModelLatencyClassSchema.optional(),
     reasoning: ModelReasoningLevelSchema.default("NONE"),
+    /** See `ModelReasoningKeySchema`: the routing policy's level for it wins over `reasoning`. */
+    reasoningKey: ModelReasoningKeySchema.optional(),
     temperature: z.number().min(0).max(2).optional(),
     budget: ModelBudgetSchema,
     attribution: ModelAttributionSchema,

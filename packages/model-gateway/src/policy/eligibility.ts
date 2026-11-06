@@ -8,6 +8,7 @@ import {
   type ModelGatewayRequest,
   type ModelLatencyClass,
   type ModelQualityClass,
+  type ModelReasoningLevel,
   type ModelSensitivity,
   type TenantModelPolicy,
 } from "@capital-q/contracts";
@@ -106,6 +107,24 @@ export type RoutePlan = {
   readonly decisions: readonly ModelCandidateDecision[];
   readonly eligible: readonly EligibleCandidate[];
 };
+
+/**
+ * Q Intelligence step 7: the reasoning level a call runs at. The routing
+ * policy's level for the kind of work the caller named wins, so the level
+ * per kind is versioned data, not code; with no key, or a policy that
+ * does not list it, the request's own level stands (the caller's
+ * pre-migration default).
+ */
+export function reasoningUnderPolicy(
+  policy: Pick<RoutingPolicyRecord, "reasoningLevels">,
+  request: Pick<ModelGatewayRequest, "reasoning" | "reasoningKey">,
+): ModelReasoningLevel {
+  const key = request.reasoningKey;
+  if (key === undefined) return request.reasoning;
+  const levels = policy.reasoningLevels ?? null;
+  if (levels === null || !Object.hasOwn(levels, key)) return request.reasoning;
+  return levels[key] ?? request.reasoning;
+}
 
 /**
  * The active policy for a task class whose sensitivity class covers the

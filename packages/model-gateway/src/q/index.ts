@@ -52,6 +52,8 @@ import {
   type ModelMessage,
   type ModelDataPosture,
   type ModelSensitivity,
+  type ModelReasoningKey,
+  type ModelReasoningLevel,
   type ModelTextTaskClass,
   type ModelToolCall,
   type PermittedContextPlan,
@@ -946,6 +948,89 @@ export function answerTaskClass(
     return "EVIDENCE_SYNTHESIS";
   }
   return byCapability;
+}
+
+/**
+ * Q Intelligence step 7 (adaptive reasoning): think when it matters. The
+ * level each answer kind the reader read runs at, versioned. This is the
+ * code-side default; the routing policy's `reasoning_levels` (keyed by
+ * `answerReasoningKey`) is the authority once its migration is applied.
+ * Small talk and lookups think least, so follow-ups stay fast; a
+ * comparison, analysis (diligence, memo, planning) or a document gets
+ * room to think.
+ */
+export const ANSWER_REASONING_V1 = {
+  CHAT: "NONE",
+  LOOKUP: "NONE",
+  FOLLOW_UP: "LOW",
+  COMPARISON: "MEDIUM",
+  ANALYSIS: "MEDIUM",
+  DOCUMENT: "MEDIUM",
+} as const satisfies Readonly<Record<TurnAnswerKind, ModelReasoningLevel>>;
+
+/**
+ * Which kind wins a compound ask. Heavier work first; a tie in level is
+ * broken here so the key sent is deterministic.
+ */
+const ANSWER_KIND_WEIGHT: Readonly<Record<TurnAnswerKind, number>> = {
+  CHAT: 0,
+  LOOKUP: 1,
+  FOLLOW_UP: 2,
+  DOCUMENT: 3,
+  COMPARISON: 4,
+  ANALYSIS: 5,
+};
+
+const REASONING_RANK: Readonly<Record<ModelReasoningLevel, number>> = {
+  NONE: 0,
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+};
+
+/** The routing-policy key for one answer kind (`reasoning_levels`). */
+export function answerReasoningKey(kind: TurnAnswerKind): ModelReasoningKey {
+  return `ANSWER_${kind}`;
+}
+
+/**
+ * The reasoning level and policy key for a conversational answer, read
+ * from the reader's answerKind and the kinds of a compound ask's parts
+ * only: the heaviest wins. Never their words. No reading (scripted or
+ * FAKE mode, a failed reader) or another capability: NONE and no key, the
+ * gateway's own default.
+ */
+export function answerReasoning(request: {
+  readonly capability: QCapability;
+  readonly answerKind?: string | undefined;
+  readonly askParts?:
+    readonly { readonly ask: string; readonly kind: string }[] | undefined;
+}): {
+  readonly reasoning: ModelReasoningLevel;
+  readonly reasoningKey?: ModelReasoningKey;
+} {
+  if (request.capability !== "ANSWER") return { reasoning: "NONE" };
+  let heaviest: TurnAnswerKind | undefined;
+  for (const kind of readAnswerKinds(request)) {
+    if (heaviest === undefined) {
+      heaviest = kind;
+      continue;
+    }
+    const byLevel =
+      REASONING_RANK[ANSWER_REASONING_V1[kind]] -
+      REASONING_RANK[ANSWER_REASONING_V1[heaviest]];
+    if (
+      byLevel > 0 ||
+      (byLevel === 0 && ANSWER_KIND_WEIGHT[kind] > ANSWER_KIND_WEIGHT[heaviest])
+    ) {
+      heaviest = kind;
+    }
+  }
+  if (heaviest === undefined) return { reasoning: "NONE" };
+  return {
+    reasoning: ANSWER_REASONING_V1[heaviest],
+    reasoningKey: answerReasoningKey(heaviest),
+  };
 }
 
 /** Q's conversational work happens in INVESTOR-facing evaluation or DEBRIEF; never assessment here. */
@@ -6355,7 +6440,10 @@ export function createModelGatewayQAnswer(
       const taskClass = taskClassForCapability(request.capability);
       const budgetClass = answerTaskClass(request);
       const budget = budgetForTaskClass(budgetClass);
-      const base = {
+      // Step 7: how hard the answer thinks follows what the reader read,
+      // and the routing policy has the last word on the level.
+      const answerThinking = answerReasoning(request);
+      const unthinking = {
         taskClass,
         sensitivity,
         dataPosture,
@@ -6373,6 +6461,7 @@ export function createModelGatewayQAnswer(
           ? {}
           : { tenantPolicy: dependencies.tenantPolicy }),
       };
+      const base = { ...unthinking, ...answerThinking };
 
       /**
        * The answer, going out a sentence at a time as the model writes it.
@@ -8569,7 +8658,13 @@ export function createModelGatewayQAnswer(
         modelCalls += 1;
         const result = gateway
           .execute<CompanyAnalystV26Result>(
-            { ...base, messages: read, output: extrasOutput(rendered.output) },
+            // The side fields run beside the answer and must not become
+            // the slowest call: they never think (step 7).
+            {
+              ...unthinking,
+              messages: read,
+              output: extrasOutput(rendered.output),
+            },
             {
               ...options,
               // Its own fields only (parallel-extras.ts); code fills the rest.
@@ -10956,6 +11051,8 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             qRunId: request.runId,
             taskClass,
             budgetClass,
+            reasoning: answerThinking.reasoning,
+            reasoningKey: answerThinking.reasoningKey ?? null,
             promptBundleVersion: rendered.bundle.bundleVersion,
             promptCharacters: rendered.characters,
             provider: final.providerCode,

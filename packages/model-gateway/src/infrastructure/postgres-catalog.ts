@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { ModelTaskClassSchema } from "@capital-q/contracts";
+import {
+  ModelReasoningKeySchema,
+  ModelReasoningLevelSchema,
+  ModelTaskClassSchema,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import {
@@ -85,6 +89,14 @@ const PolicyRow = z.object({
   // Absent before 20261207163000; a catalog read against an older schema
   // simply has no hedge.
   hedge_after_ms: z.number().int().nullable().optional(),
+  // Absent before 20261231260000 (step 7). A map the catalog cannot read
+  // costs only the map: the call keeps its own reasoning level, and the
+  // rest of the catalog still loads.
+  reasoning_levels: z
+    .record(ModelReasoningKeySchema, ModelReasoningLevelSchema)
+    .nullable()
+    .optional()
+    .catch(null),
   cost_ceiling_usd: NullableNumeric,
   preferred_models: z.array(z.string()),
   fallback_models: z.array(z.string()),
@@ -117,7 +129,8 @@ export async function loadModelCatalogSnapshot(
     // hedge_after_ms read through to_jsonb so a service deployed before
     // its migration (20261207163000) still loads its catalog, unhedged.
     sql`select id, code, task_class, sensitivity_class, quality_floor, latency_target_ms,
-               (to_jsonb(rp) ->> 'hedge_after_ms')::integer as hedge_after_ms, cost_ceiling_usd,
+               (to_jsonb(rp) ->> 'hedge_after_ms')::integer as hedge_after_ms,
+               to_jsonb(rp) -> 'reasoning_levels' as reasoning_levels, cost_ceiling_usd,
                preferred_models, fallback_models, allow_free_router, status, version
           from ai_ops.routing_policies rp order by task_class, version`,
   ]);
@@ -189,6 +202,7 @@ export async function loadModelCatalogSnapshot(
         qualityFloor: r.quality_floor,
         latencyTargetMs: r.latency_target_ms,
         hedgeAfterMs: r.hedge_after_ms ?? null,
+        reasoningLevels: r.reasoning_levels ?? null,
         costCeilingUsd: r.cost_ceiling_usd,
         preferredModels: r.preferred_models,
         fallbackModels: r.fallback_models,

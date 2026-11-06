@@ -42,6 +42,7 @@ import {
 import type { SyntheticDemoRoutingAllowance } from "./policy/synthetic-demo.js";
 import {
   planRoute,
+  reasoningUnderPolicy,
   selectRoutingPolicy,
   type EligibleCandidate,
 } from "./policy/eligibility.js";
@@ -417,7 +418,11 @@ export function createModelGateway(
               tools: request.tools,
               maxOutputTokens: outputTokens,
               temperature: request.temperature,
-              reasoning: request.reasoning,
+              // A level above NONE only reaches a model the catalogue marks
+              // as reasoning; any other model is asked for none (step 7).
+              reasoning: candidate.model.supportsReasoning
+                ? request.reasoning
+                : "NONE",
               ...(candidate.model.supportsPromptCache
                 ? { cacheKey: promptCacheKeyOf(request) }
                 : {}),
@@ -927,6 +932,12 @@ export function createModelGateway(
       });
     }
     span.setAttribute("q.model.routing_policy", policy.code);
+    // Step 7: the policy sets the level for the work the caller named; every
+    // attempt of this request, fallbacks and hedges included, runs at it.
+    const reasoning = reasoningUnderPolicy(policy, request);
+    const routed: ModelGatewayRequest =
+      reasoning === request.reasoning ? request : { ...request, reasoning };
+    span.setAttribute("q.model.reasoning", reasoning);
     const hedgeAfterMs = policy.hedgeAfterMs ?? null;
     const tenantPolicy =
       request.tenantPolicy ??
@@ -1096,7 +1107,7 @@ export function createModelGateway(
           ms: number,
         ) =>
           attempt(
-            request,
+            routed,
             which,
             whichProvider,
             policy.id,
