@@ -241,9 +241,7 @@ describe("web discovery: the page reader under a slow model (live 2026-11-06)", 
     const [first, second, ...rest] = web.timeline;
     expect(first).toMatch(/^start /u);
     expect(second).toBe(first?.replace("start", "end"));
-    // The rest went side by side.
-    expect(rest.slice(0, 2).every((step) => step.startsWith("start"))).toBe(
-      true,
-    );
+    // Then the rest of round one.
+    expect(rest[0]).toMatch(/^start /u);
   }, 20_000);
 });

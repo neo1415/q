@@ -362,9 +362,10 @@ export const RESEARCH_RUN_BUDGET = 1;
  * candidate, which the one-call rule above cannot hold. A discovery call
  * (one carrying admitted `categories` or `pageNames`) has its own budget
  * per run, strictly enforced, beside the ordinary one: at most this many
- * calls, each of at most two searches, so at most ten searches a turn.
+ * calls, each of at most two searches, so at most twelve searches a turn
+ * (2026-11-06 round 3: two calls for round one, up to four for founders).
  */
-export const RESEARCH_DISCOVERY_RUN_BUDGET = 5;
+export const RESEARCH_DISCOVERY_RUN_BUDGET = 6;
 
 const PROVIDER_UNAVAILABLE_MESSAGE =
   "Public sources couldn't be checked right now. Capital Q's own information is still available.";

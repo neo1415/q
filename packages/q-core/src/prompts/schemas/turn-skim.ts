@@ -249,3 +249,19 @@ export const TurnSkimV10ResultSchema = TurnSkimV8ResultSchema.extend({
   document: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnSkimV10Result = z.infer<typeof TurnSkimV10ResultSchema>;
+
+export const TURN_SKIM_V11_SCHEMA_VERSION = 11;
+
+/**
+ * v11 (owner's own account, live 2026-11-06 on 11180d8e6): "find me new
+ * companies online that i would be interested in" was skimmed as FIT and
+ * answered from Capital Q's own mandate ranking before the full reading
+ * landed: "online" was never read. `onWeb` is true when the turn asks Q to
+ * find companies or investors out on the public web, online, or that are
+ * not on Capital Q (yet), read by meaning in any language; the fast lane
+ * then waits for the full reading. Lenient: malformed reads as false.
+ */
+export const TurnSkimV11ResultSchema = TurnSkimV10ResultSchema.extend({
+  onWeb: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnSkimV11Result = z.infer<typeof TurnSkimV11ResultSchema>;

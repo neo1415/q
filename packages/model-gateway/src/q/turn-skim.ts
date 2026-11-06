@@ -4,10 +4,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnSkimV10ResultSchema,
+  TurnSkimV11ResultSchema,
   type PromptRegistry,
   type TurnSkimV8Result,
-  type TurnSkimV10Result,
+  type TurnSkimV11Result,
   type TurnSkimV3Variables,
 } from "@capital-q/q-core";
 
@@ -136,7 +136,7 @@ export function createTurnSkimmer(dependencies: {
             ).slice(0, 1_500),
           },
         });
-        const response = await dependencies.gateway.execute<TurnSkimV10Result>(
+        const response = await dependencies.gateway.execute<TurnSkimV11Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -158,12 +158,12 @@ export function createTurnSkimmer(dependencies: {
             },
           },
           {
-            schema: TurnSkimV10ResultSchema,
+            schema: TurnSkimV11ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const read = TurnSkimV10ResultSchema.safeParse(
+        const read = TurnSkimV11ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return read.success ? read.data : null;

@@ -52,6 +52,10 @@ export const DISCOVERY_VOCABULARY: readonly string[] = [
   "seed",
   "round",
   "funding",
+  // A founder search ("{company} founder CEO", 2026-11-06 round 3).
+  "ceo",
+  "co",
+  "cofounder",
 ];
 
 function nodeName(

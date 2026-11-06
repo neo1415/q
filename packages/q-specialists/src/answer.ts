@@ -8137,6 +8137,12 @@ export function createSpecialistQAnswer(
               ),
               stages: read.question?.discover?.stages ?? [],
               count: read.question?.count ?? null,
+              // Owner's account 2026-11-06: "…online that i would be
+              // interested in" is fit with their mandate too (the reading).
+              alsoOnCapitalQ:
+                read.question?.kind === "FIT" ||
+                read.question?.discover?.mandateRelevant === true ||
+                read.question?.discover?.ranking === "FIT",
             },
           }
         : {}),

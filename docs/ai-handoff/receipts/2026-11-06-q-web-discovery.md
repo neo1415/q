@@ -235,3 +235,97 @@ Branch `fix/q-web-discovery-2`, cut from `origin/fix/resume-asking-cv9ru3` @ `1a
 - **The log line** `q answered a web discovery` shows `readerFailed: false`, `listed` above 0, and `founderSearches` and `toolCalls` above 3.
 - **If a reader call still fails,** the log line `web discovery reader: some page groups were not read` names how many groups failed. The list then comes from the groups that were read, plus companies' own sites.
 - **The first search's ScrapingBee and Serper refusals** should be the only ones in the turn.
+
+## Round 3 (`fix/q-web-discovery-3`): founders, new first, fit filled; the owner's two live defects
+
+Branch `fix/q-web-discovery-3`, cut from `origin/fix/resume-asking-cv9ru3` @ `0a13cb2`, with the person-identity rule included.
+
+No live calls were made. I could not read the production logs from this session, so every cause below was found from the code and reproduced in a test.
+
+### 1. Founders (live 11180d8e6: all 8 companies said "founders not named")
+
+**Cause.** The founder round could start only before 60% of the 30 s deep budget had passed. Live, round one and the page reads took longer than that, so the round never ran.
+
+**Fix.**
+
+- Discovery has its own **45 s** wall clock. The founder round may start until 70% of it.
+- The founder round searches up to **8** candidates as "{company} founder CEO", sent as `pageNames`, and reads 4 pages per call.
+- Round one sends 4 queries in 2 calls. The research service's discovery budget is now **6 calls**, at most 12 searches. "CEO" and "co-founder" may go out with a founder search.
+- **Founders the reader left out are read by code.** A founder is taken from a sentence that also names the company ("founded in 2022 by X and Y", "CEO X", "X, its co-founder"), or from a page on the company's own site. Admission uses the same person-identity rule (`pageTiesPerson`). Organisation words, rounds and the company's own name are never taken for a person.
+- Round-two reader results merge across spellings of a name ("M-KOPA" and "M Kopa").
+
+### 2. "New"
+
+- **Queries:** recency queries come first ("new {sector} startups founded {last year}", "raised seed {year}", "launched {year}").
+- **Years:** only the founded or launched year, and the latest funding year, that a sentence naming the company states. No year is ever taken from the page's date or inferred.
+- **Ranking:** a company founded in the last 3 years ranks up. One founded more than 8 years ago ranks down. One that raised money this year or last ranks up.
+- **Shown:** "· founded 2024" or "· raised in 2026" when a page states it.
+
+### 3. Fit filled
+
+A sector or place the reader left unknown is filled when a sentence naming the company states one of the searched sectors or places. That sentence can be on the listing, the company's own site or a founder-round page.
+
+### 4. One line per company
+
+Each company gets a single line: `**Name** · founded 2024 — Founders: A and B. What it does. Fit: …. Source: [site](link).`
+
+### A. "find me new companies online that i would be interested in" got the in-app ranking
+
+**Cause.** The quick first read (the skim) read the ask as FIT with high confidence. The fast lane answered from Capital Q's own mandate ranking before the full reading landed, so "online" was never read.
+
+**Fix.**
+
+- **TURN_SKIM v11** adds `onWeb`, read by meaning in any language: the turn asks for companies, founders or investors on the public web, online, or not on Capital Q (yet).
+- The fast lane takes no company or fit lane when `onWeb` is set, so the full reading plans the discovery. The investor lane keeps its own web search.
+- **When the reading is also about fit** (a FIT question, `mandateRelevant` or ranking FIT), the answer opens with one line: "On Capital Q, your top 3 by mandate fit: **A**, **B** and **C** (on the cards). From the public web:". Their fit cards come with it, followed by the web's list.
+- **The turn reader is not bumped.** v78's `asksForWeb` already covers "look it up online", and B shows the full reading set up the discovery live. A bump would only have re-pinned dozens of version tests.
+
+### B. "can you find more online? that maybe not exist in capital Q yet" listed nothing (run ad5c5e5f)
+
+**Cause.** The person's words name a company the run had read: "Capital Q", held on Capital Q.
+
+- The gateway filter for searches about a company Capital Q holds (`aboutThemOnly`, live 2026-10-24) therefore kept only pages about Capital Q.
+- Every discovery page was dropped, and the reader was given nothing.
+- That matches the log: pages were fetched, but `sources=0`, there was no reader call, and the turn took 3.8 s.
+- The first-turn run at 13:09 named no held company, so it was not filtered.
+
+**Fix.**
+
+- Discovery's own searches, whose call ids `q-discovery-*` are made by code and never by a model, skip that relevance filter. Discovery looks for other companies by design.
+- Its admission still grounds every name in this run's pages, and the person-identity rule still applies to its searches.
+- A test through the real answer path reproduces the exact NONE answer and passes with the fix.
+
+### Tests
+
+| File                                                                               | What it pins                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model-gateway/test/q-web-discovery-founders.test.ts`                              | Production-shaped: 2 listing pages name 8 companies and no founders; founder-round pages state founders and years; the reader names nothing there; 20 s pass before the founder round. Founders for ≥ 50%, new first, years shown and never invented, sector and place filled |
+| `model-gateway/test/q-answer-research.test.ts`                                     | B: a follow-up that names the held company "Capital Q" still lists the web's companies                                                                                                                                                                                        |
+| `model-gateway/test/natural-conversation-eval.test.ts`                             | A: "…online that i would be interested in" answers with both (top 3 on Capital Q with cards, then the web's list); the web alone answers with the web's list only                                                                                                             |
+| `q-specialists/test/answer-fast-lane.test.ts`, `q-core/test/turn-skim-v11.test.ts` | `onWeb` keeps the fast lane out; v11 keeps v10 whole; `onWeb` is read leniently                                                                                                                                                                                               |
+
+Prompt: `turn-skim/v11` is new, and v10 is deprecated. `prompts.lock.json` gained one line.
+
+### Gates (exact results)
+
+| Gate                                                                                                                          | Result                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec turbo run build --filter=./packages/*`                                                                             | 54/54 successful                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Root tsc / `apps/q-api` tsc                                                                                                   | exit 0 / exit 0                                                                                                                                                                                                                                                                                                                                                                                                           |
+| eslint on every touched file / `npx prettier --check apps packages docs supabase`                                             | exit 0 / all files pass                                                                                                                                                                                                                                                                                                                                                                                                   |
+| vitest `packages/model-gateway q-evals q-research q-tools q-core q-runtime` / `q-specialists` + `apps/workers` / `apps/q-api` | 464 files, 5006 passed (1 skipped) / 134 files, 1822/1822 / 335 files, 3123 passed (3 skipped)                                                                                                                                                                                                                                                                                                                            |
+| Integration on local PG (q-api, model-gateway, q-evals, q-specialists, q-research, q-tools) with `CQ_Q_IQ_ALL=1`              | **115/116.** The one failure, `gateway-postgres.integration.test.ts` "a CONFIDENTIAL turn falls back to Groq when OpenAI's credit is spent (20261231290000)", is **already present on the base**: it fails the same way on a freshly rebuilt local database. The base rolled back the Groq v1 fallback in `5a58671` after that test last changed in `3b9be1e`, and this branch touches no routing, migration or that test |
+| Q-IQ through the runtime                                                                                                      | **Core: 573 turns, no fails.** **ADVERSARIAL:** score 1 with both the resisting and the obeying model. **DISCOVERY:** score 1. `liveGaps: []`                                                                                                                                                                                                                                                                             |
+
+### What the live re-run should show
+
+**"find me new companies online that i would be interested in":**
+
+- the answer opens with "On Capital Q, your top 3 by mandate fit: …" and those three cards;
+- then the web's numbered list follows;
+- `q answered a web discovery` shows `founderSearches > 0`.
+
+**"can you find more online? that maybe not exist in capital Q yet":**
+
+- a list of companies (`listed > 0`, `sources > 0`), with founders on most;
+- recent companies first, with "· founded YYYY" where a page states it.

@@ -53,7 +53,7 @@ const letters = (text: string): string =>
   text.toLowerCase().replace(/[^a-z0-9]/gu, "");
 
 /** The page is on the company's own site (its name is the site's name). */
-function onCompanySite(domain: string, company: string): boolean {
+export function onCompanySite(domain: string, company: string): boolean {
   const site = letters(
     domain
       .toLowerCase()

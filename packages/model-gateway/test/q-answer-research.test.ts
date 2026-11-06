@@ -3595,3 +3595,122 @@ describe("answer seam: a person held against a record is never a namesake (live 
     expect(toolTurn).toContain("profiles.example");
   });
 });
+
+describe("web discovery on a follow-up that names Capital Q (live 2026-11-06, run ad5c5e5f)", () => {
+  // "can you find more online? that maybe not exist in capital Q yet":
+  // pages were fetched (sourcesRetained 3) yet discovery listed nothing and
+  // read nothing. The words name a company the run read ("Capital Q"), so
+  // the relevance filter for searches about a company Capital Q holds kept
+  // only pages about it, which a search for OTHER companies never finds.
+  const CAPITAL_Q = "c0c0c0c0-0000-4000-8000-0000000000aa";
+  const LISTING = {
+    index: 1,
+    url: "https://weetracker.example/fintech-startups",
+    domain: "weetracker.example",
+    title: "Fintech startups to watch",
+    publishedAt: null,
+    retrievedAt: "2026-11-06T13:31:00.000Z",
+    excerpt:
+      "Fintech startups to watch: Owo Rails, a payments API for Lagos merchants, and Kobo Harbour, a savings app in Ibadan.",
+    extracted: true,
+    instructionRiskSignals: 0,
+  };
+  const port: QToolPort = {
+    offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+    execute: (proposal) =>
+      Promise.resolve(
+        proposal.name === "research_public_web"
+          ? {
+              callId: proposal.callId,
+              toolName: "public_web.search",
+              toolVersion: 1,
+              classification: "READ_ONLY",
+              status: "SUCCEEDED",
+              failureCode: null,
+              sensitivity: "PUBLIC",
+              result: {
+                ok: true,
+                data: {
+                  status: "OK",
+                  query: "fintech startups 2026",
+                  sources: [LISTING],
+                  comparison: [],
+                  truthClass: "UNKNOWN",
+                },
+              },
+              latencyMs: 1,
+            }
+          : {
+              callId: proposal.callId,
+              toolName: "company.get",
+              toolVersion: 1,
+              classification: "READ_ONLY",
+              status: "SUCCEEDED",
+              failureCode: null,
+              sensitivity: "INTERNAL",
+              result: {
+                ok: true,
+                data: {
+                  companyId: CAPITAL_Q,
+                  canonicalName: "Capital Q",
+                  legalName: null,
+                  websiteUrl: "https://capitalq.example",
+                  foundedDate: null,
+                  headquartersCountry: "GB",
+                  headquartersCity: "London",
+                  currentStageCode: "SEED",
+                  shortDescription:
+                    "Capital Q is an investment intelligence platform.",
+                  primaryDescription: null,
+                  companyStatus: "active",
+                  relationToYou: "SHARED",
+                  truthClass: "USER_CLAIM",
+                },
+              },
+              latencyMs: 1,
+            },
+      ),
+  };
+
+  it("lists the companies the pages name, whatever company the words also name", async () => {
+    const { seam, request, messages } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            companies: ["Owo Rails", "Kobo Harbour"].map((name) => ({
+              name,
+              founders: [],
+              does: null,
+              sector: null,
+              stage: null,
+              place: null,
+              sourceRefs: [0],
+              quote: name,
+            })),
+          },
+        },
+      ],
+      tools: port,
+      userText:
+        "can you find more online? that maybe not exist in capital Q yet",
+      subjects: [{ kind: "COMPANY", companyId: CAPITAL_Q }],
+    });
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      webDiscovery: {
+        text: "can you find more online? that maybe not exist in capital Q yet",
+        sectors: ["fintech"],
+        countries: ["NG"],
+        stages: [],
+        count: null,
+      },
+    });
+    expect(outcome.kind).toBe("ANSWERED");
+    const answer =
+      messages.filter((message) => message.role === "Q").at(-1)?.content ?? "";
+    expect(answer).toContain("**Owo Rails**");
+    expect(answer).toContain("**Kobo Harbour**");
+  });
+});

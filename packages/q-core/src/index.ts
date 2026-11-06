@@ -1825,6 +1825,9 @@ export {
   TurnSkimV8ResultSchema,
   TurnSkimV10ResultSchema,
   TURN_SKIM_V10_SCHEMA_VERSION,
+  TurnSkimV11ResultSchema,
+  TURN_SKIM_V11_SCHEMA_VERSION,
+  type TurnSkimV11Result,
   type TurnSkimV8Result,
   type TurnSkimV10Result,
   type TurnSkimV7Result,
@@ -2139,6 +2142,7 @@ export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";
 export { TURN_SKIM_V8, V8_KINDS } from "./prompts/tasks/turn-skim.v8.js";
 export { TURN_SKIM_V9, V9_ASKS_OF_IT } from "./prompts/tasks/turn-skim.v9.js";
 export { TURN_SKIM_V10, V10_DOCUMENT } from "./prompts/tasks/turn-skim.v10.js";
+export { TURN_SKIM_V11, V11_ON_WEB } from "./prompts/tasks/turn-skim.v11.js";
 
 export {
   COMPANY_ANALYST_V23,

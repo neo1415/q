@@ -7,9 +7,13 @@ import type {
 } from "@capital-q/q-runtime";
 
 import { countryWords, stageWords } from "./named-company-fact.js";
-import { namedIn, normalForm, pageTiesPerson } from "./person-anchor.js";
+import {
+  namedIn,
+  normalForm,
+  onCompanySite,
+  pageTiesPerson,
+} from "./person-anchor.js";
 import type { MandateCategories } from "./own-mandate-answer.js";
-import { Q_DEEP_TOOL_LOOP_BUDGET_MS } from "./tool-loop-budget.js";
 import type { WebDiscoveryReader } from "./web-discovery-reader.js";
 
 /**
@@ -50,11 +54,13 @@ import type { WebDiscoveryReader } from "./web-discovery-reader.js";
 export type WebDiscoveryAsk = NonNullable<QAnswerRequest["webDiscovery"]>;
 
 const RESEARCH_TOOL = "research_public_web";
+/** The call ids of discovery's own tool calls (code's, never a model's). */
+export const DISCOVERY_CALL_PREFIX = "q-discovery-";
 const EXTRACT_TOOL = "extract_public_web";
 const SEARCH_COMPANIES_TOOL = "search_companies";
 
 /** Queries in the first round. */
-export const DISCOVERY_QUERIES = { min: 3, max: 6 } as const;
+export const DISCOVERY_QUERIES = { min: 3, max: 4 } as const;
 /** Companies listed with no number asked. */
 export const DISCOVERY_DEFAULT_COUNT = 8;
 export const DISCOVERY_MAX_COUNT = 10;
@@ -65,17 +71,26 @@ export const DISCOVERY_MAX_TOOL_CALLS = 16;
  * two is at most two research calls and the whole discovery at most five,
  * the research service's discovery budget per run.
  */
-const FOUNDER_ROUND_MAX = 4;
+const FOUNDER_ROUND_MAX = 8;
 /**
  * Pages each research call reads in full (spend: a page read is a paid
  * extract). A founder is usually named in a snippet or the first page.
  */
 const ROUND_ONE_PAGES = 3;
-const FOUNDER_ROUND_PAGES = 2;
+const FOUNDER_ROUND_PAGES = 4;
 /** Pages read further when a search returned only a snippet. */
 const EXTRACT_MAX = 3;
 /** No new round starts once this share of the budget is spent. */
-const ROUND_CUTOFF = 0.6;
+const ROUND_CUTOFF = 0.7;
+/**
+ * Live 2026-11-06 (11180d8e6): eight companies listed, every one "founders
+ * not named": round one and the page reads took past 60% of the 30 s deep
+ * budget, so the founder round never started. A discovery is one errand
+ * the person asked for and waits on (the visible stage says it is
+ * searching); it gets its own wall clock, and the founder round may start
+ * until 70% of it.
+ */
+export const DISCOVERY_BUDGET_MS = 45_000;
 
 const STAGE_ORDER = [
   "pre_seed",
@@ -98,6 +113,8 @@ const HINT_WORDS = [
   "founder",
   "funding",
   "round",
+  "founded",
+  "launched",
 ] as const;
 
 export type DiscoveryPlan = {
@@ -148,6 +165,7 @@ export function queryIsPublic(
   const allowed = new Set<string>([
     ...HINT_WORDS,
     String(year),
+    String(year - 1),
     ...[...plan.sectors, ...plan.places, ...plan.stages].flatMap(tokens),
   ]);
   return tokens(query).every((token) => allowed.has(token));
@@ -203,7 +221,7 @@ export function planDiscovery(
       .map((part) => part.trim())
       .filter((part) => part.length > 0)
       .join(" ");
-  const candidates: string[] = [];
+  const categoryQueries: string[] = [];
   const sectorList = sectors.length > 0 ? sectors : [""];
   const placeList = places.length > 0 ? places : [""];
   // One query per sector and place, interleaved so every category is
@@ -211,29 +229,34 @@ export function planDiscovery(
   for (let i = 0; i < Math.max(sectorList.length, placeList.length); i += 1) {
     const sector = sectorList[i % sectorList.length] ?? "";
     const place = placeList[i % placeList.length] ?? "";
-    candidates.push(join(sector, "startups", place, stageWord, String(year)));
+    categoryQueries.push(
+      join(sector, "startups", place, stageWord, String(year)),
+    );
   }
+  // Recency first (owner 2026-11-06: "NEW companies"; Jumo and M-Kopa are
+  // long established): what was founded, launched or raised seed lately.
+  const candidates: string[] = [...categoryQueries.slice(0, 1)];
   candidates.push(
     join(
+      "new",
       sectorList[0] ?? "",
-      "startup raised seed",
+      "startups founded",
       placeList[0] ?? "",
-      String(year),
+      String(year - 1),
     ),
     join(
-      "new",
       sectorList[1] ?? sectorList[0] ?? "",
-      "startups launches",
+      "startup raised seed",
       placeList[1] ?? placeList[0] ?? "",
       String(year),
     ),
     join(
       sectorList[0] ?? "",
-      "startups founders",
+      "startups launched",
       placeList[2] ?? placeList[0] ?? "",
       String(year),
     ),
-    join("new", sectorList[0] ?? "", "startups funding round", String(year)),
+    ...categoryQueries.slice(1),
   );
   const plan = { sectors, places, stages };
   const queries = [...new Set(candidates.map((q) => q.replace(/\s+/gu, " ")))]
@@ -291,6 +314,10 @@ export type DiscoveredCompany = {
   readonly sourceUrls: readonly string[];
   /** Already a canonical company on Capital Q (search_companies). */
   readonly onCapitalQ: boolean;
+  /** The year a page says it was founded or launched; null when none does. */
+  readonly founded?: number | null | undefined;
+  /** The latest year a page says it raised money; null when none does. */
+  readonly raised?: number | null | undefined;
 };
 
 type Proposed = {
@@ -306,6 +333,14 @@ const pageText = (source: FetchedSource): string =>
   `${source.title ?? ""}\n${source.excerpt}`;
 
 /**
+ * A company's key across spellings of its name ("M-KOPA", "M Kopa"):
+ * letters and digits only. Never used to admit a name, only to merge.
+ */
+export function companyKey(name: string): string {
+  return normalForm(name).replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/**
  * Code admits what the reader proposed: a company only when its name is on
  * a page fetched in this run; a founder only when a page that names the
  * company names them too; what it does, its stage and place only when the
@@ -318,11 +353,11 @@ export function admitDiscoveries(
   known: readonly DiscoveredCompany[] = [],
 ): DiscoveredCompany[] {
   const out = new Map<string, DiscoveredCompany>(
-    known.map((company) => [normalForm(company.name), company] as const),
+    known.map((company) => [companyKey(company.name), company] as const),
   );
   for (const item of proposed) {
     const name = item.name.trim().slice(0, 120);
-    const key = normalForm(name);
+    const key = companyKey(name);
     if (key.length < 2) continue;
     const naming = sources.filter((source) => namedIn(name, pageText(source)));
     if (naming.length === 0) continue;
@@ -332,7 +367,7 @@ export function admitDiscoveries(
       .filter(
         (founder) =>
           founder.length >= 3 &&
-          normalForm(founder) !== key &&
+          companyKey(founder) !== key &&
           // The same rule as any person Q holds against a record: the page
           // names the founder AND the company (person-anchor.ts).
           sources.some((source) =>
@@ -449,6 +484,196 @@ export function namesFromCompanySites(
     }
   }
   return found;
+}
+
+// --- what the pages say about one company ---------------------------------
+
+/** A sentence of a page read in this run, with the page's site. */
+export type PageSentence = {
+  readonly text: string;
+  readonly domain?: string | null | undefined;
+};
+
+/**
+ * The sentences of the readable pages that name the company, and every
+ * sentence of a page on the company's own site (it is about the company
+ * whether or not a sentence repeats its name).
+ */
+function sentencesNaming(
+  name: string,
+  sources: readonly FetchedSource[],
+): PageSentence[] {
+  return sources
+    .filter((source) => source.risky !== true)
+    .flatMap((source) => {
+      const own = onCompanySite(source.domain, name);
+      return pageText(source)
+        .split(/(?<=[.!?])\s+|\n+/u)
+        .filter((sentence) => own || namedIn(name, sentence))
+        .map((text) => ({ text, domain: source.domain }));
+    });
+}
+
+const NAME = String.raw`\p{Lu}[\p{L}'’-]+(?:\s\p{Lu}[\p{L}'’-]+){1,3}`;
+/** How public pages state who founded or leads a company. */
+const FOUNDER_SAID: readonly RegExp[] = [
+  new RegExp(
+    String.raw`\b(?:co-?)?founded(?:\s+in\s+[\p{L}\p{N}]+)?\s+by\s+(${NAME})(?:,?\s+(?:and|&)\s+(${NAME}))?`,
+    "gu",
+  ),
+  new RegExp(
+    String.raw`\b(?:co-?founders?|founders?)\s+(?:are\s+|include\s+)?(${NAME})(?:,?\s+(?:and|&)\s+(${NAME}))?`,
+    "gu",
+  ),
+  new RegExp(
+    String.raw`\b(?:CEO|chief\s+executive|co-?founder|founder)(?:\s+and\s+(?:CEO|CTO|COO))?,?\s+(${NAME})`,
+    "gu",
+  ),
+  new RegExp(
+    String.raw`(${NAME}),?\s+(?:its\s+|the\s+)?(?:co-?founder|founder|CEO|chief\s+executive)\b`,
+    "gu",
+  ),
+];
+/** Words that make a capitalised phrase an organisation, place or title. */
+const NOT_A_PERSON = new Set([
+  "the",
+  "our",
+  "its",
+  "his",
+  "her",
+  "their",
+  "this",
+  "ltd",
+  "inc",
+  "limited",
+  "group",
+  "bank",
+  "capital",
+  "ventures",
+  "partners",
+  "fund",
+  "africa",
+  "series",
+  "seed",
+  "startup",
+  "startups",
+  "company",
+  "ceo",
+  "cto",
+  "coo",
+  "founder",
+  "co-founder",
+  "chief",
+  "executive",
+]);
+
+/**
+ * Founders a sentence that names the company states ("founded by X and
+ * Y", "CEO X", "X, its co-founder"): public page text only, and only in a
+ * sentence that also names the company, so the person is tied to it
+ * (person-anchor.ts). Used when the reader named none.
+ */
+export function foundersStated(
+  company: string,
+  sentences: readonly (string | PageSentence)[],
+): string[] {
+  const found: string[] = [];
+  for (const said of sentences) {
+    const sentence = typeof said === "string" ? said : said.text;
+    const domain = typeof said === "string" ? null : (said.domain ?? null);
+    for (const pattern of FOUNDER_SAID) {
+      for (const match of sentence.matchAll(pattern)) {
+        for (const raw of match.slice(1)) {
+          if (raw === undefined) continue;
+          const name = raw.trim();
+          const words = name.split(/\s+/u);
+          if (
+            words.length < 2 ||
+            words.some((word) => NOT_A_PERSON.has(word.toLowerCase())) ||
+            namedIn(company, name) ||
+            namedIn(name, company) ||
+            !pageTiesPerson(
+              { text: sentence, domain },
+              { person: name, company },
+            )
+          ) {
+            continue;
+          }
+          if (!found.some((known) => companyKey(known) === companyKey(name))) {
+            found.push(name);
+          }
+        }
+      }
+    }
+  }
+  return found.slice(0, 4);
+}
+
+/**
+ * The year a sentence that names the company says it was founded or
+ * launched, and the latest year it says it raised money. Only years the
+ * pages state; never inferred from a page's date.
+ */
+export function yearsStated(
+  sentences: readonly (string | PageSentence)[],
+  now: Date,
+): { readonly founded: number | null; readonly raised: number | null } {
+  const thisYear = now.getUTCFullYear();
+  const texts = sentences.map((said) =>
+    typeof said === "string" ? said : said.text,
+  );
+  const yearIn = (pattern: RegExp): number[] =>
+    texts.flatMap((sentence) =>
+      [...sentence.matchAll(pattern)]
+        .map((match) => Number(match[1]))
+        .filter((year) => year >= 1990 && year <= thisYear),
+    );
+  const founded = yearIn(
+    /\b(?:founded|launched|established|started|incorporated)\b[^.;]{0,40}?\b((?:19|20)\d{2})\b/giu,
+  );
+  const raised = yearIn(
+    /\b(?:raised|raises|secured|closed|announced)\b[^.;]{0,80}?\b(20\d{2})\b/giu,
+  );
+  return {
+    founded: founded.length === 0 ? null : Math.min(...founded),
+    raised: raised.length === 0 ? null : Math.max(...raised),
+  };
+}
+
+/**
+ * Fills what the reader left unknown from the sentences that name the
+ * company, on any page read in this run (the listing, its own site, the
+ * founder round's pages): founders, the founded and funding years, and
+ * the searched sector and place when those sentences state them.
+ */
+export function enrichFromPages(
+  company: DiscoveredCompany,
+  sources: readonly FetchedSource[],
+  plan: Pick<DiscoveryPlan, "sectors" | "places">,
+  now: Date,
+): DiscoveredCompany {
+  const sentences = sentencesNaming(company.name, sources);
+  if (sentences.length === 0) return company;
+  const text = sentences.map((sentence) => sentence.text).join(" ");
+  const years = yearsStated(sentences, now);
+  const founders =
+    company.founders.length > 0
+      ? company.founders
+      : foundersStated(company.name, sentences);
+  return {
+    ...company,
+    founders,
+    sector:
+      company.sector ??
+      plan.sectors.find((sector) => namedIn(sector, text)) ??
+      null,
+    place:
+      company.place ??
+      plan.places.find((place) => namedIn(place, text)) ??
+      null,
+    founded: company.founded ?? years.founded,
+    raised: company.raised ?? years.raised,
+  };
 }
 
 // --- fit ---------------------------------------------------------------
@@ -660,7 +885,7 @@ export async function runWebDiscovery(input: {
   if (!input.available.has(RESEARCH_TOOL)) return null;
   const now = input.now ?? Date.now;
   const started = now();
-  const budgetMs = input.budgetMs ?? Q_DEEP_TOOL_LOOP_BUDGET_MS;
+  const budgetMs = input.budgetMs ?? DISCOVERY_BUDGET_MS;
   const roundMayStart = () => now() - started < budgetMs * ROUND_CUTOFF;
   const plan = planDiscovery(input.ask, input.mandate, new Date(now()));
   const calls: QToolCallOutcome[] = [];
@@ -674,7 +899,7 @@ export async function runWebDiscovery(input: {
     const outcome = await input.tools
       .execute(
         {
-          callId: `q-discovery-${String(DISCOVERY_MAX_TOOL_CALLS - callsLeft)}`,
+          callId: `${DISCOVERY_CALL_PREFIX}${String(DISCOVERY_MAX_TOOL_CALLS - callsLeft)}`,
           name,
           arguments: args,
         },
@@ -831,7 +1056,7 @@ export async function runWebDiscovery(input: {
     .slice(0, Math.min(FOUNDER_ROUND_MAX, count));
   if (needFounders.length > 0 && roundMayStart()) {
     const before = new Set(fetched.keys());
-    const asks = needFounders.map((company) => `${company.name} founder`);
+    const asks = needFounders.map((company) => `${company.name} founder CEO`);
     founderQueries.push(...asks);
     const founderPairs: string[][] = [];
     for (let i = 0; i < asks.length; i += 2) {
@@ -842,7 +1067,7 @@ export async function runWebDiscovery(input: {
         research(
           pair,
           FOUNDER_ROUND_PAGES,
-          pair.map((ask) => ask.replace(/ founder$/u, "")),
+          pair.map((ask) => ask.replace(/ founder CEO$/u, "")),
         ),
       ),
     );
@@ -859,16 +1084,38 @@ export async function runWebDiscovery(input: {
         })) ?? [];
       // Only founders of companies already found: round two never adds a
       // company the discovery round did not.
-      const wanted = new Set(companies.map((c) => normalForm(c.name)));
+      const wanted = new Set(companies.map((c) => companyKey(c.name)));
       companies = admitDiscoveries(
-        more.filter((item) => wanted.has(normalForm(item.name))),
+        more.filter((item) => wanted.has(companyKey(item.name))),
         readable(),
         companies,
       );
     }
   }
 
-  // Ranked: fit to what was searched, then founders known, then found first.
+  // What the pages say that the reader left unknown: founders stated in a
+  // sentence naming the company, founded and funding years, sector, place.
+  const today = new Date(now());
+  companies = companies.map((company) =>
+    enrichFromPages(company, readable(), plan, today),
+  );
+
+  // Ranked: new first (owner 2026-11-06: "NEW companies"), then fit to what
+  // was searched, then founders known, then found first.
+  const thisYear = today.getUTCFullYear();
+  const recency = (company: DiscoveredCompany): number =>
+    (company.founded !== null && company.founded !== undefined
+      ? company.founded >= thisYear - 3
+        ? 3
+        : company.founded < thisYear - 8
+          ? -4
+          : 0
+      : 0) +
+    (company.raised !== null &&
+    company.raised !== undefined &&
+    company.raised >= thisYear - 1
+      ? 2
+      : 0);
   const fits = new Map(
     companies.map((company) => [company.name, discoveryFit(company, plan)]),
   );
@@ -878,7 +1125,8 @@ export async function runWebDiscovery(input: {
       (fit?.sector === "MATCH" ? 4 : 0) +
       (fit?.place === "MATCH" ? 2 : 0) +
       (fit?.stage === "MATCH" ? 1 : fit?.stage === "OUTSIDE" ? -3 : 0) +
-      (company.founders.length > 0 ? 1 : 0)
+      (company.founders.length > 0 ? 1 : 0) +
+      recency(company)
     );
   };
   const listed = companies
@@ -965,8 +1213,14 @@ export function discoveryAnswerText(
     const fit = discoveryFit(company, plan);
     const founders =
       company.founders.length > 0
-        ? `founded by ${listOf([...company.founders])}`
+        ? `Founders: ${listOf([...company.founders])}`
         : "founders not named in the sources I read";
+    const when =
+      company.founded !== null && company.founded !== undefined
+        ? ` · founded ${String(company.founded)}`
+        : company.raised !== null && company.raised !== undefined
+          ? ` · raised in ${String(company.raised)}`
+          : "";
     const does =
       company.does === null
         ? ""
@@ -981,7 +1235,7 @@ export function discoveryAnswerText(
       .filter((link): link is string => link !== null)
       .join(", ");
     const onQ = company.onCapitalQ ? " Already on Capital Q." : "";
-    return `${String(index + 1)}. **${company.name}**, ${founders}.${does}${
+    return `${String(index + 1)}. **${company.name}**${when} — ${founders}.${does}${
       fit.line.length > 0 ? ` Fit: ${fit.line}.` : ""
     } Source: ${links}.${onQ}`;
   });
