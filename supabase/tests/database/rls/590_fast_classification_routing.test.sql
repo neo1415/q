@@ -26,7 +26,7 @@ select is(
   'dialogue still prefers luna');
 
 select is(
-  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE' and task_class <> 'UI_TRANSLATION'),
+  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE' and version = 1 and task_class <> 'UI_TRANSLATION'),
   7,
   'no Q policy was added or retired (UI_TRANSLATION joined in 20261228150500)');
 

@@ -22,6 +22,8 @@ import {
   indexCatalog,
   loadModelCatalogSnapshot,
   ModelGatewayError,
+  isModelServiceUnavailable,
+  type FakeBehaviour,
 } from "../src/index.js";
 
 /**
@@ -65,7 +67,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     await db.close();
   });
 
-  it("loads the seeded catalog: four providers, fourteen models, versioned prices, eight active policies", async () => {
+  it("loads the seeded catalog: four providers, fourteen models, versioned prices, fifteen active policies (v1 and the switched-on v2)", async () => {
     const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
     const catalog = indexCatalog(snapshot);
     expect(snapshot.providers.map((p) => p.code).sort()).toEqual([
@@ -97,10 +99,16 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       "openai/gpt-oss-20b",
       "qwen/qwen3.8-27b",
     ]);
-    // Seven Q policies, plus UI_TRANSLATION (20261228150500).
+    // Seven Q policies plus UI_TRANSLATION (20261228150500) in v1, and the
+    // seven v2 policies switched on beside them (20261231340000).
     expect(
       snapshot.routingPolicies.filter((p) => p.status === "ACTIVE"),
-    ).toHaveLength(8);
+    ).toHaveLength(15);
+    expect(
+      snapshot.routingPolicies.filter(
+        (p) => p.status === "ACTIVE" && p.version === 2,
+      ),
+    ).toHaveLength(7);
 
     const flash = snapshot.models.find(
       (m) => m.modelCode === "gemini-3.8-flash",
@@ -139,59 +147,144 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(classification?.reasoningLevels ?? null).toBeNull();
   });
 
-  it("v1: a CONFIDENTIAL request has no second route when OpenAI's credit is spent (Groq rolled back, 20261231310000)", async () => {
-    // The v1 policies name no other CONFIDENTIAL model since the rollback;
-    // Claude is the backup only behind the v2 switch (tested below). The
-    // request fails with the account's own class, and neither Groq nor
-    // Gemini (PUBLIC-only) is asked.
-    const openai = createFakeModelProvider({
-      code: "openai",
-      script: [
-        { kind: "FAIL", failureClass: "PERMANENT", accountExhausted: true },
-      ],
+  it("the switched-on backup on the real migrated rows (20261231340000): luna, retry, Claude, Groq only when it fits, never Gemini", async () => {
+    const READER_SIZED = "x".repeat(17_000 * 4); // ~17k tokens: a turn reading
+    const reply = (text: string): FakeBehaviour => ({
+      kind: "TEXT",
+      text,
+      usage: { inputTokens: 40, cachedInputTokens: 0, outputTokens: 12 },
     });
-    const groq = createFakeModelProvider({
-      code: "groq",
-      script: [{ kind: "TEXT", text: "must never be reached" }],
-    });
-    const google = createFakeModelProvider({
-      code: "google",
-      script: [{ kind: "TEXT", text: "must never be reached" }],
-    });
-    const gateway = createModelGateway({
-      catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
-      registry: createModelProviderRegistry([openai, groq, google]),
-      usage: createPostgresModelUsageRepository({ sql: db.sql }),
-      sleep: () => Promise.resolve(),
-    });
-    const failed = await gateway
-      .execute({
-        taskClass: "NORMAL_DIALOGUE",
-        sensitivity: "CONFIDENTIAL",
-        messages: [
-          { role: "USER", content: "Synthetic confidential test sentence." },
-        ],
-        output: { kind: "TEXT" },
-        budget: {
-          maxAttempts: 3,
-          maxEstimatedCostUsd: 0.5,
-          maxOutputTokens: 256,
-          attemptTimeoutMs: 5_000,
-        },
-        attribution: { tenantId, correlationId: "cor_v1_no_groq" },
-      })
-      .then(
-        () => null,
-        (error: unknown) => error,
-      );
-    expect(failed).toBeInstanceOf(ModelGatewayError);
-    expect((failed as ModelGatewayError).failureClass).toBe("PERMANENT");
-    expect(openai.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(0);
-    expect(google.calls).toHaveLength(0);
-  });
+    const spent: FakeBehaviour = {
+      kind: "FAIL",
+      failureClass: "PERMANENT",
+      accountExhausted: true,
+    };
+    const world = (scripts: {
+      readonly openai: readonly FakeBehaviour[];
+      readonly anthropic: readonly FakeBehaviour[];
+    }) => {
+      const openai = createFakeModelProvider({
+        code: "openai",
+        script: scripts.openai,
+      });
+      const anthropic = createFakeModelProvider({
+        code: "anthropic",
+        script: scripts.anthropic,
+      });
+      const groq = createFakeModelProvider({
+        code: "groq",
+        script: [reply("groq answers a small request")],
+      });
+      const google = createFakeModelProvider({
+        code: "google",
+        script: [reply("must never be reached")],
+      });
+      const gateway = createModelGateway({
+        // The real rows, as migrated: no view, no override.
+        catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
+        registry: createModelProviderRegistry([
+          openai,
+          anthropic,
+          groq,
+          google,
+        ]),
+        usage: createPostgresModelUsageRepository({ sql: db.sql }),
+        sleep: () => Promise.resolve(),
+      });
+      const ask = (
+        taskClass: "NORMAL_DIALOGUE" | "FAST_CLASSIFICATION",
+        content = "Synthetic confidential question.",
+      ) =>
+        gateway.execute({
+          taskClass,
+          sensitivity: "CONFIDENTIAL",
+          messages: [{ role: "USER", content }],
+          output: { kind: "TEXT" },
+          budget: {
+            maxAttempts: 4,
+            maxEstimatedCostUsd: 1,
+            maxOutputTokens: 256,
+            attemptTimeoutMs: 1_000,
+          },
+          attribution: { tenantId, correlationId: "cor_backup_on" },
+        });
+      return { ask, openai, anthropic, groq, google };
+    };
+    const googleCalls: number[] = [];
 
-  it("routes and records against the real catalog and ledger", async () => {
+    // (a) A normal CONFIDENTIAL turn: luna serves, on v2.
+    const a = world({
+      openai: [reply("luna")],
+      anthropic: [reply("claude")],
+    });
+    const normal = await a.ask("NORMAL_DIALOGUE");
+    expect(normal.routingPolicyCode).toBe("normal_dialogue.v2");
+    expect(normal.modelCode).toBe("gpt-5.6-luna");
+    expect(a.anthropic.calls).toHaveLength(0);
+    googleCalls.push(a.google.calls.length);
+
+    // (b) luna times out once: luna is retried and serves; Claude not asked.
+    const b = world({
+      openai: [{ kind: "HANG" }, reply("luna on the retry")],
+      anthropic: [reply("claude")],
+    });
+    const retried = await b.ask("NORMAL_DIALOGUE");
+    expect(retried.modelCode).toBe("gpt-5.6-luna");
+    expect(b.openai.calls).toHaveLength(2);
+    expect(b.anthropic.calls).toHaveLength(0);
+    googleCalls.push(b.google.calls.length);
+
+    // (c) luna's credit spent: Claude serves -- Sonnet for answers, Haiku
+    //     for the reader and the fast classes.
+    const c = world({
+      openai: [spent],
+      anthropic: [reply("claude")],
+    });
+    const answer = await c.ask("NORMAL_DIALOGUE");
+    expect(answer.providerCode).toBe("anthropic");
+    expect(answer.modelCode).toBe("claude-sonnet-5-5");
+    const reading = await c.ask("FAST_CLASSIFICATION", READER_SIZED);
+    expect(reading.modelCode).toBe("claude-haiku-5-5");
+    expect(c.groq.calls).toHaveLength(0);
+    googleCalls.push(c.google.calls.length);
+
+    // (d) OpenAI and Claude both down: Groq serves a request that fits its
+    //     8K limit; a reader-sized turn is never sent to it and fails as
+    //     "temporarily unavailable" (no route that can take it).
+    const d = world({ openai: [spent], anthropic: [spent] });
+    const small = await d.ask("FAST_CLASSIFICATION");
+    expect(small.providerCode).toBe("groq");
+    expect(small.modelCode).toBe("openai/gpt-oss-120b");
+    const groqBefore = d.groq.calls.length;
+    const tooLarge = await d.ask("FAST_CLASSIFICATION", READER_SIZED).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(tooLarge).toBeInstanceOf(ModelGatewayError);
+    expect(isModelServiceUnavailable(tooLarge)).toBe(true);
+    expect(d.groq.calls).toHaveLength(groqBefore);
+    expect(
+      (tooLarge as ModelGatewayError).candidates
+        .filter((x) => x.providerCode === "groq")
+        .map((x) => x.reason),
+    ).toEqual(["CONTEXT_WINDOW_TOO_SMALL"]);
+    googleCalls.push(d.google.calls.length);
+
+    // (e) Gemini is never sent a CONFIDENTIAL request, in any of the above.
+    expect(googleCalls).toEqual([0, 0, 0, 0]);
+  }, 30_000);
+
+  it("v1 (the rollback) routes and records against the real catalog and ledger", async () => {
+    // v1 stays ACTIVE beside v2 as the one-statement rollback
+    // (20261231340000); this gateway sees the real rows with v2 retired,
+    // exactly as they read after that rollback.
+    const real = await loadModelCatalogSnapshot(db.sql, new Date());
+    const v1Catalog = createStaticModelCatalog({
+      ...real,
+      routingPolicies: real.routingPolicies.map((p) =>
+        p.version === 2 ? { ...p, status: "RETIRED" as const } : p,
+      ),
+    });
     const google = createFakeModelProvider({
       code: "google",
       script: [
@@ -223,7 +316,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       ],
     });
     const gateway = createModelGateway({
-      catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
+      catalog: v1Catalog,
       registry: createModelProviderRegistry([google, groq, openai]),
       usage: createPostgresModelUsageRepository({ sql: db.sql }),
     });
@@ -371,9 +464,9 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     );
   });
 
-  it("routes CONFIDENTIAL reasoning OpenAI -> Claude -> Groq once the v2 policies are switched on (20261231280000, 20261231300000)", async () => {
+  it("routes CONFIDENTIAL reasoning OpenAI -> Claude -> Groq on the v2 policies (20261231280000, 20261231300000, switched on 20261231340000)", async () => {
     const loaded = await loadModelCatalogSnapshot(db.sql, new Date());
-    // Before the switch nothing reaches Claude: the staged rows are RETIRED.
+    // Switched on (20261231340000): no v1 policy reaches Claude; v2 does.
     const anthropicModels = new Set(
       loaded.models
         .filter((m) => m.modelCode.startsWith("claude-"))
@@ -381,7 +474,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     );
     expect(anthropicModels.size).toBe(2);
     for (const policy of loaded.routingPolicies) {
-      if (policy.status !== "ACTIVE") continue;
+      if (policy.status !== "ACTIVE" || policy.version !== 1) continue;
       for (const id of [...policy.preferredModels, ...policy.fallbackModels]) {
         expect(anthropicModels.has(id)).toBe(false);
       }
