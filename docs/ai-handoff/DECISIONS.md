@@ -273,3 +273,8 @@ Core Seven remains the governing assessment framework. The new directive authori
     - Defaults follow the Product Specification §6.7.12–6.7.14. Settings beyond it are off until an admin turns them on.
     - Overriding an investor's Anonymous choice is a separate setting, default no.
     - **Examples are illustrations, not the test set.** Evals cover the whole site systematically, with varied phrasing and curveballs designed to break the feature. At least 30% is held out. Tuning stops when the plan's gates are met on the held-out set.
+
+73. **Intelligence is never traded for cost** (owner, 6 Nov 2026 ~23:10 UTC). This hardens DECISIONS 69.
+    - Cost work is limited to provably lossless mechanics: prompt caching, deduplicating identical calls, and request plumbing. The model, the instructions and the context Q receives stay the same.
+    - **No prompt trimming.** No removal of context, instructions or tools, and no smaller models.
+    - When only capability-reducing options remain, cost cutting stops there.
