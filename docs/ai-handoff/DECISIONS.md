@@ -266,3 +266,10 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **Priority order:** (1) the workspace, to the bar "the exact page every single time", measured by the q-nav eval; (2) analytics; (3) a browser pane, feasibility first.
     - **Shipped behind a flag** (off / labs / on, plus a global kill switch), so it is reversible without a redeploy.
     - **Analytics conflicts with Product Specification §6.7.12–6.7.14** (passive viewing is not granular founder analytics; investor visibility settings; viewing ≠ contact permission). Analytics is built inside those rules. Paid identity reveal needs an owner amendment and is not built.
+
+72. **Build every option, switchable by admin; spec-compliant by default** (owner, 6 Nov 2026 ~23:00 UTC).
+    - Analytics: viewer identity mode (default "Organisation only": "Someone from Apex Capital viewed you"); named passive viewers; paid identity reveal; granular per-person passive analytics; passive-view notifications.
+    - All are built, each an admin-controlled setting.
+    - Defaults follow the Product Specification §6.7.12–6.7.14. Settings beyond it are off until an admin turns them on.
+    - Overriding an investor's Anonymous choice is a separate setting, default no.
+    - **Examples are illustrations, not the test set.** Evals cover the whole site systematically, with varied phrasing and curveballs designed to break the feature. At least 30% is held out. Tuning stops when the plan's gates are met on the held-out set.
