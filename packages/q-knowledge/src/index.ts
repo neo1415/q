@@ -281,6 +281,7 @@ export {
   type MemoryCandidate,
   type MemoryConversationDigest,
   type MemoryRehearsalDigest,
+  type MemoryPastTurn,
   type MemoryItem,
   type MemoryOwner,
   type MemoryOwnerContextType,
@@ -322,7 +323,21 @@ export {
   REHEARSALS_LABEL,
   RELEVANT_LABEL,
   renderMemoryBundle,
+  PAST_TURNS_LABEL,
+  renderPastTurns,
 } from "./memory/render.js";
+export {
+  createMemoryRecall,
+  type MemoryRecalled,
+  type MemoryRecallInput,
+} from "./memory/recall-port.js";
+export {
+  inferredPresentedAsStated,
+  memoryTruthClass,
+  Q_READING_LABEL,
+  Q_READING_SUFFIX,
+  type MemoryTruthClass,
+} from "./memory/provenance.js";
 export {
   CONNECTED_LABEL,
   CONNECTED_MAX,
@@ -357,13 +372,17 @@ export {
   COMMUNICATION_ASPECTS,
   communicationPreferenceKey,
   communicationProfileFromMemory,
+  communicationLanguageFromMemory,
   createLoopMemoryReader,
+  LANGUAGE_ASPECT,
+  languagePreferenceValue,
   NOTHING_RECALLED,
   planAdmitsOwnMemory,
   PREFERENCE_PERSISTENCES,
   type CommunicationAspect,
   type LoopMemory,
   type LoopMemoryReader,
+  type PreferenceAspect,
   type PreferencePersistence,
 } from "./memory/communication.js";
 

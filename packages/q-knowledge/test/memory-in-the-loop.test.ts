@@ -20,6 +20,7 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 import {
   compactThread,
   COMMUNICATION_ASPECTS,
+  communicationLanguageFromMemory,
   communicationProfileFromMemory,
   createLoopMemoryReader,
   createMemoryService,
@@ -420,5 +421,107 @@ describe("the compacted thread", () => {
       recent: thread,
       omitted: 0,
     });
+  });
+});
+
+describe("language is a communication aspect (step 9)", () => {
+  it("a stated language holds as a session or long-term preference, for that person only, as a canonical tag", async () => {
+    const { memory } = store();
+    const alice = person(randomUUID());
+    const bob = person(randomUUID());
+    const session = randomUUID();
+    const reader = createLoopMemoryReader({ memory });
+    const notebook = createPreferenceNotebook({
+      memory,
+      actor: alice,
+      sessionKey: session,
+      priorUserTurns: [],
+    });
+    const said = "Please talk to me in French from now on.";
+    expect(
+      (
+        await notebook.note({
+          aspect: "language",
+          value: "FR",
+          persistence: "LONG_TERM",
+          quote: "talk to me in French",
+          latestUserText: said,
+        })
+      ).outcome,
+    ).toBe("REMEMBERED");
+    const now = await reader.read({
+      actor: alice,
+      plan: ownPlan(alice.userId),
+      sessionKey: randomUUID(),
+    });
+    expect(now.language).toBe("fr");
+    // The profile's closed aspects are untouched by it.
+    expect(now.profile).toEqual(DEFAULT_COMMUNICATION_PROFILE);
+    // A session language outranks the standing one, in that session only.
+    const yoruba = "Just for this chat, Yoruba please.";
+    await notebook.note({
+      aspect: "language",
+      value: "yo",
+      persistence: "SESSION",
+      quote: "Yoruba please",
+      latestUserText: yoruba,
+    });
+    expect(
+      (
+        await reader.read({
+          actor: alice,
+          plan: ownPlan(alice.userId),
+          sessionKey: session,
+        })
+      ).language,
+    ).toBe("yo");
+    expect(
+      communicationLanguageFromMemory(await memory.list(alice), {
+        conversationId: null,
+      }),
+    ).toBe("fr");
+    // Never for anybody else.
+    expect(
+      (
+        await reader.read({
+          actor: bob,
+          plan: ownPlan(bob.userId),
+          sessionKey: session,
+        })
+      ).language,
+    ).toBeNull();
+  });
+
+  it("refuses a value that is not a language, and one their words do not hold", async () => {
+    const { memory } = store();
+    const alice = person(randomUUID());
+    const notebook = createPreferenceNotebook({
+      memory,
+      actor: alice,
+      sessionKey: null,
+      priorUserTurns: [],
+    });
+    expect(
+      (
+        await notebook.note({
+          aspect: "language",
+          value: "not a language!",
+          persistence: "LONG_TERM",
+          quote: "speak Klingon",
+          latestUserText: "speak Klingon",
+        })
+      ).outcome,
+    ).toBe("REFUSED");
+    expect(
+      (
+        await notebook.note({
+          aspect: "language",
+          value: "fr",
+          persistence: "LONG_TERM",
+          quote: "talk to me in French",
+          latestUserText: "keep it short",
+        })
+      ).outcome,
+    ).toBe("REFUSED");
   });
 });

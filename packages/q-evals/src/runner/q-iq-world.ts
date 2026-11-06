@@ -7,6 +7,12 @@ import type { FakeBehaviour } from "@capital-q/model-gateway";
 import { createQTurnReader } from "@capital-q/model-gateway/q";
 import { createLogger, type Logger } from "@capital-q/observability";
 import type { AuthorisedFact } from "@capital-q/q-core";
+import {
+  createMemoryRecall,
+  createMemoryService,
+  createPostgresMemoryRepository,
+  type MemoryService,
+} from "@capital-q/q-knowledge";
 import { createSpecialistQAnswer } from "@capital-q/q-specialists";
 
 import { Q_IQ_FACTS, type QIqCase } from "../datasets/q-iq/index.js";
@@ -25,10 +31,19 @@ import type { QIqConversation, QIqSubject } from "./q-iq.js";
  * scope (none when the plan holds none). Scripted (FAKE) mode costs
  * nothing; LIVE mode spends provider credit and is run on request only.
  *
- * Not composed here (production has them): memory recall across
- * conversations, retrieval over documents, the company specialist's own
- * investigation. Q-IQ reports what this composition does; BASELINE.md
- * says so beside the scores.
+ * Memory recall across conversations IS composed (step 9), as q-api
+ * composes it: the memory service over the world's own store, with the
+ * person's own past turns searched (full-text, owner-scoped, only when the
+ * run's plan admits their own conversations). A case's prior
+ * conversations are stored as real conversations of the same person,
+ * dated by their `when`, before the case's first turn. Each case starts
+ * with only its own history: the earlier cases' conversations of the same
+ * fixture person are archived first (harness hygiene; archived
+ * conversations are never searched, as in production).
+ *
+ * Not composed here (production has them): retrieval over documents, the
+ * company specialist's own investigation. Q-IQ reports what this
+ * composition does; BASELINE.md says so beside the scores.
  */
 
 const ACTORS = { INVESTOR: "INVESTOR", FOUNDER: "FOUNDER" } as const;
@@ -43,6 +58,14 @@ export const Q_IQ_AUTHORISED_FACTS: readonly AuthorisedFact[] = Q_IQ_FACTS.map(
     ...(f.asOf === undefined ? {} : { asOf: f.asOf }),
   }),
 );
+
+/** How long ago a prior conversation's `when` puts it (fixture words). */
+const WHEN_DAYS: Readonly<Record<string, number>> = {
+  yesterday: 1,
+  "last week": 7,
+  "two weeks ago": 14,
+  "last month": 30,
+};
 
 function analystReply(answer: string): FakeBehaviour {
   return {
@@ -74,6 +97,8 @@ export async function createQIqWorldSubject(options: {
   readonly providerFilter?: ModelProviderCode | undefined;
   /** The outer layer's turn reader (a model call per turn). Off in FAKE mode. */
   readonly turnReader?: boolean | undefined;
+  /** Step 9: memory recall across conversations (default on). */
+  readonly memory?: boolean | undefined;
   /** FAKE mode: what the scripted model answers for a turn (default: the reference). */
   readonly scriptedReply?:
     ((evalCase: QIqCase, turn: number) => string) | undefined;
@@ -98,8 +123,53 @@ export async function createQIqWorldSubject(options: {
     );
   const turnReader = options.turnReader ?? options.providerMode === "LIVE";
 
+  // Step 9: the memory service over the world's own store, its past-turn
+  // search through the runtime's owner-scoped repository method.
+  let memoryService: MemoryService | null = null;
+  const memoryOf = (): MemoryService => {
+    if (memoryService !== null) return memoryService;
+    const search = w().repositories.messages.searchForOwner;
+    memoryService = createMemoryService({
+      sql: options.db.sql,
+      transactions: options.db.transactions,
+      repository: createPostgresMemoryRepository(),
+      conversations: {
+        digestOf: () => Promise.resolve(null),
+        recentDigests: () => Promise.resolve([]),
+        ...(search === undefined
+          ? {}
+          : {
+              pastTurns: async (actor, query) =>
+                (
+                  await search(
+                    options.db.sql,
+                    actor.tenantId,
+                    actor.userId,
+                    query,
+                  )
+                ).map((turn) => ({
+                  conversationId: turn.conversationId,
+                  conversationTitle: turn.conversationTitle,
+                  role: turn.role,
+                  content: turn.content,
+                  at: turn.createdAt,
+                })),
+            }),
+      },
+      logger,
+    });
+    return memoryService;
+  };
+  const recall =
+    options.memory === false
+      ? null
+      : createMemoryRecall({
+          recall: (query) => memoryOf().recall(query),
+        });
+
   holder.world = await createQEvalWorld({
     db: options.db,
+    ...(recall === null ? {} : { memory: () => recall }),
     providerMode: options.providerMode,
     secrets: options.secrets,
     providerFilter: options.providerFilter,
@@ -146,6 +216,62 @@ export async function createQIqWorldSubject(options: {
     };
   };
 
+  /**
+   * The case's own history, before its first turn: earlier cases'
+   * conversations of this person are archived, then each prior
+   * conversation is stored as a real one (a run per person turn, whose
+   * stored words are theirs, and Q's reply beside it), dated by its
+   * `when`. No model is called: these are what was said, as written.
+   */
+  async function seedPriorConversations(
+    evalCase: QIqCase,
+    person: QEvalWorld["people"]["INVESTOR"],
+  ): Promise<void> {
+    const { tenantId, userId } = person.actor;
+    await options.db.sql`
+      update q_runtime.conversations
+         set archived_at = coalesce(archived_at, now())
+       where tenant_id = ${tenantId} and user_id = ${userId}`;
+    for (const prior of evalCase.priorConversations) {
+      const days = WHEN_DAYS[prior.when.trim().toLowerCase()] ?? 7;
+      const at = Date.now() - days * 24 * 60 * 60 * 1000;
+      let priorConversation: QConversationId | null = null;
+      for (const [index, turn] of prior.turns.entries()) {
+        const created: Awaited<ReturnType<QEvalWorld["runtime"]["createRun"]>> =
+          await w().runtime.createRun({
+            actor: person.actor,
+            input: {
+              capability: "ANSWER",
+              message: { text: turn.user },
+              modality: "TEXT",
+              subjects: [],
+              ...(priorConversation === null
+                ? {}
+                : { conversationId: priorConversation }),
+            },
+            idempotencyKey: `q-iq-prior-${randomUUID()}`,
+            correlationId: `cor_${randomUUID()}` as never,
+          });
+        priorConversation = created.conversation.id;
+        const userAt = new Date(at + index * 60_000).toISOString();
+        const qAt = new Date(at + index * 60_000 + 5_000).toISOString();
+        await options.db.sql`
+          update q_runtime.conversation_messages
+             set created_at = ${userAt}::timestamptz
+           where tenant_id = ${tenantId} and run_id = ${created.run.id}`;
+        await options.db.sql`
+          insert into q_runtime.conversation_messages
+            (tenant_id, conversation_id, run_id, role, content, created_at)
+          values (${tenantId}, ${created.conversation.id}, ${created.run.id},
+                  'Q', ${turn.q}, ${qAt}::timestamptz)`;
+        await options.db.sql`
+          update q_runtime.conversations
+             set last_message_at = ${qAt}::timestamptz
+           where tenant_id = ${tenantId} and id = ${created.conversation.id}`;
+      }
+    }
+  }
+
   const subject: QIqSubject = {
     name:
       options.providerMode === "LIVE"
@@ -160,10 +286,12 @@ export async function createQIqWorldSubject(options: {
           "several fictional companies, people, decks and investors (the authorised facts list them)",
       });
       w().resetProviderHealth();
+      const seeded = seedPriorConversations(evalCase, person);
       let conversationId: QConversationId | null = null;
       let turn = 0;
       const conversation: QIqConversation = {
         say: async (text) => {
+          await seeded;
           if (w().providerMode === "FAKE") {
             const reply =
               options.scriptedReply?.(evalCase, turn) ??

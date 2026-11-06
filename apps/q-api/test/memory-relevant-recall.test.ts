@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ModelGateway } from "@capital-q/model-gateway";
+import { recalledText } from "@capital-q/model-gateway/q";
 import {
   createMemoryService,
   RELEVANT_LABEL,
@@ -198,24 +199,28 @@ function recallPort(withRelevant: boolean) {
 
 describe("relevant recall across the person's own conversations", () => {
   it("before: recent-only recall misses the Tensorgate conversation, eighth by recency", async () => {
-    const text = await recallPort(false).recall({
-      actor,
-      runId: "r1",
-      conversationId: CURRENT,
-      subjects: [],
-      utterance: ASKED,
-    });
+    const text = recalledText(
+      await recallPort(false).recall({
+        actor,
+        runId: "r1",
+        conversationId: CURRENT,
+        subjects: [],
+        utterance: ASKED,
+      }),
+    );
     expect(text).not.toContain("Tensorgate");
   });
 
   it("after: renders it first with its date, never another person's, tenant's or an archived one", async () => {
-    const text = await recallPort(true).recall({
-      actor,
-      runId: "r1",
-      conversationId: CURRENT,
-      subjects: [],
-      utterance: ASKED,
-    });
+    const text = recalledText(
+      await recallPort(true).recall({
+        actor,
+        runId: "r1",
+        conversationId: CURRENT,
+        subjects: [],
+        utterance: ASKED,
+      }),
+    );
     expect(text.startsWith(RELEVANT_LABEL)).toBe(true);
     expect(text).toContain(
       "- 2026-08-14 Tensorgate runway: They asked about Tensorgate's runway and the bridge round.",
@@ -234,13 +239,15 @@ describe("relevant recall across the person's own conversations", () => {
       { kind: "COMPANY", companyId: company },
     ];
     try {
-      const text = await recallPort(true).recall({
-        actor,
-        runId: "r1",
-        conversationId: CURRENT,
-        subjects: [{ kind: "COMPANY", companyId: company } as never],
-        utterance: "has anything changed?",
-      });
+      const text = recalledText(
+        await recallPort(true).recall({
+          actor,
+          runId: "r1",
+          conversationId: CURRENT,
+          subjects: [{ kind: "COMPANY", companyId: company } as never],
+          utterance: "has anything changed?",
+        }),
+      );
       expect(text).toContain("2026-08-14 Tensorgate runway");
     } finally {
       (tagged as { subjects: unknown }).subjects = original;

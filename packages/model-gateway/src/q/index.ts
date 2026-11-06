@@ -2312,9 +2312,51 @@ export type QMemoryRecall = {
      * from it by code; no model is asked.
      */
     readonly utterance?: string | undefined;
+    /**
+     * Step 9: their own earlier words in this conversation, newest first,
+     * searched with the utterance so a follow-up still finds its topic.
+     */
+    readonly earlierWords?: readonly string[] | undefined;
+    /**
+     * Step 9: the run's Context Firewall plan. Recall searches the person's
+     * own past turns only when it admits their own conversations, so
+     * authorisation is resolved before that retrieval.
+     */
+    readonly plan?: Pick<PermittedContextPlan, "scopes"> | undefined;
     readonly signal?: AbortSignal | undefined;
-  }) => Promise<string>;
+  }) => Promise<string | QMemoryRecalled>;
 };
+
+/**
+ * Recall as text, plus the person's OWN past words it found (step 9),
+ * verbatim: a figure they told Q last week grounds "you said your cheque is
+ * $750,000" in the claim check. Never Q's past words, which ground nothing.
+ */
+export type QMemoryRecalled = {
+  readonly text: string;
+  readonly ownWords: readonly string[];
+};
+
+/** The recall's text, whichever shape the port returned. */
+export function recalledText(recalled: string | QMemoryRecalled): string {
+  return typeof recalled === "string" ? recalled : recalled.text;
+}
+
+const NOTHING_RECALLED: QMemoryRecalled = {
+  text: NOTHING_REMEMBERED,
+  ownWords: [],
+};
+
+/** Step 9: their own words earlier in this conversation, newest first. */
+function earlierWordsOf(
+  earlier: readonly { readonly role: string; readonly content: string }[],
+): readonly string[] {
+  return earlier
+    .filter((message) => message.role === "USER")
+    .map((message) => message.content)
+    .reverse()
+    .slice(0, 2);
+}
 
 export type QUserStatementRecorder = {
   readonly record: (command: {
@@ -3197,27 +3239,32 @@ export function createModelGatewayQAnswer(
     request: QAnswerRequest,
     conversationId: string,
     utterance: string,
-  ): Promise<string> {
+    earlierWords: readonly string[] = [],
+  ): Promise<QMemoryRecalled> {
     const port = dependencies.memory;
-    if (port === undefined) return NOTHING_REMEMBERED;
+    if (port === undefined) return NOTHING_RECALLED;
     try {
-      const text = (
-        await port.recall({
-          actor: request.actor,
-          runId: request.runId,
-          conversationId,
-          subjects: request.subjects,
-          utterance,
-          signal: request.signal,
-        })
-      ).trim();
-      return text.length === 0 ? NOTHING_REMEMBERED : text.slice(0, 4_000);
+      const recalled = await port.recall({
+        actor: request.actor,
+        runId: request.runId,
+        conversationId,
+        subjects: request.subjects,
+        utterance,
+        earlierWords,
+        plan: request.plan,
+        signal: request.signal,
+      });
+      const text = recalledText(recalled).trim();
+      return {
+        text: text.length === 0 ? NOTHING_REMEMBERED : text.slice(0, 4_000),
+        ownWords: typeof recalled === "string" ? [] : recalled.ownWords,
+      };
     } catch (error: unknown) {
       logger?.warn(
         { err: error, qRunId: request.runId },
         "memory was not recalled for this answer",
       );
-      return NOTHING_REMEMBERED;
+      return NOTHING_RECALLED;
     }
   }
 
@@ -3967,7 +4014,7 @@ export function createModelGatewayQAnswer(
       onScreenDossier = selectedDossierRead(manifest, results);
     })();
     pageRead.catch(() => undefined);
-    const [assembled, profile, offeredForRun, availableForRun, memory] =
+    const [assembled, profile, offeredForRun, availableForRun, recalled] =
       await Promise.all([
         timed(
           "assemble",
@@ -3988,23 +4035,36 @@ export function createModelGatewayQAnswer(
               const recall = timed(
                 "memory",
                 phased("memory", () =>
-                  recallMemory(request, conversationId, latest.content),
+                  recallMemory(
+                    request,
+                    conversationId,
+                    latest.content,
+                    earlierWordsOf(earlier),
+                  ),
                 ),
               );
               return Promise.race([
                 recall,
                 arrivalDecision.then((answer) =>
-                  answer === null ? recall : NOTHING_REMEMBERED,
+                  answer === null ? recall : NOTHING_RECALLED,
                 ),
               ]);
             })()
           : timed(
               "memory",
               phased("memory", () =>
-                recallMemory(request, conversationId, latest.content),
+                recallMemory(
+                  request,
+                  conversationId,
+                  latest.content,
+                  earlierWordsOf(earlier),
+                ),
               ),
             ),
       ]);
+    const memory = recalled.text;
+    // Step 9: their own past words recall found, for the claim check.
+    const recalledOwnWords = recalled.ownWords;
     const { arrivalAnswer, names: prefetchTools } = await prefetchToolsRead;
 
     /**
@@ -5000,6 +5060,7 @@ export function createModelGatewayQAnswer(
       offeredForRun,
       availableForRun,
       memory,
+      recalledOwnWords,
       ownProfile,
       ownProfileCall,
       ownMandateData: (): unknown => ownMandateData,
@@ -5393,6 +5454,7 @@ export function createModelGatewayQAnswer(
         offeredForRun,
         availableForRun,
         memory,
+        recalledOwnWords,
         ownProfile,
         ownCompany,
         ownFigures,
@@ -8642,6 +8704,8 @@ export function createModelGatewayQAnswer(
       claimSources = () => [
         ...facts.map((fact) => fact.statement),
         latest.content,
+        // Step 9: their own words from earlier conversations, verbatim.
+        ...recalledOwnWords,
         ...earlier.map((message) => message.content),
         ...messages
           .filter((message) => !instructionMessages.has(message))

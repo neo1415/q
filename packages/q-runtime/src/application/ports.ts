@@ -51,6 +51,28 @@ export type QConversationSearch = {
   readonly limit: number;
 };
 
+/**
+ * A bounded full-text search of one owner's own past turns (Q intelligence
+ * step 9); see `messages.searchForOwner`.
+ */
+export type QPastTurnSearch = {
+  /** The words to search for: theirs, parsed into lexemes by Postgres. */
+  readonly text: string;
+  /** Conversations to leave out (the one the person is in now). */
+  readonly except: readonly string[];
+  readonly limit: number;
+};
+
+/** One past turn found for its owner. Interaction history, never evidence. */
+export type QPastTurn = {
+  readonly messageId: string;
+  readonly conversationId: string;
+  readonly conversationTitle: string | null;
+  readonly role: "USER" | "Q";
+  readonly content: string;
+  readonly createdAt: string;
+};
+
 export type QConversationRepository = {
   readonly insert: (
     tx: TransactionContext,
@@ -293,6 +315,19 @@ export type QConversationMessageRepository = {
     runId: QRunId,
     limit: number,
   ) => Promise<readonly QConversationMessage[]>;
+  /**
+   * Step 9: full-text search over the owner's OWN past turns. Tenant and
+   * owner are arguments the caller takes from the actor, never from a
+   * request; archived conversations, marked lines and superseded runs are
+   * left out. Best match first, bounded. Optional: a store without it
+   * recalls no past turns.
+   */
+  readonly searchForOwner?: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    query: QPastTurnSearch,
+  ) => Promise<readonly QPastTurn[]>;
   /** The most recent messages of a conversation, oldest first, bounded. Tenant-scoped; the caller has checked ownership. */
   readonly listRecentForConversation: (
     executor: DatabaseExecutor,

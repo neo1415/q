@@ -14,6 +14,7 @@ import {
   type MemoryConversationDigest,
   type MemoryItem,
   type MemoryOwner,
+  type MemoryPastTurn,
   type MemoryRehearsalDigest,
   type MemoryWriteMode,
   type MemoryWriteResult,
@@ -72,6 +73,20 @@ export type MemoryConversationDigestPort = {
       readonly limit: number;
     },
   ) => Promise<readonly MemoryConversationDigest[]>;
+  /**
+   * Step 9: full-text search over the actor's OWN past turns (tenant and
+   * owner from the actor, never from the query), leaving out the
+   * conversations in `except`. Best match first. Optional: without it
+   * recall has no past-turn section.
+   */
+  readonly pastTurns?: (
+    actor: ActorContext,
+    query: {
+      readonly text: string;
+      readonly except: readonly string[];
+      readonly limit: number;
+    },
+  ) => Promise<readonly MemoryPastTurn[]>;
 };
 
 /**
@@ -142,6 +157,19 @@ export type RecallQuery = {
    * by code (`recallTermsFrom`), to find earlier conversations about them.
    */
   readonly utterance?: string | undefined;
+  /**
+   * Step 9: their own earlier words in this conversation (newest first),
+   * searched with the utterance so a follow-up ("Why?") still finds what
+   * the conversation is about. Never read for meaning.
+   */
+  readonly earlierWords?: readonly string[] | undefined;
+  /**
+   * Step 9: the caller resolved, from the run's Context Firewall plan,
+   * that this person's own conversations are admitted (the actor-wide
+   * OWN_Q_CONVERSATION scope for this very person). Authorisation before
+   * retrieval: without it, past turns are not searched at all.
+   */
+  readonly ownConversationsAdmitted?: boolean | undefined;
   readonly limit?: number | undefined;
 };
 
@@ -234,6 +262,10 @@ export function looksLikeSecret(content: string): boolean {
 const RECALL_DEFAULT = 40;
 const OTHER_CONVERSATIONS = 6;
 const RELEVANT_CONVERSATIONS = 4;
+/** Step 9: past turns recalled per turn; each is bounded when rendered. */
+export const RECALLED_PAST_TURNS = 8;
+/** How many of their earlier words in this conversation join the search. */
+const EARLIER_WORDS_SEARCHED = 2;
 export const RECALLED_REHEARSALS = 3;
 
 export function createMemoryService(
@@ -302,7 +334,10 @@ export function createMemoryService(
       // Only for the person themselves, and only when the turn is about
       // their pitch practice. A failed read leaves it absent (unknown),
       // never an empty list, which would say "none on record".
-      const held: { rehearsals?: MemoryBundle["rehearsals"] } = {};
+      const held: {
+        rehearsals?: MemoryBundle["rehearsals"];
+        pastTurns?: MemoryBundle["pastTurns"];
+      } = {};
       const rehearsalPort = dependencies.rehearsals;
       const rehearsalRead =
         rehearsalPort !== undefined &&
@@ -410,7 +445,48 @@ export function createMemoryService(
             );
           }
         })();
-        await Promise.all([recentRead, relevantRead]);
+        // Step 9: their own past turns, by full-text search. Only for the
+        // person themselves, only when the plan admitted their own
+        // conversations (resolved by the caller before this read), and
+        // failing on its own: absent, never "none".
+        const searchText = [
+          query.utterance ?? "",
+          ...(query.earlierWords ?? []).slice(0, EARLIER_WORDS_SEARCHED),
+        ]
+          .map((words) => words.trim())
+          .filter((words) => words.length > 0)
+          .join("\n");
+        const pastTurnsPort = conversations.pastTurns;
+        const pastRead = (async () => {
+          if (
+            pastTurnsPort === undefined ||
+            query.ownConversationsAdmitted !== true ||
+            query.actor.actorType !== "HUMAN" ||
+            searchText.length === 0
+          ) {
+            return;
+          }
+          try {
+            held.pastTurns = (
+              await pastTurnsPort(query.actor, {
+                text: searchText,
+                except:
+                  query.conversationId === undefined
+                    ? []
+                    : [query.conversationId],
+                limit: RECALLED_PAST_TURNS,
+              })
+            )
+              .filter((turn) => turn.conversationId !== query.conversationId)
+              .slice(0, RECALLED_PAST_TURNS);
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error },
+              "past turns were not searched for recall",
+            );
+          }
+        })();
+        await Promise.all([recentRead, relevantRead, pastRead]);
         // Each conversation once, in the section that says why it is here.
         const inRelevant = new Set(relevant.map((c) => c.conversationId));
         otherConversations = otherConversations.filter(
@@ -438,6 +514,7 @@ export function createMemoryService(
         ...(held.rehearsals === undefined
           ? {}
           : { rehearsals: held.rehearsals }),
+        ...(held.pastTurns === undefined ? {} : { pastTurns: held.pastTurns }),
         ...(connected === undefined ? {} : { connected }),
       };
     },
