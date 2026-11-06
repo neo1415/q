@@ -86,6 +86,24 @@ export {
 // Q Intelligence Plan step 0: Q-IQ, 150 multi-turn conversations on
 // fictional entities, deterministic graders, Q vs the bare model.
 export * from "./datasets/q-iq/index.js";
+// Q Workspace W4.4: the navigation eval (MOVE / OFFER / STAY).
+export * from "./datasets/q-nav/index.js";
+export {
+  gradeQNavTurn,
+  Q_NAV_GATES,
+  summariseQNav,
+  targetDifferences,
+  type QNavMetrics,
+  type QNavSummary,
+  type QNavTurnGrade,
+} from "./graders/q-nav.js";
+export {
+  referenceQNavSubject,
+  runQNav,
+  type QNavDecisionInput,
+  type QNavRun,
+  type QNavSubject,
+} from "./runner/q-nav.js";
 export {
   extractFigures,
   gradeQIqCase,

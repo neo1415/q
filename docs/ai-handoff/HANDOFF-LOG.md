@@ -1664,3 +1664,14 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Multiples are figures, grounded only by plain numbers, never by money, a percentage or a date's month.
 - **Tests:** `claim-check-arithmetic.test.ts` (12 keep, 8 remove; 5 failed on the old code). `q-iq-derivations` now asserts grader and claim-check agreement on wrong and unsourced differences too.
 - **Gates:** package build 54/54; vitest all packages 11,928 passed; apps q-api, workers and api 4,218 passed; root tsc 0; Q-IQ `CQ_Q_IQ_ALL=1` 6/6, 573 turns `fails: []`, adversarial 1.0/1.0; references, retrieval and wire 5/5; eslint and prettier clean.
+
+## 2026-11-06 — Q Workspace W4 (navigation policy), milestone 1: the q-nav eval (`feat/q-navigation-policy`, from `e187b87`; not merged)
+
+- **Dataset** `packages/q-evals/src/datasets/q-nav/`: 437 cases, **487 turns** (358 MOVE, 26 OFFER, 103 STAY), 151 held out (third phrasings, unseen wording).
+  - 16 categories, both sides each: STORYBOARD (the ten turns), EXPLICIT, RECORD, THREAD, OWN_RECORDS, STAY_IN_CHAT, FOLLOW_UP (pronouns, ordinals), AMBIGUITY, DIRTY_FORM, BUSY_PANE, COLLAPSED_PANE, VOICE, NON_ENGLISH (fr, es, pt, sw, de, yo, ar), ACCESS, ADVERSARIAL (page text), ALREADY_THERE.
+- **Targets** are W3.1's shape: page, subject, tab, document {kind, ref}, thread {kind, counterpart}, sectionId, position. Records, documents and threads are named by type and fictional key; W2.3 fills the ids.
+  - `vocabulary.ts` holds every page, tab and section under one name, with side access. It marks EXISTS (app/, destinations.ts, ui-intent enums, QSection ids) or PROPOSED, the four the storyboard needs: `CAPITAL#commitments`, `COMPANY_INTEREST#deck-views`, `OWN_DATA_ROOM#missing`, `RELATIONSHIP messages#draft`. Renames for W2/W3 go here only.
+- **Graders** (`graders/q-nav.ts`): decision exact; target exact field by field; pane open and remembered moves; wrong-page MOVE; forbidden move (a forbidden page, or a MOVE from unsaved work or a busy pane). Gates per plan §6: labs ≥98% / ≤0.5% / 0 overall; on ≥99% / 0 / 0 on held-out.
+- **CI** (`test/q-nav.test.ts`, scripted): lint, determinism, storyboard, hard constraints. The reference scores 100% and passes both gates. Every grader catches its failure; the "always move" and "never move" baselines fail labs.
+- **Gates:** q-evals vitest 88 passed; root tsc 0; eslint and prettier clean; Q-IQ `CQ_Q_IQ_ALL=1` 6/6.
+- **Next:** W4.1–4.3 (NAVIGATION_DECISION), once W2's digest and W3's contract are published.
