@@ -42,13 +42,16 @@ export type QIqLiveGap = {
 
 export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
   {
-    // Re-run on 61b7a85: the list lost Silo Credit's line. The claim
-    // check read "Lagos-based SME" as an invented name.
+    // Re-run on 61b7a85: the list lost Silo Credit's line ("Lagos-based
+    // SME" read as an invented name; fixed in round 2). Re-run on 7a41ff4:
+    // it kept only Silo Credit. "- **Silo Health:** Nairobi …" read as
+    // the name "Silo Health Nairobi" (the colon sat inside "**"), and each
+    // such line was removed; Silo Credit's next word was "SME".
     caseId: "QIQ-ORD-016",
     turn: 0,
-    live: "Silo Health — Nairobi-based clinic software company founded in 2022, reporting $1.1M ARR, 14 clinic groups and a $3M seed extension; it has 22 months of runway and a 48% gross margin.\n\nBrightpath Logistics — Kigali-based freight logistics company founded in 2021, reporting $2M ARR, 120 trucks under contract and a $5M Series A raise; its gross margin is conflicting at 22% in management accounts versus 17% in an earlier investor memo, while runway is 16 months.",
+    live: "- **Silo Credit:** SME lending in Lagos, founded 2021; $2.4M ARR, $180k monthly burn, 14 months’ runway, raising a $6M Series A.",
     draft:
-      "Silo Credit — Lagos-based SME lender founded in 2021, reporting $2.4M ARR, 38 lending partners and a $6M Series A raise; it has 14 months of runway and a 62% gross margin.\n\nSilo Health — Nairobi-based clinic software company founded in 2022, reporting $1.1M ARR, 14 clinic groups and a $3M seed extension; it has 22 months of runway and a 48% gross margin.\n\nBrightpath Logistics — Kigali-based freight logistics company founded in 2021, reporting $2M ARR, 120 trucks under contract and a $5M Series A raise; its gross margin is conflicting at 22% in management accounts versus 17% in an earlier investor memo, while runway is 16 months.",
+      "- **Silo Credit:** Lagos-based SME lender founded in 2021; $2.4M ARR, $180k monthly burn, 14 months’ runway, raising a $6M Series A.\n- **Silo Health:** Nairobi clinic software company founded in 2022; $1.1M ARR, 48% gross margin, 22-month runway, raising a $3M seed extension.\n- **Brightpath Logistics:** Kigali freight logistics company founded in 2021; $2M ARR, 16-month runway, raising a $5M Series A; gross margin is reported as 17%–22%.",
   },
   {
     caseId: "QIQ-ORD-016",
@@ -131,6 +134,13 @@ export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
     caseId: "QIQ-CON-091",
     turn: 2,
     live: "Brightwell Energy’s monthly burn is $310k, according to its company profile and data room. That implies $3.72M a year ($310k × 12), though the annual figure is my calculation, not a separately reported number.",
+    nowPasses: true,
+  },
+  {
+    // Re-run on 7a41ff4: a correct refusal the grader did not read.
+    caseId: "QIQ-UNK-076",
+    turn: 2,
+    live: "There isn’t a defensible number to give: Kora Farms’ ARR isn’t established here, and I won’t invent one.",
     nowPasses: true,
   },
 ];
