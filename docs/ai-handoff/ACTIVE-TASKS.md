@@ -1,20 +1,22 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 6 November 2026, 01:25 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 6 November 2026, 02:05 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
-Production: all four services on `605c76e59` (steps 2–5 + the compound-follow-up fix). Hosted migrations 272 = local 272. Rollback: `347b74a8c`.
+Production: all four services on `f08525117` (steps 2–5, 7, 8 + compound fixes). Hosted migrations 273 = local 273. Rollback: `605c76e59`.
 
-| Area                                                                                                                                         | State                          | Evidence / next                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------- |
-| Steps 2, 3, 4, 5 + compound-follow-up fix                                                                                                    | PRODUCTION VERIFIED            | live14, live15, live16 (`receipts/2026-11-06-live16-605c76e/`)                          |
-| Batch: step 7 (adaptive reasoning, migration `20261231260000`) + step 8 (agentic loop, promise check) + compound asks via the reader's parts | MERGED `f08525117`, CI running | Then pgTAP → apply `20261231260000` → deploy → live check                               |
-| Pre-existing failing integration test: "instructions activates once per approval" (Rollback assertion)                                       | OPEN, needs its own lane       | Fails on base `be45024` too; it touches the approval path, so investigate before step 9 |
-| Step 3c (remove reference regexes)                                                                                                           | HELD                           | Needs live Q-IQ                                                                         |
-| Live Q-IQ                                                                                                                                    | WAITING ON OWNER OK            | About $5.5; check the OpenAI balance first                                              |
-| Steps 9, 10, 11                                                                                                                              | NEXT                           | After the batch deploys                                                                 |
-| Owner UI follow-ups (phone top bar, "Hide from Q", "Clear")                                                                                  | OWNER TO SAY                   | live13                                                                                  |
-| 2-hourly continuation                                                                                                                        | ON                             | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                                         |
-| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote                                            | OWNER / OPEN                   | HANDOFF-2026-11-05 §6                                                                   |
+| Area                                                                                              | State                             | Evidence / next                                                 |
+| ------------------------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------- |
+| Steps 2, 3, 4, 5, 7, 8 + compound-follow-up fixes                                                 | PRODUCTION VERIFIED               | live14–live17 (`receipts/2026-11-06-live17-f085251/`)           |
+| Stale instructions-approval integration test (not a defect; opener wording since 7 Oct)           | MERGED, ships with the next batch | `369d0ebd9`; receipt `2026-11-06-instructions-approval.md`      |
+| CI never runs `*.integration.test.ts` (several stale failures went unseen)                        | IN PROGRESS                       | In the step 11 lane                                             |
+| Step 9: memory provenance + past-chat search                                                      | IN PROGRESS                       | `feat/q-memory-recall`, `session_01Wncmn3KhaubszcWA6Jmx8V`      |
+| Step 10: grounded workforce + adversarial Q-IQ category                                           | IN PROGRESS                       | `feat/q-grounded-workforce`, `session_01Wncmn4vd5MvBG8wD5fG8Sn` |
+| Step 11: speed pass + CI integration job                                                          | IN PROGRESS                       | `feat/q-speed`, `session_01Wncmn3dLjjSmknNnfEFstX`              |
+| Step 3c (remove reference regexes)                                                                | HELD                              | Needs live Q-IQ                                                 |
+| Live Q-IQ                                                                                         | WAITING ON OWNER OK               | About $5.5; check the OpenAI balance first                      |
+| Owner UI follow-ups (phone top bar, "Hide from Q", "Clear")                                       | OWNER TO SAY                      | live13                                                          |
+| 2-hourly continuation                                                                             | ON                                | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                 |
+| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN                      | HANDOFF-2026-11-05 §6                                           |
 
 ## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
