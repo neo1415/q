@@ -51,6 +51,10 @@ import {
 } from "@/features/briefing/arrival-room";
 import { decideBriefing } from "@/features/home/briefing-gate";
 import {
+  useQPaneBoardRequest,
+  useQPaneDraft,
+} from "@/features/workspace/q-pane-requests";
+import {
   DECK_OFFER_QUESTION,
   takeAcceptedDeckOffer,
 } from "@/features/onboarding-conversation/deck-offer";
@@ -217,6 +221,13 @@ export type QConversationPanelProps = {
    * its state, and its cards stay beside Q, once the conversation starts.
    */
   readonly stageLayer?: ReactNode | undefined;
+  /**
+   * Q Workspace (W1.2, ADR 0077): the panel is the Q pane beside the page,
+   * mounted once in the layout. It sizes to the pane rather than the
+   * viewport, the Board opens as a drawer over it, and drafts and Board
+   * requests arrive from the workspace rather than the URL.
+   */
+  readonly workspace?: boolean | undefined;
 };
 
 /**
@@ -345,10 +356,14 @@ export function QConversationPanel({
   openBoard = false,
   stageLayer,
   initialAsk,
+  workspace = false,
 }: QConversationPanelProps) {
   const t = useT();
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence } = session;
+  // A page's "Ask Q about…" draft, typed into the pane, never sent.
+  const workspaceDraft = useQPaneDraft();
+  const draft = workspace ? workspaceDraft : null;
   const client = voice.client;
 
   // The page names the conversation (its URL); the store holds it, so
@@ -765,11 +780,20 @@ export function QConversationPanel({
     const body = bodyRef.current;
     if (body !== null && bigPresence) body.scrollTop = 0;
   }, [bigPresence, newest]);
-  const wide = useWide();
+  // In the workspace the pane is 300-640 px, never the wide stage.
+  const viewportWide = useWide();
+  const wide = viewportWide && !workspace;
   // The Board is closed until its icon is pressed: what Q makes is in the
   // thread, inline (founder direction A, 2026-09-28).
   // The Board opens from the answer chip on other pages (?board=1, C6).
   const [boardOpen, setBoardOpen] = useState(openBoard);
+  // Workspace: `/home?board=1` asks the one pane to open its Board.
+  const boardRequest = useQPaneBoardRequest();
+  const [boardAsked, setBoardAsked] = useState(0);
+  if (workspace && boardRequest !== boardAsked) {
+    setBoardAsked(boardRequest);
+    setBoardOpen(true);
+  }
   const boardDocked = wide && boardOpen;
   const boardMarks = useBoardMarks(q.conversationId);
   // "Show again" belongs to the conversation the person closed cards in.
@@ -1134,12 +1158,15 @@ export function QConversationPanel({
       {/* ~768 px, like a reading column (owner 2026-11-04). */}
       <div className="w-full max-w-3xl" onInput={readTypedDraft}>
         <QComposer
+          key={draft === null ? "composer" : `draft-${draft.id}`}
           id={COMPOSER_ID}
           variant="pill"
           showContext={false}
-          {...(initialAsk === undefined || conversing
-            ? {}
-            : { initialValue: initialAsk })}
+          {...(draft !== null
+            ? { initialValue: draft.text, autoFocus: true }
+            : initialAsk === undefined || conversing
+              ? {}
+              : { initialValue: initialAsk })}
           disabled={q.working && !voice.active}
           {...(voice.active
             ? {
@@ -1227,7 +1254,12 @@ export function QConversationPanel({
   return (
     <QSurfaceToolsContext.Provider value={tools}>
       <div
-        className="cq-stage cq-q-home flex flex-col lg:flex-row"
+        className={
+          workspace
+            ? "cq-stage cq-q-pane"
+            : "cq-stage cq-q-home flex flex-col lg:flex-row"
+        }
+        data-q-pane={workspace ? "" : undefined}
         data-q-surface-split
       >
         <section
