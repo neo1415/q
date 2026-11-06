@@ -119,7 +119,7 @@ describe("Q under a provider outage (scripted, local PostgreSQL)", () => {
            order by created_at`;
         const turns = result.cases.flatMap((run) => run.replies);
         expect(runs).toHaveLength(turns.length);
-        for (const [index, run] of runs.entries()) {
+        for (const run of runs) {
           if (run.status === "FAILED") {
             expect(RETRYABLE_PROVIDER_FAILURES).toContain(run.failure_code);
           } else {

@@ -132,7 +132,7 @@ describe("a topped-up account is noticed without a restart (5 Nov)", () => {
 
   it("a probe the account answered, even with an unusable reply, ends the block", async () => {
     const ms = { value: START };
-    const { gateway, alpha } = build(
+    const { gateway } = build(
       [
         EXHAUSTED,
         { kind: "FAIL", failureClass: "INVALID_MODEL_OUTPUT" },
