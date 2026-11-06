@@ -257,13 +257,6 @@ export type QTurnReading = Omit<
  */
 export const TURN_READER_ATTEMPT_TIMEOUT_MS = 9_000;
 
-/**
- * The kind of work the reader names to the routing policy, so its reasoning
- * level can be set per policy (`ai_ops.routing_policies.reasoning_levels`,
- * step 7) rather than in code. A label Capital Q chose, never their words.
- */
-export const TURN_READER_REASONING_KEY = "TURN_READER";
-
 const TURN_READER_BUDGET = {
   maxAttempts: 2,
   maxEstimatedCostUsd: 0.01,
@@ -588,11 +581,6 @@ export function createQTurnReader(dependencies: {
               // A closed classification needs little thought; left unset, a
               // reasoning model thinks at length before a one-line answer.
               reasoning: "LOW",
-              // Reader latency (2026-11-06): the level is versioned data once
-              // the routing policy lists this key (reasoning_levels); until
-              // then LOW above stands. Its thinking is output the person
-              // waits for (~9 ms a token on gpt-5.6-luna, live 2026-10-30).
-              reasoningKey: TURN_READER_REASONING_KEY,
               sensitivity,
               ...(dependencies.dataPosture === undefined
                 ? {}

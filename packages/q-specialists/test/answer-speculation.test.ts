@@ -6,11 +6,7 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
-import {
-  speculationGate,
-  type QTurnReader,
-  type QTurnReading,
-} from "@capital-q/model-gateway/q";
+import { speculationGate, type QTurnReader } from "@capital-q/model-gateway/q";
 import type { TurnReaderV8Result, TurnSkimResult } from "@capital-q/q-core";
 import type {
   QAnswerOutcome,
@@ -80,8 +76,7 @@ function request(subjects: QAnswerRequest["subjects"] = []): QAnswerRequest {
   };
 }
 
-// A v78 reading: a question to Q writes the work it asks (answerKind).
-const QUESTION: QTurnReading = {
+const QUESTION: TurnReaderV8Result = {
   kind: "QUESTION_TO_Q",
   confidence: "HIGH",
   transcript: "CLEAR",
@@ -95,7 +90,6 @@ const QUESTION: QTurnReading = {
   },
   aboutNamedOther: false,
   tool: null,
-  answerKind: "LOOKUP",
 };
 
 const NAVIGATE: TurnReaderV8Result = {
@@ -135,7 +129,7 @@ const sleep = (ms: number) =>
 
 function seam(options: {
   readonly said: string;
-  readonly reading: QTurnReading | TurnReaderV8Result | null;
+  readonly reading: TurnReaderV8Result | null;
   readonly spoken?: boolean;
   readonly speculate?: boolean;
   /** How long the turn reader takes. */
@@ -268,50 +262,6 @@ describe("a spoken question answered speculatively (latency2)", () => {
     expect(run.events).toMatchObject([{ outcome: "ADOPTED", reason: null }]);
     expect(run.heard.map((h) => h.text)).toEqual(["Answer 1."]);
     expect(run.stored).toEqual(["Answer 1."]);
-  });
-
-  // Reader latency (2026-11-06): a v78 reading asking heavier work is
-  // another answer. The speculation is dropped unheard; the turn's own
-  // answer carries the reading's work (its task class and reasoning).
-  it("discards it when the reading asks for an analysis: only the turn's own answer is said", async () => {
-    const run = seam({
-      said: "What can you do for me?",
-      reading: { ...QUESTION, answerKind: "ANALYSIS" },
-    });
-    const outcome = await run.answer.answer(request());
-    expect(outcome.kind).toBe("ANSWERED");
-    expect(run.calls).toHaveLength(2);
-    expect(run.calls[0]?.speculation).toBeDefined();
-    expect(run.calls[1]?.speculation).toBeUndefined();
-    expect(run.calls[1]?.answerKind).toBe("ANALYSIS");
-    expect(run.events).toMatchObject([
-      { outcome: "CANCELLED", reason: "NOTE" },
-    ]);
-    expect(run.heard.map((h) => h.text)).toEqual(["Answer 2."]);
-    expect(run.stored).toEqual(["Answer 2."]);
-  });
-
-  // ...and words the reader bound to the conversation's records: the
-  // speculation began before the binding and never carries it, so nothing
-  // of it is heard or stored, whatever the turn then says.
-  it("discards it when the reader bound the words to records", async () => {
-    const run = seam({
-      said: "What can you do for their company?",
-      reading: {
-        ...QUESTION,
-        references: [
-          { phrase: "their", entityIds: ["E1"], confidence: "HIGH" },
-        ],
-      },
-    });
-    await run.answer.answer(request());
-    expect(run.calls[0]?.speculation).toBeDefined();
-    // Here no record holds E1, so code asks which one (ACTED) before the
-    // reading's misfit is weighed; a ref that binds cancels as BOUND
-    // (speculation-misfit.test.ts). Either way it is never heard.
-    expect(run.events).toMatchObject([{ outcome: "CANCELLED" }]);
-    expect(run.heard.map((h) => h.text)).not.toContain("Answer 1.");
-    expect(run.stored).not.toContain("Answer 1.");
   });
 
   it("cancels it for a navigation: the move is made and nothing of the speculation is said or stored", async () => {
