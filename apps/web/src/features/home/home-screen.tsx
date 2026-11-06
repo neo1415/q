@@ -12,7 +12,6 @@ import {
 } from "@/features/q/q-conversation";
 import type { QStarter } from "@/features/q/q-starters";
 import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
-import { WorkPanel } from "@/features/work/work-panel";
 import { ArrivalStage } from "@/features/briefing/arrival-stage";
 import { warmArrivalSnapshot } from "@/features/briefing/arrival-warm";
 
@@ -150,8 +149,6 @@ export async function HomeScreen({
   // the suggested questions. Q's spoken welcome is unchanged.
   let greeting: string | undefined = undefined;
   const starters: QStarter[] = [];
-  // The work panel above the conversation, only for the plain arrival.
-  let headed = false;
   let briefing: Promise<Briefing | null> | undefined = undefined;
   if (conversationId === null) {
     if (arrival === "RETURNING") {
@@ -199,10 +196,8 @@ export async function HomeScreen({
           href: "/verification",
         });
       }
-      headed = true;
     } else if (arrival === "FIRST_TIME" && qConnected) {
       const name = firstName((await accountDetails()).displayName);
-      headed = true;
       welcomeLine = `${name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`} ${FIRST_RUN_QUESTION}`;
       // The one question that decides everything after it, with both
       // answers as the starters.
@@ -244,15 +239,10 @@ export async function HomeScreen({
         background tab until it was removed.
       */}
       {/*
-        AUTO (ADR 0030): what Q is doing under an approved plan, above the
-        conversation, only while something is running (renders nothing
-        otherwise, so Home stays Q first).
+        Owner 2026-11-06 (asked twice): no "Q is working on N things"
+        panel on Home. Running work is on the Board (its count is on the
+        top line) and on /work; WorkPanel itself is unchanged there.
       */}
-      {qConnected && !headed ? (
-        <div className="mx-auto max-h-[35dvh] w-full max-w-(--cq-layout-reading) flex-none overflow-y-auto px-(--cq-page-gutter) pt-4">
-          <WorkPanel variant="home" />
-        </div>
-      ) : null}
       <section
         aria-label={t("Ask Q")}
         className="flex min-h-0 flex-1 flex-col"

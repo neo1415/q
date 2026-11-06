@@ -23,7 +23,7 @@ vi.mock("../src/features/work/notice-store", () => ({
 }));
 
 const { arrivalWords } = await import("../src/features/briefing/arrival");
-const { openerOf, pendingCount, readOpenerReply } =
+const { openerOf, pendingCount, readOpenerReply, waitingPhrases } =
   await import("../src/features/briefing/opener");
 const { ArrivalBriefing } =
   await import("../src/features/briefing/arrival-briefing");
@@ -101,17 +101,16 @@ const QUIET_ATTENTION = { ...ATTENTION, items: [] };
 const MORNING = new Date("2026-10-16T09:30:00Z");
 
 describe("the opener's words", () => {
-  it("greets by first name and counts what waits in one sentence, never the list", () => {
+  // Owner 2026-11-06 replaces 2026-10-16's "never the list": the opener
+  // names what waits (at most three, then "and N more"), never "N things".
+  it("greets by first name and names what waits in one sentence", () => {
     const words = arrivalWords(BUSY, MORNING, null);
     expect(words.opener.pending).toBe(3);
     expect(words.spoken).toMatch(/^Good morning, Laura\. /u);
     expect(words.spoken).toMatch(
-      / You have 3 things waiting\. Would you like to look at them now, or talk about something else\?$/u,
+      / Three things need you: approve the reply to Tensorgate, approve the reply to Spheros and Apex asked for your cap table\. Would you like to look at them now, or talk about something else\?$/u,
     );
-    // Not one name or item from the cards.
-    for (const name of ["Tensorgate", "Spheros", "Apex", "cap table"]) {
-      expect(words.spoken).not.toContain(name);
-    }
+    expect(words.spoken).not.toMatch(/things waiting/u);
     // The full lowdown is kept for when they choose to look.
     expect(words.briefing).toContain("Tensorgate");
   });
@@ -132,13 +131,15 @@ describe("the opener's words", () => {
   it("one thing reads as one; a source not read makes it 'at least'", () => {
     const one = openerOf({ ...QUIET, cards: [card(1, "Tensorgate")] });
     expect(one.line).toBe(
-      "You have 1 thing waiting. Would you like to look at it now, or talk about something else?",
+      "One thing needs you: approve the reply to Tensorgate. Would you like to look at it now, or talk about something else?",
     );
     const partial = openerOf({
       ...BUSY,
       attention: { ...ATTENTION, unread: ["MEETING"] },
     });
-    expect(partial.count).toBe("You have at least 3 things waiting.");
+    expect(partial.count).toBe(
+      "At least three things need you: approve the reply to Tensorgate, approve the reply to Spheros and Apex asked for your cap table.",
+    );
   });
 
   it("unknown is never called empty: nothing counted but a read failed", () => {
@@ -181,6 +182,50 @@ describe("the opener's words", () => {
         matches: { label: "NOT_LOOKED_AT", total: 1, items: [] },
       }),
     ).toBe(0);
+  });
+});
+
+describe("what waits, named (owner 2026-11-06)", () => {
+  it("names at most three, then says how many more", () => {
+    const opener = openerOf({
+      ...QUIET,
+      cards: [
+        card(1, "Brightwell"),
+        card(2, "Ledgerfold"),
+        card(3, "Spheros"),
+        card(4, "Tensorgate"),
+        card(5, "Halyard"),
+      ],
+    });
+    expect(opener.count).toBe(
+      "Five things need you: approve the reply to Brightwell, approve the reply to Ledgerfold, approve the reply to Spheros and 2 more.",
+    );
+  });
+
+  it("says a held message as held, and never a bare count", () => {
+    const opener = openerOf({
+      ...QUIET,
+      cards: [
+        { ...card(1, "Spheros"), kind: "HELD", title: "Q held a message" },
+      ],
+    });
+    expect(opener.count).toBe(
+      "One thing needs you: a message to Spheros that Q held back.",
+    );
+    expect(opener.line).not.toMatch(/\d+ things? waiting/u);
+  });
+
+  it("names exactly what it counts, from the data it already holds", () => {
+    for (const data of [BUSY, QUIET]) {
+      const phrases = waitingPhrases(data);
+      expect(phrases.reduce((sum, phrase) => sum + phrase.weight, 0)).toBe(
+        pendingCount(data),
+      );
+    }
+  });
+
+  it("'what are they?' is the answer to look, from the held list", () => {
+    expect(readOpenerReply("What are they?")).toBe("SHOW");
   });
 });
 
@@ -256,7 +301,7 @@ describe("the opener on the page", () => {
     });
     // The briefing has landed (its opener is ready for the voice) and the
     // heading on screen is the same words.
-    expect(arrivalSpoken()).toMatch(/You have 3 things waiting./u);
+    expect(arrivalSpoken()).toMatch(/Three things need you: /u);
     expect(screen.getByRole("heading").textContent).toBe(
       "Welcome back, Laura.",
     );
@@ -287,7 +332,7 @@ describe("the opener on the page", () => {
     expect(screen.queryByRole("button", { name: "Look at them" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Something else" })).toBeNull();
     // A voice line still opens by saying what waits.
-    expect(arrivalSpoken()).toMatch(/You have 3 things waiting\./u);
+    expect(arrivalSpoken()).toMatch(/Three things need you: /u);
   });
 
   it("a typed 'yes' brings the cards up and goes no further; a question goes to Q", async () => {

@@ -319,11 +319,11 @@ describe("all of it up front, then any words (Zino, 2026-10-08)", () => {
     expect(words.summary).toBe(
       "Three things: the Spheros reply is held, Tensorgate wants a call next week, and Halyard Security wants a call next week.",
     );
-    // Said once they choose to look; the opener only counts them.
+    // Said in full once they choose to look; the opener names them briefly.
     expect(words.briefing).toContain(words.summary ?? "-");
     expect(words.briefing).toMatch(/Tell me what you'd like done/u);
     expect(words.spoken).not.toContain(words.summary ?? "-");
-    expect(words.spoken).toMatch(/You have \d+ things waiting\./u);
+    expect(words.spoken).toMatch(/[A-Z][a-z]+ things need you: /u);
   });
 
   it("numbers the cards c1.. in screen order for the reader", () => {

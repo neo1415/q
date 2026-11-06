@@ -164,10 +164,20 @@ describe("Chat and Q as two views (owner 2026-11-06)", () => {
     ).not.toBeNull();
   });
 
-  it("a stored choice still wins", async () => {
+  it("a stored choice still wins, and opens ready without the mic", async () => {
     localStorage.setItem("cq.q.view", "presence");
     await renderHome();
     expect(viewSwitch().getAttribute("data-q-view")).toBe("presence");
+    // No click, no line (QO-46): Q waits, with Talk to Q.
+    expect(talk).not.toHaveBeenCalled();
+    expect(document.querySelector(".cq-room-talk")).not.toBeNull();
+  });
+
+  it("choosing Q again while in Q starts nothing new", async () => {
+    localStorage.setItem("cq.q.view", "presence");
+    await renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Q" }));
+    expect(talk).not.toHaveBeenCalled();
   });
 
   it("the Q view shows Q's room presence; the Chat view does not", async () => {
@@ -181,14 +191,17 @@ describe("Chat and Q as two views (owner 2026-11-06)", () => {
     expect(presence?.querySelector("[data-q-aperture]")).not.toBeNull();
     // Decorative: nothing in it is announced or focusable.
     expect(presence?.getAttribute("aria-hidden")).toBe("true");
-    // Ready to talk: one clear Talk control, the same talk().
+    // Owner 2026-11-06: choosing Q starts the line in the same click,
+    // through the one talk() (never a second voice path).
+    expect(talk).toHaveBeenCalledTimes(1);
+    expect(voiceTalk).not.toHaveBeenCalled();
+    // The line did not open here (as with a refused mic): "Talk to Q" is
+    // the way to try again, the same talk().
     const talkButton =
       document.querySelector<HTMLButtonElement>(".cq-room-talk");
     expect(talkButton).not.toBeNull();
-    expect(talk).not.toHaveBeenCalled();
     if (talkButton !== null) fireEvent.click(talkButton);
-    expect(talk).toHaveBeenCalledTimes(1);
-    expect(voiceTalk).not.toHaveBeenCalled();
+    expect(talk).toHaveBeenCalledTimes(2);
     // Back to Chat: the presence goes.
     fireEvent.click(screen.getByRole("button", { name: "Chat" }));
     expect(document.querySelector("[data-q-room-presence]")).toBeNull();
@@ -259,5 +272,30 @@ describe("Chat and Q as two views (owner 2026-11-06)", () => {
     expect(aperture).not.toBeNull();
     // Calm is Q's still light: no automatic motion (ADR-001).
     expect(aperture?.getAttribute("data-motion")).toBe("calm");
+  });
+
+  it("keeps the presence in an existing conversation (/home?c=)", async () => {
+    state.turns = [
+      {
+        kind: "PERSON",
+        id: "p-1",
+        text: "Where are we with Brightwell?",
+        unconfirmed: false,
+      },
+    ];
+    localStorage.setItem("cq.q.view", "presence");
+    render(
+      <QConversationPanel
+        connected
+        context={CONTEXT}
+        conversationId="00000000-0000-4000-8000-000000000001"
+      />,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(
+      document.querySelector("[data-q-presence='stage'] [data-q-aperture]"),
+    ).not.toBeNull();
   });
 });
