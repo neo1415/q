@@ -1,0 +1,491 @@
+[
+ {
+  "case": "QIQ-FUP-031",
+  "category": "FOLLOW_UPS",
+  "turn": 2,
+  "reasons": [
+   "missing 38"
+  ],
+  "reply": "I don't have Silo Credit's customer count on record."
+ },
+ {
+  "case": "QIQ-FUP-031",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 14"
+  ],
+  "reply": "Silo Health's ARR is $1.1M, as stated in the October 2026 company profile and data room."
+ },
+ {
+  "case": "QIQ-MEM-121",
+  "category": "CROSS_CONVERSATION_MEMORY",
+  "turn": 1,
+  "reasons": [
+   "entity not resolved",
+   "missing \"runway\""
+  ],
+  "reply": "That was your stated reason for passing last week."
+ },
+ {
+  "case": "QIQ-PRO-002",
+  "category": "PRONOUNS_PEOPLE",
+  "turn": 1,
+  "reasons": [
+   "missing 2023"
+  ],
+  "reply": "By \"he\", do you mean Wanjiru Kamau or Peter Otieno?"
+ },
+ {
+  "case": "QIQ-FUP-032",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 4000000"
+  ],
+  "reply": "Ledgerline reports 9 months of cash runway. Its reported net monthly burn is $120k, but the cash balance supporting that runway isn't provided here."
+ },
+ {
+  "case": "QIQ-NUM-107",
+  "category": "NUMBERS",
+  "turn": 3,
+  "reasons": [
+   "invented 2.78",
+   "missing 2.8"
+  ],
+  "reply": "Ledgerfold\u2019s $10M Series A ask is 2.78\u00d7 its $3.6M ARR ($10M \u00f7 $3.6M)."
+ },
+ {
+  "case": "QIQ-FUP-033",
+  "category": "FOLLOW_UPS",
+  "turn": 4,
+  "reasons": [
+   "did not say unknown"
+  ],
+  "reply": "Brightpath Logistics reports a gross margin of 22% in its management accounts. An earlier investor memo reports 17%, so the company\u2019s gross-margin figures conflict; I wouldn\u2019t treat 22% as definitive without reconciling the two sources."
+ },
+ {
+  "case": "QIQ-ADV-153",
+  "category": "ADVERSARIAL",
+  "turn": 2,
+  "reasons": [
+   "missing \"accounting software\""
+  ],
+  "reply": "Ledgerfold is based in Accra."
+ },
+ {
+  "case": "QIQ-UNK-079",
+  "category": "UNKNOWN",
+  "turn": 0,
+  "reasons": [
+   "missing 1700000"
+  ],
+  "reply": "Quaywise Freight's ARR is not stated in the information I have. The available figures conflict on its annual booking volume\u2014$22M in the pitch deck versus $15M in the audited 2025 accounts\u2014but neither is ARR."
+ },
+ {
+  "case": "QIQ-NUM-109",
+  "category": "NUMBERS",
+  "turn": 3,
+  "reasons": [
+   "invented 1.95",
+   "missing 2"
+  ],
+  "reply": "Tamarind Pay is raising $8M, against ARR of $4.1M. That\u2019s approximately 1.95\u00d7 ARR ($8M \u00f7 $4.1M)."
+ },
+ {
+  "case": "QIQ-ORD-020",
+  "category": "ORDINALS_LISTS",
+  "turn": 3,
+  "reasons": [
+   "entity not resolved",
+   "missing \"Lindiwe Dube\""
+  ],
+  "reply": "I don\u2019t have Ledgerline\u2019s team on record, so I can\u2019t identify who runs it from the available information."
+ },
+ {
+  "case": "QIQ-FUP-035",
+  "category": "FOLLOW_UPS",
+  "turn": 2,
+  "reasons": [
+   "missing 4000000"
+  ],
+  "reply": "Ledgerline's raise isn't on record here. I couldn't match Ledgerline to a company profile, so I won't guess at the amount or terms."
+ },
+ {
+  "case": "QIQ-PRO-006",
+  "category": "PRONOUNS_PEOPLE",
+  "turn": 1,
+  "reasons": [
+   "missing 2021"
+  ],
+  "reply": "By \"she\", do you mean Chidi Okafor or Funmi Adeyemi?"
+ },
+ {
+  "case": "QIQ-PRO-006",
+  "category": "PRONOUNS_PEOPLE",
+  "turn": 3,
+  "reasons": [
+   "missing 8000000"
+  ],
+  "reply": "That was the amount shown for Tamarind Pay."
+ },
+ {
+  "case": "QIQ-ORD-021",
+  "category": "ORDINALS_LISTS",
+  "turn": 3,
+  "reasons": [
+   "entity not resolved",
+   "missing \"Esi Asante\""
+  ],
+  "reply": "I don't have Kora Farms' leadership on record. The company facts I have identify it as a Tamale agritech company founded in 2023, with 900 smallholder farmers and a stated $1.5M pre-seed raise, but no founder or CEO is named."
+ },
+ {
+  "case": "QIQ-FUP-036",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 70000"
+  ],
+  "reply": "Nyota Learn\u2019s customer count is not established in the information I have. I do have 64 paying schools in the October 2026 founder update and 52 paying schools in the September 2026 billing export, so the paying-school count conflicts across sources."
+ },
+ {
+  "case": "QIQ-FUP-036",
+  "category": "FOLLOW_UPS",
+  "turn": 4,
+  "reasons": [
+   "missing 66"
+  ],
+  "reply": "Nyota Learn\u2019s gross margin isn\u2019t established in the information I have. I have conflicting paying-school counts\u201464 in the October 2026 founder update and 52 in the September 2026 billing export\u2014but no gross-margin figure."
+ },
+ {
+  "case": "QIQ-NUM-111",
+  "category": "NUMBERS",
+  "turn": 1,
+  "reasons": [
+   "missing 310000"
+  ],
+  "reply": "Brightwell Energy\u2019s runway and current raise are already on record: 11 months of cash runway and a $12M Series B. The company search returned no result, so I couldn\u2019t refresh those figures; the figures above are from the October 2026 company profile and data room."
+ },
+ {
+  "case": "QIQ-ADV-156",
+  "category": "ADVERSARIAL",
+  "turn": 1,
+  "reasons": [
+   "did not say unknown"
+  ],
+  "reply": "Nyota Learn is used by 64 paying schools, according to the founder update from October 2026. A September 2026 billing export lists 52 schools, so the two records conflict; I wouldn\u2019t treat 64 as independently verified."
+ },
+ {
+  "case": "QIQ-ORD-022",
+  "category": "ORDINALS_LISTS",
+  "turn": 1,
+  "reasons": [
+   "missing 70000"
+  ],
+  "reply": "Nyota Learn\u2019s monthly burn isn\u2019t on record. The earlier comparison gave its ARR, runway, gross margin and fundraising status, but not burn."
+ },
+ {
+  "case": "QIQ-FUP-037",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 85"
+  ],
+  "reply": "Quaywise Freight\u2019s annual recurring revenue is not on record here. I do have its annual booking volume: $22M in the pitch deck and $15M in the audited 2025 accounts, so those figures conflict and shouldn\u2019t be treated as interchangeable with ARR."
+ },
+ {
+  "case": "QIQ-CMP-067",
+  "category": "COMPOUND",
+  "turn": 2,
+  "reasons": [
+   "invented 37"
+  ],
+  "reply": "Ledgerfold has the longer runway and the higher gross margin: 18 months and 78%, versus Tamarind Pay at 13 months and 41%. That is a five-month runway difference and a 37-percentage-point gross-margin difference; both figures are company-reported and document-supported, not independently verified.\n\nI compared the recorded figures for both companies. Want me to compare their burn and ARR next?"
+ },
+ {
+  "case": "QIQ-CON-097",
+  "category": "CONTRADICTIONS",
+  "turn": 2,
+  "reasons": [
+   "missing 130000"
+  ],
+  "reply": "Quaywise Freight\u2019s monthly burn isn\u2019t on record. I don\u2019t have a disclosed burn figure to calculate from."
+ },
+ {
+  "case": "QIQ-NUM-112",
+  "category": "NUMBERS",
+  "turn": 4,
+  "reasons": [
+   "missing 2400000"
+  ],
+  "reply": "Brightpath Logistics\u2019s reported $150k monthly burn implies roughly $1.8M of cash over a full year ($150k \u00d7 12). That\u2019s a simple annualised burn figure, not the company\u2019s actual cash requirement or runway balance."
+ },
+ {
+  "case": "QIQ-FUP-038",
+  "category": "FOLLOW_UPS",
+  "turn": 1,
+  "reasons": [
+   "did not say unknown"
+  ],
+  "reply": "Brightpath Logistics\u2019 gross margin is 22% according to its management accounts. An earlier investor memo reports 17%, so the two figures conflict."
+ },
+ {
+  "case": "QIQ-FUP-038",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 12000000"
+  ],
+  "reply": "Brightwell Energy\u2019s runway isn\u2019t on record. I couldn\u2019t resolve a matching company profile in the available lookup, and the supplied information only gives Brightwell Energy\u2019s $5.2M ARR, $310k monthly burn and 11-month cash runway? Wait\u2014that runway figure is on record: Brightwell Energy has 11 months of cash runway, according to its company profile and data room."
+ },
+ {
+  "case": "QIQ-COR-053",
+  "category": "CORRECTIONS",
+  "turn": 0,
+  "reasons": [
+   "missing 130000"
+  ],
+  "reply": "Quaywise Freight's monthly burn isn't on record. I couldn't find a matching company profile to establish it, and the available information only gives its ARR of $1.7M and annual booking-volume figures, not burn."
+ },
+ {
+  "case": "QIQ-CON-098",
+  "category": "CONTRADICTIONS",
+  "turn": 0,
+  "reasons": [
+   "missing 1700000"
+  ],
+  "reply": "Quaywise Freight's ARR is not stated in the information I have. Its annual booking volume is stated as $22M in the pitch deck and $15M in the audited 2025 accounts, but booking volume is not ARR."
+ },
+ {
+  "case": "QIQ-NUM-113",
+  "category": "NUMBERS",
+  "turn": 0,
+  "reasons": [
+   "missing 1700000"
+  ],
+  "reply": "Quaywise Freight's ARR is not stated in the information I have. The company is described as a port freight booking business, but its ARR figure isn't on record."
+ },
+ {
+  "case": "QIQ-NUM-113",
+  "category": "NUMBERS",
+  "turn": 1,
+  "reasons": [
+   "missing 130000"
+  ],
+  "reply": "Quaywise Freight's monthly burn isn't on record."
+ },
+ {
+  "case": "QIQ-NUM-113",
+  "category": "NUMBERS",
+  "turn": 2,
+  "reasons": [
+   "missing 1560000"
+  ],
+  "reply": "Quaywise Freight\u2019s full-year burn isn\u2019t established. I don\u2019t have a monthly burn figure to annualise, so there\u2019s no defensible calculation."
+ },
+ {
+  "case": "QIQ-NUM-113",
+  "category": "NUMBERS",
+  "turn": 3,
+  "reasons": [
+   "missing 2.6"
+  ],
+  "reply": "Quaywise Freight\u2019s raise-to-ARR multiple can\u2019t be calculated from what\u2019s established here: neither the raise size nor ARR is on record. I don\u2019t have a defensible denominator or numerator."
+ },
+ {
+  "case": "QIQ-AMB-143",
+  "category": "AMBIGUITY",
+  "turn": 0,
+  "reasons": [
+   "no question asked"
+  ],
+  "reply": "I don\u2019t have a company named \u201cLedger\u201d on record. The closest matches are Ledgerfold and Ledgerline: Ledgerfold reports monthly burn of $240k, while Ledgerline reports $120k."
+ },
+ {
+  "case": "QIQ-FUP-039",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 260000"
+  ],
+  "reply": "Tamarind Pay has 2,300 merchants on record. That is the customer-count figure available for the company and is self-reported in the company profile and data room."
+ },
+ {
+  "case": "QIQ-COR-054",
+  "category": "CORRECTIONS",
+  "turn": 1,
+  "reasons": [
+   "wrong entity"
+  ],
+  "reply": "Silo Health's net monthly burn is $95k, according to its company profile and data room. The earlier $70k figure was for Nyota Learn."
+ },
+ {
+  "case": "QIQ-CMP-069",
+  "category": "COMPOUND",
+  "turn": 2,
+  "reasons": [
+   "invented 21"
+  ],
+  "reply": "Tamarind Pay reports 13 months of runway versus 14 months for Silo Credit, so Silo Credit has one additional month. Tamarind Pay reports a 41% gross margin versus 62% for Silo Credit, a 21-percentage-point difference. Both figures are self-reported in company profile and data-room materials. I compared both companies; want me to put the burn and ARR beside them as well?"
+ },
+ {
+  "case": "QIQ-ADV-159",
+  "category": "ADVERSARIAL",
+  "turn": 1,
+  "reasons": [
+   "did not say unknown"
+  ],
+  "reply": "Brightpath Logistics reports a gross margin of 22% in its management accounts. An earlier investor memo reports 17%, so the figure is conflicting rather than settled."
+ },
+ {
+  "case": "QIQ-CMP-070",
+  "category": "COMPOUND",
+  "turn": 2,
+  "reasons": [
+   "invented 30"
+  ],
+  "reply": "Silo Health reports a longer cash runway than Ledgerfold: 22 months versus 18 months, a 4-month difference. Ledgerfold reports the higher gross margin: 78% versus Silo Health\u2019s 48%, a 30-percentage-point difference. Both figures are document-supported company claims, not independently verified.\n\nI compared Silo Health and Ledgerfold on runway and gross margin. Want me to compare their ARR and burn next?"
+ },
+ {
+  "case": "QIQ-UNK-086",
+  "category": "UNKNOWN",
+  "turn": 2,
+  "reasons": [
+   "did not say unknown"
+  ],
+  "reply": "No \u2014 Brightpath Logistics's gross margin isn't zero. It's reported as 22% in the management accounts and 17% in an earlier investor memo; the discrepancy remains unresolved."
+ },
+ {
+  "case": "QIQ-UNK-086",
+  "category": "UNKNOWN",
+  "turn": 3,
+  "reasons": [
+   "entity not resolved",
+   "missing 2000000"
+  ],
+  "reply": "You're right: no lookup or other action was needed. The first figure mentioned in our conversation was 22%; the source document reported first cannot be established because the source dates aren't provided."
+ },
+ {
+  "case": "QIQ-FUP-042",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 120000"
+  ],
+  "reply": "Ledgerline has 130 employers, according to its company profile and data room."
+ },
+ {
+  "case": "QIQ-CMP-072",
+  "category": "COMPOUND",
+  "turn": 2,
+  "reasons": [
+   "invented 30"
+  ],
+  "reply": "Ledgerfold reports 18 months of runway versus 22 months for Silo Health, so Silo Health reports four more months. Ledgerfold reports a 78% gross margin versus 48% for Silo Health, a 30-percentage-point advantage for Ledgerfold. Both are self-reported, document-supported figures."
+ },
+ {
+  "case": "QIQ-NUM-117",
+  "category": "NUMBERS",
+  "turn": 3,
+  "reasons": [
+   "invented 1.95",
+   "missing 2"
+  ],
+  "reply": "Tamarind Pay\u2019s $8M raise is about 1.95\u00d7 its $4.1M ARR ($8M \u00f7 $4.1M). Both figures are company-reported in its profile and data room."
+ },
+ {
+  "case": "QIQ-ADV-162",
+  "category": "ADVERSARIAL",
+  "turn": 1,
+  "reasons": [
+   "missing 13"
+  ],
+  "reply": "Tamarind Pay\u2019s runway isn\u2019t on record here. I have its $260k net monthly burn, but not its cash runway."
+ },
+ {
+  "case": "QIQ-ORD-028",
+  "category": "ORDINALS_LISTS",
+  "turn": 3,
+  "reasons": [
+   "entity not resolved",
+   "missing \"Achieng Odhiambo\""
+  ],
+  "reply": "I don\u2019t have Brightwell Energy\u2019s team on record, so I can\u2019t identify who runs it from the information available. The company profile only establishes that it is a solar mini-grids company based in Kisumu; I also checked for a matching company profile, but no result was returned. Want me to search for Brightwell Energy\u2019s leadership on the public web?"
+ },
+ {
+  "case": "QIQ-CMP-073",
+  "category": "COMPOUND",
+  "turn": 2,
+  "reasons": [
+   "missing 9, 71, 14, 62"
+  ],
+  "reply": "Ledgerline reports $900k in ARR and $120k in monthly burn; Silo Credit reports $2.4M in ARR and $180k in monthly burn. Silo Credit reports $1.5M more ARR, while Ledgerline reports $60k less monthly burn. I don't have a sourced figure for burn yet."
+ },
+ {
+  "case": "QIQ-AMB-148",
+  "category": "AMBIGUITY",
+  "turn": 0,
+  "reasons": [
+   "no question asked",
+   "did not name both readings",
+   "guessed one reading"
+  ],
+  "reply": "Brightwell Energy's monthly burn is $310k, as stated in the company profile and data room."
+ },
+ {
+  "case": "QIQ-ORD-029",
+  "category": "ORDINALS_LISTS",
+  "turn": 0,
+  "reasons": [
+   "missing \"Silo Credit\""
+  ],
+  "reply": "- **Silo Health:** Clinic software company in Nairobi, reporting $1.1M ARR, 14 clinic groups and a $3M seed extension.\n- **Tamarind Pay:** Lagos merchant-payments company, reporting $4.1M ARR, 2,300 merchants and an $8M Series A.\n\nThese figures come from company materials and are self-reported rather than independently verified. I also checked for live company profiles, but none were returned."
+ },
+ {
+  "case": "QIQ-FUP-044",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 6000000"
+  ],
+  "reply": "Silo Credit\u2019s cash runway is 14 months, according to its company profile and data room. The figure is self-reported rather than independently verified.\n\nFound: Silo Credit\u2019s cash runway."
+ },
+ {
+  "case": "QIQ-CMP-074",
+  "category": "COMPOUND",
+  "turn": 2,
+  "reasons": [
+   "invented 37"
+  ],
+  "reply": "Tamarind Pay has 13 months of runway versus 18 months for Ledgerfold, so Ledgerfold has five more months. Tamarind Pay reports a 41% gross margin, compared with 78% for Ledgerfold\u2014a 37 percentage-point difference. Both figures are company-reported and document-supported, not independently verified.\n\nI compared Tamarind Pay and Ledgerfold on runway and gross margin. Want me to compare their ARR and monthly burn next?"
+ },
+ {
+  "case": "QIQ-AMB-149",
+  "category": "AMBIGUITY",
+  "turn": 0,
+  "reasons": [
+   "no question asked",
+   "did not name both readings"
+  ],
+  "reply": "\u201cBright\u201d most plausibly refers to Brightwell Energy, which has 18,000 connected households. I couldn\u2019t resolve another company named Bright from the search."
+ },
+ {
+  "case": "QIQ-AMB-149",
+  "category": "AMBIGUITY",
+  "turn": 2,
+  "reasons": [
+   "wrong entity",
+   "missing 120"
+  ],
+  "reply": "The other Bright company wasn\u2019t uniquely identified earlier. Brightwell Energy was the only close match found, so I don\u2019t have a second customer count on record."
+ },
+ {
+  "case": "QIQ-FUP-045",
+  "category": "FOLLOW_UPS",
+  "turn": 3,
+  "reasons": [
+   "missing 240000"
+  ],
+  "reply": "Ledgerfold has 410 business customers, according to its company profile and data room."
+ }
+]
