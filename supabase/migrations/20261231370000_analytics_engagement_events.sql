@@ -29,26 +29,35 @@ revoke all on schema analytics from public;
 grant usage on schema analytics to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Platform analytics settings (owner, 6 Nov 2026): every behaviour the owner
--- asked for exists, each behind an admin setting whose DEFAULT is the
--- Product Specification §6.7 behaviour. One row, typed columns, written only
--- by the server's admin path (audited, below); read by SQL through
--- analytics.settings() and by TypeScript through the same function, so the
--- projection and the application can never disagree.
+-- Platform analytics settings (owner, 6 Nov 2026; DECISIONS 72/74): every
+-- behaviour the owner asked for exists, each an admin setting, with the
+-- researched defaults. One row, typed columns, written only by the server's
+-- admin path (audited, below); read by SQL through analytics.settings() and
+-- by TypeScript through the same function, so the projection and the
+-- application can never disagree.
 --
 --   default_visibility / allowed_visibilities   §6.7.13 levels. The allowed
---     set always includes the default and every level MORE private than it,
---     so a person may always choose to be stricter.
---   named_passive_viewers            OFF (spec). LinkedIn-style "who viewed
---     you": a Full identity viewer is named. OFF shows their organisation.
---   paid_identity_reveal             OFF (beyond spec). An entitled founder
---     (billing feature analytics.identity_reveal) sees viewers by name.
---   paid_reveal_overrides_anonymous  OFF (beyond spec). Only with the above:
---     an Anonymous choice is overridden. Default NO, and both must be on.
---   per_person_passive_analytics     OFF (beyond spec). Slide dwell and
---     video time per named viewer.
---   passive_view_notifications       OFF (beyond spec). "X viewed your deck".
---   intent_signal_notifications      ON (spec allows).
+--     set always includes the default and every level MORE private than it.
+--   paid_identity_reveal             ON. A founder whose plan includes the
+--     billing feature analytics.identity_reveal (Founder Pro) sees viewers at
+--     the level EACH VIEWER CHOSE: Full by name, Organisation by
+--     organisation, Anonymous only as "an investor". A free plan sees
+--     aggregates only. Investors never pay for visibility or anonymity.
+--   named_passive_viewers            OFF (beyond spec when ON): the same
+--     per-viewer display for every founder, without the plan.
+--   paid_reveal_overrides_anonymous  OFF and locked (beyond spec): reveals an
+--     Anonymous viewer to an entitled founder. Needs paid reveal, step-up and
+--     an explicit acknowledgement of the investor-trust risk.
+--   per_person_passive_analytics     OFF (beyond spec): slide and video time
+--     per NAMED viewer (the "creepy follow-up" risk).
+--   headline_floor (>= 3)            distinct organisations before any passive
+--     total appears; slice_floor (>= 5) for any breakdown, with complementary
+--     suppression. Admins may raise either, never below these minimums.
+--   passive_batch                    WEEKLY: passive figures cover completed
+--     periods only, with no per-view timestamps, so a view cannot be matched
+--     to a meeting. Intent signals stay real time.
+--   passive_view_notifications       OFF (beyond spec when ON).
+--   intent_signal_notifications      ON.
 --   q_uses_passive_signals           ON, within visibility; never "contact
 --     them because they viewed" (§6.7.14).
 -- ---------------------------------------------------------------------------
@@ -59,12 +68,15 @@ create table analytics.platform_settings (
                                      check (default_visibility in ('FULL_IDENTITY', 'ORGANISATION_ONLY', 'ANONYMOUS')),
   allowed_visibilities             text[] not null default array['FULL_IDENTITY', 'ORGANISATION_ONLY', 'ANONYMOUS'],
   named_passive_viewers            boolean not null default false,
-  paid_identity_reveal             boolean not null default false,
+  paid_identity_reveal             boolean not null default true,
   paid_reveal_overrides_anonymous  boolean not null default false,
   per_person_passive_analytics     boolean not null default false,
   passive_view_notifications       boolean not null default false,
   intent_signal_notifications      boolean not null default true,
   q_uses_passive_signals           boolean not null default true,
+  headline_floor                   integer not null default 3 check (headline_floor between 3 and 100),
+  slice_floor                      integer not null default 5 check (slice_floor between 5 and 100),
+  passive_batch                    text not null default 'WEEKLY' check (passive_batch in ('WEEKLY', 'DAILY')),
   version                          integer not null default 1 check (version >= 1),
   updated_by                       uuid references identity.user_profiles (id) on delete restrict,
   reason                           text check (reason is null or length(btrim(reason)) between 3 and 500),

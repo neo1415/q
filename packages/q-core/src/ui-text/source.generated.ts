@@ -1941,6 +1941,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "I lead product, joined in May",
   "I think these are the closest fits. Keep them, or adjust.",
   "I understand Q is an AI interviewer, my camera and microphone are used only while the video room is open, and what I say is transcribed into this application. Nothing reaches {fund} until I review and submit.",
+  "I understand this breaks the anonymity promise made to investors and can end their trust in Capital Q.",
   "I work from whatever you already have. You can talk to me or type — whichever you prefer.",
   "I'd like to change it first.",
   "I'd rather not say",

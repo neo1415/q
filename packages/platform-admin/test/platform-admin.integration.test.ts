@@ -382,8 +382,11 @@ describe("@capital-q/platform-admin against local Postgres", () => {
       expect(before.settings).toMatchObject({
         defaultVisibility: "ORGANISATION_ONLY",
         namedPassiveViewers: false,
-        paidIdentityReveal: false,
+        paidIdentityReveal: true,
         paidRevealOverridesAnonymous: false,
+        headlineFloor: 3,
+        sliceFloor: 5,
+        passiveBatch: "WEEKLY",
       });
       const next = { ...before.settings, namedPassiveViewers: true };
       expect(
@@ -400,6 +403,30 @@ describe("@capital-q/platform-admin against local Postgres", () => {
         reason: "Owner trial of who viewed you",
         changed: ["namedPassiveViewers"],
       });
+      // The Anonymous override is locked: not without the acknowledgement.
+      const unlocking = {
+        ...after.settings,
+        paidRevealOverridesAnonymous: true,
+      };
+      expect(
+        await admin.updateAnalyticsSettings(grant, {
+          settings: unlocking,
+          expectedVersion: after.version,
+          reason: "Trying the override",
+        }),
+      ).toBe("NEEDS_ACKNOWLEDGEMENT");
+      expect(
+        (await admin.readAnalyticsSettings(grant)).settings
+          .paidRevealOverridesAnonymous,
+      ).toBe(false);
+      expect(
+        await admin.updateAnalyticsSettings(grant, {
+          settings: unlocking,
+          expectedVersion: after.version,
+          reason: "Owner accepted the investor-trust risk",
+          acknowledgeInvestorTrustRisk: true,
+        }),
+      ).toBe("CHANGED");
       // A second admin working from the old version is refused.
       expect(
         await admin.updateAnalyticsSettings(grant, {
@@ -416,7 +443,7 @@ describe("@capital-q/platform-admin against local Postgres", () => {
       await expect(
         tx.sql`savepoint s1`.then(
           () =>
-            tx.sql`update analytics.platform_settings set paid_reveal_overrides_anonymous = true`,
+            tx.sql`update analytics.platform_settings set paid_identity_reveal = false`,
         ),
       ).rejects.toThrow();
       await tx.sql`rollback to savepoint s1`;
