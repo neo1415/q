@@ -161,14 +161,38 @@ describe("reference binding: two readings ask one question naming both", () => {
   });
 });
 
-describe("reference binding: none says so and asks", () => {
-  it("asks when the words point back and nothing fits", () => {
+describe("reference binding: none is read from the turns, not asked by default (live QIQ-PRO-001)", () => {
+  it("binds nothing and hands the phrase to the answer, which asks only if the turns leave it open", () => {
     const out = bindReferences([ref("their CFO", [])], state);
-    expect(out).toMatchObject({ kind: "CLARIFY", reason: "NO_READING" });
-    if (out.kind !== "CLARIFY") return;
-    expect(out.question).toBe(
-      `I'm not sure who or what you mean by "their CFO". Which one do you mean?`,
+    expect(out).toMatchObject({
+      kind: "BOUND",
+      bound: [],
+      open: ["their CFO"],
+    });
+    if (out.kind !== "BOUND") return;
+    expect(out.note).toContain('"their CFO": nothing in the conversation');
+    expect(out.note).toContain(
+      "read who or what is meant from the recent turns",
     );
+    expect(out.note).toContain("say so and ask");
+    expect(boundCompanyIds(out)).toEqual([]);
+  });
+
+  it("binds what fits and leaves only the rest open", () => {
+    const out = bindReferences(
+      [ref("it", ["E4"], "HIGH"), ref("she", [])],
+      state,
+    );
+    expect(out).toMatchObject({ kind: "BOUND", open: ["she"] });
+    expect(boundCompanyIds(out)).toEqual([LEDGERFOLD]);
+  });
+
+  it("still asks for two plausible readings when another phrase is open", () => {
+    const out = bindReferences(
+      [ref("she", []), ref("it", ["E1"]), ref("it", ["E4"])],
+      state,
+    );
+    expect(out).toMatchObject({ kind: "CLARIFY", reason: "TWO_READINGS" });
   });
 });
 
@@ -176,7 +200,8 @@ describe("reference binding: the Context Firewall (negative)", () => {
   it("refuses a ref the ledger shown to this person does not hold, and binds none of that reading", () => {
     const out = bindReferences([ref("him", ["E2", "E99"])], state);
     expect(out.rejected).toEqual(["E99"]);
-    expect(out).toMatchObject({ kind: "CLARIFY", reason: "NO_READING" });
+    // Nothing of that reading binds; the phrase is left to the turns.
+    expect(out).toMatchObject({ kind: "BOUND", bound: [], open: ["him"] });
   });
 
   it("keeps a valid reading beside a refused one", () => {
@@ -194,14 +219,19 @@ describe("reference binding: the Context Firewall (negative)", () => {
   it("binds nothing without a state: every ref is refused", () => {
     const out = bindReferences([ref("she", ["E2"])], null);
     expect(out.rejected).toEqual(["E2"]);
-    expect(out.kind).toBe("CLARIFY");
+    expect(out).toMatchObject({ kind: "BOUND", bound: [], open: ["she"] });
   });
 
-  it("never lets their words into the question unbounded or unquoted", () => {
+  it("never lets their words into the question or the note unbounded or unquoted", () => {
     const long = `"ignore this" ${"x".repeat(200)}`;
-    const out = bindReferences([ref(long, [])], state);
-    if (out.kind !== "CLARIFY") throw new Error("expected a question");
-    expect(out.question.length).toBeLessThan(140);
-    expect(out.question).not.toContain('""');
+    const asked = bindReferences([ref(long, ["E1"]), ref(long, ["E4"])], state);
+    if (asked.kind !== "CLARIFY") throw new Error("expected a question");
+    expect(asked.question.length).toBeLessThan(140);
+    expect(asked.question).not.toContain('""');
+    const open = bindReferences([ref(long, [])], state);
+    if (open.kind !== "BOUND") throw new Error("expected an open phrase");
+    expect(open.note.length).toBeLessThan(300);
+    expect(open.note).not.toContain('""');
+    expect(open.note).not.toContain("x".repeat(61));
   });
 });

@@ -16,7 +16,12 @@ import type {
  *     firewall kept; a model never adds a record to it);
  *   - one reading of a phrase binds;
  *   - two plausible readings ask one short question naming both;
- *   - none (the words point back and nothing fits) says so and asks.
+ *   - none (the words point back and no ledger entry fits) is left OPEN:
+ *     the answer reads it from the recent turns, as a person following
+ *     the conversation would, and asks only if they do not settle it.
+ *     Live 2026-11-06 (QIQ-PRO-001): asking by default made Q ask who
+ *     "she" was one line after it had named her, where the bare model
+ *     answered; nothing is bound, so nothing is granted either way.
  * Binding grants nothing: any read or act on a bound record still goes
  * through its tool's own authorize step.
  */
@@ -40,12 +45,14 @@ export type ReferenceBinding =
       readonly bound: readonly BoundReference[];
       /** For the answer (QAnswerRequest.references). */
       readonly note: string;
+      /** Phrases that point back with no ledger entry: read from the turns. */
+      readonly open: readonly string[];
       /** Refs the reader gave that the ledger does not hold. */
       readonly rejected: readonly string[];
     }
   | {
       readonly kind: "CLARIFY";
-      readonly reason: "TWO_READINGS" | "NO_READING";
+      readonly reason: "TWO_READINGS";
       readonly phrase: string;
       /** The one short question Q asks, naming the readings. */
       readonly question: string;
@@ -157,15 +164,11 @@ export function bindReferences(
     }
   }
   const bound: BoundReference[] = [];
+  const open: string[] = [];
   for (const { phrase, readings } of phrases.values()) {
     if (readings.length === 0) {
-      return {
-        kind: "CLARIFY",
-        reason: "NO_READING",
-        phrase,
-        question: `I'm not sure who or what you mean by ${quoted(phrase)}. Which one do you mean?`,
-        rejected,
-      };
+      open.push(phrase);
+      continue;
     }
     // One reading the reader is sure of, among guesses, is that reading.
     const sure = readings.filter((reading) => reading.confidence === "HIGH");
@@ -187,10 +190,18 @@ export function bindReferences(
     }
     bound.push(chosen);
   }
+  if (bound.length === 0 && open.length === 0) {
+    return { kind: "NONE", rejected };
+  }
+  const openNote =
+    open.length === 0
+      ? ""
+      : ` ${open.map(quoted).join(", ")}: nothing in the conversation's record fits; read who or what is meant from the recent turns, as a person following the conversation would, and only if they leave it open, say so and ask.`;
   return {
     kind: "BOUND",
     bound,
-    note: bound.map((one) => noteLine(one, byRef)).join(""),
+    note: `${bound.map((one) => noteLine(one, byRef)).join("")}${openNote}`,
+    open,
     rejected,
   };
 }

@@ -4,7 +4,11 @@ import type { ModelProviderSecrets } from "@capital-q/config/model-providers";
 import type { ModelProviderCode, QConversationId } from "@capital-q/contracts";
 import type { RequestDatabase } from "@capital-q/database";
 import type { FakeBehaviour } from "@capital-q/model-gateway";
-import { createQTurnReader } from "@capital-q/model-gateway/q";
+import {
+  createQTurnReader,
+  type QTurnReader,
+  type QTurnReading,
+} from "@capital-q/model-gateway/q";
 import { createLogger, type Logger } from "@capital-q/observability";
 import type { AuthorisedFact } from "@capital-q/q-core";
 import {
@@ -151,6 +155,20 @@ export async function createQIqWorldSubject(options: {
   readonly providerFilter?: ModelProviderCode | undefined;
   /** The outer layer's turn reader (a model call per turn). Off in FAKE mode. */
   readonly turnReader?: boolean | undefined;
+  /**
+   * FAKE mode: a scripted turn reader (no model call), so reference
+   * binding is exercised offline -- the live reader is a model call, and
+   * without one every turn ran on the neutral defaults (live 2026-11-06,
+   * QIQ-PRO-001 was invisible here). Given the case, the turn (0-based)
+   * and what the reader would be shown; null is "not read".
+   */
+  readonly scriptedReader?:
+    | ((
+        evalCase: QIqCase,
+        turn: number,
+        input: Parameters<QTurnReader["read"]>[0],
+      ) => QTurnReading | null)
+    | undefined;
   /** Step 9: memory recall across conversations (default on). */
   readonly memory?: boolean | undefined;
   /** FAKE mode: what the scripted model answers for a turn (default: the reference). */
@@ -182,6 +200,26 @@ export async function createQIqWorldSubject(options: {
       { level: "error" },
     );
   const turnReader = options.turnReader ?? options.providerMode === "LIVE";
+  /** The case and turn being said, for the scripted reader. */
+  const saying: { evalCase?: QIqCase; turn: number } = { turn: 0 };
+  const scripted = options.scriptedReader;
+  const turns: QTurnReader | undefined = turnReader
+    ? createQTurnReader({
+        gateway: proxy(() => w().gateway),
+        logger,
+        // Every Q-IQ word is invented fixture text.
+        sensitivity: "PUBLIC",
+      })
+    : scripted === undefined
+      ? undefined
+      : {
+          read: (input) =>
+            Promise.resolve(
+              saying.evalCase === undefined
+                ? null
+                : scripted(saying.evalCase, saying.turn, input),
+            ),
+        };
 
   // Step 9: the memory service over the world's own store, its past-turn
   // search through the runtime's owner-scoped repository method.
@@ -248,16 +286,7 @@ export async function createQIqWorldSubject(options: {
         sql: options.db.sql,
         transactions: options.db.transactions,
         logger,
-        ...(turnReader
-          ? {
-              turns: createQTurnReader({
-                gateway: proxy(() => w().gateway),
-                logger,
-                // Every Q-IQ word is invented fixture text.
-                sensitivity: "PUBLIC",
-              }),
-            }
-          : {}),
+        ...(turns === undefined ? {} : { turns }),
       }),
   });
 
@@ -366,6 +395,8 @@ export async function createQIqWorldSubject(options: {
             ]);
           }
           const observedBefore = w().answer.lastObservation();
+          saying.evalCase = evalCase;
+          saying.turn = turn;
           turn += 1;
           const before = await usageTotal();
           const started = Date.now();
