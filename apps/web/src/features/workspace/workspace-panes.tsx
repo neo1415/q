@@ -37,6 +37,12 @@ import {
   setQWidth,
   useWorkspaceLayout,
 } from "./layout-store";
+import {
+  noteOwnMove,
+  notePageMove,
+  ownMoveJustNow,
+  watchPageActivity,
+} from "./workspace-screen";
 
 /** The phone layout (W1.6): Q full screen, the page as a sheet. */
 export const PHONE_QUERY = "(max-width: 860px)";
@@ -61,12 +67,6 @@ const Q_HOME = "/home";
 const OPEN_SHEET_EVENT = "cq-ws-open-sheet";
 function openPageSheet(): void {
   window.dispatchEvent(new Event(OPEN_SHEET_EVENT));
-}
-
-/** When the person last pressed a link or went Back (their own move). */
-let lastOwnMove = 0;
-function ownMoveJustNow(): boolean {
-  return Date.now() - lastOwnMove < 2000;
 }
 
 /**
@@ -241,11 +241,11 @@ export function WorkspacePagePane({
     const mark = (event: Event) => {
       const target = event.target;
       if (target instanceof Element && target.closest("a[href]") !== null) {
-        lastOwnMove = Date.now();
+        noteOwnMove();
       }
     };
     const back = () => {
-      lastOwnMove = Date.now();
+      noteOwnMove();
     };
     document.addEventListener("click", mark, true);
     window.addEventListener("popstate", back);
@@ -271,6 +271,20 @@ export function WorkspacePagePane({
       }
     }
   }
+
+  // Q is told the page before its last move, and when the person is busy
+  // in the page pane (screen.workspace; W4's policy reads both).
+  const shownPath = useRef(pathname);
+  useEffect(() => {
+    if (shownPath.current === pathname) return;
+    notePageMove(shownPath.current, ownMoveJustNow());
+    shownPath.current = pathname;
+  }, [pathname]);
+  const paneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const pane = paneRef.current;
+    return pane === null ? undefined : watchPageActivity(pane);
+  }, []);
 
   const openSheet = useCallback(() => {
     setPeek(null);
@@ -298,6 +312,7 @@ export function WorkspacePagePane({
         <PeekBar key={peek} onView={openSheet} />
       ) : null}
       <div
+        ref={paneRef}
         className="cq-shell-body cq-ws-page"
         inert={hiddenOnPhone}
         data-ws-page

@@ -26,6 +26,7 @@ import {
   QWebsiteUrlSchema,
   type PermittedContextPlan,
   type QClientActionIntent,
+  QWorkspacePaneStateSchema,
   type QClientActionToolResult,
 } from "@capital-q/contracts";
 import { readOwn } from "@capital-q/app-actions";
@@ -67,6 +68,7 @@ export const SET_THEME = "client.theme.set" as const;
 export const RELOAD_PAGE = "client.page.reload" as const;
 export const OPEN_WEBSITE = "client.website.open" as const;
 export const SET_Q_MOTION = "client.q_motion.set" as const;
+export const SET_LAYOUT = "client.layout.set" as const;
 export const SET_VOICE = "client.voice.set" as const;
 export const SIGN_OUT = "client.session.sign_out" as const;
 export const OPEN_PAGE = "client.page.open" as const;
@@ -282,6 +284,78 @@ export function createSetQMotionTool(): AnyQToolDefinition {
         ownConversation(actor, plan)
           ? allowed({ kind: "SET_Q_MOTION", motion: input.motion })
           : deny<QClientActionToolResult>("NOT_AVAILABLE"),
+      ),
+  });
+}
+
+/**
+ * Q Workspace W1.5 (ADR 0077): open or collapse the workspace panes, the
+ * same as the small controls at each pane's foot. Approval class NONE:
+ * layout is never an action on anyone's data.
+ */
+export const SetLayoutInputSchema = z
+  .object({
+    qPane: QWorkspacePaneStateSchema.optional().describe(
+      "The Q pane (this conversation): open or collapsed.",
+    ),
+    pagePane: QWorkspacePaneStateSchema.optional().describe(
+      "The page beside Q: open or collapsed.",
+    ),
+  })
+  .strict()
+  .refine(
+    (input) => input.qPane !== undefined || input.pagePane !== undefined,
+    {
+      message: "Name at least one pane.",
+    },
+  );
+export type SetLayoutInput = z.infer<typeof SetLayoutInputSchema>;
+
+/**
+ * Whether this run's screen is the Q Workspace. Supplied by the
+ * composition (q-api) per run; absent means no: a client without the
+ * workspace must never be sent LAYOUT_SET (it drops unknown frames whole).
+ */
+export type WorkspaceReader = (execution: QToolExecutionContext) => boolean;
+
+export function createSetLayoutTool(
+  options: { readonly workspaceFor?: WorkspaceReader | undefined } = {},
+): AnyQToolDefinition {
+  return defineQTool<
+    SetLayoutInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
+    ...COMMON,
+    // Not in the always-on core: most screens have no panes, and every
+    // core schema is paid on every round. Loaded by use_capability or the
+    // turn's focus when the person asks.
+    core: false,
+    // Offered on a general turn ("hide the pages"); on any other purpose
+    // it is loaded by name (use_capability), so it never crowds out the
+    // tools a run is about.
+    supportedPurposes: ["GENERAL_QUESTION"],
+    offeredWhenNamed: true,
+    id: SET_LAYOUT,
+    providerName: "set_layout",
+    description:
+      'Opens or collapses the panes of their Q Workspace: qPane is this conversation, pagePane is the page beside it. Call it when they ask to hide or show the pages, the page side, the chat or Q ("hide the pages", "close the chat", "show the page again"), by voice too. Name only the panes they asked about. Q and the pages are never both collapsed: asking for that keeps Q open. It happens on their screen after your answer.',
+    input: SetLayoutInputSchema,
+    authorize: (input, execution) =>
+      Promise.resolve(
+        ownConversation(execution.actor, execution.plan) &&
+          options.workspaceFor?.(execution) === true
+          ? allowed({
+              kind: "LAYOUT_SET",
+              ...(input.qPane === undefined ? {} : { qPane: input.qPane }),
+              ...(input.pagePane === undefined
+                ? {}
+                : { pagePane: input.pagePane }),
+            })
+          : deny<QClientActionToolResult>(
+              "NOT_AVAILABLE",
+              "Their screen is not the Q Workspace: there are no panes to change.",
+            ),
       ),
   });
 }
@@ -1663,7 +1737,11 @@ export function createClientActionTools(
     | "work"
     | "appActions"
   >,
-  options: { readonly screenControls?: ScreenControlsReader | undefined } = {},
+  options: {
+    readonly screenControls?: ScreenControlsReader | undefined;
+    /** W1.5: whether this run's screen is the Q Workspace (default: no). */
+    readonly workspaceFor?: WorkspaceReader | undefined;
+  } = {},
 ): readonly AnyQToolDefinition[] {
   return [
     createOperateScreenTool(options),
@@ -1671,6 +1749,7 @@ export function createClientActionTools(
     createReloadPageTool(),
     createOpenWebsiteTool(ports),
     createSetQMotionTool(),
+    createSetLayoutTool(options),
     createSetVoiceTool(),
     createSignOutTool(),
     createOpenPageTool(ports),
