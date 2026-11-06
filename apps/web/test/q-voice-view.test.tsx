@@ -10,6 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createQStreamState } from "@capital-q/api-client";
 
+import type { QTurn } from "../src/features/q/conversation";
+import { demoTop } from "../src/features/q/answer-canvas-fixtures";
+
 /**
  * Owner 2026-11-06: "in ChatGPT, when you start voice the interface
  * changes". Chat is the default view (the ChatGPT-style home); Q is the
@@ -19,12 +22,7 @@ import { createQStreamState } from "@capital-q/api-client";
 
 const talk = vi.fn(() => Promise.resolve());
 const state: {
-  turns: readonly {
-    kind: "PERSON";
-    id: string;
-    text: string;
-    unconfirmed: boolean;
-  }[];
+  turns: readonly QTurn[];
   voiceActive: boolean;
 } = { turns: [], voiceActive: false };
 const voiceEnd = vi.fn((_reason?: string) => Promise.resolve());
@@ -344,5 +342,125 @@ describe("Chat is voice off (owner 2026-11-06)", () => {
     expect(talk).not.toHaveBeenCalled();
     expect(voiceTalk).not.toHaveBeenCalled();
     expect(viewSwitch().getAttribute("data-q-view")).toBe("chat");
+  });
+});
+
+type Block = Extract<QTurn, { kind: "Q" }>["blocks"][number];
+
+function qAnswer(
+  id: string,
+  text: string,
+  blocks: readonly unknown[] = [],
+): QTurn {
+  return {
+    kind: "Q",
+    id,
+    text,
+    streaming: false,
+    sourceCount: 0,
+    publicSources: [],
+    findings: [],
+    uncertainties: [],
+    blocks: blocks as Block[],
+  };
+}
+
+// The real card fixtures the dev harness uses: five discovery cards.
+const DISCOVERY = { ...demoTop(5), kind: "ANSWER_CARDS" as const };
+const NAMES = DISCOVERY.cards.map((card) => card.name);
+
+/** A live-shaped conversation: 12 turns, ending in discovery cards. */
+function longConversation(): readonly QTurn[] {
+  const turns: QTurn[] = [];
+  for (let n = 1; n <= 5; n += 1) {
+    turns.push({
+      kind: "PERSON",
+      id: `p-${String(n)}`,
+      text: `Earlier question ${String(n)}`,
+      unconfirmed: false,
+    });
+    turns.push(qAnswer(`q-${String(n)}`, `Earlier answer ${String(n)}`));
+  }
+  turns.push({
+    kind: "PERSON",
+    id: "p-6",
+    text: "Find me founders raising in fintech",
+    unconfirmed: false,
+  });
+  turns.push(
+    qAnswer("q-6", "I found **five** founders raising now.", [DISCOVERY]),
+  );
+  return turns;
+}
+
+describe("the Q view in a conversation is the voice room (owner 2026-11-06, live)", () => {
+  it("pins Q's presence and shows only the current exchange, cards one line each", async () => {
+    state.turns = longConversation();
+    localStorage.setItem("cq.q.view", "presence");
+    render(
+      <QConversationPanel
+        connected
+        context={CONTEXT}
+        conversationId="00000000-0000-4000-8000-000000000001"
+      />,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    const room = document.querySelector("[data-q-voice-room]");
+    expect(room).not.toBeNull();
+    // The presence: pinned (sticky, first in the room), decorative.
+    const pinned = room?.querySelector(".cq-voice-room-presence");
+    expect(pinned?.querySelector("[data-q-aperture]")).not.toBeNull();
+    expect(pinned?.getAttribute("aria-hidden")).toBe("true");
+    expect(room?.firstElementChild).toBe(pinned);
+    // No transcript: no thread, no earlier turns, no full cards.
+    expect(document.querySelector("[data-q-thread]")).toBeNull();
+    const body =
+      document.querySelector("[data-q-voice-stage-body]")?.textContent ?? "";
+    expect(body).not.toContain("Earlier question 1");
+    expect(body).not.toContain("Earlier answer 5");
+    for (const reason of DISCOVERY.cards[0]?.reasons ?? []) {
+      expect(body).not.toContain(reason);
+    }
+    // Their last line and Q's reply as a caption, as plain words.
+    expect(
+      document.querySelector("[data-q-exchange-person]")?.textContent,
+    ).toContain("Find me founders raising in fintech");
+    expect(
+      document.querySelector("[data-q-exchange-caption]")?.textContent,
+    ).toContain("I found five founders raising now.");
+    // Cards: one line each, at most four, the rest one way to Chat.
+    const lines = document.querySelectorAll("[data-q-card-line]");
+    expect(lines).toHaveLength(4);
+    const first = DISCOVERY.cards[0];
+    expect(lines[0]?.textContent).toBe(
+      first?.line === null || first?.line === undefined
+        ? first?.name
+        : `${first.name} · ${first.line}`,
+    );
+    screen.getByRole("button", { name: "See all in Chat" });
+    screen.getByRole("button", { name: "Earlier in this conversation" });
+  });
+
+  it("a card line opens Chat, where the whole transcript and the cards are", async () => {
+    state.turns = longConversation();
+    localStorage.setItem("cq.q.view", "presence");
+    render(<QConversationPanel connected context={CONTEXT} />);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    const first =
+      document.querySelector<HTMLButtonElement>("[data-q-card-line]");
+    if (first !== null) fireEvent.click(first);
+    expect(viewSwitch().getAttribute("data-q-view")).toBe("chat");
+    const thread = document.querySelector("[data-q-thread]")?.textContent ?? "";
+    expect(thread).toContain("Earlier question 1");
+    // The cards are Chat's again, in full (their canvas loads on demand).
+    expect(
+      (await screen.findAllByText(NAMES.at(-1) ?? "-", {}, { timeout: 4000 }))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(document.querySelector("[data-q-voice-room]")).toBeNull();
   });
 });

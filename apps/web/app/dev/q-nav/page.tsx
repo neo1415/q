@@ -1,12 +1,14 @@
 import { QConversationPanel } from "@/features/q/q-conversation";
 
 import { HarnessAppShell } from "./harness-app-shell";
+import { LongConversation } from "./long-conversation";
 
 /**
  * The Q page, bare: the real panel, as a bare /home renders it.
  * `?connected=1` dresses it as a signed-in investor's home (suggested
  * questions, the verification starter, the greeting) for screenshots;
- * nothing here reaches Q or a provider.
+ * nothing here reaches Q or a provider. `?c=demo` holds a live-shaped
+ * conversation (twelve turns ending in discovery cards) in the session.
  */
 export default async function QNavQPage({
   searchParams,
@@ -51,10 +53,12 @@ export default async function QNavQPage({
       )}
     </section>
   );
+  const held =
+    params["c"] === "demo" ? <LongConversation>{page}</LongConversation> : page;
   // `?shell=1` puts the signed-in shell's header and context around it.
   return params["shell"] === "1" ? (
-    <HarnessAppShell>{page}</HarnessAppShell>
+    <HarnessAppShell>{held}</HarnessAppShell>
   ) : (
-    page
+    held
   );
 }

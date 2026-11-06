@@ -214,6 +214,29 @@ export function useQSession(): QSessionValue {
   return value;
 }
 
+/**
+ * Dev harness only (`/dev/q-nav?c=demo`): the session as it is, with its
+ * turns replaced by a fixture, so a screenshot can show a live-shaped
+ * conversation (a long transcript with discovery cards) without a server.
+ * Never mounted by the app; reads and writes still go through the real
+ * session, which in the harness reaches nothing.
+ */
+export function QSessionTurnsOverride({
+  turns,
+  children,
+}: {
+  readonly turns: readonly QTurn[];
+  readonly children: ReactNode;
+}) {
+  const real = useQSession();
+  const value = useMemo(() => ({ ...real, turns }), [real, turns]);
+  return (
+    <QSessionContext.Provider value={value}>
+      {children}
+    </QSessionContext.Provider>
+  );
+}
+
 /** How long the settle after an answer, and the sweep of an action, show. */
 const SUCCESS_MS = 900;
 const ACTION_MS = 700;
