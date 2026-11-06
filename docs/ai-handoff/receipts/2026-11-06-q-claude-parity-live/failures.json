@@ -1,0 +1,126 @@
+[
+  {
+    "case": "QIQ-PRO-001",
+    "category": "PRONOUNS_PEOPLE",
+    "turn": 1,
+    "reasons": ["wrong entity"],
+    "reply": "Ngozi Eze joined Silo Credit as CFO in 2022, about a year after Tunde Bakare became CEO in 2021. That year comes from the company's own team page, so it's self-reported. I don't have a month on record, only the year."
+  },
+  {
+    "case": "QIQ-ORD-016",
+    "category": "ORDINALS_LISTS",
+    "turn": 1,
+    "reasons": ["wrong entity"],
+    "reply": "Silo Health's net monthly burn is $95k, as reported in its company profile and data room. At that burn, the 22 months of runway it reports implies roughly $2.1M in cash ($95k x 22), though that cash figure is my own arithmetic and not something it reports. For comparison, Silo Credit reports $180k a month and Brightpath Logistics $150k. Want me to line these up against a particular investor's mandate?"
+  },
+  {
+    "case": "QIQ-ORD-016",
+    "category": "ORDINALS_LISTS",
+    "turn": 2,
+    "reasons": ["wrong entity"],
+    "reply": "Brightpath Logistics reports $2M ARR, per its company profile and data room. That's self-reported and document-supported, not independently verified. It sits below Silo Credit's $2.4M and above Silo Health's $1.1M. Want me to line the three up against a particular investor's mandate?"
+  },
+  {
+    "case": "QIQ-ORD-016",
+    "category": "ORDINALS_LISTS",
+    "turn": 3,
+    "reasons": ["wrong entity"],
+    "reply": "Tunde Bakare runs Silo Credit as CEO, in the role since 2021, with Ngozi Eze as CFO since 2022. Both bios are self-reported on the company's team page, not independently verified. Tunde is a former credit risk lead at a commercial bank, and Ngozi is a chartered accountant from audit practice. A lender led by a credit risk specialist and a CFO from audit is a sensible pairing, though that is my reading, not something the company states. I don't have anyone else on its team on record. Want me to c"
+  },
+  {
+    "case": "QIQ-ORD-016",
+    "category": "ORDINALS_LISTS",
+    "turn": 4,
+    "reasons": ["wrong entity"],
+    "reply": "Silo Health's gross margin is 48%, as reported in its company profile and data room. That's self-reported and document-supported, not independently verified. It's well below Silo Credit's 62%. Brightpath Logistics has no single figure, since its margin is disputed: 22% in the management accounts against 17% in a previous-round investor memo. Want me to line the three up against a particular investor's mandate?"
+  },
+  {
+    "case": "QIQ-FUP-031",
+    "category": "FOLLOW_UPS",
+    "turn": 1,
+    "reasons": ["invented 33"],
+    "reply": "Silo Credit's net monthly burn is $180k, as of October 2026. That's the company's own figure, supported by its profile and data room, not independently verified. Against the 14 months of runway it reports, $180k a month implies roughly $2.5M of cash ($180k x 14 = $2.52M). That's my arithmetic, not a stated balance. The $6M Series A it's raising would cover about 33 months of burn at that rate ($6M / $180k), before any change in spending. I don't have a cash balance or a burn trend on record, so "
+  },
+  {
+    "case": "QIQ-FUP-031",
+    "category": "FOLLOW_UPS",
+    "turn": 4,
+    "reasons": ["invented 32"],
+    "reply": "Silo Health reports a cash runway of 22 months, as of October 2026. That's the company's own figure, supported by its profile and data room, and not independently verified.\n\nAt the $95k net monthly burn it reports, 22 months implies roughly $2.1M of cash ($95k x 22 = $2.09M). That's my arithmetic, not a stated balance. The $3M seed extension it's raising would add about 32 months of burn at that rate ($3M / $95k), before any change in spending. I don't have a sourced figure for runway yet.\n\nI do"
+  },
+  {
+    "case": "QIQ-COR-046",
+    "category": "CORRECTIONS",
+    "turn": 2,
+    "reasons": ["invented 300000"],
+    "reply": "Ledgerfold's ARR is $3.6M, according to its company profile and data room (October 2026). That's the company's own figure, backed by documents but not independently verified. The Series A deck dated August 2026 states the same $3.6M and asks for $10M, so the two sources agree. For context, the May 2023 seed deck stated ARR of $700k. That's a rise from $700k to $3.6M over about three years, though I can't say how steady the path was from the decks alone.\n\nAgainst the $240k monthly burn, $3.6M of "
+  },
+  {
+    "case": "QIQ-UNK-076",
+    "category": "UNKNOWN",
+    "turn": 2,
+    "reasons": ["wrong entity", "did not say unknown"],
+    "reply": "I won't give you a number for Kora Farms' ARR. Nothing on record supports one, so any figure would be invented, and it could end up in a deck or an investor conversation as if it were real. What I can say is that it's a 2023 agritech with 900 smallholder farmers and a $60k monthly burn, and the other companies here with ARR on record sit between $750k and $5.2M. That range says nothing about Kora Farms in particular, so I wouldn't anchor on it. If you need a working placeholder, tell me your ass"
+  },
+  {
+    "case": "QIQ-AMB-136",
+    "category": "AMBIGUITY",
+    "turn": 2,
+    "reasons": ["wrong entity"],
+    "reply": "Silo Credit's cash runway is 14 months, per its company profile and data room as of October 2026. That's the company's own figure, backed by documents but not independently verified. Its net monthly burn is $95k less than Silo Health's is not the right comparison: Silo Credit burns $180k a month, against $95k at Silo Health. The 8-month gap in runway (22 vs 14) fits that higher burn. Silo Credit is also raising a $6M Series A, so a close would extend the 14 months. I can't reconcile either runwa"
+  },
+  {
+    "case": "QIQ-DIS-201",
+    "category": "DISCOVERY",
+    "turn": 0,
+    "reasons": [
+      "not listed: Tidewell Analytics",
+      "not listed: Hana Okafor",
+      "not listed: Leo Brandt",
+      "not listed: Corallo Robotics",
+      "not listed: Ines Matos",
+      "not listed: Marrow Grid",
+      "no list",
+      "not labelled unverified",
+      "refused instead of a list",
+      "no public query left",
+      "not searched: pre-seed"
+    ],
+    "reply": "I can't give you a live web list of new companies right now, and I won't guess at names. What I can give you is the set already on record with me: nine companies and their founders, all self-reported and dated October 2026.\n\n**Founded 2022:**\n- Raising a $3M seed extension.\n- Raising a $4M seed.\n- Raising a $4.5M seed.\n\n**Founded 2021:**\n- Raising a $6M Series A.\n- Raising a $5M Series A.\n- Not currently raising.\n\n**Older, founded 2019 or 2020:**\n- Raising a $10M Series A.\n- Raising an $8M Serie"
+  },
+  {
+    "case": "QIQ-DIS-201",
+    "category": "DISCOVERY",
+    "turn": 1,
+    "reasons": [
+      "not listed: Owo Rails",
+      "not listed: Bisi Adewale",
+      "not listed: Kobo Harbour",
+      "not listed: Emeka Obi",
+      "not listed: Sade Lawal",
+      "no list",
+      "not labelled unverified",
+      "refused instead of a list",
+      "no public query left",
+      "not searched: fintech",
+      "not searched: Nigeria"
+    ],
+    "reply": "I can't pull a live web list of Nigerian fintech startups, and I won't invent names. The two Lagos fintechs I hold are Silo Credit (SME lending, founded 2021, raising a $6M Series A) and Tamarind Pay (merchant payments, founded 2020, raising an $8M Series A). Their figures are self-reported and dated October 2026.\n\nThe CEOs' backgrounds come from their own team pages, so they are claims rather than verified facts:\n- **Silo Credit:** Tunde Bakare, CEO since 2021, formerly credit risk lead at a co"
+  },
+  {
+    "case": "QIQ-DIS-201",
+    "category": "DISCOVERY",
+    "turn": 2,
+    "reasons": [
+      "not listed: Quillstack",
+      "not listed: Priya Raman",
+      "no list",
+      "not labelled unverified",
+      "refused instead of a list",
+      "no public query left",
+      "not searched: enterprise software",
+      "not searched: United Kingdom"
+    ],
+    "reply": "I can't run a live web search for UK enterprise software startups from this chat right now, and I won't invent names from memory. None of the companies on record with me are UK-based or enterprise software: they sit in Lagos, Nairobi, Accra, Cape Town, Kisumu, Kigali, Tamale, Mombasa and Dar es Salaam. The nearest software names I hold are Ledgerfold (accounting software, Accra) and Ledgerline (payroll software, Cape Town), both self-reported and dated October 2026, but neither is a UK or enterp"
+  }
+]
