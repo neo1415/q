@@ -78,11 +78,21 @@ describe("deck reads for many companies against local PostgreSQL", () => {
     const { sql } = tx;
     const documentId = randomUUID();
     const versionId = randomUUID();
-    await sql`insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, created_by_user_id, updated_at)
-      values (${documentId}, ${owner.tenantId}, ${owner.companyId}, ${owner.organisationId}, 'PITCH_DECK', 'Deck', ${owner.userId}, ${options.updatedAt}::timestamptz)`;
+    // The current-version pointer is set at insert (its foreign key is
+    // deferred), never by an UPDATE: the set_updated_at trigger would replace
+    // updated_at with now(), the same instant for every deck in this
+    // transaction, and "the newest deck" would then be decided by the random
+    // id tiebreak instead of by the timestamps this fixture means.
+    await sql`insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, created_by_user_id, current_version_id, updated_at)
+      values (${documentId}, ${owner.tenantId}, ${owner.companyId}, ${owner.organisationId}, 'PITCH_DECK', 'Deck', ${owner.userId}, ${versionId}, ${options.updatedAt}::timestamptz)`;
     await sql`insert into evidence.document_versions (id, tenant_id, document_id, version_number, storage_bucket, storage_key, original_filename, mime_type, size_bytes, sha256, malware_scan_status, uploaded_by_user_id)
       values (${versionId}, ${owner.tenantId}, ${documentId}, 1, 'evidence', ${`decks/${versionId}.pdf`}, 'deck.pdf', 'application/pdf', 1000, ${"a".repeat(64)}, ${options.scan}, ${owner.userId})`;
-    await sql`update evidence.documents set current_version_id = ${versionId}, updated_at = ${options.updatedAt}::timestamptz where id = ${documentId}`;
+    const [stored] = await sql<
+      { updated_at: Date }[]
+    >`select updated_at from evidence.documents where id = ${documentId}`;
+    expect(stored?.updated_at.toISOString()).toBe(
+      new Date(options.updatedAt).toISOString(),
+    );
     for (let reading = 1; reading <= (options.readings ?? 0); reading += 1) {
       await sql`insert into evidence.deck_extractions (tenant_id, company_id, document_id, document_version_id, prompt_version, schema_version, reading_number, sections)
         values (${owner.tenantId}, ${owner.companyId}, ${documentId}, ${versionId}, 1, 1, ${reading},
