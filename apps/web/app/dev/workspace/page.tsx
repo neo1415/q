@@ -44,10 +44,7 @@ export default async function WorkspaceHarnessPage({
             context={{
               scope: "investor_private",
               label: "Harbour Ventures",
-              suggestions: [
-                "What is my mandate?",
-                "What should I look at?",
-              ],
+              suggestions: ["What is my mandate?", "What should I look at?"],
             }}
             greeting="What's on your mind today, Ada?"
           />

@@ -57,6 +57,12 @@ export function usePhoneWorkspace(): boolean {
 
 const Q_HOME = "/home";
 
+/** The phone's page sheet is opened from the Q pane by this event. */
+const OPEN_SHEET_EVENT = "cq-ws-open-sheet";
+function openPageSheet(): void {
+  window.dispatchEvent(new Event(OPEN_SHEET_EVENT));
+}
+
 /** When the person last pressed a link or went Back (their own move). */
 let lastOwnMove = 0;
 function ownMoveJustNow(): boolean {
@@ -85,6 +91,21 @@ export function WorkspaceQPane({ children }: { readonly children: ReactNode }) {
         data-ws-q-expand
       >
         <QAperture state={session?.presence.state ?? "IDLE"} size={28} />
+      </button>
+      {/* Phone only (CSS): open the page sheet, where the menu is. */}
+      <button
+        type="button"
+        className="cq-ws-toggle cq-ws-pages-open"
+        onClick={openPageSheet}
+        aria-label={t("Open pages")}
+        title={t("Open pages")}
+        data-ws-pages-open
+      >
+        <PanelRight
+          size={ICON_SIZE.regular}
+          strokeWidth={ICON_STROKE}
+          aria-hidden="true"
+        />
       </button>
       <QPaneSeparator />
       <div className="cq-ws-q-foot">
@@ -256,6 +277,10 @@ export function WorkspacePagePane({
     setSheetOpen(true);
   }, []);
   const closeSheet = useCallback(() => setSheetOpen(false), []);
+  useEffect(() => {
+    window.addEventListener(OPEN_SHEET_EVENT, openSheet);
+    return () => window.removeEventListener(OPEN_SHEET_EVENT, openSheet);
+  }, [openSheet]);
 
   useEffect(() => {
     if (!phone || !sheetOpen) return;

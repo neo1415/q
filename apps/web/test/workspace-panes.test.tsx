@@ -164,3 +164,20 @@ describe("on a phone", () => {
     expect(screen.getByRole("heading").textContent).toBe("Capital");
   });
 });
+
+describe("the phone's way to the pages", () => {
+  it("opens the sheet from the Q pane before Q has moved anywhere", () => {
+    phone = true;
+    installMatchMedia();
+    pathname = "/home";
+    render(<Shell page={null} />);
+    const pane = document.querySelector("[data-ws-page]");
+    expect(pane?.getAttribute("data-ws-sheet")).toBe("closed");
+    const open = document.querySelector<HTMLButtonElement>(
+      "[data-ws-pages-open]",
+    );
+    expect(open?.getAttribute("aria-label")).toBe("Open pages");
+    if (open) fireEvent.click(open);
+    expect(pane?.getAttribute("data-ws-sheet")).toBe("open");
+  });
+});

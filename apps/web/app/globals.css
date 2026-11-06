@@ -5860,7 +5860,8 @@
     flex-direction: column;
   }
   .cq-ws-q-edge,
-  .cq-ws-page-expand,
+  .cq-ws-toggle.cq-ws-page-expand,
+  .cq-ws-toggle.cq-ws-pages-open,
   .cq-ws-sheet-bar,
   .cq-ws-peek {
     display: none;
@@ -5985,7 +5986,7 @@
   :root[data-cq-ws-page="collapsed"] .cq-ws-q-collapse {
     display: none;
   }
-  :root[data-cq-ws-page="collapsed"] .cq-ws-page-expand {
+  :root[data-cq-ws-page="collapsed"] .cq-ws-toggle.cq-ws-page-expand {
     display: inline-flex;
   }
 
@@ -6013,6 +6014,14 @@
     .cq-ws-page-foot,
     :root[data-cq-ws-q="collapsed"] .cq-ws-q-edge {
       display: none;
+    }
+    /* The way to the pages (and the menu) before Q has moved anywhere. */
+    .cq-ws-toggle.cq-ws-pages-open {
+      position: absolute;
+      top: calc(var(--cq-safe-top) + 6px);
+      inset-inline-start: 6px;
+      z-index: var(--cq-z-sticky);
+      display: inline-flex;
     }
     .cq-ws-page,
     :root[data-cq-ws-page="collapsed"] .cq-ws-page {

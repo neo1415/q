@@ -3115,6 +3115,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Open my gateway",
   "Open one to track what you raise in it.",
   "Open only",
+  "Open pages",
   "Open profile",
   "Open questions",
   "Open record",
