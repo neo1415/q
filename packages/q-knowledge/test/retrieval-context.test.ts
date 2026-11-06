@@ -552,3 +552,51 @@ describe("the local reranker", () => {
     expect(order[0]).toBe(id(1));
   });
 });
+
+describe("the reader's parts of a compound ask (TURN_READER v78)", () => {
+  it("are the sub-queries, each under the subject it names", () => {
+    const plan = planRetrievalQueries({
+      words: "How many borrowers does it have, and what's its loan book?",
+      parts: [
+        "How many borrowers does Ledgerfold have?",
+        "What is Ledgerfold's loan book?",
+      ],
+      focus: { ledger, boundRefs: ["E2"] },
+    });
+    expect(plan.queries.slice(0, 2)).toEqual([
+      {
+        text: "How many borrowers does Ledgerfold have?",
+        subjectIds: [LEDGERFOLD],
+      },
+      { text: "What is Ledgerfold's loan book?", subjectIds: [LEDGERFOLD] },
+    ]);
+  });
+
+  it("search a part under only the company it names when two are bound", () => {
+    const plan = planRetrievalQueries({
+      words: "Silo Credit's burn and Ledgerfold's runway?",
+      parts: ["What is Silo Credit's burn?", "What is Ledgerfold's runway?"],
+      focus: { ledger, boundRefs: ["E1", "E2"] },
+    });
+    expect(plan.queries).toEqual([
+      { text: "What is Silo Credit's burn?", subjectIds: [SILO_CREDIT] },
+      { text: "What is Ledgerfold's runway?", subjectIds: [LEDGERFOLD] },
+    ]);
+  });
+
+  it("are the searches with no ledger at all; one part falls back to the words", () => {
+    expect(
+      planRetrievalQueries({
+        words: "ARR and burn for Silo Credit?",
+        parts: ["What is Silo Credit's ARR?", "What is Silo Credit's burn?"],
+      }).queries,
+    ).toEqual([
+      { text: "What is Silo Credit's ARR?" },
+      { text: "What is Silo Credit's burn?" },
+    ]);
+    expect(
+      planRetrievalQueries({ words: "ARR?", parts: ["What is the ARR?"] })
+        .queries,
+    ).toEqual([{ text: "ARR?" }]);
+  });
+});
