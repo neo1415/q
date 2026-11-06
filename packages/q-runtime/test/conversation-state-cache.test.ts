@@ -14,9 +14,7 @@ import {
  * bounded.
  */
 
-const state = (
-  over: Partial<QConversationState> = {},
-): QConversationState => ({
+const state = (over: Partial<QConversationState> = {}): QConversationState => ({
   conversationId: "c1",
   tenantId: "t1",
   userId: "u1",
