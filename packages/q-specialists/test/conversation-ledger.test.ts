@@ -14,6 +14,7 @@ import {
   renderConversationState,
   withFetchedRecords,
   withMentions,
+  withNamedReferences,
   withThreads,
 } from "../src/conversation-ledger.js";
 
@@ -259,6 +260,164 @@ describe("the conversation ledger", () => {
       },
     );
     expect(state.ledger.entities.some((e) => e.kind === "PERSON")).toBe(false);
+  });
+
+  it("live QIQ-PRO-001: puts company.get's company and its team in play -- names and roles, no id made up", () => {
+    const q = message(
+      "Q",
+      "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze.",
+    );
+    const history = [message("USER", "Who are Silo Credit's CEO and CFO?"), q];
+    const { state } = foldConversationState({
+      previous: null,
+      identity,
+      history,
+    });
+    // Before: company.get names its company in canonicalName and its team
+    // members carry no person id, so the ledger held none of the three.
+    expect(state.ledger.entities).toEqual([]);
+    const fetched: QConversationFetch[] = [
+      {
+        runId: q.runId,
+        toolName: "company_get",
+        arguments: { companyId: SILO },
+        result: {
+          companyId: SILO,
+          canonicalName: "Silo Credit",
+          legalName: null,
+          team: [
+            {
+              name: "Tunde Bakare",
+              relationshipType: "team_member",
+              businessTitle: "CEO",
+              isFounder: true,
+              shortBio: "A former credit risk lead at a commercial bank.",
+            },
+            {
+              name: "Ngozi Eze",
+              relationshipType: "team_member",
+              businessTitle: "CFO",
+              isFounder: false,
+              shortBio: null,
+            },
+          ],
+          truthClass: "USER_CLAIM",
+        },
+        sensitivity: "INTERNAL",
+        fetchedAt: new Date().toISOString(),
+      } as unknown as QConversationFetch,
+    ];
+    const view = withFetchedRecords(state, history, fetched);
+    const company = view.ledger.entities.find((e) => e.kind === "COMPANY");
+    expect(company).toMatchObject({ id: SILO, name: "Silo Credit" });
+    const people = view.ledger.entities.filter((e) => e.kind === "PERSON");
+    expect(people).toEqual([
+      expect.objectContaining({
+        name: "Tunde Bakare",
+        id: null,
+        of: company?.ref,
+        value: "CEO",
+        via: ["FETCHED"],
+      }),
+      expect.objectContaining({
+        name: "Ngozi Eze",
+        id: null,
+        of: company?.ref,
+        value: "CFO",
+      }),
+    ]);
+    const rendered = renderConversationState({ state: view });
+    expect(rendered).toContain(
+      `person "Ngozi Eze" of ${company?.ref ?? ""} = "CFO" (read by Q`,
+    );
+    // Per turn only: never into the stored state.
+    expect(state.ledger.entities).toEqual([]);
+  });
+
+  it("v79: a reference read to a name joins the turn's ledger only when that name is in the conversation's words", () => {
+    const q = message(
+      "Q",
+      "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze.",
+    );
+    const history = [
+      message("USER", "Who are Silo Credit's CEO and CFO?"),
+      q,
+      message("USER", "When did she join?"),
+    ];
+    const { state } = foldConversationState({
+      previous: null,
+      identity,
+      history,
+    });
+    const said = history.map((m) => ({ text: m.content, byQ: m.role === "Q" }));
+    const out = withNamedReferences(
+      state,
+      [
+        {
+          phrase: "she",
+          entityIds: [],
+          confidence: "HIGH" as const,
+          named: { name: "Ngozi Eze", kind: "PERSON" as const },
+        },
+        {
+          // Never said in this conversation: an invention, dropped.
+          phrase: "her",
+          entityIds: [],
+          confidence: "HIGH" as const,
+          named: { name: "Amara Osei", kind: "PERSON" as const },
+        },
+      ],
+      said,
+    );
+    const ngozi = out.state.ledger.entities.find((e) => e.name === "Ngozi Eze");
+    expect(ngozi).toMatchObject({
+      kind: "PERSON",
+      id: null,
+      via: ["SAID_BY_Q"],
+    });
+    expect(out.references[0]?.entityIds).toEqual([ngozi?.ref]);
+    expect(out.references[1]?.entityIds).toEqual([]);
+    expect(out.state.ledger.entities.some((e) => e.name === "Amara Osei")).toBe(
+      false,
+    );
+  });
+
+  it("v79: a name the ledger already holds takes that entry and its record id; refs given win over a name", () => {
+    const history = [
+      message("USER", "Show me SME lenders."),
+      message("Q", "Silo Credit stands out.", [cards(["Silo Credit", SILO])]),
+      message("USER", "How much are they raising?"),
+    ];
+    const { state } = foldConversationState({
+      previous: null,
+      identity,
+      history,
+    });
+    const said = history.map((m) => ({ text: m.content, byQ: m.role === "Q" }));
+    const silo = state.ledger.entities.find((e) => e.id === SILO);
+    const out = withNamedReferences(
+      state,
+      [
+        {
+          phrase: "they",
+          entityIds: [],
+          confidence: "HIGH" as const,
+          named: { name: "silo credit", kind: "COMPANY" as const },
+        },
+        {
+          phrase: "it",
+          entityIds: ["E1"],
+          confidence: "HIGH" as const,
+          named: { name: "Ledgerfold", kind: "COMPANY" as const },
+        },
+      ],
+      said,
+    );
+    expect(out.references[0]?.entityIds).toEqual([silo?.ref]);
+    expect(out.references[1]?.entityIds).toEqual(["E1"]);
+    expect(out.state.ledger.entities).toHaveLength(
+      state.ledger.entities.length,
+    );
   });
 
   it("renders the summary of older turns fenced as a model's words, within its bound", () => {

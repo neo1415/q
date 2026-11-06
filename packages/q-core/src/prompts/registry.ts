@@ -173,6 +173,7 @@ import { TURN_READER_V75 } from "./tasks/turn-reader.v75.js";
 import { TURN_READER_V76 } from "./tasks/turn-reader.v76.js";
 import { TURN_READER_V77 } from "./tasks/turn-reader.v77.js";
 import { TURN_READER_V78 } from "./tasks/turn-reader.v78.js";
+import { TURN_READER_V79 } from "./tasks/turn-reader.v79.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -706,7 +707,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...TURN_READER_V75, status: "DEPRECATED" },
     { ...TURN_READER_V76, status: "DEPRECATED" },
     { ...TURN_READER_V77, status: "DEPRECATED" },
-    TURN_READER_V78,
+    { ...TURN_READER_V78, status: "DEPRECATED" },
+    TURN_READER_V79,
     MEMORY_EXTRACTOR_V1,
     MEMORY_EXTRACTOR_V2,
     MEETING_NOTES_V1,

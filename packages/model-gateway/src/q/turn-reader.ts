@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV78ResultSchema,
+  TurnReaderV79ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -23,8 +23,7 @@ import {
   type TurnReaderV64Result,
   type TurnReaderV65Result,
   type TurnReaderV70Result,
-  type TurnReaderV77Result,
-  type TurnReaderV78Result,
+  type TurnReaderV79Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -211,20 +210,21 @@ export type QTurnReading = Omit<
   /**
    * v77 (Q intelligence step 3): what the turn's pointing words mean, as
    * LEDGER refs read by meaning; code checks each against the ledger shown
-   * to the person before anything binds. Absent before v77: none.
+   * to the person before anything binds. Absent before v77: none. v79: a
+   * reference may carry `named`, a name written in the recent turns.
    */
-  readonly references?: TurnReaderV77Result["references"] | undefined;
+  readonly references?: TurnReaderV79Result["references"] | undefined;
   /**
    * v78 (Q intelligence step 4): the heaviest work the turn asks of the
    * answer, read by meaning -- the one source of truth for the answer's
    * task class and comparison handling. Absent or null: not read; code
    * takes the neutral default, never a word list.
    */
-  readonly answerKind?: TurnReaderV78Result["answerKind"] | undefined;
+  readonly answerKind?: TurnReaderV79Result["answerKind"] | undefined;
   /** v78: each separate thing a compound ask wants, in order; absent is one ask. */
-  readonly parts?: TurnReaderV78Result["parts"] | undefined;
+  readonly parts?: TurnReaderV79Result["parts"] | undefined;
   /** v78: a fact they ask Q to keep in mind, said back in the second person. */
-  readonly remember?: TurnReaderV78Result["remember"] | undefined;
+  readonly remember?: TurnReaderV79Result["remember"] | undefined;
   /** v78: they ask for a chart, graph or plot. */
   readonly asksForChart?: boolean | undefined;
   /** v78: they ask for the public web, news or press. */
@@ -574,8 +574,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV78Result>> =>
-          gateway.execute<TurnReaderV78Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV79Result>> =>
+          gateway.execute<TurnReaderV79Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -591,7 +591,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV78ResultSchema,
+              schema: TurnReaderV79ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -634,7 +634,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV78ResultSchema.safeParse(
+        const parsed = TurnReaderV79ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         // A comparison is never answered from an earlier turn (lane 4).
