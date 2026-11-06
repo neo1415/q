@@ -100,7 +100,7 @@ const MEANINGS: readonly (readonly string[])[] = [
   ["team", "founder", "founders", "cv", "resume", "bios"],
 ];
 
-function words(text: string): string[] {
+export function words(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/['’]s\b/gu, "")

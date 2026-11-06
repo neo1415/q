@@ -289,6 +289,26 @@ export function ProfileTabQSection({
   );
 }
 
+/**
+ * Q Workspace W2: the open tab as a section Q can name (the site map's
+ * `id@tab`), registered only while that tab is the one on screen, so the
+ * manifest never lists a tab the person cannot see.
+ */
+export function ProfileOpenTabQSection({
+  id,
+  kind,
+  on,
+  label,
+}: {
+  readonly id: string;
+  readonly kind: QManifestSectionKind;
+  readonly on: ProfileTab;
+  readonly label: string;
+}) {
+  const tab = useProfileTab();
+  return tab === on ? <QSection id={id} kind={kind} label={label} /> : null;
+}
+
 /** The panel's own placeholder while its read streams in. */
 export function ProfilePanelSkeleton() {
   return (

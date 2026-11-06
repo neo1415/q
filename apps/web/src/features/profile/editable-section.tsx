@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import { Pencil, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { LockedEdit, useGate } from "@/features/organisation/capabilities";
+import { QSection } from "@/features/q/q-section";
 
 import { EditableProfile, type EditableProfileProps } from "./editable-profile";
 
@@ -101,8 +102,23 @@ export function EditableSection({
   );
 }
 
-/** The section frame: a heading row with one action, then content. */
-export function ProfileSectionShell({
+/**
+ * The section frame: a heading row with one action, then content. Q
+ * Workspace W2: each frame is also a section Q can name by its id (the
+ * page manifest and the site map), so "open the mandate section" has an
+ * exact place.
+ */
+export function ProfileSectionShell(
+  props: ComponentProps<typeof ProfileSectionFrame>,
+) {
+  return (
+    <QSection id={props.id} kind="OTHER" label={props.title}>
+      <ProfileSectionFrame {...props} />
+    </QSection>
+  );
+}
+
+function ProfileSectionFrame({
   id,
   title,
   description,
