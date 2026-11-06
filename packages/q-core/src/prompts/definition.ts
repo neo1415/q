@@ -151,6 +151,8 @@ export const PROMPT_IDS = [
   "PLAN_REVIEW",
   /** Design 2026-10-28 (S3): a plan the person uploaded, read into the plan shape. */
   "PLAN_READ",
+  /** Owner 2026-11-06: public pages read into the companies and founders they name, quoted. */
+  "WEB_DISCOVERY_READER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -239,6 +241,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PLAN_WRITE: "plan-write",
   PLAN_REVIEW: "plan-review",
   PLAN_READ: "plan-read",
+  WEB_DISCOVERY_READER: "web-discovery-reader",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

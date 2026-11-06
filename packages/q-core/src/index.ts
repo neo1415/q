@@ -1773,6 +1773,20 @@ export { TURN_SKIM_V2 } from "./prompts/tasks/turn-skim.v2.js";
 export { TURN_SKIM_V3 } from "./prompts/tasks/turn-skim.v3.js";
 export { TURN_SKIM_V4 } from "./prompts/tasks/turn-skim.v4.js";
 export { PERSON_BRIEF_READER_V1 } from "./prompts/tasks/person-brief-reader.v1.js";
+export { WEB_DISCOVERY_READER_V1 } from "./prompts/tasks/web-discovery-reader.v1.js";
+export {
+  WEB_DISCOVERY_READER_COMPANIES_MAX,
+  WEB_DISCOVERY_READER_PAGES_MAX,
+  WEB_DISCOVERY_READER_SCHEMA_NAME,
+  WEB_DISCOVERY_READER_SCHEMA_VERSION,
+  WEB_DISCOVERY_READER_UNTRUSTED,
+  WebDiscoveryCompanySchema,
+  WebDiscoveryReaderResultSchema,
+  WebDiscoveryReaderVariablesSchema,
+  type WebDiscoveryCompany,
+  type WebDiscoveryReaderResult,
+  type WebDiscoveryReaderVariables,
+} from "./prompts/schemas/web-discovery-reader.js";
 export {
   PERSON_BRIEF_READER_SCHEMA_NAME,
   PERSON_BRIEF_READER_SCHEMA_VERSION,
