@@ -25,7 +25,11 @@ import type { WebDiscoveryReader } from "../src/q/web-discovery-reader.js";
 const { runWebDiscovery } = discovery;
 const NOW = Date.parse("2026-11-06T14:40:00Z");
 
-type Page = { readonly url: string; readonly title: string; readonly text: string };
+type Page = {
+  readonly url: string;
+  readonly title: string;
+  readonly text: string;
+};
 
 const DIRECTORY: Page = {
   url: "https://african-startups.example/fintech-2026",
@@ -189,16 +193,21 @@ describe("round 4 · 2-3: 'more' is new companies only, founders kept", () => {
     expect(queries.some((query) => !first.queries.includes(query))).toBe(true);
     // Founders on at least half of what is new.
     const withFounders = answer.companies.filter((c) => c.founders.length > 0);
-    expect(withFounders.length / answer.companies.length).toBeGreaterThanOrEqual(
-      0.5,
-    );
+    expect(
+      withFounders.length / answer.companies.length,
+    ).toBeGreaterThanOrEqual(0.5);
   });
 
   it("says honestly when nothing new was found", async () => {
     const { answer } = await discover(
-      ["Aella", "Owo Rails", "Kobo Harbour", "M-Kopa", "Numida", "Pesaflow"].map(
-        (name) => ({ name, founders: [] }),
-      ),
+      [
+        "Aella",
+        "Owo Rails",
+        "Kobo Harbour",
+        "M-Kopa",
+        "Numida",
+        "Pesaflow",
+      ].map((name) => ({ name, founders: [] })),
     );
     expect(answer.companies).toEqual([]);
     expect(answer.text).toMatch(/only named companies I've already listed/u);
@@ -222,7 +231,9 @@ describe("round 4 · 4: new means new; stage from the page", () => {
     const { answer } = await discover();
     expect(names(answer)).not.toContain("M-Kopa");
     expect(names(answer)).not.toContain("Aella");
-    expect(answer.text).toMatch(/left out 2 that the sources say were founded more than 8 years ago/u);
+    expect(answer.text).toMatch(
+      /left out 2 that the sources say were founded more than 8 years ago/u,
+    );
   });
 
   it("fills the stage a sentence naming the company states", async () => {
