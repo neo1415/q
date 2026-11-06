@@ -22,10 +22,11 @@ import { createDeepgramVoiceProvider } from "../src/voice/providers/deepgram.js"
 import { registerQVoiceRoutes } from "../src/voice/routes.js";
 
 /**
- * DECISIONS 68 (owner, 6 Nov 2026): when the OpenAI account is out, voice
- * falls back to ElevenLabs -- speech in and out by the ElevenLabs Speech
- * Engine, every answer from Q's own turn path (the Model Gateway, on
- * Claude) -- and no OpenAI line (GPT-Live, duplex) is offered. When the
+ * DECISIONS 68 (owner, 6 Nov 2026; lead's decision B): when the OpenAI
+ * account is out, the line is Deepgram listening, Q's own turn path (the
+ * Model Gateway, on Claude) answering and q-api's ElevenLabs relay
+ * speaking (voice-openai-out-speech.test.ts); without Deepgram, the
+ * ElevenLabs Speech Engine. No OpenAI line (GPT-Live, duplex) is offered. When the
  * gateway's probe succeeds again, new lines take the normal path. No live
  * provider call: every transport here is a fake.
  */
@@ -141,6 +142,8 @@ function duplexBroker(open: DuplexBroker["open"]): DuplexBroker {
 async function app(input: {
   readonly out: () => boolean;
   readonly trial?: boolean;
+  /** Without the Deepgram transport: the Speech Engine carries the line. */
+  readonly noDeepgram?: boolean;
 }) {
   // The mocks are held on their own, so the assertions read plain mocks.
   const createSession = vi.fn<RealtimeVoiceProvider["createSession"]>(() =>
@@ -182,17 +185,21 @@ async function app(input: {
     },
     bindings: createVoiceSessionBindings(),
     provider: engine,
-    deepgram: createDeepgramVoiceProvider({
-      apiKey: "disabled-locally-000000000000",
-      publicUrl: "https://q-api.invalid",
-      thinkPath: "/v1/q/voice/think",
-      fetch: () =>
-        Promise.resolve(
-          new Response(JSON.stringify({ access_token: "dg_fake" }), {
-            status: 200,
+    ...(input.noDeepgram === true
+      ? {}
+      : {
+          deepgram: createDeepgramVoiceProvider({
+            apiKey: "disabled-locally-000000000000",
+            publicUrl: "https://q-api.invalid",
+            thinkPath: "/v1/q/voice/think",
+            fetch: () =>
+              Promise.resolve(
+                new Response(JSON.stringify({ access_token: "dg_fake" }), {
+                  status: 200,
+                }),
+              ),
           }),
-        ),
-    }),
+        }),
     duplex,
     live: {
       broker: liveBroker,
@@ -219,17 +226,29 @@ async function app(input: {
 }
 
 describe("a voice line while OpenAI's account is out", () => {
-  it("is ElevenLabs' (speech in and out), with no duplex line offered", async () => {
+  it("is Deepgram's (Q's brain, the ElevenLabs relay), with no duplex line minted", async () => {
     const { server, createSession, open, issue } = await app({
       out: () => true,
     });
     const response = await issue();
     expect(response.statusCode).toBe(201);
     const body = response.json<Record<string, unknown>>();
-    expect(body["provider"]).toBe("elevenlabs");
-    expect(body["deepgram"]).toBeUndefined();
+    expect(body["provider"]).toBe("deepgram");
     expect(body["duplex"]).toBeUndefined();
     expect(body["liveOnly"]).toBeUndefined();
+    expect(open).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it("falls through to the ElevenLabs Speech Engine where Deepgram is not composed", async () => {
+    const { server, createSession, open, issue } = await app({
+      out: () => true,
+      noDeepgram: true,
+    });
+    const body = (await issue()).json<Record<string, unknown>>();
+    expect(body["provider"]).toBe("elevenlabs");
+    expect(body["duplex"]).toBeUndefined();
     expect(createSession).toHaveBeenCalledTimes(1);
     expect(open).not.toHaveBeenCalled();
     await server.close();
@@ -239,7 +258,7 @@ describe("a voice line while OpenAI's account is out", () => {
     const { server, issue } = await app({ out: () => true, trial: true });
     const body = (await issue()).json<Record<string, unknown>>();
     expect(body["liveOnly"]).toBeUndefined();
-    expect(body["provider"]).toBe("elevenlabs");
+    expect(body["provider"]).toBe("deepgram");
     await server.close();
   });
 
@@ -262,15 +281,15 @@ describe("a voice line when OpenAI is back (the gateway's probe succeeded)", () 
     const { server, createSession, open, issue } = await app({
       out: () => out,
     });
-    expect((await issue()).json<Record<string, unknown>>()["provider"]).toBe(
-      "elevenlabs",
-    );
+    const during = (await issue()).json<Record<string, unknown>>();
+    expect(during["provider"]).toBe("deepgram");
+    expect(during["duplex"]).toBeUndefined();
     out = false;
     const body = (await issue()).json<Record<string, unknown>>();
     expect(body["provider"]).toBe("deepgram");
     expect(body["duplex"]).toBeDefined();
     expect(open).toHaveBeenCalledTimes(1);
-    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(createSession).not.toHaveBeenCalled();
     await server.close();
   });
 });

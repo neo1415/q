@@ -7052,6 +7052,14 @@ const elevenLabsSpeech =
         relay: createElevenLabsSpeechRelay({
           apiKey: speechSecrets.elevenLabs.reveal(),
           model: config.voice.ttsModel,
+          // DECISIONS 68: while OpenAI's account is out, Q's voice line
+          // (Deepgram listening, Q thinking, this relay speaking in Q's own
+          // Sarah or Daniel) speaks eleven_v4_turbo, unless a deployment
+          // pinned a model with Q_VOICE_TTS_MODEL.
+          modelNow: () =>
+            !config.voice.ttsModelPinned && providerAccounts.exhausted("openai")
+              ? "eleven_v4_turbo"
+              : undefined,
           // REHEARSE: the people Q plays, never Q: v4 turbo first, v3 only
           // for a laugh, a sigh, crying or a raised voice.
           persona: {
