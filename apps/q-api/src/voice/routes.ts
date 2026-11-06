@@ -132,6 +132,14 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
    */
   readonly languageOf?:
     ((actor: ActorContext) => Promise<QLanguagePreference>) | undefined;
+  /**
+   * DECISIONS 68: whether the OpenAI account is out right now (the Model
+   * Gateway's own account block, watched: provider-accounts.ts). While it
+   * is, a new line is the ElevenLabs Speech Engine -- speech in and out by
+   * ElevenLabs, every answer from Q's own turn path -- and no OpenAI line
+   * (GPT-Live, the duplex line) is offered. Absent: never out.
+   */
+  readonly openAiExhausted?: (() => boolean) | undefined;
   /** The ElevenLabs transport, when composed. */
   readonly provider?: RealtimeVoiceProvider | undefined;
   /** The Deepgram transport, when composed; preferred when both exist. */
@@ -723,12 +731,23 @@ export function registerQVoiceRoutes(
           return reply.code(409).send(VOICE_LINE_REPLACED_PROBLEM);
         }
       }
-      const deepgram = dependencies.deepgram;
       const elevenLabs = dependencies.provider;
+      // DECISIONS 68: with OpenAI's account out, the line is ElevenLabs'
+      // (speech in and out) with Q's own brain behind it; Deepgram's line
+      // stays the way when ElevenLabs is not composed (it is OpenAI-free
+      // too: its "think" is Q's turn path on this server).
+      const openAiOut = dependencies.openAiExhausted?.() === true;
+      const deepgram =
+        openAiOut && elevenLabs !== undefined
+          ? undefined
+          : dependencies.deepgram;
       // A rehearsal is never GPT-Live, trial or not: the person Q plays
       // speaks in their own ElevenLabs persona voice (owner 2026-10-23,
       // "fully ElevenLabs"); GPT-Live would answer in Q's own voice.
+      // DECISIONS 68: nor while OpenAI's account is out -- GPT-Live is
+      // OpenAI, and a LIVE-only line would leave the person no voice.
       const liveOnly =
+        !openAiOut &&
         input.rehearsal === undefined &&
         dependencies.live?.broker.isTrialUser(actor.userId) === true;
       const transport = deepgram ?? elevenLabs;
@@ -1110,6 +1129,7 @@ export function registerQVoiceRoutes(
       let duplex: QVoiceDuplexCredential | undefined;
       if (
         !liveOnly &&
+        !openAiOut &&
         dependencies.duplex?.enabled === true &&
         input.duplex !== false &&
         input.rehearsal === undefined
@@ -1146,6 +1166,7 @@ export function registerQVoiceRoutes(
           thread: input.onboarding === undefined ? "conversation" : "interview",
           resume,
           duplex: duplex !== undefined,
+          ...(openAiOut ? { openAiOut: true } : {}),
         },
         "voice session issued",
       );
@@ -1180,6 +1201,8 @@ export function registerQVoiceRoutes(
   if (dependencies.live !== undefined) {
     registerLiveVoiceRoutes(app, {
       broker: dependencies.live.broker,
+      // DECISIONS 68: GPT-Live is OpenAI; not offered while its account is out.
+      unavailable: () => dependencies.openAiExhausted?.() === true,
       allowedUsers: dependencies.live.allowedUsers,
       withContext,
       binding: ownLine,
