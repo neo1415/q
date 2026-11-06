@@ -8107,7 +8107,9 @@ export function createSpecialistQAnswer(
       ...(read?.answerKind === undefined || read.answerKind === null
         ? {}
         : { answerKind: read.answerKind }),
-      ...(read?.parts === undefined || read.parts.length < 2
+      // TURN_READER v81: one part is a single elliptical ask ("same
+      // question for X") made self-standing; two or more, a compound ask.
+      ...(read?.parts === undefined || read.parts.length === 0
         ? {}
         : { askParts: read.parts }),
       ...(read?.remember === undefined || read.remember === null

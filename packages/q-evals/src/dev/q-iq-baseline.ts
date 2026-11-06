@@ -168,7 +168,10 @@ async function main(): Promise<number> {
   const interleaved = Array.from({ length: 15 }, (_, i) =>
     byCategory.flatMap((list) => list.slice(i, i + 1)),
   ).flat();
-  const cases = interleaved.slice(0, limit);
+  const only = arg("--categories")?.split(",") ?? null;
+  const cases = interleaved
+    .filter((x) => only === null || only.includes(x.category))
+    .slice(0, limit);
   const progress =
     (name: string) =>
     (run: { caseId: string; grade: { pass: boolean } }, spent: number) =>

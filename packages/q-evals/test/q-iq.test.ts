@@ -279,6 +279,78 @@ describe("Q-IQ graders", () => {
     ).toEqual(expect.arrayContaining([320_000, 3_840_000]));
   });
 
+  it("dataset fix (live run 2): a multiple is graded against its value, not its one-decimal rounding", () => {
+    // NUM-109 #3: $8M on $4.1M ARR is 1.951x; the live reply was right.
+    const num = find((x) => x.id === "QIQ-NUM-109");
+    const live =
+      "Tamarind Pay is raising $8M, against ARR of $4.1M. That’s approximately 1.95× ARR ($8M ÷ $4.1M).";
+    const graded = gradeQIqTurn(Q_IQ_WORLD, num, 3, live);
+    expect(graded.reasons).toEqual([]);
+    expect(graded.pass).toBe(true);
+    // The rounded rendering still passes, and a wrong multiple still fails.
+    expect(
+      gradeQIqTurn(
+        Q_IQ_WORLD,
+        num,
+        3,
+        "Tamarind Pay's $8M raise is about 2x its $4.1M ARR.",
+      ).pass,
+    ).toBe(true);
+    expect(
+      gradeQIqTurn(
+        Q_IQ_WORLD,
+        num,
+        3,
+        "Tamarind Pay's $8M raise is about 2.4x its $4.1M ARR.",
+      ).pass,
+    ).toBe(false);
+    // NUM-107 #3: 2.78x for $10M on $3.6M.
+    const ledgerfold = find((x) => x.id === "QIQ-NUM-107");
+    expect(
+      gradeQIqTurn(
+        Q_IQ_WORLD,
+        ledgerfold,
+        3,
+        "Ledgerfold’s $10M Series A ask is 2.78× its $3.6M ARR ($10M ÷ $3.6M).",
+      ).pass,
+    ).toBe(true);
+  });
+
+  it("dataset fix (live run 2): Brightpath's gross margin is two conflicting figures, never unknown", () => {
+    // FUP-033 #4 and FUP-038 #1: the live replies said both with sources.
+    const live =
+      "Brightpath Logistics’ gross margin is 22% according to its management accounts. An earlier investor memo reports 17%, so the two figures conflict.";
+    for (const [id, turn] of [
+      ["QIQ-FUP-033", 4],
+      ["QIQ-FUP-038", 1],
+    ] as const) {
+      const c = find((x) => x.id === id);
+      expect(c.turns[turn]?.expect.requiredFigures).toEqual([22, 17]);
+      expect(gradeQIqTurn(Q_IQ_WORLD, c, turn, live).pass).toBe(true);
+      // Saying only the favourable figure, or "unknown", fails.
+      expect(
+        gradeQIqTurn(
+          Q_IQ_WORLD,
+          c,
+          turn,
+          "Brightpath Logistics’ gross margin is 22%.",
+        ).pass,
+      ).toBe(false);
+      expect(
+        gradeQIqTurn(
+          Q_IQ_WORLD,
+          c,
+          turn,
+          "Brightpath Logistics’ gross margin isn't on record.",
+        ).pass,
+      ).toBe(false);
+    }
+    // No other company field turn changed: only Brightpath's margin is a
+    // planted contradiction over an empty field.
+    const unk = find((x) => x.id === "QIQ-UNK-086");
+    expect(unk.turns[2]?.expect.requiredFigures).toEqual([22, 17]);
+  });
+
   it("passes a clarifying question and fails a guess", () => {
     const c = find(
       (x) =>
