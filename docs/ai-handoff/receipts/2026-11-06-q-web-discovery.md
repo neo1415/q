@@ -428,3 +428,33 @@ Investors never hand over.
 | vitest `apps/q-api packages/q-evals packages/q-research packages/q-tools` | 5441 passed (3 skipped)                                                                                                                |
 | Integration on a freshly set-up local PG, `CQ_Q_IQ_ALL=1`                 | **31 files, 116/116**                                                                                                                  |
 | Q-IQ through the runtime                                                  | **Core: 573 turns, no fails.** ADVERSARIAL: score 1 in both modes. DISCOVERY: score 1. `liveGaps: []`                                  |
+
+## Round 6 (`fix/q-web-discovery-6`): yield floor, honest count, no stray tie line
+
+Live on `f580935bb`, ask 1 ("find me new companies online that i would be interested in") listed one company, valU. Round 3 had listed 8.
+
+Round 4's filters (names of lists and directories, companies over 8 years old) dropped most of what round one found, and nothing topped the list back up. A tie line, "Duplo and Bumpa are tied on mandate fit…", followed the web list with no cards in view.
+
+- **Yield floor.** When fewer than `DISCOVERY_YIELD_FLOOR = 5` companies survive admission, one more round runs, as long as the clock and the research budget allow. It uses angles not already sent (`topUpQueries`):
+  - an accelerator cohort ("{sector} startup accelerator cohort {place} {year}");
+  - a list per country ("top {sector} startups {country} {year}").
+
+  Its pages are read and admitted the same way, with the same listing, already-listed and over-8-years rules. Discovery now counts its research calls against the research service's budget of 6 per run (`DISCOVERY_RESEARCH_CALLS_MAX`). The founder round takes what is left. "cohort" and "top" may go out in a search.
+
+- **Honest count.** The answer says, for example, "found N companies (left out M that the sources say were founded more than 8 years ago, K that were lists or directories)". After a list, it adds "leaving out the M I listed earlier".
+- **No stray tie line.** A web discovery's answer never has a tie line appended. The top-3 line names Capital Q's top 3 itself and no longer says "(on the cards)", since the Chat view may show no cards.
+- **Tests, each failing first:**
+  - `q-web-discovery-round6.test.ts`: round one leaves 1 company (a directory and three over 8 years old), the top-up cohort and country lists bring the list to at least 5, and the text says what it left out;
+  - `natural-conversation-eval.test.ts`: top cards that tie get no tie line;
+  - `web-discovery-egress.test.ts`: the top-up's words go out.
+
+| Gate                                                                         | Result                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec turbo run build --filter=./packages/*`                            | 54/54 successful                                                                                                                                                                                                                                     |
+| Root tsc / `apps/q-api` tsc                                                  | exit 0 / exit 0                                                                                                                                                                                                                                      |
+| eslint on touched files / `npx prettier --check apps packages docs supabase` | exit 0 / all files pass                                                                                                                                                                                                                              |
+| vitest `packages/model-gateway q-evals q-research q-tools q-core q-runtime`  | 469 files, 5034 passed (1 skipped)                                                                                                                                                                                                                   |
+| vitest `packages/q-specialists` + `apps/workers`                             | 135 files, 1827/1827                                                                                                                                                                                                                                 |
+| vitest `apps/q-api`                                                          | 3122 passed, **1 failure already on the base**: `plan-live-1.test.ts` "names the live misreadings as cases" pins the active TURN_READER at v80, the base has v81, and it fails the same way with the base's own files. This branch touches no reader |
+| Integration on a freshly set-up local PG, `CQ_Q_IQ_ALL=1`                    | **31 files, 117/117**                                                                                                                                                                                                                                |
+| Q-IQ through the runtime                                                     | **Core: 573 turns, no fails.** ADVERSARIAL: score 1 in both modes. DISCOVERY: score 1. `liveGaps: []`                                                                                                                                                |
