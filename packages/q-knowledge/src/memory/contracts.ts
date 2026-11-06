@@ -229,6 +229,23 @@ export type MemoryBundle = {
    * Absent: not asked, or not read within its budget (unknown).
    */
   readonly connected?: ConnectedRecall | undefined;
+  /**
+   * Step 9: the person's own past turns, found by full-text search over
+   * their earlier conversations for what they are asking now, best match
+   * first. Their words verbatim (USER) and what Q said (Q); interaction
+   * history, never evidence. Absent: not searched (not admitted by the
+   * plan, no words, or the read failed); empty: searched, none found.
+   */
+  readonly pastTurns?: readonly MemoryPastTurn[] | undefined;
+};
+
+/** One past turn of the person's own, as recall carries it. */
+export type MemoryPastTurn = {
+  readonly conversationId: string;
+  readonly conversationTitle: string | null;
+  readonly role: "USER" | "Q";
+  readonly content: string;
+  readonly at: string;
 };
 
 /**

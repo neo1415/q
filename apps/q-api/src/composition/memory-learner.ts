@@ -23,6 +23,7 @@ import {
   type PromptRegistry,
 } from "@capital-q/q-core";
 import {
+  createMemoryRecall,
   renderMemoryBundle,
   type MemoryCandidate,
   type MemoryConversationDigestPort,
@@ -176,10 +177,29 @@ function candidateOf(
 }
 
 export function createConversationDigestPort(
-  repositories: Pick<QRuntimeRepositories, "conversations">,
+  repositories: Pick<QRuntimeRepositories, "conversations"> &
+    Partial<Pick<QRuntimeRepositories, "messages">>,
   sql: DatabaseExecutor,
 ): MemoryConversationDigestPort {
+  const search = repositories.messages?.searchForOwner;
   return {
+    // Step 9: the actor's own past turns. Tenant and owner come from the
+    // actor; the memory service reads this only when the run's plan
+    // admitted their own conversations.
+    ...(search === undefined
+      ? {}
+      : {
+          pastTurns: async (actor, query) =>
+            (await search(sql, actor.tenantId, actor.userId, query)).map(
+              (turn) => ({
+                conversationId: turn.conversationId,
+                conversationTitle: turn.conversationTitle,
+                role: turn.role,
+                content: turn.content,
+                at: turn.createdAt,
+              }),
+            ),
+        }),
     digestOf: async (actor, conversationId) => {
       const parsed = QConversationIdSchema.safeParse(conversationId);
       if (!parsed.success) return null;
@@ -242,20 +262,10 @@ export function createMemoryLearner(
     dependencies;
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
 
-  const recall: QMemoryRecall = {
-    recall: async (input) => {
-      const companyIds = input.subjects.flatMap((s: QSubjectRef) =>
-        s.kind === "COMPANY" ? [s.companyId] : [],
-      );
-      const bundle = await memory.recall({
-        actor: input.actor,
-        conversationId: input.conversationId,
-        companyIds,
-        utterance: input.utterance,
-      });
-      return renderMemoryBundle(bundle);
-    },
-  };
+  // Step 9: one composition of recall (q-knowledge), with the person's own
+  // past turns searched only when the run's plan admits their own
+  // conversations.
+  const recall: QMemoryRecall = createMemoryRecall(memory);
 
   async function extract(
     actor: ActorContext,
@@ -481,6 +491,8 @@ export function createMemoryLearner(
         // Its own transaction: a revision that loses a race with another
         // writer never costs the digest above.
         if (states !== undefined && gated?.kind === "PASSED") {
+          const coveredMessages =
+            (previousRevision?.coveredMessages ?? 0) + unseen.length;
           await transactions
             .run((tx) =>
               states.appendSummary(tx, {
@@ -489,12 +501,28 @@ export function createMemoryLearner(
                 conversationId: conversation.id,
                 summary: gated.summary,
                 coversThroughAt: summaryThrough,
-                coveredMessages:
-                  (previousRevision?.coveredMessages ?? 0) + unseen.length,
+                coveredMessages,
                 gateVersion: CONVERSATION_SUMMARY_GATE_VERSION,
                 runId: run.id,
               }),
             )
+            .then((revision) => {
+              // Step 11: committed, so the next turn's reader, served from
+              // this process's state cache, reads this revision too.
+              states.cache?.noteSummary(
+                {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  conversationId: conversation.id,
+                },
+                {
+                  revision,
+                  summary: gated.summary,
+                  coversThroughAt: summaryThrough,
+                  coveredMessages,
+                },
+              );
+            })
             .catch((error: unknown) => {
               logger.warn(
                 { err: error, qRunId: run.id },

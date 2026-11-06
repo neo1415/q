@@ -2,7 +2,9 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   communicationPreferenceKey,
-  type CommunicationAspect,
+  LANGUAGE_ASPECT,
+  languagePreferenceValue,
+  type PreferenceAspect,
   type PreferencePersistence,
 } from "./communication.js";
 import type { MemoryService } from "./service.js";
@@ -20,7 +22,7 @@ import type { MemoryService } from "./service.js";
  * scope are this code's.
  */
 export type PreferenceNote = {
-  readonly aspect: CommunicationAspect;
+  readonly aspect: PreferenceAspect;
   readonly value: string;
   readonly persistence: PreferencePersistence;
   readonly quote: string;
@@ -59,6 +61,14 @@ export function createPreferenceNotebook(options: {
       if (note.persistence === "SESSION" && options.sessionKey === null) {
         return { outcome: "REFUSED", reason: "NO_SESSION" };
       }
+      // A language is kept as its canonical tag, or not at all.
+      const value =
+        note.aspect === LANGUAGE_ASPECT
+          ? languagePreferenceValue(note.value)
+          : note.value;
+      if (value === null) {
+        return { outcome: "REFUSED", reason: "INVALID_CANDIDATE" };
+      }
       const result = await options.memory.remember({
         actor: options.actor,
         candidate: {
@@ -69,10 +79,10 @@ export function createPreferenceNotebook(options: {
             options.sessionKey,
           ),
           // Deterministic words about the preference, never the model's.
-          content: `Communication preference${note.persistence === "SESSION" ? " for this conversation" : ""}: ${note.aspect} ${note.value}.`,
+          content: `Communication preference${note.persistence === "SESSION" ? " for this conversation" : ""}: ${note.aspect} ${value}.`,
           quote: note.quote,
           subject: null,
-          structuredValue: { [note.aspect]: note.value },
+          structuredValue: { [note.aspect]: value },
         },
         writeMode: "Q_PROPOSED",
         userTurns: [

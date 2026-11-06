@@ -34,6 +34,7 @@ import {
 } from "@capital-q/contracts";
 import { APP_ACTIONS } from "@capital-q/app-actions";
 import type { Logger } from "@capital-q/observability";
+import { Q_READING_LABEL } from "@capital-q/q-knowledge";
 import {
   clipAtWord,
   PLAN_RUBRIC_V1,
@@ -2878,6 +2879,19 @@ export function plainFactName(statement: string): PlainName {
   const told = /^Remembered:\s*They said \((\d{4}-\d{2}-\d{2})\)/u.exec(text);
   if (told?.[1] !== undefined) {
     return fixed(`what you told Q on ${told[1]}`, "what you told Q");
+  }
+  // Step 9: "Remembered: Q's reading — a preference (2026-10-29), not their
+  // words: ..." is Q's reading of what they said, never what they said
+  // (memory provenance, Q_READING_LABEL), so it is cited as Q's.
+  const qReading = new RegExp(
+    `^Remembered:\\s*(?:-\\s*)?${Q_READING_LABEL}\\b[^(]*\\((\\d{4}-\\d{2}-\\d{2})\\)`,
+    "u",
+  ).exec(text);
+  if (qReading?.[1] !== undefined) {
+    return fixed(
+      `Q's reading of what you said on ${qReading[1]}`,
+      "Q's reading of what you said",
+    );
   }
   const memory = /^Remembered:\s*(?:\d{4}-\d{2}-\d{2}\s+)?([^:]{3,80}):/u.exec(
     text,

@@ -4589,3 +4589,80 @@ describe("Q intelligence step 8: the agentic loop and the promise check", () => 
     expect(alpha.calls.at(-1)?.request.tools).toEqual([]);
   });
 });
+
+/**
+ * Step 11 (A2): the warmed prepare searches the documents before the turn
+ * is read; the reading's ledger focus (step 5) and compound parts reach
+ * retrieval on the turn's own request, so the search is asked again with
+ * them and the refined facts are the ones the model answers from.
+ */
+describe("step 11: retrieval refined by the reading after a warmed prepare", () => {
+  const contextOf = () => {
+    const asked: QAnswerRequest[] = [];
+    const context: QAuthorisedContextPort = {
+      assemble: (request) => {
+        asked.push(request);
+        const focused = request.retrievalFocus !== undefined;
+        return Promise.resolve({
+          facts: [
+            {
+              scope: "COMPANY_DOCUMENTS",
+              statement: focused
+                ? "Refined passage: Silo Credit burn is $120k a month."
+                : "Unbound passage: the words alone.",
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "DOCUMENT_SUPPORTED",
+              source: "Deck",
+            },
+          ],
+          subjectDescription: focused ? "refined" : "unbound",
+        });
+      },
+    };
+    return { asked, context };
+  };
+  const focus = {
+    ledger: { entities: [], lists: [] },
+    boundRefs: ["E1"],
+  } as unknown as NonNullable<QAnswerRequest["retrievalFocus"]>;
+
+  it("asks again with the reading's focus and answers from the refined facts", async () => {
+    const { asked, context } = contextOf();
+    const { seam, request, logLines, alpha } = build({
+      context,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    if (!seam.warm) throw new Error("Warm seam missing");
+    seam.warm(request);
+    await seam.answer({ ...request, retrievalFocus: focus });
+    expect(asked).toHaveLength(2);
+    expect(asked[0]?.retrievalFocus).toBeUndefined();
+    expect(asked[1]?.retrievalFocus).toEqual(focus);
+    const prompt = JSON.stringify(alpha.calls.map((c) => c.request));
+    expect(prompt).toContain("Refined passage");
+    expect(prompt).not.toContain("Unbound passage");
+    const produced = logLines
+      .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+      .find(([, message]) => message === "q answer produced")?.[0];
+    expect(produced?.["retrievalRefineMs"]).toEqual(expect.any(Number));
+    expect(produced?.["checks"]).toMatchObject({
+      claimCheckAnswer: { runs: 1 },
+      promiseCheckAnswer: { runs: 1 },
+    });
+  });
+
+  it("asks once when the turn was not warmed, or the reading adds nothing", async () => {
+    for (const warm of [false, true]) {
+      const { asked, context } = contextOf();
+      const { seam, request } = build({
+        context,
+        script: [
+          { kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) },
+        ],
+      });
+      if (warm) seam.warm?.(request);
+      await seam.answer(warm ? request : { ...request, retrievalFocus: focus });
+      expect(asked).toHaveLength(1);
+    }
+  });
+});

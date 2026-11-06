@@ -424,7 +424,10 @@ describe("@capital-q/network against local PostgreSQL", () => {
         // both sides confirm, not a parallel deal record), the investor's
         // pass and its reference reasons (20261118090000) and diligence
         // requests and fulfilments (20261119090000; what is shared stays a
-        // disclosure policy): no meeting or deal tables exist.
+        // disclosure policy): no meeting or deal tables exist. The owner-
+        // directed additions since are listed by migration below; none is a
+        // deal or match record (each migration says so), so a new table here
+        // still fails this until someone decides it belongs.
         const tables = await tx.sql<{ n: string }[]>`
           select table_name as n from information_schema.tables
            where table_schema = 'network'
@@ -432,7 +435,22 @@ describe("@capital-q/network against local PostgreSQL", () => {
                                     'interest_responses', 'interest_response_requests', 'matches',
                                     'commitments', 'relationship_pass_reasons', 'relationship_passes',
                                     'diligence_requests', 'diligence_fulfilments',
-                                    'diligence_document_views', 'diligence_document_summaries')`;
+                                    'diligence_document_views', 'diligence_document_summaries',
+                                    -- founder documents (20261220124500): questions,
+                                    -- answers and declines against a request
+                                    'diligence_questions', 'diligence_question_answers',
+                                    'diligence_request_declines',
+                                    -- deal close (20261220170000): "no deal record";
+                                    -- terms, checklist, close and reports hang off
+                                    -- the one canonical relationship's history
+                                    'deal_terms', 'deal_close_checklist', 'deal_closes',
+                                    'relationship_reports',
+                                    -- CRM lane C (20261226200000, 20261226210000,
+                                    -- 20261227140000): saved views (presentation
+                                    -- only), the derived per-party read model, and
+                                    -- one side's private notes
+                                    'relationship_views', 'relationship_party_states',
+                                    'relationship_notes')`;
         expect(tables).toEqual([]);
         // Ensuring a relationship expresses no interest.
         expect(

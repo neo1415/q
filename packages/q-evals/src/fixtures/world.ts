@@ -46,6 +46,7 @@ import {
   createModelGatewayQAnswer,
   type ModelGatewayQAnswer,
   type QAuthorisedContextPort,
+  type QMemoryRecall,
 } from "@capital-q/model-gateway/q";
 import { createNetworkService } from "@capital-q/network";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
@@ -190,6 +191,12 @@ export type QEvalWorldOptions = {
    * is every eval case today — the world behaves exactly as before.
    */
   readonly specialist?: ((delegate: QAnswerPort) => QAnswerPort) | undefined;
+  /**
+   * Q intelligence step 9: memory recall for the answer, as q-api composes
+   * it. Read lazily, per run, so it can be built over the world's own
+   * repositories once they exist. Absent: no recall, as before.
+   */
+  readonly memory?: (() => QMemoryRecall) | undefined;
 };
 
 export type QEvalWorld = {
@@ -840,6 +847,7 @@ export async function createQEvalWorld(
       });
     },
   };
+  const memoryOf = options.memory;
   const answer = createModelGatewayQAnswer({
     gateway,
     repositories,
@@ -856,6 +864,9 @@ export async function createQEvalWorld(
         Promise.resolve(Q_COMMUNICATION_PROFILES[currentPreset]),
     },
     ...(tenantPolicy === undefined ? {} : { tenantPolicy }),
+    ...(memoryOf === undefined
+      ? {}
+      : { memory: { recall: (input) => memoryOf().recall(input) } }),
     logger,
   });
 

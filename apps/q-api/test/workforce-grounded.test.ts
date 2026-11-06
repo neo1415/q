@@ -3,10 +3,12 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import type { AnalysisDocumentResult } from "@capital-q/q-core";
+import { Q_READING_LABEL } from "@capital-q/q-knowledge";
 import { ActorContextSchema } from "@capital-q/security";
 
 import type { InstructionMaterial } from "../src/composition/instructions/material.js";
 import { groundAnalysis } from "../src/composition/workforce/analysis.js";
+import { plainFactName } from "../src/composition/workforce/plan-job.js";
 import {
   conversationMaterial,
   createWorkforcePorts,
@@ -235,5 +237,22 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
     const out = groundAnalysis(grounded, sources);
     expect(out.removed).toBe(0);
     expect(out.draft).toBe(grounded);
+  });
+});
+
+describe("a plan cites Q's reading of their words as Q's (step 9 provenance)", () => {
+  it("never as what they told Q", () => {
+    const reading = plainFactName(
+      `Remembered: - ${Q_READING_LABEL} — a preference (2026-10-29), not their words: prefers seed rounds; their words: "we only do early stuff"`,
+    );
+    expect(reading.one).toBe("Q's reading of what you said on 2026-10-29");
+    expect(reading.brief).toBe("Q's reading of what you said");
+    expect(reading.one).not.toMatch(/you told Q/u);
+    // Their own words keep their label.
+    expect(
+      plainFactName(
+        "Remembered: They said (2026-10-29): LedgerBridge sells to distributors.",
+      ).one,
+    ).toBe("what you told Q on 2026-10-29");
   });
 });

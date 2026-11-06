@@ -272,12 +272,17 @@ describe("standing instructions against PostgreSQL", () => {
         };
         expect(await store.notify(notice)).toBe(true);
         expect(await store.notify(notice)).toBe(false);
-        // The opener reads it back for them.
+        // The opener counts it for them in its own words (narrationOf),
+        // never by echoing the notice's title (Zino live 2026-10-07).
         const facts = await createOpenerFacts({ sql: tx })({
           userId: ada,
           tenantId: tenant,
         } as never);
-        expect(facts.instructionNews).toContain("1 thing needs your yes");
+        // The opener narrates from counts, in Q's own words, never a
+        // notice's text (digest.ts narrationOf; Zino live 2026-10-07).
+        expect(facts.instructionNews).toBe(
+          "1 thing is waiting for your yes. Want to go through it?",
+        );
 
         expect(await store.stop(owner, id)).toBe(true);
         expect((await store.own(owner, id))?.status).toBe("STOPPED");

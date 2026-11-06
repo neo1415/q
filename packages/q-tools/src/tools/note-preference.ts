@@ -86,6 +86,21 @@ export const NotePreferenceInputSchema = z.discriminatedUnion("aspect", [
       quote,
     })
     .strict(),
+  // Step 9: the language to speak with them, kept as a canonical BCP 47
+  // tag (the memory side refuses anything else).
+  z
+    .object({
+      aspect: z.literal("language"),
+      value: z
+        .string()
+        .trim()
+        .min(2)
+        .max(35)
+        .describe("The language as a BCP 47 tag (fr, es, pt-BR, sw, yo, ja)."),
+      persistence,
+      quote,
+    })
+    .strict(),
 ]);
 export type NotePreferenceInput = z.infer<typeof NotePreferenceInputSchema>;
 
@@ -125,7 +140,7 @@ export function createNotePreferenceTool(
     status: "ACTIVE",
     providerName: "note_preference",
     description:
-      "Records how the person has just asked you to communicate — shorter or fuller answers, tone, how hard to challenge, how many questions to ask, summary or analysis first — so it holds from the next turn. Call it only when they expressed such a preference, with their exact words as quote. It changes how you speak, never what you know or do. Result: REMEMBERED, UNCHANGED (already so) or REFUSED (with a reason).",
+      "Records how the person has just asked you to communicate — shorter or fuller answers, tone, how hard to challenge, how many questions to ask, summary or analysis first, the language to talk to them in (switching their whole app's language is set_q_language) — so it holds from the next turn. Call it only when they expressed such a preference, with their exact words as quote. It changes how you speak, never what you know or do. Result: REMEMBERED, UNCHANGED (already so) or REFUSED (with a reason).",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [],

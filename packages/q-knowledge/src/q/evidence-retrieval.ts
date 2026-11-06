@@ -94,6 +94,8 @@ export type QEvidenceRetrieval = {
 
 /** Bounded: "is there anything at all?" does not need an exact count. */
 const CORPUS_PROBE_LIMIT = 100;
+/** Step 11: runs whose assembled evidence is kept (most recent first out). */
+const ASSEMBLED_RUNS_MAX = 64;
 
 export function createQEvidenceRetrieval(
   dependencies: QEvidenceRetrievalDependencies,
@@ -101,6 +103,23 @@ export function createQEvidenceRetrieval(
   const { sql, repositories, retrieval, hydration, knowledge, logger } =
     dependencies;
   let last: AuthorisedRetrievalResult | null = null;
+  /**
+   * Step 11: a run's assembled evidence per query plan. The answer warms a
+   * search before the turn is read and asks again with the reading's
+   * binding; when the reading changes nothing about the searches, the
+   * second ask is the first one's result. Keyed by run, plan id and the
+   * planned searches, so nothing crosses runs, plans or people.
+   */
+  const assembledInRun = new Map<
+    string,
+    {
+      readonly key: string;
+      readonly result: Promise<{
+        readonly facts: readonly AuthorisedFact[];
+        readonly subjectDescription: string;
+      }>;
+    }
+  >();
 
   const port: QRetrievalPort = {
     retrieve: async (
@@ -176,32 +195,56 @@ export function createQEvidenceRetrieval(
         parts: request.askParts?.map((part) => part.ask),
         focus: request.retrievalFocus,
       });
-      const result = await retrieval.retrieve({
-        query: latest.content,
-        queries: planned.queries,
-        ...(planned.focus === null ? {} : { focus: planned.focus }),
-        envelope,
-        ...(request.signal === undefined ? {} : { signal: request.signal }),
+      const key = JSON.stringify([
+        request.plan.planId,
+        latest.id,
+        planned.queries,
+        planned.focus,
+      ]);
+      const held = assembledInRun.get(request.runId);
+      if (held?.key === key) return held.result;
+      const assembling = (async () => {
+        const result = await retrieval.retrieve({
+          query: latest.content,
+          queries: planned.queries,
+          ...(planned.focus === null ? {} : { focus: planned.focus }),
+          envelope,
+          ...(request.signal === undefined ? {} : { signal: request.signal }),
+        });
+        last = result;
+
+        // The retrieval hierarchy (§23): canonical structured state answers
+        // first, through the Tool Registry, which is why nothing here reaches
+        // for it. Then what Capital Q already understands, which carries its
+        // own evidence and confidence. Then the documents themselves.
+        //
+        // Knowledge is listed BEFORE the passages it was derived from because
+        // it is the settled reading of them; it does not replace them, and
+        // both travel so the model can see the passage behind the summary.
+        const knowledgeFacts =
+          knowledge === undefined
+            ? []
+            : await authorisedKnowledgeFacts(request.plan);
+
+        return {
+          facts: [...knowledgeFacts, ...assembleAuthorisedFacts(result)],
+          subjectDescription: describeRetrieval(result),
+        };
+      })();
+      assembledInRun.delete(request.runId);
+      assembledInRun.set(request.runId, { key, result: assembling });
+      while (assembledInRun.size > ASSEMBLED_RUNS_MAX) {
+        const oldest = assembledInRun.keys().next().value;
+        if (oldest === undefined) break;
+        assembledInRun.delete(oldest);
+      }
+      // A failed search is not kept: the next ask searches again.
+      assembling.catch(() => {
+        if (assembledInRun.get(request.runId)?.result === assembling) {
+          assembledInRun.delete(request.runId);
+        }
       });
-      last = result;
-
-      // The retrieval hierarchy (§23): canonical structured state answers
-      // first, through the Tool Registry, which is why nothing here reaches
-      // for it. Then what Capital Q already understands, which carries its
-      // own evidence and confidence. Then the documents themselves.
-      //
-      // Knowledge is listed BEFORE the passages it was derived from because
-      // it is the settled reading of them; it does not replace them, and
-      // both travel so the model can see the passage behind the summary.
-      const knowledgeFacts =
-        knowledge === undefined
-          ? []
-          : await authorisedKnowledgeFacts(request.plan);
-
-      return {
-        facts: [...knowledgeFacts, ...assembleAuthorisedFacts(result)],
-        subjectDescription: describeRetrieval(result),
-      };
+      return assembling;
     },
   };
 

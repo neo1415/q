@@ -287,6 +287,63 @@ jobs:
         if: always()
         run: pnpm exec supabase stop --no-backup
 
+  # Every *.integration.test.ts against the same local Supabase stack the
+  # pgTAP job starts (root vitest.config.ts leaves them out of `pnpm test`,
+  # so a stale one went unseen until 2026-11-06). Provider keys are
+  # non-empty disabled values: no live model or provider call is made.
+  integration:
+    name: integration (local database)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CQ_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # The Q-IQ world's checkpointer and a few suites read DATABASE_URL.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      OPENAI_API_KEY: disabled-locally-000000000000
+      GEMINI_API_KEY: disabled-locally-000000000000
+      GOOGLE_API_KEY: disabled-locally-000000000000
+      GROQ_API_KEY: disabled-locally-000000000000
+      ANTHROPIC_API_KEY: disabled-locally-000000000000
+      ELEVENLABS_API_KEY: disabled-locally-000000000000
+      DEEPGRAM_API_KEY: disabled-locally-000000000000
+      SERP_API_KEY: disabled-locally-000000000000
+      TAVILY_API_KEY: disabled-locally-000000000000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The same stack as the pgTAP job: Postgres with every migration, and
+      # Auth (through the API gateway) for the sign-in suite.
+      - name: Start the local database
+        run: >-
+          pnpm exec supabase start
+          -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api,realtime,postgres-meta,supavisor
+
+      # The suites import packages through their built entrypoints.
+      - name: Build packages
+        run: pnpm exec turbo run build --filter=./packages/* --concurrency=2
+
+      - name: Integration tests
+        run: pnpm test:integration
+
+      - name: Stop the local database
+        if: always()
+        run: pnpm exec supabase stop --no-backup
+
   # Browser journeys (Playwright, Chromium). Manual only, and documented
   # rather than proven: it has not yet run on a GitHub runner. playwright.
   # config.ts starts the built api and web itself (webServer); journeys that

@@ -88,6 +88,43 @@ function nestedTransactions(tx: TransactionContext): TransactionManager {
   };
 }
 
+/** The synonyms 20261220140200 and 20261228160000 add (see the check above). */
+const MIGRATION_ONLY_ALIASES = [
+  "saas",
+  "software as a service",
+  "b2b saas",
+  "enterprise saas",
+  "software",
+  "climate tech",
+  "climatetech",
+  "climate",
+  "clean tech",
+  "green tech",
+  "smes",
+  "smbs",
+  "msme",
+  "msmes",
+  "small business",
+  "small and medium enterprises",
+  "small and medium-sized enterprises",
+  "small and medium businesses",
+  "mid-market",
+  "mid market",
+  "midmarket",
+  "mid-sized companies",
+  "mid-sized businesses",
+  "enterprise",
+  "enterprises",
+  "large companies",
+  "corporates",
+  "consumers",
+  "retail consumers",
+  "households",
+  "government",
+  "governments",
+  "public institutions",
+] as const;
+
 describe("@capital-q/taxonomy against local PostgreSQL", () => {
   let db: RequestDatabase;
 
@@ -277,9 +314,31 @@ describe("@capital-q/taxonomy against local PostgreSQL", () => {
         .sort((a, b) => a.code.localeCompare(b.code))
         .map((v) => ({ id: v.id, code: v.code, version: v.version })),
     );
+    // Every reference alias is stored, id for id. Two owner-directed
+    // migrations add synonyms outside the reference set by design ("an
+    // alias never creates or renames a node"): 20261220140200 (sector
+    // words, F7) and 20261228160000 (customer words, ob2). Those, and only
+    // those, sit beside it, each on a reference node (issue #562).
+    const aliases = await db.sql<
+      { id: string; node_id: string; normalized_alias: string }[]
+    >`select id, node_id, normalized_alias from taxonomy.aliases`;
+    const stored = new Map(aliases.map((a) => [a.id, a]));
     expect(
-      await count(db.sql`select count(*)::int as count from taxonomy.aliases`),
-    ).toBe(REFERENCE_TAXONOMY.aliases.length);
+      REFERENCE_TAXONOMY.aliases
+        .filter(
+          (a) =>
+            stored.get(a.id)?.node_id !== a.nodeId ||
+            stored.get(a.id)?.normalized_alias !== a.normalizedAlias,
+        )
+        .map((a) => a.id),
+    ).toEqual([]);
+    const referenceIds = new Set(REFERENCE_TAXONOMY.aliases.map((a) => a.id));
+    const referenceNodes = new Set(REFERENCE_TAXONOMY.nodes.map((n) => n.id));
+    const added = aliases.filter((a) => !referenceIds.has(a.id));
+    expect(added.filter((a) => !referenceNodes.has(a.node_id))).toEqual([]);
+    expect(added.map((a) => a.normalized_alias).sort()).toEqual(
+      [...MIGRATION_ONLY_ALIASES].sort(),
+    );
     expect(
       await count(
         db.sql`select count(*)::int as count from taxonomy.node_edges`,
@@ -353,18 +412,25 @@ describe("@capital-q/taxonomy against local PostgreSQL", () => {
       expect(next.items[0]?.id).not.toBe(page.items[0]?.id);
 
       const versions = await query.getVersionSet();
-      expect(versions).toEqual({
-        business_model: 1,
-        company_stage: 1,
-        customer_type: 1,
-        // 20261008100000 grew geography to v2 (more of Africa).
-        geography: 2,
-        impact_theme: 1,
-        industry: 1,
-        product_category: 1,
-        regulatory_profile: 1,
-        technology: 1,
-      });
+      // Each vocabulary at the version the reference set publishes
+      // (geography grew to v5 and industry to v2 through additive
+      // migrations rendered from it; ADR 0005).
+      expect(versions).toEqual(
+        Object.fromEntries(
+          REFERENCE_TAXONOMY.vocabularies.map((v) => [v.code, v.version]),
+        ),
+      );
+      expect(Object.keys(versions).sort()).toEqual([
+        "business_model",
+        "company_stage",
+        "customer_type",
+        "geography",
+        "impact_theme",
+        "industry",
+        "product_category",
+        "regulatory_profile",
+        "technology",
+      ]);
       expect(await query.getVersionSet()).toEqual(versions);
     });
   });

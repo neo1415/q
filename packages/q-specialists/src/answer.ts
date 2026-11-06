@@ -2074,18 +2074,51 @@ function synthesisFromFindings(result: CompanyIntelligenceResult): string {
 
 /** Q intelligence step 2: a run's folded conversation state. */
 type RunConversationState = {
-  /** The state as stored after this run's fold (its version included). */
+  /** The state as folded for this run (the version it was read at). */
   readonly state: QConversationState;
   readonly summary: QConversationSummaryRevision | null;
-  /** False when another writer saved first: this run saves nothing more. */
-  readonly saved: boolean;
+  /**
+   * Step 11: the save, off the reader's path. False when another writer
+   * saved first (this run saves nothing more) or when there is no store.
+   */
+  readonly saving: Promise<boolean>;
+  /** Step 11: how long the read and fold took, for "q turn timing". */
+  readonly loadMs: number;
+  /** Step 11: read from this process's cache rather than the store. */
+  readonly cached: boolean;
 };
 
 /**
- * Reads the stored state, folds in the messages it does not cover yet and
- * saves the result in one short transaction (no model call inside it). A
- * composition with no state store folds from the history alone, so a turn
- * is never worse off than before.
+ * Step 11: whether a cached state can stand for the store on this turn.
+ * Only when this process folded the conversation's turn before this one:
+ * the cached state's newest message is in the history, and at most one of
+ * the person's messages (this turn's) follows it. Anything else -- a turn
+ * served by another instance, or one this process answered without folding
+ * -- reads the store, where another instance's summary may be waiting.
+ */
+export function continuesFrom(
+  state: QConversationState,
+  history: readonly QConversationMessage[],
+): boolean {
+  if (state.throughMessageId === null) return false;
+  const index = history.findIndex(
+    (message) => message.id === state.throughMessageId,
+  );
+  if (index < 0) return false;
+  let theirs = 0;
+  for (const message of history.slice(index + 1)) {
+    if (message.role === "USER") theirs += 1;
+  }
+  return theirs <= 1;
+}
+
+/**
+ * Reads the stored state (or this process's committed copy of it), folds
+ * in the messages it does not cover yet, and returns at once. The save is
+ * one short transaction (no model call inside it) that runs beside the
+ * reader instead of before it; its result reaches the cache only once it
+ * has committed. A composition with no state store folds from the history
+ * alone, so a turn is never worse off than before.
  */
 async function loadConversationState(
   deps: {
@@ -2101,45 +2134,76 @@ async function loadConversationState(
   },
   history: readonly QConversationMessage[],
 ): Promise<RunConversationState | null> {
+  const started = Date.now();
   const conversationId = history[0]?.conversationId;
   if (conversationId === undefined) return null;
   const store = deps.repositories.conversationStates;
+  const cache = store?.cache;
+  const key = { tenantId: who.tenantId, userId: who.userId, conversationId };
+  let hit = cache?.get(key);
+  if (hit !== undefined && !continuesFrom(hit.state, history)) {
+    cache?.forget(key);
+    hit = undefined;
+  }
   const [previous, summary] =
-    store === undefined
-      ? [null, null]
-      : await Promise.all([
-          store.find(deps.sql, who.tenantId, who.userId, conversationId),
-          store.latestSummary(
-            deps.sql,
-            who.tenantId,
-            who.userId,
-            conversationId,
-          ),
-        ]);
+    hit !== undefined
+      ? [hit.state, hit.summary]
+      : store === undefined
+        ? [null, null]
+        : await Promise.all([
+            store.find(deps.sql, who.tenantId, who.userId, conversationId),
+            store.latestSummary(
+              deps.sql,
+              who.tenantId,
+              who.userId,
+              conversationId,
+            ),
+          ]);
   const fold = foldConversationState({
     previous,
     identity: { conversationId, tenantId: who.tenantId, userId: who.userId },
     history,
   });
-  if (store === undefined || !fold.changed) {
-    return { state: fold.state, summary, saved: store !== undefined };
-  }
-  const saved = await deps.transactions
-    .run((tx) => store.save(tx, fold.state))
-    .catch((error: unknown) => {
-      deps.logger?.warn(
-        { err: error, qRunId: who.runId },
-        "the conversation state was not saved; it is folded again next turn",
-      );
-      return false;
-    });
-  return {
-    state: saved
-      ? { ...fold.state, version: fold.state.version + 1 }
-      : fold.state,
+  const loaded = {
+    state: fold.state,
     summary,
-    saved,
+    loadMs: Date.now() - started,
+    cached: hit !== undefined,
   };
+  if (store === undefined) {
+    return { ...loaded, saving: Promise.resolve(false) };
+  }
+  if (!fold.changed) {
+    // Nothing new, and what was read is committed: worth keeping.
+    if (previous !== null) cache?.remember({ state: fold.state, summary });
+    return { ...loaded, saving: Promise.resolve(true) };
+  }
+  const saving = deps.transactions
+    .run((tx) => store.save(tx, fold.state))
+    .then(
+      (saved) => {
+        if (saved) {
+          // Committed: the stored version is one on from the one read.
+          cache?.remember({
+            state: { ...fold.state, version: fold.state.version + 1 },
+            summary,
+          });
+        } else {
+          // Another writer saved first: what this process holds is behind.
+          cache?.forget(key);
+        }
+        return saved;
+      },
+      (error: unknown) => {
+        cache?.forget(key);
+        deps.logger?.warn(
+          { err: error, qRunId: who.runId },
+          "the conversation state was not saved; it is folded again next turn",
+        );
+        return false;
+      },
+    );
+  return { ...loaded, saving };
 }
 
 export function createSpecialistQAnswer(
@@ -2195,13 +2259,26 @@ export function createSpecialistQAnswer(
       { repositories, sql, transactions, logger },
       who,
       history,
-    ).catch((error: unknown) => {
-      logger?.warn(
-        { err: error, qRunId: who.runId },
-        "the conversation state was not read; reading the turn from history alone",
-      );
-      return null;
-    });
+    ).then(
+      (loaded) => {
+        logger?.debug(
+          {
+            qRunId: who.runId,
+            stateMs: loaded?.loadMs ?? null,
+            stateCached: loaded?.cached ?? null,
+          },
+          "q conversation state read",
+        );
+        return loaded;
+      },
+      (error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: who.runId },
+          "the conversation state was not read; reading the turn from history alone",
+        );
+        return null;
+      },
+    );
     statesInRun.set(who.runId, started);
     while (statesInRun.size > PREREADS_MAX) {
       const oldest = statesInRun.keys().next().value;
@@ -8079,10 +8156,18 @@ export function createSpecialistQAnswer(
     }
     {
       const sentAt = Date.parse(latest.createdAt);
+      // Already settled: the reader waited for it.
+      const loadedState = await statesInRun
+        .get(request.runId)
+        ?.catch(() => null);
       logger?.info(
         {
           qRunId: request.runId,
           readMs,
+          // Step 11: the conversation state's read and fold, and whether
+          // this process's committed copy stood in for the store.
+          stateMs: loadedState?.loadMs ?? null,
+          stateCached: loadedState?.cached ?? null,
           readinessLeadMs,
           lead: readinessLead !== null,
           // Live 2026-10-30: what the lead keyed on, beside the class.
@@ -8551,7 +8636,18 @@ ${line}`;
 
   return {
     lastResult: () => last,
-    answer: async (request) => answerTurn(await withFetched(request)),
+    answer: async (request) => {
+      try {
+        return await answerTurn(await withFetched(request));
+      } finally {
+        // Step 11: the state's save ran beside the turn; a run ends only
+        // once it has settled (it never fails the answer).
+        await statesInRun
+          .get(request.runId)
+          ?.then((loaded) => loaded?.saving)
+          .catch(() => undefined);
+      }
+    },
     preread,
     discard: (runId: string) => {
       prereads.delete(runId);

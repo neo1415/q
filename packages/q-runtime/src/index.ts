@@ -129,11 +129,21 @@ export {
 } from "./domain/subjects.js";
 
 export type { QRuntimeDependencies } from "./application/dependencies.js";
+export {
+  CONVERSATION_STATE_CACHE_MAX,
+  CONVERSATION_STATE_CACHE_MAX_AGE_MS,
+  createConversationStateCache,
+  type QConversationStateCache,
+  type QConversationStateCacheEntry,
+  type QConversationStateKey,
+} from "./application/conversation-state-cache.js";
 export type {
   QConversationMessageRepository,
   QConversationRepository,
   QConversationStateRepository,
   QConversationSearch,
+  QPastTurn,
+  QPastTurnSearch,
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
   QRunEventRepository,

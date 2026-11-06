@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -12,12 +12,15 @@ import type {
   QAnswerRequest,
   QConversationMessage,
   QConversationState,
+  QConversationStateCache,
   QConversationStateRepository,
   QRuntimeRepositories,
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { createSpecialistQAnswer } from "../src/answer.js";
+import { createConversationStateCache } from "@capital-q/q-runtime";
+
+import { continuesFrom, createSpecialistQAnswer } from "../src/answer.js";
 
 /**
  * Q intelligence step 2: every turn reads the conversation's durable state.
@@ -83,23 +86,56 @@ const BASE: QTurnReading = {
   tool: null,
 } as unknown as QTurnReading;
 
-function memoryStore() {
+function memoryStore(options: StoreOptions = {}) {
   let stored: QConversationState | null = null;
+  const reads = { find: 0, latestSummary: 0 };
+  const saves: Promise<boolean>[] = [];
   const store: QConversationStateRepository = {
-    find: () => Promise.resolve(stored),
-    save: (_tx, state) => {
-      if ((stored?.version ?? 0) !== state.version)
-        return Promise.resolve(false);
-      stored = { ...state, version: state.version + 1 };
-      return Promise.resolve(true);
+    find: () => {
+      reads.find += 1;
+      return Promise.resolve(stored);
     },
-    latestSummary: () => Promise.resolve(null),
+    save: (_tx, state) => {
+      const saving = (options.saveGate?.() ?? Promise.resolve()).then(() => {
+        // Another writer (another instance) can have saved first.
+        if (options.conflict?.() === true) return false;
+        if ((stored?.version ?? 0) !== state.version) return false;
+        stored = { ...state, version: state.version + 1 };
+        return true;
+      });
+      saves.push(saving);
+      return saving;
+    },
+    latestSummary: () => {
+      reads.latestSummary += 1;
+      return Promise.resolve(null);
+    },
     appendSummary: () => Promise.resolve(1),
+    ...(options.cache === undefined ? {} : { cache: options.cache }),
   };
-  return { store, stored: () => stored };
+  return {
+    store,
+    stored: () => stored,
+    reads,
+    saves,
+    /** Another instance folded a turn: the store moved on. */
+    bump: () => {
+      if (stored !== null) stored = { ...stored, version: stored.version + 1 };
+    },
+  };
 }
 
-function conversation(references: QTurnReading["references"] = []) {
+type StoreOptions = {
+  readonly cache?: QConversationStateCache | undefined;
+  /** Holds each save until it resolves. */
+  readonly saveGate?: (() => Promise<void>) | undefined;
+  readonly conflict?: (() => boolean) | undefined;
+};
+
+function conversation(
+  references: QTurnReading["references"] = [],
+  storeOptions: StoreOptions = {},
+) {
   const conversationId = randomUUID();
   const lines: QConversationMessage[] = [];
   const at = (offset: number) =>
@@ -123,7 +159,7 @@ function conversation(references: QTurnReading["references"] = []) {
   const inputs: Parameters<QTurnReader["read"]>[0][] = [];
   const delegatedWith: QAnswerRequest[] = [];
   const inserted: string[] = [];
-  const memory = memoryStore();
+  const memory = memoryStore(storeOptions);
   const answer = createSpecialistQAnswer({
     specialist: {
       id: "company-intelligence",
@@ -292,5 +328,131 @@ describe("step 3: the reader's references, bound by code against the ledger", ()
     expect(c.inserted).toEqual([
       `I'm not sure who or what you mean by "her". Which one do you mean?`,
     ]);
+  });
+});
+
+describe("step 11: the state is read once per conversation, and saved beside the turn", () => {
+  it("serves a follow-up from this process's committed copy: no store read before the reader", async () => {
+    const cache = createConversationStateCache();
+    const c = conversation([], { cache });
+    c.add("USER", "Show me SME lenders.");
+    await c.answer.answer(request());
+    expect(c.memory.reads).toEqual({ find: 1, latestSummary: 1 });
+    expect(c.memory.stored()?.version).toBe(1);
+
+    c.add("USER", "Tell me more.");
+    await c.answer.answer(request());
+    // The second turn's state came from the cache: no round trip.
+    expect(c.memory.reads).toEqual({ find: 1, latestSummary: 1 });
+    // And it was folded forward and saved on top of the stored version.
+    expect(c.memory.stored()).toMatchObject({ messagesFolded: 3, version: 2 });
+    // The reader was shown the state folded from the copy.
+    expect(c.inputs).toHaveLength(2);
+    expect(c.inputs.at(-1)?.conversationState).toEqual(expect.any(String));
+  });
+
+  it("starts the reader while the save is still running, and ends the run only once it settled", async () => {
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const c = conversation([], { saveGate: () => gate });
+    c.add("USER", "Show me SME lenders.");
+    const answering = c.answer.answer(request());
+    // The reader is reached with the save unresolved.
+    await vi.waitFor(() => {
+      expect(c.inputs).toHaveLength(1);
+    });
+    expect(c.memory.saves).toHaveLength(1);
+    let ended = false;
+    void answering.then(() => {
+      ended = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(ended).toBe(false);
+    expect(c.memory.stored()).toBeNull();
+    release();
+    await answering;
+    expect(c.memory.stored()).toMatchObject({ messagesFolded: 1, version: 1 });
+  });
+
+  it("reads the store again when a turn happened elsewhere since the copy", async () => {
+    const cache = createConversationStateCache();
+    const c = conversation([], { cache });
+    c.add("USER", "Show me SME lenders.");
+    await c.answer.answer(request());
+    // A turn this process never folded (another instance answered it).
+    c.add("USER", "And fintechs?");
+    c.add("Q", "Two more.");
+    c.memory.bump();
+    c.add("USER", "Which is larger?");
+    await c.answer.answer(request());
+    expect(c.memory.reads).toEqual({ find: 2, latestSummary: 2 });
+    expect(c.memory.stored()).toMatchObject({ messagesFolded: 5, version: 3 });
+  });
+
+  it("forgets the copy when another writer saved first", async () => {
+    const cache = createConversationStateCache();
+    let conflict = false;
+    const c = conversation([], { cache, conflict: () => conflict });
+    c.add("USER", "Show me SME lenders.");
+    await c.answer.answer(request());
+    conflict = true;
+    c.add("USER", "Tell me more.");
+    await c.answer.answer(request());
+    expect(c.memory.reads.find).toBe(1);
+    conflict = false;
+    c.add("USER", "What else stands out?");
+    await c.answer.answer(request());
+    // The refused save dropped the copy: this turn read the store.
+    expect(c.memory.reads.find).toBe(2);
+  });
+
+  it("never serves one person's state to another", async () => {
+    const cache = createConversationStateCache();
+    const c = conversation([], { cache });
+    c.add("USER", "Show me SME lenders.");
+    await c.answer.answer(request());
+    const conversationId = c.memory.stored()?.conversationId ?? "";
+    expect(
+      cache.get({ tenantId: TENANT, userId: USER, conversationId }),
+    ).toBeDefined();
+    expect(
+      cache.get({
+        tenantId: TENANT,
+        userId: "b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
+        conversationId,
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe("continuesFrom", () => {
+  const message = (id: string, role: "USER" | "Q") =>
+    ({ id, role }) as unknown as QConversationMessage;
+  const through = (id: string | null) =>
+    ({ throughMessageId: id }) as unknown as QConversationState;
+
+  it("holds when only this turn's words follow the copy", () => {
+    const history = [
+      message("a", "USER"),
+      message("b", "Q"),
+      message("c", "USER"),
+    ];
+    expect(continuesFrom(through("a"), history)).toBe(true);
+    expect(continuesFrom(through("c"), history)).toBe(true);
+  });
+
+  it("fails when another turn of theirs followed, or the copy's message is gone", () => {
+    const history = [
+      message("a", "USER"),
+      message("b", "Q"),
+      message("c", "USER"),
+      message("d", "Q"),
+      message("e", "USER"),
+    ];
+    expect(continuesFrom(through("a"), history)).toBe(false);
+    expect(continuesFrom(through("z"), history)).toBe(false);
+    expect(continuesFrom(through(null), history)).toBe(false);
   });
 });
