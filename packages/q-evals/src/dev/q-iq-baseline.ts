@@ -245,34 +245,38 @@ async function main(): Promise<number> {
   // For Claude, Q's share is divided by the cache-write factor, so the
   // ledger's base-rate pricing cannot carry real spend past the share.
   const factor = claude ? CLAUDE_WRITE_FACTOR : 1;
+  // --bare-only: measure the bare model alone (e.g. bare Claude across all
+  // 150 cases within the Anthropic test cap, while Q on Claude is parked).
+  const bareOnly = process.argv.includes("--bare-only");
   try {
-    if (claude) await setClaudeRoutes("ACTIVE");
-    try {
-      const q = await createQIqWorldSubject({
-        db,
-        providerMode: "LIVE",
-        secrets: toModelProviderSecrets({
-          OPENAI_API_KEY: apiKey,
-          ...(anthropicKey === undefined
-            ? {}
-            : { ANTHROPIC_API_KEY: anthropicKey }),
-        }),
-        providerFilter: claude ? "anthropic" : "openai",
-      });
+    if (claude && !bareOnly) await setClaudeRoutes("ACTIVE");
+    if (!bareOnly)
       try {
-        results.push(
-          await runQIq(q.subject, cases, {
-            budgetUsd: (budget * 0.75) / factor,
-            judge,
-            onCase: progress("Q"),
+        const q = await createQIqWorldSubject({
+          db,
+          providerMode: "LIVE",
+          secrets: toModelProviderSecrets({
+            OPENAI_API_KEY: apiKey,
+            ...(anthropicKey === undefined
+              ? {}
+              : { ANTHROPIC_API_KEY: anthropicKey }),
           }),
-        );
+          providerFilter: claude ? "anthropic" : "openai",
+        });
+        try {
+          results.push(
+            await runQIq(q.subject, cases, {
+              budgetUsd: (budget * 0.75) / factor,
+              judge,
+              onCase: progress("Q"),
+            }),
+          );
+        } finally {
+          await q.close();
+        }
       } finally {
-        await q.close();
+        if (claude && !bareOnly) await setClaudeRoutes("RETIRED");
       }
-    } finally {
-      if (claude) await setClaudeRoutes("RETIRED");
-    }
     const bare =
       anthropicKey === undefined
         ? bareModelQIqSubject({ provider, modelCode: MODEL, price: PRICE })
