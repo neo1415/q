@@ -1,5 +1,6 @@
 import type {
   QClientActionIntent,
+  QNavigateTargetDetail,
   QVoiceDestination,
 } from "@capital-q/contracts";
 
@@ -12,7 +13,7 @@ import {
   onNavigationOutcome,
   type NavigationOutcome,
 } from "../../q/ui-act-controller";
-import { destinationPath } from "../destinations";
+import { navigateIntentPath } from "../../q/control/deep-link";
 
 /**
  * V (founder live 2026-10-09: Q said "I've opened their page"; the founder:
@@ -36,6 +37,8 @@ export type MoveOutcome = "DONE" | "FAILED" | "PENDING";
 /** The route move a delegated run made (q-api's LiveMove). */
 export type LiveMove = {
   readonly navigate: QVoiceDestination | null;
+  /** Q Workspace W3: where on `navigate`'s page (absent: its top). */
+  readonly navigateTarget?: QNavigateTargetDetail | undefined;
   readonly action: QClientActionIntent | null;
 };
 
@@ -60,7 +63,19 @@ export function movePath(move: LiveMove): string | null {
   }
   if (action?.kind === "OPEN_SETUP") return setupPath(action.journey);
   if (action?.kind === "OPEN_SETTINGS") return settingsPath(action.section);
-  return destinationPath(move.navigate);
+  return voiceMovePath(move.navigate, move.navigateTarget);
+}
+
+/**
+ * W3: a spoken move's route, at the exact place it names (null: no page,
+ * such as an interview hand-off).
+ */
+export function voiceMovePath(
+  navigate: QVoiceDestination | null,
+  target: QNavigateTargetDetail | undefined,
+): string | null {
+  if (navigate === null) return null;
+  return navigateIntentPath({ destination: navigate, target });
 }
 
 /**

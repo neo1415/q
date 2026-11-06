@@ -576,6 +576,19 @@ export {
   Q_UI_INTENT_KINDS,
   QNavigateDestinationSchema,
   QNavigateIntentSchema,
+  Q_NAVIGATE_POSITIONS,
+  Q_NAVIGATE_SLIDE_MAX,
+  QNavigatePositionSchema,
+  QNavigateTabKeySchema,
+  QNavigateSectionIdSchema,
+  QNavigateTargetDetailSchema,
+  QNavigateTargetSchema,
+  navigateTargetToIntent,
+  intentToNavigateTarget,
+  withoutNavigateTarget,
+  Q_WORKSPACE_PANE_STATES,
+  QWorkspacePaneStateSchema,
+  QLayoutSetIntentSchema,
   QFocusSectionIntentSchema,
   QOpenCompanyIntentSchema,
   QShowComparisonIntentSchema,
@@ -657,6 +670,11 @@ export {
   type QUiIntent,
   type QUiIntentKind,
   type QNavigateDestination,
+  type QNavigatePosition,
+  type QNavigateTargetDetail,
+  type QNavigateTarget,
+  type QWorkspacePaneState,
+  type QLayoutSetIntent,
 } from "./ui-intent.js";
 
 export {
@@ -1365,3 +1383,7 @@ export * from "./arrival-snapshot.js";
 
 // W2 (2026-10-10): external person identity card, subject and evidence-classed brief.
 export * from "./external-person.js";
+
+// Q Workspace W2 (2026-11-06): the site map, its digest and the generated snapshot.
+export * from "./site-map.js";
+export * from "./site-map.generated.js";

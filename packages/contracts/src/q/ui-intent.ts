@@ -49,6 +49,8 @@ export const Q_UI_INTENT_KINDS = [
   "SHOW_CALENDAR_CONNECT",
   "DOCUMENT_ACT",
   "CARDS",
+  // Q Workspace W1.5: Q opens or collapses the workspace panes.
+  "LAYOUT_SET",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -191,10 +193,81 @@ export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
 
 export const QNavigateDestinationSchema = z.enum(Q_NAVIGATE_DESTINATIONS);
 
+/**
+ * Q Workspace W3.1 (DECISIONS 71): where exactly on a page a move lands.
+ * Additive and optional on NAVIGATE and OPEN_RECORD_PAGE: a move without
+ * it lands where it always did. Every field is an identifier or a closed
+ * value, never a path, a selector or text; the browser follows only the
+ * ids its own route map and the page's own registered sections know, and
+ * the page authorises every id server-side, as it does for a typed URL.
+ *
+ * Wire note: the intent schemas are strict, so a browser bundle older than
+ * this field drops a frame that carries it (counted, the record re-read;
+ * A5). Producers add `target` only where the workspace flag says the
+ * browser has it, and `withoutNavigateTarget` gives the legacy shape.
+ */
+export const Q_NAVIGATE_POSITIONS = ["top", "section", "latest"] as const;
+export const QNavigatePositionSchema = z.enum(Q_NAVIGATE_POSITIONS);
+export type QNavigatePosition = z.infer<typeof QNavigatePositionSchema>;
+
+/** A page's tab, by the key its own tab list uses ("looks-for", "dataroom"). */
+export const QNavigateTabKeySchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_-]{0,31}$/u);
+
+/**
+ * A section of a page, by its `QSection` id (the screen manifest's section
+ * slug; the W2 site map lists them). The page carries it as
+ * `data-q-section` and answers `#section-<id>`.
+ */
+export const QNavigateSectionIdSchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9-]{0,39}$/u);
+
+/** A deck's slides are numbered from 1; the bound is a sanity limit. */
+export const Q_NAVIGATE_SLIDE_MAX = 500;
+
+const QNavigateTargetDetailShape = {
+  /** The page's tab to open (a page's own tab key). */
+  tab: QNavigateTabKeySchema.optional(),
+  /** A document to open in the page's viewer (data room, Documents). */
+  documentId: UuidSchema.optional(),
+  /** A deck slide to open the viewer at, 1-based. */
+  slide: z.number().int().min(1).max(Q_NAVIGATE_SLIDE_MAX).optional(),
+  /** A conversation thread on the page (the relationship's thread). */
+  threadId: UuidSchema.optional(),
+  /** One message in the thread to scroll to and mark. */
+  messageId: UuidSchema.optional(),
+  /** One section of the page to scroll to and mark. */
+  sectionId: QNavigateSectionIdSchema.optional(),
+  /** One item on the page (a Board item) to scroll to and mark. */
+  itemId: UuidSchema.optional(),
+  /** Where the page lands: its top, the section, or the latest entry. */
+  position: QNavigatePositionSchema.optional(),
+} as const;
+
+function sectionPositionNamesSection(target: {
+  readonly position?: QNavigatePosition | undefined;
+  readonly sectionId?: string | undefined;
+}): boolean {
+  return target.position !== "section" || target.sectionId !== undefined;
+}
+
+export const QNavigateTargetDetailSchema = z
+  .object(QNavigateTargetDetailShape)
+  .strict()
+  .refine(sectionPositionNamesSection, {
+    message: "position section names its section",
+    path: ["sectionId"],
+  });
+export type QNavigateTargetDetail = z.infer<typeof QNavigateTargetDetailSchema>;
+
 export const QNavigateIntentSchema = z
   .object({
     kind: z.literal("NAVIGATE"),
     destination: QNavigateDestinationSchema,
+    /** W3.1: the exact place on the destination; absent = its top. */
+    target: QNavigateTargetDetailSchema.optional(),
   })
   .strict();
 
@@ -397,6 +470,11 @@ const RELATIONSHIP_PAGES: ReadonlySet<string> = new Set([
   "RELATIONSHIP_INVESTOR_MESSAGES",
 ]);
 
+const RECORD_TAB_PAGES: ReadonlySet<string> = new Set([
+  ...COMPANY_PROFILE_PAGES,
+  ...RELATIONSHIP_PAGES,
+]);
+
 /** Whether a tab belongs to a record page (a company's tab on a relationship is not one). */
 export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
   if (COMPANY_PROFILE_PAGES.has(page)) {
@@ -447,8 +525,23 @@ export const QOpenRecordPageIntentSchema = z
      * it and marks it.
      */
     anchor: QDailyAnchorSchema.optional(),
+    /**
+     * W3.1: the exact place on the record's page. The record's tab stays
+     * `tab` (above); `target.tab` is for pages whose tabs are not record
+     * tabs (an investor's page: "looks-for", "gate").
+     */
+    target: QNavigateTargetDetailSchema.optional(),
   })
   .strict()
+  .refine(
+    (intent) =>
+      intent.target?.tab === undefined ||
+      (intent.tab === undefined && !RECORD_TAB_PAGES.has(intent.page)),
+    {
+      message: "a record page's tab is `tab`, not `target.tab`",
+      path: ["target", "tab"],
+    },
+  )
   .refine(
     (intent) => intent.anchor === undefined || intent.page === "DAILY_EDITION",
     { message: "an anchor belongs to a Daily edition", path: ["anchor"] },
@@ -483,6 +576,123 @@ export const QOpenRecordPageIntentSchema = z
       path: ["section"],
     },
   );
+
+/**
+ * W3.1: one target as a whole -- a page (a named destination or a record
+ * page) plus where on it -- the shape the navigation decision (W4) returns
+ * and the site map (W2) describes. `navigateTargetToIntent` turns it into
+ * the NAVIGATE or OPEN_RECORD_PAGE a browser follows; `intentToNavigateTarget`
+ * reads it back. A record page needs its `recordId`.
+ */
+export const QNavigateTargetSchema = z
+  .object({
+    page: z.union([QNavigateDestinationSchema, QRecordPageSchema]),
+    /** The record's id, for a record page (company, relationship, ...). */
+    recordId: UuidSchema.optional(),
+    /** DATA_ROOM_DOCUMENT: the company whose data room holds it. */
+    companyId: UuidSchema.optional(),
+    ...QNavigateTargetDetailShape,
+  })
+  .strict()
+  .refine(sectionPositionNamesSection, {
+    message: "position section names its section",
+    path: ["sectionId"],
+  })
+  .refine(
+    (target) =>
+      QRecordPageSchema.safeParse(target.page).success ===
+      (target.recordId !== undefined),
+    {
+      message: "a record page, and only one, names its record",
+      path: ["recordId"],
+    },
+  );
+export type QNavigateTarget = z.infer<typeof QNavigateTargetSchema>;
+
+type QNavigateTargetIntent =
+  | z.infer<typeof QNavigateIntentSchema>
+  | z.infer<typeof QOpenRecordPageIntentSchema>;
+
+function detailOf(
+  fields: Partial<Record<keyof typeof QNavigateTargetDetailShape, unknown>>,
+): QNavigateTargetDetail | undefined {
+  const detail: Record<string, unknown> = {};
+  for (const key of Object.keys(QNavigateTargetDetailShape)) {
+    const value = fields[key as keyof typeof QNavigateTargetDetailShape];
+    if (value !== undefined) detail[key] = value;
+  }
+  if (Object.keys(detail).length === 0) return undefined;
+  return QNavigateTargetDetailSchema.parse(detail);
+}
+
+/**
+ * The intent a browser follows for a target, validated (throws on a target
+ * the intent schemas refuse, e.g. a record tab its page does not have). A
+ * record page's own tab (company, relationship) becomes the intent's `tab`.
+ */
+export function navigateTargetToIntent(
+  target: QNavigateTarget,
+): QNavigateTargetIntent {
+  const parsed = QNavigateTargetSchema.parse(target);
+  const { page, recordId, companyId, ...rest } = parsed;
+  const record = QRecordPageSchema.safeParse(page);
+  if (!record.success) {
+    const destination = QNavigateDestinationSchema.parse(page);
+    const detail = detailOf(rest);
+    return QNavigateIntentSchema.parse({
+      kind: "NAVIGATE",
+      destination,
+      ...(detail === undefined ? {} : { target: detail }),
+    });
+  }
+  const recordTab =
+    rest.tab !== undefined && RECORD_TAB_PAGES.has(record.data)
+      ? rest.tab
+      : undefined;
+  const detail = detailOf(
+    recordTab === undefined ? rest : { ...rest, tab: undefined },
+  );
+  return QOpenRecordPageIntentSchema.parse({
+    kind: "OPEN_RECORD_PAGE",
+    page: record.data,
+    id: recordId,
+    ...(companyId === undefined ? {} : { companyId }),
+    ...(recordTab === undefined ? {} : { tab: recordTab }),
+    ...(detail === undefined ? {} : { target: detail }),
+  });
+}
+
+/**
+ * The target an intent names (the inverse of `navigateTargetToIntent` for
+ * the target fields; the deck sub-tab, viewer, profile section and Daily
+ * anchor stay on the intent).
+ */
+export function intentToNavigateTarget(
+  intent: QNavigateTargetIntent,
+): QNavigateTarget {
+  if (intent.kind === "NAVIGATE") {
+    return { page: intent.destination, ...intent.target };
+  }
+  return {
+    page: intent.page,
+    recordId: intent.id,
+    ...(intent.companyId === undefined ? {} : { companyId: intent.companyId }),
+    ...intent.target,
+    ...(intent.tab === undefined ? {} : { tab: intent.tab }),
+  };
+}
+
+/**
+ * The same intent without the W3.1 `target`: the shape a browser bundle
+ * from before W3.1 accepts (it lands on the page, as before).
+ */
+export function withoutNavigateTarget<T extends QNavigateTargetIntent>(
+  intent: T,
+): T {
+  if (intent.target === undefined) return intent;
+  const { target: _target, ...legacy } = intent;
+  return legacy as T;
+}
 
 /**
  * Setup reminders (founder directive 2026-09-27): take the person back to
@@ -803,6 +1013,32 @@ export const QCardsIntentSchema = z
   );
 export type QCardsIntent = z.infer<typeof QCardsIntentSchema>;
 
+/**
+ * Q Workspace W1.5 (DECISIONS 71): Q opens or collapses the Q pane and
+ * the page pane ("hide the pages", "close the chat"), typed or spoken.
+ * Layout is not an action: no approval (plan §7, class NONE). Emitted
+ * only where the workspace flag is not off; a browser bundle from before
+ * it drops a frame that carries it (strict union).
+ */
+export const Q_WORKSPACE_PANE_STATES = ["open", "collapsed"] as const;
+export const QWorkspacePaneStateSchema = z.enum(Q_WORKSPACE_PANE_STATES);
+export type QWorkspacePaneState = z.infer<typeof QWorkspacePaneStateSchema>;
+
+export const QLayoutSetIntentSchema = z
+  .object({
+    kind: z.literal("LAYOUT_SET"),
+    qPane: QWorkspacePaneStateSchema.optional(),
+    pagePane: QWorkspacePaneStateSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (intent) => intent.qPane !== undefined || intent.pagePane !== undefined,
+    {
+      message: "LAYOUT_SET names at least one pane",
+    },
+  );
+export type QLayoutSetIntent = z.infer<typeof QLayoutSetIntentSchema>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QSetDiscoverFiltersIntentSchema,
@@ -822,6 +1058,8 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QCardsIntentSchema,
   // RECOVERY-2026-10: universal application control (ui-act.ts).
   QUiActIntentSchema,
+  // Q Workspace W1.5.
+  QLayoutSetIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -963,6 +1201,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QDocumentActIntentSchema,
   QCardsIntentSchema,
   QUiActIntentSchema,
+  QLayoutSetIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

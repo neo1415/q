@@ -10,6 +10,7 @@ import {
   QConversationPanel,
   type QSurfaceContext,
 } from "@/features/q/q-conversation";
+import { QSection } from "@/features/q/q-section";
 import type { QStarter } from "@/features/q/q-starters";
 import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { ArrivalStage } from "@/features/briefing/arrival-stage";
@@ -96,25 +97,21 @@ function mindLine(name: string | null): string {
 /** First-run words, the same ones the arrival welcome uses for its choice. */
 const FIRST_RUN_QUESTION = "Are you here to raise capital, or to invest it?";
 
-export async function HomeScreen({
-  conversationId = null,
-  fresh = false,
-  openBoard = false,
-  ask,
-}: {
-  /**
-   * Lane ov 2026-10-16: words to start the composer with ("Ask Q about
-   * their market", a profile section to tell Q about). Only typed for
-   * them; nothing is sent until they press Send.
-   */
-  readonly ask?: string | undefined;
-  /** The conversation the URL names, resolved on the server. */
-  readonly conversationId?: string | null | undefined;
-  /** "New chat" (`?new=1`): a new conversation; a bare /home keeps this tab's. */
-  readonly fresh?: boolean | undefined;
-  /** Arrived from the answer chip's Board (C6): open on the Board. */
-  readonly openBoard?: boolean | undefined;
-} = {}) {
+/** What Home's Q opens with, read on the server (shared with the Q Workspace pane). */
+export type HomeQ = {
+  readonly qConnected: boolean;
+  readonly surface: QSurfaceContext;
+  readonly greeting: string | undefined;
+  readonly starters: readonly QStarter[];
+  readonly welcomeLine: string | undefined;
+  readonly welcomeLead: string | undefined;
+  readonly briefing: Promise<Briefing | null> | undefined;
+  readonly returning: boolean;
+};
+
+export async function resolveHomeQ(
+  conversationId: string | null,
+): Promise<HomeQ> {
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
   // Speed lane 2026-10-20: the snapshot Q greets from is built while this
   // page renders and hydrates, not first asked for after hydration.
@@ -124,8 +121,7 @@ export async function HomeScreen({
   // A setup that was left part-way is offered back, in one tap -- to
   // somebody whose setup has not named a company yet as well, who is
   // back rather than new (CQ-WEB-030). Independent reads, side by side.
-  const [t, language, context, unfinished] = await Promise.all([
-    serverT(),
+  const [language, context, unfinished] = await Promise.all([
     serverUiLanguage(),
     qConnected
       ? resolveOwnContext()
@@ -224,6 +220,41 @@ export async function HomeScreen({
     }
   }
 
+  return {
+    qConnected,
+    surface: surfaceContext(context),
+    greeting,
+    starters,
+    welcomeLine,
+    welcomeLead,
+    briefing,
+    returning: arrival === "RETURNING",
+  };
+}
+
+export async function HomeScreen({
+  conversationId = null,
+  fresh = false,
+  openBoard = false,
+  ask,
+}: {
+  /**
+   * Lane ov 2026-10-16: words to start the composer with ("Ask Q about
+   * their market", a profile section to tell Q about). Only typed for
+   * them; nothing is sent until they press Send.
+   */
+  readonly ask?: string | undefined;
+  /** The conversation the URL names, resolved on the server. */
+  readonly conversationId?: string | null | undefined;
+  /** "New chat" (`?new=1`): a new conversation; a bare /home keeps this tab's. */
+  readonly fresh?: boolean | undefined;
+  /** Arrived from the answer chip's Board (C6): open on the Board. */
+  readonly openBoard?: boolean | undefined;
+} = {}) {
+  const [t, home] = await Promise.all([
+    serverT(),
+    resolveHomeQ(conversationId),
+  ]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/*
@@ -250,20 +281,22 @@ export async function HomeScreen({
       >
         {/* A conversation view still has a page heading (R30 #34). */}
         <h1 className="sr-only">Q</h1>
+        {/* Q Workspace W2: the conversation, a section Q can name. */}
+        <QSection id="q" kind="OTHER" label={t("Ask Q")} />
         <QConversationPanel
-          connected={qConnected}
-          context={surfaceContext(context)}
+          connected={home.qConnected}
+          context={home.surface}
           conversationId={conversationId}
           fresh={fresh}
           openBoard={openBoard}
-          greeting={greeting}
-          starters={starters}
-          welcomeLine={welcomeLine}
-          welcomeLead={welcomeLead}
-          briefing={briefing}
+          greeting={home.greeting}
+          starters={home.starters}
+          welcomeLine={home.welcomeLine}
+          welcomeLead={home.welcomeLead}
+          briefing={home.briefing}
           // E1: what Q did, what needs them and new matches, beside Q for
           // as long as the page lives (not only before the first word).
-          stageLayer={arrival === "RETURNING" ? <ArrivalStage /> : undefined}
+          stageLayer={home.returning ? <ArrivalStage /> : undefined}
           initialAsk={ask}
         />
       </section>

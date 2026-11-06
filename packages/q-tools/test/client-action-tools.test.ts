@@ -12,6 +12,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   OpenWebsiteInputSchema,
+  SetLayoutInputSchema,
   SetThemeInputSchema,
   type QCardReadPort,
 } from "../src/index.js";
@@ -301,5 +302,59 @@ describe("get_q_card", () => {
     );
     expect(outcome.status).toBe("DENIED");
     expect(asked).toEqual([]);
+  });
+});
+
+describe("set_layout (Q Workspace W1.5)", () => {
+  function layoutExecutor(workspace: boolean | undefined) {
+    return createQToolExecutor({
+      registry: createQToolRegistry(
+        createClientActionTools(
+          fakePorts(),
+          workspace === undefined ? {} : { workspaceFor: () => workspace },
+        ),
+      ),
+    });
+  }
+
+  it("collapses the pages in the person's own workspace", async () => {
+    const outcome = await layoutExecutor(true).execute(
+      call("set_layout", { pagePane: "collapsed" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(intentOf(outcome)).toEqual({
+      kind: "LAYOUT_SET",
+      pagePane: "collapsed",
+    });
+  });
+
+  it("is never emitted to a screen that is not the workspace", async () => {
+    for (const workspace of [false, undefined]) {
+      const outcome = await layoutExecutor(workspace).execute(
+        call("set_layout", { qPane: "collapsed" }),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(outcome.status, String(workspace)).not.toBe("SUCCEEDED");
+    }
+  });
+
+  it("is refused outside the person's own conversation", async () => {
+    const outcome = await layoutExecutor(true).execute(
+      call("set_layout", { qPane: "open" }),
+      contextFor(actorB, ownPlan(actorA)),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+
+  it("names at least one pane, with only open or collapsed", () => {
+    expect(SetLayoutInputSchema.safeParse({}).success).toBe(false);
+    expect(SetLayoutInputSchema.safeParse({ pagePane: "hidden" }).success).toBe(
+      false,
+    );
+    expect(
+      SetLayoutInputSchema.safeParse({ qPane: "open", pagePane: "collapsed" })
+        .success,
+    ).toBe(true);
   });
 });

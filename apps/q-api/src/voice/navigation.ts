@@ -2,6 +2,7 @@ import {
   QClientActionIntentSchema,
   type QClientActionIntent,
   type QNavigateDestination,
+  type QNavigateTargetDetail,
   type QResultBlock,
 } from "@capital-q/contracts";
 import {
@@ -22,6 +23,8 @@ import {
  */
 export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
   readonly navigate: QNavigateDestination | null;
+  /** W3.1: where on `navigate`'s page (absent: its top). */
+  readonly navigateTarget?: QNavigateTargetDetail | undefined;
   readonly clientAction: QClientActionIntent | null;
   /**
    * RECOVERY-2026-10 (C2): every client action, in the answer's order. A
@@ -33,6 +36,7 @@ export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
   readonly clientActions: readonly QClientActionIntent[];
 } {
   let navigate: QNavigateDestination | null = null;
+  let navigateTarget: QNavigateTargetDetail | undefined;
   let clientAction: QClientActionIntent | null = null;
   const clientActions: QClientActionIntent[] = [];
   for (const block of blocks ?? []) {
@@ -40,6 +44,7 @@ export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
     const intent = block.intent;
     if (intent.kind === "NAVIGATE") {
       navigate = intent.destination;
+      navigateTarget = intent.target;
       continue;
     }
     // Q room W3: the room's document viewer reads its acts from the
@@ -51,7 +56,7 @@ export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
       clientActions.push(action.data);
     }
   }
-  return { navigate, clientAction, clientActions };
+  return { navigate, navigateTarget, clientAction, clientActions };
 }
 
 /**

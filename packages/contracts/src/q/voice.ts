@@ -9,7 +9,10 @@ import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSilenceBeatSchema } from "./silence-ladder.js";
 import { QSubjectRefsSchema } from "./subject.js";
 import { QFailureClassSchema, QTurnDispositionSchema } from "./turn.js";
-import { QClientActionIntentSchema } from "./ui-intent.js";
+import {
+  QClientActionIntentSchema,
+  QNavigateTargetDetailSchema,
+} from "./ui-intent.js";
 
 /**
  * The realtime voice surface (CQ-Q-VOICE-001 C; doc 12 §7.2, §36).
@@ -843,6 +846,12 @@ export const QVoiceTurnStateSchema = z
       .strict()
       .nullable(),
     navigate: QVoiceDestinationSchema.nullable(),
+    /**
+     * Q Workspace W3.1: where on `navigate`'s page the move lands (a
+     * section, an item, the latest entry); only with `navigate`, and only
+     * where the workspace flag is not off (an older screen refuses it).
+     */
+    navigateTarget: QNavigateTargetDetailSchema.optional(),
     /**
      * R20/R33: something the app does in the browser that Q's answer
      * carried (theme, reload, open their website); followed once, like

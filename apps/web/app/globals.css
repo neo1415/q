@@ -298,6 +298,30 @@
       transition: none;
     }
   }
+  /* Q Workspace W3.3: where a move landed (a section, message or Board
+     item), marked briefly the way Q points: a ring outside the box, so
+     nothing moves. No fade with reduced motion. */
+  [data-q-section] > *,
+  [data-q-message],
+  [data-board-item] {
+    scroll-margin-top: 5rem;
+  }
+  [data-q-arrived] {
+    box-shadow:
+      0 0 0 2px var(--cq-gold-mid),
+      0 0 0 6px color-mix(in oklch, var(--cq-gold-light) 28%, transparent);
+    animation: cq-q-arrived var(--cq-motion-emphasis) var(--cq-ease) both;
+  }
+  @keyframes cq-q-arrived {
+    from {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-q-arrived] {
+      animation: none;
+    }
+  }
   /* The "fictional" foot note never sits under a full-height stage or a
      thread, where it added a strip and a second scroll. The names on those
      pages still lose their mark; the note shows on the next page. */
@@ -5820,4 +5844,349 @@
   white-space: normal;
   text-align: start;
   padding-block: 8px;
+}
+
+/*
+ * Q Workspace (W1, ADR 0077; flag-gated, `.cq-shell[data-workspace]` only).
+ * Desktop: nav | Q pane | page pane. The page keeps the window's scroll, so
+ * every page behaves as it does today; the nav and the Q pane are sticky
+ * columns. The pane layout is read from `<html>` attributes the boot script
+ * sets before paint (data-cq-ws-q, data-cq-ws-page, --cq-ws-q-width), so the
+ * first frame is already the right size. Phone (≤860 px): Q full screen,
+ * the page as a sheet.
+ */
+@layer components {
+  .cq-q-pane {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+  .cq-ws-q {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    width: var(--cq-ws-q-width, 380px);
+    min-width: 0;
+    height: 100dvh;
+    border-inline-end: 1px solid var(--cq-border-subtle);
+    background: var(--cq-stage-canvas);
+  }
+  .cq-ws-q-body {
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+    flex-direction: column;
+  }
+  .cq-ws-q-edge,
+  .cq-ws-toggle.cq-ws-page-expand,
+  .cq-ws-toggle.cq-ws-pages-open,
+  .cq-ws-sheet-bar,
+  .cq-ws-peek {
+    display: none;
+  }
+  .cq-ws-separator {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: -6px;
+    z-index: var(--cq-z-sticky);
+    width: 12px;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .cq-ws-separator::after {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 5px;
+    width: 2px;
+    content: "";
+    background: transparent;
+    transition: background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-ws-separator:hover::after,
+  :root[data-cq-ws-resizing] .cq-ws-separator::after {
+    background: var(--cq-border-strong);
+  }
+  .cq-ws-separator:focus-visible {
+    outline: none;
+  }
+  .cq-ws-separator:focus-visible::after {
+    background: var(--cq-focus-ring);
+  }
+  :root[data-cq-ws-resizing],
+  :root[data-cq-ws-resizing] * {
+    cursor: col-resize;
+    user-select: none;
+  }
+  /* The subtle pane controls (owner: one small icon at each pane's foot). */
+  .cq-ws-q-foot {
+    position: absolute;
+    inset-block-end: 6px;
+    inset-inline-start: 6px;
+    z-index: var(--cq-z-sticky);
+    display: flex;
+  }
+  .cq-ws-toggle {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--cq-radius-md);
+    color: var(--cq-text-tertiary, var(--cq-text-secondary));
+    opacity: 0.7;
+    transition:
+      color var(--cq-motion-fast) var(--cq-ease),
+      opacity var(--cq-motion-fast) var(--cq-ease),
+      background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-ws-q .cq-ws-toggle {
+    color: var(--cq-stage-text);
+  }
+  .cq-ws-toggle:hover,
+  .cq-ws-toggle:focus-visible {
+    opacity: 1;
+    background-color: var(--cq-surface-subtle);
+  }
+  .cq-ws-q .cq-ws-toggle:hover,
+  .cq-ws-q .cq-ws-toggle:focus-visible {
+    background-color: var(--cq-stage-surface-strong);
+  }
+  .cq-ws-toggle:focus-visible,
+  .cq-ws-q-edge:focus-visible,
+  .cq-ws-back-to-q:focus-visible,
+  .cq-ws-peek-button:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
+  .cq-ws-page {
+    min-width: 0;
+  }
+  /* A zero-height strip that sticks to the bottom of the viewport. */
+  .cq-ws-page-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--cq-z-sticky);
+    height: 0;
+  }
+  .cq-ws-page-foot .cq-ws-toggle {
+    position: absolute;
+    inset-block-end: 6px;
+    inset-inline-start: 6px;
+  }
+
+  /* Q collapsed: a thin edge with Q's mark, one tap from open. */
+  :root[data-cq-ws-q="collapsed"] .cq-ws-q {
+    width: 46px;
+  }
+  :root[data-cq-ws-q="collapsed"] .cq-ws-q-body,
+  :root[data-cq-ws-q="collapsed"] .cq-ws-separator,
+  :root[data-cq-ws-q="collapsed"] .cq-ws-q-foot {
+    display: none;
+  }
+  :root[data-cq-ws-q="collapsed"] .cq-ws-q-edge {
+    display: flex;
+    flex: 1 1 auto;
+    width: 46px;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 16px;
+  }
+  /* Pages collapsed: Q has the width. */
+  :root[data-cq-ws-page="collapsed"] .cq-ws-page {
+    display: none;
+  }
+  :root[data-cq-ws-page="collapsed"] .cq-ws-q {
+    flex: 1 1 auto;
+    width: auto;
+    border-inline-end: 0;
+  }
+  :root[data-cq-ws-page="collapsed"] .cq-ws-separator,
+  :root[data-cq-ws-page="collapsed"] .cq-ws-q-collapse {
+    display: none;
+  }
+  :root[data-cq-ws-page="collapsed"] .cq-ws-toggle.cq-ws-page-expand {
+    display: inline-flex;
+  }
+
+  /* Phone (W1.6): Q full screen; the page is a sheet over it. */
+  @media (max-width: 860px) {
+    html:has(.cq-shell[data-workspace]),
+    html:has(.cq-shell[data-workspace]) body {
+      overflow: hidden;
+    }
+    .cq-shell[data-workspace] {
+      height: 100dvh;
+      min-height: 0;
+    }
+    .cq-shell[data-workspace] .cq-ws-q,
+    :root[data-cq-ws-q="collapsed"] .cq-shell[data-workspace] .cq-ws-q {
+      flex: 1 1 auto;
+      width: 100%;
+      border-inline-end: 0;
+    }
+    :root[data-cq-ws-q="collapsed"] .cq-ws-q-body {
+      display: flex;
+    }
+    .cq-ws-separator,
+    .cq-ws-q-foot,
+    .cq-ws-page-foot,
+    :root[data-cq-ws-q="collapsed"] .cq-ws-q-edge {
+      display: none;
+    }
+    /* The way to the pages (and the menu) before Q has moved anywhere. */
+    .cq-ws-toggle.cq-ws-pages-open {
+      position: absolute;
+      top: calc(var(--cq-safe-top) + 6px);
+      inset-inline-start: 6px;
+      z-index: var(--cq-z-sticky);
+      display: inline-flex;
+    }
+    .cq-ws-page,
+    :root[data-cq-ws-page="collapsed"] .cq-ws-page {
+      position: fixed;
+      inset-inline: 0;
+      bottom: 0;
+      top: calc(var(--cq-safe-top) + 16px);
+      z-index: var(--cq-z-sheet);
+      display: flex;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      border-start-start-radius: var(--cq-radius-lg);
+      border-start-end-radius: var(--cq-radius-lg);
+      background: var(--cq-canvas);
+      box-shadow: var(--cq-shadow-overlay);
+      transform: translateY(100%);
+      visibility: hidden;
+      transition:
+        transform var(--cq-motion-base) var(--cq-ease-exit),
+        visibility 0s linear var(--cq-motion-base);
+    }
+    .cq-ws-page[data-ws-sheet="open"] {
+      transform: none;
+      visibility: visible;
+      transition:
+        transform var(--cq-motion-base) var(--cq-ease),
+        visibility 0s;
+    }
+    .cq-ws-page .cq-shell-header {
+      position: static;
+      padding-top: 0;
+    }
+    .cq-ws-sheet-bar {
+      position: sticky;
+      top: 0;
+      z-index: var(--cq-z-sticky);
+      display: flex;
+      border-bottom: 1px solid var(--cq-border-subtle);
+      background: var(--cq-canvas);
+      padding-inline: 8px;
+    }
+    .cq-ws-back-to-q {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 6px;
+      padding-inline: 8px;
+      color: var(--cq-text-primary);
+      font-weight: 500;
+    }
+    .cq-ws-peek {
+      position: fixed;
+      inset-inline: 12px;
+      bottom: calc(var(--cq-safe-bottom) + 88px);
+      z-index: var(--cq-z-popover);
+      display: flex;
+    }
+    .cq-ws-peek-button {
+      display: flex;
+      width: 100%;
+      min-height: 44px;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--cq-border-subtle);
+      border-radius: var(--cq-radius-lg);
+      background: var(--cq-surface-raised);
+      box-shadow: var(--cq-shadow-overlay);
+      padding-inline: 12px;
+      color: var(--cq-text-primary);
+      text-align: start;
+    }
+    .cq-ws-peek-view {
+      margin-inline-start: auto;
+      font-weight: 600;
+    }
+    .cq-q-pane [data-q-lumen],
+    .cq-q-pane [data-q-presence="corner"] {
+      display: none;
+    }
+    .cq-q-pane .cq-q-top-line {
+      padding-top: calc(var(--cq-safe-top) + 8px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-ws-page,
+    .cq-ws-page[data-ws-sheet="open"],
+    .cq-ws-separator::after,
+    .cq-ws-toggle {
+      transition: none;
+    }
+  }
+}
+
+/*
+ * Q Workspace (ADR 0077): the Q pane is 300-640 px wide (wider only when
+ * the pages are collapsed), but the panel's responsive classes read the
+ * viewport. Inside the pane only, each viewport breakpoint the panel uses
+ * falls back to its below-breakpoint layout while the pane is narrower than
+ * that breakpoint. Utilities layer, so these outrank the breakpoint
+ * utilities; scoped to `.cq-q-pane`, so the flag-off app is untouched.
+ */
+@layer components {
+  .cq-q-pane {
+    container: q-pane / inline-size;
+  }
+}
+@layer utilities {
+  @container q-pane (width < 1280px) {
+    /* The arrival room: cards beside Q only on the wide stage. */
+    .cq-q-pane [data-q-room].xl\:grid {
+      display: flex;
+    }
+    .cq-q-pane .hidden.xl\:flex {
+      display: none;
+    }
+    .cq-q-pane .xl\:grid-cols-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @container q-pane (width < 1024px) {
+    .cq-q-pane .lg\:grid-cols-3 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @container q-pane (width < 768px) {
+    /* The deck room: slides above their thumbnails, not beside. */
+    .cq-q-pane .md\:grid-cols-\[minmax\(0\,1fr\)_10\.75rem\] {
+      grid-template-columns: none;
+    }
+    .cq-q-pane .grid-cols-5.md\:grid-cols-2 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      max-height: none;
+      overflow-y: visible;
+    }
+    .cq-q-pane .md\:w-auto.w-full {
+      width: 100%;
+    }
+  }
+  @container q-pane (width < 640px) {
+    .cq-q-pane .sm\:grid-cols-2 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+  }
 }

@@ -92,9 +92,14 @@ export {
   createReloadPageTool,
   createSetThemeTool,
   createSetQMotionTool,
+  createSetLayoutTool,
+  SetLayoutInputSchema,
+  type SetLayoutInput,
+  type WorkspaceReader,
   createSetVoiceTool,
   createSignOutTool,
   SET_Q_MOTION,
+  SET_LAYOUT,
   SET_VOICE,
   SIGN_OUT,
   OPEN_PAGE,
@@ -863,3 +868,14 @@ export {
   type BoardWorkOutcome,
 } from "./tools/board.js";
 export type { QBoardOutcome, QBoardPort } from "./ports.js";
+
+// Q Workspace W2.3: resolve the instance behind a site-map place, as the person.
+export {
+  createResolvePageTargetTool,
+  Q_PAGE_TARGET_KINDS,
+  RESOLVE_PAGE_TARGET,
+  ResolvePageTargetInputSchema,
+  ResolvePageTargetOutputSchema,
+  type ResolvePageTargetInput,
+  type ResolvePageTargetOutput,
+} from "./tools/site-target.js";

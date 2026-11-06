@@ -44,6 +44,7 @@ import {
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
+import { navigateIntentPath } from "./control/deep-link";
 import { isLineLive, upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import {
@@ -700,7 +701,14 @@ export function QSessionProvider({
     // R3: the move is asked for first (the one lifecycle executes and
     // verifies it), so the answer's UI acts wait for the page it opens.
     // The fast path already went there for this sentence: one move.
-    const path = destinationPath(followed.navigate);
+    // W3.2: at the exact place the answer names (a section, a document).
+    const path =
+      followed.navigate === null
+        ? null
+        : navigateIntentPath({
+            destination: followed.navigate,
+            target: followed.navigateTarget,
+          });
     if (path !== null && answerMove(path)) act();
     // R20/R33: the app's own actions the answer carries, done once.
     for (const action of followed.actions) performClientAction(action);

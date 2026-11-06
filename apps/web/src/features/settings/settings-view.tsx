@@ -38,23 +38,16 @@ import {
   VoiceChoice,
   WakeRow,
 } from "./settings-controls";
+import { WorkspaceRow } from "@/features/workspace/workspace-setting";
 import { SettingsJumpIndex } from "./settings-index";
+import {
+  SETTINGS_PAGE_SECTIONS,
+  type SettingsPageSectionId,
+} from "./settings-sections";
 
-const SECTIONS = [
-  { id: "profile", label: "Your profile" },
-  { id: "account", label: "Account" },
-  { id: "security", label: "Security" },
-  { id: "team", label: "Team" },
-  { id: "appearance", label: "Appearance" },
-  { id: "q", label: "Q" },
-  { id: "speaking", label: "How Q speaks for you" },
-  { id: "notifications", label: "Notifications" },
-  { id: "connections", label: "Connections" },
-  { id: "billing", label: "Plan and billing" },
-  { id: "privacy", label: "Privacy" },
-] as const;
+const SECTIONS = SETTINGS_PAGE_SECTIONS;
 
-type SectionId = (typeof SECTIONS)[number]["id"];
+type SectionId = SettingsPageSectionId;
 
 const ROLE_WORD = {
   OWNER: "an owner",
@@ -135,21 +128,24 @@ export function SettingsView({
 
   const group = (id: SectionId, title: string, body: ReactNode) => (
     <QControl key={id} id={`section.${id}`} kind="SECTION">
-      <section
-        id={id}
-        aria-labelledby={`${id}-heading`}
-        className="scroll-mt-6"
-      >
-        <h2
-          id={`${id}-heading`}
-          className="m-0 mt-[30px] mb-2.5 text-[17px] font-semibold text-(--cq-text-primary)"
+      {/* Q Workspace W2: each group is a section Q can name (the site map). */}
+      <QSection id={id} kind="SETTINGS" label={title}>
+        <section
+          id={id}
+          aria-labelledby={`${id}-heading`}
+          className="scroll-mt-6"
         >
-          {title}
-        </h2>
-        <div className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-1">
-          {body}
-        </div>
-      </section>
+          <h2
+            id={`${id}-heading`}
+            className="m-0 mt-[30px] mb-2.5 text-[17px] font-semibold text-(--cq-text-primary)"
+          >
+            {title}
+          </h2>
+          <div className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-1">
+            {body}
+          </div>
+        </section>
+      </QSection>
     </QControl>
   );
 
@@ -397,6 +393,7 @@ export function SettingsView({
                     <VoiceChoice />
                   </SRow>
                   <WakeRow />
+                  <WorkspaceRow />
                   <SRow
                     title={t("Listening sounds")}
                     description={t(
