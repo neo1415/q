@@ -98,6 +98,7 @@ import { PhoneShellLead } from "@/components/app-shell/phone-lead";
 import { QStarters, startersOf, type QStarter } from "./q-starters";
 import { showOnStage } from "./q-presence-stage";
 import { QCurrentExchange } from "./q-current-exchange";
+import { continuationLine, threadOfTurns } from "./continuation";
 import { noteQPageView } from "./screen";
 import {
   readStageView,
@@ -419,7 +420,20 @@ export function QConversationPanel({
     // asking to be briefed, so the briefing is read (not awaited) and the
     // stage hands it to the line when it lands.
     const fresh = turns.length === 0 && spoken.length === 0;
-    const greeting = fresh ? openingWords() : undefined;
+    // Owner 2026-11-06: one conversation under both views. With turns
+    // already (typed in Chat or said earlier), Q carries on from this
+    // thread on the same conversation, never the arrival greeting.
+    const greeting = fresh
+      ? openingWords()
+      : (continuationLine(
+          turns.length > 0
+            ? threadOfTurns(turns)
+            : spoken.map((line) => ({
+                role:
+                  line.role === "user" ? ("person" as const) : ("q" as const),
+                text: line.text,
+              })),
+        ) ?? undefined);
     if (fresh && arrivalSpoken() === null) {
       void voiceBriefing().catch(() => null);
     }

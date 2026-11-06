@@ -464,3 +464,30 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
     expect(document.querySelector("[data-q-voice-room]")).toBeNull();
   });
 });
+
+describe("one conversation under both views (owner 2026-11-06)", () => {
+  it("switching to Q mid-conversation carries on from the thread, never the arrival greeting", async () => {
+    state.turns = longConversation();
+    await renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Q" }));
+    expect(talk).toHaveBeenCalledTimes(1);
+    const greeting =
+      (
+        talk.mock.calls[0] as unknown as [{ greeting?: string }] | undefined
+      )?.[0]?.greeting ?? "";
+    expect(greeting).toContain("Find me founders raising in fintech");
+    expect(greeting).toContain("I found five");
+    expect(greeting).not.toContain("Welcome back");
+    expect(greeting).not.toMatch(/things? (are )?waiting/u);
+  });
+
+  it("an empty thread still opens with the arrival greeting", async () => {
+    await renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Q" }));
+    const greeting =
+      (
+        talk.mock.calls[0] as unknown as [{ greeting?: string }] | undefined
+      )?.[0]?.greeting ?? "";
+    expect(greeting).toBe("Welcome back, David.");
+  });
+});
