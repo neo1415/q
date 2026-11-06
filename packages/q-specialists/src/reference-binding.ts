@@ -30,6 +30,15 @@ export type ReaderReference = {
   readonly phrase: string;
   readonly entityIds: readonly string[];
   readonly confidence: "HIGH" | "MEDIUM" | "LOW";
+  /** v79: a name written in the recent turns (see withNamedReferences). */
+  readonly named?:
+    | {
+        readonly name: string;
+        readonly kind:
+          "COMPANY" | "INVESTOR_ORGANISATION" | "PERSON" | "DOCUMENT";
+      }
+    | null
+    | undefined;
 };
 
 export type BoundReference = {

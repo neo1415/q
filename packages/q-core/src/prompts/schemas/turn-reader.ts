@@ -1236,3 +1236,42 @@ export const TurnReaderV78ResultSchema = TurnReaderV77ResultSchema.extend({
   asksForWeb: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV78Result = z.infer<typeof TurnReaderV78ResultSchema>;
+
+/**
+ * v79 (live 2026-11-06, QIQ-PRO-001). Q named Silo Credit's CEO and CFO
+ * from authorised facts that carry no record ids, so the LEDGER held
+ * neither; the reader could point "she" at no ref and wrote it with none,
+ * and Q asked who she was. A reference may now carry `named`: the name, as
+ * written in RECENT TURNS, of the person, company, investor or document it
+ * means when no LEDGER entry is that one, with its kind. Code keeps the
+ * name only when it really is in the conversation's words and adds it to
+ * that turn's ledger as a name with no record behind it (or the entry that
+ * already holds that name); a name is never a record id.
+ */
+export const TURN_READER_V79_SCHEMA_VERSION = 79;
+export const TURN_REFERENCE_NAMED_KINDS = [
+  "PERSON",
+  "COMPANY",
+  "INVESTOR_ORGANISATION",
+  "DOCUMENT",
+] as const;
+export const TurnReaderNamedReferenceSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    kind: z.enum(TURN_REFERENCE_NAMED_KINDS),
+  })
+  .strict();
+export const TurnReaderV79ReferenceSchema = TurnReaderReferenceSchema.extend({
+  named: TurnReaderNamedReferenceSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV79Reference = z.infer<
+  typeof TurnReaderV79ReferenceSchema
+>;
+export const TurnReaderV79ResultSchema = TurnReaderV78ResultSchema.extend({
+  references: z
+    .array(TurnReaderV79ReferenceSchema)
+    .max(TURN_READER_REFERENCES_MAX)
+    .default([])
+    .catch([]),
+}).strict();
+export type TurnReaderV79Result = z.infer<typeof TurnReaderV79ResultSchema>;

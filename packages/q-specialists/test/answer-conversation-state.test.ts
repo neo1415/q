@@ -86,6 +86,14 @@ const BASE: QTurnReading = {
   tool: null,
 } as unknown as QTurnReading;
 
+/** As the reader writes them: `named` (v79) may be left out. */
+type ReaderReferences = readonly (Omit<
+  NonNullable<QTurnReading["references"]>[number],
+  "named"
+> & {
+  readonly named?: NonNullable<QTurnReading["references"]>[number]["named"];
+})[];
+
 function memoryStore(options: StoreOptions = {}) {
   let stored: QConversationState | null = null;
   const reads = { find: 0, latestSummary: 0 };
@@ -133,7 +141,7 @@ type StoreOptions = {
 };
 
 function conversation(
-  references: QTurnReading["references"] = [],
+  references: ReaderReferences = [],
   storeOptions: StoreOptions = {},
 ) {
   const conversationId = randomUUID();
@@ -269,7 +277,7 @@ const LEDGERFOLD = "5f0c9a5e-1d1e-4c55-9d2b-3f6c1b7a0a11";
 const SILO_HEALTH = "6a1d0b6f-2e2f-4d66-8e3c-4a7d2c8b1b22";
 
 /** Q showed two companies as cards: E1 Silo Credit, E2 Ledgerfold. */
-function twoCards(references: QTurnReading["references"]) {
+function twoCards(references: ReaderReferences) {
   const c = conversation(references);
   c.add("USER", "Show me SME lenders.");
   c.add("Q", "Two stand out.", [
@@ -343,7 +351,7 @@ describe("step 3: the reader's references, bound by code against the ledger", ()
 describe("live QIQ-PRO-001: pronouns after Q named the people", () => {
   const CLARIFY = /not sure who or what you mean/u;
 
-  function siloTeam(references: QTurnReading["references"]) {
+  function siloTeam(references: ReaderReferences) {
     const c = conversation(references);
     c.add("USER", "Who are Silo Credit's CEO and CFO?");
     c.add("Q", "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze.");
@@ -366,6 +374,67 @@ describe("live QIQ-PRO-001: pronouns after Q named the people", () => {
       );
     });
   }
+
+  for (const [said, phrase, name, kind] of [
+    ["When did she join?", "she", "Ngozi Eze", "PERSON"],
+    ["What did his career look like before?", "his", "Tunde Bakare", "PERSON"],
+    ["How much are they raising?", "they", "Silo Credit", "COMPANY"],
+  ] as const) {
+    it(`v79 reading of "${phrase}" binds ${name}, said a line before`, async () => {
+      const c = siloTeam([
+        { phrase, entityIds: [], confidence: "HIGH", named: { name, kind } },
+      ]);
+      c.add("USER", said);
+      await c.answer.answer(request());
+      expect(c.inserted).toEqual([]);
+      const note = c.delegatedWith[0]?.references ?? "";
+      expect(note).toContain(`"${phrase}" means E`);
+      expect(note).toContain(`"${name}" (no record behind it)`);
+      // Ids are never invented: a name has no record behind it.
+      expect(c.delegatedWith[0]?.referencedCompanyIds).toBeUndefined();
+    });
+  }
+
+  it("v79: a name the conversation never said is never bound (no invention)", async () => {
+    const c = siloTeam([
+      {
+        phrase: "she",
+        entityIds: [],
+        confidence: "HIGH",
+        named: { name: "Amara Osei", kind: "PERSON" },
+      },
+    ]);
+    c.add("USER", "When did she join?");
+    await c.answer.answer(request());
+    const note = c.delegatedWith[0]?.references ?? "";
+    expect(note).not.toContain("Amara Osei");
+    expect(note).toContain('"she": nothing in the conversation');
+  });
+
+  it("v79: two named readings of one phrase still ask, naming both (Silo Credit vs Silo Health)", async () => {
+    const c = conversation([
+      {
+        phrase: "it",
+        entityIds: [],
+        confidence: "MEDIUM",
+        named: { name: "Silo Credit", kind: "COMPANY" },
+      },
+      {
+        phrase: "it",
+        entityIds: [],
+        confidence: "MEDIUM",
+        named: { name: "Silo Health", kind: "COMPANY" },
+      },
+    ]);
+    c.add("USER", "Tell me about Silo Credit and Silo Health.");
+    c.add("Q", "Silo Credit lends to SMEs; Silo Health runs clinics.");
+    c.add("USER", "What's its runway?");
+    await c.answer.answer(request());
+    expect(c.delegatedWith).toHaveLength(0);
+    expect(c.inserted).toEqual([
+      'By "it", do you mean Silo Credit or Silo Health?',
+    ]);
+  });
 
   it('production 1ef895999: "the first one" over the founders Q listed in words is read from the turns, never asked', async () => {
     const c = conversation([

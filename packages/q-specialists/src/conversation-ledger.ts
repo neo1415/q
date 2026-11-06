@@ -317,7 +317,22 @@ const ID_KEYS: readonly [string, QLedgerEntityKind][] = [
   ["documentId", "DOCUMENT"],
   ["planId", "PLAN"],
 ];
-const NAME_KEYS = ["name", "displayName", "fullName", "legalName", "title"];
+// canonicalName: company.get names its company there (live 2026-11-06,
+// QIQ-PRO-001: the company Q had just read was missing from the ledger).
+const NAME_KEYS = [
+  "name",
+  "displayName",
+  "fullName",
+  "canonicalName",
+  "legalName",
+  "title",
+];
+/**
+ * A person on a record's team as the tool returns it: a name and a role
+ * field, no record id of their own (company.get `team`). Structural over
+ * the tool's own output, never over anyone's words.
+ */
+const ROLE_KEYS = ["businessTitle", "role"];
 
 /**
  * Records in a tool result Q read for this person: any object carrying a
@@ -326,14 +341,16 @@ const NAME_KEYS = ["name", "displayName", "fullName", "legalName", "title"];
  */
 function foldFetched(draft: Draft, result: unknown, turn: number): void {
   let seen = 0;
-  const walk = (value: unknown, depth: number) => {
+  const walk = (value: unknown, depth: number, owner: string | null) => {
     if (seen >= FETCH_RECORDS_MAX || depth > 6) return;
     if (Array.isArray(value)) {
-      for (const item of value.slice(0, 40)) walk(item, depth + 1);
+      for (const item of value.slice(0, 40)) walk(item, depth + 1, owner);
       return;
     }
     if (value === null || typeof value !== "object") return;
     const record = value as Record<string, unknown>;
+    let here = owner;
+    let folded = false;
     for (const [key, kind] of ID_KEYS) {
       const id = record[key];
       if (typeof id !== "string" || id.length === 0 || id.length > 120) {
@@ -344,13 +361,41 @@ function foldFetched(draft: Draft, result: unknown, turn: number): void {
       );
       const name = nameKey === undefined ? null : (record[nameKey] as string);
       if (name === null) continue;
-      upsert(draft, { kind, id, name, turn, via: "FETCHED" });
+      const entity = upsert(draft, {
+        kind,
+        id,
+        name,
+        turn,
+        via: "FETCHED",
+        ...(kind === "PERSON" ? { of: owner } : {}),
+      });
+      if (entity !== null) here = entity.ref;
       seen += 1;
+      folded = true;
       break;
     }
-    for (const field of Object.values(record)) walk(field, depth + 1);
+    if (!folded && owner !== null && typeof record.name === "string") {
+      // A team member Q read: in play by name and role, tied to its
+      // record. No id is made up for them; the ledger says so.
+      const roleKey = ROLE_KEYS.find((key) => key in record);
+      if (roleKey !== undefined) {
+        const role = record[roleKey];
+        upsert(draft, {
+          kind: "PERSON",
+          id: null,
+          name: record.name,
+          turn,
+          via: "FETCHED",
+          of: owner,
+          value:
+            typeof role === "string" ? cleanName(role)?.slice(0, 60) : null,
+        });
+        seen += 1;
+      }
+    }
+    for (const field of Object.values(record)) walk(field, depth + 1, here);
   };
-  walk(result, 0);
+  walk(result, 0, null);
 }
 
 const escapeForPattern = (text: string) =>
@@ -526,6 +571,83 @@ export function withMentions(
   return {
     ...state,
     ledger: { entities: draft.entities, lists: draft.lists },
+  };
+}
+
+/** A reader reference that may carry a name instead of a ref (v79). */
+export type NamedReference = {
+  readonly phrase: string;
+  readonly entityIds: readonly string[];
+  readonly confidence: "HIGH" | "MEDIUM" | "LOW";
+  readonly named?:
+    | {
+        readonly name: string;
+        readonly kind: Exclude<QLedgerEntityKind, "FIGURE" | "PLAN">;
+      }
+    | null
+    | undefined;
+};
+
+/**
+ * Live 2026-11-06 (QIQ-PRO-001): Q named Silo Credit's CEO and CFO in its
+ * answer from authorised facts that carry no record ids, so the ledger
+ * held neither; "when did she join?" had no entry to point at, and Q asked
+ * who "she" was. The reader (v79) now reads such a reference to a name
+ * written in RECENT TURNS. Code keeps that name only when it really is in
+ * the conversation's words (Q's or theirs); a name never said is dropped,
+ * so the ledger cannot be seeded with an invention. A name the ledger
+ * already holds takes that entry (and its record id, which only a tool
+ * result or a block put there); a new one is a name with no record behind
+ * it. The reading then points at that entry's ref. A reading that also
+ * gave refs keeps its refs: the ledger wins over a name.
+ */
+export function withNamedReferences<Reference extends NamedReference>(
+  state: QConversationState,
+  references: readonly Reference[],
+  said: readonly { readonly text: string; readonly byQ: boolean }[],
+): {
+  readonly state: QConversationState;
+  readonly references: readonly Reference[];
+} {
+  if (!references.some((reference) => reference.named != null)) {
+    return { state, references };
+  }
+  const draft: Draft = {
+    entities: [...state.ledger.entities],
+    lists: [...state.ledger.lists],
+  };
+  const turn = Math.max(1, state.messagesFolded);
+  const mapped = references.map((reference) => {
+    const named = reference.named;
+    if (named == null || reference.entityIds.length > 0) return reference;
+    const name = cleanName(named.name);
+    const where =
+      name === null ? [] : said.filter((one) => namesIn(one.text, name));
+    if (name === null || where.length === 0) return reference;
+    const known = draft.entities.find(
+      (entity) =>
+        entity.kind !== "FIGURE" &&
+        entity.name?.toLowerCase() === name.toLowerCase(),
+    );
+    const entity =
+      known ??
+      upsert(draft, {
+        kind: named.kind,
+        id: null,
+        name,
+        turn,
+        via: where.some((one) => one.byQ) ? "SAID_BY_Q" : "SAID_BY_THEM",
+      });
+    return entity === null
+      ? reference
+      : { ...reference, entityIds: [entity.ref] };
+  });
+  return {
+    state: {
+      ...state,
+      ledger: { entities: draft.entities, lists: draft.lists },
+    },
+    references: mapped,
   };
 }
 

@@ -111,7 +111,7 @@ describe("Q-IQ — reference binding through the runtime with a scripted reader"
       c.category === "FOLLOW_UPS",
   );
 
-  for (const mode of ["LIVE_V78"] as const) {
+  for (const mode of ["LIVE_V78", "V79"] as const) {
     it(`${mode}: pronouns bind or are read from the turns, and the confusable pairs still ask`, async () => {
       expect(cases.some((c) => c.id === "QIQ-PRO-001")).toBe(true);
       const q = await createQIqWorldSubject({

@@ -181,6 +181,7 @@ import {
   foldConversationState,
   renderConversationState,
   withFetchedRecords,
+  withNamedReferences,
 } from "./conversation-ledger.js";
 import type {
   QSpecialist,
@@ -6573,9 +6574,24 @@ export function createSpecialistQAnswer(
       pointed?.control !== undefined ||
       (pointed?.resolved?.kind === "ONE" && pointed.resolved.via === "PAGE");
     if (read !== null && read.addressedToQ !== false) {
+      // v79: a name the reader read the words to joins this turn's ledger
+      // only when it really is in the conversation's words (no invention,
+      // no id made up); the stored turns hold their words this turn too.
+      const shown = shownStateInRun.get(request.runId) ?? null;
+      const named =
+        shown === null || read.references === undefined
+          ? null
+          : withNamedReferences(
+              shown,
+              read.references,
+              history.map((message) => ({
+                text: message.content,
+                byQ: message.role === "Q",
+              })),
+            );
       const binding = bindReferences(
-        read.references,
-        shownStateInRun.get(request.runId) ?? null,
+        named?.references ?? read.references,
+        named?.state ?? shown,
       );
       if (binding.rejected.length > 0) {
         logger?.warn(
