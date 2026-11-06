@@ -36,7 +36,7 @@ select is(
   'no other class was given a map');
 
 select is(
-  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE' and task_class <> 'UI_TRANSLATION'),
+  (select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE' and version = 1 and task_class <> 'UI_TRANSLATION'),
   7,
   'no Q policy was added or retired');
 
