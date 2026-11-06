@@ -76,6 +76,12 @@ export function registerLiveVoiceRoutes(
      */
     readonly allowedUsers: ReadonlySet<string> | null;
     /**
+     * DECISIONS 68: true while the OpenAI account is out. Live voice is
+     * then not offered (it is OpenAI), and the answer is never remembered,
+     * so it comes back the moment the account does.
+     */
+    readonly unavailable?: (() => boolean) | undefined;
+    /**
      * Names this person is likely to say (their records, their
      * counterparts), for the voice to recognise and pronounce. A failed
      * read costs the line its names, never the line.
@@ -290,11 +296,28 @@ export function registerLiveVoiceRoutes(
   // Answered from memory for a token seen in the last few minutes (no
   // Auth server call, no database read): availability-cache.ts.
   const availability = createAvailabilityCache();
+  const remembered = availability.hook(withContext);
+  const unavailable = (): boolean => dependencies.unavailable?.() === true;
   app.get(
     Q_VOICE_LIVE_AVAILABLE_PATH,
-    { onRequest: availability.hook(withContext) },
+    {
+      // A remembered "yes" is not given while the account is out.
+      onRequest: function liveAvailableHook(
+        this: FastifyInstance,
+        request: FastifyRequest,
+        reply: FastifyReply,
+        done: (error?: Error) => void,
+      ): void {
+        if (unavailable()) {
+          withContext.call(this, request, reply, done);
+          return;
+        }
+        remembered.call(this, request, reply, done);
+      },
+    },
     async (request, reply) => {
-      let available = broker.enabled && mayOpen(request);
+      const out = unavailable();
+      let available = !out && broker.enabled && mayOpen(request);
       // A spent, held or unreadable trial is unavailable. Its LIVE-only
       // binding never authorises an unmetered fallback.
       if (available && broker.isTrialUser(getActorContext(request).userId)) {
@@ -305,7 +328,7 @@ export function registerLiveVoiceRoutes(
       }
       // Trial balances and account claims change during a call; cache only
       // ordinary configured access, never a trial's mutable availability.
-      if (!broker.isTrialUser(getActorContext(request).userId))
+      if (!out && !broker.isTrialUser(getActorContext(request).userId))
         availability.remember(request, available);
       return reply
         .code(200)
