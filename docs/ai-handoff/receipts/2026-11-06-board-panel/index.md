@@ -10,3 +10,5 @@
 - `prod-after.png`: Timeline / Pinned 0 / Files 6 tabs with a clean file list.
 
 Ships with CI on `c71eb2ee4`.
+
+**Production (deployed `c71eb2ee4` at 10:45 UTC, CI 42201578294 all green):** `live-after-deploy.png` shows the docked Board with Timeline / Pinned 0 / Files 6 tabs and no overlap. No CSS was injected for this check. PASS.
