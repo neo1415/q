@@ -6114,3 +6114,55 @@
     }
   }
 }
+
+/*
+ * Q Workspace (ADR 0077): the Q pane is 300-640 px wide (wider only when
+ * the pages are collapsed), but the panel's responsive classes read the
+ * viewport. Inside the pane only, each viewport breakpoint the panel uses
+ * falls back to its below-breakpoint layout while the pane is narrower than
+ * that breakpoint. Utilities layer, so these outrank the breakpoint
+ * utilities; scoped to `.cq-q-pane`, so the flag-off app is untouched.
+ */
+@layer components {
+  .cq-q-pane {
+    container: q-pane / inline-size;
+  }
+}
+@layer utilities {
+  @container q-pane (width < 1280px) {
+    /* The arrival room: cards beside Q only on the wide stage. */
+    .cq-q-pane [data-q-room].xl\:grid {
+      display: flex;
+    }
+    .cq-q-pane .hidden.xl\:flex {
+      display: none;
+    }
+    .cq-q-pane .xl\:grid-cols-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @container q-pane (width < 1024px) {
+    .cq-q-pane .lg\:grid-cols-3 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @container q-pane (width < 768px) {
+    /* The deck room: slides above their thumbnails, not beside. */
+    .cq-q-pane .md\:grid-cols-\[minmax\(0\,1fr\)_10\.75rem\] {
+      grid-template-columns: none;
+    }
+    .cq-q-pane .grid-cols-5.md\:grid-cols-2 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      max-height: none;
+      overflow-y: visible;
+    }
+    .cq-q-pane .md\:w-auto.w-full {
+      width: 100%;
+    }
+  }
+  @container q-pane (width < 640px) {
+    .cq-q-pane .sm\:grid-cols-2 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+  }
+}
