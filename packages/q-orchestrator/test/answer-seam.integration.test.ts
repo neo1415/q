@@ -355,19 +355,19 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
   it("answers a public run through the gateway: Q message, COMPLETED, policy version, ledger row", async () => {
     const world = await commitWorld();
     try {
-      // normal_dialogue.v1 prefers gemini-3.5-flash-lite (migration
-      // 20260920) and a PUBLIC run is within Gemini's reviewed ceiling, so
-      // the fake under the google code answers; groq is the fallback and is
-      // never reached.
-      const { engine, groq, google } = orchestrator(world, {
-        google: [
+      // normal_dialogue.v1 prefers gpt-5.6-luna (20261008130000), which is
+      // not registered here; Groq gpt-oss-120b follows it directly
+      // (20261231290000, the CONFIDENTIAL fallback), ahead of Gemini, so the
+      // fake under the groq code answers and google is never reached.
+      const { engine, google, groq } = orchestrator(world, {
+        groq: [
           {
             kind: "JSON",
             value: analystResult("Synthetic answer from the fake provider."),
             usage: { inputTokens: 90, cachedInputTokens: 0, outputTokens: 12 },
           },
         ],
-        groq: [{ kind: "JSON", value: analystResult("unused") }],
+        google: [{ kind: "JSON", value: analystResult("unused") }],
         maxSensitivity: "PUBLIC",
       });
       const run = await createRun(world, "Say hello to the test.");
@@ -393,35 +393,35 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.promptBundleVersion).toBe(
         `q-system.v2_company-analyst.v${String(analyst)}_comm.v1`,
       );
-      expect(google.calls[0]?.request.messages[0]?.content).toContain(
+      expect(groq.calls[0]?.request.messages[0]?.content).toContain(
         "You are Q",
       );
-      expect(google.calls[0]?.request.messages[1]?.content).toContain(
+      expect(groq.calls[0]?.request.messages[1]?.content).toContain(
         '<<<UNTRUSTED_CONTENT source="userMessage">>>',
       );
-      expect(google.calls[0]?.request.output.kind).toBe("STRUCTURED");
+      expect(groq.calls[0]?.request.output.kind).toBe("STRUCTURED");
       expect(final.messages.map((m) => m.role)).toEqual(["USER", "Q"]);
       expect(final.messages[1]?.content).toBe(
         "Synthetic answer from the fake provider.",
       );
 
-      // NORMAL_DIALOGUE prefers gemini-3.5-flash-lite; the fake under the google code answered.
-      expect(google.calls).toHaveLength(1);
-      expect(groq.calls).toHaveLength(0);
-      expect(google.calls[0]?.request.modelCode).toBe("gemini-3.5-flash-lite");
+      // luna unregistered: Groq, next in the policy, answered; Gemini not asked.
+      expect(groq.calls).toHaveLength(1);
+      expect(google.calls).toHaveLength(0);
+      expect(groq.calls[0]?.request.modelCode).toBe("openai/gpt-oss-120b");
       // Charter, task, then what the run can do and has produced (the
       // capability note, a trusted SYSTEM message since CQ-QX-008), then
       // where findings go in a conversation (claim check, step 6).
-      expect(google.calls[0]?.request.messages.map((m) => m.role)).toEqual([
+      expect(groq.calls[0]?.request.messages.map((m) => m.role)).toEqual([
         "SYSTEM",
         "USER",
         "SYSTEM",
         "SYSTEM",
       ]);
-      expect(google.calls[0]?.request.messages[3]?.content).toContain(
+      expect(groq.calls[0]?.request.messages[3]?.content).toContain(
         "IN THIS CONVERSATION put each evidence-backed point in findings",
       );
-      expect(google.calls[0]?.request.messages[2]?.content).toContain(
+      expect(groq.calls[0]?.request.messages[2]?.content).toContain(
         "You cannot end, clear or start a conversation",
       );
 
@@ -446,9 +446,9 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
     const world = await commitWorld();
     try {
       const tools = scriptedTools();
-      const { engine, google } = orchestrator(world, {
-        groq: [{ kind: "JSON", value: analystResult("unused") }],
-        google: [
+      const { engine, groq } = orchestrator(world, {
+        google: [{ kind: "JSON", value: analystResult("unused") }],
+        groq: [
           {
             kind: "TOOL_CALLS",
             calls: [
@@ -488,19 +488,19 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       ]);
       // The tool port is asked on behalf of the actor the engine re-validated.
       expect(tools.actors).toEqual([world.actor.userId]);
-      expect(google.calls).toHaveLength(2);
-      expect(google.calls[0]?.request.tools.map((t) => t.name)).toEqual([
+      expect(groq.calls).toHaveLength(2);
+      expect(groq.calls[0]?.request.tools.map((t) => t.name)).toEqual([
         "get_company",
       ]);
       // The tool round asks for the answer's own shape beside the tools
       // (schema-enforced first round, 2026-10-01); a provider that cannot
       // take both drops the schema in its adapter, never here.
-      expect(google.calls[0]?.request.output.kind).toBe("STRUCTURED");
+      expect(groq.calls[0]?.request.output.kind).toBe("STRUCTURED");
       // The tools-first note (a SYSTEM message) travels with every tool
       // round since 1e1c4e1, on every provider.
       // Charter, task, the capability note (CQ-QX-008), the findings note
       // (step 6), the tools-first note, then the tool round and its result.
-      expect(google.calls[1]?.request.messages.map((m) => m.role)).toEqual([
+      expect(groq.calls[1]?.request.messages.map((m) => m.role)).toEqual([
         "SYSTEM",
         "USER",
         "SYSTEM",
@@ -509,10 +509,10 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
         "ASSISTANT",
         "TOOL",
       ]);
-      expect(google.calls[1]?.request.messages[2]?.content).toContain(
+      expect(groq.calls[1]?.request.messages[2]?.content).toContain(
         "You cannot end, clear or start a conversation",
       );
-      expect(google.calls[1]?.request.messages[4]?.content).toContain(
+      expect(groq.calls[1]?.request.messages[4]?.content).toContain(
         "LOOK IT UP FIRST.",
       );
 
