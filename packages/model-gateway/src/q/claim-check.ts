@@ -616,9 +616,14 @@ function namesIn(sentence: string): string[] {
       flush();
     }
     // A possessive, a sentence boundary or clause punctuation ends a name:
-    // "Northwind's ARR" names Northwind.
+    // "Northwind's ARR" names Northwind. So does closing Markdown emphasis,
+    // and punctuation inside it: "**Silo Health:** Nairobi …" names Silo
+    // Health (live ORD-016 #0, 7a41ff4: read as "Silo Health Nairobi", the
+    // whole list line was removed).
+    const unmarked = said.replace(/[*_`]+$/u, "");
     if (possessive) flush();
-    else if (/[,;:!?.)"”]$/u.test(said) && !/\b[A-Z]\.$/u.test(said)) {
+    else if (unmarked !== said && /[*_`]{2}$|`$/u.test(said)) flush();
+    else if (/[,;:!?.)"”]$/u.test(unmarked) && !/\b[A-Z]\.$/u.test(unmarked)) {
       flush();
     }
   }

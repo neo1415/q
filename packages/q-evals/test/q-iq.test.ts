@@ -225,6 +225,31 @@ describe("Q-IQ graders", () => {
     ).toBe(false);
   });
 
+  it('reads "isn\'t established", "no defensible number" and "won\'t invent" as unknown, unless a figure follows (live UNK-076 #2 on 7a41ff4)', () => {
+    const unk = find((x) => x.id === "QIQ-UNK-076");
+    expect(unk.turns[2]?.expect.behaviour).toBe("UNKNOWN");
+    const said = (reply: string) =>
+      gradeQIqTurn(Q_IQ_WORLD, unk, 2, reply).saidUnknown;
+    // The exact live reply.
+    expect(
+      said(
+        "There isn’t a defensible number to give: Kora Farms’ ARR isn’t established here, and I won’t invent one.",
+      ),
+    ).toBe(true);
+    expect(said("Kora Farms’ ARR hasn't been established.")).toBe(true);
+    expect(said("There's no defensible figure for Kora Farms’ ARR.")).toBe(
+      true,
+    );
+    // The words, then a number anyway: not an unknown.
+    expect(
+      said("Kora Farms’ ARR isn’t established, but it’s about $60k."),
+    ).toBe(false);
+    expect(
+      said("There isn’t a defensible number, so I’d say $500k for Kora Farms."),
+    ).toBe(false);
+    expect(said("I won’t invent one: Kora Farms’ ARR is 120k.")).toBe(false);
+  });
+
   it("allows a labelled derivation from sourced figures, and nothing else (DECISIONS 61, live CON-091 #2)", () => {
     const con = find((x) => x.id === "QIQ-CON-091");
     const turn = 2;
