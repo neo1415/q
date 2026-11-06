@@ -5,6 +5,11 @@ import type {
   MemoryRehearsalDigest,
 } from "./contracts.js";
 import { renderConnectedRecall } from "./graph.js";
+import {
+  memoryTruthClass,
+  Q_READING_LABEL,
+  Q_READING_SUFFIX,
+} from "./provenance.js";
 
 /**
  * From a memory bundle to the bounded text a prompt receives (doc 14
@@ -30,9 +35,40 @@ const TYPE_LABEL: Record<MemoryItem["memoryType"], string> = {
   small_talk: "In passing",
 };
 
+/** What kind of reading it is: never "They said", which it is not. */
+const READING_KIND: Record<MemoryItem["memoryType"], string> = {
+  preference: "Preference",
+  pronunciation: "Pronunciation",
+  correction: "Correction",
+  fact: "About them",
+  episodic: "Earlier",
+  small_talk: "In passing",
+};
+
+/** Their quoted words, bounded, for beside Q's reading of them. */
+const QUOTE_SHOWN_MAX = 200;
+
+/**
+ * One remembered item. Step 9: who said it decides the label. Their own
+ * words (or what they confirmed) keep the type's label; Q's reading of
+ * their words is labelled as Q's, never "They said" or "Preference", and
+ * carries the words it was read from, so the answer can say it back as a
+ * reading and they can correct it.
+ */
 function line(item: MemoryItem): string {
   const when = item.createdAt.slice(0, 10);
-  return `- ${TYPE_LABEL[item.memoryType]} (${when}): ${item.content}`;
+  if (memoryTruthClass(item) === "USER_CLAIM") {
+    return `- ${TYPE_LABEL[item.memoryType]} (${when}): ${item.content}`;
+  }
+  const words =
+    item.quote === null
+      ? ""
+      : `; their words: "${
+          item.quote.length > QUOTE_SHOWN_MAX
+            ? `${item.quote.slice(0, QUOTE_SHOWN_MAX - 1).trimEnd()}…`
+            : item.quote
+        }"`;
+  return `- ${Q_READING_LABEL} — ${READING_KIND[item.memoryType]} (${when}), ${Q_READING_SUFFIX}: ${item.content}${words}`;
 }
 
 export const RELEVANT_LABEL =

@@ -681,6 +681,27 @@ describe("situation assembler", () => {
     );
   });
 
+  it("types Q's reading of their words as Q_INFERENCE, never their claim (step 9)", async () => {
+    const { port } = fakeTools();
+    const dossier = await assemblerWith(port, {
+      memory: () =>
+        Promise.resolve([
+          "About the person:",
+          '- Q\'s reading — Preference (2026-10-31), not their words: Prefers B2B SaaS; their words: "We back B2B companies with recurring revenue."',
+          "- They said (2026-10-31): recurring revenue",
+        ]),
+    }).assemble({ context: contextOf(), subject: FOUNDER, ask: "Plan" });
+    const memory = sectionOf(dossier, "MEMORY");
+    expect(memory.status).toBe("READ");
+    const facts = situationFacts(dossier).filter((fact) =>
+      fact.statement.startsWith("Remembered:"),
+    );
+    expect(facts.map((fact) => fact.truthClass)).toEqual([
+      "Q_INFERENCE",
+      "USER_CLAIM",
+    ]);
+  });
+
   it("never gives a founder an investor's private mandate", async () => {
     const { port, calls } = fakeTools();
     const dossier = await assemblerWith(port).assemble({

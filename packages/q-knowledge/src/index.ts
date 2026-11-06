@@ -324,6 +324,13 @@ export {
   renderMemoryBundle,
 } from "./memory/render.js";
 export {
+  inferredPresentedAsStated,
+  memoryTruthClass,
+  Q_READING_LABEL,
+  Q_READING_SUFFIX,
+  type MemoryTruthClass,
+} from "./memory/provenance.js";
+export {
   CONNECTED_LABEL,
   CONNECTED_MAX,
   GRAPH_BUDGET_MS,
