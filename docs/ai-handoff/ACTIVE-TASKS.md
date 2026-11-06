@@ -1,8 +1,8 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 5 November 2026, 23:15 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 6 November 2026, 00:10 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
-Production: **all four services on `b2c08ab2a`** (deployed 23:07 UTC). Hosted migrations 272 = local 272. Rollback: `789a1ecbd`.
+Production: **all four services on `347b74a8c`** (step 5, deployed 23:58 UTC). Hosted migrations 272 = local 272. Rollback: `b2c08ab2a`.
 
 | Area                                                                                              | State               | Evidence / next                                                                                                      |
 | ------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
