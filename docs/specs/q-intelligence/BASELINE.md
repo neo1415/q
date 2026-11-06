@@ -170,6 +170,12 @@ The dataset was corrected in two places: exact multiples, and the Brightpath pla
 
 Q now matches the bare model in both categories that were its largest gaps. The one remaining Q failure is QIQ-NUM-113.
 
+### Run 3 — 6 Nov 2026, evening, on f0b4503b0 (incomplete)
+
+- **Q and bare OpenAI did not run.** The OpenAI account's credit ran out after 7 Q cases (`credit_balance_exhausted`). Re-run after the owner tops up.
+- Production carried on through the v2 Claude backup; the logs show OpenAI set aside and answers still served.
+- **Bare Claude** (claude-sonnet-5-5) on the corrected dataset: 88.7% overall (turns, including DISCOVERY at 0); 104/163 cases; 15 wrong-entity turns; 31 invented-figure turns; $2.13.
+
 ## Cost
 
 Actual, first live run: **$3.476** ($3.390 Q, $0.086 bare model and judge). The estimate below undercounted Q: Q's actual cost per case was about 2.5× the estimate.
