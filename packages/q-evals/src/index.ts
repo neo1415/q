@@ -89,6 +89,7 @@ export * from "./datasets/q-iq/index.js";
 // Q Workspace W4.4: the navigation eval (MOVE / OFFER / STAY).
 export * from "./datasets/q-nav/index.js";
 export {
+  canonicalTarget,
   gradeQNavTurn,
   Q_NAV_GATES,
   summariseQNav,

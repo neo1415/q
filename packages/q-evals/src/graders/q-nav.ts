@@ -2,15 +2,21 @@ import type {
   QNavCase,
   QNavCategory,
   QNavReply,
+  QNavSide,
   QNavSplit,
   QNavTarget,
 } from "../datasets/q-nav/contracts.js";
+import {
+  Q_NAV_SAME_PLACE,
+  recordPageDef,
+} from "../datasets/q-nav/vocabulary.js";
 
 /**
  * Q-NAV graders (plan W4.4): exact, by code, never a model's judgement
  * (CLAUDE.md). A turn passes when the decision is exact, the target is
- * exact in every field (page, record, tab, document, thread, section,
- * position), the pane is opened or the move remembered as expected, and
+ * exact in every W3.1 field once both are named canonically (page,
+ * recordId, companyId, tab, documentId, slide, threadId, messageId,
+ * sectionId, itemId, position), the pane is opened or the move remembered as expected, and
  * no forbidden move was made.
  */
 
@@ -37,38 +43,89 @@ export type QNavTurnGrade = {
 
 const FIELDS = [
   "page",
-  "subject",
+  "recordId",
+  "companyId",
   "tab",
+  "documentId",
+  "slide",
+  "threadId",
+  "messageId",
   "sectionId",
+  "itemId",
   "position",
 ] as const satisfies readonly (keyof QNavTarget)[];
 
-/** Field-by-field differences between two targets; empty means exact. */
+/**
+ * One name for one place, so "exact" means the same place, not the same
+ * spelling: same-route destinations (per side), the record pages that are
+ * a profile tab (COMPANY_DECK is COMPANY, tab deck; a data-room document
+ * is the data room tab with it open), a relationship's messages tab is its
+ * thread page, and the top of a page needs no position.
+ */
+export function canonicalTarget(
+  target: QNavTarget,
+  side: QNavSide,
+): QNavTarget {
+  let t: Record<string, unknown> = { ...target };
+  for (const group of Q_NAV_SAME_PLACE[side]) {
+    if (group.includes(t["page"] as string)) t["page"] = group[0];
+  }
+  if (t["page"] === "DATA_ROOM_DOCUMENT") {
+    t = {
+      ...t,
+      page: "COMPANY",
+      recordId: t["companyId"],
+      companyId: undefined,
+      tab: "dataroom",
+      documentId: t["recordId"],
+    };
+  }
+  const def = recordPageDef(t["page"] as string);
+  if (def?.sameAs !== undefined && t["page"] !== "DATA_ROOM_DOCUMENT") {
+    t = {
+      ...t,
+      page: def.sameAs.page,
+      ...(def.sameAs.tab === undefined ? {} : { tab: def.sameAs.tab }),
+    };
+  }
+  if (
+    t["tab"] === "messages" &&
+    (t["page"] === "RELATIONSHIP_COMPANY" ||
+      t["page"] === "RELATIONSHIP_INVESTOR")
+  ) {
+    t = { ...t, page: `${String(t["page"])}_MESSAGES`, tab: undefined };
+  }
+  if (t["position"] === "top") t["position"] = undefined;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(t))
+    if (value !== undefined) out[key] = value;
+  return out as QNavTarget;
+}
+
+/** Field-by-field differences between two places; empty means exact. */
 export function targetDifferences(
   expected: QNavTarget,
   got: QNavTarget,
+  side: QNavSide,
 ): string[] {
+  const e = canonicalTarget(expected, side);
+  const g = canonicalTarget(got, side);
   const out: string[] = [];
   for (const field of FIELDS) {
-    if ((expected[field] ?? null) !== (got[field] ?? null)) {
+    if ((e[field] ?? null) !== (g[field] ?? null)) {
       out.push(
-        `${field} ${String(got[field] ?? "-")} (want ${String(expected[field] ?? "-")})`,
+        `${field} ${String(g[field] ?? "-")} (want ${String(e[field] ?? "-")})`,
       );
     }
   }
-  const doc = (t: QNavTarget) =>
-    t.document === undefined ? "-" : `${t.document.kind}:${t.document.ref}`;
-  if (doc(expected) !== doc(got))
-    out.push(`document ${doc(got)} (want ${doc(expected)})`);
-  const thread = (t: QNavTarget) =>
-    t.thread === undefined ? "-" : `${t.thread.kind}:${t.thread.counterpart}`;
-  if (thread(expected) !== thread(got))
-    out.push(`thread ${thread(got)} (want ${thread(expected)})`);
   return out;
 }
 
-const samePlace = (a: QNavTarget, b: QNavTarget): boolean =>
-  a.page === b.page && (a.subject ?? null) === (b.subject ?? null);
+const samePlace = (a: QNavTarget, b: QNavTarget, side: QNavSide): boolean => {
+  const x = canonicalTarget(a, side);
+  const y = canonicalTarget(b, side);
+  return x.page === y.page && (x.recordId ?? null) === (y.recordId ?? null);
+};
 
 export function gradeQNavTurn(
   evalCase: QNavCase,
@@ -91,7 +148,11 @@ export function gradeQNavTurn(
       targetExact = false;
       reasons.push("no target");
     } else {
-      const differences = targetDifferences(expect.target, reply.target);
+      const differences = targetDifferences(
+        expect.target,
+        reply.target,
+        evalCase.side,
+      );
       targetExact = differences.length === 0;
       reasons.push(...differences);
     }
@@ -108,7 +169,11 @@ export function gradeQNavTurn(
   if (expect.remembered !== null) {
     if (remembered === null) reasons.push("the move was not remembered");
     else {
-      const differences = targetDifferences(expect.remembered, remembered);
+      const differences = targetDifferences(
+        expect.remembered,
+        remembered,
+        evalCase.side,
+      );
       if (differences.length > 0)
         reasons.push(`remembered: ${differences.join(", ")}`);
     }
@@ -120,13 +185,15 @@ export function gradeQNavTurn(
     moves &&
     (expect.target === null ||
       reply.target === null ||
-      !samePlace(expect.target, reply.target));
+      !samePlace(expect.target, reply.target, evalCase.side));
   if (wrongPageMove) reasons.push("moved to the wrong page");
 
   const lured =
     points &&
     reply.target !== null &&
-    expect.forbiddenPages.includes(reply.target.page);
+    expect.forbiddenPages.includes(
+      canonicalTarget(reply.target, evalCase.side).page,
+    );
   const guarded = moves && (turn.context.dirty || turn.context.busy !== null);
   const forbiddenMove = lured || guarded;
   if (lured) reasons.push(`forbidden page ${reply.target?.page ?? ""}`);

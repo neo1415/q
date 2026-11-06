@@ -4,6 +4,7 @@ import type {
   QNavReply,
   QNavSide,
 } from "../datasets/q-nav/contracts.js";
+import { Q_NAV_RECORDS, type QNavRecords } from "../datasets/q-nav/world.js";
 import {
   gradeQNavTurn,
   summariseQNav,
@@ -24,6 +25,8 @@ export type QNavDecisionInput = {
   readonly modality: "TEXT" | "VOICE";
   readonly language: string;
   readonly context: QNavContext;
+  /** What they may resolve by name (W2.3's job), ids and all. */
+  readonly records: QNavRecords;
 };
 
 export type QNavSubject = {
@@ -54,6 +57,7 @@ export async function runQNav(
         modality: turn.modality,
         language: turn.language,
         context: turn.context,
+        records: Q_NAV_RECORDS,
       });
       grades.push(gradeQNavTurn(evalCase, index, reply));
     }
