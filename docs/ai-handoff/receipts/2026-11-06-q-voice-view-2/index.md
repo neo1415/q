@@ -231,3 +231,66 @@ The owner preferred an opener written by Q itself, about 1.5 s, from `q_runtime.
 - eslint on the 4 touched files: exit 0, with no findings. The first run warned on `talk()`'s dependency list; it now lists `turns` and `spoken`.
 - Full web vitest, re-run after that fix: 468 files and 4071 tests passed, exit 0.
 - `prettier --check apps/web`: clean.
+
+## Addendum 4: the duplex microphone after Chat, and full cards in the Q view (owner 2026-11-06)
+
+### The microphone a stuck duplex line kept
+
+**Live finding** (the integration owner's run on `d3829431a`, with UDP blocked): after switching to Chat, a track opened by `duplex-line.ts` `open()` was still live.
+
+**Cause:** the line itself was sound. Its fallback and close (`#finish`) stop every track. The problem was above it, in two places:
+
+1. `use-voice-interview` `end()` closed the transports only through `endVoiceLine`, which waits for any open still in progress (the voice-line exclusive queue). A duplex line stuck connecting held its stream until its timeouts and its rejoin attempt ran out.
+2. `use-voice-session` `start()`, once ended mid-duplex, could still bring up the standard line after the duplex line gave up.
+
+**Fix:**
+
+1. `end()` now ends this surface's own transports at once, and again after any open in progress. Both are idempotent.
+2. `start()` opens no standard line after an End.
+
+**Tests:**
+
+- `voice-off-line-mid-connect.test.ts` (2 tests): a failed connect falls back and stops the track; a close mid-connect stops it at once.
+- `voice-off-session-mid-start.test.tsx` (1 test): ending mid-duplex-start opens no standard line.
+- `voice-off-interview-mid-open.test.tsx` (1 test): End reaches the transport while the open is still in flight.
+- **Failing-first** against the previous hooks: the session test and the interview test failed. The two line tests passed, which confirms the line was already correct.
+
+### Full cards in the conversation's Q view (owner decision)
+
+This replaces addendum 2's one-line cards.
+
+- **Kept:** the pinned presence (280 / 200 px) and the current exchange (their last line and Q's caption).
+- **Under them:** `QPresenceStage` again, so the answer's cards are drawn in full. Its stage objects work again: the cards canvas, room documents, live previews and the flight to the Board. A company Q names on a live call appears as a full card.
+- **One presence:** the stage draws no presence of its own; the pinned one stays.
+- **Unchanged:** earlier turns are still Chat's.
+- **CSS:** the pinned presence is above the cards scrolling under it (`z-index: var(--cq-z-sticky)`), and its field reaches past the column by the stage's gutter. That is 20 px on a phone and 32 px from 640 px, so there is no sideways scroll; measured, the stage's `scrollWidth` equals its `clientWidth` at both widths.
+
+### The `?c=demo` proof, updated
+
+`after-conversation-q-*` and the new `after-conversation-q-scrolled-*` cover 1440 and 390, light and dark.
+
+- **At rest:** the presence is fully in view (280 / 200 px). All four card names are drawn in full, there are no card lines, there is no thread, and no earlier turn is shown.
+- **Scrolled to the end of the cards:** the presence stays pinned at the top (y = 72 to 352 at 1440, 73 to 273 at 390) and above the cards.
+- **Before:** `before-conversation-q-*` is unchanged (`1501a54`), with no presence in view.
+
+### Tests in `q-voice-view.test.tsx`, updated honestly
+
+- "Pins Q's presence and shows the current exchange with its cards in full": one aperture only, no thread, no earlier turns, every card name drawn, and no card lines.
+- "Earlier in this conversation opens Chat, where the whole transcript is."
+
+### Restored after a review of the full diff against `1501a54`
+
+- **The G-R3 screen-reader rows** of the current exchange (`Latest exchange`, with `data-q-turn-id`, `data-q-turn-role` and `data-q-disposition`). `scripts/recovery/voice/play-clips.mjs` counts the USER rows. The visible exchange words are `aria-hidden` there, so nothing is read twice; its buttons stay reachable.
+- **The pinned work lines** for documents still being made, in the non-voice caption.
+- **The written-answer note** to an open line (`briefLine`), back to its plain call. An earlier splice had appended a stray expression to it. The call still ran, so behaviour was unchanged, but eslint caught it (`no-unused-expressions`). It is fixed in `e4cb224`.
+
+The screenshots were taken at `bbc24c3`. These restorations add only an `sr-only` list and an empty-hidden work-line slot, so the shots are unchanged.
+
+### Gates (exact results, at `e4cb224`)
+
+- Root tsc: exit 0.
+- Web tsc: exit 0.
+- eslint on the 10 touched files: exit 0, with no findings.
+- Full web vitest: 471 files and 4075 tests passed, exit 0.
+  - That includes `back-everywhere` (87), `destination-routes` (52) and `manifest-page-coverage` (3).
+- `prettier --check apps/web` and the receipt: clean.
