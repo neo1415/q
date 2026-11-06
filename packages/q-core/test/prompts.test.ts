@@ -324,7 +324,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v28_comm.v1",
+      "q-system.v2_company-analyst.v29_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -455,7 +455,9 @@ describe("renderer", () => {
     // of repeated wording said once, so it keeps at least 5% headroom.
     // v27 (QO-04): ~75 tokens for speaking to the person.
     // v28 (step 10): the subject description is fenced; three trims pay for it.
-    expect(rendered.bundle.task).toBe("company-analyst/v28");
+    // v29 (live Q-IQ gaps): ~70 tokens -- name the subject, a fact is on
+    // record, a worked figure shows its inputs, conflicts side by side.
+    expect(rendered.bundle.task).toBe("company-analyst/v29");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });
