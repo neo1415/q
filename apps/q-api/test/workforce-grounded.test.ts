@@ -170,7 +170,7 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
   const draft: AnalysisDocumentResult = {
     title: "Kestrel Grid: investment analysis",
     summary:
-      "Kestrel Grid reports $420,000 in ARR (company record). It is growing 300% a year.",
+      "Kestrel Grid reports $420,000 in ARR (company record). It is growing 300% a year [S1].",
     sections: [
       {
         heading: "Traction",
@@ -187,7 +187,8 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
     ],
     topRecommendations: [
       "Ask for the 2025 accounts.",
-      "Verify the $1.1M pipeline before committing.",
+      "Its $1.1M pipeline (company record) needs verifying before committing.",
+      "Open 40 more sites by Q2, then raise.",
     ],
     gaps: ["Runway is not known."],
   };
@@ -198,7 +199,7 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
     "Request: an investment analysis of Kestrel Grid.",
   ];
 
-  it("removes every sentence stating a figure no source holds, keeps labelled estimates, and says how many", () => {
+  it("removes every sentence presenting a figure as sourced that no source holds, keeps labelled estimates and plan targets, and says how many", () => {
     const out = groundAnalysis(draft, sources);
     const filed = [
       out.draft.summary,
@@ -210,6 +211,8 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
     expect(filed).toContain("about $90M (estimate:");
     expect(filed).toContain("Competitors raised $45M last year [S2]");
     expect(filed).toContain("Runway is not known");
+    // A plan's own target is not a claim about the world.
+    expect(filed).toContain("Open 40 more sites by Q2");
     // Invented: 300% growth, 0.4% churn, a $1.1M pipeline.
     expect(filed).not.toContain("300%");
     expect(filed).not.toContain("0.4%");

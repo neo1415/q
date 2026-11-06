@@ -907,14 +907,17 @@ export function readersDraft(
 
 /**
  * Q Intelligence Plan, step 10: the filed document passes code's claim
- * check (step 6), whatever the reviews said. Every figure a sentence
- * states as fact -- cited to a source, the company record or nothing --
- * must be in what the writer was given (the company text, the research,
- * the sources list, the request); a sentence whose figure is in none of
- * them is removed and the person is told how many. A labelled estimate or
- * Q's inference is not stated as fact (it carries its own truth class) and
- * is kept. Names are left to the reviewers here: a market section names
- * companies the research named in its own words.
+ * check (step 6), whatever the reviews said. A sentence that presents a
+ * figure as sourced -- an [S n] citation, the company's or Capital Q's
+ * record, their mandate -- must find every figure in what the writer was
+ * given (the company text, the admitted research, the sources list, the
+ * request); one that does not is removed and the person is told how many.
+ * A labelled estimate or Q's inference carries its own truth class and is
+ * kept. A figure with no basis at all is the basis check's (basisProblems:
+ * the reviewer loop sends it back, and it is filed as an open point); a
+ * plan's own targets ("40 kiosks by Q2") are not claims about the world.
+ * Names are left to the reviewers: a market section names companies the
+ * research named in its own words.
  */
 export function groundAnalysis(
   draft: AnalysisDocumentResult,
@@ -926,7 +929,8 @@ export function groundAnalysis(
     const kept = groundText(text, corpus, {
       names: false,
       unknownLine: false,
-      exempt: (sentence) => LABELLED_NOT_FACT.test(sentence),
+      exempt: (sentence) =>
+        LABELLED_NOT_FACT.test(sentence) || !ATTRIBUTED.test(sentence),
     });
     removed += kept.changed;
     return kept.changed === 0 ? text : kept.text;
@@ -959,6 +963,9 @@ export function groundAnalysis(
 
 /** An estimate or Q's own inference: labelled, never stated as fact. */
 const LABELLED_NOT_FACT = /\(estimate|\bestimated?\b|Q's inference/iu;
+/** A figure presented as sourced: a citation or a record's label. */
+const ATTRIBUTED =
+  /\[S\d{1,3}|\((?:the )?(?:company|Capital Q) record|\(your mandate\)/iu;
 
 export async function writeAnalysisWithReview(dependencies: {
   readonly models: Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis">;
