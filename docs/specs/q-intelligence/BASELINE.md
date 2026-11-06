@@ -141,7 +141,13 @@ Reading it:
 - Invented figures are not yet 0 for either subject.
 - DISCOVERY needs web search in the eval world; until then it scores 0 for every subject and is excluded.
 - Latency is unchanged: the turn reader (4–5 s) is the planned target, with reader thinking OFF next.
-- The bare Claude run (`--provider anthropic --bare-only`) follows.
+- **Bare Claude (claude-sonnet-5-5, `--provider anthropic --bare-only`, $2.10)**: like-for-like over the same 158 cases, **87.9% (523/595)**, so Q leads it by 3.2 points. By category:
+  - PRONOUNS 95.0, ORDINALS 89.2, FOLLOW_UPS 93.3, CORRECTIONS 96.7
+  - COMPOUND 84.4, UNKNOWN 88.3, CONTRADICTIONS 82.2, NUMBERS 78.1
+  - MEMORY 100, AMBIGUITY 62.2, ADVERSARIAL 94.4
+  - Wrong-entity turns 17; invented-figure turns 35; clarified ambiguous asks 6.7%
+  - Latency p50 / p95: 1.7 s / 3.2 s
+- Ranking like-for-like: bare OpenAI 92.9% > **Q 91.1%** > bare Claude 87.9%. Q makes the fewest wrong-entity errors except bare OpenAI (Q 2, OpenAI 1, Claude 17), and fewer invented figures than either (Q 8, OpenAI 10, Claude 35).
 
 ## Cost
 
