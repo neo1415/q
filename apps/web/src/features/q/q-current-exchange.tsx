@@ -64,6 +64,7 @@ export function QCurrentExchange({
   captions,
   earlier,
   onOpenChat,
+  cardLines = true,
 }: {
   /** The person's last line and what Q said after it. */
   readonly lines: readonly ExchangeLine[];
@@ -76,6 +77,11 @@ export function QCurrentExchange({
   /** The conversation has more before this exchange. */
   readonly earlier: boolean;
   readonly onOpenChat: () => void;
+  /**
+   * The answer's cards as one line each. Off where the stage draws them
+   * in full under this exchange (owner 2026-11-06: full cards in Q).
+   */
+  readonly cardLines?: boolean | undefined;
 }) {
   const t = useT();
   const person = lines.findLast((line) => line.role === "person");
@@ -87,7 +93,7 @@ export function QCurrentExchange({
       : reply === undefined
         ? null
         : plainFromMarkdown(reply.text);
-  const cards = cardLinesOf(reply?.turn);
+  const cards = cardLines ? cardLinesOf(reply?.turn) : [];
   const shown = cards.slice(0, CARD_LINES_AT_MOST);
   const more = cards.length - shown.length;
   return (
