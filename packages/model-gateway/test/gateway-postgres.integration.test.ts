@@ -61,7 +61,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     await db.close();
   });
 
-  it("loads the seeded catalog: three providers, ten models, versioned prices, seven policies", async () => {
+  it("loads the seeded catalog: three providers, twelve models, versioned prices, eight policies", async () => {
     const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
     const catalog = indexCatalog(snapshot);
     expect(snapshot.providers.map((p) => p.code).sort()).toEqual([
@@ -73,22 +73,26 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     ]);
     // gemini-3.5-flash (20261008120000) and the two image models
     // (20261113010000) joined the original five; gpt-realtime-mini
-    // (20261203090000) for duplex voice.
+    // (20261203090000) for duplex voice; gemini-3.1-flash-lite-image
+    // (20261220192000) and gpt-live-1 (20261221090000).
     expect(snapshot.models.map((m) => m.modelCode).sort()).toEqual([
       "gemini-2.5-flash-image",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.5-flash",
       "gemini-3.5-flash-lite",
       "gemini-3.8-flash",
       "gpt-5.6-luna",
       "gpt-image-1",
+      "gpt-live-1",
       "gpt-realtime-mini",
       "openai/gpt-oss-120b",
       "openai/gpt-oss-20b",
       "qwen/qwen3.8-27b",
     ]);
+    // Seven Q policies, plus UI_TRANSLATION (20261228150500).
     expect(
       snapshot.routingPolicies.filter((p) => p.status === "ACTIVE"),
-    ).toHaveLength(7);
+    ).toHaveLength(8);
 
     const flash = snapshot.models.find(
       (m) => m.modelCode === "gemini-3.8-flash",
