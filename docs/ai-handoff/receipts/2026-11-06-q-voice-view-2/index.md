@@ -185,3 +185,49 @@ Measured in the page, with no scrolling:
   - That includes `back-everywhere`, `destination-routes` and `manifest-page-coverage`.
 - `packages/q-core` vitest: 149 files passed and 1 skipped; 841 tests passed and 1 skipped.
 - prettier: clean.
+
+## Addendum 3: one conversation, so voice carries on (owner 2026-11-06)
+
+1. **The arrival greeting only opens an empty thread.** In the panel's `talk()`, a thread with turns (typed in Chat or said earlier) no longer gets the arrival words. That applies to the switch, the composer's Q button and Talk to Q alike. The fallback in `q-session.talk()` (`callOpening()`, the briefing) is only reached when the panel hands no line. With turns, the panel now always hands one.
+2. **Q's first words continue the thread** (`continuation.ts`, `continuationLine`). They are built deterministically from the turns the page holds:
+   - after an answer with cards: "You'd asked “Find me founders raising in fintech right now”, and I found five. Want me to go through them, or something else?";
+   - after an answer in words: "We were on “What's Brightwell's runway”. Want to pick up from there, or something else?";
+   - when Q had not answered yet: "You'd asked “…”. Want me to carry on with that, or something else?".
+
+   The person's words are said back at most 90 characters long, cut at a word. There is no waiting-count tail, because the client can't tell what arrived since the last turn without a new read, so none is added.
+
+3. **Same conversation id. This was already true, and is now covered further:**
+   - `q-session.talk()` opens the line with `resume: true` and `thread.conversationId` set to the open conversation. `voice-resume-conversation.test.tsx` already asserts both, and that no arrival greeting is sent.
+   - With a greeting line from the panel, the line still resumes. The server composes no opening on a resumed line (`apps/q-api/src/voice/routes.ts`), and Q says the panel's line.
+   - Spoken lines join Chat's transcript through `spokenOnly` and `threadInOrder`. There is a new test for this.
+
+### What was found about a model-written opener
+
+The owner preferred an opener written by Q itself, about 1.5 s, from `q_runtime.conversation_states`. It is not possible today without a server change:
+
+- On `resume`, the q-api voice session route deliberately composes no opening, and the browser has no read of the conversation state.
+- Adding one means a new step in `apps/q-api/src/voice/routes.ts` (resume branch). It would read the conversation state through q-runtime's repositories and run one bounded model call through the Q Model Gateway, with a timeout of about 1.5 s. This deterministic line would be the fallback.
+- That is a server lane: q-runtime, the model gateway and q-api. It is outside this UI lane, which may not touch q-runtime or the model gateway. It is proposed to the integration owner, not built.
+
+### Tests
+
+- **New:** `test/q-voice-continuation.test.ts` (6 tests):
+  - empty means null;
+  - cards are named with a count;
+  - an answer in words is picked up;
+  - an unanswered question offers to carry on;
+  - long words are cut at a word;
+  - there is never a waiting count or welcome.
+- **New, in `q-voice-view.test.tsx`:**
+  - mid-conversation, the switch speaks the continuation, with no "Welcome back" and no waiting count;
+  - an empty thread still opens with the arrival greeting;
+  - voice lines appear in Chat's transcript.
+- **Failing-first** against the previous panel (`19777b9`): the mid-conversation test failed (it had no line); the others passed there. The empty-thread test and the voice-in-Chat test check behaviour that already existed.
+
+### Gates (exact results)
+
+- Root tsc: exit 0.
+- Web tsc: exit 0.
+- eslint on the 4 touched files: exit 0, with no findings. The first run warned on `talk()`'s dependency list; it now lists `turns` and `spoken`.
+- Full web vitest, re-run after that fix: 468 files and 4071 tests passed, exit 0.
+- `prettier --check apps/web`: clean.

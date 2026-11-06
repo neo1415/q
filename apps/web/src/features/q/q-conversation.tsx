@@ -438,7 +438,7 @@ export function QConversationPanel({
       void voiceBriefing().catch(() => null);
     }
     await sessionTalk(greeting === undefined ? undefined : { greeting });
-  }, [sessionTalk, openingWords, turns.length, spoken.length]);
+  }, [sessionTalk, openingWords, turns, spoken]);
 
   const endVoice = voice.end;
   // The End button: the person's own choice.

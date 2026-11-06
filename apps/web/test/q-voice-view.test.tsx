@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQStreamState } from "@capital-q/api-client";
 
 import type { QTurn } from "../src/features/q/conversation";
+import type { SpokenLine } from "../src/features/q/spoken";
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 
 /**
@@ -24,7 +25,8 @@ const talk = vi.fn(() => Promise.resolve());
 const state: {
   turns: readonly QTurn[];
   voiceActive: boolean;
-} = { turns: [], voiceActive: false };
+  spokenOnly: readonly SpokenLine[];
+} = { turns: [], voiceActive: false, spokenOnly: [] };
 const voiceEnd = vi.fn((_reason?: string) => Promise.resolve());
 const voiceTalk = vi.fn(() => Promise.resolve());
 const speechStop = vi.fn();
@@ -86,7 +88,9 @@ vi.mock("@/features/q/q-session", () => ({
       end: voiceEnd,
       setVoice: vi.fn(),
     },
-    spokenOnly: [],
+    get spokenOnly() {
+      return state.spokenOnly;
+    },
     spoken: [],
     voiceOutcomes: [],
     spokenPreview: null,
@@ -110,6 +114,7 @@ let reducedMotion = false;
 beforeEach(() => {
   state.turns = [];
   state.voiceActive = false;
+  state.spokenOnly = [];
   reducedMotion = false;
   talk.mockClear();
   voiceTalk.mockClear();
@@ -489,5 +494,29 @@ describe("one conversation under both views (owner 2026-11-06)", () => {
         talk.mock.calls[0] as unknown as [{ greeting?: string }] | undefined
       )?.[0]?.greeting ?? "";
     expect(greeting).toBe("Welcome back, David.");
+  });
+
+  it("what was said on the voice line is in Chat's transcript", async () => {
+    state.turns = longConversation();
+    state.spokenOnly = [
+      {
+        id: "s1",
+        role: "user",
+        text: "Tell me about the second one",
+        after: "q-6",
+      },
+      {
+        id: "s2",
+        role: "q",
+        text: "Kestrel Heat installs heat pumps in a day.",
+        after: "q-6",
+      },
+    ];
+    localStorage.setItem("cq.q.view", "chat");
+    await renderHome();
+    const thread = document.querySelector("[data-q-thread]")?.textContent ?? "";
+    expect(thread).toContain("Find me founders raising in fintech");
+    expect(thread).toContain("Tell me about the second one");
+    expect(thread).toContain("Kestrel Heat installs heat pumps in a day.");
   });
 });
