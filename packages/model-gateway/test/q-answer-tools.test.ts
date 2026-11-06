@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -45,6 +45,10 @@ import { onScreenCompanyFact } from "../src/q/company-fact.js";
 import { chatInsteadOf } from "../src/q/message-channel.js";
 import { EXTRAS_FIELDS } from "../src/q/parallel-extras.js";
 import { qCardOfferOf } from "../src/q/q-card-offer.js";
+import {
+  Q_DEEP_TOOL_LOOP_BUDGET_MS,
+  Q_DEEP_TOOL_LOOP_MAX_ROUNDS,
+} from "../src/q/tool-loop-budget.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
 
@@ -3941,6 +3945,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         : {
             ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
             toolName: "app.q_card.handle.claim",
+            classification: "SIDE_EFFECT" as const,
           },
     );
     const { seam, alpha, request } = build({
@@ -3991,6 +3996,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         : {
             ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
             toolName: "app.q_card.handle.claim",
+            classification: "SIDE_EFFECT" as const,
           },
     );
     const { seam, messages, request } = build({
@@ -4031,6 +4037,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         : {
             ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
             toolName: "app.q_card.handle.claim",
+            classification: "SIDE_EFFECT" as const,
           },
     );
     const { seam, messages, request } = build({
@@ -4409,5 +4416,176 @@ describe("the tool that does it is loaded when it is needed", () => {
       "propose_chat_message",
     ]);
     expect(executed[1]?.focusTools).toContain("propose_chat_message");
+  });
+});
+
+describe("Q intelligence step 8: the agentic loop and the promise check", () => {
+  const PREPARE_DOCUMENT_OFFERED: QOfferedTool = {
+    toolName: "document.prepare",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "prepare_document",
+      description: "Prepares a document and files it as their own.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: "PREPARING_DOCUMENT",
+  };
+  const prepared = (proposal: QToolProposal): QToolCallOutcome => ({
+    callId: proposal.callId,
+    toolName: "document.prepare",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    status: "SUCCEEDED",
+    failureCode: null,
+    sensitivity: "CONFIDENTIAL",
+    result: { ok: true, data: { status: "PREPARED" } },
+    latencyMs: 2,
+  });
+  const PROMISED =
+    "I've prepared your investment brief on Northwind. It covers the market and the team.";
+
+  it("the known case: a document promised with no tool call is rewritten to an honest offer", async () => {
+    const tools = toolPort([GET_COMPANY, PREPARE_DOCUMENT_OFFERED], (p) =>
+      succeeded(p, {}),
+    );
+    const { seam, request, messages, logLines } = build({
+      script: [{ kind: "JSON", value: analystResult(PROMISED) }],
+      tools,
+      said: "Make me a one-pager on Northwind.",
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed).toHaveLength(0);
+    const said = messages.at(-1)?.content ?? "";
+    expect(said).not.toContain("I've prepared");
+    expect(said).toContain("I haven't prepared that yet.");
+    expect(said).toContain("It covers the market and the team.");
+    expect(
+      logLines.some((line) =>
+        line.includes("unbacked action claims rewritten in a Q answer"),
+      ),
+    ).toBe(true);
+  });
+
+  it("the known case: with the tool's successful result in this run, the sentence is kept", async () => {
+    const tools = toolPort([GET_COMPANY, PREPARE_DOCUMENT_OFFERED], (p) =>
+      p.name === "prepare_document" ? prepared(p) : succeeded(p, {}),
+    );
+    const { seam, request, messages, logLines } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "doc", name: "prepare_document", arguments: {} }],
+        },
+        { kind: "JSON", value: analystResult(PROMISED) },
+      ],
+      tools,
+      said: "Make me a one-pager on Northwind.",
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => p.name)).toEqual(["prepare_document"]);
+    expect(messages.at(-1)?.content ?? "").toContain(
+      "I've prepared your investment brief on Northwind.",
+    );
+    expect(
+      logLines.some((line) => line.includes("unbacked action claims")),
+    ).toBe(false);
+  });
+
+  it("a read never backs an action claim", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, request, messages } = build({
+      script: [
+        call("read"),
+        {
+          kind: "JSON",
+          value: analystResult("I've sent the update to Priya."),
+        },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    expect(messages.at(-1)?.content ?? "").not.toContain("I've sent");
+  });
+
+  const chained = (count: number) =>
+    Array.from({ length: count }, (_v, i) =>
+      call(`deep${String(i)}`, { companyId: `deep-${String(i)}` }),
+    );
+
+  it("a turn read as analysis chains up to the deep round budget", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request } = build({
+      script: [
+        ...chained(Q_DEEP_TOOL_LOOP_MAX_ROUNDS),
+        { kind: "JSON", value: analystResult("deep") },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer({ ...request, answerKind: "ANALYSIS" });
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed).toHaveLength(Q_DEEP_TOOL_LOOP_MAX_ROUNDS);
+    expect(alpha.calls).toHaveLength(Q_DEEP_TOOL_LOOP_MAX_ROUNDS + 1);
+    // Same tools in every round: more rounds never means more tools.
+    for (const sent of alpha.calls.slice(0, -1)) {
+      expect(sent.request.tools.map((tool) => tool.name)).toEqual([
+        "get_company",
+      ]);
+    }
+    expect(alpha.calls.at(-1)?.request.tools).toEqual([]);
+  });
+
+  it.each([undefined, "LOOKUP", "FOLLOW_UP", "CHAT"] as const)(
+    "a %s turn keeps the standard rounds",
+    async (answerKind) => {
+      const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+      const { seam, alpha, request } = build({
+        script: [
+          ...chained(Q_TOOL_LOOP_MAX_ROUNDS),
+          { kind: "JSON", value: analystResult("standard") },
+        ],
+        tools,
+      });
+      const outcome = await seam.answer({
+        ...request,
+        ...(answerKind === undefined ? {} : { answerKind }),
+      });
+      expect(outcome.kind).toBe("ANSWERED");
+      expect(tools.executed).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS);
+      expect(alpha.calls).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS + 1);
+      // The round after the standard two holds no tools: no deep loop.
+      expect(alpha.calls.at(-1)?.request.tools).toEqual([]);
+    },
+  );
+
+  it("a deep turn starts no extra round once its time budget is spent", async () => {
+    let shift = 0;
+    // Each executed call moves the clock past the deep budget.
+    const tools = toolPort([GET_COMPANY], (p) => {
+      shift += Q_DEEP_TOOL_LOOP_BUDGET_MS;
+      return succeeded(p, {});
+    });
+    const { seam, alpha, request } = build({
+      script: [
+        ...chained(Q_TOOL_LOOP_MAX_ROUNDS),
+        { kind: "JSON", value: analystResult("timed") },
+      ],
+      tools,
+    });
+    const real = Date.now.bind(Date);
+    const clock = vi
+      .spyOn(Date, "now")
+      .mockImplementation(() => real() + shift);
+    try {
+      const outcome = await seam.answer({ ...request, answerKind: "ANALYSIS" });
+      expect(outcome.kind).toBe("ANSWERED");
+    } finally {
+      clock.mockRestore();
+    }
+    expect(tools.executed).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS);
+    expect(alpha.calls).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS + 1);
+    expect(alpha.calls.at(-1)?.request.tools).toEqual([]);
   });
 });

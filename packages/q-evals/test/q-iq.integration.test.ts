@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { parseDatabaseConfig } from "@capital-q/config/database";
+import { actionClaims } from "@capital-q/model-gateway/q";
 import {
   createRequestDatabaseClient,
   type RequestDatabase,
@@ -76,9 +77,23 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
       // Scripted providers only: any cost here is the gateway's own token
       // estimate priced at catalogue rates, never spend.
       expect(q.world().providerMode).toBe("FAKE");
+      // Step 8: every reply went through the promise check, so an action
+      // claim still in a reply was backed by a tool of its run; a rewrite
+      // means the draft claimed one that no tool did.
+      const replies = result.cases.flatMap((r) => r.replies);
+      const actionClaimsKept = replies.filter(
+        (reply) => actionClaims(reply).length > 0,
+      ).length;
+      const promiseRewrites = replies.filter((reply) =>
+        /\bI haven't (?:prepared that yet|sent it|scheduled it|saved that yet)\b/u.test(
+          reply,
+        ),
+      ).length;
       console.log(
         JSON.stringify(
           {
+            actionClaimsKept,
+            promiseRewrites,
             estimatedUsd: result.costUsd,
             input: result.inputTokens,
             turns: result.summary.overall.turns,
