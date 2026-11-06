@@ -98,6 +98,7 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_COMPANY"
       | "FOCUS_SECTION"
       | "OPEN_SETTINGS"
+      | "LAYOUT_SET"
       | "SHOW_IN_Q_ROOM"
       | "SHOW_CALENDAR_CONNECT"
       | "DOCUMENT_ACT"
@@ -144,7 +145,9 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "SHOW_CALENDAR_CONNECT" ||
     intent.kind === "DOCUMENT_ACT" ||
     intent.kind === "CARDS" ||
-    intent.kind === "UI_ACT"
+    intent.kind === "UI_ACT" ||
+    // Q Workspace W1.5: the panes change where the person is; no link.
+    intent.kind === "LAYOUT_SET"
   ) {
     return null;
   }
@@ -245,6 +248,8 @@ function intentLabel(intent: QUiIntent): string {
                     "Open the relationship");
     case "SCREEN_ACT":
       return "On this page";
+    case "LAYOUT_SET":
+      return "Workspace";
     case "OPEN_SETUP":
       return intent.journey === "investor"
         ? "Continue your mandate"

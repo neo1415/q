@@ -49,6 +49,8 @@ export const Q_UI_INTENT_KINDS = [
   "SHOW_CALENDAR_CONNECT",
   "DOCUMENT_ACT",
   "CARDS",
+  // Q Workspace W1.5: Q opens or collapses the workspace panes.
+  "LAYOUT_SET",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -1011,6 +1013,32 @@ export const QCardsIntentSchema = z
   );
 export type QCardsIntent = z.infer<typeof QCardsIntentSchema>;
 
+/**
+ * Q Workspace W1.5 (DECISIONS 71): Q opens or collapses the Q pane and
+ * the page pane ("hide the pages", "close the chat"), typed or spoken.
+ * Layout is not an action: no approval (plan §7, class NONE). Emitted
+ * only where the workspace flag is not off; a browser bundle from before
+ * it drops a frame that carries it (strict union).
+ */
+export const Q_WORKSPACE_PANE_STATES = ["open", "collapsed"] as const;
+export const QWorkspacePaneStateSchema = z.enum(Q_WORKSPACE_PANE_STATES);
+export type QWorkspacePaneState = z.infer<typeof QWorkspacePaneStateSchema>;
+
+export const QLayoutSetIntentSchema = z
+  .object({
+    kind: z.literal("LAYOUT_SET"),
+    qPane: QWorkspacePaneStateSchema.optional(),
+    pagePane: QWorkspacePaneStateSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (intent) => intent.qPane !== undefined || intent.pagePane !== undefined,
+    {
+      message: "LAYOUT_SET names at least one pane",
+    },
+  );
+export type QLayoutSetIntent = z.infer<typeof QLayoutSetIntentSchema>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QSetDiscoverFiltersIntentSchema,
@@ -1030,6 +1058,8 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QCardsIntentSchema,
   // RECOVERY-2026-10: universal application control (ui-act.ts).
   QUiActIntentSchema,
+  // Q Workspace W1.5.
+  QLayoutSetIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -1171,6 +1201,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QDocumentActIntentSchema,
   QCardsIntentSchema,
   QUiActIntentSchema,
+  QLayoutSetIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

@@ -198,6 +198,15 @@ describe("W3.3 arrival: link → page → the target in view", () => {
       `<div data-q-section="rounds" class="contents"><section>rounds</section></div>`,
     ],
     ["/profile#section-mandate", `<section id="mandate">mandate</section>`],
+    // W4's eval vocabulary (feat/q-navigation-policy): once W2 registers
+    // these QSection ids, arrival needs nothing more.
+    ...["commitments", "deck-views", "missing", "draft"].map(
+      (id) =>
+        [
+          `/somewhere#section-${id}`,
+          `<div data-q-section="${id}" class="contents"><section>${id}</section></div>`,
+        ] as const,
+    ),
     [
       "/relationships/x/messages#latest",
       `<ol><li data-q-message="a">1</li><li data-q-message="b" id="last">2</li></ol>`,

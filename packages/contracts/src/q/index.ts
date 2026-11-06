@@ -586,6 +586,9 @@ export {
   navigateTargetToIntent,
   intentToNavigateTarget,
   withoutNavigateTarget,
+  Q_WORKSPACE_PANE_STATES,
+  QWorkspacePaneStateSchema,
+  QLayoutSetIntentSchema,
   QFocusSectionIntentSchema,
   QOpenCompanyIntentSchema,
   QShowComparisonIntentSchema,
@@ -670,6 +673,8 @@ export {
   type QNavigatePosition,
   type QNavigateTargetDetail,
   type QNavigateTarget,
+  type QWorkspacePaneState,
+  type QLayoutSetIntent,
 } from "./ui-intent.js";
 
 export {
