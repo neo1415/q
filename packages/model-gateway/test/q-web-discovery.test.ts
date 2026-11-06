@@ -414,7 +414,8 @@ describe("web discovery: the query plan from the mandate", () => {
     expect(plan.queries.length).toBeLessThanOrEqual(DISCOVERY_QUERIES.max);
     expect(plan.fromMandate).toBe(true);
     for (const query of plan.queries) {
-      expect(query).toContain("2026");
+      // This year, or last year for what was founded lately.
+      expect(query).toMatch(/\b202[56]\b/u);
       expect(queryIsPublic(query, plan, 2026)).toBe(true);
       expect(
         plan.sectors.some((sector) => query.includes(sector)) ||
@@ -535,7 +536,7 @@ describe("web discovery: the run (scripted web, scripted reader)", () => {
     // The directory was read in full, then founders were searched for.
     expect(web.calls.some((c) => c.name === "extract_public_web")).toBe(true);
     expect(answer.founderQueries).toEqual(
-      expect.arrayContaining(["Kudi Ledger founder"]),
+      expect.arrayContaining(["Kudi Ledger founder CEO"]),
     );
     expect(answer.toolCalls).toBeLessThanOrEqual(DISCOVERY_MAX_TOOL_CALLS);
   });
@@ -560,7 +561,7 @@ describe("web discovery: the run (scripted web, scripted reader)", () => {
     const { answer, web } = await discover({
       now: () => {
         const at = t;
-        t += 10_000;
+        t += 20_000;
         return at;
       },
     });
