@@ -52,3 +52,28 @@ So for a pronoun follow-up, the figures depended on which tools the model chose 
 | Integration (local PG): model-gateway, q-evals, q-knowledge                  | 93/96. All 3 failures are **pre-existing on base `347b74a`**: the 2 `q-knowledge.integration` chunk-set tests (as in the step-5 receipt), and `gateway-postgres.integration` "ten models" (the seed now has 12, checked in a base worktree) |
 | Scripted Q-IQ, all 150                                                       | 571/573. Same MEM-134 #0 and MEM-135 #0 as before                                                                                                                                                                                           |
 | Prettier                                                                     | clean                                                                                                                                                                                                                                       |
+
+## Addendum: on step 4 (be45024f1), reader parts as sub-queries
+
+The integration owner pointed out that step 4 is merged and that TURN_READER v78 now carries `QAnswerRequest.askParts`. The branch now merges `be45024` (a merge, not a rebase, so the pushed history is kept).
+
+- **Parts come from the reader.** `planRetrievalQueries` takes `parts` (the reader's self-standing asks). Two or more replace the punctuation split, which is now the fallback only when there is no reading.
+- **Each part goes to the subject it names.** With subjects bound, a part that names one of them is searched only under that subject. A part that names none is searched under each.
+- **No ledger subject:** each part is its own unfiltered search.
+- **Wiring:** `evidence-retrieval.ts` passes `request.askParts`.
+- **Tests:** 3 new ones in `q-knowledge/test/retrieval-context.test.ts`.
+
+The borrower fact comes from the company's figures (`read_company_figures`, a tool read), not from retrieval chunks. The bound-company read above covers that for every part of the turn, because it reads the bound company's profile, figures and deck once, before the model.
+
+The gates were re-run on the merged tree (it is identical to the gated rebase).
+
+| Gate                                         | Result                                                          |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| Package build                                | 54/54                                                           |
+| Root tsc                                     | exit 0                                                          |
+| q-api tsc                                    | exit 0                                                          |
+| eslint (model-gateway, q-knowledge, q-evals) | 0                                                               |
+| vitest (6 targets)                           | 637 files passed and 1 skipped; 6527 tests passed and 3 skipped |
+| Integration                                  | 93/96, the same 3 pre-existing failures                         |
+| Scripted Q-IQ                                | 571/573 (MEM-134/135)                                           |
+| Prettier                                     | clean                                                           |

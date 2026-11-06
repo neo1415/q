@@ -76,6 +76,9 @@ export type QAuthorisedEvidenceContext = {
     readonly signal?: AbortSignal | undefined;
     /** Step 5: the shown ledger and bound refs, for query rewriting. */
     readonly retrievalFocus?: QRetrievalFocus | undefined;
+    /** TURN_READER v78: the self-standing parts of a compound ask. */
+    readonly askParts?:
+      readonly { readonly ask: string; readonly kind: string }[] | undefined;
   }) => Promise<{
     readonly facts: readonly AuthorisedFact[];
     readonly subjectDescription: string;
@@ -170,6 +173,7 @@ export function createQEvidenceRetrieval(
       const planned = planRetrievalQueries({
         words: latest.content,
         previousWords,
+        parts: request.askParts?.map((part) => part.ask),
         focus: request.retrievalFocus,
       });
       const result = await retrieval.retrieve({

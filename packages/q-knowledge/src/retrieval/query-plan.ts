@@ -201,10 +201,20 @@ export function planRetrievalQueries(input: {
    * this turn's subjects, counting for less than the turn's own words.
    */
   readonly previousWords?: string | readonly string[] | undefined;
+  /**
+   * The turn reader's parts of a compound ask (TURN_READER v78
+   * `askParts`), each made self-standing by the reader ("What is
+   * Ledgerfold's loan book?"). Two or more replace the punctuation split;
+   * fewer, or none, fall back to it.
+   */
+  readonly parts?: readonly string[] | undefined;
   readonly focus?: QRetrievalFocus | undefined;
   readonly maxQueries?: number | undefined;
 }): RetrievalQueryPlan {
   const words = bounded(input.words);
+  const readerParts = (input.parts ?? [])
+    .map(bounded)
+    .filter((part) => part.length > 0);
   // Newest first; at most three, each counting half the one after it.
   const previous = (
     input.previousWords === undefined
@@ -217,12 +227,18 @@ export function planRetrievalQueries(input: {
     .map(bounded)
     .filter((text) => text.length > 0);
   const max = Math.max(1, input.maxQueries ?? RETRIEVAL_SUB_QUERIES_MAX);
+  // Without a ledger subject, the reader's parts are the searches (each
+  // already names what it is about); otherwise their words, as before.
+  const unfocused = (): readonly RetrievalSubQuery[] =>
+    readerParts.length >= 2
+      ? readerParts.slice(0, max).map((text) => ({ text }))
+      : [{ text: words }];
   if (input.focus === undefined) {
-    return { queries: [{ text: words }], focus: null, entities: [] };
+    return { queries: unfocused(), focus: null, entities: [] };
   }
   const entities = focusEntities(words, input.focus);
   if (entities.length === 0) {
-    return { queries: [{ text: words }], focus: null, entities };
+    return { queries: unfocused(), focus: null, entities };
   }
 
   const firm = entities.filter((entity) => entity.source !== "RECENT");
@@ -295,13 +311,18 @@ export function planRetrievalQueries(input: {
     });
   }
 
-  const parts = askParts(words);
+  const parts = readerParts.length >= 2 ? readerParts : askParts(words);
   if (firm.length > 0) {
     const groups = groupsOf(firm);
     // Subjects first, then parts, so a compound ask about two companies
-    // keeps one search per company within the bound.
+    // keeps one search per company within the bound. A part that names
+    // some of the subjects (the reader's parts are self-standing) is
+    // searched under those only; one that names none, under each.
     for (const part of parts) {
-      for (const group of groups) {
+      const naming = groups.filter((group) =>
+        group.names.some((name) => namesInText(part, name)),
+      );
+      for (const group of naming.length > 0 ? naming : groups) {
         const named = group.names.filter((name) => !namesInText(part, name));
         add({
           text: bounded([...named, part].join(" ")),
