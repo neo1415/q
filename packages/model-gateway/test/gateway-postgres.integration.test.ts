@@ -8,8 +8,10 @@ import {
   type RequestDatabase,
 } from "@capital-q/database";
 
+import { createAnthropicWireDouble } from "../src/providers/anthropic-wire-double.js";
 import {
   createFakeModelProvider,
+  type ModelProvider,
   createStaticModelCatalog,
   providerJustifiedCeiling,
   createModelGateway,
@@ -381,7 +383,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     );
   });
 
-  it("routes CONFIDENTIAL reasoning Claude -> OpenAI -> Groq once the v2 policies are switched on (20261231280000)", async () => {
+  it("routes CONFIDENTIAL reasoning OpenAI -> Claude -> Groq once the v2 policies are switched on (20261231280000, 20261231300000)", async () => {
     const loaded = await loadModelCatalogSnapshot(db.sql, new Date());
     // Before the switch nothing reaches Claude: the staged rows are RETIRED.
     const anthropicModels = new Set(
@@ -451,38 +453,48 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       },
       attribution: { tenantId, qRunId: runId, correlationId: "cor_claude" },
     });
-    const gatewayWith = (providers: ReturnType<typeof text>[]) =>
+    const gatewayWith = (providers: readonly ModelProvider[]) =>
       createModelGateway({
         catalog: createStaticModelCatalog(switched),
         registry: createModelProviderRegistry(providers),
         usage: createPostgresModelUsageRepository({ sql: db.sql }),
       });
 
-    // Claude answers dialogue (Sonnet) and the reader's class (Haiku).
-    const claude = gatewayWith([
+    // Switched on, OpenAI still answers first (DECISIONS 67, 20261231300000).
+    const all = gatewayWith([
       text("anthropic", "claude"),
       text("openai", "openai"),
       text("groq", "groq"),
       text("google", "google"),
     ]);
-    const answered = await claude.execute(confidential("NORMAL_DIALOGUE"));
+    const answered = await all.execute(confidential("NORMAL_DIALOGUE"));
     expect(answered.routingPolicyCode).toBe("normal_dialogue.v2");
-    expect(answered.modelCode).toBe("claude-sonnet-5-5");
-    const read = await claude.execute(confidential("FAST_CLASSIFICATION"));
-    expect(read.routingPolicyCode).toBe("fast_classification.v2");
-    expect(read.modelCode).toBe("claude-haiku-5-5");
+    expect(answered.modelCode).toBe("gpt-5.6-luna");
 
-    // Claude's account empty: OpenAI answers.
-    const toOpenAI = await gatewayWith([
-      exhausted("anthropic"),
-      text("openai", "openai"),
+    // OpenAI's credit exhausted: Claude answers, through the real adapter
+    // and SDK over the Messages API's wire shapes -- Sonnet for the
+    // answer, Haiku for the reader's class.
+    const wire = createAnthropicWireDouble(text("anthropic", "claude"));
+    const toClaude = gatewayWith([
+      wire,
+      exhausted("openai"),
       text("groq", "groq"),
       text("google", "google"),
-    ]).execute(confidential("NORMAL_DIALOGUE"));
-    expect(toOpenAI.providerCode).toBe("openai");
-    expect(toOpenAI.fallbackUsed).toBe(true);
+    ]);
+    const backup = await toClaude.execute(confidential("NORMAL_DIALOGUE"));
+    expect(backup.providerCode).toBe("anthropic");
+    expect(backup.modelCode).toBe("claude-sonnet-5-5");
+    expect(backup.fallbackUsed).toBe(true);
+    expect(backup.output).toEqual({ kind: "TEXT", text: "claude" });
+    expect(backup.attempts.map((a) => a.providerCode)).toEqual([
+      "openai",
+      "anthropic",
+    ]);
+    const read = await toClaude.execute(confidential("FAST_CLASSIFICATION"));
+    expect(read.modelCode).toBe("claude-haiku-5-5");
+    expect(wire.refusals).toEqual([]);
 
-    // Both empty: Groq answers.
+    // OpenAI and Claude both empty: Groq answers.
     const toGroq = await gatewayWith([
       exhausted("anthropic"),
       exhausted("openai"),
@@ -491,8 +503,8 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     ]).execute(confidential("NORMAL_DIALOGUE"));
     expect(toGroq.providerCode).toBe("groq");
     expect(toGroq.attempts.map((a) => a.providerCode)).toEqual([
-      "anthropic",
       "openai",
+      "anthropic",
       "groq",
     ]);
 

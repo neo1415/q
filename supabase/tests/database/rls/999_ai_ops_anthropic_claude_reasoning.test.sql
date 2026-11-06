@@ -104,6 +104,8 @@ select is(
   'voice, translation and embedding routes untouched');
 
 -- the order: Claude -> OpenAI -> Groq -> (PUBLIC-only Gemini)
+-- 20261231300000 (DECISIONS 67) reordered the staged rows: OpenAI first,
+-- Claude the backup. These assert the state after every migration.
 select is(
   (select array_agg(p.code order by u.n)
      from ai_ops.routing_policies rp,
@@ -111,26 +113,26 @@ select is(
      join ai_ops.models mm on mm.id = u.m
      join ai_ops.providers p on p.id = mm.provider_id
     where rp.code = 'normal_dialogue.v2'),
-  array['anthropic', 'openai', 'groq', 'google', 'google'],
-  'dialogue v2: Claude, then OpenAI, then Groq, then Gemini');
+  array['openai', 'anthropic', 'groq', 'google', 'google'],
+  'dialogue v2: OpenAI, then Claude, then Groq, then Gemini (20261231300000)');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies rp
     where rp.version = 2
-      and (rp.fallback_models[1] <> 'a2000000-0000-4000-8000-000000000009'
+      and (rp.preferred_models <> array['a2000000-0000-4000-8000-000000000009'::uuid]
            or rp.fallback_models[2] <> 'a2000000-0000-4000-8000-000000000004')),
   0,
-  'every v2 policy falls back to OpenAI first, Groq second');
+  'every v2 policy prefers OpenAI and falls back to Groq after Claude');
 
 select is(
   (select array_agg(code || '=' || m.model_code order by code)
-     from ai_ops.routing_policies rp join ai_ops.models m on m.id = rp.preferred_models[1]
+     from ai_ops.routing_policies rp join ai_ops.models m on m.id = rp.fallback_models[1]
     where rp.version = 2),
   array['comparison.v2=claude-sonnet-5-5', 'deep_investigation.v2=claude-sonnet-5-5',
         'evidence_synthesis.v2=claude-sonnet-5-5', 'fast_classification.v2=claude-haiku-5-5',
         'normal_dialogue.v2=claude-sonnet-5-5', 'structured_extraction.v2=claude-haiku-5-5',
         'taxonomy_mapping.v2=claude-haiku-5-5'],
-  'Sonnet answers and analyses; Haiku reads, classifies and extracts');
+  'the Claude backup: Sonnet for answers and analyses, Haiku to read, classify and extract');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies v2
@@ -157,7 +159,7 @@ select is(
     where rp.version = 2 and mm.sensitivity_ceiling = 'PUBLIC'
       and u.n < 4),
   0,
-  'PUBLIC-only models come only after Claude, OpenAI and Groq');
+  'PUBLIC-only models come only after OpenAI, Claude and Groq');
 
 -- the switch, and back
 update ai_ops.routing_policies set status = 'ACTIVE'

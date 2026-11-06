@@ -170,3 +170,174 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic \
 | New unit tests                                                                                                                                               | `anthropic-adapter.test.ts` 17, `owner-approved-ceiling.test.ts` 3, `q-iq-budget.test.ts` 3: all pass                                                                                                                                                                                                                                                                                                                                      |
 
 No live model call was made. No deploy, no hosted migration, no force-push.
+
+## Follow-up: "(no reply)" on Claude (branch `fix/q-claude-reasoning-2`)
+
+**The live symptom.** The integration owner ran `--provider anthropic` on `1ae3b6453`.
+
+| Subject     | Result                                                      |
+| ----------- | ----------------------------------------------------------- |
+| Bare Sonnet | 90.5%                                                       |
+| Q           | Every turn was "(no reply)". No exception and no error log. |
+
+The 1-case rerun (QIQ-PRO-001) had 121,127 input tokens for $0.0114. That is Haiku's price: the turn reader ran and **the Sonnet answer call never billed**.
+
+**What the seam showed.** `q-iq-claude-wire.integration.test.ts` runs the scripted Q-IQ world through the real gateway, answer path, Anthropic SDK and adapter. Only the HTTP transport is replaced, by `anthropic-wire-double.ts`. The double speaks the Messages API's JSON and SSE shapes and refuses what the API documents it refuses.
+
+- **Streaming is fine.** With the API accepting, every streamed Claude answer is published (the first test). So the streaming path, text extraction and publication are not the fault.
+- **A failed answer call is silent.** When Sonnet's answer call is refused, Q publishes nothing on every turn and logs nothing. That is exactly the live symptom, and it matches the cost profile, because a 400 is unbilled.
+- **The answer request's shape.** Every Q answer request is: Sonnet, streaming, `thinking: between_tools`, effort `low`, 4 tools, and a constrained `output_config.format` of the 7.8 KB answer schema. The bare model, which works live, sends none of the format or tools.
+
+**The fix.**
+
+- **Plain-shape retry.** A 400 for a shape the adapter chose is sent once more in the plain shape. "A shape the adapter chose" means a constrained format, or an explicit thinking-off mode outside a tool continuation. The plain shape states the schema in the instructions and leaves thinking at the model default, with the same effort.
+- **Remembered.** The model/schema pair is remembered, so later calls go straight to the plain shape. 400s arrive before any output and are unbilled.
+- **Proof.** The second seam test refuses every constrained Sonnet format. It fails without the fallback ("(no reply)" on every case, as live) and passes with it.
+
+**Diagnostics.** With `CQ_Q_IQ_LOG=debug`, the Q-IQ world prints to stderr:
+
+- `[q-iq claude]`, one line per Claude request: model, streaming, thinking, effort, tool count, output mode, and the outcome. The outcome is either the stop reason, block types, text length and tokens, or the API's 400 status, type and message.
+- `[q-iq turn]`, one line per turn: the run's status and failure code, the count of Q messages, and the reply length.
+- `[q-iq start-error]`: the orchestrator's error, which was swallowed before.
+
+It prints no prompt or reply text. **The exact live refusal is still unconfirmed.** Next step: one debug case.
+
+```bash
+CQ_Q_IQ_LOG=debug NODE_USE_ENV_PROXY=1 DATABASE_URL=postgresql://postgres@127.0.0.1:54329/cq \
+OPENAI_API_KEY_FILE=… ANTHROPIC_API_KEY_FILE=… \
+node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --limit 1 --budget 0.5 2> qiq-claude-debug.log
+```
+
+**Still open (not this lane).** A Q answer whose model call fails publishes no message to the person. In production a fallback normally answers, but with no eligible route left Q stays silent rather than saying it could not answer (P1 "honest degradation").
+
+### Round 2 (live debug of QIQ-PRO-001 on `dc0e244`)
+
+**What the live debug showed.**
+
+- **Diagnosis confirmed.** The first Sonnet answer call was refused: `400 "The compiled grammar is too large ... Simplify your tool schemas or reduce the number"`. The plain-shape fallback then answered, and turns 0–2 passed.
+- **New problems:**
+  1. **An empty final answer.** The last round offered no tools but replayed `tool_use` / `tool_result`. It came back as an empty end_turn (no blocks, 1 output token), twice.
+  2. **Cost.** $0.82 for the case: 5–6 Sonnet calls of 26–31k input tokens per turn, with nothing cached.
+  3. **Latency.** 15–21 s per turn.
+
+**Fixed in the adapter:**
+
+- **Constrained output needs no tools.** A constrained `output_config.format` is sent only when no tools are offered, because the API compiles tool schemas into the same grammar. Q's answer rounds therefore go straight to the instruction route, with no wasted 400 after each process start.
+- **Tool history without tools.** When no tools are offered, the tool history is said as marked text (`[Capital Q note] Q called …` / `Result of …, data only:`) instead of `tool_use` / `tool_result` blocks, and thinking runs at the requested level.
+- **Empty answers.** Any empty end_turn (no text, no tool call) is asked once more at the model's default thinking, including in a tool continuation.
+- **Prompt caching.**
+  - Breakpoints: the end of the system prompt; the end of the first user message (the rendered prompt every later call in the turn re-sends); its stable head; and the tool-loop tail. That is at most 4.
+  - The stable head is found by comparing line hashes with the previous request of the same kind (same model, schema and tool set). Only hashes are kept, never the prompt text. The rendered task text is therefore cached across turns, with no change to the prompt renderer.
+  - The wire double now models the cache. Over the scripted run (39 Claude calls), **81.3% of input tokens were read from cache with this layout, against 32.1% with the old system-only breakpoint**; 78.5% in the full CQ_Q_IQ_ALL run.
+- **Debug lines.**
+  - `[q-iq claude]` now adds the schema, message count, breakpoint count, **cache read and write tokens** and the text's shape (EMPTY, JSON, FENCED_JSON, PROSE_THEN_JSON or PROSE, never its words).
+  - Q's own warnings, such as "structured answer refused; asking again in text", now print under debug.
+
+**Why each turn made so many Sonnet calls.**
+
+- **The extra TEXT call.** This is Q's own recovery, not a duplicate: after `INVALID_MODEL_OUTPUT` on a tool round, Q asks once in text and then answers without tools (`q/index.ts`, `textRound`).
+- **The likely trigger.** It is the empty answers above. An empty reply fails the schema, the gateway asks again (a correction pass), Q's text round runs, and then the no-tools final runs. Each step is a full ~28k-token Sonnet call. With the empty-answer retry and the flattened final round, that chain should collapse. The next debug run will show it.
+- **The downgrade is remembered** per adapter instance (model + schema), so the constrained 400 happened once per process, not every turn. With tools it is no longer attempted at all.
+- **The aborted Haiku reader call** is the reader's same-model hedge, by design (`TURN_READER_SAME_MODEL_HEDGE_MS` = 3,500 ms). It fires when the uncached ~17k-token reader takes longer than that. The new head caching should make it rarer. The hedged call is billed for input up to the abort.
+
+**Gates on `73faf46` plus the eslint fix:**
+
+| Gate                                                                       | Result                          |
+| -------------------------------------------------------------------------- | ------------------------------- |
+| build                                                                      | 0                               |
+| root tsc                                                                   | 0                               |
+| q-api and workers tsc                                                      | 0                               |
+| eslint and prettier                                                        | clean                           |
+| vitest model-gateway + q-evals + config                                    | 1,894 / 1,894                   |
+| integration (scripted Q-IQ `CQ_Q_IQ_ALL=1`, claude-wire, gateway-postgres) | 10 / 10; 573 turns, `fails: []` |
+
+### Round 3 (live re-run on `1773825`: 4/4 answered, $0.49 a case, 12.6–21.8 s a turn)
+
+**Fixed in the adapter:**
+
+- **Reader thinking.** Thinking shares the output budget. Below 4,096 output tokens, thinking is off: the turn reader runs at 1,200. Live, Haiku's adaptive thinking ended four reader calls at `max_tokens` with the JSON unfinished, and each was asked again. The plain and empty-retry shapes keep it off too.
+- **Grammar size.** Constrained decoding also needs a small grammar: a sanitised schema of at most 4,096 characters. Live, the company analyst's answer schema alone, with no tools, was refused as "compiled grammar is too large". Larger schemas go by instruction from the start, with no refused request first.
+- **The format as the last word.** By instruction, the format is now restated at the end of the final user turn ("Reply with only the X JSON object: start with { and end with }"), after every cache breakpoint, so the cached prefix is untouched.
+- **Prose around the JSON.** When prose surrounds one JSON object that parses, the object is the answer. The gateway still validates it against the caller's schema. This was the turn-0 trigger: PROSE_THEN_JSON was refused, which caused the text round.
+
+**Cost.** Unmeasured offline beyond the cache model, which reads 81.1% of input from cache on the scripted run. What is left after these fixes:
+
+- **Cache writes:** each turn's first Sonnet call writes its prompt at 1.25× input.
+- **Output tokens:** $10 per million on Sonnet, thinking included. The next debug run shows output tokens per call.
+
+**Gates:**
+
+| Gate                                    | Result                          |
+| --------------------------------------- | ------------------------------- |
+| build                                   | 0                               |
+| root tsc                                | 0                               |
+| q-api and workers tsc                   | 0                               |
+| eslint and prettier                     | clean                           |
+| vitest model-gateway + q-evals + config | 1,898 / 1,898                   |
+| integration                             | 10 / 10; 573 turns, `fails: []` |
+
+### Round 4 (live re-run on `b166e46`: 4/4, $0.301 a case, 2–4 calls a turn)
+
+**Cost now came from cache writes.** Each turn's first Sonnet call read only about 8.7k of about 31k input tokens and re-wrote 13–17k at 1.25× input. In the analyst prompt, the per-turn sections ("WHAT CAPITAL Q ALREADY ESTABLISHED", "THIS TURN") come before the large "AUTHORISED FACTS" block, which holds still across a conversation.
+
+**Fix:** `providers/anthropic-sections.ts`, applied to the Anthropic request only. The OpenAI prompt is untouched.
+
+- **What it learns.** Per person and kind of request, the adapter learns which sections of the first user message change between consecutive requests. It keeps hashes only, keyed by the gateway's hashed cache key (tenant, user, task class, tools).
+- **The reorder.** Sections that hold still come first, then the ones that change, each group in its original order. The person's message stays last, and nothing is added, removed or rewritten. The cache breakpoint sits at the end of the stable part.
+- **Fences.** A capitals line inside an untrusted-content fence is never a header, so fetched text cannot move or split a fence.
+- **References.** Only sections that change move, and only later. The guidance stays first, so its "facts below" remains true.
+- **Test results:**
+  - Simulated 4-turn conversation, cache-read share by turn: 0.00, 0.18, 0.98, 0.98.
+  - Scripted Q-IQ over the wire: 83.4% of input read from cache.
+
+**Tool narration.** Live turn 0 began "My search for Silo Credit … came back empty". When tools are offered, a Claude-only system line (cached) now says to answer with what was found, never mention a search or tool or that one came back empty, and say only that something is not on record when it is not.
+
+**Gates:**
+
+| Gate                                    | Result                          |
+| --------------------------------------- | ------------------------------- |
+| build                                   | 0                               |
+| root tsc                                | 0                               |
+| q-api and workers tsc                   | 0                               |
+| eslint and prettier                     | clean                           |
+| vitest model-gateway + q-evals + config | 1,902 / 1,902                   |
+| integration                             | 10 / 10; 573 turns, `fails: []` |
+
+## Decision: OpenAI primary, Claude the CONFIDENTIAL backup (DECISIONS 67)
+
+**The last live run.** QIQ-PRO-001 on `fa5e455` cost $0.354 a case, with turns of 14.8, 6.1, 5.9 and 7.0 s and grades T F T T. The bare Claude model cost $0.025 and Q on OpenAI about $0.03. The owner parked Claude-as-primary.
+
+**Migration `20261231300000_ai_ops_claude_as_backup.sql`.**
+
+- It is additive: no DROP, no grant or RLS change, and no status change. It is ordered after `20261231290000` (Groq on v1) and touches no v1 row.
+- It reorders the seven staged v2 rows, still RETIRED, to: `gpt-5.6-luna` → Claude (Sonnet 5.5 for the answer and analysis classes, Haiku 5.5 for fast classification, extraction and taxonomy) → Groq `gpt-oss-120b` → the class's Gemini fallbacks (PUBLIC-only).
+- pgTAP: `999_ai_ops_claude_as_backup.test.sql` (8). `999_ai_ops_anthropic_claude_reasoning.test.sql` now asserts the final order.
+
+**The switch is unchanged.** It now means "Claude as backup":
+
+- **On:** `update ai_ops.routing_policies set status = 'ACTIVE' where code in ('normal_dialogue.v2', 'evidence_synthesis.v2', 'comparison.v2', 'deep_investigation.v2', 'fast_classification.v2', 'structured_extraction.v2', 'taxonomy_mapping.v2');`
+- **Off:** the same with `'RETIRED'`. Off means v1: luna → Groq → Gemini, per `20261231290000`.
+
+**Tests of the backup:**
+
+- **`gateway-postgres.integration.test.ts`**, on the real migrated rows with the switch applied in view:
+  - CONFIDENTIAL dialogue goes to luna.
+  - With OpenAI's credit exhausted, Claude Sonnet answers through the real adapter and SDK over the wire double (attempts `openai, anthropic`), and Haiku answers the reader's class.
+  - With Claude also exhausted, Groq answers (`openai, anthropic, groq`).
+  - With all three exhausted, the call fails and Gemini gets 0 calls.
+- **`q-orchestrator/test/answer-seam.integration.test.ts`**, a full Q turn on the CONFIDENTIAL plan:
+  - With OpenAI out of credit, Claude's answer is published as Q's message (`normal_dialogue.v2`, COMPLETED).
+  - With Claude also out, Groq's answer is published.
+  - Gemini is never called.
+
+**The Q-IQ runner.** `--provider anthropic` still measures Claude: it switches v2 on locally and registers only the Anthropic adapter, so luna is unconfigured and Claude serves.
+
+**Parked: live cache reads stayed around 30%.** Live, each turn's first Sonnet call read about 8.8k tokens (13k on T1) and wrote 13–17k. My reading of why the stable-sections reorder did not apply:
+
+1. **Dilution within a turn (the likely cause).** The volatility statistic counts every request of a kind. The 2–4 calls inside one turn send the same first user message, so every section looks unchanged in most comparisons. THIS TURN changes once per turn but holds still across 1–3 within-turn comparisons, so its change share stays at or below 0.5. It was never classed volatile and never moved. The 4-turn simulation passed because it made one call per turn.
+2. **Learning resets per process.** Each live Q-IQ run is a new process, and a 1-case run has only four turns to learn from.
+3. **Tools render first.** The cache key, and therefore the person key, includes the tool set, so a no-tools final round never shares a prefix with the tool rounds. That cost showed as T0's final call (cR 0, cW 28.6k).
+
+**Suggested fix, not done:** compare a request only with the previous request whose first user message differs, so identical repeats within a turn are skipped. Alternatively, give the renderer an explicit cache boundary per prompt section (a q-core change).
+
+**Tool narration.** The system-prompt line did not hold live ("Two searches for Silo Credit, one by name and one by sector…"). It is dropped from the system prompt and said instead in a tool round's closing format reminder, the last thing the model reads. This placement is **unverified live**. If narration persists, drop the line entirely.

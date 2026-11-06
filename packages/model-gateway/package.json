@@ -17,6 +17,10 @@
       "types": "./dist/providers/anthropic.d.ts",
       "default": "./dist/providers/anthropic.js"
     },
+    "./providers/anthropic-wire-double": {
+      "types": "./dist/providers/anthropic-wire-double.d.ts",
+      "default": "./dist/providers/anthropic-wire-double.js"
+    },
     "./providers/groq": {
       "types": "./dist/providers/groq.d.ts",
       "default": "./dist/providers/groq.js"
