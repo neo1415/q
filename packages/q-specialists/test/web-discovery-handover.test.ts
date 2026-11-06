@@ -29,9 +29,6 @@ import { createSpecialistQAnswer } from "../src/answer.js";
 const TENANT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER = "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1";
 const CONVERSATION = randomUUID();
-/** What the full turn reading takes here (hosted p50 is ~1.2 s). */
-const READ_MS = 400;
-const SKIM_MS = 20;
 
 const actor = ActorContextSchema.parse({
   userId: USER,
@@ -73,30 +70,6 @@ function request(): QAnswerRequest {
     }),
   };
 }
-
-const later = <T>(ms: number, value: T): Promise<T> =>
-  new Promise((resolve) => setTimeout(() => resolve(value), ms));
-
-const DISCOVER: NonNullable<TurnSkimResult["discover"]> = {
-  sectors: ["fintech"],
-  countries: ["ng"],
-  stages: [],
-  ranking: "NONE",
-  mandateRelevant: false,
-  previous: false,
-  raising: false,
-  verifiedOnly: false,
-  hasPitch: false,
-  raiseShared: false,
-};
-
-const SKIM_DISCOVER: TurnSkimResult = {
-  kind: "DISCOVER_COMPANIES",
-  confidence: "HIGH",
-  count: 3,
-  discover: DISCOVER,
-  person: null,
-};
 
 const EARLIER_LIST =
   "I searched the public web and found 2 companies.\n\n1. **Numida** · founded 2022 — Founders: Mina Shahid and Catherine Lahner. Fit: fintech. Source: [press.example](https://press.example/numida).\n2. **Owo Rails** — founders not named in the sources I read. Source: [weetracker.example](https://weetracker.example/a).";
