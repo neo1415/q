@@ -115,6 +115,10 @@ const HINT_WORDS = [
   "round",
   "founded",
   "launched",
+  "to",
+  "watch",
+  "emerging",
+  "accelerator",
 ] as const;
 
 export type DiscoveryPlan = {
@@ -179,6 +183,12 @@ export function planDiscovery(
   ask: WebDiscoveryAsk,
   mandate: MandateCategories | null,
   now: Date,
+  /**
+   * Round 4: a search for more, after a list in this conversation: other
+   * angles (lists to watch, accelerators, seed funding), so the same pages
+   * do not simply come back.
+   */
+  further = false,
 ): DiscoveryPlan {
   const year = now.getUTCFullYear();
   const askSectors = ask.sectors.filter((code) =>
@@ -235,29 +245,58 @@ export function planDiscovery(
   }
   // Recency first (owner 2026-11-06: "NEW companies"; Jumo and M-Kopa are
   // long established): what was founded, launched or raised seed lately.
-  const candidates: string[] = [...categoryQueries.slice(0, 1)];
-  candidates.push(
-    join(
-      "new",
-      sectorList[0] ?? "",
-      "startups founded",
-      placeList[0] ?? "",
-      String(year - 1),
-    ),
-    join(
-      sectorList[1] ?? sectorList[0] ?? "",
-      "startup raised seed",
-      placeList[1] ?? placeList[0] ?? "",
-      String(year),
-    ),
-    join(
-      sectorList[0] ?? "",
-      "startups launched",
-      placeList[2] ?? placeList[0] ?? "",
-      String(year),
-    ),
-    ...categoryQueries.slice(1),
-  );
+  const candidates: string[] = further
+    ? [
+        join(
+          sectorList[0] ?? "",
+          "startups to watch",
+          placeList[0] ?? "",
+          String(year),
+        ),
+        join(
+          "emerging",
+          sectorList[1] ?? sectorList[0] ?? "",
+          "startups",
+          placeList[1] ?? placeList[0] ?? "",
+          String(year),
+        ),
+        join(
+          sectorList[0] ?? "",
+          "startup accelerator",
+          placeList[2] ?? placeList[0] ?? "",
+          String(year),
+        ),
+        join(
+          sectorList[0] ?? "",
+          "seed funding",
+          placeList[0] ?? "",
+          String(year - 1),
+        ),
+      ]
+    : [...categoryQueries.slice(0, 1)];
+  if (!further)
+    candidates.push(
+      join(
+        "new",
+        sectorList[0] ?? "",
+        "startups founded",
+        placeList[0] ?? "",
+        String(year - 1),
+      ),
+      join(
+        sectorList[1] ?? sectorList[0] ?? "",
+        "startup raised seed",
+        placeList[1] ?? placeList[0] ?? "",
+        String(year),
+      ),
+      join(
+        sectorList[0] ?? "",
+        "startups launched",
+        placeList[2] ?? placeList[0] ?? "",
+        String(year),
+      ),
+      ...categoryQueries.slice(1),
+    );
   const plan = { sectors, places, stages };
   const queries = [...new Set(candidates.map((q) => q.replace(/\s+/gu, " ")))]
     .filter((query) => tokens(query).length >= 3)
@@ -502,6 +541,8 @@ export type PageSentence = {
 function sentencesNaming(
   name: string,
   sources: readonly FetchedSource[],
+  /** Other companies the pages name: a clause ends where one begins. */
+  others: readonly string[] = [],
 ): PageSentence[] {
   return sources
     .filter((source) => source.risky !== true)
@@ -510,8 +551,36 @@ function sentencesNaming(
       return pageText(source)
         .split(/(?<=[.!?])\s+|\n+/u)
         .filter((sentence) => own || namedIn(name, sentence))
-        .map((text) => ({ text, domain: source.domain }));
+        .map((sentence) => ({
+          text: own ? sentence : clauseOf(name, sentence, others),
+          domain: source.domain,
+        }));
     });
+}
+
+/**
+ * Round 4 (live 2026-11-06): a directory sentence names several companies
+ * ("Aella, founded in 2019; Owo Rails, a pre-seed API founded in 2025…").
+ * What it says about one of them runs from its name to the next company
+ * the sentence names, so a year or a stage is never given to a neighbour.
+ */
+function clauseOf(
+  name: string,
+  sentence: string,
+  others: readonly string[],
+): string {
+  // Lower-casing keeps every position, so the cut is exact.
+  const lower = sentence.toLowerCase();
+  const at = lower.indexOf(name.toLowerCase());
+  if (at < 0) return sentence;
+  const from = at + name.length;
+  let end = sentence.length;
+  for (const other of others) {
+    if (other.length < 2 || companyKey(other) === companyKey(name)) continue;
+    const next = lower.indexOf(other.toLowerCase(), from);
+    if (next >= 0 && next < end) end = next;
+  }
+  return sentence.slice(at, end);
 }
 
 const NAME = String.raw`\p{Lu}[\p{L}'’-]+(?:\s\p{Lu}[\p{L}'’-]+){1,3}`;
@@ -651,8 +720,9 @@ export function enrichFromPages(
   sources: readonly FetchedSource[],
   plan: Pick<DiscoveryPlan, "sectors" | "places">,
   now: Date,
+  others: readonly string[] = [],
 ): DiscoveredCompany {
-  const sentences = sentencesNaming(company.name, sources);
+  const sentences = sentencesNaming(company.name, sources, others);
   if (sentences.length === 0) return company;
   const text = sentences.map((sentence) => sentence.text).join(" ");
   const years = yearsStated(sentences, now);
@@ -673,7 +743,103 @@ export function enrichFromPages(
       null,
     founded: company.founded ?? years.founded,
     raised: company.raised ?? years.raised,
+    // Round 4: the stage its own clause states ("raised a seed round").
+    stage: company.stage ?? stageStated(text),
   };
+}
+
+const STAGE_NAMES: Readonly<Record<string, string>> = {
+  pre_seed: "pre-seed",
+  seed: "seed",
+  series_a: "Series A",
+  series_b: "Series B",
+  series_c: "Series C",
+  growth: "growth",
+};
+
+/** The funding stage a company's own clause states, as words; else null. */
+function stageStated(text: string): string | null {
+  const found = STAGE_SAID.find(([pattern]) => pattern.test(text));
+  return found === undefined ? null : (STAGE_NAMES[found[1]] ?? null);
+}
+
+/** Generic words a list, a directory or a media name ends with. */
+const LISTING_WORDS = new Set([
+  "startups",
+  "startup",
+  "companies",
+  "businesses",
+  "founders",
+  "investors",
+  "list",
+  "lists",
+  "directory",
+  "news",
+  "digest",
+  "magazine",
+  "weekly",
+]);
+
+/**
+ * Round 4 (live 2026-11-06: "African startups · raised in 2026" was the
+ * african-startups.com directory): a name is a listing, not a company,
+ * when it ends with a generic plural ("… startups", "… companies"),
+ * starts with a ranking ("Top 10 …"), is a page's own title, or is the
+ * site name of a page that names other companies (a directory's own name).
+ * Over public page text and the reader's proposals, never anyone's words.
+ */
+export function isListingName(
+  name: string,
+  sources: readonly FetchedSource[],
+  candidates: readonly string[],
+): boolean {
+  const words = normalForm(name)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  const last = words[words.length - 1] ?? "";
+  if (LISTING_WORDS.has(last)) return true;
+  if (words[0] === "top" || /^\d+$/u.test(words[0] ?? "")) return true;
+  const key = companyKey(name);
+  return sources.some((source) => {
+    if (source.title !== null && companyKey(source.title) === key) return true;
+    if (!onCompanySite(source.domain, name)) return false;
+    const text = pageText(source);
+    const othersNamed = candidates.filter(
+      (other) => companyKey(other) !== key && namedIn(other, text),
+    );
+    return othersNamed.length >= 2;
+  });
+}
+
+/**
+ * The companies and founders Q listed in its own earlier discovery replies
+ * in this conversation ("1. **Numida** · founded 2022 — Founders: A and
+ * B."), read from Q's own composed lines, never from the person's words.
+ */
+export function priorListings(
+  qReplies: readonly string[],
+): { readonly name: string; readonly founders: readonly string[] }[] {
+  const out: { name: string; founders: string[] }[] = [];
+  for (const reply of qReplies) {
+    for (const line of reply.split("\n")) {
+      const item = /^\d+\.\s+\*\*(.+?)\*\*(.*)$/u.exec(line.trim());
+      if (item === null) continue;
+      const name = (item[1] ?? "").trim();
+      if (name.length < 2) continue;
+      const said = /Founders: (.+?)\.(?:\s|$)/u.exec(item[2] ?? "");
+      const founders =
+        said === null
+          ? []
+          : (said[1] ?? "")
+              .split(/,\s*|\s+and\s+/u)
+              .map((founder) => founder.trim())
+              .filter((founder) => founder.length > 2);
+      if (!out.some((known) => companyKey(known.name) === companyKey(name))) {
+        out.push({ name, founders });
+      }
+    }
+  }
+  return out;
 }
 
 // --- fit ---------------------------------------------------------------
@@ -881,13 +1047,27 @@ export async function runWebDiscovery(input: {
   readonly now?: (() => number) | undefined;
   readonly budgetMs?: number | undefined;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Round 4: the companies (and founders) Q already listed in this
+   * conversation (`priorListings`). "More" is new companies only.
+   */
+  readonly alreadyListed?:
+    | readonly { readonly name: string; readonly founders: readonly string[] }[]
+    | undefined;
 }): Promise<WebDiscoveryAnswer | null> {
   if (!input.available.has(RESEARCH_TOOL)) return null;
   const now = input.now ?? Date.now;
   const started = now();
   const budgetMs = input.budgetMs ?? DISCOVERY_BUDGET_MS;
   const roundMayStart = () => now() - started < budgetMs * ROUND_CUTOFF;
-  const plan = planDiscovery(input.ask, input.mandate, new Date(now()));
+  const prior = input.alreadyListed ?? [];
+  const priorKeys = new Set(prior.map((one) => companyKey(one.name)));
+  const plan = planDiscovery(
+    input.ask,
+    input.mandate,
+    new Date(now()),
+    prior.length > 0,
+  );
   const calls: QToolCallOutcome[] = [];
   let callsLeft = DISCOVERY_MAX_TOOL_CALLS;
   const call = async (
@@ -1040,10 +1220,56 @@ export async function runWebDiscovery(input: {
   // The reader failing is never zero companies: the results on companies'
   // own sites name them (deterministic, admitted the same way).
   const readerFailed = proposed === null;
-  let companies = admitDiscoveries(
-    [...(proposed ?? []), ...namesFromCompanySites(firstPages)],
-    firstPages,
+  const firstProposed = [
+    ...(proposed ?? []),
+    ...namesFromCompanySites(firstPages),
+  ];
+  const candidateNames = firstProposed.map((item) => item.name);
+  const today = new Date(now());
+  const thisYear = today.getUTCFullYear();
+  // Round 4: a listing is not a company; what this conversation already
+  // listed is not new; a company a page says is over 8 years old is not
+  // new either. What the pages say is read before the founder round, so
+  // its searches go to the companies still without a founder.
+  let excludedPrior = 0;
+  let droppedOld = 0;
+  const priorFounders = new Map(
+    prior.map((one) => [companyKey(one.name), one.founders] as const),
   );
+  const settle = (list: readonly DiscoveredCompany[]): DiscoveredCompany[] =>
+    list
+      .map((company) =>
+        enrichFromPages(company, readable(), plan, today, candidateNames),
+      )
+      .map((company) => {
+        const known = priorFounders.get(companyKey(company.name));
+        return company.founders.length === 0 &&
+          known !== undefined &&
+          known.length > 0
+          ? { ...company, founders: [...known] }
+          : company;
+      })
+      .filter((company) => {
+        const old =
+          company.founded !== null &&
+          company.founded !== undefined &&
+          company.founded < thisYear - 8;
+        if (old) droppedOld += 1;
+        return !old;
+      });
+  let companies = admitDiscoveries(firstProposed, firstPages).filter(
+    (company) => {
+      if (isListingName(company.name, firstPages, candidateNames)) {
+        return false;
+      }
+      if (priorKeys.has(companyKey(company.name))) {
+        excludedPrior += 1;
+        return false;
+      }
+      return true;
+    },
+  );
+  companies = settle(companies);
 
   // Round 2: founders for the candidates the pages left without one.
   const count = Math.min(
@@ -1093,16 +1319,12 @@ export async function runWebDiscovery(input: {
     }
   }
 
-  // What the pages say that the reader left unknown: founders stated in a
-  // sentence naming the company, founded and funding years, sector, place.
-  const today = new Date(now());
-  companies = companies.map((company) =>
-    enrichFromPages(company, readable(), plan, today),
-  );
+  // What the founder round's pages say, read the same way (droppedOld
+  // counts each company once: what round one dropped is gone).
+  companies = settle(companies);
 
   // Ranked: new first (owner 2026-11-06: "NEW companies"), then fit to what
   // was searched, then founders known, then found first.
-  const thisYear = today.getUTCFullYear();
   const recency = (company: DiscoveredCompany): number =>
     (company.founded !== null && company.founded !== undefined
       ? company.founded >= thisYear - 3
@@ -1176,7 +1398,11 @@ export async function runWebDiscovery(input: {
   }
 
   return {
-    text: discoveryAnswerText(marked, plan, fetched, readerFailed),
+    text: discoveryAnswerText(marked, plan, fetched, readerFailed, {
+      further: prior.length > 0,
+      excludedPrior,
+      droppedOld,
+    }),
     outcome: marked.length > 0 ? "FOUND" : "NONE",
     readerFailed,
     companies: marked,
@@ -1195,6 +1421,12 @@ export function discoveryAnswerText(
   fetched: ReadonlyMap<string, FetchedSource>,
   /** The page reader failed; what is listed came from the results alone. */
   readerFailed = false,
+  /** Round 4: a search for more, and what was left out and why. */
+  left: {
+    readonly further: boolean;
+    readonly excludedPrior: number;
+    readonly droppedOld: number;
+  } = { further: false, excludedPrior: 0, droppedOld: 0 },
 ): string {
   const looking = lookingPhrase(plan);
   const against =
@@ -1203,6 +1435,16 @@ export function discoveryAnswerText(
       : plan.fromMandate && !plan.askNamed
         ? ` against your mandate (${looking})`
         : ` for ${looking}`;
+  const searched = left.further
+    ? `I searched the public web further${against}`
+    : `I searched the public web${against}`;
+  const oldLine =
+    left.droppedOld === 0
+      ? ""
+      : ` I left out ${String(left.droppedOld)} that the sources say were founded more than 8 years ago.`;
+  if (companies.length === 0 && left.excludedPrior > 0) {
+    return `${searched}, but the pages I read only named companies I've already listed in this conversation, so there's nothing new to add.${oldLine} I can try a different angle -- a specific city, a sub-sector or a recent accelerator batch -- if you'd like.`;
+  }
   if (companies.length === 0 && readerFailed) {
     return `I searched the public web${against} and found pages to read, but I couldn't read them in time just now, so I won't guess at names. Ask me again in a moment and I'll read them again.`;
   }
@@ -1240,8 +1482,15 @@ export function discoveryAnswerText(
     } Source: ${links}.${onQ}`;
   });
   const n = companies.length;
+  const found = left.further
+    ? `found ${String(n)} new ${n === 1 ? "company" : "companies"}${
+        left.excludedPrior > 0
+          ? ` (leaving out the ${String(left.excludedPrior)} I listed earlier)`
+          : ""
+      }`
+    : `found ${String(n)} ${n === 1 ? "company" : "companies"}`;
   return [
-    `I searched the public web${against} and found ${String(n)} ${n === 1 ? "company" : "companies"}. These come from public web pages and are unverified: nothing here is checked by Capital Q, and anything marked unknown wasn't stated in the sources.`,
+    `${searched} and ${found}.${oldLine} These come from public web pages and are unverified: nothing here is checked by Capital Q, and anything marked unknown wasn't stated in the sources.`,
     lines.join("\n"),
     "Would you like me to look deeper into any of them, or prepare an introduction note for your approval? I won't contact anyone unless you approve it.",
   ].join("\n\n");

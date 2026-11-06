@@ -262,3 +262,22 @@ describe("provider health on the 6 Nov production keys", () => {
     expect(calls).toEqual({ scrapingbee: 1, serper: 1, brave: 6, tavily: 6 });
   });
 });
+
+describe("round 4: a search for more keeps its words", () => {
+  it("sends 'startups to watch', 'emerging' and 'accelerator' with real categories", async () => {
+    const provider = createFakeResearchProvider({ pages: [DIRECTORY] });
+    const service = createPublicWebResearchService({ provider });
+    await service.research(
+      command({
+        runId: `${RUN}-more`,
+        requestedQuery: "fintech startups to watch Nigeria 2026",
+        alsoQueries: ["emerging fintech startup accelerator Nigeria 2026"],
+        categories: { sectors: ["fintech"], countries: ["NG"] },
+      }),
+    );
+    const sent = provider.searches.map((s) => s.query).join(" | ");
+    expect(sent).toContain("to watch");
+    expect(sent).toContain("emerging");
+    expect(sent).toContain("accelerator");
+  });
+});

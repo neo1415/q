@@ -56,6 +56,11 @@ export const DISCOVERY_VOCABULARY: readonly string[] = [
   "ceo",
   "co",
   "cofounder",
+  // A search for more ("{sector} startups to watch", "emerging …",
+  // "… startup accelerator"; round 4, 2026-11-06).
+  "watch",
+  "emerging",
+  "accelerator",
 ];
 
 function nodeName(
