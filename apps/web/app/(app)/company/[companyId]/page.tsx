@@ -30,6 +30,7 @@ import {
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
 import { BackLink } from "@/features/company/back-link";
+import { EngagementView } from "@/features/engagement/engagement-view";
 import {
   ProfileOpenTabQSection,
   ProfileTabQSection,
@@ -319,6 +320,10 @@ export default async function CompanyPage({
           <BackLink fallbackHref="/home" label="Q" />
         ) : (
           <BackLink fallbackHref="/discover" label={t("Discover")} />
+        )}
+        {/* Q Workspace §8 A1: a passive view, analytics only. */}
+        {profile.viewer === "OWNER" ? null : (
+          <EngagementView type="PROFILE_VIEW" companyId={profile.companyId} />
         )}
         <CompanyProfileView
           translate={t}

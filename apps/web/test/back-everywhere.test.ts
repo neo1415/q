@@ -37,6 +37,7 @@ const ROOTS = [
   // The admin console and its sections, each a tab of its own nav.
   "admin",
   "admin/accounts",
+  "admin/analytics",
   "admin/audit",
   "admin/billing",
   "admin/brand",
