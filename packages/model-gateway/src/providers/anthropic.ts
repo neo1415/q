@@ -519,10 +519,13 @@ export function finishOf(
       return "MAX_OUTPUT_TOKENS";
     case "refusal":
       return "CONTENT_FILTERED";
-    default:
-      // pause_turn, model_context_window_exceeded, or a reason added later.
+    case "pause_turn":
+    case "model_context_window_exceeded":
+    case null:
       return "OTHER";
   }
+  // A stop reason the SDK's types do not know yet.
+  return "OTHER";
 }
 
 function result(message: Message): ModelProviderResult {
@@ -605,23 +608,25 @@ export function normalizeError(error: unknown): ModelProviderFailure {
     });
   }
   if (error instanceof APIError) {
-    const exhausted = accountExhausted(error);
-    const status = error.status;
-    const retryAfter = retryAfterMs(error);
+    // instanceof widens the SDK's generic to any; this is its declared shape.
+    const refused: APIError = error as APIError;
+    const exhausted = accountExhausted(refused);
+    const status = refused.status;
+    const retryAfter = retryAfterMs(refused);
     return new ModelProviderFailure(
       `anthropic request refused (${status ?? "no status"})`,
       {
         // An exhausted account is PERMANENT for the attempt -- another
         // candidate may answer -- and flagged, so the provider is set
         // aside until a probe succeeds rather than retried every turn.
-        failureClass: exhausted ? "PERMANENT" : classify(error),
+        failureClass: exhausted ? "PERMANENT" : classify(refused),
         ...(exhausted ? { accountExhausted: true } : {}),
         providerCode: ANTHROPIC_PROVIDER_CODE,
         ...(status === undefined ? {} : { providerStatus: status }),
         ...(retryAfter === undefined ? {} : { retryAfterMs: retryAfter }),
         // The vendor's error TYPE token, never its message.
-        ...(error.type === null ? {} : { vendorErrorCode: error.type }),
-        cause: error,
+        ...(refused.type === null ? {} : { vendorErrorCode: refused.type }),
+        cause: refused,
       },
     );
   }
