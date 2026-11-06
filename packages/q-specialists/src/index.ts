@@ -455,6 +455,13 @@ export {
   type NamedCompanyRecord,
   type QNamedCompanyPort,
 } from "./named-company.js";
+export {
+  bindHeardName,
+  createToolNameCandidatesPort,
+  nameReadings,
+  type NameCandidate,
+  type QNameCandidatesPort,
+} from "./name-candidates.js";
 // Situation-first planning (S5, S6): the answer's port to the plan job.
 export {
   offeredPlanAccepted,

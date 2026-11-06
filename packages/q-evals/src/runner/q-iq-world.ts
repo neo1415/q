@@ -20,6 +20,7 @@ import {
 import { createSpecialistQAnswer } from "@capital-q/q-specialists";
 
 import {
+  Q_IQ_COMPANIES,
   Q_IQ_FACTS,
   type QIqCase,
   type QIqFact,
@@ -64,6 +65,17 @@ const authorised = (f: QIqFact): AuthorisedFact => ({
   source: f.source,
   ...(f.asOf === undefined ? {} : { asOf: f.asOf }),
 });
+
+/** A name search over the fixture companies (search_companies' stand-in). */
+export function qIqNameCandidates(
+  name: string,
+): readonly { readonly companyId: string; readonly name: string }[] {
+  const query = name.trim().toLowerCase();
+  if (query.length < 2) return [];
+  return Q_IQ_COMPANIES.filter((c) => c.name.toLowerCase().includes(query)).map(
+    (c) => ({ companyId: c.id, name: c.name }),
+  );
+}
 
 export const Q_IQ_AUTHORISED_FACTS: readonly AuthorisedFact[] =
   Q_IQ_FACTS.map(authorised);
@@ -287,6 +299,11 @@ export async function createQIqWorldSubject(options: {
         transactions: options.db.transactions,
         logger,
         ...(turns === undefined ? {} : { turns }),
+        // The companies a heard name could mean, as q-api reads them with
+        // search_companies: here the fixture companies, every one of them
+        // authorised (their facts are all released), matched by name.
+        nameCandidates: (_request, name) =>
+          Promise.resolve(qIqNameCandidates(name)),
       }),
   });
 
