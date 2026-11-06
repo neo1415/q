@@ -919,6 +919,10 @@ body:has([data-arrival-dock]:not([data-tucked]) > div:not(:empty))
   margin: 0 auto;
   padding: 14px 24px 40px;
   color: var(--cq-text-primary);
+  /* The Board is a page and a docked side panel (~350px on a desktop
+     window). Its one-column, tabbed layout follows its own width, not the
+     viewport's, so the panel never draws the two-column grid over itself. */
+  container: cq-board / inline-size;
 }
 .cq-board-head {
   display: flex;
@@ -1196,6 +1200,8 @@ body:has([data-arrival-dock]:not([data-tucked]) > div:not(:empty))
   .cq-board {
     padding: 6px 16px 100px;
   }
+}
+@container cq-board (max-width: 760px) {
   .cq-board-grid {
     grid-template-columns: 1fr;
     margin-top: 4px;
