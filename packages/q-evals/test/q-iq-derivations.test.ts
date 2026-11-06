@@ -104,14 +104,10 @@ describe("labelled differences: grader and claim check agree (DECISIONS 61)", ()
   it.each(cases)("%s", (reply, allowed) => {
     const grade = gradeQIqTurn(Q_IQ_WORLD, cmp, turn, reply);
     expect(grade.inventedFigures.length === 0, "grader").toBe(allowed);
-    // Known gap, reported (not this lane's change): the claim check also
-    // grounds a small number derivable from any two figures of one source
-    // line, so it publishes the wrong "33" too. Agreement is asserted on
-    // the correct differences, which both publish.
-    if (allowed) {
-      expect(checkAnswer(reply, corpus).text === reply, "claim check").toBe(
-        true,
-      );
-    }
+    // The claim check recomputes a derivation now (fix/q-claim-check-
+    // arithmetic): a wrong or unsourced difference is removed there too.
+    expect(checkAnswer(reply, corpus).text === reply, "claim check").toBe(
+      allowed,
+    );
   });
 });
