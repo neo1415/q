@@ -73,6 +73,16 @@ export type FakeBehaviour =
       /** A raw, unclassified exception — what a buggy adapter would leak. */
       readonly kind: "THROW_RAW";
       readonly message: string;
+    }
+  | {
+      /**
+       * Chooses the behaviour from the request itself (its output schema,
+       * say): one script that answers a turn reader one way and the answer
+       * another, with each its own delay, as a latency harness needs.
+       * `pick` must not return another ROUTED behaviour.
+       */
+      readonly kind: "ROUTED";
+      readonly pick: (request: ModelProviderRequest) => FakeBehaviour;
     };
 
 export type FakeCall = {
@@ -170,7 +180,9 @@ export function createFakeModelProvider(
       context: ModelExecutionContext,
     ): Promise<ModelProviderResult> => {
       calls.push({ request, attempt: context.attempt });
-      const behaviour = next();
+      const scripted = next();
+      const behaviour =
+        scripted.kind === "ROUTED" ? scripted.pick(request) : scripted;
       try {
         switch (behaviour.kind) {
           case "TEXT":
@@ -239,6 +251,8 @@ export function createFakeModelProvider(
             return await waitForAbort(context.signal);
           case "THROW_RAW":
             throw new Error(behaviour.message);
+          case "ROUTED":
+            throw new Error("a ROUTED behaviour picked another ROUTED one");
         }
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {

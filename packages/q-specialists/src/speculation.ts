@@ -32,6 +32,14 @@ export const SPECULATIVE_READING: TurnReaderResult = {
   aboutNamedOther: false,
 };
 
+/**
+ * What the speculative answer is asked to be (TURN_READER v78 answerKind):
+ * a lookup, the commonest plain question. Adopted only when the reading
+ * says the same, so the answer runs at the task class and reasoning the
+ * reading would have given it.
+ */
+export const SPECULATIVE_ANSWER_KIND = "LOOKUP";
+
 export type QSpeculationCancelReason =
   /** The turn could not be read. */
   | "UNREAD"
@@ -43,6 +51,12 @@ export type QSpeculationCancelReason =
   | "FOCUS"
   /** A note the default lacks: a lead, a document, a series, an action. */
   | "NOTE"
+  /**
+   * The words were bound to records (the reader's references, or code's
+   * own pointing): the turn's answer carries that binding, which the
+   * speculative answer, started before it, does not.
+   */
+  | "BOUND"
   /** The turn went another way: a decision, a hand, an action, silence. */
   | "ACTED";
 
@@ -139,10 +153,22 @@ export function speculationMisfit(input: {
   readonly ownRecords: boolean;
   readonly speculative: QAnswerRequest;
   readonly speculativeResearch: QResearchDirective;
+  /** The turn's words were bound to records for its answer this run. */
+  readonly bound?: boolean | undefined;
 }): QSpeculationCancelReason | null {
   const { final, speculative } = input;
   if (final.turnUnread === true) return "UNREAD";
   if (final.turnKind !== speculative.turnKind) return "KIND";
+  // Reader latency (2026-11-06): the turn's answer is given the binding
+  // (withReferences) after the speculation began without it. Never adopt
+  // an answer that was not told what "it", "her" or "the second one" is.
+  if (
+    input.bound === true ||
+    final.references !== undefined ||
+    final.referencedCompanyIds !== undefined
+  ) {
+    return "BOUND";
+  }
   if (
     JSON.stringify(input.finalResearch) !==
     JSON.stringify(input.speculativeResearch)
@@ -178,11 +204,42 @@ export function speculationMisfit(input: {
     final.fitQuestion !== undefined ||
     final.discoverCompanies !== undefined ||
     JSON.stringify(final.capabilities) !==
-      JSON.stringify(speculative.capabilities)
+      JSON.stringify(speculative.capabilities) ||
+    READING_FIELDS.some(
+      (field) =>
+        JSON.stringify(normalised(final[field])) !==
+        JSON.stringify(normalised(speculative[field])),
+    )
   ) {
     return "NOTE";
   }
   return null;
+}
+
+/**
+ * What the reading puts on the answer's request beyond its kind (steps 3-4,
+ * TURN_READER v77-v78, and the K-lanes): each changes the answer's task
+ * class, reasoning, route or prompt, so the speculation's answer is the
+ * turn's only when every one is the same. Listed rather than inferred, and
+ * compared whole: a field added to the reading must be added here.
+ * `questionKind` is compared above, as the voice lane decided (ADVICE and
+ * THEIR_OWN_RECORDS only).
+ */
+const READING_FIELDS = [
+  "answerKind",
+  "askParts",
+  "rememberAsk",
+  "asksForChart",
+  "asksForWeb",
+  "preparedSubject",
+  "namedOther",
+] as const satisfies readonly (keyof QAnswerRequest)[];
+
+/** Absent, null and false say the same: nothing was read. */
+function normalised(value: unknown): unknown {
+  return value === undefined || value === null || value === false
+    ? null
+    : value;
 }
 
 /** A reading that cannot end in the speculation's answer, known at once. */
@@ -200,6 +257,11 @@ export function readingMisfit(
     readonly askedAction?: string | null | undefined;
     /** Their own work board (reader boardAsk): answered by its own branch. */
     readonly boardAsk?: string | null | undefined;
+    /** v78: the work the turn asks of the answer, and a compound ask's parts. */
+    readonly answerKind?: string | null | undefined;
+    readonly parts?: readonly unknown[] | undefined;
+    /** v77: the phrases bound to the conversation's records. */
+    readonly references?: readonly unknown[] | undefined;
     readonly reference?:
       | { readonly open: unknown; readonly retryLast: boolean }
       | null
@@ -230,6 +292,14 @@ export function readingMisfit(
     read.reference?.retryLast === true
   ) {
     return "ACTED";
+  }
+  // Known as soon as the reading lands, rather than at the end of the path.
+  if ((read.references?.length ?? 0) > 0) return "BOUND";
+  if (
+    (read.answerKind ?? null) !== SPECULATIVE_ANSWER_KIND ||
+    (read.parts?.length ?? 0) >= 2
+  ) {
+    return "NOTE";
   }
   return null;
 }
