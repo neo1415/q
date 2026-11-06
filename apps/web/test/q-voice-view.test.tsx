@@ -29,6 +29,18 @@ const state: {
 } = { turns: [], voiceActive: false };
 const voiceEnd = vi.fn((_reason?: string) => Promise.resolve());
 const voiceTalk = vi.fn(() => Promise.resolve());
+const speechStop = vi.fn();
+vi.mock("../src/features/voice/use-q-speech", () => ({
+  useQSpeech: () => ({
+    status: "idle",
+    muted: false,
+    say: vi.fn(() => Promise.resolve()),
+    queue: vi.fn(),
+    play: vi.fn(),
+    stop: speechStop,
+    toggleMuted: vi.fn(),
+  }),
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/home",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -104,6 +116,7 @@ beforeEach(() => {
   talk.mockClear();
   voiceTalk.mockClear();
   voiceEnd.mockClear();
+  speechStop.mockClear();
   localStorage.clear();
   vi.stubGlobal(
     "matchMedia",
@@ -297,5 +310,39 @@ describe("Chat and Q as two views (owner 2026-11-06)", () => {
     expect(
       document.querySelector("[data-q-presence='stage'] [data-q-aperture]"),
     ).not.toBeNull();
+  });
+});
+
+describe("Chat is voice off (owner 2026-11-06)", () => {
+  it("switching to Chat ends the line and stops Q mid-sentence", async () => {
+    localStorage.setItem("cq.q.view", "presence");
+    state.voiceActive = true;
+    await renderHome();
+    expect(voiceEnd).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+    expect(voiceEnd).toHaveBeenCalledWith("user");
+    expect(speechStop).toHaveBeenCalled();
+  });
+
+  it("arriving on Chat with a line still open (stored choice, navigation) ends it", async () => {
+    localStorage.setItem("cq.q.view", "chat");
+    state.voiceActive = true;
+    await renderHome();
+    expect(voiceEnd).toHaveBeenCalledWith("user");
+  });
+
+  it("never re-arms on Chat: a line that comes up there is ended, and talk() is not called", async () => {
+    localStorage.setItem("cq.q.view", "chat");
+    const view = render(<QConversationPanel connected context={CONTEXT} />);
+    expect(voiceEnd).not.toHaveBeenCalled();
+    state.voiceActive = true;
+    view.rerender(<QConversationPanel connected context={CONTEXT} />);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(voiceEnd).toHaveBeenCalledTimes(1);
+    expect(talk).not.toHaveBeenCalled();
+    expect(voiceTalk).not.toHaveBeenCalled();
+    expect(viewSwitch().getAttribute("data-q-view")).toBe("chat");
   });
 });

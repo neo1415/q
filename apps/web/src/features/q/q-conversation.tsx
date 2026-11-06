@@ -98,6 +98,12 @@ import { PhoneShellLead } from "@/components/app-shell/phone-lead";
 import { QStarters, startersOf, type QStarter } from "./q-starters";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { noteQPageView } from "./screen";
+import {
+  readStageView,
+  subscribeStageView,
+  writeStageView,
+  type QStageView,
+} from "./stage-view";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
@@ -641,15 +647,23 @@ export function QConversationPanel({
     () => "chat" as const,
   );
   const voiceOn = voice.active;
-  // Leaving Q for Chat ends a live line the way End does (owner
-  // 2026-11-06, "like ChatGPT"): the words stay in the one thread.
-  const chooseView = useCallback(
-    (next: QStageView) => {
-      if (next === "chat" && voiceOn) end();
-      writeStageView(next);
-    },
-    [voiceOn, end],
-  );
+  const chooseView = useCallback((next: QStageView) => {
+    writeStageView(next);
+  }, []);
+  // Owner 2026-11-06: Chat means voice fully off, however Chat was reached
+  // (the switch, a stored choice, arriving by navigation with a line still
+  // open). The line ends the way End does -- which closes it and stops
+  // every microphone track (duplex-line.ts, live-call.ts) -- and Q stops
+  // mid-sentence. A line that comes up while Chat shows is ended too, so
+  // nothing reconnects here; the voice view is the one place it lives.
+  const shownBefore = useRef<QStageView | null>(null);
+  useEffect(() => {
+    const arrived = view === "chat" && shownBefore.current !== "chat";
+    shownBefore.current = view;
+    if (view !== "chat") return;
+    if (arrived) stopSpeech();
+    if (voiceOn) end();
+  }, [view, voiceOn, end, stopSpeech]);
   // Q intelligence step 1: questions asked here say the Q page and its
   // view; once it unmounts, Q is the dock again.
   useEffect(() => {
@@ -2118,44 +2132,6 @@ export function QConversationPanel({
       </div>
     </QSurfaceToolsContext.Provider>
   );
-}
-
-type QStageView = "presence" | "chat";
-const STAGE_VIEW_KEY = "cq.q.view";
-const STAGE_VIEW_EVENT = "cq:q-view";
-
-function subscribeStageView(onChange: () => void): () => void {
-  window.addEventListener(STAGE_VIEW_EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(STAGE_VIEW_EVENT, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
-let stageViewInMemory: QStageView | null = null;
-
-function writeStageView(next: QStageView): void {
-  try {
-    localStorage.setItem(STAGE_VIEW_KEY, next);
-    stageViewInMemory = null;
-  } catch {
-    // Private mode: the choice lasts for this page only.
-    stageViewInMemory = next;
-  }
-  window.dispatchEvent(new Event(STAGE_VIEW_EVENT));
-}
-
-function readStageView(): QStageView {
-  try {
-    const stored = localStorage.getItem(STAGE_VIEW_KEY);
-    if (stored === "chat" || stored === "presence") return stored;
-  } catch {
-    // Storage unavailable: fall through to this page's own choice.
-  }
-  // Owner 2026-11-06 (extending 2026-10-28's phone rule to every width):
-  // everyone without a stored choice opens on Chat; Q is one tap away.
-  return stageViewInMemory ?? "chat";
 }
 
 /*

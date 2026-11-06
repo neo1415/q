@@ -87,3 +87,43 @@ No new `t()` strings were added; the opener's words are spoken, and the Arabic c
   - That includes `back-everywhere` (87), `destination-routes` (52) and `manifest-page-coverage` (3).
   - There is no `app-routes` test file; `control/app-routes.ts` is covered through the tests that use it.
 - `prettier --check` on `apps/web` and this receipt: clean.
+
+## Addendum: Chat is voice fully off (owner 2026-11-06, commit `067ff5b`)
+
+Switching to Chat mirrors switching to Q. Whenever Chat shows, one effect in `q-conversation.tsx` acts. That covers the switch, a stored choice, and arriving on Chat by navigation with a line still open. It does three things:
+
+- **Ends the line** the way End does (`voice.end("user")`). That closes it, and the line's own close stops every microphone track:
+  - `duplex-line.ts` and `live-call.ts`; `voice-duplex.test.tsx` already asserts `track.stop`.
+  - The interview's `end()` clears any pending reconnect.
+- **Stops Q's speech** mid-sentence (`useQSpeech().stop`) on arrival at Chat.
+- **Ends any line that comes up while Chat shows,** so nothing reconnects on Chat, and `talk()` is never called from there.
+
+Also in this commit:
+
+- **ElevenLabs permission probe.** It used to leave its `getUserMedia` stream open until garbage collection, so the microphone light stayed on. `probeMicrophone()` now stops every track it opened.
+- **"Hey Q".** The view store moved to `q/stage-view.ts`. The wake word now calls `showQVoiceView()` before it talks, on the Q page or the one it opens. Voice means the Q view, so Chat never ends a line the person asked for by name.
+- **Scope.** Navigating away from the Q page during a call is unchanged. A call can follow Q-driven navigation across pages (`destinations.ts`), so "navigation away" is read as arriving on Chat, and is handled there.
+- **Wake listener.** The "Hey Q" listener itself keeps its microphone while that setting is on. It is the person's own app-wide setting, not the Q line.
+
+### Tests
+
+- In `q-voice-view.test.tsx`, "Chat is voice off" (3 tests):
+  - the switch ends the line and stops speech;
+  - arriving on Chat with a line open ends it;
+  - a line coming up on Chat is ended, and `talk()` is not called.
+- `voice-off-microphone.test.ts` (2 tests):
+  - the probe stops every track;
+  - a wake chooses the voice view.
+- **Failing-first** against `24ee53c`'s `src`:
+  - the two Chat-arrival and no-re-arm tests failed;
+  - the probe and wake file could not load, because neither export existed;
+  - "the switch stops speech" already passed there.
+
+### Gates (exact results)
+
+- Root tsc: exit 0.
+- Web tsc: exit 0.
+- eslint on the 6 touched TS/TSX files (`NODE_OPTIONS=--max-old-space-size=6144`): exit 0.
+- Full web vitest: 467 files and 4060 tests passed, exit 0.
+  - That includes `back-everywhere` (87), `destination-routes` (52) and `manifest-page-coverage` (3).
+- `prettier --check apps/web`: clean.

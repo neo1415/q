@@ -104,7 +104,7 @@ export function useElevenLabsVoiceSession(
       lastLineRef.current = null;
       setState("CONNECTING");
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        await probeMicrophone();
       } catch {
         setState("ERROR");
         eventsRef.current.onError?.(PLAIN_ERRORS.microphone);
@@ -278,4 +278,15 @@ export function useElevenLabsVoiceSession(
       outputLevel,
     ],
   );
+}
+
+/**
+ * Asks for the microphone only to know it is allowed; the SDK opens its
+ * own. The probe's tracks are stopped at once (owner 2026-11-06: off
+ * means the browser's microphone light goes off), never left to the
+ * garbage collector.
+ */
+export async function probeMicrophone(): Promise<void> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  for (const track of stream.getTracks()) track.stop();
 }
