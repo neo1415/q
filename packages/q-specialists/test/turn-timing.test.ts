@@ -17,6 +17,7 @@ import {
 } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
+  TURN_READER_REASONING,
   type QTurnReader,
   type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
@@ -55,7 +56,12 @@ import { createSpecialistQAnswer } from "../src/answer.js";
  * Latencies and their sources (docs/ai-handoff/workstreams/
  * TURN-LATENCY-2026-10-20.md section 1 unless stated):
  *   TURN_SKIM 850 ms        measured p50 0.75-0.95 s (row 3)
- *   TURN_READER 1,200 ms    measured p50 1.2 s (row 4)
+ *   TURN_READER by the reasoning level the reader asks for
+ *                           (TURN_READER_REASONING): LOW 4,500 ms (live
+ *                           Q-IQ run 2, 6 Nov 2026: "the turn reader
+ *                           (4-5 s)", BASELINE.md); NONE 1,200 ms
+ *                           (row 4: measured p50 1.2 s before the reader
+ *                           set a level). NONE is the model to confirm live
  *   tool-selection round    1,900 ms (row 16: two rounds 3.8-4.5 s;
  *                           PERFORMANCE-BASELINE.md: 1,798 + 2,036 ms)
  *   answer model            1,600 ms to first token, then 125
@@ -74,7 +80,6 @@ import { createSpecialistQAnswer } from "../src/answer.js";
 const SCALE = Number(process.env["CQ_TURN_TIMING_SCALE"] ?? "1");
 const LATENCY = {
   skimMs: 850,
-  readerMs: 1_200,
   roundMs: 1_900,
   firstTokenMs: 1_600,
   tokensPerSecond: 125,
@@ -82,6 +87,10 @@ const LATENCY = {
   readMs: 40,
   dbMs: 10,
 } as const;
+
+/** The reader's latency by the reasoning level it asks for (see above). */
+const READER_MS = { NONE: 1_200, LOW: 4_500 } as const;
+type ReaderReasoning = keyof typeof READER_MS;
 
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms * SCALE));
@@ -240,7 +249,9 @@ function timedModel(
       }
       if (proposals.length > 0) {
         calls.push(`tools:${proposals.map((p) => p.name).join("+")}`);
+        trace?.("round asked");
         await wait(LATENCY.roundMs);
+        trace?.("round done");
         return {
           text: "",
           toolCalls: proposals.map((p, index) => ({
@@ -516,7 +527,56 @@ export type Timing = {
   readonly holding: readonly { readonly text: string; readonly ms: number }[];
   /** When the quick first read returned, from the turn's start. */
   readonly skimDoneMs: number | null;
+  /** When the answer model was first asked to write the answer. */
+  readonly answerAskedMs: number | null;
+  /**
+   * Model calls one after another before the answer model was asked: the
+   * longest chain of skim, reader and tool-selection calls in which each
+   * starts after the one before it ended (calls side by side count once).
+   */
+  readonly serialBeforeAnswer: number;
 };
+
+/** The longest chain of back-to-back spans that end by `until`. */
+export function serialChain(
+  spans: readonly { readonly start: number; readonly end: number }[],
+  until: number,
+): number {
+  const done = [...spans]
+    .filter((span) => span.end <= until)
+    .sort((a, b) => a.end - b.end);
+  const depth: number[] = [];
+  done.forEach((span, i) => {
+    let best = 0;
+    for (let j = 0; j < i; j += 1) {
+      const before = done[j];
+      if (before !== undefined && before.end <= span.start)
+        best = Math.max(best, depth[j] ?? 0);
+    }
+    depth.push(best + 1);
+  });
+  return Math.max(0, ...depth);
+}
+
+/** Model-call spans from the trace: "<x> asked@t" ... "<x> done@t". */
+function spansOf(traced: readonly string[]): { start: number; end: number }[] {
+  const open = new Map<string, number[]>();
+  const spans: { start: number; end: number }[] = [];
+  for (const line of traced) {
+    const match = /^(reader|skim|round) (asked|done)@(\d+)$/u.exec(line);
+    if (match === null) continue;
+    const [, what = "", edge, ms = "0"] = match;
+    const starts = open.get(what) ?? [];
+    if (edge === "asked") {
+      starts.push(Number(ms));
+      open.set(what, starts);
+    } else {
+      const start = starts.shift();
+      if (start !== undefined) spans.push({ start, end: Number(ms) });
+    }
+  }
+  return spans;
+}
 
 const question = (kind: string, text: string) => ({
   kind: "QUESTION_TO_Q",
@@ -698,8 +758,13 @@ export const JOURNEYS: readonly Journey[] = [
 
 export async function timeJourney(
   journey: Journey,
-  options: { readonly parallelExtras?: boolean } = {},
+  options: {
+    readonly parallelExtras?: boolean;
+    /** The reader's level; production's own (TURN_READER_REASONING) by default. */
+    readonly readerReasoning?: ReaderReasoning;
+  } = {},
 ): Promise<Timing> {
+  const readerMs = READER_MS[options.readerReasoning ?? TURN_READER_REASONING];
   const runId = randomUUID();
   const conversationId = randomUUID();
   const calls: string[] = [];
@@ -870,7 +935,7 @@ export async function timeJourney(
     read: async () => {
       calls.push("reader");
       trace("reader asked");
-      await wait(LATENCY.readerMs);
+      await wait(readerMs);
       trace("reader done");
       return readingNow as never;
     },
@@ -878,7 +943,9 @@ export async function timeJourney(
   const turnSkim: QTurnSkimmer = {
     skim: async () => {
       calls.push("skim");
+      trace("skim asked");
       await wait(LATENCY.skimMs);
+      trace("skim done");
       skimDoneMs = at();
       return {
         kind: journey.skim ?? "OTHER",
@@ -1028,6 +1095,18 @@ export async function timeJourney(
     firstText,
     holding,
     skimDoneMs,
+    ...(() => {
+      const asked = traced.find((line) => line.startsWith("model asked@"));
+      const answerAskedMs =
+        asked === undefined ? null : Number(asked.split("@")[1]);
+      return {
+        answerAskedMs,
+        serialBeforeAnswer:
+          answerAskedMs === null
+            ? 0
+            : serialChain(spansOf(traced), answerAskedMs),
+      };
+    })(),
   };
 }
 
@@ -1057,7 +1136,10 @@ async function onVirtualClock<T>(work: () => Promise<T>): Promise<T> {
 
 const journeyTimed = (
   journey: Journey,
-  options?: { readonly parallelExtras?: boolean },
+  options?: {
+    readonly parallelExtras?: boolean;
+    readonly readerReasoning?: ReaderReasoning;
+  },
 ): Promise<Timing> => onVirtualClock(() => timeJourney(journey, options));
 
 describe("turn timing harness", () => {
@@ -1175,6 +1257,67 @@ describe("turn timing harness", () => {
       "reader",
       "answer:1100",
     ]);
+  }, 600_000);
+
+  it("reader thinking off (owner 2026-11-06): the answer is asked sooner by the reader's saving, with no call added", async () => {
+    // Production's reader asks for no thinking; LOW is the level before.
+    expect(TURN_READER_REASONING).toBe("NONE");
+    for (const journey of JOURNEYS) await journeyTimed(journey);
+    const rows: {
+      readonly journey: string;
+      readonly before: Timing;
+      readonly after: Timing;
+    }[] = [];
+    for (const journey of JOURNEYS) {
+      rows.push({
+        journey: journey.name,
+        before: await journeyTimed(journey, { readerReasoning: "LOW" }),
+        after: await journeyTimed(journey),
+      });
+    }
+    const saved = (row: (typeof rows)[number]): number =>
+      (row.before.answerAskedMs ?? 0) - (row.after.answerAskedMs ?? 0);
+    console.log(
+      `\n${[
+        "| journey | serial model calls before the answer | answer asked, reader LOW | answer asked, reader NONE | saved | complete, LOW | complete, NONE |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+        ...rows.map(
+          (row) =>
+            `| ${row.journey} | ${String(row.before.serialBeforeAnswer)} → ${String(row.after.serialBeforeAnswer)} | ${ms(row.before.answerAskedMs)} | ${ms(row.after.answerAskedMs)} | ${ms(saved(row))} | ${ms(row.before.completeMs)} | ${ms(row.after.completeMs)} |`,
+        ),
+      ].join("\n")}\n`,
+    );
+    for (const row of rows) {
+      // The same work: the same model calls and reads, in the same order.
+      expect(row.after.calls, row.journey).toEqual(row.before.calls);
+      expect(row.after.reads, row.journey).toEqual(row.before.reads);
+      expect(row.after.serialBeforeAnswer, row.journey).toBe(
+        row.before.serialBeforeAnswer,
+      );
+      // Never later; never more than the reader's own saving.
+      expect(saved(row), row.journey).toBeGreaterThanOrEqual(0);
+      expect(saved(row), row.journey).toBeLessThanOrEqual(
+        READER_MS.LOW - READER_MS.NONE,
+      );
+    }
+    // Where the answer waits on the reading (every typed turn), the whole
+    // reader saving reaches the answer; a spoken turn's speculative answer
+    // already starts on the skim, so it neither gains nor loses.
+    const spoken = new Set(
+      JOURNEYS.filter((journey) => journey.spoken).map((j) => j.name),
+    );
+    const waited = rows.filter((row) => !spoken.has(row.journey));
+    expect(waited.length).toBeGreaterThan(0);
+    for (const row of waited) {
+      expect(saved(row), row.journey).toBe(READER_MS.LOW - READER_MS.NONE);
+    }
+    // At most one model call before the answer is serial with the reader
+    // and none waits on a skim: the reader and the skim run side by side.
+    for (const row of rows) {
+      expect(row.after.calls.filter((call) => call === "reader")).toHaveLength(
+        1,
+      );
+    }
   }, 600_000);
 
   it("owner 2026-10-22: findings and cards written beside the answer finish the turn sooner", async () => {
