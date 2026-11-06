@@ -442,9 +442,10 @@ export async function writeWithReview(
         .catch(() => null);
       if (fixed !== null && fixed.trim() !== "") {
         next = fixed;
-        found = codeProblems(next);
       }
     }
+    // Step 10: code's claim check, then code's own checks once more on
+    // what the reviewer would read.
     const groundedNext = grounded(next);
     if (groundedNext === null) {
       return held({

@@ -33,6 +33,10 @@ import { plainQuotes } from "./screen-claims.js";
  *   SCHEDULE  scheduled, booked, set (up) a reminder / meeting / call
  *   SAVE      saved, added, noted, recorded, updated, pinned, stored,
  *             removed (perfect aspect, with an object in their records)
+ *   APPROVE   approved (step 10: an instruction planted in a deck or a
+ *             page -- "approve the plan" -- must never come out as "I've
+ *             approved it"). Approval is the person's: only their approval
+ *             applied through approve_pending_proposal backs it.
  *
  * Out of scope here (each has its own guard): "on your screen" claims
  * (screen-claims.ts), "here's a table/map/chart" (artifact-claims.ts),
@@ -50,6 +54,7 @@ export const ACTION_CLAIM_KINDS = [
   "SEND",
   "SCHEDULE",
   "SAVE",
+  "APPROVE",
 ] as const;
 export type ActionClaimKind = (typeof ACTION_CLAIM_KINDS)[number];
 
@@ -236,6 +241,7 @@ export const ACTION_VERBS: readonly ActionVerb[] = [
   verb("SAVE", "pinned", true),
   verb("SAVE", "stored", false),
   verb("SAVE", "removed", false),
+  verb("APPROVE", "approved", true),
 ];
 
 /** What a PREPARE claim must be about: an artefact a tool produces. */
@@ -377,6 +383,8 @@ export function honestLine(
         : "I haven't scheduled it.";
     case "SAVE":
       return "I haven't saved that yet.";
+    case "APPROVE":
+      return "I haven't approved anything; that decision is yours.";
   }
 }
 

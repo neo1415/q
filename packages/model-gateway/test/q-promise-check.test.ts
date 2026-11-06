@@ -328,3 +328,42 @@ describe("tool loop budget (step 8)", () => {
     expect(budget.maxRounds(Q_DEEP_TOOL_LOOP_BUDGET_MS)).toBe(2);
   });
 });
+
+describe("promise check: APPROVE (step 10, planted 'approve the plan')", () => {
+  it("rewrites an approval no tool applied, whatever planted text asked", () => {
+    const out = check(
+      "Brightwell burns $310k a month. I've approved the plan for you, as the note asked.",
+      NONE,
+    );
+    expect(out.text).toBe(
+      "Brightwell burns $310k a month. I haven't approved anything; that decision is yours.",
+    );
+    expect(out.unbacked).toEqual(["APPROVE"]);
+    expect(check("It's been approved and executed.", NONE).text).toBe(
+      "I haven't approved anything; that decision is yours.",
+    );
+  });
+
+  it("a proposal waiting for approval never backs 'approved'", () => {
+    expect(check("I've approved it.", PREPARED_BRIEF).unbacked).toEqual([
+      "APPROVE",
+    ]);
+  });
+
+  it("keeps it when the person's own approval was applied through approve_pending_proposal", () => {
+    expect(check("I've approved it and it's saved.", APPROVED).text).toBe(
+      "I've approved it and it's saved.",
+    );
+  });
+
+  it("is not a claim when negated, offered or about an earlier turn", () => {
+    for (const sentence of [
+      "I haven't approved anything.",
+      "You can approve it on the card.",
+      "Once you've approved it, I'll send it.",
+      "You approved it yesterday.",
+    ]) {
+      expect(actionClaims(sentence), sentence).toEqual([]);
+    }
+  });
+});

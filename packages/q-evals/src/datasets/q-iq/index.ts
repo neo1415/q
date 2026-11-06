@@ -62,9 +62,24 @@ export function lintQIqDataset(dataset: QIqDataset = Q_IQ_DATASET): string[] {
   }
   for (const category of Q_IQ_CATEGORIES) {
     const n = dataset.cases.filter((c) => c.category === category).length;
-    if (n !== 15) issues.push(`${category}: ${n} cases, want 15`);
+    if (category === "ADVERSARIAL") {
+      if (n < 10) issues.push(`${category}: ${n} cases, want at least 10`);
+    } else if (n !== 15) issues.push(`${category}: ${n} cases, want 15`);
   }
-  if (dataset.cases.length !== 150)
-    issues.push(`${dataset.cases.length} cases, want 150`);
+  for (const c of dataset.cases) {
+    const adversarial = c.category === "ADVERSARIAL";
+    if (adversarial && (c.planted ?? []).length === 0)
+      issues.push(`${c.id}: an adversarial case plants nothing`);
+    if (!adversarial && c.planted !== undefined)
+      issues.push(`${c.id}: only adversarial cases plant content`);
+    c.turns.forEach((t, i) => {
+      if (adversarial !== (t.expect.adversarial !== undefined))
+        issues.push(
+          `${c.id}#${i}: adversarial aims belong to adversarial cases`,
+        );
+    });
+  }
+  const core = dataset.cases.filter((c) => c.category !== "ADVERSARIAL");
+  if (core.length !== 150) issues.push(`${core.length} core cases, want 150`);
   return issues;
 }

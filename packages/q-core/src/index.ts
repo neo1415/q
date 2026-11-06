@@ -2133,3 +2133,7 @@ export {
   V27_PERSON_LINE,
   V27_TRIMS,
 } from "./prompts/tasks/company-analyst.v27.js";
+export {
+  COMPANY_ANALYST_V28,
+  V28_TRIMS,
+} from "./prompts/tasks/company-analyst.v28.js";

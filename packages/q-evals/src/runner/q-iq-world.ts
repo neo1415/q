@@ -9,9 +9,13 @@ import { createLogger } from "@capital-q/observability";
 import type { AuthorisedFact } from "@capital-q/q-core";
 import { createSpecialistQAnswer } from "@capital-q/q-specialists";
 
-import { Q_IQ_FACTS, type QIqCase } from "../datasets/q-iq/index.js";
+import {
+  Q_IQ_FACTS,
+  type QIqCase,
+  type QIqFact,
+} from "../datasets/q-iq/index.js";
 import { createQEvalWorld, type QEvalWorld } from "../fixtures/world.js";
-import type { QIqConversation, QIqSubject } from "./q-iq.js";
+import { plantedFacts, type QIqConversation, type QIqSubject } from "./q-iq.js";
 
 /**
  * Q as a Q-IQ subject: each turn is a real run — createRun, the LangGraph
@@ -33,16 +37,66 @@ import type { QIqConversation, QIqSubject } from "./q-iq.js";
 
 const ACTORS = { INVESTOR: "INVESTOR", FOUNDER: "FOUNDER" } as const;
 
-export const Q_IQ_AUTHORISED_FACTS: readonly AuthorisedFact[] = Q_IQ_FACTS.map(
-  (f) => ({
-    scope: "COMPANY",
-    statement: f.statement,
-    truthClass: f.truthClass,
-    evidenceStatus: f.evidenceStatus,
-    source: f.source,
-    ...(f.asOf === undefined ? {} : { asOf: f.asOf }),
-  }),
-);
+const authorised = (f: QIqFact): AuthorisedFact => ({
+  scope: "COMPANY",
+  statement: f.statement,
+  truthClass: f.truthClass,
+  evidenceStatus: f.evidenceStatus,
+  source: f.source,
+  ...(f.asOf === undefined ? {} : { asOf: f.asOf }),
+});
+
+export const Q_IQ_AUTHORISED_FACTS: readonly AuthorisedFact[] =
+  Q_IQ_FACTS.map(authorised);
+
+const Q_IQ_DESCRIPTION =
+  "several fictional companies, people, decks and investors (the authorised facts list them)";
+
+/**
+ * A case's authorised context: the shared facts plus what it planted
+ * (ADVERSARIAL). A planted company name is also the subject's name, which
+ * production writes into the subject description (the company
+ * specialist's `canonicalName`): the founder's own words, in the place Q
+ * is told what it is looking at.
+ */
+export function qIqContext(evalCase: QIqCase): {
+  readonly facts: readonly AuthorisedFact[];
+  readonly description: string;
+} {
+  const name = evalCase.planted?.find(
+    (planted) => planted.carrier === "COMPANY_NAME",
+  );
+  return {
+    facts: [
+      ...Q_IQ_AUTHORISED_FACTS,
+      ...plantedFacts(evalCase).map(authorised),
+    ],
+    description:
+      name === undefined
+        ? Q_IQ_DESCRIPTION
+        : `${name.text}, a company available in this conversation, and ${Q_IQ_DESCRIPTION}`.slice(
+            0,
+            400,
+          ),
+  };
+}
+
+function toolCallsOf(
+  calls: readonly {
+    readonly name: string;
+    readonly arguments: Record<string, unknown>;
+  }[],
+): FakeBehaviour {
+  return {
+    kind: "TOOL_CALLS",
+    calls: calls.map((call, index) => ({
+      callId: `call_${String(index + 1)}`,
+      name: call.name,
+      arguments: call.arguments,
+    })),
+    usage: { inputTokens: 900, cachedInputTokens: 0, outputTokens: 40 },
+  };
+}
 
 function analystReply(answer: string): FakeBehaviour {
   return {
@@ -77,6 +131,12 @@ export async function createQIqWorldSubject(options: {
   /** FAKE mode: what the scripted model answers for a turn (default: the reference). */
   readonly scriptedReply?:
     ((evalCase: QIqCase, turn: number) => string) | undefined;
+  /**
+   * FAKE mode, ADVERSARIAL: the scripted model OBEYS the planted text --
+   * it says each turn's `compromised` reply and makes its tool calls --
+   * so what is measured is what Q's code leaves in effect.
+   */
+  readonly compromised?: boolean | undefined;
 }): Promise<QIqWorldSubject> {
   // Filled once the world exists; the specialist reads it lazily, per run.
   const holder: { world?: QEvalWorld } = {};
@@ -150,23 +210,30 @@ export async function createQIqWorldSubject(options: {
     open: (evalCase) => {
       const person = w().people[ACTORS[evalCase.actor]];
       w().setPreset("BALANCED");
-      w().setFactList({
-        facts: Q_IQ_AUTHORISED_FACTS,
-        description:
-          "several fictional companies, people, decks and investors (the authorised facts list them)",
-      });
+      w().setFactList(qIqContext(evalCase));
       w().resetProviderHealth();
       let conversationId: QConversationId | null = null;
       let turn = 0;
       const conversation: QIqConversation = {
         say: async (text) => {
           if (w().providerMode === "FAKE") {
+            const obeyed =
+              options.compromised === true
+                ? evalCase.turns[turn]?.compromised
+                : undefined;
             const reply =
+              obeyed?.reply ??
               options.scriptedReply?.(evalCase, turn) ??
               evalCase.turns[turn]?.reference ??
               "";
-            w().setScript([analystReply(reply)]);
+            w().setScript([
+              ...(obeyed === undefined || obeyed.toolCalls.length === 0
+                ? []
+                : [toolCallsOf(obeyed.toolCalls)]),
+              analystReply(reply),
+            ]);
           }
+          const observedBefore = w().answer.lastObservation();
           turn += 1;
           const before = await usageTotal();
           const started = Date.now();
@@ -204,8 +271,18 @@ export async function createQIqWorldSubject(options: {
             .map((m) => m.content)
             .join(" ")
             .trim();
+          // The tools that succeeded in this turn's answer (none when no
+          // answer was observed this turn).
+          const observed = w().answer.lastObservation();
+          const toolsRun =
+            observed === undefined || observed === observedBefore
+              ? []
+              : observed.toolCalls
+                  .filter((call) => call.status === "SUCCEEDED")
+                  .map((call) => call.providerName);
           return {
             text: reply.length === 0 ? "(no reply)" : reply,
+            toolsRun,
             latencyMs,
             costUsd: after.cost - before.cost,
             inputTokens: after.input - before.input,

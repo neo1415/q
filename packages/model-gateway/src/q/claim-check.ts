@@ -924,3 +924,29 @@ export function groundText(
     changed,
   };
 }
+
+/**
+ * A rendered prompt message without its template's own words: what is
+ * left is the values put into it (the facts, the conversation, Capital
+ * Q's turn notes). Q Intelligence Plan, step 10: the answer prompt's
+ * instructions carry figures of their own ("7.5/10 · Good fit", "at most
+ * three"), and with the whole task message among the claim check's
+ * sources, a founder-private runway of 7.5 months invented by a model
+ * that obeyed a planted instruction was "sourced" by the instructions.
+ * A rendering that does not follow its template is returned whole (the
+ * check's earlier behaviour), so a mismatch never drops a real source.
+ */
+export function templateValues(content: string, template: string): string {
+  const chunks = template
+    .split(/\{\{\w+\}\}/u)
+    .filter((chunk) => chunk.length > 0);
+  let out = "";
+  let at = 0;
+  for (const chunk of chunks) {
+    const found = content.indexOf(chunk, at);
+    if (found === -1) return content;
+    out += `${content.slice(at, found)}\n`;
+    at = found + chunk.length;
+  }
+  return out + content.slice(at);
+}

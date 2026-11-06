@@ -190,7 +190,7 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
       "Verify the $1.1M pipeline before committing.",
     ],
     gaps: ["Runway is not known."],
-  } as AnalysisDocumentResult;
+  };
   const sources = [
     "Kestrel Grid (company record): annual recurring revenue $420,000; stage Seed.",
     "[S1] kestrelgrid.example: 120 mini-grid sites live.",
@@ -228,7 +228,7 @@ describe("workforce documents pass the claim check (invented figures: 0)", () =>
         { heading: "Risks", body: "Runway is not known." },
       ],
       topRecommendations: ["Ask for the 2025 accounts."],
-    } as AnalysisDocumentResult;
+    };
     const out = groundAnalysis(grounded, sources);
     expect(out.removed).toBe(0);
     expect(out.draft).toBe(grounded);
