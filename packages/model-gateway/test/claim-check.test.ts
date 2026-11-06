@@ -206,6 +206,43 @@ describe("claim check: true claims pass untouched", () => {
     ).not.toContain("7.3");
   });
 
+  it("keeps a sourced place and a sourced acronym, which name nobody (live ORD-016 #0, CMP-061 #0)", () => {
+    // Live 2026-11-06 on 61b7a85: "Silo Credit is a Lagos-based SME
+    // lender…" read "Lagos-based SME" as an invented name. A list lost
+    // Silo Credit's whole line, and "Tell me what Silo Credit does" lost
+    // the sentence that named it, leaving "It reports $2.4M…".
+    const silo = claimCorpus(
+      [
+        "Silo Credit is a SME lending company based in Lagos, founded in 2021.",
+        "Silo Credit annual recurring revenue (ARR) is $2.4M.",
+        "Silo Credit has 38 lending partners.",
+        "Kora Farms is a agritech company based in Tamale, founded in 2023.",
+      ],
+      TODAY,
+    );
+    const answer =
+      "Silo Credit is a Lagos-based SME lender founded in 2021. It reports $2.4M in ARR and works with 38 lending partners.";
+    expect(checkAnswer(answer, silo).text).toBe(answer);
+    for (const sentence of [
+      "Silo Credit — Lagos-based SME lender founded in 2021, reporting $2.4M ARR.",
+      "Silo Credit — Lagos SME lending company, founded in 2021.",
+    ]) {
+      expect(checkSentence(sentence, silo).ungrounded, sentence).toEqual([]);
+    }
+    // Still names: parts of two sourced names put together, a place
+    // beside an unsourced word, an acronym the sources never write.
+    expect(
+      checkSentence("Kora Credit lends in Lagos.", silo).ungrounded,
+    ).toEqual(["NAME"]);
+    expect(
+      checkSentence("Silo Credit works with Lagos Brightstone.", silo)
+        .ungrounded,
+    ).toEqual(["NAME"]);
+    expect(
+      checkSentence("Silo Credit is backed by Lagos KPX.", silo).ungrounded,
+    ).toEqual(["NAME"]);
+  });
+
   it("uses a sourced short duration as an input, never as a claim", () => {
     const withRunway = claimCorpus(
       ["Ledgerline: monthly burn $120,000; runway 9 months."],
