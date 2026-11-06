@@ -3714,3 +3714,99 @@ describe("web discovery on a follow-up that names Capital Q (live 2026-11-06, ru
     expect(answer).toContain("**Kobo Harbour**");
   });
 });
+
+describe("URGENT 2026-11-06 (3547127f2): a web discovery with research EXPLICIT is always the discovery", () => {
+  it("the early web search never answers it; discovery's own searches do", async () => {
+    const executed: QToolProposal[] = [];
+    const port: QToolPort = {
+      offer: () => Promise.resolve([RESEARCH]),
+      execute: (proposal) => {
+        executed.push(proposal);
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "public_web.search",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "PUBLIC",
+          result: {
+            ok: true,
+            data: {
+              status: "OK",
+              query: "fintech startups 2026",
+              sources: [
+                {
+                  index: 1,
+                  url: "https://weetracker.example/fintech-startups",
+                  domain: "weetracker.example",
+                  title: "Fintech startups to watch",
+                  publishedAt: null,
+                  retrievedAt: "2026-11-06T16:30:00.000Z",
+                  excerpt:
+                    "Fintech startups to watch: Owo Rails, a pre-seed payments API founded in 2025 by Bisi Adewale.",
+                  extracted: true,
+                  instructionRiskSignals: 0,
+                },
+              ],
+              comparison: [],
+              truthClass: "UNKNOWN",
+            },
+          },
+          latencyMs: 1,
+        } as QToolCallOutcome);
+      },
+    };
+    const { seam, request, messages } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            companies: [
+              {
+                name: "Owo Rails",
+                founders: [],
+                does: null,
+                sector: null,
+                stage: null,
+                place: null,
+                sourceRefs: [0],
+                quote: "Owo Rails",
+              },
+            ],
+          },
+        },
+      ],
+      tools: port,
+      subjects: [],
+      userText: "find me new companies online that i would be interested in",
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "RESEARCH_REQUEST",
+      },
+    });
+    const outcome = await seam.answer({
+      ...request,
+      questionKind: "DISCOVER_COMPANIES",
+      webDiscovery: {
+        text: "find me new companies online that i would be interested in",
+        sectors: [],
+        countries: [],
+        stages: [],
+        count: null,
+      },
+    });
+    expect(outcome.kind).toBe("ANSWERED");
+    const searches = executed.filter((p) => p.name === "research_public_web");
+    expect(searches.length).toBeGreaterThan(0);
+    expect(searches.every((p) => p.callId.startsWith("q-discovery-"))).toBe(
+      true,
+    );
+    const answer =
+      messages.filter((message) => message.role === "Q").at(-1)?.content ?? "";
+    expect(answer).toContain("**Owo Rails**");
+  });
+});
