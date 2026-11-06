@@ -347,9 +347,10 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
             if (regraded.wrongEntity) problems.push(`${at}: wrong entity`);
             if (regraded.saidUnknown !== true)
               problems.push(`${at}: unknown not read`);
-            expect(regraded.reasons).toEqual(["entity not resolved"]);
-          } else {
-            expect(regraded.pass, at).toBe(false);
+            if (regraded.reasons.join("; ") !== "entity not resolved")
+              problems.push(`${at}: ${regraded.reasons.join("; ")}`);
+          } else if (regraded.pass) {
+            problems.push(`${at}: the live words now pass the grader`);
           }
         } else if (gap.keptOnly === true) {
           if (reply !== gap.draft) problems.push(`${at}: draft not kept`);
@@ -361,9 +362,10 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
       }
       // AMB-136: one short question naming both Silo companies, by code.
       const amb = result.cases.find((r) => r.caseId === "QIQ-AMB-136");
-      expect(amb?.replies[0]).toBe(
-        'By "Silo", do you mean Silo Credit or Silo Health?',
-      );
+      if (
+        amb?.replies[0] !== 'By "Silo", do you mean Silo Credit or Silo Health?'
+      )
+        problems.push(`QIQ-AMB-136#0: not asked :: ${amb?.replies[0] ?? ""}`);
       console.log(JSON.stringify({ liveGaps: problems }, null, 1));
       expect(problems).toEqual([]);
     } finally {
