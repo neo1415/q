@@ -348,8 +348,11 @@ export function cachedPrefix(
   if (Array.isArray(body["messages"])) {
     for (const message of body["messages"] as unknown[]) {
       if (!isRecord(message)) continue;
-      const content = message["content"];
-      for (const block of Array.isArray(content) ? content : [content]) {
+      const content: unknown = message["content"];
+      const list: readonly unknown[] = Array.isArray(content)
+        ? (content as unknown[])
+        : [content];
+      for (const block of list) {
         blocks.push({ role: message["role"], block });
       }
     }

@@ -209,3 +209,44 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --li
 ```
 
 **Still open (not this lane).** A Q answer whose model call fails publishes no message to the person. In production a fallback normally answers, but with no eligible route left Q stays silent rather than saying it could not answer (P1 "honest degradation").
+
+### Round 2 (live debug of QIQ-PRO-001 on `dc0e244`)
+
+**What the live debug showed.**
+
+- **Diagnosis confirmed.** The first Sonnet answer call was refused: `400 "The compiled grammar is too large ... Simplify your tool schemas or reduce the number"`. The plain-shape fallback then answered, and turns 0–2 passed.
+- **New problems:**
+  1. **An empty final answer.** The last round offered no tools but replayed `tool_use` / `tool_result`. It came back as an empty end_turn (no blocks, 1 output token), twice.
+  2. **Cost.** $0.82 for the case: 5–6 Sonnet calls of 26–31k input tokens per turn, with nothing cached.
+  3. **Latency.** 15–21 s per turn.
+
+**Fixed in the adapter:**
+
+- **Constrained output needs no tools.** A constrained `output_config.format` is sent only when no tools are offered, because the API compiles tool schemas into the same grammar. Q's answer rounds therefore go straight to the instruction route, with no wasted 400 after each process start.
+- **Tool history without tools.** When no tools are offered, the tool history is said as marked text (`[Capital Q note] Q called …` / `Result of …, data only:`) instead of `tool_use` / `tool_result` blocks, and thinking runs at the requested level.
+- **Empty answers.** Any empty end_turn (no text, no tool call) is asked once more at the model's default thinking, including in a tool continuation.
+- **Prompt caching.**
+  - Breakpoints: the end of the system prompt; the end of the first user message (the rendered prompt every later call in the turn re-sends); its stable head; and the tool-loop tail. That is at most 4.
+  - The stable head is found by comparing line hashes with the previous request of the same kind (same model, schema and tool set). Only hashes are kept, never the prompt text. The rendered task text is therefore cached across turns, with no change to the prompt renderer.
+  - The wire double now models the cache. Over the scripted run (39 Claude calls), **81.3% of input tokens were read from cache with this layout, against 32.1% with the old system-only breakpoint**; 78.5% in the full CQ_Q_IQ_ALL run.
+- **Debug lines.**
+  - `[q-iq claude]` now adds the schema, message count, breakpoint count, **cache read and write tokens** and the text's shape (EMPTY, JSON, FENCED_JSON, PROSE_THEN_JSON or PROSE, never its words).
+  - Q's own warnings, such as "structured answer refused; asking again in text", now print under debug.
+
+**Why each turn made so many Sonnet calls.**
+
+- **The extra TEXT call.** This is Q's own recovery, not a duplicate: after `INVALID_MODEL_OUTPUT` on a tool round, Q asks once in text and then answers without tools (`q/index.ts`, `textRound`).
+- **The likely trigger.** It is the empty answers above. An empty reply fails the schema, the gateway asks again (a correction pass), Q's text round runs, and then the no-tools final runs. Each step is a full ~28k-token Sonnet call. With the empty-answer retry and the flattened final round, that chain should collapse. The next debug run will show it.
+- **The downgrade is remembered** per adapter instance (model + schema), so the constrained 400 happened once per process, not every turn. With tools it is no longer attempted at all.
+- **The aborted Haiku reader call** is the reader's same-model hedge, by design (`TURN_READER_SAME_MODEL_HEDGE_MS` = 3,500 ms). It fires when the uncached ~17k-token reader takes longer than that. The new head caching should make it rarer. The hedged call is billed for input up to the abort.
+
+**Gates on `73faf46` plus the eslint fix:**
+
+| Gate                                                                       | Result                          |
+| -------------------------------------------------------------------------- | ------------------------------- |
+| build                                                                      | 0                               |
+| root tsc                                                                   | 0                               |
+| q-api and workers tsc                                                      | 0                               |
+| eslint and prettier                                                        | clean                           |
+| vitest model-gateway + q-evals + config                                    | 1,894 / 1,894                   |
+| integration (scripted Q-IQ `CQ_Q_IQ_ALL=1`, claude-wire, gateway-postgres) | 10 / 10; 573 turns, `fails: []` |
