@@ -197,11 +197,13 @@ import {
   namesOnlyCompany,
   profileOf,
   readNamedVisibleCompany,
+  readVisibleCompanyById,
   runNamedCompanyFact,
   type CompanyFactAnswer,
   type CompanyFactAsk,
 } from "./named-company-fact.js";
 import { namedCompanyFitLine } from "./named-fit-line.js";
+import { boundCompaniesOf } from "./bound-companies.js";
 import {
   FIRST_CONTACT_TOOL,
   FIRST_CONTACT_REPLY,
@@ -4371,9 +4373,21 @@ export function createModelGatewayQAnswer(
             (other) => other.toLowerCase() === name.toLowerCase(),
           ) === index,
       );
-      if (names.length === 0) return;
-      const found = await Promise.all(
-        names.map((name, index) =>
+      // Live 2026-11-06 (347b74a8c): "How many borrowers does it have, and
+      // what's its loan book?" after "What does Ledgerfold do?" got the
+      // loan book and "no borrower number": a company NAMED in the words
+      // was read here, one the reader bound a pronoun to was not, so each
+      // part of a follow-up rested on what the model chose to look up.
+      // The companies the turn reader bound this turn's words to (step 3,
+      // checked against the ledger this person was shown) are read too,
+      // by id, through the same tools and plan; a read refused adds
+      // nothing. A company the ledger merely recalls is not read.
+      const bound = boundCompaniesOf(request.retrievalFocus).filter(
+        (companyId) => companyId !== onScreenId,
+      );
+      if (names.length === 0 && bound.length === 0) return;
+      const found = await Promise.all([
+        ...names.map((name, index) =>
           readNamedVisibleCompany({
             name,
             exclude: new Set(onScreenId === null ? [] : [onScreenId]),
@@ -4387,7 +4401,18 @@ export function createModelGatewayQAnswer(
             },
           }).catch(() => null),
         ),
-      );
+        ...bound.map((companyId, index) => {
+          stepStarts(request, "REVIEWING_COMPANY");
+          return readVisibleCompanyById({
+            companyId,
+            tools,
+            context: toolContext,
+            available: prefetchTools,
+            callPrefix: "q-bound-company",
+            callIndex: index,
+          }).catch(() => null);
+        }),
+      ]);
       await own.catch(() => undefined);
       for (const read of found) {
         if (read === null) continue;
