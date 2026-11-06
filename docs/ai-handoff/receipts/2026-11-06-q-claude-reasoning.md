@@ -170,3 +170,42 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic \
 | New unit tests                                                                                                                                               | `anthropic-adapter.test.ts` 17, `owner-approved-ceiling.test.ts` 3, `q-iq-budget.test.ts` 3: all pass                                                                                                                                                                                                                                                                                                                                      |
 
 No live model call was made. No deploy, no hosted migration, no force-push.
+
+## Follow-up: "(no reply)" on Claude (branch `fix/q-claude-reasoning-2`)
+
+**The live symptom.** The integration owner ran `--provider anthropic` on `1ae3b6453`.
+
+| Subject     | Result                                                      |
+| ----------- | ----------------------------------------------------------- |
+| Bare Sonnet | 90.5%                                                       |
+| Q           | Every turn was "(no reply)". No exception and no error log. |
+
+The 1-case rerun (QIQ-PRO-001) had 121,127 input tokens for $0.0114. That is Haiku's price: the turn reader ran and **the Sonnet answer call never billed**.
+
+**What the seam showed.** `q-iq-claude-wire.integration.test.ts` runs the scripted Q-IQ world through the real gateway, answer path, Anthropic SDK and adapter. Only the HTTP transport is replaced, by `anthropic-wire-double.ts`. The double speaks the Messages API's JSON and SSE shapes and refuses what the API documents it refuses.
+
+- **Streaming is fine.** With the API accepting, every streamed Claude answer is published (the first test). So the streaming path, text extraction and publication are not the fault.
+- **A failed answer call is silent.** When Sonnet's answer call is refused, Q publishes nothing on every turn and logs nothing. That is exactly the live symptom, and it matches the cost profile, because a 400 is unbilled.
+- **The answer request's shape.** Every Q answer request is: Sonnet, streaming, `thinking: between_tools`, effort `low`, 4 tools, and a constrained `output_config.format` of the 7.8 KB answer schema. The bare model, which works live, sends none of the format or tools.
+
+**The fix.**
+
+- **Plain-shape retry.** A 400 for a shape the adapter chose is sent once more in the plain shape. "A shape the adapter chose" means a constrained format, or an explicit thinking-off mode outside a tool continuation. The plain shape states the schema in the instructions and leaves thinking at the model default, with the same effort.
+- **Remembered.** The model/schema pair is remembered, so later calls go straight to the plain shape. 400s arrive before any output and are unbilled.
+- **Proof.** The second seam test refuses every constrained Sonnet format. It fails without the fallback ("(no reply)" on every case, as live) and passes with it.
+
+**Diagnostics.** With `CQ_Q_IQ_LOG=debug`, the Q-IQ world prints to stderr:
+
+- `[q-iq claude]`, one line per Claude request: model, streaming, thinking, effort, tool count, output mode, and the outcome. The outcome is either the stop reason, block types, text length and tokens, or the API's 400 status, type and message.
+- `[q-iq turn]`, one line per turn: the run's status and failure code, the count of Q messages, and the reply length.
+- `[q-iq start-error]`: the orchestrator's error, which was swallowed before.
+
+It prints no prompt or reply text. **The exact live refusal is still unconfirmed.** Next step: one debug case.
+
+```bash
+CQ_Q_IQ_LOG=debug NODE_USE_ENV_PROXY=1 DATABASE_URL=postgresql://postgres@127.0.0.1:54329/cq \
+OPENAI_API_KEY_FILE=… ANTHROPIC_API_KEY_FILE=… \
+node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --limit 1 --budget 0.5 2> qiq-claude-debug.log
+```
+
+**Still open (not this lane).** A Q answer whose model call fails publishes no message to the person. In production a fallback normally answers, but with no eligible route left Q stays silent rather than saying it could not answer (P1 "honest degradation").

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   createFakeModelProvider,
+  createInMemoryModelUsageRepository,
   createModelGateway,
   createModelProviderRegistry,
   createStaticModelCatalog,
@@ -118,6 +119,7 @@ function wired(refuse?: (body: Record<string, unknown>) => string | null) {
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(catalog),
     registry: createModelProviderRegistry([double]),
+    usage: createInMemoryModelUsageRepository(),
   });
   return { double, gateway, exchanges };
 }
