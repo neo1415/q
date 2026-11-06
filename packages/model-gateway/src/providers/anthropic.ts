@@ -333,6 +333,15 @@ export function schemaInstruction(
 // --- messages ------------------------------------------------------------------
 
 const CACHE: CacheControlEphemeral = { type: "ephemeral" };
+/**
+ * The long-lived prefix (tools, charter, the stable head and its notes)
+ * is kept an hour: a person often pauses longer than five minutes between
+ * turns, and at the default TTL every such turn re-wrote ~20k tokens. An
+ * hour's write bills 2x input instead of 1.25x, once per prefix. Longer
+ * TTLs precede shorter ones, as the API requires: system and stable head
+ * (1h) come before the end of the first message and the tool-loop tail.
+ */
+const CACHE_LONG: CacheControlEphemeral = { type: "ephemeral", ttl: "1h" };
 
 /**
  * Capital Q's messages as a Messages API request. Nothing else travels.
@@ -366,6 +375,12 @@ export function toMessages(
   options: {
     readonly flattenTools?: boolean | undefined;
     readonly stableHead?: number | undefined;
+    /**
+     * Indexes (in `messages`) of the late SYSTEM notes that hold still from
+     * turn to turn: said, still as marked notes in the same user turn,
+     * right after the stable head, so they join the cached prefix.
+     */
+    readonly stableNotes?: ReadonlySet<number> | undefined;
   } = {},
 ): {
   readonly system: TextBlockParam[] | undefined;
@@ -380,7 +395,7 @@ export function toMessages(
     system.push({ type: "text", text: extraInstruction });
   }
   const last = system.at(-1);
-  if (last !== undefined) last.cache_control = CACHE;
+  if (last !== undefined) last.cache_control = CACHE_LONG;
 
   const out: MessageParam[] = [];
   // The API combines consecutive turns of one role; doing it here keeps
@@ -406,6 +421,14 @@ export function toMessages(
   let firstUser = true;
   for (const [index, message] of messages.entries()) {
     if (message.role === "SYSTEM") {
+      // Already said after the stable head (stableNotes).
+      if (
+        options.stableHead !== undefined &&
+        options.stableHead > 0 &&
+        options.stableNotes?.has(index) === true
+      ) {
+        continue;
+      }
       if (leading !== -1 && index >= leading) {
         push("user", [
           { type: "text", text: `[Capital Q note] ${message.content}` },
@@ -422,14 +445,27 @@ export function toMessages(
         head > 0 &&
         head < message.content.length
       ) {
-        text.push(
-          {
+        const notes = [...(options.stableNotes ?? [])]
+          .sort((x, y) => x - y)
+          .map((at) => messages[at])
+          .filter(
+            (note): note is ModelMessage & { role: "SYSTEM" } =>
+              note !== undefined && note.role === "SYSTEM",
+          )
+          .map((note): TextBlockParam => ({
             type: "text",
-            text: message.content.slice(0, head),
-            cache_control: CACHE,
-          },
-          { type: "text", text: message.content.slice(head) },
-        );
+            text: `[Capital Q note] ${note.content}`,
+          }));
+        const stableBlocks: TextBlockParam[] = [
+          { type: "text", text: message.content.slice(0, head) },
+          ...notes,
+        ];
+        const lastStable = stableBlocks.at(-1);
+        if (lastStable !== undefined) lastStable.cache_control = CACHE_LONG;
+        text.push(...stableBlocks, {
+          type: "text",
+          text: message.content.slice(head),
+        });
       } else {
         text.push({ type: "text", text: message.content });
       }
@@ -679,11 +715,30 @@ export function jsonObjectOf(text: string): string {
   }
 }
 
-function result(message: Message, structured = false): ModelProviderResult {
+/**
+ * `earlier`: a call of the same generate that this one answered again (an
+ * empty reply, a prose-only one); its tokens were billed too, so they are
+ * counted in the usage the gateway prices.
+ */
+function result(
+  message: Message,
+  structured = false,
+  earlier?: Message,
+): ModelProviderResult {
+  const usage = toUsage(message);
+  const before = earlier === undefined ? undefined : toUsage(earlier);
   return {
     text: structured ? jsonObjectOf(textOf(message)) : textOf(message),
     toolCalls: toToolCalls(message),
-    usage: toUsage(message),
+    usage:
+      before === undefined
+        ? usage
+        : {
+            inputTokens: usage.inputTokens + before.inputTokens,
+            cachedInputTokens:
+              usage.cachedInputTokens + before.cachedInputTokens,
+            outputTokens: usage.outputTokens + before.outputTokens,
+          },
     finish: finishOf(message),
     modelCode: message.model,
     providerReference: message.id,
@@ -817,6 +872,54 @@ export const TOOL_USE_GUIDANCE =
   "When you use tools, answer with what you found, not an account of how you looked: never mention a search, lookup or tool, and never say that one came back empty. If something is not on record, say only that it is not on record.";
 
 /**
+ * Claude adds what was not asked more readily than the models Q's prompts
+ * were tuned on. Live 2026-11-06 (12 cases on Sonnet, 71% of turns): every
+ * "wrong entity" turn had the right reading -- "the second one" bound to
+ * Silo Health, "she" to Ngozi Eze -- and answered it, then added the other
+ * companies or people ("For comparison, Silo Credit reports $180k") or its
+ * own working ("would cover about 33 months"), which named forbidden
+ * entities and invented figures. Said with the tool-round reminder, the
+ * last thing the model reads, after every cache breakpoint. It narrows
+ * what is said, never what is true: a comparison or a calculation they
+ * ask for is still given, and unknown is still said to be unknown.
+ */
+export const ANSWER_SCOPE_GUIDANCE =
+  "Answer only what this message asks, about only whom it asks: do not bring in any other company or person, or their figures, and add no figures of your own working (implied cash, months of cover, differences, ranges), unless the message asks for a comparison or a calculation.";
+
+/**
+ * The same request once more, with the prose reply after it and a note
+ * asking for that answer as the schema's JSON object. Live 2026-11-06 (12
+ * cases): 4 of 52 Sonnet answers came back as prose only; the gateway
+ * then asked again in text and once more without tools, and each of those
+ * re-wrote 20-27k tokens of cache (~$0.06-0.12 each), because a request
+ * without the schema note or the tools is a different prefix. Appended
+ * after the last message, everything the first call cached is read back.
+ * The reply is the model's own words: it is restated, not re-decided.
+ */
+export function repairRequest(
+  params: MessageCreateParamsNonStreaming,
+  prose: string,
+  schemaName: string,
+): MessageCreateParamsNonStreaming {
+  return {
+    ...params,
+    messages: [
+      ...params.messages,
+      { role: "assistant", content: [{ type: "text", text: prose }] },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `[Capital Q note] Say that same answer again as only the ${schemaName} JSON object, its answer field holding your reply: start with { and end with }, nothing before or after it.`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
  * The largest sanitised schema sent for constrained decoding. The API does
  * not publish its grammar-size limit; the live refusal was a schema of
  * about 7.8k characters. Larger schemas go by instruction from the start
@@ -828,6 +931,7 @@ export function toRequest(
   request: ModelProviderRequest,
   constrain = true,
   stableHead?: number,
+  stableNotes?: ReadonlySet<number>,
 ): MessageCreateParamsNonStreaming {
   const toolsOffered = request.tools.length > 0;
   const { thinking, effort } = thinkingFor(
@@ -861,7 +965,7 @@ export function toRequest(
   const { system, messages } = toMessages(
     request.messages,
     extra.length === 0 ? undefined : extra.join("\n\n"),
-    { flattenTools: !toolsOffered, stableHead },
+    { flattenTools: !toolsOffered, stableHead, stableNotes },
   );
   // By instruction, the last word is the format: a reminder at the end of
   // the final user turn (after every cache breakpoint, so the cached prefix
@@ -880,7 +984,7 @@ export function toRequest(
       {
         type: "text",
         text: `[Capital Q note] Reply with only the ${structured.schemaName} JSON object: start with { and end with }, nothing before or after it.${
-          toolsOffered ? ` ${TOOL_USE_GUIDANCE}` : ""
+          toolsOffered ? ` ${TOOL_USE_GUIDANCE} ${ANSWER_SCOPE_GUIDANCE}` : ""
         }`,
       },
     ];
@@ -1003,8 +1107,9 @@ const STABLE_HEADS_MAX = 128;
 export function plainRequest(
   request: ModelProviderRequest,
   stableHead?: number,
+  stableNotes?: ReadonlySet<number>,
 ): MessageCreateParamsNonStreaming {
-  const params = toRequest(request, false, stableHead);
+  const params = toRequest(request, false, stableHead, stableNotes);
   if (
     (request.tools.length > 0 && continuesToolCalls(request.messages)) ||
     request.maxOutputTokens < THINKING_MIN_OUTPUT_TOKENS
@@ -1129,6 +1234,17 @@ export function createAnthropicModelProvider(
           (message) => message.role === "USER",
         );
         const original = request.messages[firstIndex];
+        // The SYSTEM notes directly after the first user message (Q's
+        // trusted notes on what it can do, how people write, and so on).
+        const noteIndexes: number[] = [];
+        for (
+          let at = firstIndex + 1;
+          firstIndex !== -1 && at < request.messages.length;
+          at += 1
+        ) {
+          if (request.messages[at]?.role !== "SYSTEM") break;
+          noteIndexes.push(at);
+        }
         const ordered =
           original === undefined || original.role !== "USER"
             ? undefined
@@ -1136,7 +1252,14 @@ export function createAnthropicModelProvider(
                 plainKey,
                 request.cacheKey ?? headKey,
                 original.content,
+                noteIndexes.map((at) => request.messages[at]?.content ?? ""),
               );
+        const stableNotes = new Set(
+          (ordered?.stableNotes ?? []).flatMap((i) => {
+            const at = noteIndexes[i];
+            return at === undefined ? [] : [at];
+          }),
+        );
         if (
           ordered !== undefined &&
           original !== undefined &&
@@ -1163,8 +1286,8 @@ export function createAnthropicModelProvider(
           }
         }
         const params = refusedShapes.has(plainKey)
-          ? plainRequest(request, stableHead)
-          : toRequest(request, true, stableHead);
+          ? plainRequest(request, stableHead, stableNotes)
+          : toRequest(request, true, stableHead, stableNotes);
         try {
           const message = await send(params);
           // An empty end_turn -- no text, no tool call -- answers nothing.
@@ -1180,7 +1303,7 @@ export function createAnthropicModelProvider(
             // so the retry always runs at the model's default thinking,
             // continuation or not. If the API refuses that, the refusal is
             // the failure, which is no worse than an empty answer.
-            const again = toRequest(request, false, stableHead);
+            const again = toRequest(request, false, stableHead, stableNotes);
             // A short reply keeps thinking off (it would eat the budget).
             const { thinking: _off, ...retry } = again;
             return result(
@@ -1190,7 +1313,25 @@ export function createAnthropicModelProvider(
                   : retry,
               ),
               structured,
+              message,
             );
+          }
+          // A structured answer said as prose only, no JSON at all, is
+          // asked once more for the same answer as the object, after it on
+          // the same prefix, so the cache holds (repairRequest).
+          const repair =
+            request.output.kind === "STRUCTURED" &&
+            message.stop_reason === "end_turn" &&
+            toToolCalls(message) === undefined &&
+            textShapeOf(textOf(message)) === "PROSE"
+              ? repairRequest(
+                  params,
+                  textOf(message),
+                  request.output.schemaName,
+                )
+              : undefined;
+          if (repair !== undefined) {
+            return result(await send(repair), structured, message);
           }
           return result(message, structured);
         } catch (error: unknown) {
@@ -1203,7 +1344,7 @@ export function createAnthropicModelProvider(
           // silences every answer that uses it (live 2026-11-06: every Q
           // turn on Claude published nothing). A 400 is refused before any
           // output, so nothing was streamed and nothing billed.
-          const plain = plainRequest(request, stableHead);
+          const plain = plainRequest(request, stableHead, stableNotes);
           if (
             !(error instanceof APIError) ||
             error.status !== 400 ||

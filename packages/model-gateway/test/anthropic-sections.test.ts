@@ -62,7 +62,11 @@ describe("Anthropic prompt sections, stable first", () => {
   it("learns which sections change and puts the stable ones first; nothing added or lost", () => {
     const order = createSectionOrder();
     const first = order.order("QAnswer", "person-a", prompt(1));
-    expect(first).toEqual({ text: prompt(1), stableChars: 0 });
+    expect(first).toEqual({
+      text: prompt(1),
+      stableChars: 0,
+      stableNotes: [],
+    });
     order.order("QAnswer", "person-a", prompt(2));
     // One comparison (turn 2 against turn 1) is enough to start.
     const third = order.order("QAnswer", "person-a", prompt(3));
@@ -144,5 +148,29 @@ describe("Anthropic prompt sections, stable first", () => {
     );
     expect(share[2]).toBeGreaterThan(0.8);
     expect(share[3]).toBeGreaterThan(0.8);
+  });
+
+  it("a repeat within a turn reuses the order and teaches nothing", () => {
+    const order = createSectionOrder();
+    order.order("QAnswer", "p", prompt(1));
+    const turn2 = order.order("QAnswer", "p", prompt(2));
+    // The answer round of turn 2 sends the same prompt as its tool round.
+    expect(order.order("QAnswer", "p", prompt(2))).toEqual(turn2);
+    expect(order.order("QAnswer", "p", prompt(2))).toEqual(turn2);
+    // Turn 3 still sees THIS TURN as changing (repeats did not dilute it).
+    const turn3 = order.order("QAnswer", "p", prompt(3));
+    expect(sectionsOf(turn3.text).sections[0]?.header).toBe("AUTHORISED FACTS");
+  });
+
+  it("notes that hold still join the cached head; a changing note does not", () => {
+    const order = createSectionOrder();
+    const notes = (turn: number) => [
+      "THEIR WORDS MAY BE MESSY: a stable note.",
+      `WHAT YOU ALREADY SAID: turn ${String(turn)}.`,
+    ];
+    order.order("QAnswer", "p", prompt(1), notes(1));
+    const second = order.order("QAnswer", "p", prompt(2), notes(2));
+    expect(second.stableNotes).toEqual([0]);
+    expect(second.stableChars).toBeGreaterThan(0);
   });
 });

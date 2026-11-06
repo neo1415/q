@@ -257,9 +257,17 @@ export type QTurnReading = Omit<
  */
 export const TURN_READER_ATTEMPT_TIMEOUT_MS = 9_000;
 
+/**
+ * The cost bound fits a reading on the Claude backup's Sonnet (DECISIONS
+ * 69: no smaller model for the reader). The gateway estimates an attempt
+ * with no cache credit, ~31k input tokens at $2/M plus the output room:
+ * ~$0.075, so $0.01 skipped Sonnet for a smaller model. $0.15 leaves room
+ * for the second attempt. It is a bound, not a spend: a reading on OpenAI
+ * costs what it did.
+ */
 const TURN_READER_BUDGET = {
   maxAttempts: 2,
-  maxEstimatedCostUsd: 0.01,
+  maxEstimatedCostUsd: 0.15,
   maxOutputTokens: 1_200,
   attemptTimeoutMs: TURN_READER_ATTEMPT_TIMEOUT_MS,
 } as const;

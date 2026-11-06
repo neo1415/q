@@ -134,4 +134,30 @@ describe("Q-IQ — Q on Claude through the Anthropic wire (scripted model)", () 
       await q.close();
     }
   });
+
+  it("reads each turn on Sonnet, never Haiku, within the reader's budget (DECISIONS 69)", async () => {
+    const cases = Q_IQ_DATASET.cases
+      .filter((c) => c.category === "ORDINALS_LISTS")
+      .slice(0, 1);
+    const q = await createQIqWorldSubject({
+      db,
+      providerMode: "FAKE",
+      wire: "anthropic",
+      // The real turn reader, through the gateway's routing and budget.
+      turnReader: true,
+    });
+    try {
+      await runQIq(q.subject, cases);
+      const readings = (q.world().wire?.exchanges() ?? []).filter(
+        (e) => e.schema === "TurnReaderResult",
+      );
+      expect(readings.length).toBeGreaterThan(0);
+      expect([...new Set(readings.map((e) => e.model))]).toEqual([
+        "claude-sonnet-5-5",
+      ]);
+      expect(q.world().wire?.refusals()).toEqual([]);
+    } finally {
+      await q.close();
+    }
+  });
 });

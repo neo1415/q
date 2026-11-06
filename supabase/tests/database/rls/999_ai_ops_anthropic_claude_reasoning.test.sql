@@ -129,10 +129,10 @@ select is(
      from ai_ops.routing_policies rp join ai_ops.models m on m.id = rp.fallback_models[1]
     where rp.version = 2),
   array['comparison.v2=claude-sonnet-5-5', 'deep_investigation.v2=claude-sonnet-5-5',
-        'evidence_synthesis.v2=claude-sonnet-5-5', 'fast_classification.v2=claude-haiku-5-5',
-        'normal_dialogue.v2=claude-sonnet-5-5', 'structured_extraction.v2=claude-haiku-5-5',
-        'taxonomy_mapping.v2=claude-haiku-5-5'],
-  'the Claude backup: Sonnet for answers and analyses, Haiku to read, classify and extract');
+        'evidence_synthesis.v2=claude-sonnet-5-5', 'fast_classification.v2=claude-sonnet-5-5',
+        'normal_dialogue.v2=claude-sonnet-5-5', 'structured_extraction.v2=claude-sonnet-5-5',
+        'taxonomy_mapping.v2=claude-sonnet-5-5'],
+  'the Claude backup: Sonnet throughout (20261231360000, DECISIONS 69)');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies v2

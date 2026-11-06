@@ -192,6 +192,19 @@ export async function createQIqWorldSubject(options: {
     | undefined;
   /** Step 9: memory recall across conversations (default on). */
   readonly memory?: boolean | undefined;
+  /**
+   * FAKE mode: tool calls the scripted model makes before it answers each
+   * turn, as a live model's tool round does (default: none).
+   */
+  readonly scriptedToolCalls?:
+    | ((
+        evalCase: QIqCase,
+        turn: number,
+      ) => readonly {
+        readonly name: string;
+        readonly arguments: Record<string, unknown>;
+      }[])
+    | undefined;
   /** FAKE mode: what the scripted model answers for a turn (default: the reference). */
   readonly scriptedReply?:
     ((evalCase: QIqCase, turn: number) => string) | undefined;
@@ -294,23 +307,52 @@ export async function createQIqWorldSubject(options: {
       });
     },
   };
-  const turns: QTurnReader | undefined = turnReader
+  const liveReader = turnReader
     ? createQTurnReader({
         gateway: proxy(() => w().gateway),
         logger,
         // Every Q-IQ word is invented fixture text.
         sensitivity: "PUBLIC",
       })
-    : scripted === undefined
-      ? undefined
-      : {
-          read: (input) =>
-            Promise.resolve(
-              saying.evalCase === undefined
-                ? null
-                : scripted(saying.evalCase, saying.turn, input),
-            ),
-        };
+    : undefined;
+  const turns: QTurnReader | undefined =
+    liveReader !== undefined
+      ? qIqDebug()
+        ? {
+            // CQ_Q_IQ_LOG=debug: the reader's parsed reading beside the
+            // case and turn, so a wrong-entity reply can be told apart
+            // from a wrong binding (live 2026-11-06). Fixture text only.
+            read: async (input) => {
+              const reading = await liveReader.read(input);
+              qIqDebugLine("reading", {
+                caseId: saying.evalCase?.id ?? null,
+                turn: saying.turn,
+                reading:
+                  reading === null
+                    ? null
+                    : {
+                        kind: reading.kind,
+                        confidence: reading.confidence,
+                        answerKind: reading.answerKind ?? null,
+                        question: reading.question,
+                        reference: reading.reference ?? null,
+                        tool: reading.tool,
+                      },
+              });
+              return reading;
+            },
+          }
+        : liveReader
+      : scripted === undefined
+        ? undefined
+        : {
+            read: (input) =>
+              Promise.resolve(
+                saying.evalCase === undefined
+                  ? null
+                  : scripted(saying.evalCase, saying.turn, input),
+              ),
+          };
 
   // Step 9: the memory service over the world's own store, its past-turn
   // search through the runtime's owner-scoped repository method.
@@ -510,6 +552,14 @@ export async function createQIqWorldSubject(options: {
                       ...(obeyed === undefined || obeyed.toolCalls.length === 0
                         ? []
                         : [toolCallsOf(obeyed.toolCalls)]),
+                      ...((options.scriptedToolCalls?.(evalCase, turn) ?? [])
+                        .length === 0
+                        ? []
+                        : [
+                            toolCallsOf(
+                              options.scriptedToolCalls?.(evalCase, turn) ?? [],
+                            ),
+                          ]),
                       analystReply(reply),
                     ],
             );

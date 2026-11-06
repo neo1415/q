@@ -12,6 +12,7 @@ import type { ModelCatalogSnapshot } from "../src/catalog.js";
 import type { AnthropicExchange } from "../src/providers/anthropic.js";
 import {
   createAnthropicWireDouble,
+  requestRefusal,
   sseOf,
 } from "../src/providers/anthropic-wire-double.js";
 import { request } from "./fixtures.js";
@@ -264,5 +265,77 @@ describe("Claude over the Messages API wire, through the gateway", () => {
       "message_delta",
       "message_stop",
     ]);
+  });
+
+  it("refuses a 1h cache breakpoint after a 5m one, as the API does", () => {
+    const body = (first: unknown, second: unknown) => ({
+      model: "claude-sonnet-5-5",
+      system: [{ type: "text", text: "Charter.", cache_control: first }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "Hi", cache_control: second }],
+        },
+      ],
+    });
+    const long = { type: "ephemeral", ttl: "1h" };
+    const short = { type: "ephemeral" };
+    expect(requestRefusal(body(long, short))).toBeNull();
+    expect(requestRefusal(body(short, long))).toContain("ttl '1h'");
+  });
+});
+
+describe("Claude over the wire: a prose-only structured answer", () => {
+  it("is asked once more for the object on the same prefix, read back from cache, and validated", async () => {
+    const exchanges: AnthropicExchange[] = [];
+    const double = createAnthropicWireDouble(
+      createFakeModelProvider({
+        code: "anthropic",
+        script: [
+          { kind: "TEXT", text: "Ledgerfold has two founders." },
+          { kind: "JSON", value },
+        ],
+      }),
+      { onExchange: (exchange) => exchanges.push(exchange) },
+    );
+    const gateway = createModelGateway({
+      catalog: createStaticModelCatalog(catalog),
+      registry: createModelProviderRegistry([double]),
+      usage: createInMemoryModelUsageRepository(),
+    });
+    // A schema too large for constrained decoding: by instruction, as Q's
+    // answer schema is live.
+    const large = {
+      ...structured,
+      jsonSchema: { ...structured.jsonSchema, description: "x".repeat(5_000) },
+    };
+    const result = await gateway.execute(
+      request({
+        sensitivity: "CONFIDENTIAL",
+        output: large,
+        reasoning: "NONE",
+        budget: roomy,
+        messages: [
+          { role: "SYSTEM", content: "Rules.\n".repeat(800) },
+          { role: "USER", content: "How many founders?" },
+        ],
+      }),
+      { schema: AnswerSchema, onTextDelta: () => undefined },
+    );
+    expect(result.output).toEqual({ kind: "STRUCTURED", value });
+    expect(double.refusals).toEqual([]);
+    expect(
+      exchanges.map((e) =>
+        e.outcome.kind === "MESSAGE" ? e.outcome.textShape : "ERROR",
+      ),
+    ).toEqual(["PROSE", "JSON"]);
+    const [first, second] = exchanges.map((e) =>
+      e.outcome.kind === "MESSAGE" ? e.outcome : undefined,
+    );
+    // What the first call wrote, the second reads; nothing is re-written.
+    expect(second?.cacheReadTokens).toBeGreaterThan(0);
+    expect(second?.cacheReadTokens).toBe(
+      (first?.cacheReadTokens ?? 0) + (first?.cacheWriteTokens ?? 0),
+    );
   });
 });

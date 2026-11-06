@@ -5,9 +5,9 @@ import { toModelProviderSecrets } from "@capital-q/config/model-providers";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
   ANTHROPIC_ANSWER_MODEL,
+  ANTHROPIC_FAST_MODEL,
   createAnthropicModelProvider,
 } from "@capital-q/model-gateway/providers/anthropic";
-import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 
 import { Q_IQ_CATEGORIES, Q_IQ_DATASET } from "../datasets/q-iq/index.js";
 import {
@@ -23,42 +23,32 @@ import { createQIqWorldSubject } from "../runner/q-iq-world.js";
  * Q-IQ baseline (Q Intelligence Plan, step 0).
  *
  *   node packages/q-evals/dist/dev/q-iq-baseline.js            # scripted, free
- *   OPENAI_API_KEY_FILE=… node packages/q-evals/dist/dev/q-iq-baseline.js --live \
- *     [--budget 4.5] [--limit 150] [--out results.json]
- *   OPENAI_API_KEY_FILE=… ANTHROPIC_API_KEY_FILE=… \
- *     node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic \
- *     [--budget 4.5] [--limit 150] [--out results.json]
+ *   ANTHROPIC_API_KEY_FILE=… node packages/q-evals/dist/dev/q-iq-baseline.js \
+ *     --live --provider anthropic [--q-only] [--no-judge] [--budget 4] \
+ *     [--limit 12] [--categories A,B] [--out results.json]
  *
- * LIVE spends founder credit: Q (the real runtime on a LOCAL database with
- * fictional fixtures) and the bare model, the bare model at reasoning NONE.
- * The budget is shared and hard: Q may spend up to 75% of it, the bare
+ * LIVE spends founder credit, and only Anthropic's: DECISIONS 68 keeps the
+ * OpenAI credit for production, so a live run on OpenAI is refused and no
+ * OpenAI key is read. Q (the real runtime on a LOCAL database with
+ * fictional fixtures) and, unless --q-only, the bare model. The budget is
+ * hard: Q may spend up to 75% of it (all of it with --q-only), the bare
  * model and the helpfulness judge the rest, and a case starts only if the
  * dearest case so far would still fit. A subject that reaches its share
  * stops and reports the cases it ran. Keys are read from files and never
  * printed. Needs DATABASE_URL (local), NODE_USE_ENV_PROXY=1 in the cloud.
  *
- * --provider openai (default): both subjects on gpt-5.6-luna, production's
- * primary today.
- *
- * --provider anthropic (DECISIONS 62): the staged Claude routing policies
- * (20261231280000) are switched ON in the LOCAL database for the run and
- * OFF again afterwards -- the same single UPDATE the receipt gives for
- * production -- and Claude is the only adapter registered, so the Q
- * subject measures Claude and never a fallback. The bare subject runs on
- * claude-sonnet-5-5. The judge stays on gpt-5.6-luna for both providers,
- * so two runs are graded by the same judge. Claude spend is held to the
- * owner's $20 test cap: a --budget above it is refused, and Claude is
- * budgeted at its cache-write rate (1.25x input), the most an input token
- * can cost, because the gateway ledger prices cache writes at base rate.
+ * The Claude backup routing policies (v2: OpenAI first, Claude the
+ * backup; DECISIONS 67 and 69) are switched ON in the LOCAL database for
+ * the run and back to their prior status afterwards, and Claude is the
+ * only adapter
+ * registered, so the Q subject measures Claude and never a fallback. The
+ * bare subject runs on claude-sonnet-5-5 and the judge on claude-haiku-5-5
+ * (--no-judge: none). Claude spend is held to the owner's $20 test cap: a
+ * --budget above it is refused, and Claude is budgeted at its cache-write
+ * rate (1.25x input), the most an input token can cost, because the
+ * gateway ledger prices cache writes at base rate.
  */
 
-const MODEL = "gpt-5.6-luna";
-// ai_ops.model_prices for gpt-5.6-luna (migration 20261008120000).
-const PRICE = {
-  inputPerMillion: 0.2,
-  cachedInputPerMillion: 0.02,
-  outputPerMillion: 1.2,
-};
 // ai_ops.model_prices for claude-sonnet-5-5 (20261231280000), with input
 // at the 1.25x cache-write rate: an upper bound, for a hard budget.
 const CLAUDE_BUDGET_PRICE = {
@@ -66,11 +56,21 @@ const CLAUDE_BUDGET_PRICE = {
   cachedInputPerMillion: 0.2,
   outputPerMillion: 10,
 };
+// claude-haiku-5-5 (20261231280000), input at the 1.25x write rate.
+const HAIKU_BUDGET_PRICE = {
+  inputPerMillion: 0.125,
+  cachedInputPerMillion: 0.01,
+  outputPerMillion: 0.5,
+};
 /** The owner's cap on Anthropic test and evaluation spend (DECISIONS 62). */
 const CLAUDE_TEST_CAP_USD = 20;
 /** The cache-write factor: ledger cost times this bounds real Claude spend. */
 const CLAUDE_WRITE_FACTOR = 1.25;
-/** The staged Claude policies; the receipt's switch names the same codes. */
+/**
+ * The Claude backup policies (v2, ACTIVE in production by 20261231340000).
+ * With OpenAI not registered, every route reaches Claude: Sonnet
+ * throughout (20261231360000, DECISIONS 69). No Claude-first policy exists.
+ */
 export const CLAUDE_POLICY_CODES = [
   "normal_dialogue.v2",
   "evidence_synthesis.v2",
@@ -185,7 +185,7 @@ async function main(): Promise<number> {
     return result.summary.overall.score === 1 ? 0 : 1;
   }
 
-  const providerArg = arg("--provider") ?? "openai";
+  const providerArg = arg("--provider") ?? "anthropic";
   if (providerArg !== "openai" && providerArg !== "anthropic") {
     throw new Error("--provider must be openai or anthropic");
   }
@@ -203,9 +203,16 @@ async function main(): Promise<number> {
     if (file === undefined) throw new Error(`${name} is required for --live`);
     return readFileSync(file, "utf8").trim();
   };
-  // The judge is OpenAI for both providers, so two runs share one judge.
-  const apiKey = readKey("OPENAI_API_KEY_FILE");
-  const anthropicKey = claude ? readKey("ANTHROPIC_API_KEY_FILE") : undefined;
+  // DECISIONS 68: the OpenAI credit is for production only. No live eval
+  // reads the OpenAI key; on Claude the judge is Claude Haiku as well.
+  if (!claude) {
+    throw new Error(
+      "live Q-IQ runs on OpenAI are not allowed (DECISIONS 68): use --provider anthropic",
+    );
+  }
+  const anthropicKey = readKey("ANTHROPIC_API_KEY_FILE");
+  const qOnly = process.argv.includes("--q-only");
+  const noJudge = process.argv.includes("--no-judge");
   const databaseUrl = process.env["DATABASE_URL"];
   if (
     databaseUrl === undefined ||
@@ -224,25 +231,37 @@ async function main(): Promise<number> {
       DATABASE_CONNECT_TIMEOUT_SECONDS: "5",
     }),
   );
-  const provider = createOpenAIModelProvider({ apiKey });
-  const judge = providerHelpfulnessJudge({
-    provider,
-    modelCode: MODEL,
-    price: PRICE,
-  });
+  const claudeProvider = createAnthropicModelProvider({ apiKey: anthropicKey });
+  const judge = noJudge
+    ? undefined
+    : providerHelpfulnessJudge({
+        provider: claudeProvider,
+        modelCode: ANTHROPIC_FAST_MODEL,
+        price: HAIKU_BUDGET_PRICE,
+      });
   const results: QIqRunResult[] = [];
-  // The receipt's switch, on the LOCAL database only (checked above).
-  const setClaudeRoutes = async (
-    status: "ACTIVE" | "RETIRED",
-  ): Promise<void> => {
-    const changed = await db.sql`
-      update ai_ops.routing_policies set status = ${status}
-       where code in ${db.sql([...CLAUDE_POLICY_CODES])}
-      returning code`;
-    if (changed.length !== CLAUDE_POLICY_CODES.length) {
-      throw new Error(
-        `expected ${String(CLAUDE_POLICY_CODES.length)} staged Claude policies, found ${String(changed.length)}: is 20261231280000 applied locally?`,
-      );
+  // The receipt's switch, on the LOCAL database only (checked above):
+  // the Claude backup on for the run, and every row back to the status it had.
+  let before: readonly { code: string; status: string }[] = [];
+  const setClaudeRoutes = async (on: boolean): Promise<void> => {
+    if (on) {
+      before = await db.sql<{ code: string; status: string }[]>`
+        select code, status from ai_ops.routing_policies
+         where code in ${db.sql([...CLAUDE_POLICY_CODES])}`;
+      if (before.length !== CLAUDE_POLICY_CODES.length) {
+        throw new Error(
+          `expected ${String(CLAUDE_POLICY_CODES.length)} Claude backup policies, found ${String(before.length)}: is 20261231280000 applied locally?`,
+        );
+      }
+      await db.sql`
+        update ai_ops.routing_policies set status = 'ACTIVE'
+         where code in ${db.sql([...CLAUDE_POLICY_CODES])}`;
+      return;
+    }
+    for (const row of before) {
+      await db.sql`
+        update ai_ops.routing_policies set status = ${row.status}
+         where code = ${row.code}`;
     }
   };
   // For Claude, Q's share is divided by the cache-write factor, so the
@@ -252,24 +271,20 @@ async function main(): Promise<number> {
   // 150 cases within the Anthropic test cap, while Q on Claude is parked).
   const bareOnly = process.argv.includes("--bare-only");
   try {
-    if (claude && !bareOnly) await setClaudeRoutes("ACTIVE");
+    if (claude && !bareOnly) await setClaudeRoutes(true);
     if (!bareOnly)
       try {
         const q = await createQIqWorldSubject({
           db,
           providerMode: "LIVE",
-          secrets: toModelProviderSecrets({
-            OPENAI_API_KEY: apiKey,
-            ...(anthropicKey === undefined
-              ? {}
-              : { ANTHROPIC_API_KEY: anthropicKey }),
-          }),
-          providerFilter: claude ? "anthropic" : "openai",
+          // Anthropic only: no OpenAI key reaches the world at all.
+          secrets: toModelProviderSecrets({ ANTHROPIC_API_KEY: anthropicKey }),
+          providerFilter: "anthropic",
         });
         try {
           results.push(
             await runQIq(q.subject, cases, {
-              budgetUsd: (budget * 0.75) / factor,
+              budgetUsd: (budget * (qOnly ? 1 : 0.75)) / factor,
               judge,
               onCase: progress("Q"),
             }),
@@ -278,23 +293,22 @@ async function main(): Promise<number> {
           await q.close();
         }
       } finally {
-        if (claude && !bareOnly) await setClaudeRoutes("RETIRED");
+        if (claude && !bareOnly) await setClaudeRoutes(false);
       }
-    const bare =
-      anthropicKey === undefined
-        ? bareModelQIqSubject({ provider, modelCode: MODEL, price: PRICE })
-        : bareModelQIqSubject({
-            provider: createAnthropicModelProvider({ apiKey: anthropicKey }),
-            modelCode: ANTHROPIC_ANSWER_MODEL,
-            price: CLAUDE_BUDGET_PRICE,
-          });
-    results.push(
-      await runQIq(bare, cases, {
-        budgetUsd: Math.max(0, budget - (results[0]?.costUsd ?? 0) * factor),
-        judge,
-        onCase: progress("bare"),
-      }),
-    );
+    if (!qOnly) {
+      const bare = bareModelQIqSubject({
+        provider: claudeProvider,
+        modelCode: ANTHROPIC_ANSWER_MODEL,
+        price: CLAUDE_BUDGET_PRICE,
+      });
+      results.push(
+        await runQIq(bare, cases, {
+          budgetUsd: Math.max(0, budget - (results[0]?.costUsd ?? 0) * factor),
+          judge,
+          onCase: progress("bare"),
+        }),
+      );
+    }
   } finally {
     await db.close();
   }

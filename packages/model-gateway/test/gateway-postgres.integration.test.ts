@@ -234,8 +234,8 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(b.anthropic.calls).toHaveLength(0);
     googleCalls.push(b.google.calls.length);
 
-    // (c) luna's credit spent: Claude serves -- Sonnet for answers, Haiku
-    //     for the reader and the fast classes.
+    // (c) luna's credit spent: Claude Sonnet serves answers and the reader
+    //     alike (20261231360000, DECISIONS 69: no Haiku for understanding).
     const c = world({
       openai: [spent],
       anthropic: [reply("claude")],
@@ -244,7 +244,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(answer.providerCode).toBe("anthropic");
     expect(answer.modelCode).toBe("claude-sonnet-5-5");
     const reading = await c.ask("FAST_CLASSIFICATION", READER_SIZED);
-    expect(reading.modelCode).toBe("claude-haiku-5-5");
+    expect(reading.modelCode).toBe("claude-sonnet-5-5");
     expect(c.groq.calls).toHaveLength(0);
     googleCalls.push(c.google.calls.length);
 
@@ -572,7 +572,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       "anthropic",
     ]);
     const read = await toClaude.execute(confidential("FAST_CLASSIFICATION"));
-    expect(read.modelCode).toBe("claude-haiku-5-5");
+    expect(read.modelCode).toBe("claude-sonnet-5-5");
     expect(wire.refusals).toEqual([]);
 
     // OpenAI and Claude both empty: Groq answers.
