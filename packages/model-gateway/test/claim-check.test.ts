@@ -243,6 +243,33 @@ describe("claim check: true claims pass untouched", () => {
     ).toEqual(["NAME"]);
   });
 
+  it("ends a name at a bold label's colon (live ORD-016 #0 on 7a41ff4)", () => {
+    // "- **Silo Health:** Nairobi clinic software…" was read as the name
+    // "Silo Health Nairobi" (the colon sat inside the closing "**"), and
+    // the claim check removed the whole line: the list kept only Silo
+    // Credit, whose next word ("SME") a source writes.
+    const world = claimCorpus(
+      [
+        "Silo Health is a clinic software company based in Nairobi, founded in 2022.",
+        "Silo Health annual recurring revenue (ARR) is $1.1M.",
+        "Brightpath Logistics is a freight logistics company based in Kigali, founded in 2021.",
+        "Brightpath Logistics annual recurring revenue (ARR) is $2M.",
+      ],
+      TODAY,
+    );
+    const list =
+      "- **Silo Health:** Nairobi clinic software company founded in 2022; $1.1M ARR.\n- **Brightpath Logistics** — Kigali freight logistics company founded in 2021; $2M ARR.\n- __Silo Health__: Nairobi clinic software.";
+    expect(checkAnswer(list, world).text).toBe(list);
+    // A name still runs on inside the bold, and an invented one is caught.
+    expect(
+      checkSentence("- **Silo Health Nairobi:** clinic software.", world)
+        .ungrounded,
+    ).toEqual(["NAME"]);
+    expect(
+      checkSentence("- **Kora Credit:** Nairobi lender.", world).ungrounded,
+    ).toEqual(["NAME"]);
+  });
+
   it("uses a sourced short duration as an input, never as a claim", () => {
     const withRunway = claimCorpus(
       ["Ledgerline: monthly burn $120,000; runway 9 months."],
