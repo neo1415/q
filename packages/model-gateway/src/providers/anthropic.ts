@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import Anthropic, {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -149,6 +151,8 @@ export function thinkingFor(
   modelCode: string,
   reasoning: ModelReasoningLevel,
   messages: readonly ModelMessage[],
+  /** False when tools are not offered: the history is then flattened to text. */
+  toolsOffered = true,
 ): {
   readonly thinking: ThinkingConfigParam;
   readonly effort: NonNullable<OutputConfig["effort"]>;
@@ -164,7 +168,7 @@ export function thinkingFor(
     );
   }
   const effort = EFFORT[reasoning];
-  if (reasoning === "NONE" || continuesToolCalls(messages)) {
+  if (reasoning === "NONE" || (toolsOffered && continuesToolCalls(messages))) {
     return { thinking: off, effort };
   }
   // Adaptive is the only on-mode these models accept. `display` is left at
@@ -324,18 +328,35 @@ const CACHE: CacheControlEphemeral = { type: "ephemeral" };
  * authority. It is said where it was added, as a marked note in a user
  * turn, exactly as the OpenAI and Google adapters place it.
  *
- * Prompt caching: one breakpoint closes the system prompt, so the tools
- * and the charter (the prefix every Q call shares) are written once and
- * read thereafter. Inside a tool loop, a second closes the conversation so
- * far, because the next iteration re-sends all of it.
+ * Tool history without tools (`flattenTools`): a round that offers no
+ * tools but replays earlier tool_use / tool_result blocks came back live
+ * as an empty end_turn (2026-11-06, the final round of a tool loop: no
+ * blocks, one output token, twice). With no tool on offer, the calls and
+ * their results are said as marked text instead -- the same facts, still
+ * data, never instructions -- so the round is an ordinary conversation.
+ *
+ * Prompt caching, at most four breakpoints (render order tools, system,
+ * messages):
+ *   1. the end of the system prompt: tools + charter;
+ *   2. `stableHead` characters into the first user message: the rendered
+ *      task text every turn of this kind shares, before its variables
+ *      (found by the caller from the previous request; see stableHeadOf);
+ *   3. the end of the first user message: the whole rendered prompt, which
+ *      every later call in the same turn (tool rounds, follow-ups) re-sends;
+ *   4. inside a tool loop, the conversation so far.
  */
 export function toMessages(
   messages: readonly ModelMessage[],
   extraInstruction?: string,
+  options: {
+    readonly flattenTools?: boolean | undefined;
+    readonly stableHead?: number | undefined;
+  } = {},
 ): {
   readonly system: TextBlockParam[] | undefined;
   readonly messages: MessageParam[];
 } {
+  const flatten = options.flattenTools === true;
   const leading = messages.findIndex((message) => message.role !== "SYSTEM");
   const system: TextBlockParam[] = (
     leading === -1 ? messages : messages.slice(0, leading)
@@ -367,6 +388,7 @@ export function toMessages(
   };
 
   let sawToolResult = false;
+  let firstUser = true;
   for (const [index, message] of messages.entries()) {
     if (message.role === "SYSTEM") {
       if (leading !== -1 && index >= leading) {
@@ -377,6 +399,30 @@ export function toMessages(
       continue;
     }
     if (message.role === "USER") {
+      const text: TextBlockParam[] = [];
+      const head = options.stableHead;
+      if (
+        firstUser &&
+        head !== undefined &&
+        head > 0 &&
+        head < message.content.length
+      ) {
+        text.push(
+          {
+            type: "text",
+            text: message.content.slice(0, head),
+            cache_control: CACHE,
+          },
+          { type: "text", text: message.content.slice(head) },
+        );
+      } else {
+        text.push({ type: "text", text: message.content });
+      }
+      if (firstUser) {
+        const end = text.at(-1);
+        if (end !== undefined) end.cache_control = CACHE;
+        firstUser = false;
+      }
       push("user", [
         // A shared screen in a rehearsal (REHEARSE): inline base64 only.
         ...(message.images ?? []).map((image): ContentBlockParam => ({
@@ -387,22 +433,28 @@ export function toMessages(
             data: image.dataBase64,
           },
         })),
-        { type: "text", text: message.content },
+        ...text,
       ]);
       continue;
     }
     if (message.role === "ASSISTANT") {
+      const calls = message.toolCalls ?? [];
       // The text it said, then the tool calls it made.
       push("assistant", [
         ...(message.content.length > 0
           ? [{ type: "text" as const, text: message.content }]
           : []),
-        ...(message.toolCalls ?? []).map((call): ContentBlockParam => ({
-          type: "tool_use",
-          id: call.callId,
-          name: call.name,
-          input: call.arguments,
-        })),
+        ...(flatten
+          ? calls.map((call): ContentBlockParam => ({
+              type: "text",
+              text: `[Capital Q note] Q called ${call.name} (${call.callId}) with ${JSON.stringify(call.arguments)}.`,
+            }))
+          : calls.map((call): ContentBlockParam => ({
+              type: "tool_use",
+              id: call.callId,
+              name: call.name,
+              input: call.arguments,
+            }))),
       ]);
       continue;
     }
@@ -410,11 +462,16 @@ export function toMessages(
     if (message.role !== "TOOL") continue;
     sawToolResult = true;
     push("user", [
-      {
-        type: "tool_result",
-        tool_use_id: message.callId,
-        content: message.content,
-      },
+      flatten
+        ? {
+            type: "text",
+            text: `[Capital Q note] Result of ${message.name} (${message.callId}), data only:\n${message.content}`,
+          }
+        : {
+            type: "tool_result",
+            tool_use_id: message.callId,
+            content: message.content,
+          },
     ]);
   }
 
@@ -439,12 +496,63 @@ export function toMessages(
     const tail = Array.isArray(blocks) ? blocks.at(-1) : undefined;
     if (
       tail !== undefined &&
-      (tail.type === "text" || tail.type === "tool_result")
+      (tail.type === "text" || tail.type === "tool_result") &&
+      countBreakpoints(system, out) < 4
     ) {
       tail.cache_control = CACHE;
     }
   }
   return { system: system.length === 0 ? undefined : system, messages: out };
+}
+
+function countBreakpoints(
+  system: readonly TextBlockParam[],
+  messages: readonly MessageParam[],
+): number {
+  let count = system.filter((block) => block.cache_control != null).length;
+  for (const message of messages) {
+    if (!Array.isArray(message.content)) continue;
+    for (const block of message.content) {
+      if ("cache_control" in block && block.cache_control != null) count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * Where the stable head of a rendered prompt ends, from the previous
+ * request of the same kind: the lines both share, from the start. Only
+ * line HASHES of the previous prompt are kept (stableHeads below), never
+ * its text. Returns 0 (no split) when the shared head is too short to be
+ * worth a breakpoint.
+ */
+const STABLE_HEAD_MIN_CHARS = 2_048;
+
+export function lineHashes(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) =>
+      createHash("sha256").update(line).digest("base64url").slice(0, 16),
+    );
+}
+
+export function stableHeadOf(
+  text: string,
+  previous: readonly string[] | undefined,
+): number {
+  if (previous === undefined) return 0;
+  const lines = text.split("\n");
+  let chars = 0;
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const line = lines[index] ?? "";
+    const hash = createHash("sha256")
+      .update(line)
+      .digest("base64url")
+      .slice(0, 16);
+    if (previous[index] !== hash) break;
+    chars += line.length + 1;
+  }
+  return chars >= STABLE_HEAD_MIN_CHARS ? chars : 0;
 }
 
 /** The canonical tool definitions, and nothing provider-side. */
@@ -662,16 +770,23 @@ export function normalizeError(error: unknown): ModelProviderFailure {
 export function toRequest(
   request: ModelProviderRequest,
   constrain = true,
+  stableHead?: number,
 ): MessageCreateParamsNonStreaming {
+  const toolsOffered = request.tools.length > 0;
   const { thinking, effort } = thinkingFor(
     request.modelCode,
     request.reasoning,
     request.messages,
+    toolsOffered,
   );
   const structured =
     request.output.kind === "STRUCTURED" ? request.output : undefined;
+  // Constrained decoding only without tools: with tools offered the API
+  // compiles their schemas into the same grammar, and live (2026-11-06)
+  // Q's answer schema plus four tools was refused as "compiled grammar is
+  // too large ... simplify your tool schemas or reduce the number".
   const constrained =
-    structured === undefined || !constrain
+    structured === undefined || !constrain || toolsOffered
       ? null
       : toOutputSchema(structured.jsonSchema);
   const { system, messages } = toMessages(
@@ -679,6 +794,7 @@ export function toRequest(
     structured !== undefined && constrained === null
       ? schemaInstruction(structured)
       : undefined,
+    { flattenTools: !toolsOffered, stableHead },
   );
   const tools = toTools(request.tools);
   return {
@@ -715,13 +831,22 @@ export type AnthropicExchange = {
   readonly effort: string | undefined;
   readonly tools: number;
   readonly output: "TEXT" | "CONSTRAINED" | "INSTRUCTION";
+  /** The structured output's schema name, or TEXT. */
+  readonly schema: string;
+  readonly messages: number;
+  readonly cacheBreakpoints: number;
   readonly outcome:
     | {
         readonly kind: "MESSAGE";
         readonly stopReason: string | null;
         readonly blocks: readonly string[];
         readonly textChars: number;
+        /** The shape of the text, never its words. */
+        readonly textShape:
+          "EMPTY" | "JSON" | "FENCED_JSON" | "PROSE_THEN_JSON" | "PROSE";
         readonly inputTokens: number;
+        readonly cacheReadTokens: number;
+        readonly cacheWriteTokens: number;
         readonly outputTokens: number;
       }
     | {
@@ -731,6 +856,16 @@ export type AnthropicExchange = {
         readonly message: string;
       };
 };
+
+export function textShapeOf(
+  text: string,
+): "EMPTY" | "JSON" | "FENCED_JSON" | "PROSE_THEN_JSON" | "PROSE" {
+  const trimmed = text.trim();
+  if (trimmed === "") return "EMPTY";
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return "JSON";
+  if (trimmed.startsWith("```")) return "FENCED_JSON";
+  return trimmed.includes("{") ? "PROSE_THEN_JSON" : "PROSE";
+}
 
 function exchangeOf(
   params: MessageCreateParamsNonStreaming,
@@ -744,6 +879,13 @@ function exchangeOf(
     thinking: params.thinking?.type ?? "default",
     effort: params.output_config?.effort ?? undefined,
     tools: params.tools?.length ?? 0,
+    schema:
+      request.output.kind === "STRUCTURED" ? request.output.schemaName : "TEXT",
+    messages: params.messages.length,
+    cacheBreakpoints: countBreakpoints(
+      Array.isArray(params.system) ? params.system : [],
+      params.messages,
+    ),
     output:
       request.output.kind === "TEXT"
         ? "TEXT"
@@ -762,6 +904,7 @@ function exchangeOf(
  * remembered again.
  */
 const REFUSED_SCHEMAS_MAX = 256;
+const STABLE_HEADS_MAX = 128;
 
 /**
  * The plainest request for an attempt: no constrained format, and no
@@ -770,9 +913,12 @@ const REFUSED_SCHEMAS_MAX = 256;
  */
 export function plainRequest(
   request: ModelProviderRequest,
+  stableHead?: number,
 ): MessageCreateParamsNonStreaming {
-  const params = toRequest(request, false);
-  if (continuesToolCalls(request.messages)) return params;
+  const params = toRequest(request, false, stableHead);
+  if (request.tools.length > 0 && continuesToolCalls(request.messages)) {
+    return params;
+  }
   const { thinking: _chosen, ...rest } = params;
   return rest;
 }
@@ -797,6 +943,9 @@ export function createAnthropicModelProvider(
   options: AnthropicProviderOptions,
 ): ModelProvider {
   const refusedShapes = new Set<string>();
+  // Line hashes of the last rendered prompt per kind (never its text), to
+  // find the stable head the next one shares. Oldest entry evicted first.
+  const stableHeads = new Map<string, string[]>();
   const client: AnthropicClient =
     options.client ??
     new Anthropic({
@@ -843,7 +992,10 @@ export function createAnthropicModelProvider(
               stopReason: message.stop_reason,
               blocks: message.content.map((block) => block.type),
               textChars: textOf(message).length,
+              textShape: textShapeOf(textOf(message)),
               inputTokens: toUsage(message).inputTokens,
+              cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
               outputTokens: message.usage.output_tokens,
             }),
           );
@@ -869,11 +1021,52 @@ export function createAnthropicModelProvider(
             ? request.output.schemaName
             : "TEXT"
         }`;
+        // The stable head of the rendered prompt, against the previous
+        // request of the same kind (same model, output and tool set).
+        const firstUser = request.messages.find(
+          (message) => message.role === "USER",
+        )?.content;
+        const headKey = `${plainKey}|${request.tools
+          .map((tool) => tool.name)
+          .join(",")}`;
+        const stableHead =
+          firstUser === undefined
+            ? undefined
+            : stableHeadOf(firstUser, stableHeads.get(headKey));
+        if (firstUser !== undefined) {
+          stableHeads.delete(headKey);
+          stableHeads.set(headKey, lineHashes(firstUser));
+          if (stableHeads.size > STABLE_HEADS_MAX) {
+            const oldest = stableHeads.keys().next().value;
+            if (oldest !== undefined) stableHeads.delete(oldest);
+          }
+        }
         const params = refusedShapes.has(plainKey)
-          ? plainRequest(request)
-          : toRequest(request);
+          ? plainRequest(request, stableHead)
+          : toRequest(request, true, stableHead);
         try {
-          return result(await send(params));
+          const message = await send(params);
+          // An empty end_turn -- no text, no tool call -- answers nothing.
+          // It is asked once more in the plain shape (thinking at the
+          // model's default) before the gateway sees it as an answer.
+          if (
+            message.stop_reason === "end_turn" &&
+            textOf(message).trim() === "" &&
+            toToolCalls(message) === undefined
+          ) {
+            // Live 2026-11-06: rounds after a tool result with thinking
+            // switched off came back empty (no blocks, one output token),
+            // so the retry always runs at the model's default thinking,
+            // continuation or not. If the API refuses that, the refusal is
+            // the failure, which is no worse than an empty answer.
+            const { thinking: _off, ...retry } = toRequest(
+              request,
+              false,
+              stableHead,
+            );
+            return result(await send(retry));
+          }
+          return result(message);
         } catch (error: unknown) {
           // A 400 for a shape this adapter CHOSE -- a constrained format,
           // or an explicit thinking-off mode -- is sent once more in the
@@ -884,7 +1077,7 @@ export function createAnthropicModelProvider(
           // silences every answer that uses it (live 2026-11-06: every Q
           // turn on Claude published nothing). A 400 is refused before any
           // output, so nothing was streamed and nothing billed.
-          const plain = plainRequest(request);
+          const plain = plainRequest(request, stableHead);
           if (
             !(error instanceof APIError) ||
             error.status !== 400 ||

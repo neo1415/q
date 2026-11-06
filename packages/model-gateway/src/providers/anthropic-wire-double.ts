@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
 
 import type { ModelFailureClass } from "@capital-q/contracts";
 
@@ -323,10 +324,79 @@ type Block =
       readonly input: Record<string, unknown>;
     };
 
+/**
+ * The prompt cache, modelled: render order is tools, system, messages; a
+ * block with cache_control writes the prefix up to and including it, and
+ * a later request whose breakpoint prefix was written reads it. Tokens are
+ * characters / 4. Stricter than the API (which also looks back up to 20
+ * blocks and keeps entries for 5 minutes): a hit here needs an exact
+ * breakpoint match, so real caching can only be as good or better.
+ */
+export function cachedPrefix(
+  body: Record<string, unknown>,
+  written: Set<string>,
+): {
+  readonly totalTokens: number;
+  readonly readTokens: number;
+  readonly writeTokens: number;
+} {
+  const blocks: unknown[] = [];
+  if (Array.isArray(body["tools"]))
+    blocks.push(...(body["tools"] as unknown[]));
+  if (Array.isArray(body["system"]))
+    blocks.push(...(body["system"] as unknown[]));
+  if (Array.isArray(body["messages"])) {
+    for (const message of body["messages"] as unknown[]) {
+      if (!isRecord(message)) continue;
+      const content = message["content"];
+      for (const block of Array.isArray(content) ? content : [content]) {
+        blocks.push({ role: message["role"], block });
+      }
+    }
+  }
+  const strip = (value: unknown): unknown =>
+    JSON.stringify(value, (key, inner: unknown) =>
+      key === "cache_control" ? undefined : inner,
+    );
+  const hash = createHash("sha256");
+  let chars = 0;
+  let readChars = 0;
+  let lastBreakpointChars = 0;
+  const fresh: string[] = [];
+  for (const block of blocks) {
+    const text = String(strip(block));
+    chars += text.length;
+    hash.update(text);
+    const marked =
+      isRecord(block) &&
+      (isRecord(block["block"])
+        ? "cache_control" in block["block"]
+        : "cache_control" in block);
+    if (!marked) continue;
+    const key = hash.copy().digest("hex");
+    lastBreakpointChars = chars;
+    if (written.has(key)) readChars = chars;
+    else fresh.push(key);
+  }
+  for (const key of fresh) written.add(key);
+  const totalTokens = Math.ceil(chars / 4);
+  const readTokens = Math.floor(readChars / 4);
+  const writeTokens = Math.max(
+    0,
+    Math.floor(lastBreakpointChars / 4) - readTokens,
+  );
+  return { totalTokens, readTokens, writeTokens };
+}
+
 function messageOf(
   body: Record<string, unknown>,
   result: ModelProviderResult,
   id: string,
+  cache?: {
+    readonly totalTokens: number;
+    readonly readTokens: number;
+    readonly writeTokens: number;
+  },
 ): {
   readonly message: Record<string, unknown>;
   readonly blocks: readonly Block[];
@@ -362,11 +432,21 @@ function messageOf(
         : result.finish === "CONTENT_FILTERED"
           ? "refusal"
           : "end_turn";
-  const usage = result.usage ?? {
+  const scripted = result.usage ?? {
     inputTokens: 100,
     cachedInputTokens: 0,
     outputTokens: 20,
   };
+  // With the cache modelled, input is what was actually sent.
+  const usage =
+    cache === undefined
+      ? scripted
+      : {
+          inputTokens: cache.totalTokens,
+          cachedInputTokens: cache.readTokens,
+          outputTokens: scripted.outputTokens,
+        };
+  const written = cache?.writeTokens ?? 0;
   return {
     blocks,
     message: {
@@ -379,9 +459,12 @@ function messageOf(
       stop_sequence: null,
       stop_details: null,
       usage: {
-        input_tokens: Math.max(0, usage.inputTokens - usage.cachedInputTokens),
+        input_tokens: Math.max(
+          0,
+          usage.inputTokens - usage.cachedInputTokens - written,
+        ),
         cache_read_input_tokens: usage.cachedInputTokens,
-        cache_creation_input_tokens: 0,
+        cache_creation_input_tokens: written,
         output_tokens: usage.outputTokens,
         service_tier: "standard",
       },
@@ -519,6 +602,7 @@ export function createAnthropicWireDouble(
   const current = new AsyncLocalStorage<Captured>();
   const bodies: Record<string, unknown>[] = [];
   const refusals: string[] = [];
+  const written = new Set<string>();
   let serial = 0;
 
   const transport = async (
@@ -563,7 +647,12 @@ export function createAnthropicWireDouble(
       throw error;
     }
     serial += 1;
-    const { message, blocks } = messageOf(body, result, `msg_wire_${serial}`);
+    const { message, blocks } = messageOf(
+      body,
+      result,
+      `msg_wire_${serial}`,
+      cachedPrefix(body, written),
+    );
     if (body["stream"] === true) {
       return new Response(sseOf(message, blocks), {
         status: 200,

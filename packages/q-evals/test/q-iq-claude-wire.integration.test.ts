@@ -77,6 +77,22 @@ describe("Q-IQ — Q on Claude through the Anthropic wire (scripted model)", () 
         expect(run.error, run.caseId).toBeNull();
       }
       expect(q.world().wire?.refusals()).toEqual([]);
+      // Prompt caching (live 2026-11-06: Q on Claude cost ~$0.82 a case,
+      // nothing cached). Across the run most input is read from cache:
+      // the charter, the rendered task text every turn shares, and each
+      // turn's prompt for the calls after its first.
+      const exchanges = q.world().wire?.exchanges() ?? [];
+      let input = 0;
+      let read = 0;
+      for (const exchange of exchanges) {
+        if (exchange.outcome.kind !== "MESSAGE") continue;
+        input += exchange.outcome.inputTokens;
+        read += exchange.outcome.cacheReadTokens;
+      }
+      process.stdout.write(
+        `claude wire: ${String(exchanges.length)} calls, input ${String(input)} tokens, cache read ${String(read)} (${((100 * read) / Math.max(1, input)).toFixed(1)}%)\n`,
+      );
+      expect(read / Math.max(1, input)).toBeGreaterThan(0.5);
       expect(result.summary.overall.score).toBe(1);
     } finally {
       await q.close();
@@ -111,8 +127,9 @@ describe("Q-IQ — Q on Claude through the Anthropic wire (scripted model)", () 
         .map((run) => run.caseId);
       expect(silent).toEqual([]);
       expect(result.summary.overall.score).toBe(1);
-      // Refused once, then remembered: the plain shape from then on.
-      expect(q.world().wire?.refusals().length).toBe(1);
+      // At most once, then remembered. Q's answers offer tools, and with
+      // tools the format is never constrained, so usually not even once.
+      expect(q.world().wire?.refusals().length ?? 0).toBeLessThanOrEqual(1);
     } finally {
       await q.close();
     }

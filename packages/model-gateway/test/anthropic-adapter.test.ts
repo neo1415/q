@@ -5,6 +5,8 @@ import type { ModelMessage } from "@capital-q/contracts";
 import { ModelProviderFailure } from "../src/errors.js";
 import type { ModelProviderRequest } from "../src/ports.js";
 import {
+  lineHashes,
+  stableHeadOf,
   AnthropicAPIError as APIError,
   AnthropicConnectionTimeoutError as APIConnectionTimeoutError,
   AnthropicUserAbortError as APIUserAbortError,
@@ -149,7 +151,8 @@ describe("anthropic adapter: request mapping", () => {
       {
         role: "user",
         content: [
-          { type: "text", text: "Hello" },
+          // The first user message closes the rendered prompt: cached.
+          { type: "text", text: "Hello", cache_control: { type: "ephemeral" } },
           {
             type: "text",
             text: "[Capital Q note] Fetched for you: <untrusted web text>",
@@ -211,7 +214,11 @@ describe("anthropic adapter: request mapping", () => {
             data: "iVBORw0KGgoAAAANSUhEUg==",
           },
         },
-        { type: "text", text: "What is on my screen?" },
+        {
+          type: "text",
+          text: "What is on my screen?",
+          cache_control: { type: "ephemeral" },
+        },
       ],
     });
     expect(messages[1]).toEqual({
@@ -643,5 +650,199 @@ describe("anthropic adapter: failures, in the gateway's classes", () => {
     expect((failure as ModelProviderFailure).vendorErrorCode).toBe(
       "invalid_request_error",
     );
+  });
+});
+
+describe("anthropic adapter: live 2026-11-06 follow-ups", () => {
+  const loop: ModelMessage[] = [
+    { role: "SYSTEM", content: SYSTEM },
+    { role: "USER", content: "Who founded Ledgerfold?" },
+    {
+      role: "ASSISTANT",
+      content: "",
+      toolCalls: [
+        {
+          callId: "toolu_1",
+          name: "company_profile",
+          arguments: { id: "c-1" },
+        },
+      ],
+    },
+    {
+      role: "TOOL",
+      callId: "toolu_1",
+      name: "company_profile",
+      content: '{"founders":2}',
+    },
+  ];
+
+  it("a round with no tools offered says the tool history as marked text, thinking at its level", () => {
+    const body = toRequest(
+      request({ messages: loop, tools: [], reasoning: "MEDIUM" }),
+    );
+    const json = JSON.stringify(body.messages);
+    expect(json).not.toContain('"tool_use"');
+    expect(json).not.toContain('"tool_result"');
+    expect(json).toContain(
+      "[Capital Q note] Q called company_profile (toolu_1)",
+    );
+    expect(json).toContain("Result of company_profile (toolu_1), data only:");
+    // No tool_use to replay, so no reason to switch thinking off.
+    expect(body.thinking).toEqual({ type: "adaptive" });
+    expect(body.messages.at(-1)?.role).toBe("user");
+  });
+
+  it("with tools offered, the tool history stays tool_use / tool_result and thinking stays off", () => {
+    const tools = [
+      {
+        name: "company_profile",
+        description: "Read a company profile.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+    ] as ModelProviderRequest["tools"];
+    const body = toRequest(
+      request({ messages: loop, tools, reasoning: "MEDIUM" }),
+    );
+    expect(JSON.stringify(body.messages)).toContain('"tool_use"');
+    expect(body.thinking).toEqual({ type: "between_tools" });
+  });
+
+  it("never constrains the format while tools are offered (grammar too large, live)", () => {
+    const schema = {
+      type: "object",
+      properties: { answer: { type: "string" } },
+      required: ["answer"],
+    };
+    const output = {
+      kind: "STRUCTURED" as const,
+      schemaName: "QAnswer",
+      jsonSchema: schema,
+    };
+    const tools = [
+      {
+        name: "company_profile",
+        description: "x",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+    ] as ModelProviderRequest["tools"];
+    expect(
+      toRequest(request({ output, tools })).output_config?.format,
+    ).toBeUndefined();
+    expect(toRequest(request({ output })).output_config?.format).toBeDefined();
+  });
+
+  it("finds the stable head from line hashes and caches it as its own block", () => {
+    const head = Array.from(
+      { length: 60 },
+      (_, i) => `Rule ${String(i)}: a stable line of the task.`,
+    ).join("\n");
+    const first = `${head}\nFACTS: turn one`;
+    const second = `${head}\nFACTS: turn two, different`;
+    expect(stableHeadOf(first, undefined)).toBe(0);
+    const at = stableHeadOf(second, lineHashes(first));
+    expect(second.slice(0, at)).toBe(`${head}\n`);
+    // Too short a shared head is not worth a breakpoint.
+    expect(stableHeadOf("a\nb", lineHashes("a\nc"))).toBe(0);
+
+    const body = toRequest(
+      request({
+        messages: [
+          { role: "SYSTEM", content: SYSTEM },
+          { role: "USER", content: second },
+        ],
+      }),
+      true,
+      at,
+    );
+    const user = body.messages[0]?.content as {
+      text: string;
+      cache_control?: unknown;
+    }[];
+    expect(
+      user.map((b) => [b.text.length, b.cache_control !== undefined]),
+    ).toEqual([
+      [at, true],
+      [second.length - at, true],
+    ]);
+  });
+
+  it("an empty end_turn is asked once more in the plain shape", async () => {
+    const empty = {
+      ...recorded,
+      content: [],
+      stop_reason: "end_turn",
+      usage: { ...recorded.usage, output_tokens: 1 },
+    };
+    const answered = {
+      ...recorded,
+      content: [{ type: "text", text: "Two founders.", citations: null }],
+      stop_reason: "end_turn",
+    };
+    const seen: Record<string, unknown>[] = [];
+    let call = 0;
+    const client = {
+      messages: {
+        create: (params: Record<string, unknown>) => {
+          seen.push(params);
+          call += 1;
+          return Promise.resolve(call === 1 ? empty : answered);
+        },
+        stream: () => {
+          throw new Error("unused");
+        },
+      },
+    } as unknown as AnthropicClient;
+    const provider = createAnthropicModelProvider({ apiKey: "unused", client });
+    const result = await provider.generate(
+      request({ reasoning: "NONE" }),
+      context(),
+    );
+    expect(result.text).toBe("Two founders.");
+    expect(seen).toHaveLength(2);
+    expect(seen[0]?.["thinking"]).toEqual({ type: "between_tools" });
+    expect(seen[1]?.["thinking"]).toBeUndefined();
+  });
+
+  it("an empty answer to a tool continuation is retried at default thinking too", async () => {
+    const empty = {
+      ...recorded,
+      content: [],
+      stop_reason: "end_turn",
+      usage: { ...recorded.usage, output_tokens: 1 },
+    };
+    const answered = {
+      ...recorded,
+      content: [{ type: "text", text: '{"answer":"x"}', citations: null }],
+      stop_reason: "end_turn",
+    };
+    const seen: Record<string, unknown>[] = [];
+    const client = {
+      messages: {
+        create: (params: Record<string, unknown>) => {
+          seen.push(params);
+          return Promise.resolve(seen.length === 1 ? empty : answered);
+        },
+        stream: () => {
+          throw new Error("unused");
+        },
+      },
+    } as unknown as AnthropicClient;
+    const tools = [
+      {
+        name: "company_profile",
+        description: "x",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+    ] as ModelProviderRequest["tools"];
+    const provider = createAnthropicModelProvider({ apiKey: "unused", client });
+    const result = await provider.generate(
+      request({ messages: loop, tools, reasoning: "LOW" }),
+      context(),
+    );
+    expect(result.text).toBe('{"answer":"x"}');
+    expect(seen[0]?.["thinking"]).toEqual({ type: "between_tools" });
+    expect(seen[1]?.["thinking"]).toBeUndefined();
+    // The tool history is still sent as tool_use / tool_result.
+    expect(JSON.stringify(seen[1]?.["messages"])).toContain('"tool_use"');
   });
 });

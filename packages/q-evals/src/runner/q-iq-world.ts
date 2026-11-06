@@ -230,7 +230,7 @@ export async function createQIqWorldSubject(options: {
     options.logger ??
     createLogger(
       { serviceName: "q-iq", environment: "local" },
-      { level: "error" },
+      { level: qIqDebug() ? "warn" : "error" },
     );
   const turnReader = options.turnReader ?? options.providerMode === "LIVE";
   /** The case and turn being said, for the scripted reader. */

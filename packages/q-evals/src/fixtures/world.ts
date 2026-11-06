@@ -235,6 +235,8 @@ export type QEvalWorld = {
     | {
         readonly bodies: () => readonly Record<string, unknown>[];
         readonly refusals: () => readonly string[];
+        /** Every Claude exchange: shapes, block types, cache reads and writes. */
+        readonly exchanges: () => readonly AnthropicExchange[];
       }
     | undefined;
   readonly ids: {
@@ -738,17 +740,16 @@ export async function createQEvalWorld(
   const scripted = new Map<string, ReturnType<typeof scriptedProvider>>();
   const providers: ModelProvider[] = [];
   let wireDouble: AnthropicWireDouble | undefined;
+  const wireExchanges: AnthropicExchange[] = [];
   if (options.providerMode === "FAKE" && options.wire === "anthropic") {
     const provider = scriptedProvider("anthropic");
     scripted.set("anthropic", provider);
     wireDouble = createAnthropicWireDouble(provider, {
       refuse: options.wireRefuse,
-      ...(qIqDebug()
-        ? {
-            onExchange: (exchange: AnthropicExchange) =>
-              qIqDebugLine("claude", exchange),
-          }
-        : {}),
+      onExchange: (exchange: AnthropicExchange) => {
+        wireExchanges.push(exchange);
+        if (qIqDebug()) qIqDebugLine("claude", exchange);
+      },
     });
     providers.push(recordingProvider(wireDouble, recorded));
   } else if (options.providerMode === "FAKE") {
@@ -1176,6 +1177,7 @@ export async function createQEvalWorld(
           wire: {
             bodies: () => wireDouble.bodies,
             refusals: () => wireDouble.refusals,
+            exchanges: () => wireExchanges,
           },
         }),
     resetProviderHealth: () => {
