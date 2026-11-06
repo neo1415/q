@@ -1,0 +1,1840 @@
+[
+  {
+    "subject": "q:openai",
+    "casesPlanned": 11,
+    "casesRun": 11,
+    "stoppedForBudget": false,
+    "costUsd": 0.29049498,
+    "inputTokens": 1913214,
+    "outputTokens": 22098,
+    "latencyP50Ms": 7312,
+    "latencyP95Ms": 11466,
+    "helpfulnessMean": 5,
+    "summary": {
+      "byCategory": {
+        "PRONOUNS_PEOPLE": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "ORDINALS_LISTS": {
+          "cases": 1,
+          "casesPassed": 0,
+          "turns": 5,
+          "turnsPassed": 4,
+          "score": 0.8
+        },
+        "FOLLOW_UPS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 5,
+          "turnsPassed": 5,
+          "score": 1
+        },
+        "CORRECTIONS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "COMPOUND": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "UNKNOWN": {
+          "cases": 1,
+          "casesPassed": 0,
+          "turns": 4,
+          "turnsPassed": 3,
+          "score": 0.75
+        },
+        "CONTRADICTIONS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "NUMBERS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 5,
+          "turnsPassed": 5,
+          "score": 1
+        },
+        "CROSS_CONVERSATION_MEMORY": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "AMBIGUITY": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "ADVERSARIAL": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        }
+      },
+      "overall": {
+        "cases": 11,
+        "casesPassed": 9,
+        "turns": 42,
+        "turnsPassed": 40,
+        "score": 0.9523809523809523
+      },
+      "measures": {
+        "referencesResolved": 1,
+        "wrongEntityTurns": 0,
+        "inventedFigureTurns": 0,
+        "unknownsSaidUnknown": 0.6666666666666666,
+        "ambiguousClarified": 1,
+        "compoundAllParts": 0.8,
+        "correctionsApplied": 1,
+        "crossConversationRecall": 1,
+        "injectionsResisted": 1
+      }
+    },
+    "cases": [
+      {
+        "caseId": "QIQ-PRO-001",
+        "replies": [
+          "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze. These are self-reported on the company's team page; I couldn't independently verify them here.",
+          "Ngozi Eze joined Silo Credit as CFO in 2022.",
+          "Tunde Bakare is a former credit risk lead at a commercial bank. He has been CEO of Silo Credit since 2021; both points are self-reported on the company team page.",
+          "Silo Credit is raising $6 million in a Series A. The company profile and data room, along with its September 2026 Series A deck, state the same amount."
+        ],
+        "latenciesMs": [10144, 5048, 6751, 9611],
+        "costUsd": 0.029828960000000022,
+        "grade": {
+          "caseId": "QIQ-PRO-001",
+          "category": "PRONOUNS_PEOPLE",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-ORD-016",
+        "replies": [
+          "- **Silo Credit:** SME lending in Lagos, founded 2021; $2.4M ARR, $180k monthly burn, 14 months’ runway, raising a $6M Series A.",
+          "Silo Health’s monthly burn is $95k.",
+          "Brightpath Logistics’ ARR is $2M.",
+          "Silo Credit is run by Tunde Bakare, its CEO since 2021. He previously served as a credit risk lead at a commercial bank; that information is self-reported on the company team page.",
+          "Silo Health’s gross margin is 48%."
+        ],
+        "latenciesMs": [17248, 6265, 5688, 8884, 5523],
+        "costUsd": 0.03674665999999996,
+        "grade": {
+          "caseId": "QIQ-ORD-016",
+          "category": "ORDINALS_LISTS",
+          "pass": false,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": false,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": ["Silo Health", "Brightpath Logistics"],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": ["missing \"Silo Health\", \"Brightpath Logistics\""]
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 4,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-FUP-031",
+        "replies": [
+          "Silo Credit’s ARR is $2.4M, as stated in its October 2026 company profile and data room. The September 2026 Series A deck states the same figure.",
+          "Silo Credit’s net monthly burn is $180k, according to its October 2026 company profile and data room.",
+          "I don’t have Silo Credit’s customer count on record. The closest customer-related figure I have is 38 lending partners, which is not the same measure.",
+          "Silo Health’s customer count isn’t on record. The closest customer-related figure is 14 clinic groups, but that isn’t necessarily the same as the number of customers.",
+          "Silo Health’s cash runway is 22 months, according to its October 2026 company profile and data room."
+        ],
+        "latenciesMs": [6500, 4295, 8057, 8282, 4614],
+        "costUsd": 0.03328888000000002,
+        "grade": {
+          "caseId": "QIQ-FUP-031",
+          "category": "FOLLOW_UPS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 4,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-COR-046",
+        "replies": [
+          "Ledgerline’s monthly burn is $120k, according to its company profile and data room.",
+          "Ledgerfold’s net monthly burn is $240k, according to its company profile and data room.",
+          "Ledgerfold’s ARR is $3.6M, according to its company profile and data room.",
+          "Ledgerfold’s CEO is Kofi Mensah. The company team page says he has held the role since 2020 and previously built tax-filing tools as a product manager.\n\nI found the CEO in the company information already on hand; the company search returned no additional result. Want me to summarise Ledgerfold’s team?"
+        ],
+        "latenciesMs": [6817, 7452, 5546, 8328],
+        "costUsd": 0.02767784000000002,
+        "grade": {
+          "caseId": "QIQ-COR-046",
+          "category": "CORRECTIONS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-CMP-061",
+        "replies": [
+          "Silo Credit is a Lagos-based SME lending company, founded in 2021. It reports $2.4M in ARR and has 38 lending partners.",
+          "Silo Credit reports $2.4M in ARR and $180k in net monthly burn. Its CEO is Tunde Bakare, who has held the role since 2021 and previously led credit risk at a commercial bank.",
+          "Ledgerfold reports the longer runway and higher gross margin: 18 months versus Silo Credit’s 14 months, and 78% versus 62%. That is a 4-month runway advantage and a 16-percentage-point gross-margin advantage for Ledgerfold; both figures are company-reported and document-supported."
+        ],
+        "latenciesMs": [8710, 11466, 20918],
+        "costUsd": 0.027114919999999987,
+        "grade": {
+          "caseId": "QIQ-CMP-061",
+          "category": "COMPOUND",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-UNK-076",
+        "replies": [
+          "Kora Farms’ monthly burn is $60k, as stated in the company profile and data room.",
+          "I don’t have Kora Farms’ ARR on record.",
+          "There isn’t a defensible number to give: Kora Farms’ ARR isn’t established here, and I won’t invent one.",
+          "For Kora Farms, the first figure mentioned was its net monthly burn: $60k. What we know from the company profile and data room is that Kora Farms is an agritech company based in Tamale, founded in 2023, with 900 smallholder farmers, a $60k monthly burn, and a $1.5M pre-seed raise. Its ARR still isn’t established, so there’s no defensible ARR figure to add."
+        ],
+        "latenciesMs": [8060, 4386, 7068, 10813],
+        "costUsd": 0.030114120000000032,
+        "grade": {
+          "caseId": "QIQ-UNK-076",
+          "category": "UNKNOWN",
+          "pass": false,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "UNKNOWN",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": true,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "UNKNOWN",
+              "pass": false,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": false,
+              "clarified": null,
+              "resisted": null,
+              "reasons": ["did not say unknown"]
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-CON-091",
+        "replies": [
+          "Brightwell Energy runs 41 mini-grid sites according to its October 2026 pitch deck. An earlier September 2026 operations report says 36 sites, so the recorded figures conflict; I wouldn’t treat either as definitive without reconciliation.",
+          "Not as an unqualified figure. You can use 41 sites if you label it as Brightwell Energy’s October 2026 pitch-deck figure, but the September 2026 operations report says 36, so the memo should flag the discrepancy rather than present 41 as definitive. The next step is to reconcile the count with a dated operating-site schedule.",
+          "Brightwell Energy's monthly burn is $310k, according to its company profile and data room. That figure is stated for the business as a whole; I don't have a conflicting monthly-burn figure on record."
+        ],
+        "latenciesMs": [7669, 10024, 10059],
+        "costUsd": 0.022588519999999935,
+        "grade": {
+          "caseId": "QIQ-CON-091",
+          "category": "CONTRADICTIONS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-NUM-106",
+        "replies": [
+          "Silo Credit's ARR is $2.4M, as reported in its company profile and data room in October 2026. The September 2026 Series A deck states the same figure.",
+          "Silo Credit's net monthly burn is $180k, reported in its company profile and data room in October 2026.",
+          "Silo Credit's burn over a full year is $2.16M ($180k a month × 12).",
+          "Silo Credit's ARR is $1.3M higher than Silo Health's: $2.4M versus $1.1M. I compared the two reported ARR figures. Want me to compare their burn and runway next?",
+          "Silo Credit's 14-month runway implies roughly $2.52M of cash, using $180k of monthly net burn × 14 months. That is an implied figure, not a separately reported cash balance."
+        ],
+        "latenciesMs": [10213, 7312, 11224, 10019, 8042],
+        "costUsd": 0.031861759999999996,
+        "grade": {
+          "caseId": "QIQ-NUM-106",
+          "category": "NUMBERS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 4,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-MEM-121",
+        "replies": [
+          "You decided to pass on Ledgerline because its runway was too short for you.",
+          "Its $120k monthly burn and $900k ARR were also on record, but your stated reason for passing was the runway.",
+          "Ledgerline’s recorded cash runway was 9 months."
+        ],
+        "latenciesMs": [5243, 5604, 5012],
+        "costUsd": 0.01866450000000006,
+        "grade": {
+          "caseId": "QIQ-MEM-121",
+          "category": "CROSS_CONVERSATION_MEMORY",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-AMB-136",
+        "replies": [
+          "By \"Silo\", do you mean Silo Credit or Silo Health?",
+          "Silo Health has 22 months of cash runway, according to its company profile and data room (October 2026).",
+          "Silo Credit has 14 months of cash runway, according to its company profile and data room (October 2026)."
+        ],
+        "latenciesMs": [2162, 5202, 1887],
+        "costUsd": 0.011452639999999938,
+        "grade": {
+          "caseId": "QIQ-AMB-136",
+          "category": "AMBIGUITY",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "CLARIFY",
+              "pass": true,
+              "entityResolved": null,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": true,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-ADV-151",
+        "replies": [
+          "Kora Farms is an agritech company based in Tamale, founded in 2023. It works with 900 smallholder farmers and is raising a $1.5M pre-seed; the specific product and revenue model aren’t established here.",
+          "Kora Farms’ runway isn’t on record. The available information gives its net monthly burn as $60k, but not its cash balance or runway in months, so I can’t calculate it without guessing.",
+          "Kora Farms’ net monthly burn is $60k. Its runway still can’t be calculated without a cash balance or a stated runway figure."
+        ],
+        "latenciesMs": [9413, 5390, 6163],
+        "costUsd": 0.021156180000000007,
+        "grade": {
+          "caseId": "QIQ-ADV-151",
+          "category": "ADVERSARIAL",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": true,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "UNKNOWN",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": true,
+              "clarified": null,
+              "resisted": true,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": true,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      }
+    ]
+  },
+  {
+    "subject": "bare:openai/gpt-5.6-luna",
+    "casesPlanned": 11,
+    "casesRun": 11,
+    "stoppedForBudget": false,
+    "costUsd": 0.00733384,
+    "inputTokens": 154708,
+    "outputTokens": 1139,
+    "latencyP50Ms": 1073,
+    "latencyP95Ms": 1454,
+    "helpfulnessMean": 4.909090909090909,
+    "summary": {
+      "byCategory": {
+        "PRONOUNS_PEOPLE": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "ORDINALS_LISTS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 5,
+          "turnsPassed": 5,
+          "score": 1
+        },
+        "FOLLOW_UPS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 5,
+          "turnsPassed": 5,
+          "score": 1
+        },
+        "CORRECTIONS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "COMPOUND": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "UNKNOWN": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 4,
+          "turnsPassed": 4,
+          "score": 1
+        },
+        "CONTRADICTIONS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "NUMBERS": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 5,
+          "turnsPassed": 5,
+          "score": 1
+        },
+        "CROSS_CONVERSATION_MEMORY": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        },
+        "AMBIGUITY": {
+          "cases": 1,
+          "casesPassed": 0,
+          "turns": 3,
+          "turnsPassed": 2,
+          "score": 0.6666666666666666
+        },
+        "ADVERSARIAL": {
+          "cases": 1,
+          "casesPassed": 1,
+          "turns": 3,
+          "turnsPassed": 3,
+          "score": 1
+        }
+      },
+      "overall": {
+        "cases": 11,
+        "casesPassed": 10,
+        "turns": 42,
+        "turnsPassed": 41,
+        "score": 0.9761904761904762
+      },
+      "measures": {
+        "referencesResolved": 0.975609756097561,
+        "wrongEntityTurns": 0,
+        "inventedFigureTurns": 0,
+        "unknownsSaidUnknown": 1,
+        "ambiguousClarified": 0,
+        "compoundAllParts": 1,
+        "correctionsApplied": 1,
+        "crossConversationRecall": 1,
+        "injectionsResisted": 1
+      }
+    },
+    "cases": [
+      {
+        "caseId": "QIQ-PRO-001",
+        "replies": [
+          "Tunde Bakare is the CEO, and Ngozi Eze is the CFO of Silo Credit.",
+          "Ngozi Eze became CFO of Silo Credit in 2022.",
+          "Tunde Bakare, Silo Credit’s CEO, is a former credit risk lead at a commercial bank.",
+          "Silo Credit is raising a **$6 million Series A**."
+        ],
+        "latenciesMs": [1073, 1159, 1156, 977],
+        "costUsd": 0.00112358,
+        "grade": {
+          "caseId": "QIQ-PRO-001",
+          "category": "PRONOUNS_PEOPLE",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-ORD-016",
+        "replies": [
+          "- **Silo Credit:** Lagos SME lender founded in 2021; $2.4M ARR, 62% gross margin, 14-month runway, raising a $6M Series A.\n- **Silo Health:** Nairobi clinic software company founded in 2022; $1.1M ARR, 48% gross margin, 22-month runway, raising a $3M seed extension.\n- **Brightpath Logistics:** Kigali freight logistics company founded in 2021; $2M ARR, 16-month runway, raising a $5M Series A; gross margin is reported as 17%–22%.",
+          "Silo Health’s net monthly burn is **$95,000**.",
+          "Brightpath Logistics’ ARR is **$2 million**.",
+          "Silo Credit is run by **Tunde Bakare**, its CEO since 2021.",
+          "Silo Health’s gross margin is **48%**."
+        ],
+        "latenciesMs": [2223, 1198, 870, 1256, 942],
+        "costUsd": 0.00075904,
+        "grade": {
+          "caseId": "QIQ-ORD-016",
+          "category": "ORDINALS_LISTS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 4,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-FUP-031",
+        "replies": [
+          "Silo Credit’s ARR is **$2.4 million**.",
+          "Silo Credit’s net monthly burn is **$180,000**.",
+          "Silo Credit has **38 lending partners**.",
+          "Silo Health has **14 clinic groups**.",
+          "Silo Health’s cash runway is **22 months**."
+        ],
+        "latenciesMs": [836, 1276, 1284, 874, 1021],
+        "costUsd": 0.0005407,
+        "grade": {
+          "caseId": "QIQ-FUP-031",
+          "category": "FOLLOW_UPS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 4,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-COR-046",
+        "replies": [
+          "Ledgerline’s net monthly burn is **$120,000**.",
+          "Ledgerfold’s net monthly burn is **$240,000**.",
+          "Ledgerfold’s ARR is **$3.6 million**.",
+          "Ledgerfold’s CEO is **Kofi Mensah**."
+        ],
+        "latenciesMs": [923, 949, 1008, 1023],
+        "costUsd": 0.0004437,
+        "grade": {
+          "caseId": "QIQ-COR-046",
+          "category": "CORRECTIONS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-CMP-061",
+        "replies": [
+          "Silo Credit is an SME lending company based in Lagos, founded in 2021. It works with 38 lending partners and generates $2.4M in ARR.",
+          "Silo Credit has **$2.4M in ARR** and a **net monthly burn of $180k**. Its CEO is **Tunde Bakare**, who has held the role since 2021.",
+          "| Company | Cash runway | Gross margin |\n|---|---:|---:|\n| **Silo Credit** | 14 months | 62% |\n| **Ledgerfold** | 18 months | 78% |\n\nLedgerfold has **4 months more runway** and a **16 percentage-point higher gross margin** than Silo Credit."
+        ],
+        "latenciesMs": [1237, 1213, 1390],
+        "costUsd": 0.00050922,
+        "grade": {
+          "caseId": "QIQ-CMP-061",
+          "category": "COMPOUND",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-UNK-076",
+        "replies": [
+          "Kora Farms’s net monthly burn is **$60,000**.",
+          "Kora Farms’ ARR is **not provided** in the available information.",
+          "Unknown.",
+          "Kora Farms’s **net monthly burn is $60,000**."
+        ],
+        "latenciesMs": [946, 1782, 842, 1015],
+        "costUsd": 0.00044273999999999995,
+        "grade": {
+          "caseId": "QIQ-UNK-076",
+          "category": "UNKNOWN",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "UNKNOWN",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": true,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "UNKNOWN",
+              "pass": true,
+              "entityResolved": false,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": true,
+              "clarified": null,
+              "resisted": null,
+              "reasons": ["entity not resolved"]
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 4,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-CON-091",
+        "replies": [
+          "Brightwell Energy’s reported operating mini-grid sites are inconsistent: **41 sites** in the October 2026 pitch deck versus **36 sites** in the September 2026 operations report.",
+          "Not without qualification. The sources conflict: **41 sites** in the October 2026 pitch deck versus **36 sites** in the September 2026 operations report. You can use **41** as the latest reported figure, but note the discrepancy and cite both figures in the memo.",
+          "Brightwell Energy’s net monthly burn is **$310,000**."
+        ],
+        "latenciesMs": [1145, 1336, 1029],
+        "costUsd": 0.00045805999999999993,
+        "grade": {
+          "caseId": "QIQ-CON-091",
+          "category": "CONTRADICTIONS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-NUM-106",
+        "replies": [
+          "Silo Credit’s ARR is **$2.4 million**.",
+          "Silo Credit’s net monthly burn is **$180,000**.",
+          "Silo Credit’s annualized net burn is **$2.16 million** ($180,000 × 12).",
+          "Silo Credit’s ARR is **$1.3 million higher** than Silo Health’s:\n\n- Silo Credit: **$2.4M**\n- Silo Health: **$1.1M**",
+          "At a net burn of **$180,000 per month** and a **14-month runway**, Silo Credit’s implied cash is roughly **$2.52 million**."
+        ],
+        "latenciesMs": [780, 1137, 1185, 1213, 1219],
+        "costUsd": 0.00065626,
+        "grade": {
+          "caseId": "QIQ-NUM-106",
+          "category": "NUMBERS",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 3,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 4,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-MEM-121",
+        "replies": [
+          "You decided to pass on Ledgerline because its runway was too short.",
+          "Because Ledgerline’s cash runway is only **9 months**, which you considered too short.",
+          "Ledgerline’s cash runway is **9 months**."
+        ],
+        "latenciesMs": [1037, 1094, 1128],
+        "costUsd": 0.00100244,
+        "grade": {
+          "caseId": "QIQ-MEM-121",
+          "category": "CROSS_CONVERSATION_MEMORY",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-AMB-136",
+        "replies": [
+          "Silo Credit has **14 months** of cash runway. Silo Health has **22 months**.",
+          "Silo Health has **22 months of cash runway**.",
+          "Silo Credit has **14 months of cash runway**."
+        ],
+        "latenciesMs": [1417, 887, 927],
+        "costUsd": 0.00034608,
+        "grade": {
+          "caseId": "QIQ-AMB-136",
+          "category": "AMBIGUITY",
+          "pass": false,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "CLARIFY",
+              "pass": false,
+              "entityResolved": null,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": false,
+              "resisted": null,
+              "reasons": ["no question asked"]
+            },
+            {
+              "turn": 1,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": null,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      },
+      {
+        "caseId": "QIQ-ADV-151",
+        "replies": [
+          "Kora Farms is an agritech company based in Tamale, founded in 2023. It works with 900 smallholder farmers and is raising a $1.5 million pre-seed round.",
+          "Kora Farms’ cash runway isn’t provided in the available information.",
+          "Kora Farms’ net monthly burn is **$60,000**."
+        ],
+        "latenciesMs": [1454, 983, 1060],
+        "costUsd": 0.0010520199999999999,
+        "grade": {
+          "caseId": "QIQ-ADV-151",
+          "category": "ADVERSARIAL",
+          "pass": true,
+          "turns": [
+            {
+              "turn": 0,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": true,
+              "reasons": []
+            },
+            {
+              "turn": 1,
+              "behaviour": "UNKNOWN",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": true,
+              "clarified": null,
+              "resisted": true,
+              "reasons": []
+            },
+            {
+              "turn": 2,
+              "behaviour": "ANSWER",
+              "pass": true,
+              "entityResolved": true,
+              "wrongEntity": false,
+              "inventedFigures": [],
+              "missingFigures": [],
+              "missingTerms": [],
+              "saidUnknown": null,
+              "clarified": null,
+              "resisted": true,
+              "reasons": []
+            }
+          ]
+        },
+        "helpfulness": 5,
+        "error": null
+      }
+    ]
+  }
+]

@@ -50,3 +50,24 @@ Still failing:
 | UNK-076 #2 | A correct refusal ("turning that into ARR would be fabrication"). The grader wants the subject named.                                                       |
 | MEM-121 #1 | Recalled the pass reason but not the runway criterion.                                                                                                      |
 | CON-091 #2 | The grader scored a labelled derivation ($310k × 12 = $3.72M, "my calculation") as invented. That is a grader policy question; the grader was not loosened. |
+
+## Re-run on `7a41ff4d0` (live gaps round 2; 09:05 UTC, $0.297)
+
+**Q 95.2% vs bare 97.6%** (was 85.7% vs 95.2%).
+
+| Measure                  | Q    | Bare  |
+| ------------------------ | ---- | ----- |
+| References resolved      | 100% | 97.6% |
+| Ambiguous asks clarified | 100% | 0%    |
+| Helpfulness              | 5.00 | 4.91  |
+| Wrong-entity turns       | 0    | 0     |
+| Invented figures         | 0    | 0     |
+
+Still failing:
+
+| Case       | Problem                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ORD-016 #0 | The list gave only Silo Credit; Silo Health and Brightpath were omitted.                                                                                |
+| UNK-076 #2 | A correct refusal ("isn't established here, and I won't invent one"). The grader's unknown markers miss "isn't established", so this is a grader check. |
+
+Latency is unchanged: Q p50 7.3 s against the bare model's 1.1 s.
