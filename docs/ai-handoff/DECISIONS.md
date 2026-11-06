@@ -243,3 +243,14 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **Keep cutting Claude's cost in the background** by means that do not reduce intelligence: caching, a leaner prompt, fewer calls per turn.
     - **Avoid adding rigid structure.** It can make Q less dynamic and lose the flexibility of the model. Prefer giving the model better context over hard-coding behaviour.
     - **Q must beat the bare model it runs on.** The bare OpenAI scores in BASELINE.md are the bar for Q on OpenAI. Improvements are proven scripted first; paid checks run on Anthropic within the $50 budget (DECISIONS 68).
+
+70. **GitHub Actions minutes are limited** (owner is on GitHub Pro). CI runs only when it buys something:
+    - **One CI run per deploy batch.** Merge ready lanes together, then run CI once. No CI run per lane.
+    - **Never push docs-only commits to `recovery/2026-09-12-8y2j4w`.** Handoff, receipt and benchmark docs go to the integration branch only.
+    - **Never push mid-run.** A push cancels the running workflow, and the minutes it already used are wasted. Wait for the result, then push the next batch.
+    - **Local gates before CI:**
+      - the package build;
+      - root tsc;
+      - full vitest for every app and package the batch touches, so version-pin tests like plan-live-1 fail locally, not in CI;
+      - eslint and prettier on changed files.
+    - **Urgent production fixes** are the only exception to batching.
