@@ -29,7 +29,12 @@ import {
   type QIqCase,
   type QIqFact,
 } from "../datasets/q-iq/index.js";
-import { createQEvalWorld, type QEvalWorld } from "../fixtures/world.js";
+import {
+  createQEvalWorld,
+  qIqDebug,
+  qIqDebugLine,
+  type QEvalWorld,
+} from "../fixtures/world.js";
 import { plantedFacts, type QIqConversation, type QIqSubject } from "./q-iq.js";
 
 /**
@@ -205,6 +210,11 @@ export async function createQIqWorldSubject(options: {
    * Every query that reaches the scripted web is reported per turn.
    */
   readonly web?: boolean | undefined;
+  /** FAKE mode: the scripted model through the real Anthropic adapter (world.ts `wire`). */
+  readonly wire?: "anthropic" | undefined;
+  /** With `wire`: a further refusal the double applies (world.ts `wireRefuse`). */
+  readonly wireRefuse?:
+    ((body: Record<string, unknown>) => string | null) | undefined;
 }): Promise<QIqWorldSubject> {
   // Filled once the world exists; the specialist reads it lazily, per run.
   const holder: { world?: QEvalWorld } = {};
@@ -348,6 +358,10 @@ export async function createQIqWorldSubject(options: {
     providerMode: options.providerMode,
     secrets: options.secrets,
     providerFilter: options.providerFilter,
+    ...(options.wire === undefined ? {} : { wire: options.wire }),
+    ...(options.wireRefuse === undefined
+      ? {}
+      : { wireRefuse: options.wireRefuse }),
     specialist: (delegate) =>
       createSpecialistQAnswer({
         // No company investigation in Q-IQ: every turn is conversational,
@@ -523,7 +537,15 @@ export async function createQIqWorldSubject(options: {
               runId: created.run.id,
               correlationId,
             })
-            .catch(() => undefined);
+            .catch((error: unknown) => {
+              if (qIqDebug()) {
+                qIqDebugLine("start-error", {
+                  name: error instanceof Error ? error.name : typeof error,
+                  message:
+                    error instanceof Error ? error.message.slice(0, 300) : "",
+                });
+              }
+            });
           const latencyMs = Date.now() - started;
           const messages = await w().repositories.messages.listForRun(
             options.db.sql,
@@ -547,6 +569,22 @@ export async function createQIqWorldSubject(options: {
               : observed.toolCalls
                   .filter((call) => call.status === "SUCCEEDED")
                   .map((call) => call.providerName);
+          if (qIqDebug()) {
+            // The publish decision: how the run ended and what it stored.
+            const [run] = await options.db.sql<
+              { status: string; failure_code: string | null }[]
+            >`select status, failure_code from q_runtime.runs
+               where id = ${created.run.id}`;
+            qIqDebugLine("turn", {
+              caseId: evalCase.id,
+              turn: turn - 1,
+              runStatus: run?.status ?? null,
+              failureCode: run?.failure_code ?? null,
+              qMessages: messages.filter((m) => m.role === "Q").length,
+              replyChars: reply.length,
+              latencyMs,
+            });
+          }
           return {
             text: reply.length === 0 ? "(no reply)" : reply,
             toolsRun,

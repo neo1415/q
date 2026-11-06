@@ -35,11 +35,19 @@ import {
   SyntheticDemoRoutingRefusedError,
   type FakeBehaviour,
   type ModelGateway,
+  type ModelCatalogPort,
   type ModelProvider,
   type ProviderHealthPort,
   type SyntheticDemoRoutingAllowance,
 } from "@capital-q/model-gateway";
-import { createAnthropicModelProvider } from "@capital-q/model-gateway/providers/anthropic";
+import {
+  createAnthropicModelProvider,
+  type AnthropicExchange,
+} from "@capital-q/model-gateway/providers/anthropic";
+import {
+  createAnthropicWireDouble,
+  type AnthropicWireDouble,
+} from "@capital-q/model-gateway/providers/anthropic-wire-double";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
@@ -206,9 +214,29 @@ export type QEvalWorldOptions = {
    * repositories once they exist. Absent: no recall, as before.
    */
   readonly memory?: (() => QMemoryRecall) | undefined;
+  /**
+   * FAKE only: the scripted model answers THROUGH the real Anthropic
+   * adapter and SDK, over a wire double that speaks the Messages API's
+   * JSON and SSE shapes and refuses what the API refuses
+   * (anthropic-wire-double.ts). The Claude routing policies (v2,
+   * 20261231280000) are switched on in this world's catalogue view only,
+   * and the double is the only provider, as in a live --provider
+   * anthropic run. Absent: the scripted model is registered directly.
+   */
+  readonly wire?: "anthropic" | undefined;
+  /** With `wire`: a further refusal the double applies, to reproduce a live one. */
+  readonly wireRefuse?:
+    ((body: Record<string, unknown>) => string | null) | undefined;
 };
 
 export type QEvalWorld = {
+  /** The anthropic wire only: every request body the SDK sent, and why the double refused any. */
+  readonly wire?:
+    | {
+        readonly bodies: () => readonly Record<string, unknown>[];
+        readonly refusals: () => readonly string[];
+      }
+    | undefined;
   readonly ids: {
     readonly tenantC: string;
     readonly tenantI: string;
@@ -324,6 +352,41 @@ function recordingProvider(
 }
 
 /** A provider whose scripted behaviour changes per case. */
+/** CQ_Q_IQ_LOG=debug: one stderr line per model exchange and per turn. */
+export function qIqDebug(): boolean {
+  return process.env["CQ_Q_IQ_LOG"] === "debug";
+}
+
+/** Shapes, counts and the vendor's refusal text; never prompt or reply text. */
+export function qIqDebugLine(kind: string, detail: unknown): void {
+  process.stderr.write(`[q-iq ${kind}] ${JSON.stringify(detail)}\n`);
+}
+
+/**
+ * The Claude routing policies switched on in this world's view of the
+ * catalogue -- exactly what the receipt's UPDATE does to the table --
+ * without writing to the shared database. Only for the anthropic wire.
+ */
+function claudeRoutesOn(
+  catalog: ModelCatalogPort,
+  options: Pick<QEvalWorldOptions, "wire">,
+): ModelCatalogPort {
+  if (options.wire !== "anthropic") return catalog;
+  return {
+    load: async () => {
+      const snapshot = await catalog.load();
+      return {
+        ...snapshot,
+        routingPolicies: snapshot.routingPolicies.map((policy) =>
+          policy.version === 2 && policy.code.endsWith(".v2")
+            ? { ...policy, status: "ACTIVE" as const }
+            : policy,
+        ),
+      };
+    },
+  };
+}
+
 function scriptedProvider(code: ModelProviderCode): ModelProvider & {
   readonly setScript: (script: readonly FakeBehaviour[]) => void;
 } {
@@ -674,7 +737,21 @@ export async function createQEvalWorld(
   const recorded: RecordedProviderCall[] = [];
   const scripted = new Map<string, ReturnType<typeof scriptedProvider>>();
   const providers: ModelProvider[] = [];
-  if (options.providerMode === "FAKE") {
+  let wireDouble: AnthropicWireDouble | undefined;
+  if (options.providerMode === "FAKE" && options.wire === "anthropic") {
+    const provider = scriptedProvider("anthropic");
+    scripted.set("anthropic", provider);
+    wireDouble = createAnthropicWireDouble(provider, {
+      refuse: options.wireRefuse,
+      ...(qIqDebug()
+        ? {
+            onExchange: (exchange: AnthropicExchange) =>
+              qIqDebugLine("claude", exchange),
+          }
+        : {}),
+    });
+    providers.push(recordingProvider(wireDouble, recorded));
+  } else if (options.providerMode === "FAKE") {
     // The scripted model registers under the real catalogue codes so
     // routing, eligibility, prices and the usage ledger all apply. OpenAI
     // is every policy's primary since 20261008130000 (Groq left every
@@ -726,6 +803,12 @@ export async function createQEvalWorld(
         recordingProvider(
           createAnthropicModelProvider({
             apiKey: secrets.anthropic.reveal(),
+            ...(qIqDebug()
+              ? {
+                  onExchange: (exchange: AnthropicExchange) =>
+                    qIqDebugLine("claude", exchange),
+                }
+              : {}),
           }),
           recorded,
         ),
@@ -795,7 +878,7 @@ export async function createQEvalWorld(
   };
 
   const gateway = createModelGateway({
-    catalog: createPostgresModelCatalog({ sql }),
+    catalog: claudeRoutesOn(createPostgresModelCatalog({ sql }), options),
     registry: createModelProviderRegistry(providers),
     usage: createPostgresModelUsageRepository({ sql }),
     health,
@@ -1087,6 +1170,14 @@ export async function createQEvalWorld(
     setFactList: (list) => {
       factList = list;
     },
+    ...(wireDouble === undefined
+      ? {}
+      : {
+          wire: {
+            bodies: () => wireDouble.bodies,
+            refusals: () => wireDouble.refusals,
+          },
+        }),
     resetProviderHealth: () => {
       providerHealth = createProcessLocalProviderHealth();
     },

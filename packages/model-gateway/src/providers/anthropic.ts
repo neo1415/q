@@ -105,6 +105,14 @@ export type AnthropicProviderOptions = {
   readonly apiKey: string;
   /** For tests: a client already built. */
   readonly client?: AnthropicClient | undefined;
+  /**
+   * For tests and evals: the HTTP transport under the real SDK client, so
+   * the SDK's own request encoding and SSE parsing run against recorded
+   * response shapes (anthropic-wire-double.ts). Ignored with `client`.
+   */
+  readonly fetch?: typeof fetch | undefined;
+  /** Opt-in diagnostics: called once per request with its shape and outcome. */
+  readonly onExchange?: ((exchange: AnthropicExchange) => void) | undefined;
 };
 
 /** The part of the SDK client this adapter uses; the test seam. */
@@ -646,9 +654,14 @@ export function normalizeError(error: unknown): ModelProviderFailure {
 
 // --- the request -----------------------------------------------------------------
 
-/** The full request body for one attempt. Exported for the tests. */
+/**
+ * The full request body for one attempt. Exported for the tests.
+ * `constrain: false` states a structured schema in the instructions even
+ * when it would fit constrained decoding (the refusal fallback below).
+ */
 export function toRequest(
   request: ModelProviderRequest,
+  constrain = true,
 ): MessageCreateParamsNonStreaming {
   const { thinking, effort } = thinkingFor(
     request.modelCode,
@@ -658,7 +671,9 @@ export function toRequest(
   const structured =
     request.output.kind === "STRUCTURED" ? request.output : undefined;
   const constrained =
-    structured === undefined ? null : toOutputSchema(structured.jsonSchema);
+    structured === undefined || !constrain
+      ? null
+      : toOutputSchema(structured.jsonSchema);
   const { system, messages } = toMessages(
     request.messages,
     structured !== undefined && constrained === null
@@ -687,15 +702,108 @@ export function toRequest(
   };
 }
 
+/**
+ * One request and what came of it, for an opt-in diagnostic hook (the
+ * Q-IQ world's CQ_Q_IQ_LOG=debug). Shapes and counts only, plus the
+ * vendor's own error message on a refusal, which is what tells a refused
+ * request shape from anything else. Never wired in a service.
+ */
+export type AnthropicExchange = {
+  readonly model: string;
+  readonly streaming: boolean;
+  readonly thinking: string;
+  readonly effort: string | undefined;
+  readonly tools: number;
+  readonly output: "TEXT" | "CONSTRAINED" | "INSTRUCTION";
+  readonly outcome:
+    | {
+        readonly kind: "MESSAGE";
+        readonly stopReason: string | null;
+        readonly blocks: readonly string[];
+        readonly textChars: number;
+        readonly inputTokens: number;
+        readonly outputTokens: number;
+      }
+    | {
+        readonly kind: "ERROR";
+        readonly status: number | undefined;
+        readonly type: string | null;
+        readonly message: string;
+      };
+};
+
+function exchangeOf(
+  params: MessageCreateParamsNonStreaming,
+  request: ModelProviderRequest,
+  streaming: boolean,
+  outcome: AnthropicExchange["outcome"],
+): AnthropicExchange {
+  return {
+    model: params.model,
+    streaming,
+    thinking: params.thinking?.type ?? "default",
+    effort: params.output_config?.effort ?? undefined,
+    tools: params.tools?.length ?? 0,
+    output:
+      request.output.kind === "TEXT"
+        ? "TEXT"
+        : params.output_config?.format === undefined ||
+            params.output_config.format === null
+          ? "INSTRUCTION"
+          : "CONSTRAINED",
+    outcome,
+  };
+}
+
+/**
+ * Model and schema pairs the API refused in the adapter's chosen shape,
+ * for this provider instance: they go straight to the plain shape after
+ * the first refusal. Bounded; a pair forgotten is refused once more and
+ * remembered again.
+ */
+const REFUSED_SCHEMAS_MAX = 256;
+
+/**
+ * The plainest request for an attempt: no constrained format, and no
+ * explicit thinking mode unless the turn continues its own tool calls
+ * (where thinking must stay off; see continuesToolCalls).
+ */
+export function plainRequest(
+  request: ModelProviderRequest,
+): MessageCreateParamsNonStreaming {
+  const params = toRequest(request, false);
+  if (continuesToolCalls(request.messages)) return params;
+  const { thinking: _chosen, ...rest } = params;
+  return rest;
+}
+
+/** Whether the adapter's chosen shape differs from the plain one. */
+function choseShape(
+  chosen: MessageCreateParamsNonStreaming,
+  plain: MessageCreateParamsNonStreaming,
+): boolean {
+  const format = chosen.output_config?.format;
+  // Adaptive is both models' default, so sending it explicitly is not a
+  // choice; only an explicit off-mode is.
+  const thinking = (params: MessageCreateParamsNonStreaming): string =>
+    params.thinking?.type ?? "adaptive";
+  return (
+    (format !== undefined && format !== null) ||
+    thinking(chosen) !== thinking(plain)
+  );
+}
+
 export function createAnthropicModelProvider(
   options: AnthropicProviderOptions,
 ): ModelProvider {
+  const refusedShapes = new Set<string>();
   const client: AnthropicClient =
     options.client ??
     new Anthropic({
       apiKey: options.apiKey,
       // The gateway owns retry; the SDK gets one shot.
       maxRetries: 0,
+      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
     });
 
   return {
@@ -710,20 +818,85 @@ export function createAnthropicModelProvider(
       request: ModelProviderRequest,
       context: ModelExecutionContext,
     ): Promise<ModelProviderResult> => {
-      try {
-        const params = toRequest(request);
-        const requestOptions = {
-          signal: context.signal,
-          timeout: context.attemptTimeoutMs,
-        };
-        if (context.onTextDelta === undefined) {
-          return result(await client.messages.create(params, requestOptions));
+      const requestOptions = {
+        signal: context.signal,
+        timeout: context.attemptTimeoutMs,
+      };
+      const streaming = context.onTextDelta !== undefined;
+      const send = async (
+        params: MessageCreateParamsNonStreaming,
+      ): Promise<Message> => {
+        try {
+          let message: Message;
+          if (context.onTextDelta === undefined) {
+            message = await client.messages.create(params, requestOptions);
+          } else {
+            const onTextDelta = context.onTextDelta;
+            const stream = client.messages.stream(params, requestOptions);
+            // Text deltas only: thinking deltas are never surfaced.
+            stream.on("text", (delta: string) => onTextDelta(delta));
+            message = await stream.finalMessage();
+          }
+          options.onExchange?.(
+            exchangeOf(params, request, streaming, {
+              kind: "MESSAGE",
+              stopReason: message.stop_reason,
+              blocks: message.content.map((block) => block.type),
+              textChars: textOf(message).length,
+              inputTokens: toUsage(message).inputTokens,
+              outputTokens: message.usage.output_tokens,
+            }),
+          );
+          return message;
+        } catch (error: unknown) {
+          if (error instanceof APIError) {
+            const refused: APIError = error as APIError;
+            options.onExchange?.(
+              exchangeOf(params, request, streaming, {
+                kind: "ERROR",
+                status: refused.status,
+                type: refused.type,
+                message: refused.message.slice(0, 500),
+              }),
+            );
+          }
+          throw error;
         }
-        const onTextDelta = context.onTextDelta;
-        const stream = client.messages.stream(params, requestOptions);
-        // Text deltas only: thinking deltas are never surfaced.
-        stream.on("text", (delta: string) => onTextDelta(delta));
-        return result(await stream.finalMessage());
+      };
+      try {
+        const plainKey = `${request.modelCode}|${
+          request.output.kind === "STRUCTURED"
+            ? request.output.schemaName
+            : "TEXT"
+        }`;
+        const params = refusedShapes.has(plainKey)
+          ? plainRequest(request)
+          : toRequest(request);
+        try {
+          return result(await send(params));
+        } catch (error: unknown) {
+          // A 400 for a shape this adapter CHOSE -- a constrained format,
+          // or an explicit thinking-off mode -- is sent once more in the
+          // plainest shape: the schema stated in the instructions (the
+          // gateway validates every answer against the caller's schema
+          // either way) and thinking at the model's default, same effort.
+          // The pair is remembered, so a shape the API will not take never
+          // silences every answer that uses it (live 2026-11-06: every Q
+          // turn on Claude published nothing). A 400 is refused before any
+          // output, so nothing was streamed and nothing billed.
+          const plain = plainRequest(request);
+          if (
+            !(error instanceof APIError) ||
+            error.status !== 400 ||
+            accountExhausted(error as APIError) ||
+            !choseShape(params, plain)
+          ) {
+            throw error;
+          }
+          if (refusedShapes.size >= REFUSED_SCHEMAS_MAX) refusedShapes.clear();
+          refusedShapes.add(plainKey);
+          return result(await send(plain));
+        }
       } catch (error: unknown) {
         throw normalizeError(error);
       }
