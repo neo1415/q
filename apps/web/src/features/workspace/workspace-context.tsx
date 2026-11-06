@@ -2,7 +2,10 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { WORKSPACE_OFF, type WorkspaceMode } from "./mode-rules";
+import {
+  WORKSPACE_OFF,
+  type WorkspaceMode,
+} from "@capital-q/config/workspace-mode";
 
 /**
  * Whether this page is inside the Q Workspace (W1.1), as the server

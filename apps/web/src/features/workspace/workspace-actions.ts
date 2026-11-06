@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/auth/session";
 import { createServerSupabaseClient } from "@/auth/supabase-server";
 
-import { WORKSPACE_PREFERENCE_KEY } from "./mode-rules";
+import { WORKSPACE_PREFERENCE_KEY } from "@capital-q/config/workspace-mode";
 
 /**
  * The person turns the Q Workspace preview on or off for their account

@@ -107,3 +107,27 @@ describe("layout store", () => {
     expect(getWorkspaceLayout().pagePane).toBe("open");
   });
 });
+
+describe("Q's LAYOUT_SET", () => {
+  it("collapses and opens panes inside the workspace only", async () => {
+    const { performLayoutSet } =
+      await import("../src/features/workspace/layout-action");
+    // Flag off: no workspace shell; handled, nothing changes.
+    expect(performLayoutSet({ pagePane: "collapsed" })).toBe(true);
+    expect(root.hasAttribute("data-cq-ws-page")).toBe(false);
+    const shell = document.createElement("div");
+    shell.className = "cq-shell";
+    shell.setAttribute("data-workspace", "");
+    document.body.append(shell);
+    // "Hide the pages"
+    expect(performLayoutSet({ pagePane: "collapsed" })).toBe(true);
+    expect(root.getAttribute("data-cq-ws-page")).toBe("collapsed");
+    // "Close the chat" while pages are hidden: the pages come back.
+    performLayoutSet({ qPane: "collapsed" });
+    expect(root.getAttribute("data-cq-ws-q")).toBe("collapsed");
+    expect(root.hasAttribute("data-cq-ws-page")).toBe(false);
+    // Naming no pane is not an action.
+    expect(performLayoutSet({})).toBe(false);
+    shell.remove();
+  });
+});

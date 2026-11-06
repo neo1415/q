@@ -55,3 +55,26 @@ export function decideWorkspaceMode(
       return { enabled: preference !== "off", available: true };
   }
 }
+
+/**
+ * The same decision from a verified access token's claims and the
+ * environment, for any service that holds the person's token (q-api's
+ * producers of workspace-only stream blocks, W3/W4). Only call it with
+ * claims from a token the caller has already verified.
+ */
+export function workspaceModeFromClaims(
+  claims: unknown,
+  env: Readonly<Record<string, string | undefined>>,
+): WorkspaceMode {
+  const server = serverModeOf(env["CQ_WORKSPACE_MODE"]);
+  if (server === "off") return WORKSPACE_OFF;
+  const metadata =
+    typeof claims === "object" && claims !== null
+      ? (claims as Record<string, unknown>)["user_metadata"]
+      : undefined;
+  const raw =
+    typeof metadata === "object" && metadata !== null
+      ? (metadata as Record<string, unknown>)[WORKSPACE_PREFERENCE_KEY]
+      : undefined;
+  return decideWorkspaceMode(server, preferenceOf(raw));
+}

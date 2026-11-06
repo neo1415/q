@@ -25,7 +25,7 @@ import { WORKSPACE_BOOT_SCRIPT } from "@/features/workspace/layout-rules";
 import {
   WORKSPACE_OFF,
   type WorkspaceMode,
-} from "@/features/workspace/mode-rules";
+} from "@capital-q/config/workspace-mode";
 import { WorkspaceProvider } from "@/features/workspace/workspace-context";
 import {
   WorkspacePagePane,

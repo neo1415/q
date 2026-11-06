@@ -4,7 +4,8 @@ import {
   decideWorkspaceMode,
   preferenceOf,
   serverModeOf,
-} from "../src/features/workspace/mode-rules";
+  workspaceModeFromClaims,
+} from "../src/workspace-mode.js";
 
 /** W1.1: the Q Workspace flag (Q_WORKSPACE_PLAN §4.1, DECISIONS 71). */
 describe("workspace mode", () => {
@@ -48,5 +49,20 @@ describe("workspace mode", () => {
       enabled: false,
       available: true,
     });
+  });
+
+  it("decides from verified token claims for other services", () => {
+    const claims = { sub: "u", user_metadata: { cq_workspace: "on" } };
+    expect(workspaceModeFromClaims(claims, {}).enabled).toBe(false);
+    expect(
+      workspaceModeFromClaims(claims, { CQ_WORKSPACE_MODE: "labs" }).enabled,
+    ).toBe(true);
+    expect(
+      workspaceModeFromClaims({ sub: "u" }, { CQ_WORKSPACE_MODE: "labs" })
+        .enabled,
+    ).toBe(false);
+    expect(
+      workspaceModeFromClaims(null, { CQ_WORKSPACE_MODE: "on" }).enabled,
+    ).toBe(true);
   });
 });
