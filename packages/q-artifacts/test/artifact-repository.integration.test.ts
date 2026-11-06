@@ -219,8 +219,14 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
         await tx.sql`delete from identity.organisation_memberships where organisation_id = ${party.organisationId}`;
         await tx.sql`delete from identity.organisations where id = ${party.organisationId}`;
         await tx.sql`delete from identity.tenants where id = ${party.tenantId}`;
-        await tx.sql`delete from auth.users where id =
-          (select auth_user_id from identity.user_profiles where id = ${party.userId})`;
+        // The profile references its auth user (user_profiles_auth_user_id_fkey,
+        // no cascade): the profile goes first, then the auth user it named.
+        const [profile] = await tx.sql<{ auth_user_id: string }[]>`
+          delete from identity.user_profiles where id = ${party.userId}
+          returning auth_user_id`;
+        if (profile !== undefined) {
+          await tx.sql`delete from auth.users where id = ${profile.auth_user_id}`;
+        }
       });
     }
   });
@@ -398,7 +404,13 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
         artifact.id,
         legacy.id,
       ]);
-      expect(read?.get(artifact.id)).toEqual(sources);
+      // The port returns the sources, not an order: rows written by one
+      // statement share created_at and then sort by their random ids.
+      const byId = (a: { id: string }, b: { id: string }) =>
+        a.id.localeCompare(b.id);
+      expect([...(read?.get(artifact.id) ?? [])].sort(byId)).toEqual(
+        [...sources].sort(byId),
+      );
       // An artifact composed before sources were recorded has none.
       expect(read?.get(legacy.id) ?? []).toEqual([]);
       // Another tenant selects nothing.

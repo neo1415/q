@@ -26,6 +26,7 @@ import type {
   QConversationState,
   QConversationSummaryRevision,
 } from "../contracts/conversation-state.js";
+import type { QConversationStateCache } from "./conversation-state-cache.js";
 
 /**
  * Persistence ports for the Q runtime.
@@ -466,6 +467,12 @@ export type QConversationStateRepository = {
     userId: UserId,
     conversationId: string,
   ) => Promise<QConversationSummaryRevision | null>;
+  /**
+   * Step 11: this process's committed state and summary per conversation
+   * and owner (conversation-state-cache.ts). Absent: every turn reads the
+   * store. Callers update it only after their transaction resolved.
+   */
+  readonly cache?: QConversationStateCache | undefined;
   /** Appends the next revision; returns its number. */
   readonly appendSummary: (
     tx: TransactionContext,

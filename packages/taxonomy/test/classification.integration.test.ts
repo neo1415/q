@@ -47,6 +47,20 @@ import {
   type TaxonomyNodeId,
   type TaxonomyService,
 } from "../src/index.js";
+import { REFERENCE_TAXONOMY } from "../src/reference-data/index.js";
+
+/**
+ * A vocabulary's version as published by the reference set. Additive
+ * vocabulary migrations move it (ADR 0005: geography reached v5, industry
+ * v2), so a classification records whatever the reference says now.
+ */
+const referenceVersion = (code: string): number => {
+  const vocabulary = REFERENCE_TAXONOMY.vocabularies.find(
+    (v) => v.code === code,
+  );
+  if (vocabulary === undefined) throw new Error(`no vocabulary ${code}`);
+  return vocabulary.version;
+};
 
 /**
  * The deterministic classifier against the real local database: exact,
@@ -270,7 +284,9 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
         matchTypes: ["CANONICAL_CODE_EXACT"],
       });
       expect(code.classifier).toEqual(TAXONOMY_CLASSIFIER_IDENTITY);
-      expect(code.taxonomyVersions).toEqual({ industry: 1 });
+      expect(code.taxonomyVersions).toEqual({
+        industry: referenceVersion("industry"),
+      });
 
       const alias = await find({
         text: "  Payments   RAILS ",
@@ -454,7 +470,7 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
         vocabularyCodes: ["product_category", "industry"],
       });
       expect(bumped.taxonomyVersions).toEqual({
-        industry: 1,
+        industry: referenceVersion("industry"),
         product_category: 2,
       });
     });
@@ -504,7 +520,11 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
         // no longer suggests a category.
         classifierVersion: "taxonomy-lexical-v5",
         // geography v2 since 20261008100000 (more of Africa).
-        taxonomyVersion: { geography: 2, industry: 1, product_category: 1 },
+        taxonomyVersion: {
+          geography: referenceVersion("geography"),
+          industry: referenceVersion("industry"),
+          product_category: referenceVersion("product_category"),
+        },
         status: "COMPLETED",
         costUsd: "0.000000",
       });
@@ -794,7 +814,10 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
         expect(row?.accepted).toBeNull();
         expect(
           await count(
-            tx.sql`select count(*)::int as count from taxonomy.entity_assignments`,
+            // This company's only: other suites commit assignments of their
+            // own, so a table-wide count depended on the file order.
+            tx.sql`select count(*)::int as count from taxonomy.entity_assignments
+                    where entity_type = 'COMPANY' and entity_id = ${companyA}`,
           ),
         ).toBe(0);
       },

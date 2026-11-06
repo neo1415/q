@@ -18,6 +18,7 @@ import {
 import type { ExtractedBlock } from "@capital-q/evidence/contracts";
 
 import { createQKnowledgeService } from "../src/application/service.js";
+import { CHUNKING_VERSION } from "../src/contracts/index.js";
 import { DerivedGovernanceError } from "../src/domain/inheritance.js";
 
 /**
@@ -298,10 +299,22 @@ describe("@capital-q/q-knowledge against local PostgreSQL", () => {
         expect(chunk.locator.pageStart).toBeGreaterThanOrEqual(1);
         expect(chunk.locator.headingPath?.[0]).toContain("Report");
       }
-      for (const leaf of leaves) {
+      // q-chunking-v2 (chunking/index.ts planNarrativeRun): a section that
+      // fits one leaf, or a bare heading, is a leaf of its own with no
+      // parent; a long section's leaves sit under its parent windows. So
+      // every leaf that names a parent names a PARENT in the same set, and
+      // the long sections here produce such leaves.
+      const parented = leaves.filter((leaf) => leaf.parentChunkId !== null);
+      expect(parented.length).toBeGreaterThan(0);
+      for (const leaf of parented) {
         const parent = chunks.find((c) => c.id === leaf.parentChunkId);
         expect(parent?.role).toBe("PARENT");
         expect(parent?.chunkSetId).toBe(leaf.chunkSetId);
+      }
+      for (const parent of parents) {
+        expect(parented.some((leaf) => leaf.parentChunkId === parent.id)).toBe(
+          true,
+        );
       }
       // The instruction-shaped passage is carried as text and flagged.
       const flagged = chunks.filter((c) => c.instructionRiskSignals > 0);
@@ -449,13 +462,18 @@ describe("@capital-q/q-knowledge against local PostgreSQL", () => {
       });
       expect(oldSets[0]?.status).toBe("SUPERSEDED");
       expect(oldSets[0]?.statusReason).toBe("NEWER_DOCUMENT_VERSION");
-      // Reprocessing the old version under a newer chunker is history from birth.
+      // Reprocessing the old version under a newer chunker is history from
+      // birth. "Newer" is one past the current default (v2 became the
+      // default, so naming v2 here asked for the set that already exists).
       const oldAgain = await service.buildChunkSet({
         tenantId: a.tenantId,
         documentVersionId: first.versionId,
         pipelineVersion: PIPELINE,
         blocks,
-        chunkingVersion: "q-chunking-v2",
+        chunkingVersion: CHUNKING_VERSION.replace(
+          /v(\d+)$/u,
+          (_v, n: string) => `v${String(Number(n) + 1)}`,
+        ),
       });
       expect(oldAgain.outcome).toBe("BUILT");
       if (oldAgain.outcome !== "BUILT") return;

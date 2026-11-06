@@ -197,3 +197,68 @@ describe("what Capital Q understands, read back by subject", () => {
     expect(asked).toEqual([]);
   });
 });
+
+/**
+ * Step 11: the answer warms a search before the turn is read and asks
+ * again with the reading's binding. One search per run and query plan:
+ * the same plan is the first search's result; a different plan (the
+ * reading's compound parts) searches again; another run never shares it.
+ */
+describe("step 11: one search per run and query plan", () => {
+  function counting() {
+    const searched: unknown[] = [];
+    const wired = createQEvidenceRetrieval({
+      sql: {} as never,
+      repositories: {
+        messages: {
+          listRecentForConversationOfRun: () =>
+            Promise.resolve([
+              {
+                id: "m1",
+                role: "USER",
+                content: "What is its burn and who is the CFO?",
+              },
+            ]),
+        },
+      } as never,
+      retrieval: {
+        retrieve: (request: unknown) => {
+          searched.push(request);
+          return Promise.resolve(emptyResult);
+        },
+      } as never,
+      hydration: { countAuthorised: () => Promise.resolve(0) } as never,
+    });
+    const assemble = (
+      runId: string,
+      askParts?: readonly { ask: string; kind: string }[],
+    ) =>
+      wired.context.assemble({
+        runId: runId as never,
+        tenantId: TENANT as never,
+        plan: plan({ runId: runId as never }),
+        ...(askParts === undefined ? {} : { askParts }),
+      });
+    return { searched, assemble };
+  }
+
+  it("takes the first search's result when the plan is the same", async () => {
+    const { searched, assemble } = counting();
+    const first = await assemble(RUN);
+    const again = await assemble(RUN);
+    expect(searched).toHaveLength(1);
+    expect(again).toBe(first);
+  });
+
+  it("searches again when the reading changes the plan, and never shares across runs", async () => {
+    const { searched, assemble } = counting();
+    await assemble(RUN);
+    await assemble(RUN, [
+      { ask: "What is Silo Credit's burn?", kind: "LOOKUP" },
+      { ask: "Who is Silo Credit's CFO?", kind: "LOOKUP" },
+    ]);
+    expect(searched).toHaveLength(2);
+    await assemble("99999999-9999-4999-8999-999999999999");
+    expect(searched).toHaveLength(3);
+  });
+});

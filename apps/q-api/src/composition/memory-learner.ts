@@ -481,6 +481,8 @@ export function createMemoryLearner(
         // Its own transaction: a revision that loses a race with another
         // writer never costs the digest above.
         if (states !== undefined && gated?.kind === "PASSED") {
+          const coveredMessages =
+            (previousRevision?.coveredMessages ?? 0) + unseen.length;
           await transactions
             .run((tx) =>
               states.appendSummary(tx, {
@@ -489,12 +491,28 @@ export function createMemoryLearner(
                 conversationId: conversation.id,
                 summary: gated.summary,
                 coversThroughAt: summaryThrough,
-                coveredMessages:
-                  (previousRevision?.coveredMessages ?? 0) + unseen.length,
+                coveredMessages,
                 gateVersion: CONVERSATION_SUMMARY_GATE_VERSION,
                 runId: run.id,
               }),
             )
+            .then((revision) => {
+              // Step 11: committed, so the next turn's reader, served from
+              // this process's state cache, reads this revision too.
+              states.cache?.noteSummary(
+                {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  conversationId: conversation.id,
+                },
+                {
+                  revision,
+                  summary: gated.summary,
+                  coversThroughAt: summaryThrough,
+                  coveredMessages,
+                },
+              );
+            })
             .catch((error: unknown) => {
               logger.warn(
                 { err: error, qRunId: run.id },

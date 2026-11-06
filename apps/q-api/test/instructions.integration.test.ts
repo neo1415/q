@@ -278,6 +278,8 @@ describe("standing instructions against PostgreSQL", () => {
           userId: ada,
           tenantId: tenant,
         } as never);
+        // The opener narrates from counts, in Q's own words, never a
+        // notice's text (digest.ts narrationOf; Zino live 2026-10-07).
         expect(facts.instructionNews).toBe(
           "1 thing is waiting for your yes. Want to go through it?",
         );
