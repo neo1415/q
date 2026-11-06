@@ -1577,3 +1577,4 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Scripted Q-IQ: 571/573, unchanged.
 - **Integration owner:** CI pgTAP, then a hosted apply of `20261231260000`, then deploy. A live Q-IQ is needed for the comparison and number bar and the follow-up p50.
 - Receipt: `docs/ai-handoff/receipts/2026-11-06-q-step7.md`.
+- 6 Nov 01:25 UTC: deployed `605c76e59` (step 4 + compound-follow-up fix) at 01:14 after CI 42138230329 was green (pgTAP re-run once after a Docker Hub rate limit). live16 PASS: "How many borrowers does it have, and what's its loan book?" → 2,150 borrowers, USD 410,000. Merged the step 7 + step 8 + compound-parts batch as `f08525117`; CI running.
