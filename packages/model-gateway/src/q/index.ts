@@ -369,6 +369,7 @@ import {
   ownMandateAnswer,
 } from "./own-mandate-answer.js";
 import { runWebDiscovery, type WebDiscoveryAsk } from "./web-discovery.js";
+import { tiedToRecordPerson, type PersonAnchor } from "./person-anchor.js";
 import {
   createWebDiscoveryReader,
   type WebDiscoveryReader,
@@ -2973,7 +2974,45 @@ export function createModelGatewayQAnswer(
    * company the record holds, so the answer never sees them, nor do its
    * Sources or its pictures. By the run's own reads of their record.
    */
+  /**
+   * Live 2026-11-06 (6c8d108cf): the person each run's turn is about, when
+   * Capital Q holds them against a company (person-anchor.ts). Bounded.
+   */
+  const personAnchorByRun = new Map<string, PersonAnchor>();
+  const notePersonAnchor = (runId: string, anchor: PersonAnchor): void => {
+    personAnchorByRun.set(runId, anchor);
+    if (personAnchorByRun.size > 256) {
+      const [oldest] = personAnchorByRun.keys();
+      if (oldest !== undefined) personAnchorByRun.delete(oldest);
+    }
+  };
+  /**
+   * Every public search a run makes passes here: pages about a company
+   * Capital Q holds must be about it, and pages about a person it holds
+   * against a company must name that company too (never a namesake).
+   */
   const aboutThemOnly = (
+    proposal: Parameters<QToolPort["execute"]>[0],
+    runId: string,
+    outcome: QToolCallOutcome,
+    words: string,
+  ): QToolCallOutcome => {
+    const companies = aboutHeldCompaniesOnly(proposal, runId, outcome, words);
+    const anchor = personAnchorByRun.get(runId);
+    if (proposal.name !== PUBLIC_WEB_TOOL || anchor === undefined) {
+      return companies;
+    }
+    const tied = tiedToRecordPerson(proposal, companies, anchor);
+    if (tied.dropped > 0) {
+      // Never the page text or the name: how many were left out.
+      logger?.info(
+        { qRunId: runId, dropped: tied.dropped },
+        "q public pages that do not tie the person to their company left out",
+      );
+    }
+    return tied.outcome;
+  };
+  const aboutHeldCompaniesOnly = (
     proposal: Parameters<QToolPort["execute"]>[0],
     runId: string,
     outcome: QToolCallOutcome,
@@ -5615,6 +5654,16 @@ export function createModelGatewayQAnswer(
         attention,
         counterparty,
       } = prepared;
+      // Live 2026-11-06: whom this turn's public pages must tie to a record.
+      if (
+        request.namedOther?.kind === "PERSON" &&
+        request.namedOtherAnchor !== undefined
+      ) {
+        notePersonAnchor(request.runId, {
+          person: request.namedOther.name,
+          company: request.namedOtherAnchor.company,
+        });
+      }
       // QA F-114: what this turn may put on their Discover filters. Noted
       // here, from the read turn: the turn is warmed before it is read
       // (answer.ts), so a rule noted while preparing never saw the reading

@@ -321,6 +321,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
     | null
     | undefined;
   /**
+   * Live 2026-11-06 (6c8d108cf): when the person the turn is about is one
+   * Capital Q holds against a record (a company's founder Q read), that
+   * company, from the conversation's ledger. Public pages may speak about
+   * the person only when they name the company too; a namesake's page never
+   * reaches the answer. Absent: not a record person, or none known.
+   */
+  readonly namedOtherAnchor?: { readonly company: string } | undefined;
+  /**
    * K8: the reader read a question about something prepared for this turn
    * (their mandate, the record on screen, Q's work for them). The router
    * answers it from that context without a tool round when it is there.
