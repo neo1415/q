@@ -370,6 +370,7 @@ import {
 } from "./own-mandate-answer.js";
 import {
   DISCOVERY_CALL_PREFIX,
+  priorListings,
   runWebDiscovery,
   type WebDiscoveryAsk,
 } from "./web-discovery.js";
@@ -4384,7 +4385,11 @@ export function createModelGatewayQAnswer(
     // Owner 2026-11-06: companies out on the public web, found by a
     // discovery plan from the mandate's categories (web-discovery.ts),
     // through this run's tools, plan and firewall.
-    const webDiscoveryFor = async (ask: WebDiscoveryAsk, prepared: unknown) => {
+    const webDiscoveryFor = async (
+      ask: WebDiscoveryAsk,
+      prepared: unknown,
+      alreadyListed: ReturnType<typeof priorListings> = [],
+    ) => {
       // The mandate is read through its authorised tool when this turn's
       // prepared reads did not need it (an investor's own mandate only).
       let mandate = prepared;
@@ -4409,6 +4414,7 @@ export function createModelGatewayQAnswer(
       }
       return runWebDiscovery({
         ask,
+        alreadyListed,
         mandate: mandateCategories(mandate),
         tools,
         context: toolContext,
@@ -8140,8 +8146,18 @@ export function createModelGatewayQAnswer(
         // Owner's account 2026-11-06: "find me new companies online that i
         // would be interested in" -- Capital Q's own top matches by mandate
         // fit first, in one line, then the web's; both side by side.
+        // Round 4 (live 2026-11-06): what Q already listed here, from its
+        // own replies. "More" leaves those out, and a follow-up shows the
+        // web's list only: no top-3 cards, no ranking line again.
+        const alreadyListed = priorListings(
+          earlier
+            .filter((message) => message.role === "Q")
+            .map((message) => message.content),
+        );
         const onCapitalQ =
-          request.webDiscovery.alsoOnCapitalQ === true && investorAsking
+          request.webDiscovery.alsoOnCapitalQ === true &&
+          investorAsking &&
+          alreadyListed.length === 0
             ? discoverFor({
                 text: request.webDiscovery.text,
                 sectors: [],
@@ -8155,7 +8171,11 @@ export function createModelGatewayQAnswer(
               }).catch(() => null)
             : Promise.resolve(null);
         const [found, catalog] = await Promise.all([
-          webDiscoveryFor(request.webDiscovery, prepared.ownMandateData()),
+          webDiscoveryFor(
+            request.webDiscovery,
+            prepared.ownMandateData(),
+            alreadyListed,
+          ),
           onCapitalQ,
         ]);
         if (found !== null) {

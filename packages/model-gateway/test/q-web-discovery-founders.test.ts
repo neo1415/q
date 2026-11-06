@@ -235,14 +235,18 @@ describe("web discovery round 3: founders, new first, fit filled (live 2026-11-0
     if (answer === null) throw new Error("no answer");
     const order = answer.companies.map((company) => company.name);
     const at = (name: string) => order.indexOf(name);
+    // Round 4 (live 2026-11-06): over 8 years old is not new -- left out.
+    expect(at("Jumo")).toBe(-1);
+    expect(at("M-Kopa")).toBe(-1);
+    expect(answer.text).toMatch(
+      /left out 2 that the sources say were founded more than 8 years ago/u,
+    );
     for (const fresh of ["Numida", "Agridex", "Udu Technologies"]) {
-      expect(at(fresh)).toBeLessThan(at("Jumo"));
-      expect(at(fresh)).toBeLessThan(at("M-Kopa"));
+      expect(at(fresh)).toBeLessThan(at("Kopo Kopo"));
     }
     expect(answer.text).toContain("**Udu Technologies** · founded 2024");
     expect(answer.text).toContain("**Numida** · founded 2022");
     expect(answer.text).toContain("**Agridex** · raised in 2026");
-    expect(answer.text).toContain("**Jumo** · founded 2014");
     // No page states a year for Kopo Kopo: none is shown.
     expect(answer.text).toMatch(/\*\*Kopo Kopo\*\* —/u);
   });

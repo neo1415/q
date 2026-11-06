@@ -329,3 +329,62 @@ Prompt: `turn-skim/v11` is new, and v10 is deprecated. `prompts.lock.json` gaine
 
 - a list of companies (`listed > 0`, `sources > 0`), with founders on most;
 - recent companies first, with "· founded YYYY" where a page states it.
+
+## Round 4 (`fix/q-web-discovery-4`): no listings; "more" is new only; new means new; no repeat cards
+
+Branch `fix/q-web-discovery-4`, cut from `origin/fix/resume-asking-cv9ru3`. Base `4d23ad457`, at `c76cd66`, a docs-only commit after it.
+
+The five defects come from the live run on `309143f51`. Each has a test, recorded failing before the fix.
+
+1. **A directory listed as a company** ("African startups · raised in 2026", african-startups.com).
+   - **Rule.** `isListingName` treats a name as a listing, never a company, when any of these is true:
+     - it ends with a generic plural ("startups", "companies", "businesses", "founders", "investors", "list", "directory", "news", …);
+     - it starts with a ranking ("Top 10 …");
+     - it is a page's own title;
+     - it is the site name of a page that names two or more other companies.
+   - **Scope.** This runs over the reader's proposals and public page text, never over anyone's words.
+   - **Own site.** A company on its own single-company site is still a company.
+2. **"Find more" re-listed the same five companies.**
+   - **What it reads.** `priorListings` reads the companies (and founders) from Q's own earlier discovery lines in this conversation. That is Q's own composed format, never the person's words.
+   - **What it leaves out.** Those companies are left out of the new list.
+   - **Other angles.** The search tries different queries: "… startups to watch", "emerging … startups", "… startup accelerator", "seed funding {last year}". The research egress lets these words out.
+   - **What it says.** The answer says "found N new companies (leaving out the M I listed earlier)". If nothing is new, it says honestly that the pages only named companies already listed.
+3. **Founders got worse on the repeat.**
+   - Founders Q listed earlier are reused.
+   - What the pages state (founders, years, stage, sector, place) is read **before** the founder round. Its searches therefore go only to the companies still without a founder.
+   - The bar of founders on at least 50% of companies is pinned for a "more" run.
+4. **The answer wasn't "new".**
+   - **Old companies.** A company a source says was founded more than 8 years ago is left out, and the answer says how many were left out.
+   - **Stage.** The stage the company's own clause states ("raised a seed round", "pre-seed", "Series A") fills "stage unknown".
+   - **Whose facts.** A sentence that names several companies ("Aella, founded in 2016; Owo Rails, a pre-seed API founded in 2025…") is read clause by clause: from a company's name to the next company named. A year or stage is never given to a neighbour.
+5. **The follow-up repeated the top-3 cards, the top-3 line and a tie line.** After a discovery list in the conversation, a "more online" ask shows the web's list only. Capital Q's catalog ranking is not run, so there are no cards and no tie line.
+
+### Tests
+
+- **`model-gateway/test/q-web-discovery-round4.test.ts`**, 6 tests. All 6 failed before the fix and pass after it.
+- **`natural-conversation-eval.test.ts`**, round 4 · 5. It failed before the fix (`discover_companies` ran) and passes after it.
+- **`q-research/test/web-discovery-egress.test.ts`**: the words of a search for more go out.
+- **`q-web-discovery-founders.test.ts`**: updated so that Jumo (2014) and M-Kopa (2011) are now left out and counted.
+
+### Gates (exact results)
+
+| Gate                                                                                                                          | Result                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm exec turbo run build --filter=./packages/*`                                                                             | 54/54 successful                                                                                                                                                                           |
+| Root tsc / `apps/q-api` tsc                                                                                                   | exit 0 / exit 0                                                                                                                                                                            |
+| eslint on every touched file / `npx prettier --check apps packages docs supabase`                                             | exit 0 / all files pass                                                                                                                                                                    |
+| vitest `packages/model-gateway q-evals q-research q-tools q-core q-runtime` / `q-specialists` + `apps/workers` / `apps/q-api` | 466 files, 5019 passed (1 skipped) / 134 files, 1822/1822 / 335 files, 3123 passed (3 skipped)                                                                                             |
+| Integration on local PG (freshly set up) with `CQ_Q_IQ_ALL=1`                                                                 | **31 files, 116/116**                                                                                                                                                                      |
+| Q-IQ through the runtime                                                                                                      | **Core: 573 turns, no fails**, `actionClaimsKept: 0`, `promiseRewrites: 0`. **ADVERSARIAL:** score 1 with both the resisting and the obeying model. **DISCOVERY:** score 1. `liveGaps: []` |
+
+### What the live re-run should show
+
+1. **Ask 1:**
+   - no directory or "… startups" name in the list;
+   - recent companies only, with any company over 8 years old left out and counted;
+   - the stage where a page states it;
+   - founders on at least half the companies.
+2. **"can you find more online? that maybe not exist in capital Q yet":**
+   - "I searched the public web further … found N new companies (leaving out the M I listed earlier)", with none of the first reply's companies;
+   - no top-3 line, no cards and no tie line;
+   - if nothing new is found, it says so.

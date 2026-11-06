@@ -1078,3 +1078,59 @@ describe("owner's account, live 2026-11-06: 'find me new companies online that i
     expect(text).toContain("**Owo Rails**");
   });
 });
+
+describe("round 4 · 5: 'find more online' after a discovery list is the web only (live 2026-11-06)", () => {
+  it("shows no top-3 line, no cards and no tie line, and leaves out what was listed", async () => {
+    const earlier =
+      "I searched the public web and found 1 company.\n\n1. **Owo Rails** · founded 2025 — Founders: Bisi Adewale. Fit: fintech. Source: [weetracker.example](https://weetracker.example/fintech).";
+    const { text, blocks, executed } = await replay({
+      question:
+        "can you find more online? that maybe not exist in capital Q yet",
+      web: true,
+      before: [
+        {
+          role: "USER",
+          content: "find me new companies online that i would be interested in",
+        },
+        { role: "Q", content: earlier },
+      ],
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            companies: [
+              {
+                name: "Owo Rails",
+                founders: [],
+                does: null,
+                sector: null,
+                stage: null,
+                place: null,
+                sourceRefs: [0],
+                quote: "Owo Rails",
+              },
+            ],
+          },
+        },
+      ],
+      reading: {
+        questionKind: "FIT",
+        webDiscovery: {
+          text: "can you find more online? that maybe not exist in capital Q yet",
+          sectors: [],
+          countries: [],
+          stages: [],
+          count: null,
+          alsoOnCapitalQ: true,
+        },
+      },
+    });
+    expect(executed).toContain("research_public_web");
+    expect(executed).not.toContain("discover_companies");
+    expect(text).not.toContain("On Capital Q, your top");
+    expect(text).not.toMatch(/\btied\b/u);
+    expect(cardsOf(blocks)).toEqual([]);
+    // Owo Rails was listed already: nothing new, said honestly.
+    expect(text).toMatch(/only named companies I've already listed/u);
+  });
+});
