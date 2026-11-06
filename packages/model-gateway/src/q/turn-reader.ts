@@ -276,6 +276,24 @@ const TURN_READER_BUDGET = {
 export const TURN_READER_SAME_MODEL_HEDGE_MS = 3_500;
 
 /**
+ * The reader's thinking (owner 2026-11-06: "measure first, then reader
+ * thinking off with spot checks"). Live Q-IQ run 2: the reader took 4-5 s
+ * before the answer could start, the largest single wait of a turn, at
+ * LOW. Its latency follows its output tokens (~9 ms a token, above), and a
+ * reasoning model's thinking is output. A closed classification into a
+ * fixed schema is read with no thinking; left unset, a reasoning model
+ * thinks at length, so it is set, never left to the model's default.
+ *
+ * The level is also keyed (TURN_READ), so it is versioned data as well as
+ * code: a FAST_CLASSIFICATION routing policy whose reasoning_levels lists
+ * TURN_READ overrides NONE without a deploy (step 7's
+ * reasoningUnderPolicy). No policy lists it today; a spot check that
+ * regresses is rolled back by writing {"TURN_READ": "LOW"} there.
+ */
+export const TURN_READER_REASONING = "NONE" as const;
+export const TURN_READER_REASONING_KEY = "TURN_READ";
+
+/**
  * How long the first model gets when a synthetic-demo posture routes the
  * read to the fast shared model first and another waits behind it. Measured
  * 2026-10-01 (ai_ops.model_usage, 72 h, Gemini flash-lite): 66 reads
@@ -578,9 +596,8 @@ export function createQTurnReader(dependencies: {
           gateway.execute<TurnReaderV79Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
-              // A closed classification needs little thought; left unset, a
-              // reasoning model thinks at length before a one-line answer.
-              reasoning: "LOW",
+              reasoning: TURN_READER_REASONING,
+              reasoningKey: TURN_READER_REASONING_KEY,
               sensitivity,
               ...(dependencies.dataPosture === undefined
                 ? {}
