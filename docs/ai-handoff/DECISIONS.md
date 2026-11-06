@@ -278,3 +278,10 @@ Core Seven remains the governing assessment framework. The new directive authori
     - Cost work is limited to provably lossless mechanics: prompt caching, deduplicating identical calls, and request plumbing. The model, the instructions and the context Q receives stay the same.
     - **No prompt trimming.** No removal of context, instructions or tools, and no smaller models.
     - When only capability-reducing options remain, cost cutting stops there.
+
+74. **Analytics defaults from research** (the owner asked for research on what customers on both sides want and what works for the business; applied 6 Nov 2026 ~23:55 UTC; every item stays admin-switchable per DECISIONS 72). Sources are in the analytics receipt.
+    - **Anonymous is never revealed by payment.** Anonymous viewers show as "An investor" (LinkedIn's private-mode model). The override is off and locked behind step-up.
+    - **Paid identity reveal is founder-side,** mid tier and up, as a subscription, not credits. It covers only viewers who chose Full or Organisation visibility. Investors never pay for visibility or anonymity: they are the scarce side.
+    - **Floors.** Headline totals need ≥3 distinct organisations (admins may raise this, never lower it). Sliced breakdowns need ≥5, with complementary suppression. Below the floor: "Fewer than 3 investor organisations viewed this week".
+    - **Passive analytics refresh weekly,** with no per-view timestamps or real-time passive alerts. Intent signals are real-time and always shown, named per the viewer's visibility.
+    - **Per-slide time tied to a named viewer** is off by default.
