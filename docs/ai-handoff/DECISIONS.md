@@ -205,3 +205,14 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **The arithmetic is exact.** It reproduces the figure within rounding.
 
     An unlabelled derivation, a wrong product, or an unsourced input still counts as invented. The product's claim check follows the same rule: derivations stay grounded, and invented numbers are never allowed. This was first raised by live Q-IQ case CON-091 ("$310k × 12 = $3.72M, my calculation").
+
+62. **Claude for reasoning, OpenAI for voice** (owner, 2026-11-06). The owner added an Anthropic API key to q-api, workers and the cloud environment.
+    - **Routing:** Q's reasoning tasks move to Claude through the Model Gateway, with OpenAI as the fallback. Voice (realtime) stays on OpenAI.
+    - **Before Q switches over:** Claude must reach parity on a live Q-IQ comparison.
+    - **Data access:** the owner approves Anthropic for CONFIDENTIAL context through the API key route. This is recorded as the owner's governance decision; the catalog row says so.
+    - **Spend:** test and evaluation use of the Anthropic key is capped at $20 in total. The cap is enforced by the eval runner's budget, and the owner sets the hard limit in the Anthropic console.
+    - **Fallback:** if Claude is unavailable or rejected, the gateway falls back to OpenAI (and the reverse).
+63. **Balance alerts, no hard cap** (owner): alert when a model provider's remaining balance would last less than about 7 days at current spend; no automatic hard stop.
+64. **Proactive briefing is opt-in, at most once a day** (owner). It is off by default, ranked by mandate relevance, never engagement.
+65. **Quality feedback is thumbs only; retire dead search providers** (owner). There is no sampling of real conversations until a consent flow exists. ScrapingBee and Serper leave the research rotation; Brave and Tavily remain.
+66. **Illustrative answers** (owner, later): research whether Q should pull images and graphics from the web and compose its own visual layouts ("invent modals"). Run this as a deep-research item after the steps above.
