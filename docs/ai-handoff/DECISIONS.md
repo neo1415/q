@@ -236,3 +236,10 @@ Core Seven remains the governing assessment framework. The new directive authori
       - **Prompt caching is top priority.** Even 2× OpenAI's cost per turn is unacceptable; the target is cost parity.
       - **Claude becomes the main model** once its cost is near OpenAI's. It is staged as a data-only routing switch.
       - The ElevenLabs voice fallback uses `eleven_v4_turbo` with Q's own voices: Sarah (female) and Daniel (male).
+
+69. **Intelligence first; OpenAI stays primary; Claude Sonnet stays the backup** (owner, 6 Nov 2026, ~20:15 UTC). This supersedes the "Claude becomes the main model" line in 68's amendment.
+    - **Never trade intelligence for cost.** No downgrade to a smaller model, Haiku included, for anything that affects understanding or answers: the turn reader, binding and answers. In the Claude backup chain the reader runs on Sonnet too.
+    - **Claude-first is not wanted.** Do not stage or activate it.
+    - **Keep cutting Claude's cost in the background** by means that do not reduce intelligence: caching, a leaner prompt, fewer calls per turn.
+    - **Avoid adding rigid structure.** It can make Q less dynamic and lose the flexibility of the model. Prefer giving the model better context over hard-coding behaviour.
+    - **Q must beat the bare model it runs on.** The bare OpenAI scores in BASELINE.md are the bar for Q on OpenAI. Improvements are proven scripted first; paid checks run on Anthropic within the $50 budget (DECISIONS 68).
