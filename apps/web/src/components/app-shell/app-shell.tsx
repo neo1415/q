@@ -14,6 +14,7 @@ import type { VerifyNudge } from "@/features/verification/verify-state";
 import { WakeIndicator } from "@/features/wake/wake-indicator";
 
 import { AppHeader } from "./app-header";
+import { ShellPhoneLeadProvider } from "./phone-lead";
 import { DesktopSidebar } from "./desktop-sidebar";
 import { FictionalNames } from "./fictional-names";
 import { GlobalQProvider } from "./global-q";
@@ -117,7 +118,9 @@ export function AppShell({
             </div>
           )}
           <main id="main" className="cq-shell-main">
-            {children}
+            <ShellPhoneLeadProvider context={context} verifyNudge={verifyNudge}>
+              {children}
+            </ShellPhoneLeadProvider>
             <FictionalNames />
           </main>
           {/* Discover only (owner 2026-10-29); null on every other page. */}

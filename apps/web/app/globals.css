@@ -4162,6 +4162,49 @@
   .cq-shell:has(.cq-q-home) .cq-verify-nudge-desktop {
     display: none;
   }
+  /* Owner 2026-11-06: on a phone or tablet the Q home has one slim top
+     bar, its own (menu, Q | Chat, Board, Conversations, More). The shell's
+     header steps aside there; its scope, bell and You are the first row of
+     the menu's drawer (PhoneShellLead). Every other page keeps it. */
+  @media (max-width: 1023px) {
+    .cq-shell:has(.cq-q-home) .cq-shell-header {
+      display: none;
+    }
+    .cq-q-home .cq-q-top-line {
+      padding-top: calc(var(--cq-safe-top) + 8px);
+    }
+  }
+  /* A message's actions (owner 2026-11-06, like a chat app's): out of
+     sight until the row is hovered or something in it has keyboard focus,
+     or its menu is open. A touch screen has no hover, so there the small
+     button stays, quiet. Opacity, not display: Tab still reaches it. */
+  .cq-q-msg-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+  }
+  .cq-q-msg-actions-trigger {
+    min-height: 28px;
+    padding: 0 8px;
+    opacity: 0;
+    transition: opacity var(--cq-motion-fast) var(--cq-ease);
+  }
+  li:hover > .cq-q-msg-actions .cq-q-msg-actions-trigger,
+  .cq-q-msg-actions:focus-within .cq-q-msg-actions-trigger,
+  .cq-q-msg-actions-trigger[data-popup-open] {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .cq-q-msg-actions-trigger {
+      opacity: 0.7;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-q-msg-actions-trigger {
+      transition: none;
+    }
+  }
 
   /* Talk to Q, under the welcome: the room's invitation (one press). */
   .cq-room-talk {

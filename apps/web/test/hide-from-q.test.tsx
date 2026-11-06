@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 /**
@@ -19,13 +20,16 @@ const MESSAGE = "f0000000-0000-4000-8000-000000000003";
 
 describe("Hide from Q", () => {
   it("hides their line through the Q API and says it stays in their history", async () => {
+    const user = userEvent.setup();
     render(<HideFromQ conversationId={CONVERSATION} messageId={MESSAGE} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Hide from Q" }));
-      await Promise.resolve();
-    });
+    // Owner 2026-11-06: a message action, not a link under the line.
+    expect(screen.queryByRole("button", { name: "Hide from Q" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Message actions" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Hide from Q" }),
+    );
     expect(hide).toHaveBeenCalledWith(CONVERSATION, MESSAGE);
-    expect(screen.getByRole("status").textContent).toContain(
+    expect((await screen.findByRole("status")).textContent).toContain(
       "Hidden from Q. It stays in your history.",
     );
   });

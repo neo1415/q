@@ -863,4 +863,11 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   "Hide captions": "إخفاء الترجمة النصية",
   "Raising capital": "جمع التمويل",
   Investing: "الاستثمار",
+
+  // The Q home tidied like a chat app's (owner 2026-11-06)
+  "Message actions": "إجراءات الرسالة",
+  "Hide from Q": "إخفاء عن Q",
+  "Couldn't hide that. Try again": "تعذّر إخفاء ذلك. حاول مرة أخرى",
+  "Clear the cards": "مسح البطاقات",
+  "Show the cards again": "إظهار البطاقات مرة أخرى",
 };
