@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations'), ('gateq'), ('workspace');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations'), ('gateq'), ('workspace'), ('analytics');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -217,6 +217,10 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- Work board (owner 2026-10-23): the person's own board, server-only; suite 987.
   ('workspace', 'board_items',       'INTERNAL_SERVER_ONLY', '{}'),
   ('workspace', 'board_item_events', 'INTERNAL_SERVER_ONLY', '{}'),
+  -- Q Workspace §8 A1/A2: the viewer reads their own events and setting; founders
+  -- read only through the redacting projection functions. Suite 999_analytics_engagement.
+  ('analytics', 'engagement_events',        'RLS_REQUIRED', '{SELECT}'),
+  ('analytics', 'viewing_privacy_settings', 'RLS_REQUIRED', '{SELECT}'),
   -- RECOVERY D3: the durable agent work queue; owners read their own rows, suite 892.
   ('q_runtime', 'agent_work_queue', 'RLS_REQUIRED', '{SELECT}'),
   ('q_runtime', 'workforce_agent_runs', 'RLS_REQUIRED', '{SELECT}'),
