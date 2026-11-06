@@ -21,7 +21,11 @@ export type QIqLiveGap = {
   readonly promptLine?: string | undefined;
   /** What the answer prompt must hold on that turn (an authorised fact). */
   readonly promptFact?: string | undefined;
-  /** The scripted reader's name for the company the turn is about. */
+  /**
+   * The scripted reader's name for the company the turn is about, as
+   * TURN_READER v80 writes it (namedOther), also given as a v79 named
+   * reference with no ledger ref.
+   */
   readonly namedOther?: string | undefined;
   /**
    * The draft must reach the person as written (the claim check keeps
@@ -31,6 +35,15 @@ export type QIqLiveGap = {
 };
 
 export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
+  {
+    // Re-run on 61b7a85: the list lost Silo Credit's line. The claim
+    // check read "Lagos-based SME" as an invented name.
+    caseId: "QIQ-ORD-016",
+    turn: 0,
+    live: "Silo Health — Nairobi-based clinic software company founded in 2022, reporting $1.1M ARR, 14 clinic groups and a $3M seed extension; it has 22 months of runway and a 48% gross margin.\n\nBrightpath Logistics — Kigali-based freight logistics company founded in 2021, reporting $2M ARR, 120 trucks under contract and a $5M Series A raise; its gross margin is conflicting at 22% in management accounts versus 17% in an earlier investor memo, while runway is 16 months.",
+    draft:
+      "Silo Credit — Lagos-based SME lender founded in 2021, reporting $2.4M ARR, 38 lending partners and a $6M Series A raise; it has 14 months of runway and a 62% gross margin.\n\nSilo Health — Nairobi-based clinic software company founded in 2022, reporting $1.1M ARR, 14 clinic groups and a $3M seed extension; it has 22 months of runway and a 48% gross margin.\n\nBrightpath Logistics — Kigali-based freight logistics company founded in 2021, reporting $2M ARR, 120 trucks under contract and a $5M Series A raise; its gross margin is conflicting at 22% in management accounts versus 17% in an earlier investor memo, while runway is 16 months.",
+  },
   {
     caseId: "QIQ-ORD-016",
     turn: 4,
@@ -46,9 +59,13 @@ export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
     promptLine: '"Same question for X": their last one, about X.',
   },
   {
+    // Re-run on 61b7a85: still "It reports…". The model named it; the
+    // claim check removed the naming sentence ("Lagos-based SME").
     caseId: "QIQ-CMP-061",
     turn: 0,
-    live: "It reports $2.4M in ARR and 38 lending partners, and is raising a $6M Series A.",
+    live: "It reports $2.4M in ARR and works with 38 lending partners.",
+    draft:
+      "Silo Credit is a Lagos-based SME lender founded in 2021. It reports $2.4M in ARR and works with 38 lending partners.",
     promptLine:
       'Name what you answer about at its first mention in each reply, never a bare "Its"',
   },
@@ -77,9 +94,10 @@ export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
     keptOnly: true,
   },
   {
+    // Re-run on 61b7a85 (reader v79): still answered as Silo Credit.
     caseId: "QIQ-AMB-136",
     turn: 0,
-    live: "Silo Credit's cash runway is 14 months, according to its October 2026 company profile and data room. I found no matching company record for “Silo” alone, so I’ve used the clearly matching Silo Credit facts.",
+    live: "Silo Credit has 14 months of cash runway, based on the October 2026 company profile and data room.",
     draft:
       "Silo Credit's cash runway is 14 months, according to its October 2026 company profile and data room.",
     namedOther: "Silo",

@@ -292,7 +292,19 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
           aboutNamedOther: named !== undefined,
           ...(named === undefined
             ? {}
-            : { namedOther: { name: named, kind: "COMPANY" as const } }),
+            : {
+                namedOther: { name: named, kind: "COMPANY" as const },
+                // v79 may also give the name as a reference with no ref:
+                // it then joins the turn's ledger with no record behind it.
+                references: [
+                  {
+                    phrase: named,
+                    entityIds: [],
+                    confidence: "HIGH" as const,
+                    named: { name: named, kind: "COMPANY" as const },
+                  },
+                ],
+              }),
           tool: null,
         };
       },
