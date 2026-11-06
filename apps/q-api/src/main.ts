@@ -462,6 +462,7 @@ import {
   createPostgresModelUsageRepository,
   createPostgresUsageReader,
   createProcessLocalProviderHealth,
+  providerBlockedAlertText,
   type ModelProvider,
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
@@ -877,6 +878,9 @@ import {
   recordingEmailSender,
   recordingFirewall,
   createEtiquetteGuideAdminStore,
+  createOperatorAlerts,
+  createPostgresOperatorEmails,
+  type OperatorAlert,
 } from "@capital-q/platform-admin";
 import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
@@ -1269,12 +1273,23 @@ const modelCatalog = withTestRouting(
  * it. Outside a voice turn the wrapper adds nothing.
  */
 const voiceTimings = createVoiceTurnTimings({ logger });
+// Premium Plan P1: Capital Q's operators hear at once when a provider's
+// credit runs out or its key is refused. The email sender is composed
+// further down; until then (and without one) the alert is the log line.
+const operatorAlert: { send: (alert: OperatorAlert) => Promise<boolean> } = {
+  send: (alert) => {
+    logger.error({ qAlert: "OPERATOR", alertKey: alert.key }, alert.text);
+    return Promise.resolve(true);
+  },
+};
 const modelGateway = timedModelGateway(
   createModelGateway({
     catalog: modelCatalog,
     registry: createModelProviderRegistry(providers),
     usage: createPostgresModelUsageRepository({ sql: database.sql }),
     health: createProcessLocalProviderHealth(),
+    onProviderBlocked: (event) =>
+      operatorAlert.send(providerBlockedAlertText(event)).then(() => undefined),
     syntheticDemo,
     // Owner 2026-10-28: the demo posture covers the seeded world only; a
     // person who signed up for real is routed as a customer.
@@ -7243,6 +7258,11 @@ const operatorEmail =
             provider: "SMTP",
           },
         );
+operatorAlert.send = createOperatorAlerts({
+  operatorEmails: createPostgresOperatorEmails(database.sql),
+  email: operatorEmail,
+  logger,
+}).alert;
 const reportPausedAccount = async (
   actor: ActorContext,
   strikes: number,

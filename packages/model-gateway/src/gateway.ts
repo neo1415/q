@@ -120,6 +120,23 @@ export type ModelGatewayDependencies = {
    * timeout). Default `PROBE_WAIT_MS`.
    */
   readonly probeWaitMs?: number | undefined;
+  /**
+   * Told when a provider account or key is set aside (credit or quota
+   * spent, key refused), as the ERROR line is logged: the composition sends
+   * the owner an alert from here (Premium Plan P1). Called again when a
+   * probe finds it still shut; the receiver de-duplicates. Never throws
+   * into the request: a failure here is logged and dropped.
+   */
+  readonly onProviderBlocked?:
+    ((event: ProviderBlockedEvent) => void | Promise<void>) | undefined;
+};
+
+export type ProviderBlockedEvent = {
+  readonly providerCode: ModelProviderCode;
+  readonly modelCode: ModelCode;
+  readonly kind: "ACCOUNT_EXHAUSTED" | "KEY_REFUSED";
+  readonly providerStatus: number | undefined;
+  readonly at: Date;
 };
 
 /** A probe of a fixed account usually answers within a reading's time. */
@@ -763,6 +780,27 @@ export function createModelGateway(
                 ? `model provider ${provider.code} account exhausted (credit or quota): every model on it set aside until a probe succeeds`
                 : `model provider ${provider.code} refused the key: this model set aside until a probe succeeds`,
             );
+            if (dependencies.onProviderBlocked !== undefined) {
+              const blocked: ProviderBlockedEvent = {
+                providerCode: provider.code,
+                modelCode: candidate.model.modelCode,
+                kind: exhausted ? "ACCOUNT_EXHAUSTED" : "KEY_REFUSED",
+                providerStatus:
+                  outcome.kind === "FAILURE" &&
+                  outcome.cause instanceof ModelProviderFailure
+                    ? outcome.cause.providerStatus
+                    : undefined,
+                at,
+              };
+              void Promise.resolve()
+                .then(() => dependencies.onProviderBlocked?.(blocked))
+                .catch((error: unknown) => {
+                  logger?.warn(
+                    { err: error, provider: provider.code },
+                    "provider block alert could not be sent",
+                  );
+                });
+            }
           } else if (before === "HEALTHY" && after !== "HEALTHY") {
             logger?.warn(
               {

@@ -36,6 +36,9 @@ export function composeWorkerModelGateway(options: {
   readonly logger: Parameters<typeof createModelGateway>[0]["logger"];
   /** For tests; the process environment otherwise. */
   readonly env?: Readonly<Record<string, string | undefined>> | undefined;
+  /** Premium Plan P1: the owner is alerted when a provider is set aside. */
+  readonly onProviderBlocked?:
+    Parameters<typeof createModelGateway>[0]["onProviderBlocked"] | undefined;
 }) {
   const { config } = options;
   const providerSecrets = config.secrets.modelProviders;
@@ -134,6 +137,7 @@ export function composeWorkerModelGateway(options: {
     }),
     spendCap,
     logger: options.logger,
+    onProviderBlocked: options.onProviderBlocked,
   });
   return { providers, syntheticDemo, dataPosture, gateway };
 }

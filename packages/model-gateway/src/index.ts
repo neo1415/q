@@ -72,6 +72,7 @@ export {
   createModelGateway,
   type ModelGateway,
   type ModelGatewayDependencies,
+  type ProviderBlockedEvent,
   type ModelGatewayExecuteOptions,
 } from "./gateway.js";
 
@@ -123,6 +124,18 @@ export {
   createPostgresModelUsageRepository,
 } from "./infrastructure/postgres-usage.js";
 export { createPostgresDailySpendReader } from "./infrastructure/postgres-daily-spend.js";
+export { createPostgresProviderSpendReader } from "./infrastructure/postgres-provider-spend.js";
+export {
+  assessProviderBalance,
+  balanceAlertText,
+  providerBlockedAlertText,
+  parseProviderBalanceSettings,
+  BALANCE_ALERT_DAYS,
+  SPEND_RATE_WINDOW_DAYS,
+  type ProviderBalanceAssessment,
+  type ProviderBalanceSetting,
+  type ProviderSpend,
+} from "./policy/balance-watch.js";
 export {
   createDailySpendCap,
   parseDailySpendCapUsd,
