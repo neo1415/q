@@ -805,10 +805,13 @@ export function normalizeError(error: unknown): ModelProviderFailure {
 /**
  * Claude narrates its tool use more readily than the models Q's prompts
  * were tuned on (live 2026-11-06: "My search for Silo Credit on Capital Q
- * came back empty, so I..." before a correct answer). Said once, in the
- * cached system prompt, whenever tools are offered. It does not change
- * what may be said about the record: what is unknown is still said to be
- * unknown, only not as an account of searches.
+ * came back empty, so I..." before a correct answer). As a line in the
+ * system prompt it did not hold live ("Two searches for Silo Credit, one
+ * by name and one by sector..."), so it is said in the trailing format
+ * reminder of a tool round instead -- the last thing the model reads.
+ * Unverified live. It does not change what may be said about the record:
+ * what is unknown is still said to be unknown, only not as an account of
+ * searches.
  */
 export const TOOL_USE_GUIDANCE =
   "When you use tools, answer with what you found, not an account of how you looked: never mention a search, lookup or tool, and never say that one came back empty. If something is not on record, say only that it is not on record.";
@@ -851,12 +854,10 @@ export function toRequest(
     JSON.stringify(sanitized).length <= CONSTRAINED_SCHEMA_MAX_CHARS
       ? sanitized
       : null;
-  const extra = [
-    ...(structured !== undefined && constrained === null
+  const extra =
+    structured !== undefined && constrained === null
       ? [schemaInstruction(structured)]
-      : []),
-    ...(toolsOffered ? [TOOL_USE_GUIDANCE] : []),
-  ];
+      : [];
   const { system, messages } = toMessages(
     request.messages,
     extra.length === 0 ? undefined : extra.join("\n\n"),
@@ -878,7 +879,9 @@ export function toRequest(
       ...tail.content,
       {
         type: "text",
-        text: `[Capital Q note] Reply with only the ${structured.schemaName} JSON object: start with { and end with }, nothing before or after it.`,
+        text: `[Capital Q note] Reply with only the ${structured.schemaName} JSON object: start with { and end with }, nothing before or after it.${
+          toolsOffered ? ` ${TOOL_USE_GUIDANCE}` : ""
+        }`,
       },
     ];
   }

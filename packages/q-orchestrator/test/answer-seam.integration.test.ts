@@ -23,7 +23,10 @@ import {
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
   type FakeBehaviour,
+  type ModelCatalogPort,
+  type ModelProvider,
 } from "@capital-q/model-gateway";
+import { createAnthropicWireDouble } from "@capital-q/model-gateway/providers/anthropic-wire-double";
 import { createModelGatewayQAnswer } from "@capital-q/model-gateway/q";
 import { createLogger, type Logger } from "@capital-q/observability";
 import {
@@ -249,6 +252,10 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       readonly groq: readonly FakeBehaviour[];
       readonly maxSensitivity: QSensitivityClass;
       readonly tools?: QToolPort | undefined;
+      /** Further providers registered beside google and groq. */
+      readonly more?: readonly ModelProvider[] | undefined;
+      /** The staged v2 policies switched on, in this gateway's view only. */
+      readonly v2?: boolean | undefined;
     },
   ) {
     const store = createPostgresQCheckpointStore({
@@ -264,9 +271,32 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       code: "groq",
       script: options.groq,
     });
+    const loaded = createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 });
+    // The receipt's switch (status = 'ACTIVE' on the v2 rows), applied to
+    // this gateway's view of the catalogue, never to the shared database.
+    const catalog: ModelCatalogPort =
+      options.v2 === true
+        ? {
+            load: async () => {
+              const snapshot = await loaded.load();
+              return {
+                ...snapshot,
+                routingPolicies: snapshot.routingPolicies.map((policy) =>
+                  policy.version === 2
+                    ? { ...policy, status: "ACTIVE" as const }
+                    : policy,
+                ),
+              };
+            },
+          }
+        : loaded;
     const gateway = createModelGateway({
-      catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
-      registry: createModelProviderRegistry([google, groq]),
+      catalog,
+      registry: createModelProviderRegistry([
+        google,
+        groq,
+        ...(options.more ?? []),
+      ]),
       usage: createPostgresModelUsageRepository({ sql: db.sql }),
       logger: world.logger,
     });
@@ -540,6 +570,102 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       const text = JSON.stringify(events) + world.logLines.join("\n");
       expect(text).not.toContain("Synthetic Co");
       expect(text).not.toContain('"companyId":"x"');
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("CONFIDENTIAL turn on the switched v2 routing: OpenAI out of credit, Claude answers; Claude out too, Groq answers (DECISIONS 67)", async () => {
+    const world = await commitWorld();
+    try {
+      const exhausted: FakeBehaviour[] = [
+        { kind: "FAIL", failureClass: "PERMANENT", accountExhausted: true },
+      ];
+      const openai = createFakeModelProvider({
+        code: "openai",
+        script: exhausted,
+      });
+      // Claude through the real adapter and SDK, over the Messages API's
+      // wire shapes; the scripted analyst decides what it says.
+      const claudeScript = createFakeModelProvider({
+        code: "anthropic",
+        script: [
+          {
+            kind: "JSON",
+            value: analystResult("Claude answered as the backup."),
+            usage: { inputTokens: 90, cachedInputTokens: 0, outputTokens: 12 },
+          },
+        ],
+      });
+      const claude = createAnthropicWireDouble(claudeScript);
+      const first = orchestrator(world, {
+        groq: [{ kind: "JSON", value: analystResult("unused") }],
+        google: [{ kind: "JSON", value: analystResult("unused") }],
+        maxSensitivity: "CONFIDENTIAL",
+        more: [openai, claude],
+        v2: true,
+      });
+      const run = await createRun(world, "Synthetic confidential question.");
+      const handle = await first.engine.start({
+        actor: world.actor,
+        runId: run.id,
+        correlationId: CORRELATION(),
+      });
+      expect(handle.status).toBe("COMPLETED");
+      const final = await world.service.getRun({
+        actor: world.actor,
+        runId: run.id,
+      });
+      expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v2");
+      expect(final.messages.map((m) => m.role)).toEqual(["USER", "Q"]);
+      expect(final.messages[1]?.content).toBe("Claude answered as the backup.");
+      expect(openai.calls.length).toBeGreaterThan(0);
+      expect(claudeScript.calls.map((c) => c.request.modelCode)).toEqual([
+        "claude-sonnet-5-5",
+      ]);
+      expect(claude.refusals).toEqual([]);
+      expect(first.groq.calls).toHaveLength(0);
+      expect(first.google.calls).toHaveLength(0);
+
+      // Claude's account empty as well: Groq answers; Gemini (PUBLIC-only)
+      // is never sent the CONFIDENTIAL turn.
+      const second = orchestrator(world, {
+        groq: [
+          {
+            kind: "JSON",
+            value: analystResult("Groq answered after OpenAI and Claude."),
+            usage: { inputTokens: 90, cachedInputTokens: 0, outputTokens: 12 },
+          },
+        ],
+        google: [{ kind: "JSON", value: analystResult("must not be called") }],
+        maxSensitivity: "CONFIDENTIAL",
+        more: [
+          createFakeModelProvider({ code: "openai", script: exhausted }),
+          createFakeModelProvider({ code: "anthropic", script: exhausted }),
+        ],
+        v2: true,
+      });
+      const run2 = await createRun(
+        world,
+        "Another synthetic confidential question.",
+      );
+      const handle2 = await second.engine.start({
+        actor: world.actor,
+        runId: run2.id,
+        correlationId: CORRELATION(),
+      });
+      expect(handle2.status).toBe("COMPLETED");
+      const final2 = await world.service.getRun({
+        actor: world.actor,
+        runId: run2.id,
+      });
+      expect(final2.messages.at(-1)?.content).toBe(
+        "Groq answered after OpenAI and Claude.",
+      );
+      expect(second.groq.calls[0]?.request.modelCode).toBe(
+        "openai/gpt-oss-120b",
+      );
+      expect(second.google.calls).toHaveLength(0);
     } finally {
       await cleanup(world);
     }

@@ -5,6 +5,7 @@ import type { ModelMessage } from "@capital-q/contracts";
 import { ModelProviderFailure } from "../src/errors.js";
 import type { ModelProviderRequest } from "../src/ports.js";
 import {
+  TOOL_USE_GUIDANCE,
   CONSTRAINED_SCHEMA_MAX_CHARS,
   jsonObjectOf,
   lineHashes,
@@ -948,5 +949,46 @@ describe("anthropic adapter: live 2026-11-06 round 3", () => {
       context(),
     );
     expect(result.text).toBe('{"answer":"Two founders."}');
+  });
+});
+
+describe("anthropic adapter: tool narration (DECISIONS 67 follow-up)", () => {
+  it("says the no-narration line in a tool round's closing reminder, not the system prompt", () => {
+    const schema = {
+      type: "object",
+      properties: { answer: { type: "string" } },
+      required: ["answer"],
+    };
+    const tools = [
+      {
+        name: "company_profile",
+        description: "x",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+    ] as ModelProviderRequest["tools"];
+    const body = toRequest(
+      request({
+        output: {
+          kind: "STRUCTURED",
+          schemaName: "CompanyAnalyst",
+          jsonSchema: schema,
+        },
+        tools,
+      }),
+    );
+    expect(JSON.stringify(body.system)).not.toContain(TOOL_USE_GUIDANCE);
+    const last = body.messages.at(-1)?.content as { text: string }[];
+    expect(last.at(-1)?.text).toContain(TOOL_USE_GUIDANCE);
+    // Without tools, no such line at all.
+    const plain = toRequest(
+      request({
+        output: {
+          kind: "STRUCTURED",
+          schemaName: "CompanyAnalyst",
+          jsonSchema: { ...schema, description: "x".repeat(5_000) },
+        },
+      }),
+    );
+    expect(JSON.stringify(plain)).not.toContain(TOOL_USE_GUIDANCE);
   });
 });

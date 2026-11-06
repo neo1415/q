@@ -302,3 +302,42 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --li
 | eslint and prettier                     | clean                           |
 | vitest model-gateway + q-evals + config | 1,902 / 1,902                   |
 | integration                             | 10 / 10; 573 turns, `fails: []` |
+
+## Decision: OpenAI primary, Claude the CONFIDENTIAL backup (DECISIONS 67)
+
+**The last live run.** QIQ-PRO-001 on `fa5e455` cost $0.354 a case, with turns of 14.8, 6.1, 5.9 and 7.0 s and grades T F T T. The bare Claude model cost $0.025 and Q on OpenAI about $0.03. The owner parked Claude-as-primary.
+
+**Migration `20261231300000_ai_ops_claude_as_backup.sql`.**
+
+- It is additive: no DROP, no grant or RLS change, and no status change. It is ordered after `20261231290000` (Groq on v1) and touches no v1 row.
+- It reorders the seven staged v2 rows, still RETIRED, to: `gpt-5.6-luna` → Claude (Sonnet 5.5 for the answer and analysis classes, Haiku 5.5 for fast classification, extraction and taxonomy) → Groq `gpt-oss-120b` → the class's Gemini fallbacks (PUBLIC-only).
+- pgTAP: `999_ai_ops_claude_as_backup.test.sql` (8). `999_ai_ops_anthropic_claude_reasoning.test.sql` now asserts the final order.
+
+**The switch is unchanged.** It now means "Claude as backup":
+
+- **On:** `update ai_ops.routing_policies set status = 'ACTIVE' where code in ('normal_dialogue.v2', 'evidence_synthesis.v2', 'comparison.v2', 'deep_investigation.v2', 'fast_classification.v2', 'structured_extraction.v2', 'taxonomy_mapping.v2');`
+- **Off:** the same with `'RETIRED'`. Off means v1: luna → Groq → Gemini, per `20261231290000`.
+
+**Tests of the backup:**
+
+- **`gateway-postgres.integration.test.ts`**, on the real migrated rows with the switch applied in view:
+  - CONFIDENTIAL dialogue goes to luna.
+  - With OpenAI's credit exhausted, Claude Sonnet answers through the real adapter and SDK over the wire double (attempts `openai, anthropic`), and Haiku answers the reader's class.
+  - With Claude also exhausted, Groq answers (`openai, anthropic, groq`).
+  - With all three exhausted, the call fails and Gemini gets 0 calls.
+- **`q-orchestrator/test/answer-seam.integration.test.ts`**, a full Q turn on the CONFIDENTIAL plan:
+  - With OpenAI out of credit, Claude's answer is published as Q's message (`normal_dialogue.v2`, COMPLETED).
+  - With Claude also out, Groq's answer is published.
+  - Gemini is never called.
+
+**The Q-IQ runner.** `--provider anthropic` still measures Claude: it switches v2 on locally and registers only the Anthropic adapter, so luna is unconfigured and Claude serves.
+
+**Parked: live cache reads stayed around 30%.** Live, each turn's first Sonnet call read about 8.8k tokens (13k on T1) and wrote 13–17k. My reading of why the stable-sections reorder did not apply:
+
+1. **Dilution within a turn (the likely cause).** The volatility statistic counts every request of a kind. The 2–4 calls inside one turn send the same first user message, so every section looks unchanged in most comparisons. THIS TURN changes once per turn but holds still across 1–3 within-turn comparisons, so its change share stays at or below 0.5. It was never classed volatile and never moved. The 4-turn simulation passed because it made one call per turn.
+2. **Learning resets per process.** Each live Q-IQ run is a new process, and a 1-case run has only four turns to learn from.
+3. **Tools render first.** The cache key, and therefore the person key, includes the tool set, so a no-tools final round never shares a prefix with the tool rounds. That cost showed as T0's final call (cR 0, cW 28.6k).
+
+**Suggested fix, not done:** compare a request only with the previous request whose first user message differs, so identical repeats within a turn are skipped. Alternatively, give the renderer an explicit cache boundary per prompt section (a q-core change).
+
+**Tool narration.** The system-prompt line did not hold live ("Two searches for Silo Credit, one by name and one by sector…"). It is dropped from the system prompt and said instead in a tool round's closing format reminder, the last thing the model reads. This placement is **unverified live**. If narration persists, drop the line entirely.
