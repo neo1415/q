@@ -43,7 +43,7 @@ The reader prompt was captured from Q-IQ conversations run through the runtime w
 | Per-turn input (state, recent turns, shown, utterance) in a Q-IQ turn | ~2,000     | ~500       |
 | **Whole prompt (p50)**                                                | **67,277** | **16,800** |
 
-The part a prefix cache could not reuse from the previous reading in the same conversation is RESULT_UNCACHED.
+The part a prefix cache could not reuse from the previous reading in the same conversation: **p50 492 tokens**, p95 16,807 tokens (a conversation's first reading, cold) — 82 readings over 20 cases.
 
 How to read this:
 
@@ -125,7 +125,16 @@ Fix:
 
 "Before" is this branch with `answer.ts` and `speculation.ts` at the base (the harness is new, so it cannot run on the base itself). Figures are p50 / p95 in ms.
 
-RESULT_TABLE
+| Stage (82 turns)                                     | Before          | After           |
+| ---------------------------------------------------- | --------------- | --------------- |
+| Reader (`readMs`)                                    | 3,999 / 4,004   | 3,998 / 4,008   |
+| Message → routing done (`sinceMessageMs`)            | 4,024 / 4,039   | 4,022 / 4,034   |
+| Model's first words (`firstTextMs`, from seam start) | 1,506 / 1,511   | 1,506 / 1,511   |
+| **First words since message** (joined per run)       | 5,530 / 5,548   | 5,529 / 5,542   |
+| First sentence since message (streamed, n=5)         | 5,535 / 5,539   | 5,536 / 5,538   |
+| Message → answer settled (`totalSinceRunMs`)         | 5,542 / 5,567   | 5,542 / 5,557   |
+| Reader prompt (est. tokens)                          | 16,856 / 16,970 | 16,856 / 16,970 |
+| Q-IQ score                                           | 1.0             | 1.0             |
 
 What this does and does not show:
 
