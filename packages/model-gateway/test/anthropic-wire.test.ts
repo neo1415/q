@@ -124,10 +124,20 @@ function wired(refuse?: (body: Record<string, unknown>) => string | null) {
   return { double, gateway, exchanges };
 }
 
+// Room for thinking (THINKING_MIN_OUTPUT_TOKENS): the fixture's 256 would
+// keep thinking off whatever the level.
+const roomy = {
+  maxAttempts: 3,
+  maxEstimatedCostUsd: 0.25,
+  maxOutputTokens: 8_192,
+  attemptTimeoutMs: 5_000,
+};
+
 const ask = request({
   sensitivity: "CONFIDENTIAL",
   output: structured,
   reasoning: "NONE",
+  budget: roomy,
 });
 
 describe("Claude over the Messages API wire, through the gateway", () => {
@@ -194,7 +204,11 @@ describe("Claude over the Messages API wire, through the gateway", () => {
         : null,
     );
     const result = await gateway.execute(
-      request({ sensitivity: "CONFIDENTIAL", reasoning: "NONE" }),
+      request({
+        sensitivity: "CONFIDENTIAL",
+        reasoning: "NONE",
+        budget: roomy,
+      }),
     );
     // The fake's JSON value, as text: the request asked for TEXT.
     expect(result.output).toEqual({
@@ -211,7 +225,11 @@ describe("Claude over the Messages API wire, through the gateway", () => {
     const { gateway, exchanges } = wired(() => "messages.0: something else");
     await expect(
       gateway.execute(
-        request({ sensitivity: "CONFIDENTIAL", reasoning: "LOW" }),
+        request({
+          sensitivity: "CONFIDENTIAL",
+          reasoning: "LOW",
+          budget: roomy,
+        }),
       ),
     ).rejects.toThrow();
     expect(exchanges).toHaveLength(1);

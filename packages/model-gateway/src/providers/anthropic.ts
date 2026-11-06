@@ -147,12 +147,22 @@ export function continuesToolCalls(messages: readonly ModelMessage[]): boolean {
   return false;
 }
 
+/**
+ * Thinking shares the output budget. Below this, a short structured reply
+ * (the turn reader's is 1,200 tokens) runs with thinking off: live
+ * 2026-11-06, Haiku's adaptive thinking ended four reader calls at
+ * max_tokens with the JSON unfinished, and each was asked again.
+ */
+export const THINKING_MIN_OUTPUT_TOKENS = 4_096;
+
 export function thinkingFor(
   modelCode: string,
   reasoning: ModelReasoningLevel,
   messages: readonly ModelMessage[],
   /** False when tools are not offered: the history is then flattened to text. */
   toolsOffered = true,
+  /** The attempt's output budget; thinking shares it. */
+  maxOutputTokens: number = THINKING_MIN_OUTPUT_TOKENS,
 ): {
   readonly thinking: ThinkingConfigParam;
   readonly effort: NonNullable<OutputConfig["effort"]>;
@@ -168,7 +178,11 @@ export function thinkingFor(
     );
   }
   const effort = EFFORT[reasoning];
-  if (reasoning === "NONE" || (toolsOffered && continuesToolCalls(messages))) {
+  if (
+    reasoning === "NONE" ||
+    maxOutputTokens < THINKING_MIN_OUTPUT_TOKENS ||
+    (toolsOffered && continuesToolCalls(messages))
+  ) {
     return { thinking: off, effort };
   }
   // Adaptive is the only on-mode these models accept. `display` is left at
@@ -644,9 +658,29 @@ export function finishOf(
   return "OTHER";
 }
 
-function result(message: Message): ModelProviderResult {
+/**
+ * By instruction only: when prose precedes (or follows) one JSON object
+ * that parses, the object is the answer. The gateway still validates it
+ * against the caller's schema; anything else is returned as written.
+ */
+export function jsonObjectOf(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("```")) return text;
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start === -1 || end <= start) return text;
+  const candidate = trimmed.slice(start, end + 1);
+  try {
+    const parsed: unknown = JSON.parse(candidate);
+    return typeof parsed === "object" && parsed !== null ? candidate : text;
+  } catch {
+    return text;
+  }
+}
+
+function result(message: Message, structured = false): ModelProviderResult {
   return {
-    text: textOf(message),
+    text: structured ? jsonObjectOf(textOf(message)) : textOf(message),
     toolCalls: toToolCalls(message),
     usage: toUsage(message),
     finish: finishOf(message),
@@ -767,6 +801,14 @@ export function normalizeError(error: unknown): ModelProviderFailure {
  * `constrain: false` states a structured schema in the instructions even
  * when it would fit constrained decoding (the refusal fallback below).
  */
+/**
+ * The largest sanitised schema sent for constrained decoding. The API does
+ * not publish its grammar-size limit; the live refusal was a schema of
+ * about 7.8k characters. Larger schemas go by instruction from the start
+ * instead of paying a refused request first.
+ */
+export const CONSTRAINED_SCHEMA_MAX_CHARS = 4_096;
+
 export function toRequest(
   request: ModelProviderRequest,
   constrain = true,
@@ -778,6 +820,7 @@ export function toRequest(
     request.reasoning,
     request.messages,
     toolsOffered,
+    request.maxOutputTokens,
   );
   const structured =
     request.output.kind === "STRUCTURED" ? request.output : undefined;
@@ -785,10 +828,17 @@ export function toRequest(
   // compiles their schemas into the same grammar, and live (2026-11-06)
   // Q's answer schema plus four tools was refused as "compiled grammar is
   // too large ... simplify your tool schemas or reduce the number".
-  const constrained =
+  const sanitized =
     structured === undefined || !constrain || toolsOffered
       ? null
       : toOutputSchema(structured.jsonSchema);
+  // And only a small grammar: live 2026-11-06 the company analyst's answer
+  // schema alone (no tools) was refused as "compiled grammar is too large".
+  const constrained =
+    sanitized !== null &&
+    JSON.stringify(sanitized).length <= CONSTRAINED_SCHEMA_MAX_CHARS
+      ? sanitized
+      : null;
   const { system, messages } = toMessages(
     request.messages,
     structured !== undefined && constrained === null
@@ -796,6 +846,26 @@ export function toRequest(
       : undefined,
     { flattenTools: !toolsOffered, stableHead },
   );
+  // By instruction, the last word is the format: a reminder at the end of
+  // the final user turn (after every cache breakpoint, so the cached prefix
+  // is untouched). Live 2026-11-06: prose before the JSON cost a refused
+  // round and a text round each time.
+  const tail = messages.at(-1);
+  if (
+    structured !== undefined &&
+    constrained === null &&
+    tail !== undefined &&
+    tail.role === "user" &&
+    Array.isArray(tail.content)
+  ) {
+    tail.content = [
+      ...tail.content,
+      {
+        type: "text",
+        text: `[Capital Q note] Reply with only the ${structured.schemaName} JSON object: start with { and end with }, nothing before or after it.`,
+      },
+    ];
+  }
   const tools = toTools(request.tools);
   return {
     model: request.modelCode,
@@ -916,7 +986,10 @@ export function plainRequest(
   stableHead?: number,
 ): MessageCreateParamsNonStreaming {
   const params = toRequest(request, false, stableHead);
-  if (request.tools.length > 0 && continuesToolCalls(request.messages)) {
+  if (
+    (request.tools.length > 0 && continuesToolCalls(request.messages)) ||
+    request.maxOutputTokens < THINKING_MIN_OUTPUT_TOKENS
+  ) {
     return params;
   }
   const { thinking: _chosen, ...rest } = params;
@@ -1016,6 +1089,7 @@ export function createAnthropicModelProvider(
         }
       };
       try {
+        const structured = request.output.kind === "STRUCTURED";
         const plainKey = `${request.modelCode}|${
           request.output.kind === "STRUCTURED"
             ? request.output.schemaName
@@ -1059,14 +1133,19 @@ export function createAnthropicModelProvider(
             // so the retry always runs at the model's default thinking,
             // continuation or not. If the API refuses that, the refusal is
             // the failure, which is no worse than an empty answer.
-            const { thinking: _off, ...retry } = toRequest(
-              request,
-              false,
-              stableHead,
+            const again = toRequest(request, false, stableHead);
+            // A short reply keeps thinking off (it would eat the budget).
+            const { thinking: _off, ...retry } = again;
+            return result(
+              await send(
+                request.maxOutputTokens < THINKING_MIN_OUTPUT_TOKENS
+                  ? again
+                  : retry,
+              ),
+              structured,
             );
-            return result(await send(retry));
           }
-          return result(message);
+          return result(message, structured);
         } catch (error: unknown) {
           // A 400 for a shape this adapter CHOSE -- a constrained format,
           // or an explicit thinking-off mode -- is sent once more in the
@@ -1088,7 +1167,7 @@ export function createAnthropicModelProvider(
           }
           if (refusedShapes.size >= REFUSED_SCHEMAS_MAX) refusedShapes.clear();
           refusedShapes.add(plainKey);
-          return result(await send(plain));
+          return result(await send(plain), structured);
         }
       } catch (error: unknown) {
         throw normalizeError(error);

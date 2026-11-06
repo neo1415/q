@@ -250,3 +250,28 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --li
 | eslint and prettier                                                        | clean                           |
 | vitest model-gateway + q-evals + config                                    | 1,894 / 1,894                   |
 | integration (scripted Q-IQ `CQ_Q_IQ_ALL=1`, claude-wire, gateway-postgres) | 10 / 10; 573 turns, `fails: []` |
+
+### Round 3 (live re-run on `1773825`: 4/4 answered, $0.49 a case, 12.6–21.8 s a turn)
+
+**Fixed in the adapter:**
+
+- **Reader thinking.** Thinking shares the output budget. Below 4,096 output tokens, thinking is off: the turn reader runs at 1,200. Live, Haiku's adaptive thinking ended four reader calls at `max_tokens` with the JSON unfinished, and each was asked again. The plain and empty-retry shapes keep it off too.
+- **Grammar size.** Constrained decoding also needs a small grammar: a sanitised schema of at most 4,096 characters. Live, the company analyst's answer schema alone, with no tools, was refused as "compiled grammar is too large". Larger schemas go by instruction from the start, with no refused request first.
+- **The format as the last word.** By instruction, the format is now restated at the end of the final user turn ("Reply with only the X JSON object: start with { and end with }"), after every cache breakpoint, so the cached prefix is untouched.
+- **Prose around the JSON.** When prose surrounds one JSON object that parses, the object is the answer. The gateway still validates it against the caller's schema. This was the turn-0 trigger: PROSE_THEN_JSON was refused, which caused the text round.
+
+**Cost.** Unmeasured offline beyond the cache model, which reads 81.1% of input from cache on the scripted run. What is left after these fixes:
+
+- **Cache writes:** each turn's first Sonnet call writes its prompt at 1.25× input.
+- **Output tokens:** $10 per million on Sonnet, thinking included. The next debug run shows output tokens per call.
+
+**Gates:**
+
+| Gate                                    | Result                          |
+| --------------------------------------- | ------------------------------- |
+| build                                   | 0                               |
+| root tsc                                | 0                               |
+| q-api and workers tsc                   | 0                               |
+| eslint and prettier                     | clean                           |
+| vitest model-gateway + q-evals + config | 1,898 / 1,898                   |
+| integration                             | 10 / 10; 573 turns, `fails: []` |

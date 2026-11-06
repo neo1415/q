@@ -5,6 +5,8 @@ import type { ModelMessage } from "@capital-q/contracts";
 import { ModelProviderFailure } from "../src/errors.js";
 import type { ModelProviderRequest } from "../src/ports.js";
 import {
+  CONSTRAINED_SCHEMA_MAX_CHARS,
+  jsonObjectOf,
   lineHashes,
   stableHeadOf,
   AnthropicAPIError as APIError,
@@ -844,5 +846,107 @@ describe("anthropic adapter: live 2026-11-06 follow-ups", () => {
     expect(seen[1]?.["thinking"]).toBeUndefined();
     // The tool history is still sent as tool_use / tool_result.
     expect(JSON.stringify(seen[1]?.["messages"])).toContain('"tool_use"');
+  });
+});
+
+describe("anthropic adapter: live 2026-11-06 round 3", () => {
+  it("a short structured reply (the turn reader's 1,200 tokens) runs with thinking off", () => {
+    const reader = toRequest(
+      request({
+        modelCode: ANTHROPIC_FAST_MODEL,
+        reasoning: "LOW",
+        maxOutputTokens: 1_200,
+      }),
+    );
+    expect(reader.thinking).toEqual({ type: "disabled" });
+    const roomy = toRequest(
+      request({
+        modelCode: ANTHROPIC_FAST_MODEL,
+        reasoning: "LOW",
+        maxOutputTokens: 8_192,
+      }),
+    );
+    expect(roomy.thinking).toEqual({ type: "adaptive" });
+  });
+
+  it("a schema larger than the grammar cap goes by instruction from the start", () => {
+    const big = {
+      type: "object",
+      properties: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [
+          `field${String(i)}`,
+          {
+            type: "string",
+            enum: Array.from(
+              { length: 30 },
+              (_, j) => `VALUE_${String(i)}_${String(j)}`,
+            ),
+          },
+        ]),
+      ),
+      required: Array.from({ length: 12 }, (_, i) => `field${String(i)}`),
+    };
+    expect(JSON.stringify(toOutputSchema(big)).length).toBeGreaterThan(
+      CONSTRAINED_SCHEMA_MAX_CHARS,
+    );
+    const body = toRequest(
+      request({
+        output: {
+          kind: "STRUCTURED",
+          schemaName: "CompanyAnalyst",
+          jsonSchema: big,
+        },
+      }),
+    );
+    expect(body.output_config?.format).toBeUndefined();
+    // The format is the last word of the final user turn.
+    const last = body.messages.at(-1)?.content as { text: string }[];
+    expect(last.at(-1)?.text).toContain(
+      "Reply with only the CompanyAnalyst JSON object",
+    );
+  });
+
+  it("keeps the one JSON object when prose surrounds it, and nothing else changes", () => {
+    expect(jsonObjectOf('Here it is: {"answer":"x"} Thanks.')).toBe(
+      '{"answer":"x"}',
+    );
+    expect(jsonObjectOf('{"answer":"x"}')).toBe('{"answer":"x"}');
+    expect(jsonObjectOf("No JSON here.")).toBe("No JSON here.");
+    expect(jsonObjectOf("Broken { not json }")).toBe("Broken { not json }");
+  });
+
+  it("a structured answer by instruction is returned as its JSON object", async () => {
+    const big = {
+      type: "object",
+      properties: {
+        answer: { type: "string" },
+        extra: { type: "string", description: "x".repeat(5_000) },
+      },
+    };
+    const provider = createAnthropicModelProvider({
+      apiKey: "unused",
+      client: clientReturning({
+        ...recorded,
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: 'Sure.\n{"answer":"Two founders."}',
+            citations: null,
+          },
+        ],
+      }),
+    });
+    const result = await provider.generate(
+      request({
+        output: {
+          kind: "STRUCTURED",
+          schemaName: "CompanyAnalyst",
+          jsonSchema: big,
+        },
+      }),
+      context(),
+    );
+    expect(result.text).toBe('{"answer":"Two founders."}');
   });
 });
