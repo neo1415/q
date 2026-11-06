@@ -16,10 +16,12 @@ Production: all four services on `d09aec914` (21:44). Hosted migrations 281. Rou
 | A1–A6 analytics (within spec §6.7.12–14)                                               | session_01Wncmn6n2wuJcJPM1ZeWXX3 | feat/q-analytics         | STARTED 22:40                              |
 | Browser pane                                                                           | —                                | —                        | Feasibility in plan §9; owner choice later |
 
-| Other                                            | State                                                                           |
-| ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| Claim check recomputes derived figures (c98639b) | MERGED into integration (386b9aa48), not yet in CI; goes with workspace batch 1 |
-| Owner questions                                  | COR-054 hint; the analytics default visibility (Organisation only?)             |
+| Other                                                       | State                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claim check recomputes derived figures (c98639b)            | MERGED into integration (386b9aa48), not yet in CI; goes with workspace batch 1                                                                                                                                  |
+| Owner questions                                             | COR-054 hint. Analytics: (1) with paid reveal but no override, do Anonymous viewers show their organisation (now no)? (2) which plans include identity reveal? (3) should the 3-organisation floor be a setting? |
+| NEXT after the workspace and analytics (owner, 6 Nov 23:35) | Audit suitability, the unicorn predictor, reversibility and the other metrics, plus their UI/UX                                                                                                                  |
+| 3:10 a.m. Lagos resume check                                | Scheduled (trig_01NLmTk8xoe8k6pyduUJbLXp, 02:10 UTC), in case usage runs out                                                                                                                                     |
 
 Anthropic test spend: about $7.7.
 
