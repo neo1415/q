@@ -275,3 +275,30 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --li
 | eslint and prettier                     | clean                           |
 | vitest model-gateway + q-evals + config | 1,898 / 1,898                   |
 | integration                             | 10 / 10; 573 turns, `fails: []` |
+
+### Round 4 (live re-run on `b166e46`: 4/4, $0.301 a case, 2–4 calls a turn)
+
+**Cost now came from cache writes.** Each turn's first Sonnet call read only about 8.7k of about 31k input tokens and re-wrote 13–17k at 1.25× input. In the analyst prompt, the per-turn sections ("WHAT CAPITAL Q ALREADY ESTABLISHED", "THIS TURN") come before the large "AUTHORISED FACTS" block, which holds still across a conversation.
+
+**Fix:** `providers/anthropic-sections.ts`, applied to the Anthropic request only. The OpenAI prompt is untouched.
+
+- **What it learns.** Per person and kind of request, the adapter learns which sections of the first user message change between consecutive requests. It keeps hashes only, keyed by the gateway's hashed cache key (tenant, user, task class, tools).
+- **The reorder.** Sections that hold still come first, then the ones that change, each group in its original order. The person's message stays last, and nothing is added, removed or rewritten. The cache breakpoint sits at the end of the stable part.
+- **Fences.** A capitals line inside an untrusted-content fence is never a header, so fetched text cannot move or split a fence.
+- **References.** Only sections that change move, and only later. The guidance stays first, so its "facts below" remains true.
+- **Test results:**
+  - Simulated 4-turn conversation, cache-read share by turn: 0.00, 0.18, 0.98, 0.98.
+  - Scripted Q-IQ over the wire: 83.4% of input read from cache.
+
+**Tool narration.** Live turn 0 began "My search for Silo Credit … came back empty". When tools are offered, a Claude-only system line (cached) now says to answer with what was found, never mention a search or tool or that one came back empty, and say only that something is not on record when it is not.
+
+**Gates:**
+
+| Gate                                    | Result                          |
+| --------------------------------------- | ------------------------------- |
+| build                                   | 0                               |
+| root tsc                                | 0                               |
+| q-api and workers tsc                   | 0                               |
+| eslint and prettier                     | clean                           |
+| vitest model-gateway + q-evals + config | 1,902 / 1,902                   |
+| integration                             | 10 / 10; 573 turns, `fails: []` |

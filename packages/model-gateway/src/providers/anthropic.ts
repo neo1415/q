@@ -31,6 +31,7 @@ import {
 } from "@capital-q/contracts";
 
 import { ModelProviderFailure } from "../errors.js";
+import { createSectionOrder } from "./anthropic-sections.js";
 import type {
   ModelExecutionContext,
   ModelProvider,
@@ -802,6 +803,17 @@ export function normalizeError(error: unknown): ModelProviderFailure {
  * when it would fit constrained decoding (the refusal fallback below).
  */
 /**
+ * Claude narrates its tool use more readily than the models Q's prompts
+ * were tuned on (live 2026-11-06: "My search for Silo Credit on Capital Q
+ * came back empty, so I..." before a correct answer). Said once, in the
+ * cached system prompt, whenever tools are offered. It does not change
+ * what may be said about the record: what is unknown is still said to be
+ * unknown, only not as an account of searches.
+ */
+export const TOOL_USE_GUIDANCE =
+  "When you use tools, answer with what you found, not an account of how you looked: never mention a search, lookup or tool, and never say that one came back empty. If something is not on record, say only that it is not on record.";
+
+/**
  * The largest sanitised schema sent for constrained decoding. The API does
  * not publish its grammar-size limit; the live refusal was a schema of
  * about 7.8k characters. Larger schemas go by instruction from the start
@@ -839,11 +851,15 @@ export function toRequest(
     JSON.stringify(sanitized).length <= CONSTRAINED_SCHEMA_MAX_CHARS
       ? sanitized
       : null;
+  const extra = [
+    ...(structured !== undefined && constrained === null
+      ? [schemaInstruction(structured)]
+      : []),
+    ...(toolsOffered ? [TOOL_USE_GUIDANCE] : []),
+  ];
   const { system, messages } = toMessages(
     request.messages,
-    structured !== undefined && constrained === null
-      ? schemaInstruction(structured)
-      : undefined,
+    extra.length === 0 ? undefined : extra.join("\n\n"),
     { flattenTools: !toolsOffered, stableHead },
   );
   // By instruction, the last word is the format: a reminder at the end of
@@ -1019,6 +1035,7 @@ export function createAnthropicModelProvider(
   // Line hashes of the last rendered prompt per kind (never its text), to
   // find the stable head the next one shares. Oldest entry evicted first.
   const stableHeads = new Map<string, string[]>();
+  const sectionOrder = createSectionOrder();
   const client: AnthropicClient =
     options.client ??
     new Anthropic({
@@ -1037,9 +1054,11 @@ export function createAnthropicModelProvider(
       cancellation: true,
     }),
     generate: async (
-      request: ModelProviderRequest,
+      incoming: ModelProviderRequest,
       context: ModelExecutionContext,
     ): Promise<ModelProviderResult> => {
+      // Replaced below by the section-ordered copy, never mutated.
+      let request = incoming;
       const requestOptions = {
         signal: context.signal,
         timeout: context.attemptTimeoutMs,
@@ -1097,16 +1116,41 @@ export function createAnthropicModelProvider(
         }`;
         // The stable head of the rendered prompt, against the previous
         // request of the same kind (same model, output and tool set).
-        const firstUser = request.messages.find(
-          (message) => message.role === "USER",
-        )?.content;
         const headKey = `${plainKey}|${request.tools
           .map((tool) => tool.name)
           .join(",")}`;
+        // Stable sections first in the first user message (Anthropic only;
+        // anthropic-sections.ts), learned per person from the gateway's
+        // hashed cache key.
+        const firstIndex = request.messages.findIndex(
+          (message) => message.role === "USER",
+        );
+        const original = request.messages[firstIndex];
+        const ordered =
+          original === undefined || original.role !== "USER"
+            ? undefined
+            : sectionOrder.order(
+                plainKey,
+                request.cacheKey ?? headKey,
+                original.content,
+              );
+        if (
+          ordered !== undefined &&
+          original !== undefined &&
+          original.role === "USER" &&
+          ordered.text !== original.content
+        ) {
+          const messages = [...request.messages];
+          messages[firstIndex] = { ...original, content: ordered.text };
+          request = { ...request, messages };
+        }
+        const firstUser = ordered?.text;
         const stableHead =
           firstUser === undefined
             ? undefined
-            : stableHeadOf(firstUser, stableHeads.get(headKey));
+            : ordered !== undefined && ordered.stableChars > 0
+              ? ordered.stableChars
+              : stableHeadOf(firstUser, stableHeads.get(headKey));
         if (firstUser !== undefined) {
           stableHeads.delete(headKey);
           stableHeads.set(headKey, lineHashes(firstUser));
