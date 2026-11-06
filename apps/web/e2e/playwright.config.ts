@@ -59,6 +59,7 @@ export default defineConfig({
       CQ_DEV_PREVIEW: "1",
       // Nothing here may reach a provider (CLAUDE.md): non-empty, disabled.
       OPENAI_API_KEY: "disabled-locally-000000000000",
+      ANTHROPIC_API_KEY: "disabled-locally-000000000000",
       ELEVENLABS_API_KEY: "disabled-locally-000000000000",
       DEEPGRAM_API_KEY: "disabled-locally-000000000000",
     },

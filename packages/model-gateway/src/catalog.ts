@@ -38,6 +38,15 @@ export const ProviderRecordSchema = z
     privacyPolicyClass: ProviderPrivacyPolicyClassSchema,
     supportsZeroRetention: z.boolean(),
     regionSupport: z.array(z.string().max(32)).max(64),
+    /**
+     * A ceiling the owner approved by recorded decision, above what the
+     * privacy class alone justifies (ai_ops.providers.owner_approved_ceiling,
+     * 20261231280000). Absent or null: the class decides alone.
+     */
+    ownerApprovedCeiling: z
+      .enum(["INTERNAL", "CONFIDENTIAL"])
+      .nullable()
+      .optional(),
   })
   .strict();
 export type ProviderRecord = z.infer<typeof ProviderRecordSchema>;

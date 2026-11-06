@@ -125,6 +125,15 @@ export const modelProviderEnvShape = {
   // under this name before it was configurable.
   OPEN_AI_API_KEY: apiKey.optional(),
   /**
+   * Anthropic (DECISIONS 62: Claude for reasoning, OpenAI for voice and as
+   * the fallback). Without it the Claude routes are skipped as
+   * unconfigured and every request falls to OpenAI. Whether Claude is
+   * routed to at all is the catalogue's call (ai_ops.routing_policies),
+   * not this key's: a configured key with the Claude policies retired is
+   * inert. The adapter runs only the models it knows and refuses others.
+   */
+  ANTHROPIC_API_KEY: apiKey.optional(),
+  /**
    * Put one provider's models first, for a deployment that is diagnosing
    * rather than serving. Named by code (`openai`). Absent is the ordinary
    * case and the production one.
@@ -153,6 +162,8 @@ export type ModelProviderSecrets = {
   readonly groqKeys: readonly ProviderCredential[];
   /** OpenAI, diagnostic only; absent means the adapter is not configured. */
   readonly openai: ProviderCredential | undefined;
+  /** Anthropic (DECISIONS 62); absent means the adapter is not configured. */
+  readonly anthropic: ProviderCredential | undefined;
   /** Which provider a diagnosing deployment asked to try first, if any. */
   readonly testProviderCode: string | undefined;
 };
@@ -160,6 +171,7 @@ export type ModelProviderSecrets = {
 export type ModelProviderConfigStatus = {
   readonly syntheticDemoRouting: boolean;
   readonly openai: "configured" | "unconfigured";
+  readonly anthropic: "configured" | "unconfigured";
   /** Named only when a deployment asked to diagnose; never in production. */
   readonly testProvider: string | undefined;
   readonly google: "configured" | "unconfigured";
@@ -183,6 +195,7 @@ export function toModelProviderSecrets(parsed: {
   readonly GROQ_API_KEY_4?: string | undefined;
   readonly OPENAI_API_KEY?: string | undefined;
   readonly OPEN_AI_API_KEY?: string | undefined;
+  readonly ANTHROPIC_API_KEY?: string | undefined;
   readonly CQ_TEST_MODEL_PROVIDER?: string | undefined;
 }): ModelProviderSecrets {
   const groqKeys = [
@@ -211,6 +224,10 @@ export function toModelProviderSecrets(parsed: {
       key === undefined ? undefined : new ProviderCredential(key))(
       parsed.OPENAI_API_KEY ?? parsed.OPEN_AI_API_KEY,
     ),
+    anthropic:
+      parsed.ANTHROPIC_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.ANTHROPIC_API_KEY),
     testProviderCode: parsed.CQ_TEST_MODEL_PROVIDER,
   };
 }
@@ -226,6 +243,7 @@ export function modelProviderConfigStatus(
     googleKeys: secrets.googleKeys.length,
     groqKeys: secrets.groqKeys.length,
     openai: secrets.openai === undefined ? "unconfigured" : "configured",
+    anthropic: secrets.anthropic === undefined ? "unconfigured" : "configured",
     testProvider: secrets.testProviderCode,
   };
 }

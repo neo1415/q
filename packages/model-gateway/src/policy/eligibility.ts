@@ -78,6 +78,26 @@ import { estimateAttemptCost } from "./cost.js";
 export function providerJustifiedCeiling(
   provider: ProviderRecord,
 ): ModelSensitivity {
+  const reviewed = reviewedCeiling(provider);
+  const approved = provider.ownerApprovedCeiling ?? null;
+  // An owner's recorded approval (DECISIONS 62 for Anthropic) can raise a
+  // provider that is at least contractually no-training to CONFIDENTIAL,
+  // and no further. It never lifts an unreviewed or training-permitted
+  // provider, never reaches HIGHLY_CONFIDENTIAL, and never lowers what the
+  // review already allows. The database holds the same rules as checks.
+  if (
+    approved === null ||
+    provider.privacyPolicyClass === "UNREVIEWED" ||
+    provider.privacyPolicyClass === "TRAINING_PERMITTED"
+  ) {
+    return reviewed;
+  }
+  return rankSensitivity(approved) > rankSensitivity(reviewed)
+    ? approved
+    : reviewed;
+}
+
+function reviewedCeiling(provider: ProviderRecord): ModelSensitivity {
   switch (provider.privacyPolicyClass) {
     case "UNREVIEWED":
     case "TRAINING_PERMITTED":

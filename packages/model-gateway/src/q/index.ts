@@ -1117,7 +1117,13 @@ export function budgetForTaskClass(taskClass: ModelTextTaskClass): ModelBudget {
     case "NORMAL_DIALOGUE":
       return {
         maxAttempts: 3,
-        maxEstimatedCostUsd: 0.1,
+        // Sized for Claude Sonnet (DECISIONS 62, $2/$10 per million): the
+        // gateway estimates an attempt at full input price plus the whole
+        // output budget, so a 30k-token answer prompt already estimates at
+        // $0.10, and at 0.1 long answers fell to the fallback before Claude
+        // was asked. A ceiling, not a spend: cached input bills at a tenth,
+        // and the cheaper models it allows cost what they always did.
+        maxEstimatedCostUsd: 0.25,
         maxOutputTokens: 4_096,
         attemptTimeoutMs: 45_000,
       };

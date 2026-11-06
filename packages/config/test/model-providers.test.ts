@@ -49,6 +49,7 @@ describe("model provider configuration", () => {
       groq: "unconfigured",
       groqKeys: 0,
       openai: "unconfigured",
+      anthropic: "unconfigured",
       testProvider: undefined,
     });
 
@@ -60,6 +61,7 @@ describe("model provider configuration", () => {
       groq: "configured",
       groqKeys: 1,
       openai: "unconfigured",
+      anthropic: "unconfigured",
       testProvider: undefined,
     });
     expect(groqOnly.secrets.modelProviders.google).toBeUndefined();
@@ -110,5 +112,29 @@ describe("model provider configuration", () => {
       modelProviderConfigStatus(config.secrets.modelProviders).openai,
     ).toBe("unconfigured");
     expect(config.secrets.modelProviders.google?.reveal()).toBe(GEMINI);
+  });
+
+  it("reads ANTHROPIC_API_KEY as an opaque credential, empty as unconfigured (DECISIONS 62)", () => {
+    const ANTHROPIC = "synthetic-anthropic-key-000000000000000000";
+    const config = parseQApiConfig({ ...base, ANTHROPIC_API_KEY: ANTHROPIC });
+    expect(config.secrets.modelProviders.anthropic?.reveal()).toBe(ANTHROPIC);
+    expect(
+      modelProviderConfigStatus(config.secrets.modelProviders).anthropic,
+    ).toBe("configured");
+    expect(JSON.stringify(config)).not.toContain(ANTHROPIC);
+    expect(inspect(config.secrets.modelProviders)).not.toContain(ANTHROPIC);
+
+    const off = parseQApiConfig({ ...base, ANTHROPIC_API_KEY: "" });
+    expect(off.secrets.modelProviders.anthropic).toBeUndefined();
+
+    // The value tests and local stacks use: present, so the adapter is
+    // built, and useless, so nothing can reach the vendor with it.
+    const disabled = parseQApiConfig({
+      ...base,
+      ANTHROPIC_API_KEY: "disabled-locally-000000000000",
+    });
+    expect(disabled.secrets.modelProviders.anthropic?.reveal()).toBe(
+      "disabled-locally-000000000000",
+    );
   });
 });

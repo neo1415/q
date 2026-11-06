@@ -22,11 +22,11 @@ select pg_temp.rls_setup();
 select plan(35);
 
 -- Seed is present and shaped as the packet verified it -------------------------------
-select is((select count(*)::int from ai_ops.providers), 3, 'three providers are seeded (openai joined in 20261006090000)');
+select is((select count(*)::int from ai_ops.providers), 4, 'four providers are seeded (openai joined in 20261006090000, anthropic in 20261231280000)');
 select results_eq(
   $$ select code from ai_ops.providers order by code $$,
-  $$ values ('google'), ('groq'), ('openai') $$,
-  'the providers are google, groq and openai');
+  $$ values ('anthropic'), ('google'), ('groq'), ('openai') $$,
+  'the providers are anthropic, google, groq and openai');
 select is((select privacy_policy_class from ai_ops.providers where code = 'google'), 'UNREVIEWED',
   'google data-use terms are recorded as unreviewed');
 -- CQ-C5-R2A: groq was reviewed on 2026-09-08. The class states what the
@@ -38,10 +38,10 @@ select ok((select supports_zero_retention from ai_ops.providers where code = 'gr
   'groq zero data retention is recorded as enabled for this organisation');
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
-  $$ values ('gemini-2.5-flash-image'), ('gemini-3.1-flash-lite-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
+  $$ values ('claude-haiku-5-5'), ('claude-sonnet-5-5'), ('gemini-2.5-flash-image'), ('gemini-3.1-flash-lite-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
             ('gpt-5.6-luna'), ('gpt-image-1'), ('gpt-live-1'), ('gpt-realtime-mini'),
             ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b'), ('qwen/qwen3.8-27b') $$,
-  'the twelve model ids are seeded, exactly (gpt-live-1 for the GPT-Live voice line in 20261221090000, priced per second in its metadata so it has no model_prices row; gemini-3.1-flash-lite-image under its own id in 20261220192000, gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
+  'the fourteen model ids are seeded, exactly (claude-haiku-5-5 and claude-sonnet-5-5 in 20261231280000; gpt-live-1 for the GPT-Live voice line in 20261221090000, priced per second in its metadata so it has no model_prices row; gemini-3.1-flash-lite-image under its own id in 20261220192000, gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
 select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
   'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
 select is(
@@ -50,14 +50,17 @@ select is(
      join ai_ops.providers p on p.id = m.provider_id
     where m.sensitivity_ceiling = 'CONFIDENTIAL'
       and not (p.privacy_policy_class in ('NO_TRAINING_ZERO_RETENTION', 'ENTERPRISE_CONTRACT')
-               and (p.privacy_policy_class = 'ENTERPRISE_CONTRACT' or p.supports_zero_retention))),
+               and (p.privacy_policy_class = 'ENTERPRISE_CONTRACT' or p.supports_zero_retention))
+      -- or the owner's recorded approval (DECISIONS 62), which the table's
+      -- own checks confine to a no-training class and CONFIDENTIAL at most
+      and not (p.owner_approved_ceiling = 'CONFIDENTIAL' and p.owner_approval_ref is not null)),
   0,
-  'every model cleared for confidential data sits behind a provider whose review justifies it');
+  'every model cleared for confidential data sits behind a provider whose review, or recorded owner approval, justifies it');
 select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gemini-3.8-flash'), 'PUBLIC',
   'unverified gemini is public-only');
 select is((select sensitivity_ceiling from ai_ops.models where model_code = 'openai/gpt-oss-120b'), 'CONFIDENTIAL',
   'groq carries confidential work under its reviewed zero-retention terms');
-select is((select count(*)::int from ai_ops.model_prices), 9, 'nine price snapshots are seeded (one per priced model, plus the closed introductory gemini-3.8-flash price; gpt-realtime-mini joined in 20261203090000)');
+select is((select count(*)::int from ai_ops.model_prices), 11, 'eleven price snapshots are seeded (one per priced model, plus the closed introductory gemini-3.8-flash price; gpt-realtime-mini joined in 20261203090000; the two Claude models in 20261231280000)');
 select is(
   (select effective_to from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000002'),
   '2027-01-01T00:00:00Z'::timestamptz,
