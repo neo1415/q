@@ -272,6 +272,12 @@ import {
 } from "./promise-check.js";
 import { toolLoopBudget } from "./tool-loop-budget.js";
 export {
+  claimCorpus,
+  groundText,
+  type ClaimKind,
+  type GroundedText,
+} from "./claim-check.js";
+export {
   ACTION_CLAIM_KINDS,
   actionClaims,
   checkPromises,

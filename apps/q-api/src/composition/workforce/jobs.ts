@@ -880,7 +880,11 @@ export function createWorkforceExecutors(dependencies: {
             theirLatest: latest.text,
             body: draft,
           },
-          { job: { jobId: context.jobId, parentRunId: context.runId } },
+          {
+            job: { jobId: context.jobId, parentRunId: context.runId },
+            // Step 10: nothing the material and thread don't hold is said.
+            ground: true,
+          },
         );
         if (verdict.verdict === "HELD") {
           held += 1;

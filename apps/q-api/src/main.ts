@@ -1947,8 +1947,12 @@ const workforcePortsFor = createWorkforcePorts(
         (item) => ({
           relationshipId: item.relationshipId,
           name: item.counterpart.name,
+          counterpart: { kind: item.counterpart.kind, id: item.counterpart.id },
         }),
       ),
+    // Q Intelligence Plan, step 10: the standing-instruction material
+    // reader, as the person (composed further down; read when a job runs).
+    material: (actor, people) => instructionMaterial(actor, people),
     readChat: (input) => chat.readForQ(input),
     sendChat: (input) =>
       chat.send({
@@ -2033,6 +2037,7 @@ const workforcePortsFor = createWorkforcePorts(
           principalName: input.principalName,
           counterpartName: input.counterpartName,
           brief: input.brief,
+          material: input.material,
           callComing: input.callComing,
           thread: input.thread,
           correlationId: input.correlationId,

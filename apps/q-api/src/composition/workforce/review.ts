@@ -11,6 +11,7 @@ import {
   type ReviewPolicy,
 } from "@capital-q/q-orchestrator";
 import type { DraftChannel, DraftStage } from "@capital-q/q-core";
+import { claimCorpus, groundText } from "@capital-q/model-gateway/q";
 
 import type { WorkforceModels } from "./models.js";
 import type { JobSourceKind, Owner, WorkforceStore } from "./store.js";
@@ -125,6 +126,15 @@ export type OutwardReview = {
       readonly prepared?: PreparedDraft | null | undefined;
       /** Hand back a near miss (HELD, `nearMiss`) for the person's card. */
       readonly nearMiss?: boolean | undefined;
+      /**
+       * Q Intelligence Plan, step 10: every draft goes through code's
+       * claim check (step 6) against what this message was given -- its
+       * material, the thread, its purpose and the two names -- before the
+       * reviewer reads it. Opt-in: a path whose facts are not all in its
+       * material (an email the person dictated in their conversation)
+       * would lose true sentences.
+       */
+      readonly ground?: boolean | undefined;
     },
   ) => Promise<OutwardVerdict>;
   /** A prepared message the writer had nothing honest for: its runs end. */
@@ -277,6 +287,37 @@ export function createOutwardReview(dependencies: {
       // Thread consistency: what their latest message left open, by code.
       const asks =
         draft.stage === "REPLY" ? pendingAsks(draft.theirLatest) : [];
+      // Step 10: the same sources the writer and the reviewer were given,
+      // never wider. What is removed is logged by kind, never by value.
+      const corpus =
+        options?.ground === true
+          ? claimCorpus([
+              frame.material,
+              frame.thread,
+              frame.purpose,
+              frame.principalName,
+              frame.counterpartName,
+              draft.theirLatest ?? "",
+            ])
+          : null;
+      const ground =
+        corpus === null
+          ? undefined
+          : (body: string): string | null => {
+              const kept = groundText(body, corpus, { unknownLine: false });
+              if (kept.changed > 0) {
+                logger?.warn(
+                  {
+                    source: source.kind,
+                    removed: kept.changed,
+                    kinds: [...new Set(kept.ungrounded)],
+                    emptied: kept.text.length === 0,
+                  },
+                  "ungrounded claims removed from a workforce draft",
+                );
+              }
+              return kept.text.length === 0 ? null : kept.text;
+            };
       const outcome = await writeWithReview(
         draft.body,
         {
@@ -301,6 +342,7 @@ export function createOutwardReview(dependencies: {
               ).slice(0, 2_000),
             }),
           recheck: options?.recheck,
+          ground,
           ...(options?.nearMiss === true
             ? { nearMissPoints: NEAR_MISS_POINTS }
             : {}),

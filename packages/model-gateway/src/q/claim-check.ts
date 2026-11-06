@@ -507,7 +507,10 @@ const FUNCTION_WORDS = new Set(
     "in on at for with from by to of into over under about after before during based given " +
     "however also overall finally then " +
     "shall will can could would should may might must do does did is are was were be been " +
-    "has have had let please want need see consider ask check open compare book send"
+    "has have had let please want need see consider ask check open compare book send " +
+    // A greeting or sign-off opens no name: "Hi Ngozi," names Ngozi, and
+    // "Best, Daniel" names Daniel (step 10: messages written for the person).
+    "hi hello hey dear thanks thank best regards cheers warmly kind"
   ).split(/\s+/u),
 );
 
@@ -685,6 +688,19 @@ function metricOf(sentence: string): string | null {
   return null;
 }
 
+/** How a sentence is checked; every default is the answer path's. */
+export interface SentenceCheckOptions {
+  /** Check multi-word names too (default true). */
+  readonly names?: boolean | undefined;
+  /**
+   * Rewrite an ungrounded figure about a named metric as Q's honest
+   * unknown (default true). False removes the sentence instead: in a
+   * message written for the person to the other side, or in a filed
+   * document, Q's own "I don't have a sourced figure" is not theirs to say.
+   */
+  readonly unknownLine?: boolean | undefined;
+}
+
 /**
  * Check one sentence against the corpus. `said` holds the metrics already
  * said to be unknown in this answer, so the honest unknown is said once.
@@ -693,8 +709,11 @@ export function checkSentence(
   sentence: string,
   corpus: ClaimCorpus,
   said: Set<string> = new Set(),
+  options: SentenceCheckOptions = {},
 ): SentenceCheck {
-  const claims = extractClaims(sentence);
+  const claims = extractClaims(sentence).filter(
+    (claim) => options.names !== false || claim.kind !== "NAME",
+  );
   if (claims.length === 0) return { text: sentence, ungrounded: [] };
   const figures = claims.filter(
     (claim) =>
@@ -731,7 +750,10 @@ export function checkSentence(
   if (ungrounded.length === 0) return { text: sentence, ungrounded };
   // A name we cannot ground is removed; a figure becomes an honest unknown
   // about its metric when there is one, said once.
-  const metric = ungrounded.includes("NAME") ? null : metricOf(sentence);
+  const metric =
+    ungrounded.includes("NAME") || options.unknownLine === false
+      ? null
+      : metricOf(sentence);
   if (metric === null || said.has(metric)) return { text: null, ungrounded };
   said.add(metric);
   return {
@@ -844,4 +866,61 @@ export function statedNumbers(text: string): readonly (readonly string[])[] {
       const whole = String(figure.value);
       return plain === whole ? [plain] : [plain, whole];
     });
+}
+
+/** What `groundText` kept of a text, and what it took out. */
+export interface GroundedText {
+  readonly text: string;
+  /** The kinds of the claims that were not grounded; values withheld. */
+  readonly ungrounded: readonly ClaimKind[];
+  /** Sentences removed or rewritten. */
+  readonly changed: number;
+}
+
+/**
+ * Any text Q wrote outside a live answer (Q Intelligence Plan, step 10:
+ * a workforce message, a filed document), sentence by sentence against
+ * what the work was given, keeping its line breaks and list markers.
+ * Unlike `checkAnswer` it never substitutes `NOTHING_SOURCED`: nothing
+ * left is an empty text, for the caller to hold. `exempt` keeps a sentence
+ * that is not stated as fact (a labelled estimate or Q's inference, which
+ * carries its own truth class).
+ */
+export function groundText(
+  text: string,
+  corpus: ClaimCorpus,
+  options: SentenceCheckOptions & {
+    readonly exempt?: ((sentence: string) => boolean) | undefined;
+  } = {},
+): GroundedText {
+  const said = new Set<string>();
+  const ungrounded: ClaimKind[] = [];
+  let changed = 0;
+  const lines = text.split("\n").map((line) => {
+    if (line.trim().length === 0) return line;
+    const lead = /^\s*(?:[-*•]|\d+[.)])\s+/u.exec(line)?.[0] ?? "";
+    const body = line.slice(lead.length);
+    const sentences = body.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"“(*])/u);
+    const kept: string[] = [];
+    for (const sentence of sentences) {
+      if (options.exempt?.(sentence) === true) {
+        kept.push(sentence);
+        continue;
+      }
+      const checked = checkSentence(sentence, corpus, said, options);
+      ungrounded.push(...checked.ungrounded);
+      if (checked.text !== sentence) changed += 1;
+      if (checked.text !== null) kept.push(checked.text);
+    }
+    return kept.length === 0 ? null : `${lead}${kept.join(" ")}`;
+  });
+  return {
+    text: lines
+      .filter((line): line is string => line !== null)
+      .join("\n")
+      .replace(/\n{3,}/gu, "\n\n")
+      .trim(),
+    ungrounded,
+    changed,
+  };
 }

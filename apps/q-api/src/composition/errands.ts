@@ -29,7 +29,7 @@ import {
   renderPrompt,
   type ErrandReplyResult,
   type WorkSlotReaderResult,
-  type ErrandReplyVariables,
+  type ErrandReplyVariablesV2,
 } from "@capital-q/q-core";
 import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
 import {
@@ -428,6 +428,11 @@ export type ErrandReplyComposer = {
     readonly principalName: string;
     readonly counterpartName: string;
     readonly brief: string;
+    /**
+     * Step 10: the facts the reviewer grades against (a workforce reply's
+     * material), fenced as data in the writer's prompt; "" for none.
+     */
+    readonly material?: string | undefined;
     readonly callComing: boolean;
     readonly thread: string;
     /** J6: the workforce job's correlation, so the draft is priced there. */
@@ -457,7 +462,7 @@ export function createErrandReplyComposer(dependencies: {
         { tenantId: input.actor.tenantId, userId: input.actor.userId },
         "SPEAK_FOR",
       );
-      const rendered = renderPrompt<ErrandReplyVariables>(registry, {
+      const rendered = renderPrompt<ErrandReplyVariablesV2>(registry, {
         task: "ERRAND_REPLY",
         ...(etiquette === undefined ? {} : { etiquette }),
         operatingMode: "CONTINUOUS_INTELLIGENCE",
@@ -468,6 +473,7 @@ export function createErrandReplyComposer(dependencies: {
           principalName: input.principalName,
           counterpartName: input.counterpartName,
           brief: input.brief,
+          material: (input.material ?? "").slice(0, 4_000),
           callComing: input.callComing,
           thread: input.thread,
         },

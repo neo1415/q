@@ -5,6 +5,11 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import type { PublicWebResearchService } from "@capital-q/q-research";
 import type { ActorContext } from "@capital-q/security";
 
+import {
+  materialLine,
+  senderLines,
+  type InstructionMaterial,
+} from "../instructions/material.js";
 import { sendAllowed } from "../instructions/send-guard.js";
 import { threadPace } from "../instructions/quarantine.js";
 import type {
@@ -61,8 +66,30 @@ export type WorkforcePortServices = {
     readonly {
       readonly relationshipId: string;
       readonly name: string;
+      /** Who is on the other side, for their network-visible material. */
+      readonly counterpart?:
+        | {
+            readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+            readonly id: string;
+          }
+        | undefined;
     }[]
   >;
+  /**
+   * Q Intelligence Plan, step 10: what a reply may state as fact, read as
+   * the person -- the reader standing instructions use (their approved
+   * facts, each counterpart's network-visible material), never wider.
+   * Absent or failing: no material, and the writer may state nothing.
+   */
+  readonly material?:
+    | ((
+        actor: ActorContext,
+        people: readonly {
+          readonly counterpartKind: "COMPANY" | "INVESTOR_ORGANISATION";
+          readonly counterpartId: string;
+        }[],
+      ) => Promise<InstructionMaterial | null>)
+    | undefined;
   readonly readChat: (input: {
     readonly actor: ActorContext;
     readonly relationshipId: string;
@@ -95,6 +122,8 @@ export type WorkforcePortServices = {
     readonly correlationId: string | undefined;
     /** D-09: what the reply is for (the step's goal); was always "". */
     readonly brief: string;
+    /** Step 10: the facts it may state, the reviewer's own material. */
+    readonly material: string;
   }) => Promise<string | null>;
   /**
    * RESEARCH (D1): one bounded public-web research turn, as the person.
@@ -135,6 +164,32 @@ export type WorkforcePortServices = {
   readonly nameOf: (userId: string) => Promise<string | null>;
   readonly now?: (() => Date) | undefined;
 };
+
+/**
+ * One conversation's material, in the words the standing-instruction
+ * writer and the reviewer already read: the sender's approved facts, then
+ * the other side's network-visible material. Empty when nothing was read.
+ */
+export function conversationMaterial(
+  material: InstructionMaterial | null,
+  counterpartId: string | null,
+  counterpartName: string,
+): string {
+  if (material === null) return "";
+  const theirs =
+    counterpartId === null
+      ? undefined
+      : material.counterparts.get(counterpartId);
+  return [
+    "WHO YOU WRITE AS:",
+    senderLines(material.sender),
+    theirs === undefined || theirs.length === 0
+      ? `${counterpartName.slice(0, 120)}: no network-visible material.`
+      : `${counterpartName.slice(0, 120)}'s ${materialLine(theirs)}`,
+  ]
+    .join("\n")
+    .slice(0, 4_000);
+}
 
 const CALL_MINUTES = 30;
 const LEAD_MS = 24 * 3_600_000;
@@ -204,6 +259,25 @@ export function createWorkforcePorts(
           0,
           MAX_RELATIONSHIPS,
         );
+        // Step 10: read once for every conversation, as the person.
+        const material =
+          services.material === undefined
+            ? null
+            : await services
+                .material(
+                  actor,
+                  own.flatMap((one) =>
+                    one.counterpart === undefined
+                      ? []
+                      : [
+                          {
+                            counterpartKind: one.counterpart.kind,
+                            counterpartId: one.counterpart.id,
+                          },
+                        ],
+                  ),
+                )
+                .catch(() => null);
         const open: OpenConversation[] = [];
         for (const one of own) {
           const read = await services
@@ -225,8 +299,13 @@ export function createWorkforcePorts(
               last.text.trim().length > 0
                 ? { id: last.id, text: last.text }
                 : null,
-            // Only what both sides already said is stated as fact.
-            material: "",
+            // Step 10: the person's approved facts and the other side's
+            // network-visible material; with none, only the thread.
+            material: conversationMaterial(
+              material,
+              one.counterpart?.id ?? null,
+              one.name,
+            ),
           };
           conversations.set(one.relationshipId, conversation);
           if (conversation.latest !== null) open.push(conversation);
@@ -246,6 +325,7 @@ export function createWorkforcePorts(
           callComing: intent === "PROPOSE_TIMES",
           correlationId,
           brief: (brief ?? "").slice(0, 600),
+          material: conversation.material.slice(0, 4_000),
         });
       },
 
