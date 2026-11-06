@@ -10,6 +10,7 @@ import {
   QConversationPanel,
   type QSurfaceContext,
 } from "@/features/q/q-conversation";
+import { QSection } from "@/features/q/q-section";
 import type { QStarter } from "@/features/q/q-starters";
 import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { ArrivalStage } from "@/features/briefing/arrival-stage";
@@ -250,6 +251,8 @@ export async function HomeScreen({
       >
         {/* A conversation view still has a page heading (R30 #34). */}
         <h1 className="sr-only">Q</h1>
+        {/* Q Workspace W2: the conversation, a section Q can name. */}
+        <QSection id="q" kind="OTHER" label={t("Ask Q")} />
         <QConversationPanel
           connected={qConnected}
           context={surfaceContext(context)}
