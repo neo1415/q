@@ -1526,3 +1526,7 @@ export * from "./board.js";
 export * from "./relationship-notes.js";
 export * from "./onboarding-coverage.js";
 export * from "./unicorn-potential.js";
+
+// ANALYTICS block (Q Workspace §8)
+export * from "./engagement.js";
+// end ANALYTICS block
