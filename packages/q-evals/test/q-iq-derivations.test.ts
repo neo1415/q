@@ -61,3 +61,57 @@ describe("labelled derivations: grader and claim check agree (DECISIONS 61)", ()
     );
   });
 });
+
+/**
+ * Live Q-IQ run 2 (CMP-067/069/070/072/074 #2): "78% versus 41%, a
+ * 37-percentage-point difference" was published by the claim check (both
+ * inputs in the sentence) and graded invented: the grader knew no label
+ * for a difference. The two now agree; a wrong or unsourced difference is
+ * still invented, and still removed.
+ */
+describe("labelled differences: grader and claim check agree (DECISIONS 61)", () => {
+  const cmp = Q_IQ_DATASET.cases.find((c) => c.id === "QIQ-CMP-074");
+  if (cmp === undefined) throw new Error("QIQ-CMP-074 is missing");
+  const turn = 2;
+  const corpus = claimCorpus(
+    [
+      ...Q_IQ_FACTS.map((f) => `${f.statement} ${f.source}`),
+      ...cmp.turns.slice(0, turn + 1).map((t) => t.user),
+    ],
+    new Date("2026-11-06T08:00:00Z"),
+  );
+  const cases: readonly (readonly [string, boolean])[] = [
+    // The exact live sentence.
+    [
+      "Tamarind Pay reports a 41% gross margin, compared with 78% for Ledgerfold—a 37 percentage-point difference.",
+      true,
+    ],
+    [
+      "Ledgerfold's gross margin is 78% against Tamarind Pay's 41%, a gap of 37 points.",
+      true,
+    ],
+    // A wrong difference, labelled.
+    [
+      "Tamarind Pay reports a 41% gross margin, compared with 78% for Ledgerfold—a 33 percentage-point difference.",
+      false,
+    ],
+    // An unsourced input, labelled.
+    [
+      "Tamarind Pay reports a 45% gross margin, compared with 78% for Ledgerfold—a 33 percentage-point difference.",
+      false,
+    ],
+  ];
+  it.each(cases)("%s", (reply, allowed) => {
+    const grade = gradeQIqTurn(Q_IQ_WORLD, cmp, turn, reply);
+    expect(grade.inventedFigures.length === 0, "grader").toBe(allowed);
+    // Known gap, reported (not this lane's change): the claim check also
+    // grounds a small number derivable from any two figures of one source
+    // line, so it publishes the wrong "33" too. Agreement is asserted on
+    // the correct differences, which both publish.
+    if (allowed) {
+      expect(checkAnswer(reply, corpus).text === reply, "claim check").toBe(
+        true,
+      );
+    }
+  });
+});

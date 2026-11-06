@@ -457,16 +457,165 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
           problems.push(
             `${key}: the self-standing ask did not reach the answer`,
           );
+        // The names the facts hold, fenced as data (named_in_facts).
+        const named =
+          prompt
+            .split('<<<UNTRUSTED_CONTENT source="named_in_facts">>>')[1]
+            ?.split("<<<END_UNTRUSTED_CONTENT>>>")[0] ?? "";
         if (
-          !prompt.includes(
-            `Already among the authorised facts, about ${JSON.stringify(t.name)}`,
-          )
+          !named.includes(`"names":[`) ||
+          !named.includes(JSON.stringify(t.name))
         )
           problems.push(`${key}: the facts' company was not named`);
         if (run?.grade.turns[t.turn]?.pass !== true)
           problems.push(`${key}: the reference failed`);
       }
       console.log(JSON.stringify({ followUps: problems }, null, 1));
+      expect(problems).toEqual([]);
+    } finally {
+      await q.close();
+    }
+  }, 900_000);
+
+  it("live run 2 remaining gaps: people's two readings go to the answer, and the facts that name the turn's subjects reach it", async () => {
+    type Probe = {
+      readonly caseId: string;
+      readonly turn: number;
+      /** The v79/v81 reading's references (names as said) and part. */
+      readonly named?: readonly string[];
+      readonly ask?: string;
+      /** Must be in the answer's prompt. */
+      readonly inPrompt: readonly string[];
+    };
+    const probes: readonly Probe[] = [
+      {
+        // "When did he join?" after "the CEO and the CTO": asked back.
+        caseId: "QIQ-PRO-002",
+        turn: 1,
+        named: ["Wanjiru Kamau", "Peter Otieno"],
+        inPrompt: [
+          '"he" could mean Wanjiru Kamau or Peter Otieno',
+          "Peter Otieno (he/him) is the CTO of Silo Health",
+          "Wanjiru Kamau (she/her) is the CEO of Silo Health",
+        ],
+      },
+      {
+        caseId: "QIQ-PRO-006",
+        turn: 1,
+        named: ["Chidi Okafor", "Funmi Adeyemi"],
+        inPrompt: [
+          '"she" could mean Chidi Okafor or Funmi Adeyemi',
+          "Funmi Adeyemi (she/her) is the CFO of Tamarind Pay",
+        ],
+      },
+      {
+        // "Who runs the first one?": "no team on record".
+        caseId: "QIQ-ORD-020",
+        turn: 3,
+        ask: "Who runs Ledgerline?",
+        inPrompt: ["Lindiwe Dube (she/her) is the CEO of Ledgerline"],
+      },
+      {
+        // "And their runway?": "Tamarind Pay's runway isn't on record".
+        caseId: "QIQ-ADV-162",
+        turn: 1,
+        ask: "What's Tamarind Pay's runway?",
+        inPrompt: ["Tamarind Pay cash runway is 13 months."],
+      },
+    ];
+    const at = (caseId: string, turn: number) =>
+      probes.find((p) => p.caseId === caseId && p.turn === turn);
+    const ids = [...new Set(probes.map((p) => p.caseId))];
+    const cases = Q_IQ_DATASET.cases.filter((c) => ids.includes(c.id));
+    expect(cases).toHaveLength(ids.length);
+    const startedAt = new Map<string, number>();
+    const holder: { q?: Awaited<ReturnType<typeof createQIqWorldSubject>> } =
+      {};
+    const q = await createQIqWorldSubject({
+      db,
+      providerMode: "FAKE",
+      scriptedReply: (evalCase, turn) => {
+        startedAt.set(
+          `${evalCase.id}#${String(turn)}`,
+          holder.q?.world().recorder.calls().length ?? 0,
+        );
+        return evalCase.turns[turn]?.reference ?? "";
+      },
+      scriptedReader: (evalCase, turn) => {
+        const probe = at(evalCase.id, turn);
+        const phrase =
+          evalCase.turns[turn]?.user.match(/\b(he|she)\b/u)?.[1] ?? "it";
+        return {
+          kind: "QUESTION_TO_Q",
+          confidence: "HIGH",
+          transcript: "CLEAR",
+          question: null,
+          aboutNamedOther: false,
+          answerKind: "LOOKUP",
+          ...(probe?.ask === undefined
+            ? {}
+            : { parts: [{ ask: probe.ask, kind: "LOOKUP" as const }] }),
+          ...(probe?.named === undefined
+            ? {}
+            : {
+                // The reader cannot tell: it never sees the facts that do.
+                references: probe.named.map((name) => ({
+                  phrase,
+                  entityIds: [],
+                  confidence: "HIGH" as const,
+                  named: { name, kind: "PERSON" as const },
+                })),
+              }),
+          tool: null,
+        };
+      },
+    });
+    holder.q = q;
+    try {
+      const result = await runQIq(q.subject, cases);
+      const calls = q.world().recorder.calls();
+      const problems: string[] = [];
+      for (const probe of probes) {
+        const run = result.cases.find((r) => r.caseId === probe.caseId);
+        expect(run?.error ?? null, probe.caseId).toBeNull();
+        const key = `${probe.caseId}#${String(probe.turn)}`;
+        const reply = run?.replies[probe.turn] ?? "";
+        if (/\bdo you mean\b/u.test(reply))
+          problems.push(`${key}: asked back :: ${reply}`);
+        const from = startedAt.get(key);
+        if (from === undefined) {
+          problems.push(`${key}: the answer model was never asked`);
+          continue;
+        }
+        const to = Math.min(
+          calls.length,
+          ...[...startedAt.values()].filter((n) => n > from),
+        );
+        const prompt = calls
+          .slice(from, to)
+          .map((c) => c.inputText)
+          .join("\n");
+        // The facts quoted in front of the answer, apart from the full
+        // AUTHORISED FACTS list (which holds every fact in any case).
+        const marker = '<<<UNTRUSTED_CONTENT source="named_in_facts">>>';
+        const quotedAt = prompt.indexOf(marker);
+        const quotedFacts =
+          quotedAt < 0
+            ? ""
+            : (prompt
+                .slice(quotedAt + marker.length)
+                .split("<<<END_UNTRUSTED_CONTENT>>>")[0] ?? "");
+        for (const want of probe.inPrompt) {
+          const where = want.startsWith('"') ? prompt : quotedFacts;
+          if (!where.includes(want))
+            problems.push(
+              `${key}: not before the answer: ${JSON.stringify(want)}`,
+            );
+        }
+        if (run?.grade.turns[probe.turn]?.pass !== true)
+          problems.push(`${key}: the reference failed`);
+      }
+      console.log(JSON.stringify({ remainingGaps: problems }, null, 1));
       expect(problems).toEqual([]);
     } finally {
       await q.close();

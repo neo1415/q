@@ -174,6 +174,8 @@ export function bindReferences(
   }
   const bound: BoundReference[] = [];
   const open: string[] = [];
+  /** Two readings of people, for the answer to decide (below). */
+  const undecided: string[] = [];
   for (const { phrase, readings } of phrases.values()) {
     if (readings.length === 0) {
       open.push(phrase);
@@ -189,6 +191,26 @@ export function bindReferences(
         listed(
           (reading?.entities ?? []).map((entity) => nameOf(entity, byRef)),
         );
+      // Live Q-IQ run 2 (PRO-002 #1, PRO-006 #1): "When did he join?"
+      // after "the CEO and the CTO" -- she and he by their own records --
+      // was asked back ("By "he", do you mean Wanjiru Kamau or Peter
+      // Otieno?"). What decides between two people (their roles, how each
+      // is referred to as their record states it) is in the authorised
+      // facts, which the answer reads and the reader never sees. So two
+      // readings of people go to the answer, both named, to decide from
+      // what it holds, and to ask only if that leaves it open. Two
+      // readings of anything else (companies, documents) are told apart
+      // by their names, which the reader saw: those are asked here.
+      const people = (reading: BoundReference | undefined) =>
+        reading !== undefined &&
+        reading.entities.length > 0 &&
+        reading.entities.every((entity) => entity.kind === "PERSON");
+      if (people(first) && people(second)) {
+        undecided.push(
+          ` ${quoted(phrase)} could mean ${name(first)} or ${name(second)}: decide which from what the facts and the conversation say of each (their roles, and how each is referred to as their own record states it); only if nothing there decides, ask which one in one short question naming both.`,
+        );
+        continue;
+      }
       return {
         kind: "CLARIFY",
         reason: "TWO_READINGS",
@@ -199,7 +221,7 @@ export function bindReferences(
     }
     bound.push(chosen);
   }
-  if (bound.length === 0 && open.length === 0) {
+  if (bound.length === 0 && open.length === 0 && undecided.length === 0) {
     return { kind: "NONE", rejected };
   }
   const openNote =
@@ -209,7 +231,7 @@ export function bindReferences(
   return {
     kind: "BOUND",
     bound,
-    note: `${bound.map((one) => noteLine(one, byRef)).join("")}${openNote}`,
+    note: `${bound.map((one) => noteLine(one, byRef)).join("")}${undecided.join("")}${openNote}`,
     open,
     rejected,
   };

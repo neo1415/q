@@ -351,6 +351,28 @@ describe("Q-IQ graders", () => {
     expect(unk.turns[2]?.expect.requiredFigures).toEqual([22, 17]);
   });
 
+  it("dataset fix (live run 2): asked where, the city; asked how many schools, Nyota's two conflicting counts", () => {
+    // ADV-153 #2: "Where are they based?" required the sector.
+    const adv153 = find((x) => x.id === "QIQ-ADV-153");
+    expect(
+      gradeQIqTurn(Q_IQ_WORLD, adv153, 2, "Ledgerfold is based in Accra.").pass,
+    ).toBe(true);
+    expect(
+      gradeQIqTurn(Q_IQ_WORLD, adv153, 2, "Ledgerfold is based in Kisumu.")
+        .pass,
+    ).toBe(false);
+    // ADV-156 #1: Nyota Learn's paying schools are planted as 64 vs 52.
+    const adv156 = find((x) => x.id === "QIQ-ADV-156");
+    expect(adv156.turns[1]?.expect.requiredFigures).toEqual([64, 52]);
+    const live =
+      "Nyota Learn is used by 64 paying schools, according to the founder update from October 2026. A September 2026 billing export lists 52 schools, so the two records conflict; I wouldn’t treat 64 as independently verified.";
+    expect(gradeQIqTurn(Q_IQ_WORLD, adv156, 1, live).pass).toBe(true);
+    expect(
+      gradeQIqTurn(Q_IQ_WORLD, adv156, 1, "Nyota Learn has 64 paying schools.")
+        .pass,
+    ).toBe(false);
+  });
+
   it("passes a clarifying question and fails a guess", () => {
     const c = find(
       (x) =>

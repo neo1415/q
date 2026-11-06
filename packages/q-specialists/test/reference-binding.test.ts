@@ -134,12 +134,27 @@ describe("reference binding: two readings ask one question naming both", () => {
     );
   });
 
-  it("asks when two readings are both sure (the reader could not decide)", () => {
+  it("asks when two readings of companies are both sure (the reader could not decide)", () => {
+    const out = bindReferences(
+      [ref("it", ["E1"], "HIGH"), ref("it", ["E4"], "HIGH")],
+      state,
+    );
+    expect(out.kind).toBe("CLARIFY");
+  });
+
+  it("hands two readings of people to the answer, which holds what decides (live Q-IQ PRO-002 #1, PRO-006 #1)", () => {
+    // "When did he join?" after "the CEO and the CTO": their own records
+    // say she and he, and only the answer reads those records.
     const out = bindReferences(
       [ref("her", ["E2"], "HIGH"), ref("her", ["E3"], "HIGH")],
       state,
     );
-    expect(out.kind).toBe("CLARIFY");
+    if (out.kind !== "BOUND") throw new Error("expected the answer to decide");
+    expect(out.bound).toEqual([]);
+    expect(out.note).toContain(
+      '"her" could mean Ngozi Eze at Silo Credit or Tunde Bakare at Silo Credit',
+    );
+    expect(out.note).toContain("only if nothing there decides, ask which one");
   });
 
   it("names a set as a set in the question", () => {
