@@ -6,6 +6,8 @@ import { parseQApiConfig } from "../src/q-api.js";
 import {
   RESEARCH_PROVIDER_ENV_NAMES,
   researchProviderConfigStatus,
+  retiredResearchProviders,
+  toResearchProviderSecrets,
 } from "../src/research-providers.js";
 import { parseWebServerConfig } from "../src/web.js";
 
@@ -72,11 +74,14 @@ describe("research provider configuration", () => {
   });
 
   it("reads ScrapingBee under its correct name and under the typo it was first deployed with", () => {
-    const typo = parseQApiConfig({ ...base, SCRAPIG_BEE_API: KEY });
+    // Retired by default (DECISIONS 65); the names are still read when
+    // the owner brings them back.
+    const back = { ...base, CQ_RESEARCH_PROVIDERS_RETIRED: "" };
+    const typo = parseQApiConfig({ ...back, SCRAPIG_BEE_API: KEY });
     expect(typo.secrets.researchProviders.scrapingBee?.reveal()).toBe(KEY);
-    const right = parseQApiConfig({ ...base, SCRAPING_BEE_API: KEY });
+    const right = parseQApiConfig({ ...back, SCRAPING_BEE_API: KEY });
     expect(right.secrets.researchProviders.scrapingBee?.reveal()).toBe(KEY);
-    const serper = parseQApiConfig({ ...base, SERPER_API_KEY: KEY });
+    const serper = parseQApiConfig({ ...back, SERPER_API_KEY: KEY });
     expect(serper.secrets.researchProviders.serper?.reveal()).toBe(KEY);
   });
 
@@ -120,5 +125,50 @@ describe("research provider configuration", () => {
     expect(JSON.stringify(web)).not.toContain(KEY);
     expect(JSON.stringify(web)).not.toContain("tavily");
     expect(JSON.stringify(web)).not.toContain("TAVILY");
+  });
+});
+
+describe("retired research providers (DECISIONS 65)", () => {
+  const keys = {
+    TAVILY_API_KEY: "tvly-synthetic-research-key-000000000000000000",
+    BRAVE_API: "brave-synthetic-research-key-0000000000000000",
+    SERPER_API_KEY: "serper-synthetic-research-key-000000000000000",
+    SCRAPING_BEE_API: "bee-synthetic-research-key-0000000000000000000",
+  };
+
+  it("leaves ScrapingBee and Serper out by default, so Brave and Tavily carry research", () => {
+    const status = researchProviderConfigStatus(
+      toResearchProviderSecrets(keys),
+    );
+    expect(status).toMatchObject({
+      tavily: "configured",
+      brave: "configured",
+      serper: "unconfigured",
+      scrapingBee: "unconfigured",
+    });
+  });
+
+  it("brings them back by configuration alone (the code paths stay)", () => {
+    const status = researchProviderConfigStatus(
+      toResearchProviderSecrets({ ...keys, CQ_RESEARCH_PROVIDERS_RETIRED: "" }),
+    );
+    expect(status).toMatchObject({
+      serper: "configured",
+      scrapingBee: "configured",
+    });
+  });
+
+  it("can retire another provider, and ignores an unknown code rather than failing start", () => {
+    expect([...retiredResearchProviders("brave, nonsense")]).toEqual(["brave"]);
+    const status = researchProviderConfigStatus(
+      toResearchProviderSecrets({
+        ...keys,
+        CQ_RESEARCH_PROVIDERS_RETIRED: "brave",
+      }),
+    );
+    expect(status).toMatchObject({
+      brave: "unconfigured",
+      serper: "configured",
+    });
   });
 });
