@@ -105,6 +105,42 @@ export function retiredResearchProviders(
   );
 }
 
+export type BrightDataSecrets = {
+  readonly apiKey: ProviderCredential;
+  readonly serpZone: string | undefined;
+  readonly unlockerZone: string | undefined;
+};
+
+export type ResearchProviderSecrets = {
+  /** Tavily search + extract; absent means the research tools are not composed. */
+  readonly tavily: ProviderCredential | undefined;
+  /** Bright Data; absent means no profile lookups and no Bright Data search. */
+  readonly brightData: BrightDataSecrets | undefined;
+  /** SerpApi search; absent means one search index only. */
+  readonly serpApi: ProviderCredential | undefined;
+  /** Serper.dev search + page scrape; absent means that index is skipped. */
+  readonly serper?: ProviderCredential | undefined;
+  /** ScrapingBee Google search + HTML fetch; absent means that index is skipped. */
+  readonly scrapingBee?: ProviderCredential | undefined;
+  /** Brave Search web, news and images; absent means that index is skipped. */
+  readonly brave?: ProviderCredential | undefined;
+  /** Companies House; absent means investor research skips it. */
+  readonly companiesHouse?: ProviderCredential | undefined;
+  /** The contact EDGAR requires; absent means investor research skips it. */
+  readonly secEdgarUserAgent?: string | undefined;
+};
+
+export type ResearchProviderConfigStatus = {
+  readonly tavily: "configured" | "unconfigured";
+  readonly brightData: "configured" | "unconfigured";
+  /** Both zones named: search and extraction may go through Bright Data. */
+  readonly brightDataZones: "configured" | "unconfigured";
+  readonly serpApi: "configured" | "unconfigured";
+  readonly serper: "configured" | "unconfigured";
+  readonly scrapingBee: "configured" | "unconfigured";
+  readonly brave: "configured" | "unconfigured";
+};
+
 export function toResearchProviderSecrets(parsed: {
   readonly TAVILY_API_KEY?: string | undefined;
   readonly BRIGHT_DATA_API_KEY?: string | undefined;
