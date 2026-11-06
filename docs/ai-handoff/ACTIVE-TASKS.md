@@ -1,5 +1,30 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 6 November 2026, 22:45 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+
+Production: all four services on `d09aec914` (21:44). Hosted migrations 281. Routes v2: OpenAI first, Claude Sonnet backup throughout. Rollback: `c2346a404`. Governing decisions: 68–71.
+
+**PROGRAMME: Q Workspace** (owner priority 1). Plan: `docs/specs/q-workspace/Q_WORKSPACE_PLAN.md`; storyboard https://claude.ai/artifact/VV1PZzYJd2Xqk3wdM6NgNY. Everything ships behind the `workspace` flag (default off). Merge order W1 → W2/W3 → W4 → W5; one CI run per batch (DECISIONS 70).
+
+| Lane                                                                                   | Session                          | Branch                   | State                                      |
+| -------------------------------------------------------------------------------------- | -------------------------------- | ------------------------ | ------------------------------------------ |
+| W1 shell (flag, Q pane in the layout, split, subtle collapse, phone, ADR 0031)         | session_01Wncmn4AftvVnCCbs7qHobz | feat/q-workspace-shell   | STARTED 22:40                              |
+| W2 site map + instance resolution + digest                                             | session_01Wncmn4SKUdLWXcpXd7KKVm | feat/q-site-map          | STARTED 22:40                              |
+| W3 deep links + arrival + Back (single contracts owner: ui-intent.ts, result-block.ts) | session_01Wncmn6yZzXx1xtFxaXwp9b | feat/q-deep-links        | STARTED 22:40                              |
+| W4 navigation policy + q-nav eval (≥ 400 turns; gates ≥ 98% / ≥ 99%)                   | session_01Wncmn4BQnwUu8PoUpcMjfu | feat/q-navigation-policy | STARTED (eval first)                       |
+| W5 page actions (approval classes), arrival intelligence, meetings                     | session_01Wncmn7LanmxRBs1Eoe8por | feat/q-page-actions      | AFTER W1 lands                             |
+| A1–A6 analytics (within spec §6.7.12–14)                                               | session_01Wncmn6n2wuJcJPM1ZeWXX3 | feat/q-analytics         | STARTED 22:40                              |
+| Browser pane                                                                           | —                                | —                        | Feasibility in plan §9; owner choice later |
+
+| Other                                                       | State                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claim check recomputes derived figures (c98639b)            | MERGED into integration (386b9aa48), not yet in CI; goes with workspace batch 1                                                                                                                                  |
+| Owner questions                                             | COR-054 hint. Analytics: (1) with paid reveal but no override, do Anonymous viewers show their organisation (now no)? (2) which plans include identity reveal? (3) should the 3-organisation floor be a setting? |
+| NEXT after the workspace and analytics (owner, 6 Nov 23:35) | Audit suitability, the unicorn predictor, reversibility and the other metrics, plus their UI/UX                                                                                                                  |
+| 3:10 a.m. Lagos resume check                                | Scheduled (trig_01NLmTk8xoe8k6pyduUJbLXp, 02:10 UTC), in case usage runs out                                                                                                                                     |
+
+Anthropic test spend: about $7.7.
+
 ## Live board — 6 November 2026, 21:10 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
 Production: all four services on `c2346a404` (20:28). Hosted migrations 280. Routes v2: OpenAI first; Claude backup (Haiku for the fast classes until 20261231360000). Rollback: `2dba5ed8c`. Governing decisions: **68–70** (no OpenAI evals; Anthropic test budget $50; intelligence first; OpenAI primary and Sonnet backup; one CI run per batch).

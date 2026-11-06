@@ -21,6 +21,10 @@
       "types": "./dist/workers.d.ts",
       "default": "./dist/workers.js"
     },
+    "./workspace-mode": {
+      "types": "./dist/workspace-mode.d.ts",
+      "default": "./dist/workspace-mode.js"
+    },
     "./web": {
       "types": "./dist/web.d.ts",
       "default": "./dist/web.js"

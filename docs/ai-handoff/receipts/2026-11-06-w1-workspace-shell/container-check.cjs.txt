@@ -1,0 +1,24 @@
+const { chromium } = require("playwright");
+(async () => {
+  const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+  const out = {};
+  for (const ws of ["on", "off"]) {
+    const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+    await p.goto(`http://127.0.0.1:3100/dev/workspace?ws=${ws}`, { waitUntil: "load", timeout: 120000 });
+    await p.waitForTimeout(2000);
+    out[ws] = await p.evaluate(() => {
+      const host = document.querySelector(".cq-q-pane") ?? document.querySelector("main");
+      host.insertAdjacentHTML("beforeend", `<div id="t" style="width:100%">
+        <div id="room" data-q-room="filled" class="flex w-full flex-col items-center xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"><div id="slot" class="hidden xl:flex"></div></div>
+        <div id="cmp" class="grid sm:grid-cols-2 lg:grid-cols-3"></div>
+        <div id="cmp4" class="grid sm:grid-cols-2 xl:grid-cols-4"></div>
+        <div id="deck" class="grid gap-4 md:grid-cols-[minmax(0,1fr)_10.75rem]"></div>
+        <div id="thumbs" class="grid grid-cols-5 md:grid-cols-2 md:overflow-y-auto"></div></div>`);
+      const cs = (id, prop) => getComputedStyle(document.getElementById(id))[prop];
+      const cols = (id) => cs(id, "gridTemplateColumns").split(" ").length;
+      return { room: cs("room", "display"), slot: cs("slot", "display"), cmp: cols("cmp"), cmp4: cols("cmp4"), deck: cols("deck"), thumbs: cols("thumbs") };
+    });
+  }
+  console.log(JSON.stringify(out));
+  await b.close();
+})();

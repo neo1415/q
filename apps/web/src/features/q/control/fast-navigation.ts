@@ -23,6 +23,7 @@ import {
 import { tabAskOf } from "@capital-q/q-specialists/tab-request";
 
 import { destinationPath } from "@/features/voice/destinations";
+import { navigateIntentPath } from "./deep-link";
 
 import {
   noteAsked,
@@ -119,7 +120,7 @@ export function pathOfIntent(
 ): string | null {
   switch (intent.kind) {
     case "NAVIGATE":
-      return destinationPath(intent.destination);
+      return navigateIntentPath(intent);
     case "OPEN_SETTINGS":
       return settingsPath(intent.section);
     case "OPEN_RECORD_PAGE":

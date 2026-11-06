@@ -64,7 +64,12 @@ export function DeckBrief({
   const [picked, setPicked] = useState<number | null>(null);
   const index = picked ?? (askedAt >= 0 ? askedAt : firstProvided(sections));
   const [file, setFile] = useState<OpenedFile | null>(null);
-  const [slide, setSlide] = useState(() => sections[index]?.pages[0] ?? 1);
+  // W3.2: a deep link to one slide (`?slide=<n>`, with `open=1`) starts
+  // the viewer there; a number past the deck's end is the last slide.
+  const askedSlide = slideParam(params?.get("slide"), view.deck?.pageCount);
+  const [slide, setSlide] = useState(
+    () => askedSlide ?? sections[index]?.pages[0] ?? 1,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const frame = useRef<HTMLDivElement>(null);
@@ -437,4 +442,18 @@ function DeckSectionDetail({
       </ClaimLine>
     </>
   );
+}
+
+/** A `?slide=` value as a slide number (1-based), or null when not one. */
+export function slideParam(
+  raw: string | null | undefined,
+  pageCount: number | null | undefined,
+): number | null {
+  if (raw === null || raw === undefined || !/^[1-9][0-9]{0,3}$/u.test(raw)) {
+    return null;
+  }
+  const asked = Number(raw);
+  return pageCount === null || pageCount === undefined
+    ? asked
+    : Math.min(asked, Math.max(1, pageCount));
 }

@@ -19,6 +19,7 @@ import {
   beginNavigationTurn,
   lastNavigationTo,
 } from "./control/navigation-lifecycle";
+import { withNavigateTarget } from "./control/deep-link";
 import { currentRoute } from "./control/route-state";
 import {
   doneByScreen,
@@ -68,6 +69,15 @@ export type ClientActionEffects = {
    * over the page they are on. Absent: its page (/documents?open=).
    */
   readonly openDocument?: ((artifactId: string) => void) | undefined;
+  /**
+   * Q Workspace W1.5: open or collapse the panes; absent where there is
+   * no workspace (the action is then not performed, and says so).
+   */
+  readonly setLayout?:
+    | ((
+        layout: Extract<QClientActionIntent, { kind: "LAYOUT_SET" }>,
+      ) => boolean)
+    | undefined;
 };
 
 /** A data-room document Q opened on screen (R0). */
@@ -175,6 +185,13 @@ const RELATIONSHIP_TAB_NAMES: readonly string[] = [
  * authorises what it shows as the person, as for a typed URL.
  */
 export function recordIntentPath(
+  intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): string {
+  // W3.2: the exact place on the page (document, slide, message, section).
+  return withNavigateTarget(recordIntentBasePath(intent), intent.target);
+}
+
+function recordIntentBasePath(
   intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
 ): string {
   const base = recordPagePath(intent.page, intent.id, intent.companyId);
@@ -720,6 +737,8 @@ function performChecked(
     case "SIGN_OUT":
       effects.signOut();
       return true;
+    case "LAYOUT_SET":
+      return effects.setLayout?.(action) ?? false;
     case "OPEN_RECORD_PAGE":
       // Lane 7: what Q opened is what "it" and "the other one" mean next.
       noteOpenedPage(action);

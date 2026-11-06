@@ -31,6 +31,10 @@ import {
   type DnsTxtResolver,
 } from "./email.js";
 import { createFlagReader, listFlags, setFlag } from "./flags.js";
+import {
+  readAnalyticsSettings,
+  updateAnalyticsSettings,
+} from "./analytics-settings.js";
 import { qErrors, qMonitor, qRunTrace } from "./q-monitor.js";
 import { reviewReport, safetyQueue } from "./safety.js";
 import { listTeam, revokeTeamRole, setTeamRole } from "./team.js";
@@ -428,6 +432,12 @@ export function createPlatformAdmin(options: {
       query: Parameters<typeof searchAudit>[2],
     ) => searchAudit(sql, grant, query),
     listFlags: (grant: AdminGrant) => listFlags(sql, grant),
+    readAnalyticsSettings: (grant: AdminGrant) =>
+      readAnalyticsSettings(sql, grant),
+    updateAnalyticsSettings: (
+      grant: AdminGrant,
+      input: Parameters<typeof updateAnalyticsSettings>[2],
+    ) => updateAnalyticsSettings(transactions, grant, input),
     setFlag: (grant: AdminGrant, input: Parameters<typeof setFlag>[2]) =>
       setFlag(transactions, grant, input),
     emailPanel,

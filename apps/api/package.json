@@ -24,6 +24,7 @@
     "@capital-q/database": "workspace:*",
     "@capital-q/deck-render": "workspace:*",
     "@capital-q/discovery": "workspace:*",
+    "@capital-q/engagement": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/evidence": "workspace:*",
     "@capital-q/founder-onboarding": "workspace:*",

@@ -15,7 +15,7 @@ import {
   type NavigationOutcome,
 } from "../q/ui-act-controller";
 import { noteToLine } from "./line-cards";
-import { destinationPath } from "./destinations";
+import { voiceMovePath } from "./live/move";
 import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 import type { VoiceSessionClient } from "./session";
 
@@ -95,7 +95,7 @@ export function performTurnChain(
   const path =
     turn.navigate === "Q_PITCH" && qPitchHoldsVoice()
       ? null
-      : destinationPath(turn.navigate);
+      : voiceMovePath(turn.navigate, turn.navigateTarget);
   // Every move gets its receipt, even to where they already are (VERIFIED
   // at once): the GPT-Live voice waits for it before it speaks.
   if (path !== null && typeof window !== "undefined") {
