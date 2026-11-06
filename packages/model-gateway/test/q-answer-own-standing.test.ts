@@ -836,7 +836,14 @@ describe("what exists, and the parity gap", () => {
   });
 
   it("confirms a remember ask in code's own words, with no could-not line (QA 2026-10-24)", async () => {
-    const asked = async (said: string, answer: string) => {
+    // Step 4: the reader reads the remember ask (v78 `remember`), said
+    // back in the second person; a task for later leaves it out.
+    const TOBACCO = { fact: "you pass on tobacco businesses" };
+    const asked = async (
+      said: string,
+      answer: string,
+      rememberAsk?: { readonly fact: string | null },
+    ) => {
       const { seam, request, persisted } = build(
         { status: "SUCCEEDED", data: CONNECTED },
         undefined,
@@ -848,6 +855,7 @@ describe("what exists, and the parity gap", () => {
         ...request,
         turnKind: "TOOL_REQUEST",
         askedAction: "get_q_daily",
+        ...(rememberAsk === undefined ? {} : { rememberAsk }),
       });
       return persisted.join("\n");
     };
@@ -860,6 +868,7 @@ describe("what exists, and the parity gap", () => {
       const said = await asked(
         "Remember: I pass on tobacco businesses.",
         answer,
+        TOBACCO,
       );
       expect(said, answer).toBe(
         "I'll remember that you pass on tobacco businesses.",
@@ -869,6 +878,7 @@ describe("what exists, and the parity gap", () => {
     const offered = await asked(
       "Remember: I pass on tobacco businesses.",
       "You pass on tobacco businesses.\n\nWould you like me to add tobacco to your mandate's exclusions?",
+      TOBACCO,
     );
     expect(offered).toBe(
       "I'll remember that you pass on tobacco businesses.\n\nWould you like me to add tobacco to your mandate's exclusions?",
@@ -882,28 +892,38 @@ describe("what exists, and the parity gap", () => {
     expect(task).toContain("I didn't prepare that, so nothing was changed.");
   });
 
-  it("says their words back to them in a remember confirmation", () => {
+  it("says the reader's second-person fact back in a remember confirmation", () => {
     expect(
-      rememberConfirmation("Remember that we only lead seed rounds.")?.line,
+      rememberConfirmation({ fact: "you only lead seed rounds" })?.line,
     ).toBe("I'll remember that you only lead seed rounds.");
-    expect(
-      rememberConfirmation("please remember I'm based in Lagos")?.line,
-    ).toBe("I'll remember that you're based in Lagos.");
-    expect(
-      rememberConfirmation("Q, keep in mind my fund closes in March.")?.line,
-    ).toBe("I'll remember that your fund closes in March.");
+    expect(rememberConfirmation({ fact: "you're based in Lagos." })?.line).toBe(
+      "I'll remember that you're based in Lagos.",
+    );
     // Not plain to say back: confirmed without repeating it.
+    expect(rememberConfirmation({ fact: null })?.line).toBe(
+      "I'll remember that.",
+    );
     expect(
-      rememberConfirmation("Remember: you should be shorter. Ask less.")?.line,
+      rememberConfirmation({ fact: "you want shorter answers. Ask less." })
+        ?.line,
     ).toBe("I'll remember that.");
-    for (const notAsked of [
-      "Remember to send Kestrel my deck",
-      "Remember what I said about Kestrel",
-      "Do you remember my mandate?",
-      "Note the call is tomorrow",
-    ]) {
-      expect(rememberConfirmation(notAsked), notAsked).toBeNull();
-    }
+    // No remember ask read, or no reading at all: nothing, whatever the words.
+    expect(rememberConfirmation(null)).toBeNull();
+    expect(rememberConfirmation(undefined)).toBeNull();
+  });
+
+  it("step 4: 'Remember: …' with no reader remember field gets no code confirmation", async () => {
+    const { seam, request, persisted } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {},
+      {
+        said: "Remember: I pass on tobacco businesses.",
+        answer: "Noted -- tobacco is out for you.",
+      },
+    );
+    await seam.answer({ ...request, turnKind: "ANSWER" });
+    expect(persisted.join("\n")).not.toContain("I'll remember that");
   });
 
   // QA I18 (batch-7 re-score, run de5e799d): "What happened in my last

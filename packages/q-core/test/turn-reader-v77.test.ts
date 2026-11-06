@@ -22,13 +22,14 @@ describe("TURN_READER v77", () => {
     confidence: "HIGH",
   };
 
-  it("is the active reader: v76 kept whole plus one REFERENCES rule", () => {
+  it("is v76 kept whole plus one REFERENCES rule (v78 is active)", () => {
     const active =
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
-    expect(active.version).toBe(77);
-    expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV77ResultSchema,
-    );
+    expect(active.version).toBe(78);
+    expect(
+      TURN_READER_V77.output.kind === "STRUCTURED" &&
+        TURN_READER_V77.output.schema,
+    ).toBe(TurnReaderV77ResultSchema);
     expect(
       TURN_READER_V77.template.replace(
         `${V76_CONVERSATION_STATE}${V77_REFERENCES}`,

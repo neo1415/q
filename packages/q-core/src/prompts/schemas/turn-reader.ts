@@ -1175,3 +1175,64 @@ export const TurnReaderV77ResultSchema = TurnReaderV75ResultSchema.extend({
     .catch([]),
 }).strict();
 export type TurnReaderV77Result = z.infer<typeof TurnReaderV77ResultSchema>;
+
+/**
+ * v78 (Q intelligence step 4): one source of truth for "what was asked".
+ * Code chose the answer's work from word lists (analysis words, comparison
+ * words, two kinds of work product) beside the reading; v78 asks the reader
+ * for it by meaning, in any language. `answerKind` is the heaviest work the
+ * turn asks of the answer; `parts` lists each separate thing a compound ask
+ * wants, in the order asked, each with its own kind -- empty for a single
+ * ask. Lenient: a malformed value reads as absent and never costs the
+ * reading. Absent (no reading, FAKE mode, an older version) is the neutral
+ * default: the answer's work follows the capability alone, never a word
+ * list.
+ */
+export const TURN_READER_V78_SCHEMA_VERSION = 78;
+export const TURN_ANSWER_KINDS = [
+  "CHAT",
+  "LOOKUP",
+  "FOLLOW_UP",
+  "ANALYSIS",
+  "COMPARISON",
+  "DOCUMENT",
+] as const;
+export type TurnAnswerKind = (typeof TURN_ANSWER_KINDS)[number];
+export const TurnAnswerKindSchema = z.enum(TURN_ANSWER_KINDS);
+export const TURN_READER_PARTS_MAX = 6;
+export const TurnReaderPartSchema = z
+  .object({
+    ask: z.string().trim().min(1).max(240),
+    kind: TurnAnswerKindSchema,
+  })
+  .strict();
+export type TurnReaderPart = z.infer<typeof TurnReaderPartSchema>;
+/**
+ * v78: they ask Q to keep something in mind about themselves or how they
+ * work ("Remember: I pass on gambling", "don't forget I only do seed") --
+ * not a task for later ("remember to send…") and not a recall question
+ * ("remember what I said about Kestrel?"). `fact` is it said back to them
+ * in the second person ("you pass on gambling businesses"), or null when
+ * it would not read back plainly. Code says the confirmation; the memory
+ * write gate, not this field, decides what is kept.
+ */
+export const TurnRememberAskSchema = z
+  .object({
+    fact: z.string().trim().min(1).max(200).nullable().default(null),
+  })
+  .strict();
+export type TurnRememberAsk = z.infer<typeof TurnRememberAskSchema>;
+export const TurnReaderV78ResultSchema = TurnReaderV77ResultSchema.extend({
+  answerKind: TurnAnswerKindSchema.nullable().default(null).catch(null),
+  parts: z
+    .array(TurnReaderPartSchema)
+    .max(TURN_READER_PARTS_MAX)
+    .default([])
+    .catch([]),
+  remember: TurnRememberAskSchema.nullable().default(null).catch(null),
+  /** They ask for a chart, graph or plot of something. */
+  asksForChart: z.boolean().default(false).catch(false),
+  /** They ask for the public web, news or press -- what is said outside Capital Q. */
+  asksForWeb: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV78Result = z.infer<typeof TurnReaderV78ResultSchema>;

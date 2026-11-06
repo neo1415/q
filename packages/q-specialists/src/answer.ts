@@ -49,24 +49,24 @@ const INVESTOR_VISIBILITY_TOOL = "set_investor_visibility";
  * One of their own records' audience is that record's declared action,
  * never the company's visibility (QA run 3af14042: "Make Ajopot seed deck
  * private to my organisation again" prepared "Make your company private").
- * A deck, document or upload first ("pitch deck" is a deck), then a pitch
- * video. The tool resolves the name among their own records and refuses
- * one it cannot find.
+ * Q intelligence step 4: which record's action is the reader's askedAction
+ * (v30), never a word list; the tool resolves the name among their own
+ * records and refuses one it cannot find.
  */
-const RECORD_AUDIENCE: readonly (readonly [RegExp, string])[] = [
-  [
-    /\b(?:decks?|documents?|docs?|files?|uploads?|one-pagers?|financials)\b/iu,
-    "set_deck_audience",
-  ],
-  [/\b(?:pitch(?:es)?|videos?|recordings?)\b/iu, "set_pitch_sharing"],
-];
+const RECORD_AUDIENCE_TOOLS: ReadonlySet<string> = new Set([
+  "set_deck_audience",
+  "set_pitch_sharing",
+]);
 
-/** The record-audience action the words name, or null. */
-export function recordAudienceTool(utterance: string): string | null {
-  for (const [words, tool] of RECORD_AUDIENCE) {
-    if (words.test(utterance)) return tool;
-  }
-  return null;
+/** The record-audience action the reader named, or null. */
+export function recordAudienceTool(
+  askedAction: string | null | undefined,
+): string | null {
+  return askedAction !== null &&
+    askedAction !== undefined &&
+    RECORD_AUDIENCE_TOOLS.has(askedAction)
+    ? askedAction
+    : null;
 }
 import {
   QMessageIdSchema,
@@ -1662,9 +1662,26 @@ function askedIn(history: readonly QConversationMessage[]): string {
  * words voice speaks for the same destinations; the screen follows the
  * UI_INTENT the message carries, through its one route map.
  */
-/** Words that ask for the public web, so advice still researches (S7). */
-const NAMES_THE_WEB =
-  /\b(?:web|online|internet|news|press|google|public(?:ly)?\s+(?:sources?|information|record|reports?)|search(?:\s+for)?|look\s+(?:it|them|this|that)\s+up|in\s+the\s+media)\b/i;
+/**
+ * S7 (lane S, live 2026-10-15 runs d3fdbd12 and f72d9994, "What are the
+ * main risks here?" on a company page): advice takes research by default
+ * (q-core), so every such ask about a company Capital Q holds searched the
+ * public web first -- 6.3 s before the synthesis started, a paid provider
+ * call each time. Advice alone is answered from Capital Q's records; it
+ * still researches when they ask for the web (Q intelligence step 4: the
+ * reader's asksForWeb, never a word list) or name a web address.
+ */
+export function adviceOnCapitalQRecord(
+  request: Pick<QAnswerRequest, "turnKind" | "questionKind" | "asksForWeb">,
+  text: string,
+): boolean {
+  return (
+    request.turnKind === "QUESTION_TO_Q" &&
+    request.questionKind === "ADVICE" &&
+    request.asksForWeb !== true &&
+    !namesWebAddress(text)
+  );
+}
 
 /**
  * A screen of an investor's own (INVESTOR_SCREENS) asked for by someone
@@ -6600,15 +6617,11 @@ export function createSpecialistQAnswer(
         return added;
       }
     }
-    // A save in their words the reader left unread ("save that plan to my
-    // board"): never a request for new work (live 9ff4a1118, F-78b: it
-    // went to the team job and filed a plan from nothing).
-    const savesToBoard =
-      boardAsk === "SAVE" ||
-      boardAsk === "BREAKDOWN" ||
-      (boardAsk === null &&
-        mentionsOwnBoard(latest.content) &&
-        /\b(?:save|keep|pin|file)\b/iu.test(latest.content));
+    // A save to their board, as the reader read it (v61 boardAsk). Q
+    // intelligence step 4: never a word fallback when the reader left it
+    // unread -- an unread save is no save, so it never starts new work
+    // either (live 9ff4a1118, F-78b).
+    const savesToBoard = boardAsk === "SAVE" || boardAsk === "BREAKDOWN";
     // F-90 (QA re-score): "Write a 12-month growth plan and save it to my
     // board", one turn. The work starts first; the board then keeps the
     // job itself, linked, never Q's previous answer.
@@ -6618,10 +6631,10 @@ export function createSpecialistQAnswer(
       read.addressedToQ !== false &&
       read.workFromEarlier !== true &&
       (read.teamJob === true ||
-        // The turn itself asks for the work first ("Write … and save it").
-        /^\s*(?:please\s+|can you\s+|could you\s+)?(?:write|draft|make|create|prepare|build|put together)\b/iu.test(
-          latest.content,
-        ));
+        // The turn itself asks for a document first ("Write … and save
+        // it"): the reader's DOCUMENT kind (v78), never the verb.
+        read.answerKind === "DOCUMENT" ||
+        (read.parts ?? []).some((part) => part.kind === "DOCUMENT"));
     // A document asked for in the same breath is the work itself (batch 8
     // F11: "write a plan and save it" read with a document request too).
     if (
@@ -7260,11 +7273,11 @@ export function createSpecialistQAnswer(
       !request.subjects.some((subject) => subject.kind === "COMPANY") &&
       offeredNames.has(INVESTOR_VISIBILITY_TOOL) &&
       (dependencies.appActions?.tools.has(INVESTOR_VISIBILITY_TOOL) ?? false);
-    // SET_VISIBILITY read for words that name a deck or a pitch of theirs:
-    // that record's own action, when this run offers it.
+    // SET_VISIBILITY read with a deck's or a pitch's own action named by
+    // the reader (askedAction): that record's action, when offered.
     const audienceTool =
       tool?.kind === "SET_VISIBILITY"
-        ? recordAudienceTool(latest.content)
+        ? recordAudienceTool(read?.askedAction)
         : null;
     const recordAudience =
       audienceTool !== null &&
@@ -7689,7 +7702,7 @@ export function createSpecialistQAnswer(
     // Ledgerfold, and a waiting connection request was turned into an
     // "accept and send a message" card. Asking for work products is never
     // a hand-over of a relationship: the answer path plans that work.
-    const askedForWork = asksForWorkProducts(latest.content);
+    const askedForWork = asksForWorkProducts(read?.parts);
     if (askedForWork && read?.handOver != null) {
       logger?.info(
         { qRunId: request.runId },
@@ -7911,6 +7924,20 @@ export function createSpecialistQAnswer(
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
+      // Q intelligence step 4: what was asked comes from the reading alone
+      // (TURN_READER v78) -- the answer's work and every part of a compound
+      // ask. Unread, neither is sent: the answer takes its neutral default.
+      ...(read?.answerKind === undefined || read.answerKind === null
+        ? {}
+        : { answerKind: read.answerKind }),
+      ...(read?.parts === undefined || read.parts.length < 2
+        ? {}
+        : { askParts: read.parts }),
+      ...(read?.remember === undefined || read.remember === null
+        ? {}
+        : { rememberAsk: read.remember }),
+      ...(read?.asksForChart === true ? { asksForChart: true } : {}),
+      ...(read?.asksForWeb === true ? { asksForWeb: true } : {}),
       // K8: a question about a prepared subject.
       ...(read?.kind === "QUESTION_TO_Q" &&
       read.question?.subject !== undefined &&
@@ -8134,26 +8161,6 @@ export function createSpecialistQAnswer(
     }
     return outcome;
   };
-
-  /**
-   * S7 (lane S, live 2026-10-15 runs d3fdbd12 and f72d9994, "What are the
-   * main risks here?" on a company page): advice takes research by default
-   * (q-core), so every such ask about a company Capital Q holds searched the
-   * public web first -- 6.3 s before the synthesis started, first text at
-   * 11.3-11.7 s, a paid provider call each time. The specialist reads the
-   * web only for a turn that asks for public information: a research
-   * request, PUBLIC_FACTS or REAL_WORLD_EXAMPLE, or words that name the web.
-   * Advice alone is answered from Capital Q's records. A company known only
-   * publicly is still always researched (the specialist's own rule).
-   */
-  const adviceOnCapitalQRecord = (
-    request: QAnswerRequest,
-    text: string,
-  ): boolean =>
-    request.turnKind === "QUESTION_TO_Q" &&
-    request.questionKind === "ADVICE" &&
-    !NAMES_THE_WEB.test(text) &&
-    !namesWebAddress(text);
 
   /** Lane S: their words name one of their own counterparts other than `focus`. */
   const namesOtherCounterpart = async (
@@ -8740,23 +8747,28 @@ function asksAQuestion(text: string): boolean {
   );
 }
 
+/** Work-product kinds of a part (TURN_READER v78): judgement, weighing, a document. */
+const WORK_PRODUCT_KINDS: ReadonlySet<string> = new Set([
+  "ANALYSIS",
+  "COMPARISON",
+  "DOCUMENT",
+]);
+
 /**
- * The words ask Q to produce analysis or documents (research, an
- * assessment, a memo or brief, a critique or revision, diligence
- * questions): two or more distinct kinds of work. Handing a relationship
- * over ("handle Kestrel for me") names none of them.
+ * The reading splits the turn into two or more parts that each ask Q for
+ * work (an assessment, a comparison, a memo, diligence questions): a
+ * request for work products. Handing a relationship over ("handle Kestrel
+ * for me") is one ask and names none of them. Q intelligence step 4: read
+ * from the reader's parts (v78), never from the words; no reading, or an
+ * older one, is no work request (the neutral default).
  */
-export function asksForWorkProducts(text: string): boolean {
-  const said = text.toLowerCase();
-  const kinds = [
-    /\bresearch/u,
-    /\b(assess|assessment|evaluat|analy[sz])/u,
-    /\b(memo|brief|report|one-pager|write-?up)\b/u,
-    /\b(critique|second opinion|review it|revise|revision)/u,
-    /\b(diligence questions|due diligence|questions for the founder|founder questions|diligence)/u,
-    /\b(risks?|missing information|red flags)\b/u,
-  ];
-  return kinds.filter((kind) => kind.test(said)).length >= 2;
+export function asksForWorkProducts(
+  parts: readonly { readonly kind: string }[] | undefined,
+): boolean {
+  return (
+    (parts ?? []).filter((part) => WORK_PRODUCT_KINDS.has(part.kind)).length >=
+    2
+  );
 }
 
 /** Q's own question for their city or time zone. */

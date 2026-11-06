@@ -28,7 +28,7 @@ describe("TURN_READER v24", () => {
   it("is the active reader and v23 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(77);
+    ).toBe(78);
     expect(TURN_READER_V23.status).toBe("DEPRECATED");
     expect(TURN_READER_V24.status).toBe("DEPRECATED");
   });

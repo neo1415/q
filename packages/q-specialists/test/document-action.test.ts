@@ -2219,7 +2219,32 @@ describe("saving work that has to start first, or never started", () => {
     expect(s.stored[0]?.content).toMatch(/Nothing has gone on your board/u);
   });
 
-  it("'save that plan to my board' after the team job's failure line, unread by the reader, saves nothing and starts nothing", async () => {
+  it("'save that plan to my board' after the team job's failure line saves nothing and starts nothing", async () => {
+    const { board, added } = keeper(null);
+    let proposed = 0;
+    const s = seam({
+      history: [
+        message("USER", "Write me a 12-month plan"),
+        message("Q", teamJobLine({ status: "FAILED" })),
+        message("USER", "save that plan to my board"),
+      ],
+      // Step 4: the save is the reader's (boardAsk), never a word fallback.
+      reading: reading("SAVE"),
+      board,
+      teamJob: {
+        propose: () => {
+          proposed += 1;
+          return Promise.resolve({ status: "FAILED" });
+        },
+      },
+    });
+    await s.run();
+    expect(proposed).toBe(0);
+    expect(added).toEqual([]);
+    expect(s.prepared).toHaveLength(0);
+    expect(s.stored[0]?.content).toMatch(/^There's nothing to save yet/u);
+  });
+  it("step 4: the same words unread by the reader save nothing, start nothing and are no board save", async () => {
     const { board, added } = keeper(null);
     let proposed = 0;
     const s = seam({
@@ -2240,8 +2265,9 @@ describe("saving work that has to start first, or never started", () => {
     await s.run();
     expect(proposed).toBe(0);
     expect(added).toEqual([]);
-    expect(s.prepared).toHaveLength(0);
-    expect(s.stored[0]?.content).toMatch(/^There's nothing to save yet/u);
+    expect(s.stored[0]?.content ?? "").not.toMatch(
+      /^There's nothing to save yet/u,
+    );
   });
 });
 
