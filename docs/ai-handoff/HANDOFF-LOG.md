@@ -1654,3 +1654,13 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - run 1, 71% ($1.56);
   - run 2 with Sonnet throughout plus the scope line, 39/42 = Q on OpenAI ($1.74).
 - d09aec914 in CI: Claude parity (migration 20261231360000) plus Q remaining gaps. Full local gates passed first: 7507 tests, root tsc 0.
+
+## 2026-11-06 — claim-check arithmetic lane (`fix/q-claim-check-arithmetic`, from `4e890ba`; not merged or deployed)
+
+- **Cause:** the claim check grounded a derived figure if any arithmetic of any two numbers on one source line matched it at the claim's precision. "33" came from 400k ÷ 1.2M × 100 on an unrelated deck line. A figure grounded that way then fed the sentence's own derivations ("45%" = 78 − 33). A date's month grounded "3x". "2.5x"/"3x" were not read as figures at all.
+- **Fix (`claim-check.ts`):** a derived figure is grounded only when one typed operation (sum, mean, difference, ratio, ×100, growth, a period or duration product, a percentage of money) of **visible** inputs reproduces it at its stated precision. The inputs are the sentence's directly sourced figures, the previous sentence's, sourced durations and periods, or a source-line pair of which the sentence says one.
+  - Kinds: money combines only with money of one currency.
+  - A difference of two percentages is points, not "%".
+  - Multiples are figures, grounded only by plain numbers, never by money, a percentage or a date's month.
+- **Tests:** `claim-check-arithmetic.test.ts` (12 keep, 8 remove; 5 failed on the old code). `q-iq-derivations` now asserts grader and claim-check agreement on wrong and unsourced differences too.
+- **Gates:** package build 54/54; vitest all packages 11,928 passed; apps q-api, workers and api 4,218 passed; root tsc 0; Q-IQ `CQ_Q_IQ_ALL=1` 6/6, 573 turns `fails: []`, adversarial 1.0/1.0; references, retrieval and wire 5/5; eslint and prettier clean.

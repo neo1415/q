@@ -51,13 +51,30 @@ export interface Claim {
 interface SourceNumber {
   readonly value: number;
   readonly currency: string | null;
+  /** A date's day or month: it grounds a plain number only ("22 November"). */
+  readonly datePart?: true;
+  /** Money or a percentage as the source wrote it; absent for a plain number. */
+  readonly kind?: "MONEY" | "PERCENT";
+}
+
+/** What a figure is, for arithmetic: money, a percentage or a plain number. */
+type OperandKind = "MONEY" | "PERCENT" | "NUMBER";
+
+/** A figure an operation may take: its value, kind and currency. */
+interface Operand {
+  readonly value: number;
+  readonly kind: OperandKind;
+  readonly currency: string | null;
 }
 
 /** What a run holds, prepared once for many sentences. */
 export interface ClaimCorpus {
   readonly numbers: readonly SourceNumber[];
-  /** Each source line's own numbers, the only pairs derivations may use. */
-  readonly lines: readonly (readonly number[])[];
+  /**
+   * Each source line's own figures: a pair from one line may ground a
+   * derivation only when the sentence says one of the two itself.
+   */
+  readonly lines: readonly (readonly Operand[])[];
   /** Lower-cased, whitespace- and apostrophe-normalised source text. */
   readonly text: string;
   /** Year-month(-day) keys of every date a source states. */
@@ -135,6 +152,8 @@ const FIGURE = new RegExp(
     String.raw`(?<int>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?<frac>\d+))?` +
     String.raw`(?:\s?(?<scale>k|mm|mn|m|bn|b|tn|t|thousand|million|billion|trillion)(?![\p{L}]))?` +
     String.raw`(?:\s?(?<pct>%|percent\b|per\s?cent\b)|\s(?<post>${CURRENCY_CODES})\b)?` +
+    // A multiple written "2.5x" or "3×": the figure is the multiple.
+    String.raw`(?:[x×](?![\p{L}\p{N}]))?` +
     String.raw`(?![\p{L}\p{N}_]|\.\d|:\d)`,
   "giu",
 );
@@ -302,7 +321,7 @@ export function claimCorpus(
   today: Date = new Date(),
 ): ClaimCorpus {
   const numbers: SourceNumber[] = [];
-  const lines: number[][] = [];
+  const lines: Operand[][] = [];
   const dates = new Set<string>();
   const ordinary = new Set<string>();
   const minutes = new Set<string>();
@@ -317,19 +336,25 @@ export function claimCorpus(
     for (const line of source.split(/\n|(?<=[.;!?])\s+(?=[A-Z])/u)) {
       const own = figuresIn(line);
       for (const figure of own) {
-        numbers.push({ value: figure.value, currency: figure.currency });
+        numbers.push({
+          value: figure.value,
+          currency: figure.currency,
+          ...(figure.kind === "MONEY" || figure.kind === "PERCENT"
+            ? { kind: figure.kind }
+            : {}),
+        });
       }
       // Bounded: a line listing dozens of numbers (a table dump) adds its
       // values but not its pairs.
       if (own.length >= 2 && own.length <= 12) {
-        lines.push(own.map((figure) => figure.value));
+        lines.push(own.map(operandOf));
       }
       for (const minute of clockMinutesIn(line)) minutes.add(minute);
       for (const { key } of dateKeysIn(line)) {
         dates.add(key);
         // A date's day and month ground "22 November" said without a year.
         for (const part of key.split("-").slice(1)) {
-          numbers.push({ value: Number(part), currency: null });
+          numbers.push({ value: Number(part), currency: null, datePart: true });
         }
       }
       for (const word of line.match(/(?<![\p{L}])[\p{Ll}][\p{L}'-]*/gu) ?? []) {
@@ -358,29 +383,109 @@ function roundsTo(claim: number, precision: number, source: number): boolean {
   return Math.abs(rounded - claim) <= step * 1e-6;
 }
 
-function derivedFrom(values: readonly number[]): number[] {
-  const out: number[] = [];
-  for (const a of values) {
-    for (const b of values) {
-      if (a === b) continue;
-      out.push(a + b, a - b, Math.abs(a - b));
-      if (b !== 0) {
-        out.push(a / b, (a / b) * 100, ((a - b) / b) * 100);
-        out.push(Math.abs(((a - b) / b) * 100));
-      }
-      out.push((a * b) / 100, a * b);
+function operandOf(figure: Claim): Operand {
+  return {
+    value: figure.value,
+    kind:
+      figure.kind === "MONEY"
+        ? "MONEY"
+        : figure.kind === "PERCENT"
+          ? "PERCENT"
+          : "NUMBER",
+    currency: figure.currency,
+  };
+}
+
+/** A plain number an operation may take: a factor, a duration, a period. */
+const plainOperand = (value: number): Operand => ({
+  value,
+  kind: "NUMBER",
+  currency: null,
+});
+
+/**
+ * What a result of arithmetic is. POINTS is a difference of two
+ * percentages: said as points ("37 percentage points"), never as a
+ * percentage ("37% higher" is a relative claim: 90% for 78% on 41%).
+ */
+type ResultKind = OperandKind | "POINTS";
+
+interface Result {
+  readonly value: number;
+  readonly kind: ResultKind;
+}
+
+/**
+ * Every result one operation of `a` with `b` gives, by kind. Money is
+ * added to, averaged with and compared with money of the same currency
+ * only. A ratio of
+ * like with like is a multiple (or months: cash ÷ burn), times 100 a
+ * percentage, and a growth rate. Money or a count is multiplied or
+ * divided by a plain number (a period, a duration), and a percentage of
+ * it taken.
+ */
+function combine(a: Operand, b: Operand): Result[] {
+  const out: Result[] = [];
+  const like =
+    a.kind === b.kind &&
+    (a.kind !== "MONEY" ||
+      a.currency === null ||
+      b.currency === null ||
+      a.currency === b.currency);
+  if (like) {
+    out.push({ value: a.value + b.value, kind: a.kind });
+    // The mid-point of a range ("KES 3 to KES 5": KES 4).
+    out.push({ value: (a.value + b.value) / 2, kind: a.kind });
+    out.push({
+      value: Math.abs(a.value - b.value),
+      kind: a.kind === "PERCENT" ? "POINTS" : a.kind,
+    });
+    if (b.value !== 0) {
+      out.push({ value: a.value / b.value, kind: "NUMBER" });
+      out.push({ value: (a.value / b.value) * 100, kind: "PERCENT" });
+      out.push({
+        value: Math.abs(((a.value - b.value) / b.value) * 100),
+        kind: "PERCENT",
+      });
     }
+  }
+  if (b.kind === "NUMBER" && a.kind !== "PERCENT") {
+    out.push({ value: a.value * b.value, kind: a.kind });
+    if (b.value !== 0) out.push({ value: a.value / b.value, kind: a.kind });
+  }
+  if (a.kind === "PERCENT" && b.kind !== "PERCENT") {
+    out.push({ value: (a.value * b.value) / 100, kind: b.kind });
   }
   return out;
 }
 
-function figureGrounded(
-  figure: Claim,
-  corpus: ClaimCorpus,
-  sameSentence: readonly number[],
-): boolean {
+/** "37% points": a percentage sign that still says points. */
+const POINTS_AFTER = /^\s*(?:percentage[\s-]+)?points?\b/iu;
+
+/** May a result of this kind be said as this claim? */
+function saysKind(claim: Claim, result: ResultKind, after: string): boolean {
+  if (claim.kind === "MONEY") return result === "MONEY";
+  if (claim.kind === "PERCENT") {
+    return (
+      result === "PERCENT" || (result === "POINTS" && POINTS_AFTER.test(after))
+    );
+  }
+  // A plain number: a multiple, months, points, a count, or money said
+  // without its sign ("a difference of 1.3 million").
+  return result !== "PERCENT";
+}
+
+/** Is `figure` a number the sources state, at its stated precision? */
+function directlyGrounded(figure: Claim, corpus: ClaimCorpus): boolean {
+  // A multiple is a plain number: neither "$3" nor "3%" nor a date's
+  // month ("March 2024") grounds "a 3x multiple"; and a day or month of a
+  // date grounds a plain number only ("22 November").
+  const multiple = /[x×]$/u.test(figure.text.trim());
+  const plainNumber = figure.kind === "NUMBER" && !multiple;
   const direct = corpus.numbers.some(
     (source) =>
+      (source.datePart !== true || plainNumber) &&
+      (!multiple || source.kind === undefined) &&
       roundsTo(figure.value, figure.precision, source.value) &&
       (figure.currency === null ||
         source.currency === null ||
@@ -388,24 +493,59 @@ function figureGrounded(
   );
   if (direct) return true;
   // A year said as itself ("in 2024").
-  if (
+  return (
     figure.kind === "NUMBER" &&
     Number.isInteger(figure.value) &&
     figure.value >= 1900 &&
     figure.value <= 2100 &&
     [...corpus.dates].some((key) => key.startsWith(String(figure.value)))
-  ) {
-    return true;
+  );
+}
+
+/**
+ * A figure is grounded when the sources state it, or when it is
+ * recomputed: one operation (combine) of two inputs reproduces it at the
+ * figure's own stated precision, as a result of a kind the figure may say.
+ * The inputs are what the reader can see -- the sentence's own sourced
+ * figures, the sentence before's, sourced durations and the periods the
+ * sentence converts between -- or a pair from one source line of which
+ * the sentence says at least one. Never a figure that is itself only
+ * derived from coincidence, and never a pair the reader cannot see
+ * (400k ÷ 1.2M × 100 on a deck line does not ground "33%").
+ */
+function figureGrounded(
+  figure: Claim,
+  corpus: ClaimCorpus,
+  inputs: readonly Operand[],
+  after = "",
+): boolean {
+  if (directlyGrounded(figure, corpus)) return true;
+  const reproduces = (a: Operand, b: Operand): boolean =>
+    combine(a, b).some(
+      (result) =>
+        Number.isFinite(result.value) &&
+        saysKind(figure, result.kind, after) &&
+        roundsTo(figure.value, figure.precision, result.value),
+    );
+  for (const [i, a] of inputs.entries()) {
+    for (const [j, b] of inputs.entries()) {
+      if (i !== j && reproduces(a, b)) return true;
+    }
   }
-  // Derived: both inputs present together, in one source line or in this
-  // sentence's own grounded figures.
-  const pools = [...corpus.lines, sameSentence];
-  return pools.some(
-    (pool) =>
-      pool.length >= 2 &&
-      derivedFrom(pool).some((value) =>
-        roundsTo(figure.value, figure.precision, value),
-      ),
+  const said = (operand: Operand): boolean =>
+    inputs.some(
+      (input) =>
+        input.value === operand.value ||
+        (operand.value !== 0 &&
+          Math.abs(input.value - operand.value) / Math.abs(operand.value) <
+            1e-9),
+    );
+  return corpus.lines.some((line) =>
+    line.some(
+      (a, i) =>
+        said(a) &&
+        line.some((b, j) => i !== j && (reproduces(a, b) || reproduces(b, a))),
+    ),
   );
 }
 
@@ -756,6 +896,12 @@ function metricOf(sentence: string): string | null {
   return null;
 }
 
+/** The words after a claim in its sentence ("… points"). */
+function afterClaim(sentence: string, claim: Claim): string {
+  const at = sentence.indexOf(claim.text);
+  return at < 0 ? "" : sentence.slice(at + claim.text.length);
+}
+
 /** How a sentence is checked; every default is the answer path's. */
 export interface SentenceCheckOptions {
   /** Check multi-word names too (default true). */
@@ -772,7 +918,7 @@ export interface SentenceCheckOptions {
    * paragraph: inputs a derivation here may use (never a claim's own
    * grounding), so arithmetic split over two sentences stays visible.
    */
-  readonly before?: readonly number[] | undefined;
+  readonly before?: readonly Operand[] | undefined;
 }
 
 /**
@@ -798,7 +944,7 @@ function checkOne(
   corpus: ClaimCorpus,
   said: Set<string>,
   options: SentenceCheckOptions,
-): { readonly check: SentenceCheck; readonly figures: readonly number[] } {
+): { readonly check: SentenceCheck; readonly figures: readonly Operand[] } {
   const claims = extractClaims(sentence).filter(
     (claim) => options.names !== false || claim.kind !== "NAME",
   );
@@ -812,19 +958,19 @@ function checkOne(
       claim.kind === "PERCENT" ||
       (claim.kind === "DATE" && Number.isFinite(claim.value)),
   );
-  // The inputs a derived figure may use: the sentence's own grounded
-  // figures, its stated sourced durations and its stated period
-  // conversions. Every input is said in the sentence, so the arithmetic
-  // is visible to the reader.
+  // The inputs a derived figure may use: the sentence's own sourced
+  // figures, its stated sourced durations, its stated period conversions
+  // and the sentence before's figures. Every input is said, so the
+  // arithmetic is visible to the reader.
   const own = figures
-    .filter((figure) => figureGrounded(figure, corpus, []))
-    .map((figure) => figure.value);
+    .filter((figure) => directlyGrounded(figure, corpus))
+    .map(operandOf);
   const calendar = calendarOperandsIn(sentence);
-  const groundedValues = [
+  const inputs: Operand[] = [
     ...own,
-    ...durationInputsIn(sentence, corpus),
-    ...periodFactorsIn(sentence),
-    ...calendar,
+    ...durationInputsIn(sentence, corpus).map(plainOperand),
+    ...periodFactorsIn(sentence).map(plainOperand),
+    ...calendar.map(plainOperand),
     ...(options.before ?? []),
   ];
   const ungrounded: ClaimKind[] = [];
@@ -834,7 +980,7 @@ function checkOne(
         ? nameGrounded(claim.text, corpus)
         : Number.isFinite(claim.value)
           ? (claim.kind === "NUMBER" && calendar.includes(claim.value)) ||
-            figureGrounded(claim, corpus, groundedValues)
+            figureGrounded(claim, corpus, inputs, afterClaim(sentence, claim))
           : claim.text.startsWith("time:")
             ? corpus.minutes.has(claim.text.slice("time:".length))
             : corpus.dates.has(claim.text) ||
@@ -845,7 +991,7 @@ function checkOne(
   if (ungrounded.length === 0) {
     return {
       check: { text: sentence, ungrounded },
-      figures: figures.map((figure) => figure.value),
+      figures: figures.map(operandOf),
     };
   }
   // A name we cannot ground is removed; a figure becomes an honest unknown
@@ -889,7 +1035,7 @@ export function createClaimChecker(
   let corpus: ClaimCorpus | null = null;
   const said = new Set<string>();
   // The sentence just before, while the paragraph goes on.
-  let before: readonly number[] = [];
+  let before: readonly Operand[] = [];
   const current = (): ClaimCorpus => {
     const now = sources();
     if (
@@ -930,7 +1076,7 @@ export function checkAnswer(
     const body = line.slice(lead.length);
     const sentences = body.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"“(*])/u);
     const kept: string[] = [];
-    let before: readonly number[] = [];
+    let before: readonly Operand[] = [];
     for (const sentence of sentences) {
       const one = checkOne(sentence, corpus, said, { before });
       const checked = one.check;
@@ -962,10 +1108,12 @@ export function figuresGrounded(text: string, corpus: ClaimCorpus): boolean {
   const figures = figuresIn(text).filter(
     (figure) => !isIncidental(text, figure),
   );
-  const grounded = figures
-    .filter((figure) => figureGrounded(figure, corpus, []))
-    .map((figure) => figure.value);
-  return figures.every((figure) => figureGrounded(figure, corpus, grounded));
+  const inputs = figures
+    .filter((figure) => directlyGrounded(figure, corpus))
+    .map(operandOf);
+  return figures.every((figure) =>
+    figureGrounded(figure, corpus, inputs, text.slice(figure.end)),
+  );
 }
 
 /**
