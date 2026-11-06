@@ -153,6 +153,8 @@ async function renderHome() {
   });
 }
 
+// Owner 2026-11-06: this is the Chat view, now the default; the Q view
+// (Q's room presence, for voice) is covered by q-voice-view.test.tsx.
 describe("the empty Q home (client 2026-11-05)", () => {
   it("is one greeting, the composer and at most three starters, with no Q field", async () => {
     await renderHome();
@@ -229,6 +231,11 @@ describe("the empty Q home (client 2026-11-05)", () => {
     fireEvent.click(talkButton);
     // The one voice path: the panel's own talk(), never a second.
     expect(talk).toHaveBeenCalledTimes(1);
+    // Owner 2026-11-06: starting voice moves to the Q (voice) view; back
+    // in Chat the same composer sends once there is text.
+    const view = screen.getByRole("group", { name: "View" });
+    expect(view.getAttribute("data-q-view")).toBe("presence");
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Ask Q" }), {
       target: { value: "What should I look at?" },
     });
@@ -241,6 +248,10 @@ describe("the empty Q home (client 2026-11-05)", () => {
     const group = screen.getByRole("group", { name: "View" });
     const chat = screen.getByRole("button", { name: "Chat" });
     const q = screen.getByRole("button", { name: "Q" });
+    // Owner 2026-11-06: Chat is the default view.
+    expect(chat.getAttribute("aria-pressed")).toBe("true");
+    expect(group.getAttribute("data-q-view")).toBe("chat");
+    fireEvent.click(q);
     expect(q.getAttribute("aria-pressed")).toBe("true");
     expect(group.getAttribute("data-q-view")).toBe("presence");
     fireEvent.click(chat);
