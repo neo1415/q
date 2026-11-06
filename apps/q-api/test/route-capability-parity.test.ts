@@ -999,6 +999,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/dev/q-presence": exempt("development-only page"),
   "/dev/ui": exempt("development-only page"),
+  // Q Workspace W1 (ADR 0077): the shell harness for screenshots.
+  "/dev/workspace": exempt("development-only page"),
   "/dev/daily": exempt("development-only page"),
   "/dev/profile": exempt(
     "development-only page (design review, fictional data)",
