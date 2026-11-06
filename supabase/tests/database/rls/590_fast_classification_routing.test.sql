@@ -16,8 +16,10 @@ select is(
   (select fallback_models from ai_ops.routing_policies
     where code = 'fast_classification.v1' and status = 'ACTIVE'),
   array['a2000000-0000-4000-8000-000000000009'::uuid,
+        'a2000000-0000-4000-8000-000000000004'::uuid,
+        'a2000000-0000-4000-8000-000000000003'::uuid,
         'a2000000-0000-4000-8000-000000000010'::uuid],
-  'and falls back to gpt-5.6-luna, then gemini-3.5-flash');
+  'and falls back to gpt-5.6-luna, then Groq (20261231330000), then gemini-3.5-flash');
 
 select is(
   (select preferred_models from ai_ops.routing_policies

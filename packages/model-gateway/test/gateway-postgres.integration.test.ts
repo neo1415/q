@@ -22,6 +22,7 @@ import {
   indexCatalog,
   loadModelCatalogSnapshot,
   ModelGatewayError,
+  type FakeBehaviour,
 } from "../src/index.js";
 
 /**
@@ -139,57 +140,85 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(classification?.reasoningLevels ?? null).toBeNull();
   });
 
-  it("v1: a CONFIDENTIAL request has no second route when OpenAI's credit is spent (Groq rolled back, 20261231310000)", async () => {
-    // The v1 policies name no other CONFIDENTIAL model since the rollback;
-    // Claude is the backup only behind the v2 switch (tested below). The
-    // request fails with the account's own class, and neither Groq nor
-    // Gemini (PUBLIC-only) is asked.
-    const openai = createFakeModelProvider({
-      code: "openai",
-      script: [
-        { kind: "FAIL", failureClass: "PERMANENT", accountExhausted: true },
-      ],
-    });
-    const groq = createFakeModelProvider({
-      code: "groq",
-      script: [{ kind: "TEXT", text: "must never be reached" }],
-    });
-    const google = createFakeModelProvider({
-      code: "google",
-      script: [{ kind: "TEXT", text: "must never be reached" }],
-    });
-    const gateway = createModelGateway({
-      catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
-      registry: createModelProviderRegistry([openai, groq, google]),
-      usage: createPostgresModelUsageRepository({ sql: db.sql }),
-      sleep: () => Promise.resolve(),
-    });
-    const failed = await gateway
-      .execute({
-        taskClass: "NORMAL_DIALOGUE",
+  it("re-land (20261231330000): a 17k-token reader turn never goes to Groq; a small CONFIDENTIAL request falls back to it", async () => {
+    // Live 2026-11-06 13:00: a luna timeout handed a ~17k-token turn
+    // reading to Groq, whose 8K per-request limit refused it (413).
+    const READER_SIZED = "x".repeat(17_000 * 4); // ~17k tokens by the estimate
+    const ask = (
+      gateway: ReturnType<typeof createModelGateway>,
+      content: string,
+    ) =>
+      gateway.execute({
+        taskClass: "FAST_CLASSIFICATION",
         sensitivity: "CONFIDENTIAL",
-        messages: [
-          { role: "USER", content: "Synthetic confidential test sentence." },
-        ],
+        messages: [{ role: "USER", content }],
         output: { kind: "TEXT" },
         budget: {
           maxAttempts: 3,
-          maxEstimatedCostUsd: 0.5,
+          maxEstimatedCostUsd: 1,
           maxOutputTokens: 256,
-          attemptTimeoutMs: 5_000,
+          attemptTimeoutMs: 1_000,
         },
-        attribution: { tenantId, correlationId: "cor_v1_no_groq" },
-      })
-      .then(
-        () => null,
-        (error: unknown) => error,
-      );
+        attribution: { tenantId, correlationId: "cor_reland" },
+      });
+    const build = (openaiScript: readonly FakeBehaviour[]) => {
+      const openai = createFakeModelProvider({
+        code: "openai",
+        script: openaiScript,
+      });
+      const groq = createFakeModelProvider({
+        code: "groq",
+        script: [{ kind: "TEXT", text: "groq answers a small request" }],
+      });
+      const google = createFakeModelProvider({
+        code: "google",
+        script: [{ kind: "TEXT", text: "must never be reached" }],
+      });
+      const gateway = createModelGateway({
+        catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
+        registry: createModelProviderRegistry([openai, groq, google]),
+        usage: createPostgresModelUsageRepository({ sql: db.sql }),
+        sleep: () => Promise.resolve(),
+      });
+      return { gateway, openai, groq, google };
+    };
+
+    // 1. luna times out once and then answers: retried on luna, Groq never asked.
+    const once = build([
+      { kind: "HANG" },
+      { kind: "TEXT", text: "luna answers on the retry" },
+    ]);
+    const retried = await ask(once.gateway, READER_SIZED);
+    expect(retried.providerCode).toBe("openai");
+    expect(once.openai.calls).toHaveLength(2);
+    expect(once.groq.calls).toHaveLength(0);
+
+    // 2. luna keeps timing out: the reader-sized turn still never goes to
+    //    Groq (planned out by its 8K limit), nor to Gemini; it fails.
+    const down = build([{ kind: "HANG" }, { kind: "HANG" }]);
+    const failed = await ask(down.gateway, READER_SIZED).then(
+      () => null,
+      (error: unknown) => error,
+    );
     expect(failed).toBeInstanceOf(ModelGatewayError);
-    expect((failed as ModelGatewayError).failureClass).toBe("PERMANENT");
-    expect(openai.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(0);
-    expect(google.calls).toHaveLength(0);
-  });
+    expect((failed as ModelGatewayError).failureClass).toBe("TIMEOUT");
+    expect(
+      (failed as ModelGatewayError).candidates
+        .filter((c) => c.providerCode === "groq")
+        .map((c) => c.reason),
+    ).toEqual(["CONTEXT_WINDOW_TOO_SMALL", "CONTEXT_WINDOW_TOO_SMALL"]);
+    expect(down.groq.calls).toHaveLength(0);
+    expect(down.google.calls).toHaveLength(0);
+
+    // 3. A small CONFIDENTIAL request with OpenAI's credit spent: Groq serves.
+    const spent = build([
+      { kind: "FAIL", failureClass: "PERMANENT", accountExhausted: true },
+    ]);
+    const served = await ask(spent.gateway, "A short confidential label.");
+    expect(served.providerCode).toBe("groq");
+    expect(served.modelCode).toBe("openai/gpt-oss-120b");
+    expect(spent.google.calls).toHaveLength(0);
+  }, 20_000);
 
   it("routes and records against the real catalog and ledger", async () => {
     const google = createFakeModelProvider({
