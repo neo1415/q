@@ -254,3 +254,15 @@ Core Seven remains the governing assessment framework. The new directive authori
       - full vitest for every app and package the batch touches, so version-pin tests like plan-live-1 fail locally, not in CI;
       - eslint and prettier on changed files.
     - **Urgent production fixes** are the only exception to batching.
+
+71. **Q Workspace (owner, 6 Nov 2026 ~22:30 UTC).** The plan is `docs/specs/q-workspace/Q_WORKSPACE_PLAN.md`, implementing PADL Decision #92.
+    - **The layout:** a split with the nav sidebar, the Q pane (Chat/Voice) and the page pane; each collapsible with a subtle icon; Q can collapse or expand panes on request, by voice too. On phones Q stays full screen with the page as a sheet.
+    - **Navigation contract N1 is amended:** Q may move the page pane on its own when the conversation is about something that has a page, model-led, with the exact page, tab, document, section and position. It STAYs when no single page answers, and never leaves unsaved work.
+    - **Actions keep the authority rule:**
+      - NONE: navigation and layout;
+      - CONFIRM: reversible saves and holds;
+      - APPROVAL: anything outward or binding, including soft and hard commitments;
+      - NEVER: moving money.
+    - **Priority order:** (1) the workspace, to the bar "the exact page every single time", measured by the q-nav eval; (2) analytics; (3) a browser pane, feasibility first.
+    - **Shipped behind a flag** (off / labs / on, plus a global kill switch), so it is reversible without a redeploy.
+    - **Analytics conflicts with Product Specification §6.7.12–6.7.14** (passive viewing is not granular founder analytics; investor visibility settings; viewing ≠ contact permission). Analytics is built inside those rules. Paid identity reveal needs an owner amendment and is not built.
