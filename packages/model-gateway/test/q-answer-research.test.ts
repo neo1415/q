@@ -3620,7 +3620,7 @@ describe("web discovery on a follow-up that names Capital Q (live 2026-11-06, ru
     execute: (proposal) =>
       Promise.resolve(
         proposal.name === "research_public_web"
-          ? ({
+          ? {
               callId: proposal.callId,
               toolName: "public_web.search",
               toolVersion: 1,
@@ -3639,8 +3639,8 @@ describe("web discovery on a follow-up that names Capital Q (live 2026-11-06, ru
                 },
               },
               latencyMs: 1,
-            } as QToolCallOutcome)
-          : ({
+            }
+          : {
               callId: proposal.callId,
               toolName: "company.get",
               toolVersion: 1,
@@ -3668,7 +3668,7 @@ describe("web discovery on a follow-up that names Capital Q (live 2026-11-06, ru
                 },
               },
               latencyMs: 1,
-            } as QToolCallOutcome),
+            },
       ),
   };
 
