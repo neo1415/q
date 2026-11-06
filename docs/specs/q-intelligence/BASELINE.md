@@ -149,6 +149,27 @@ Reading it:
   - Latency p50 / p95: 1.7 s / 3.2 s
 - Ranking like-for-like: bare OpenAI 92.9% > **Q 91.1%** > bare Claude 87.9%. Q makes the fewest wrong-entity errors except bare OpenAI (Q 2, OpenAI 1, Claude 17), and fewer invented figures than either (Q 8, OpenAI 10, Claude 35).
 
+### Targeted live check — 6 Nov 2026, fix/q-iq-followups-numbers @ defe36bad
+
+FOLLOW_UPS and NUMBERS only (`--categories FOLLOW_UPS,NUMBERS`, 30 cases, $1.05). The fix:
+
+- TURN_READER v81 restates a single elliptical ask as a self-standing part.
+- A deterministic note on names held in the authorised facts.
+
+The dataset was corrected in two places: exact multiples, and the Brightpath planted contradiction. Both corrections apply to the bare model as well.
+
+| Category                             | Q, run 2       | **Q, after the fix** | Bare model, same run |
+| ------------------------------------ | -------------- | -------------------- | -------------------- |
+| FOLLOW_UPS                           | 81.3%          | **100.0%**           | 98.7%                |
+| NUMBERS                              | 86.8%          | **98.6%**            | 100.0%               |
+| Overall (turns)                      | —              | **99.3%**            | 99.3%                |
+| Cases fully passed                   | 12/29          | **29/30**            | 29/30                |
+| Wrong-entity / invented-figure turns | —              | 0 / 0                | 0 / 0                |
+| Unknowns said as unknown             | —              | 100%                 | 75%                  |
+| Latency p50 / p95                    | 7.6 s / 18.4 s | 7.7 s / 12.8 s       | 1.1 s / 1.6 s        |
+
+Q now matches the bare model in both categories that were its largest gaps. The one remaining Q failure is QIQ-NUM-113.
+
 ## Cost
 
 Actual, first live run: **$3.476** ($3.390 Q, $0.086 bare model and judge). The estimate below undercounted Q: Q's actual cost per case was about 2.5× the estimate.
