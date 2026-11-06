@@ -1,22 +1,21 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 6 November 2026, 02:55 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 6 November 2026, 03:35 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
-Production: all four services on `f08525117` (steps 2–5, 7, 8 + compound fixes). Hosted migrations 273 = local 273. Rollback: `605c76e59`.
+Production: all four services on `5ed2f21c8` (steps 2–5, 7, 8, 11 + fixes). Hosted migrations 273 = local 273. Rollback: `f08525117`.
 
-| Area                                                                                              | State                             | Evidence / next                                                 |
-| ------------------------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------- |
-| Steps 2, 3, 4, 5, 7, 8 + compound-follow-up fixes                                                 | PRODUCTION VERIFIED               | live14–live17 (`receipts/2026-11-06-live17-f085251/`)           |
-| Stale instructions-approval integration test (not a defect; opener wording since 7 Oct)           | MERGED, ships with the next batch | `369d0ebd9`; receipt `2026-11-06-instructions-approval.md`      |
-| CI never runs `*.integration.test.ts` (several stale failures went unseen)                        | IN PROGRESS                       | In the step 11 lane                                             |
-| Step 9: memory provenance + past-chat search                                                      | IN PROGRESS                       | `feat/q-memory-recall`, `session_01Wncmn3KhaubszcWA6Jmx8V`      |
-| Step 10: grounded workforce + adversarial Q-IQ category                                           | IN PROGRESS                       | `feat/q-grounded-workforce`, `session_01Wncmn4vd5MvBG8wD5fG8Sn` |
-| Step 11: speed pass + CI integration job                                                          | IN PROGRESS                       | `feat/q-speed`, `session_01Wncmn3dLjjSmknNnfEFstX`              |
-| Step 3c (remove reference regexes)                                                                | HELD                              | Needs live Q-IQ                                                 |
-| Live Q-IQ                                                                                         | WAITING ON OWNER OK               | About $5.5; check the OpenAI balance first                      |
-| Owner UI follow-ups (phone top bar, "Hide from Q", "Clear")                                       | OWNER TO SAY                      | live13                                                          |
-| 2-hourly continuation                                                                             | ON                                | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                 |
-| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN                      | HANDOFF-2026-11-05 §6                                           |
+| Area                                                                                              | State                                                                   | Evidence / next                                                                                                            |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Steps 2, 3, 4, 5, 7, 8, 11 + fixes                                                                | PRODUCTION VERIFIED                                                     | live14–live18                                                                                                              |
+| **Latency** (first sentence p50 bar 2.5 s)                                                        | NOT MET: 6.2 s / 4.4 s                                                  | live18. The turn reader takes 4–5 s on the critical path. Lane `feat/q-reader-latency`, `session_01Wncmn5z1WBfxuuj9J3xMhW` |
+| Step 9: memory provenance + past-turn recall (scripted memory 45/45)                              | MERGED `2cfa07bb5`, CI running                                          | Then pgTAP → apply `20261231271900` (GIN index; 10,920 rows / 12 MB, builds in under 1 s) → deploy                         |
+| Step 10: grounded workforce + ADVERSARIAL Q-IQ (36/36)                                            | GATES GREEN; re-gating after merging step 9 (conflict in q-iq-world.ts) | `session_01Wncmn4vd5MvBG8wD5fG8Sn`                                                                                         |
+| CI integration job                                                                                | ON (first run green)                                                    | Promote to required in `quality` after a few runs; issue #562 (taxonomy alias) needs a reference-data decision             |
+| Step 3c (remove reference regexes)                                                                | HELD                                                                    | Needs live Q-IQ                                                                                                            |
+| Live Q-IQ / step 12 certification                                                                 | WAITING ON OWNER OK                                                     | About $5.5 per run; check the OpenAI balance first                                                                         |
+| Owner UI follow-ups (phone top bar, "Hide from Q", "Clear")                                       | OWNER TO SAY                                                            | live13                                                                                                                     |
+| 2-hourly continuation                                                                             | ON                                                                      | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                                                                            |
+| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN                                                            | HANDOFF-2026-11-05 §6                                                                                                      |
 
 ## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
