@@ -6,8 +6,9 @@ import { attentionLines, unreadWords } from "./attention";
  * user and tell them they have notifications if they do and ask if they'd
  * like to look at them ... or if they want to talk about other things").
  *
- * A short greeting by first name, then one sentence with how many things
- * wait (never the list), then one question with two answers: look at them
+ * A short greeting by first name, then one sentence naming what waits
+ * (owner 2026-11-06, replacing 2026-10-16's "never the list": at most
+ * three named, then "and N more"), then one question with two answers: look at them
  * now, or something else. Nothing waiting: the greeting and "What would you
  * like to look at?", with no urgency of its own. Pure and deterministic: no
  * model, no clock, no I/O, so the opener is instant and a test pins it.
@@ -30,7 +31,7 @@ export type Opener = {
   readonly pending: number;
   /** Whether the two choices are offered (something is waiting). */
   readonly offersChoice: boolean;
-  /** "You have 3 things waiting." -- null with nothing waiting. */
+  /** "Two things need you: …" -- null with nothing waiting. */
   readonly count: string | null;
   /** The one question Q asks after the greeting. */
   readonly question: string;
@@ -79,8 +80,13 @@ export function openerOf(data: ArrivalData): Opener {
           : `${unknown} ${NOTHING_WAITING_QUESTION}`,
     };
   }
-  const atLeast = unread.length > 0 ? "at least " : "";
-  const count = `You have ${atLeast}${String(pending)} ${pending === 1 ? "thing" : "things"} waiting.`;
+  // Owner 2026-11-06: say what is waiting, never a bare "N things" -- the
+  // same items the cards hold, so "what are they?" is answered from them.
+  const count = waitingSentence(
+    waitingPhrases(data),
+    pending,
+    unread.length > 0,
+  );
   const question = `Would you like to look at ${pending === 1 ? "it" : "them"} now, or talk about something else?`;
   return {
     pending,
@@ -89,6 +95,115 @@ export function openerOf(data: ArrivalData): Opener {
     question,
     line: `${count} ${question}`,
   };
+}
+
+/** One named thing waiting, and how many of the count it stands for. */
+export type WaitingPhrase = { readonly words: string; readonly weight: number };
+
+const IMPERATIVE =
+  /^(Approve|Reply|Send|Email|Book|Share|Follow|Answer|Check|Review|Confirm|Sign|Finish)\b/u;
+
+function trimEnd(words: string): string {
+  return words.trim().replace(/[.!?\s]+$/u, "");
+}
+
+/** A card's words: who it is for, from the card's own data. */
+function cardPhrase(card: ArrivalData["cards"][number]): string {
+  const who = card.counterpart?.trim() ?? "";
+  if (card.kind === "HELD") {
+    return who === ""
+      ? "a message Q held back"
+      : `a message to ${who} that Q held back`;
+  }
+  if (who !== "" && card.title === "Reply ready to send") {
+    return `approve the reply to ${who}`;
+  }
+  if (who !== "" && card.title === "Email ready to send") {
+    return `approve the email to ${who}`;
+  }
+  const title = trimEnd(card.title);
+  return IMPERATIVE.test(title)
+    ? `${title.charAt(0).toLowerCase()}${title.slice(1)}`
+    : `approve ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+}
+
+/**
+ * What waits on them, named, in the order `pendingCount` counts it. Every
+ * phrase comes from data the arrival already holds: no read of its own.
+ */
+export function waitingPhrases(data: ArrivalData): readonly WaitingPhrase[] {
+  const phrases: WaitingPhrase[] = data.cards.map((card) => ({
+    words: cardPhrase(card),
+    weight: 1,
+  }));
+  if (data.attention !== null && data.attention !== undefined) {
+    for (const item of attentionLines(data.attention)) {
+      phrases.push({ words: trimEnd(item.title), weight: 1 });
+    }
+  }
+  if (data.matches?.label === "SINCE_LAST_VISIT") {
+    for (const match of data.matches.items) {
+      phrases.push({ words: `${match.name} is a new match`, weight: 1 });
+    }
+  }
+  const questions = data.questions?.length ?? 0;
+  if (questions > 0) {
+    phrases.push({
+      words:
+        questions === 1
+          ? "a question from Q about your company"
+          : `${String(questions)} questions from Q about your company`,
+      weight: questions,
+    });
+  }
+  if ((data.setupReminders ?? 0) > 0) {
+    phrases.push({ words: "finishing your setup", weight: 1 });
+  }
+  if ((data.deckReview?.pending ?? 0) > 0) {
+    phrases.push({ words: "checking Q's reading of your deck", weight: 1 });
+  }
+  return phrases;
+}
+
+const NUMBER_WORDS = [
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+] as const;
+/** At most this many are named; the rest are "and N more". */
+const NAMED_AT_MOST = 3;
+
+/**
+ * "Two things need you: approve the reply to Brightwell and Apex asked for
+ * your cap table." The count is `pendingCount`'s; a source not read makes
+ * it "at least" (unknown is not zero).
+ */
+export function waitingSentence(
+  phrases: readonly WaitingPhrase[],
+  pending: number,
+  atLeast: boolean,
+): string {
+  const number = NUMBER_WORDS[pending] ?? String(pending);
+  const counted = atLeast ? `At least ${number.toLowerCase()}` : number;
+  const head = `${counted} ${pending === 1 ? "thing needs" : "things need"} you`;
+  const shown = phrases.slice(0, NAMED_AT_MOST);
+  if (shown.length === 0) return `${head}.`;
+  const named = shown.map((phrase) => phrase.words);
+  const rest = pending - shown.reduce((sum, phrase) => sum + phrase.weight, 0);
+  if (rest > 0) named.push(`${String(rest)} more`);
+  const list =
+    named.length === 1
+      ? (named[0] ?? "")
+      : `${named.slice(0, -1).join(", ")} and ${named.at(-1) ?? ""}`;
+  return `${head}: ${list}.`;
 }
 
 // ---------------------------------------------------------------------------

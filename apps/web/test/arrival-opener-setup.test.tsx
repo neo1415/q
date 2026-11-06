@@ -100,11 +100,14 @@ describe("the setup reminder in Q's opener", () => {
       await Promise.resolve();
     });
     // The page asks one open question (owner 2026-10-17); a voice line
-    // counts what waits, the reminder among it, never named on its own.
+    // names what waits (owner 2026-11-06), the reminder among it, without
+    // the mandate's own questions.
     const said = document.querySelector("[data-arrival-lowdown]")?.textContent;
     expect(said).toBe("What's on your mind today?");
-    expect(arrivalSpoken()).toMatch(/You have 1 thing waiting\./u);
-    expect(arrivalSpoken()).not.toMatch(/setup|mandate/iu);
+    expect(arrivalSpoken()).toMatch(
+      /One thing needs you: finishing your setup\./u,
+    );
+    expect(arrivalSpoken()).not.toMatch(/mandate|cheque/iu);
     expect(
       screen.queryByRole("link", { name: /Continue your mandate/u }),
     ).toBeNull();

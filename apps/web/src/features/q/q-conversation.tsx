@@ -1251,7 +1251,20 @@ export function QConversationPanel({
                   key={option}
                   type="button"
                   aria-pressed={view === option}
-                  onClick={() => chooseView(option)}
+                  onClick={() => {
+                    // Owner 2026-11-06: choosing Q is choosing to talk.
+                    // The click is their own action (QO-46), so the line
+                    // opens in the same gesture and Q speaks first. A
+                    // stored Q choice with no click opens ready, mic shut;
+                    // "Talk to Q" stays for that and for a refused mic.
+                    const starting =
+                      option === "presence" &&
+                      view !== "presence" &&
+                      connected &&
+                      !voice.active;
+                    chooseView(option);
+                    if (starting) void talk();
+                  }}
                 >
                   {option === "presence" ? "Q" : t("Chat")}
                 </button>
