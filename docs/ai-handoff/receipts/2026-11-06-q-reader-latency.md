@@ -171,4 +171,28 @@ What this does and does not show:
 
 ## Gates (exact results)
 
-GATES
+Gates run on `4d2c8b433` with the code at `c13105f49`; every provider key was `disabled-locally-000000000000`.
+
+| Gate                                                              | Result                                                                   |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `pnpm exec turbo run build --filter=./packages/*`                 | 54/54 successful                                                         |
+| Root tsc (`--max-old-space-size=7168 … -p tsconfig.json`)         | exit 0                                                                   |
+| `apps/q-api` tsc / `apps/web` tsc                                 | exit 0 / exit 0                                                          |
+| eslint (6144 MB): model-gateway, q-specialists, q-evals           | all exit 0                                                               |
+| `npx prettier --check apps packages docs supabase`                | all files pass                                                           |
+| vitest model-gateway + q-evals                                    | 186 files, 1691/1691                                                     |
+| vitest q-specialists                                              | 84 files, 1519/1519                                                      |
+| vitest apps/q-api                                                 | 335 files passed (1 skipped); 3123 passed (3 skipped)                    |
+| **Scripted Q-IQ through the runtime** (`CQ_Q_IQ_ALL=1`, local PG) | **573 turns, score 1.0**, no regression                                  |
+| Integration, `scripts/local-pg` (PG 16), `pnpm test:integration`  | 107 files passed, 3 failed: 723 passed, 24 failed, 12 skipped. See below |
+| pgTAP                                                             | not run: no migration                                                    |
+
+The integration failures:
+
+- **Environment only (step 11 receipt, local-pg):**
+  - `eventing/outbox` (pgmq stub);
+  - `security/supabase-auth` (no GoTrue).
+- **`evidence/deck-batch-reads`: a pre-existing flaky test.**
+  - Run alone twice, it passed once and failed once (`expected <id> to be <id>`, an ordering).
+  - This branch does not change `packages/evidence`.
+  - Not fixed here (out of this lane); flagged for the owner of that test.
