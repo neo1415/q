@@ -328,6 +328,23 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly preparedSubject?:
     "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | "OWN_COMPANY" | undefined;
   /**
+   * Owner 2026-11-06 (Savanna Seed Partners): they asked Q to find
+   * companies (and their founders) out on the public web, as the turn
+   * reader read it by meaning (discoverWhom COMPANIES with asksForWeb, v78).
+   * Code plans targeted public searches from the mandate's categories and
+   * these, reads the pages, and lists only companies the pages name.
+   */
+  readonly webDiscovery?:
+    | {
+        readonly text: string;
+        /** Taxonomy codes the turn named; empty: the mandate's. */
+        readonly sectors: readonly string[];
+        readonly countries: readonly string[];
+        readonly stages: readonly string[];
+        readonly count: number | null;
+      }
+    | undefined;
+  /**
    * K1: a DISCOVER_COMPANIES request as the reader read it ("three
    * fintech companies in Nigeria"). Answered from the catalog by code, fit
    * only when asked for; never the analyst, never the public web.
