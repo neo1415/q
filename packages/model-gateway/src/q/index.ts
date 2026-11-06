@@ -8091,6 +8091,7 @@ export function createModelGatewayQAnswer(
             {
               qRunId: request.runId,
               outcome: found.outcome,
+              readerFailed: found.readerFailed,
               listed: found.companies.length,
               withFounders: found.companies.filter(
                 (company) => company.founders.length > 0,

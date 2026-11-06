@@ -407,6 +407,67 @@ export function admitDiscoveries(
   return [...out.values()];
 }
 
+/**
+ * Live 2026-11-06: when the page reader fails, a reader failure must not
+ * mean zero companies. A search result on a company's OWN site names it:
+ * a run of words in the page title whose letters are exactly the site's
+ * name ("About Kobo Harbour" on koboharbour.example, "Owo Rails | Payments
+ * API" on owo-rails.com). A site named after its own title is also what
+ * a publisher or a directory is, so the name must be corroborated: another
+ * fetched page, on another domain, names it too. Deterministic, from
+ * public page data only; what it finds still goes through
+ * `admitDiscoveries`. It never names a founder or guesses what a company
+ * does.
+ */
+export function namesFromCompanySites(
+  sources: readonly FetchedSource[],
+): Proposed[] {
+  const found: Proposed[] = [];
+  for (const source of sources) {
+    if (source.risky === true || source.title === null) continue;
+    const labels = source.domain
+      .toLowerCase()
+      .replace(/^www\./u, "")
+      .split(".");
+    const site = (labels[0] ?? "").replace(/[^a-z0-9]/gu, "");
+    if (site.length < 3) continue;
+    const words = source.title
+      .split(/\s+/u)
+      .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+      .filter((word) => word.length > 0);
+    let best: string | null = null;
+    for (let from = 0; from < words.length; from += 1) {
+      for (let to = from + 1; to <= Math.min(words.length, from + 4); to += 1) {
+        const span = words.slice(from, to).join(" ");
+        const letters = span.toLowerCase().replace(/[^a-z0-9]/gu, "");
+        if (letters === site && (best === null || span.length > best.length)) {
+          best = span;
+        }
+      }
+    }
+    const name = best;
+    const corroborated =
+      name !== null &&
+      sources.some(
+        (other) =>
+          other.risky !== true &&
+          other.domain !== source.domain &&
+          namedIn(name, pageText(other)),
+      );
+    if (name !== null && corroborated) {
+      found.push({
+        name,
+        founders: [],
+        does: null,
+        sector: null,
+        stage: null,
+        place: null,
+      });
+    }
+  }
+  return found;
+}
+
 // --- fit ---------------------------------------------------------------
 
 export type DiscoveryFit = {
@@ -491,6 +552,8 @@ export function discoveryFit(
 export type WebDiscoveryAnswer = {
   readonly text: string;
   readonly outcome: "FOUND" | "NONE" | "UNAVAILABLE";
+  /** The page reader failed and the companies came from the fallback only. */
+  readonly readerFailed: boolean;
   readonly companies: readonly DiscoveredCompany[];
   /** Every page a listed company stands on, for the Sources block. */
   readonly sources: readonly PublicSourceLike[];
@@ -697,12 +760,18 @@ export async function runWebDiscovery(input: {
     keep(read.sources);
   };
 
-  // Round 1: the plan's queries, two to a call, all at once.
+  // Round 1: the plan's queries, two to a call. The first call goes alone
+  // and the rest side by side once it has landed: a refused or spent key
+  // (ScrapingBee 401, Serper 402 live 2026-11-06, each asked five times
+  // by calls already in flight) then rests behind its breaker before the
+  // others start, and is skipped by them.
   const pairs: string[][] = [];
   for (let i = 0; i < plan.queries.length; i += 2) {
     pairs.push(plan.queries.slice(i, i + 2));
   }
-  await Promise.all(pairs.map((pair) => research(pair, ROUND_ONE_PAGES)));
+  const [probe, ...others] = pairs;
+  if (probe !== undefined) await research(probe, ROUND_ONE_PAGES);
+  await Promise.all(others.map((pair) => research(pair, ROUND_ONE_PAGES)));
   if (answered === 0) {
     return {
       text:
@@ -710,6 +779,7 @@ export async function runWebDiscovery(input: {
           ? "I tried to search the public web for companies that fit, but the search providers weren't available just now, so I have no public results to give you. Ask me again in a few minutes and I'll run it."
           : "I searched the public web for companies that fit, but the searches came back empty, so I have nothing specific I can put in front of you.",
       outcome: unavailable > 0 ? "UNAVAILABLE" : "NONE",
+      readerFailed: false,
       companies: [],
       sources: [],
       queries: plan.queries,
@@ -752,15 +822,20 @@ export async function runWebDiscovery(input: {
   const readable = () =>
     [...fetched.values()].filter((source) => source.risky !== true);
   const firstPages = readable();
-  const proposed =
-    (await input.reader({
-      looking:
-        looking.length === 0 ? "new companies and their founders" : looking,
-      sources: firstPages,
-      attribution: input.attribution,
-      signal: input.signal,
-    })) ?? [];
-  let companies = admitDiscoveries(proposed, firstPages);
+  const proposed = await input.reader({
+    looking:
+      looking.length === 0 ? "new companies and their founders" : looking,
+    sources: firstPages,
+    attribution: input.attribution,
+    signal: input.signal,
+  });
+  // The reader failing is never zero companies: the results on companies'
+  // own sites name them (deterministic, admitted the same way).
+  const readerFailed = proposed === null;
+  let companies = admitDiscoveries(
+    [...(proposed ?? []), ...namesFromCompanySites(firstPages)],
+    firstPages,
+  );
 
   // Round 2: founders for the candidates the pages left without one.
   const count = Math.min(
@@ -870,8 +945,9 @@ export async function runWebDiscovery(input: {
   }
 
   return {
-    text: discoveryAnswerText(marked, plan, fetched),
+    text: discoveryAnswerText(marked, plan, fetched, readerFailed),
     outcome: marked.length > 0 ? "FOUND" : "NONE",
+    readerFailed,
     companies: marked,
     sources,
     queries: plan.queries,
@@ -886,6 +962,8 @@ export function discoveryAnswerText(
   companies: readonly DiscoveredCompany[],
   plan: DiscoveryPlan,
   fetched: ReadonlyMap<string, FetchedSource>,
+  /** The page reader failed; what is listed came from the results alone. */
+  readerFailed = false,
 ): string {
   const looking = lookingPhrase(plan);
   const against =
@@ -894,6 +972,9 @@ export function discoveryAnswerText(
       : plan.fromMandate && !plan.askNamed
         ? ` against your mandate (${looking})`
         : ` for ${looking}`;
+  if (companies.length === 0 && readerFailed) {
+    return `I searched the public web${against} and found pages to read, but I couldn't read them in time just now, so I won't guess at names. Ask me again in a moment and I'll read them again.`;
+  }
   if (companies.length === 0) {
     return `I searched the public web${against}, but the pages I could read didn't name specific companies I could stand behind, so I won't guess. I can search again with a different angle (a city, a sub-sector or a recent accelerator batch) if you'd like.`;
   }
