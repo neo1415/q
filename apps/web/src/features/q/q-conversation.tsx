@@ -96,7 +96,8 @@ import { QNow } from "./q-now";
 import { QMoreMenu } from "./q-more-menu";
 import { PhoneShellLead } from "@/components/app-shell/phone-lead";
 import { QStarters, startersOf, type QStarter } from "./q-starters";
-import { QPresenceStage, showOnStage } from "./q-presence-stage";
+import { showOnStage } from "./q-presence-stage";
+import { QCurrentExchange } from "./q-current-exchange";
 import { noteQPageView } from "./screen";
 import {
   readStageView,
@@ -112,7 +113,7 @@ import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
 import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
-import { earlierWork, jobIdsIn, PinnedWorkLines } from "./pinned-work";
+import { earlierWork, PinnedWorkLines } from "./pinned-work";
 import { QWorkProgress, useWorkStreams } from "./work-progress-view";
 import { promisedJobs } from "./work-live";
 import { WakeResume } from "@/features/wake/wake-resume";
@@ -607,17 +608,6 @@ export function QConversationPanel({
           (line) => !(line.role === "person" && words(line.text) === liveWords),
         );
 
-  // Documents still being made, asked for before the latest exchange: the
-  // presence view keeps a line for each (pinned-work.tsx).
-  const pinnedWork = useMemo(() => {
-    const latest = latestExchange(thread);
-    const turnsOf = (some: readonly (typeof thread)[number][]) =>
-      some.flatMap((line) => (line.turn === undefined ? [] : [line.turn]));
-    return earlierWork(
-      turnsOf(thread.slice(0, thread.length - latest.length)),
-      turnsOf(latest),
-    );
-  }, [thread]);
   // Owner 2026-10-28: the voice room draws no thread, so every job the
   // conversation named keeps its line there (each hides once finished).
   const roomWork = useMemo(() => {
@@ -701,18 +691,14 @@ export function QConversationPanel({
           }
         : null,
   });
-  // Owner 2026-10-17: cards on the presence stage (kept or brought back
-  // by a later answer too) get the same wide layout as fresh ones.
-  const [stageCards, setStageCards] = useState(false);
   // Cards stay wide while Q talks over them or works on a follow-up.
   const showingCards =
-    (latestAnswer?.kind === "Q" &&
-      !latestAnswer.streaming &&
-      latestAnswer.blocks.some(
-        (block) =>
-          block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
-      )) ||
-    (view === "presence" && stageCards);
+    latestAnswer?.kind === "Q" &&
+    !latestAnswer.streaming &&
+    latestAnswer.blocks.some(
+      (block) =>
+        block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
+    );
   // Presence view is Q's presence only (founder request 2026-10-03): a
   // laid-out answer is shown over it (QPresenceStage), not as a thread.
   const bigPresence = view === "presence";
@@ -736,21 +722,18 @@ export function QConversationPanel({
     const body = bodyRef.current;
     if (body !== null && !conversing) body.scrollTop = 0;
   }, [conversing]);
-  // An object shown over the presence holds the stage still, at its top:
-  // following newest would scroll the presence and Dismiss off screen
-  // (lead 2026-10-03, live capture at 390px).
-  const [objectShown, setObjectShown] = useState(false);
-  const holdStill = bigPresence && objectShown;
-  useEffect(() => {
-    const body = bodyRef.current;
-    if (body !== null && holdStill) body.scrollTop = 0;
-  }, [holdStill]);
   const threadEnd = useRef<HTMLDivElement>(null);
   useFollowNewest(
     threadEnd,
-    conversing && !holdStill ? newest : "",
-    !holdStill && (lines.at(-1)?.role === "person" || liveIsPerson),
+    conversing && !bigPresence ? newest : "",
+    !bigPresence && (lines.at(-1)?.role === "person" || liveIsPerson),
   );
+  // Owner 2026-11-06: the Q view's room starts at Q's presence; nothing
+  // follows the newest words there (the exchange sits under Q).
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (body !== null && bigPresence) body.scrollTop = 0;
+  }, [bigPresence, newest]);
   const wide = useWide();
   // The Board is closed until its icon is pressed: what Q makes is in the
   // thread, inline (founder direction A, 2026-09-28).
@@ -766,27 +749,14 @@ export function QConversationPanel({
   // reconnect moved the page to another conversation.
   const shelf = useResultShelf();
   const boardTurns = useMemo(() => withShelf(turns, shelf), [turns, shelf]);
-  // C4 / F-37: what the Board holds, less a Board entry on the stage.
-  const [stageObject, setStageObject] = useState<string | null>(null);
+  // C4 / F-37: what the Board holds. Owner 2026-11-06: the Q view draws
+  // no stage objects in a conversation any more (its cards are one line
+  // each), so nothing on screen is subtracted from the count.
   const boardCount = boardCountOf(
     boardTimeline(boardTurns, q.decisions),
     boardMarks.dismissed,
-    stageObject,
+    null,
   );
-  // N3: a job whose own card the stage draws now is not also a line under it.
-  const stageJobs = useMemo(
-    () =>
-      jobIdsIn(
-        boardTurns.flatMap((turn) =>
-          turn.kind === "Q" && turn.id === stageObject ? [turn] : [],
-        ),
-      ),
-    [boardTurns, stageObject],
-  );
-  const [boardBump, setBoardBump] = useState(0);
-  const onBoardLanded = useCallback(() => {
-    setBoardBump((n) => n + 1);
-  }, []);
 
   const documentStage =
     q.state.stage === "PREPARING_DOCUMENT" ||
@@ -813,7 +783,7 @@ export function QConversationPanel({
   // E1: the cards step aside (one line below Q) while an answer holds the
   // centre or the thread is the view; beside Q otherwise.
   const stageMode =
-    conversing && (!bigPresence || objectShown || showingCards)
+    conversing && (!bigPresence || showingCards)
       ? ("STRIP" as const)
       : ("FULL" as const);
   const stateLabel = voice.active
@@ -1286,9 +1256,10 @@ export function QConversationPanel({
             </div>
             <div className="flex flex-1 items-center justify-end gap-1">
               <button
-                key={`board-${String(boardBump)}`}
                 type="button"
-                className={`${boardOpen ? "cq-stage-quiet is-active" : "cq-stage-quiet"}${boardBump > 0 ? " cq-board-bump" : ""}`}
+                className={
+                  boardOpen ? "cq-stage-quiet is-active" : "cq-stage-quiet"
+                }
                 aria-expanded={boardOpen}
                 aria-label={`Board, ${String(boardCount)} ${boardCount === 1 ? "item" : "items"}`}
                 title={t("Board")}
@@ -1373,284 +1344,118 @@ export function QConversationPanel({
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >
                 {bigPresence ? (
-                  <ArrivalRoom wide>
-                    {captions && !voice.active ? null : (
-                      // The latest exchange for a screen reader while the
-                      // presence view shows no transcript (audit 06 §9);
-                      // each turn with its id and disposition (G-R3).
-                      // Text only: nothing focusable is hidden here.
-                      <ol className="sr-only" aria-label={t("Latest exchange")}>
-                        {latestExchange(thread).map((line) =>
-                          line.role === "person" ? (
-                            <li
-                              key={line.id}
-                              data-q-turn-id={line.turnId ?? line.id}
-                              data-q-turn-role="USER"
-                              data-q-disposition={rowDisposition(line)}
-                            >
-                              {t("You:")} {line.text}
-                            </li>
-                          ) : (
-                            <li
-                              key={line.id}
-                              data-q-turn-id={line.turnId ?? line.id}
-                              data-q-turn-role="Q"
-                              data-q-disposition={rowDisposition(line)}
-                              data-q-failure={rowFailure(line)}
-                            >
-                              Q: {plainFromMarkdown(line.text)}
-                            </li>
-                          ),
-                        )}
-                        {liveIsPerson ? (
-                          <li
-                            key={live.id}
-                            data-q-turn-id={live.id}
-                            data-q-turn-role="USER"
-                          >
-                            You, speaking: {live.text}
-                          </li>
-                        ) : null}
-                      </ol>
-                    )}
-                    <QPresenceStage
-                      live={voice.active}
-                      spokenPreview={session.spokenPreview}
-                      onBoardLanded={onBoardLanded}
-                      onPin={boardMarks.pin}
-                      // Owner 2026-11-06: the Q view is the voice view, and
-                      // Q's presence is back on its stage (as before 5 Nov),
-                      // with the state ("Listening", "Speaking") under it.
-                      presence={(compact, mini) =>
-                        mini === true ? (
-                          <ViewTransition
-                            name="q-aperture"
-                            share="cq-q-morph"
-                            default="none"
-                          >
-                            <QAperture
-                              state={presence.state}
-                              size={44}
-                              inputLevel={client.inputLevel}
-                              outputLevel={client.outputLevel}
-                              showing={showingCards}
-                            />
-                          </ViewTransition>
-                        ) : (
-                          <div
-                            className="flex flex-col items-center gap-2 pt-2"
-                            data-q-presence="stage"
-                          >
-                            <div aria-hidden="true">
-                              <ViewTransition
-                                name="q-aperture"
-                                share="cq-q-morph"
-                                default="none"
-                              >
-                                <QAperture
-                                  state={presence.state}
-                                  size={compact ? 64 : 200}
-                                  inputLevel={client.inputLevel}
-                                  outputLevel={client.outputLevel}
-                                  stage
-                                  showing={compact || showingCards}
-                                />
-                              </ViewTransition>
-                            </div>
-                            {stateLabel === null ? null : (
-                              <span
-                                className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
-                                role="status"
-                                data-q-state-pill
-                              >
-                                <span
-                                  aria-hidden="true"
-                                  className={cx(
-                                    "size-2 rounded-full bg-(--cq-accent)",
-                                    voice.active && "motion-safe:animate-pulse",
-                                  )}
-                                />
-                                {t(stateLabel)}
-                              </span>
+                  // Owner 2026-11-06 (live, "is the presence only there on
+                  // first login?"): in a conversation the Q view is the
+                  // voice room. Q's presence is pinned and always in view;
+                  // under it only the current exchange -- their last line,
+                  // Q's latest reply as a caption, its cards one line each.
+                  // The whole transcript, cards and lists are Chat's.
+                  <div
+                    className="flex w-full flex-col items-center gap-4"
+                    data-q-voice-room
+                  >
+                    <div
+                      className="cq-voice-room-presence"
+                      aria-hidden="true"
+                      data-q-presence="stage"
+                      data-q-room-presence="conversation"
+                    >
+                      <ViewTransition
+                        name="q-aperture"
+                        share="cq-q-morph"
+                        default="none"
+                      >
+                        <QAperture
+                          state={presence.state}
+                          size={wide ? 280 : 200}
+                          inputLevel={client.inputLevel}
+                          outputLevel={client.outputLevel}
+                          stage
+                        />
+                      </ViewTransition>
+                    </div>
+                    <div className="flex min-h-6 flex-col items-center gap-2">
+                      {stateLabel === null ? null : (
+                        <span
+                          className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                          role="status"
+                          data-q-state-pill
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cx(
+                              "size-2 rounded-full bg-(--cq-accent)",
+                              voice.active && "motion-safe:animate-pulse",
                             )}
-                            {!compact &&
-                            thread.length > latestExchange(thread).length ? (
-                              <button
-                                type="button"
-                                className="cq-stage-quiet"
-                                onClick={() => chooseView("chat")}
-                              >
-                                {t("Earlier in this conversation")}
-                              </button>
-                            ) : null}
-                          </div>
-                        )
-                      }
-                      onShowingChange={setObjectShown}
-                      onStageObjectChange={setStageObject}
-                      onCardsShowingChange={setStageCards}
-                      turns={turns}
-                      captions={captions || voice.active}
-                      caption={
-                        voice.active ? (
-                          // The voice room shows no captions (owner
-                          // 2026-10-20: words appearing and leaving moved
-                          // the room up and down); only its way out, in a
-                          // place that never moves. The transcript is Chat.
-                          <div
-                            className="flex w-full flex-col items-center gap-3"
-                            data-q-voice-room-end
-                          >
-                            {/* Owner 2026-10-28 (job 9e52faf7): in the
-                                voice room the work Q promised was never on
-                                screen, only "Pulling it together". Each
-                                running job keeps its line here, its plan
-                                one tap away; it goes when it is done. */}
-                            <div className="w-full max-w-md">
-                              <PinnedWorkLines
-                                jobs={roomWork.filter(
-                                  (job) => !stageJobs.has(job.jobId),
-                                )}
-                                onOpenArtifact={showArtifact}
-                                onAsk={sayOrAsk}
-                              />
-                              <QWorkProgress jobs={false} className="mt-2" />
-                            </div>
-                            {/* QO-19: Q's spoken words as captions, in a
-                                slot of fixed height that is there whether
-                                Q speaks or not, so nothing moves (owner
-                                2026-10-20); off with Captions. */}
-                            {captions ? (
-                              <p
-                                className="cq-room-caption cq-body"
-                                aria-live="polite"
-                                data-q-voice-caption
-                              >
-                                {qSaying}
-                              </p>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="cq-room-end"
-                              onClick={end}
-                              data-q-control="room-end"
-                            >
-                              <i aria-hidden="true" />
-                              {t("End")}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex w-full flex-col gap-5">
-                            {/* A document still being made, asked for
-                              earlier: its line stays in view (owner
-                              2026-10-24, coordinator 25 Oct). */}
-                            <PinnedWorkLines
-                              jobs={pinnedWork.filter(
-                                (job) => !stageJobs.has(job.jobId),
-                              )}
-                              onOpenArtifact={showArtifact}
-                              onAsk={sayOrAsk}
-                            />
-                            {/* N2: the answer's real trail of stages, and
-                                its waiting or failed state. */}
-                            <QWorkProgress jobs={false} />
-
-                            <ol
-                              className="flex w-full flex-col gap-5"
-                              aria-label={t("Conversation")}
-
-                              data-q-thread
-                            >
-                              {latestExchange(thread).map((line) =>
-                                line.role === "person" ? (
-                                  <li
-                                    key={line.id}
-                                    className="flex flex-col"
-                                    data-q-row="person"
-                                    data-q-turn-id={line.turnId ?? line.id}
-                                    data-q-turn-role="USER"
-                                    data-q-disposition={rowDisposition(line)}
-                                  >
-                                    <p className="cq-q-bubble cq-body">
-                                      <span className="sr-only">
-                                        {t("You:")}{" "}
-                                      </span>
-                                      {line.text}
-                                    </p>
-                                    <HideFromQ
-                                      conversationId={q.conversationId}
-                                      messageId={line.id}
-                                    />
-                                  </li>
-                                ) : (
-                                  <li
-                                    key={line.id}
-                                    className="flex flex-col"
-                                    data-q-row="q"
-                                    data-q-turn-id={line.turnId ?? line.id}
-                                    data-q-turn-role="Q"
-                                    data-q-disposition={rowDisposition(line)}
-                                    data-q-failure={rowFailure(line)}
-                                  >
-                                    <span className="sr-only">Q: </span>
-                                    {line.turn === undefined ? (
-                                      <QMarkdown
-                                        text={line.text}
-                                        className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)"
-                                      />
-                                    ) : (
-                                      <QAnswer
-                                        turn={line.turn}
-                                        mark={false}
-                                        // N3: the stage around these captions
-                                        // draws its own kinds; the caption
-                                        // draws the rest (block-surfaces).
-                                        surface="caption"
-                                        onAsk={sayOrAsk}
-                                        onOpenArtifact={showArtifact}
-                                      />
-                                    )}
-                                  </li>
-                                ),
-                              )}
-                              {liveIsPerson ? (
-                                <li
-                                  key={live.id}
-                                  className="flex flex-col"
-                                  data-q-row="person"
-                                  data-q-turn-id={live.id}
-                                  data-q-turn-role="USER"
-                                >
-                                  <p
-                                    className="cq-q-bubble is-live cq-body"
-                                    data-q-live-line
-                                  >
-                                    <span className="sr-only">
-                                      {t("You, speaking:")}{" "}
-                                    </span>
-                                    {live.text}
-                                  </p>
-                                </li>
-                              ) : null}
-                            </ol>
-                          </div>
-                        )
-                      }
-                      waiting={
-                        boardDocked ? null : (
-                          <QNow
-                            session={session}
-                            onAct={sayOrAsk}
-                            quietWhenIdle
-                            withStop={false}
-                            taskShownElsewhere={runListed}
                           />
-                        )
-                      }
-                      onAsk={sayOrAsk}
-                      onOpenArtifact={showArtifact}
+                          {t(stateLabel)}
+                        </span>
+                      )}
+                      <StageLine current={presence.stage} reserve />
+                    </div>
+                    <QCurrentExchange
+                      lines={latestExchange(thread)}
+                      live={liveIsPerson ? live.text : null}
+                      qSaying={voice.active ? qSaying : null}
+                      captions={captions || voice.active}
+                      onOpenChat={() => chooseView("chat")}
+                      earlier={thread.length > latestExchange(thread).length}
                     />
-                  </ArrivalRoom>
+                    {voice.active ? (
+                      <div
+                        className="flex w-full flex-col items-center gap-3"
+                        data-q-voice-room-end
+                      >
+                        <div className="w-full max-w-md">
+                          <PinnedWorkLines
+                            jobs={roomWork}
+                            onOpenArtifact={showArtifact}
+                            onAsk={sayOrAsk}
+                          />
+                          <QWorkProgress jobs={false} className="mt-2" />
+                        </div>
+                        <button
+                          type="button"
+                          className="cq-room-end"
+                          onClick={end}
+                          data-q-control="room-end"
+                        >
+                          <i aria-hidden="true" />
+                          {t("End")}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <QWorkProgress jobs={false} />
+                        {connected && !q.working ? (
+                          <button
+                            type="button"
+                            className="cq-room-talk"
+                            onClick={() => void talk()}
+                            data-q-control="talk"
+                          >
+                            <Mic
+                              aria-hidden="true"
+                              size={ICON_SIZE.compact}
+                              strokeWidth={ICON_STROKE}
+                            />
+                            {t("Talk to Q")}
+                          </button>
+                        ) : null}
+                      </>
+                    )}
+                    {boardDocked ? null : (
+                      <div className="w-full max-w-md">
+                        <QNow
+                          session={session}
+                          onAct={sayOrAsk}
+                          quietWhenIdle
+                          withStop={false}
+                          taskShownElsewhere={runListed}
+                        />
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <ol
                     className="flex w-full flex-col gap-5"

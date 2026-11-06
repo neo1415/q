@@ -127,3 +127,61 @@ Also in this commit:
 - Full web vitest: 467 files and 4060 tests passed, exit 0.
   - That includes `back-everywhere` (87), `destination-routes` (52) and `manifest-page-coverage` (3).
 - `prettier --check apps/web`: clean.
+
+## Addendum 2: in a conversation, the Q view is the voice room (owner 2026-11-06, live defect)
+
+The live defect: on `/home?c=…` the Q view looked like Chat, a full transcript with cards, and the presence was scrolled out of view. The owner asked: "is the presence only there on first login?".
+
+**Now, in a conversation:**
+
+- **Q's presence is the stage.** It is pinned (`.cq-voice-room-presence`, sticky at the top of the stage with the stage's own field behind it) and centred. It is 280 px at desktop width and 200 px on a phone, and decorative (`aria-hidden`), with the state line under it.
+- **Only the current exchange sits under it** (`q-current-exchange.tsx`):
+  - the person's last line (2 lines at most);
+  - Q's latest reply as a caption, in plain words (3 lines at most). On a live line it is what Q is saying now.
+  - Q's cards, one line each ("Name · line"), four at most, then "See all in Chat". Every card line, and "Earlier in this conversation", opens Chat.
+- **Chat keeps the whole transcript, the cards and the lists,** as before.
+- **Unchanged:** one thread and one `talk()`. Talk to Q, End, the work lines, and the approval waiting on them (QNow) all stay.
+- **Nothing follows the newest words in the Q view;** it rests at Q's presence. Chat follows them as before.
+- **`QPresenceStage` is no longer mounted in the conversation's Q view** (it is unchanged, and still used by the dev rooms). Its stage objects are no longer drawn there: the cards canvas, room documents and live previews, and the flight to the Board. They are Chat's now, as asked.
+
+  **Flag for the owner:** during a live call, Q naming a company used to put its card up on the stage. In the Q view that card is now a one-line entry. Whether that fits the Q Pitch script's live-card moments is a call for the owner.
+
+- **Harness:** `/dev/q-nav?c=demo` holds a live-shaped conversation through `QSessionTurnsOverride`, a dev-only override of the session's turns that the app never mounts. The conversation has 12 turns and ends in discovery cards, using the harness's own `demoTop(5)` card fixtures.
+
+New strings, with Arabic in `sweep.ts`, are "See all in Chat" and "Cards in this answer". `generate-ui-text-source` regenerated them: 6524 strings, 0 Arabic gaps.
+
+### The `?c=` proof
+
+| View                    | Before (`1501a54`)                          | After                                      |
+| ----------------------- | ------------------------------------------- | ------------------------------------------ |
+| Q, 12-turn conversation | `before-conversation-q-<w>-<scheme>.png`    | `after-conversation-q-<w>-<scheme>.png`    |
+| Chat, same conversation | `before-conversation-chat-<w>-<scheme>.png` | `after-conversation-chat-<w>-<scheme>.png` |
+
+These replace the earlier two-line conversation shots of the same names.
+
+Measured in the page, with no scrolling:
+
+- **Before:** in the Q view, no aperture taller than 100 px inside the viewport. A thread was drawn.
+- **After:** the aperture is fully in view, 280 px at 1440 and 200 px at 390, in light and dark. There is no thread. There are 4 card lines, the body's `scrollTop` is 0, and no earlier turn is on screen.
+- **Chat, after:** the whole transcript is there, from the first question to the cards.
+
+### Tests
+
+- In `q-voice-view.test.tsx` (14 tests in all), "the Q view in a conversation is the voice room" (2 tests):
+  - the presence is pinned and first in the room;
+  - there is no thread and no earlier turn;
+  - the person's line and Q's caption are shown;
+  - there are 4 card lines plus "See all in Chat";
+  - a card line opens Chat, which has the whole transcript and the cards.
+- **Failing-first** against `1501a54`'s panel: both failed, and the other 12 passed.
+
+### Gates (exact results)
+
+- Package build: exit 0. There were 54 tasks, 41 of them cached.
+- Root tsc: exit 0.
+- Web tsc: exit 0.
+- eslint on the 7 touched files: exit 0.
+- Full web vitest: 467 files and 4062 tests passed, exit 0.
+  - That includes `back-everywhere`, `destination-routes` and `manifest-page-coverage`.
+- `packages/q-core` vitest: 149 files passed and 1 skipped; 841 tests passed and 1 skipped.
+- prettier: clean.

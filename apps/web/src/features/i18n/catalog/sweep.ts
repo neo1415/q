@@ -870,4 +870,7 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   "Couldn't hide that. Try again": "تعذّر إخفاء ذلك. حاول مرة أخرى",
   "Clear the cards": "مسح البطاقات",
   "Show the cards again": "إظهار البطاقات مرة أخرى",
+  // Q voice room in a conversation (owner 2026-11-06)
+  "See all in Chat": "عرض الكل في المحادثة",
+  "Cards in this answer": "البطاقات في هذه الإجابة",
 };

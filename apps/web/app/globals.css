@@ -5774,6 +5774,22 @@
 }
 
 /*
+ * Owner 2026-11-06: in a conversation the Q view's presence is the stage,
+ * pinned at the top of the scrolling stage and centred, so it never
+ * scrolls away under the exchange. The stage's own field behind it, so
+ * words scrolled under it are hidden rather than seen through.
+ */
+.cq-voice-room-presence {
+  position: sticky;
+  top: 0;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  padding-block: 8px;
+  background: var(--cq-stage-canvas);
+}
+
+/*
  * Owner 2026-10-28: on a phone Q's page is a plain conversation, like
  * ChatGPT. The moving light and the animated corner mark are for the wide
  * screen. Owner 2026-11-06: Q's room presence is the Q (voice) view's
