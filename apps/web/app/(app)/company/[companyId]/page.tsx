@@ -31,6 +31,7 @@ import {
 import { apiSession } from "@/features/q/context";
 import { BackLink } from "@/features/company/back-link";
 import {
+  ProfileOpenTabQSection,
   ProfileTabQSection,
   ProfileTabs,
 } from "@/features/company/profile-tabs";
@@ -255,6 +256,37 @@ export default async function CompanyPage({
           refs={[{ kind: "COMPANY", id: profile.companyId }]}
           total={1}
           label={`${profile.canonicalName} profile`}
+        />
+        {/* Q Workspace W2: the open tab, as a section Q can name. */}
+        <ProfileOpenTabQSection
+          id="overview"
+          kind="COMPANY_PROFILE"
+          on="overview"
+          label={t("Overview")}
+        />
+        <ProfileOpenTabQSection
+          id="diligence"
+          kind="DILIGENCE"
+          on="diligence"
+          label={t("Diligence")}
+        />
+        <ProfileOpenTabQSection
+          id="elevator"
+          kind="ELEVATOR"
+          on="elevator"
+          label={t("Elevator")}
+        />
+        <ProfileOpenTabQSection
+          id="deck"
+          kind="DECK"
+          on="deck"
+          label={t("Pitch deck")}
+        />
+        <ProfileOpenTabQSection
+          id="team"
+          kind="TEAM"
+          on="team"
+          label={t("Team")}
         />
         {dataRoom === null ? null : (
           <ProfileTabQSection

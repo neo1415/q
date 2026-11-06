@@ -1365,3 +1365,7 @@ export * from "./arrival-snapshot.js";
 
 // W2 (2026-10-10): external person identity card, subject and evidence-classed brief.
 export * from "./external-person.js";
+
+// Q Workspace W2 (2026-11-06): the site map, its digest and the generated snapshot.
+export * from "./site-map.js";
+export * from "./site-map.generated.js";
