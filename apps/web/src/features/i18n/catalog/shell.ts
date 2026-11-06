@@ -298,4 +298,14 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
     "لا يتأثر ملفك الشخصي ولا شركاتك وشركاتك الاستثمارية الأخرى.",
   "not configured": "غير مُعدّ",
   or: "أو",
+  // Q Workspace (W1, ADR 0077): the split's pane controls and phone sheet.
+  "Hide Q": "إخفاء Q",
+  "Hide pages": "إخفاء الصفحات",
+  "Show pages": "إظهار الصفحات",
+  "Resize Q": "تغيير حجم Q",
+  Opened: "فُتحت",
+  "the page": "الصفحة",
+  "Q Workspace (preview)": "مساحة عمل Q (معاينة)",
+  "Q and your pages side by side. Q can open the page you are talking about.":
+    "Q وصفحاتك جنباً إلى جنب. يستطيع Q فتح الصفحة التي تتحدث عنها.",
 };
