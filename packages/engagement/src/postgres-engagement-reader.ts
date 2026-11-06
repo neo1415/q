@@ -38,9 +38,12 @@ const day = (value: unknown): string => {
   throw new TypeError("expected a date");
 };
 const num = z.coerce.number().int();
+const text = z.string();
 
+const nullableNum = z.coerce.number().int().nullable();
 const ViewerRow = z.object({
   visibility: z.string(),
+  basis: z.string(),
   viewer_user_id: z.string().nullable(),
   viewer_organisation_id: z.string().nullable(),
   viewer_name: z.string().nullable(),
@@ -49,8 +52,8 @@ const ViewerRow = z.object({
   events: num,
   profile_views: num,
   deck_opens: num,
-  total_dwell_ms: num,
-  video_watch_ms: num,
+  total_dwell_ms: nullableNum,
+  video_watch_ms: nullableNum,
   q_card_views: num,
   data_room_document_views: num,
   last_viewed_at: z.unknown(),
@@ -67,17 +70,19 @@ export function createPostgresCompanyEngagementReader(
       // Not a member, or no such company: the same answer.
       if (access?.allowed !== true) return null;
 
-      const [daily, funnel, videos, documents, viewers] = await Promise.all([
-        sql`select * from analytics.company_engagement_daily(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-        sql`select * from analytics.company_deck_funnel(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-        sql`select * from analytics.company_video_completion(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-        sql`select * from analytics.company_document_views(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-        // Names only for ids the projection chose to show.
-        sql`select v.*, p.display_name as viewer_name, o.display_name as organisation_name
+      const [daily, funnel, videos, documents, viewers, detail] =
+        await Promise.all([
+          sql`select * from analytics.company_engagement_daily(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+          sql`select * from analytics.company_deck_funnel(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+          sql`select * from analytics.company_video_completion(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+          sql`select * from analytics.company_document_views(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+          // Names only for ids the projection chose to show.
+          sql`select v.*, p.display_name as viewer_name, o.display_name as organisation_name
               from analytics.company_engagement_viewers(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz) v
               left join identity.user_profiles p on p.id = v.viewer_user_id
               left join identity.organisations o on o.id = v.viewer_organisation_id`,
-      ]);
+          sql`select * from analytics.company_viewer_deck_detail(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        ]);
 
       return CompanyEngagementDtoSchema.parse({
         companyId,
@@ -94,21 +99,21 @@ export function createPostgresCompanyEngagementReader(
           dataRoomDocumentViews: num.parse(r["data_room_document_views"]),
         })),
         deckFunnel: funnel.map((r) => ({
-          documentId: r["document_id"],
+          documentId: text.parse(r["document_id"]),
           slideNumber: num.parse(r["slide_number"]),
           viewersReached: num.parse(r["viewers_reached"]),
           totalDwellMs: num.parse(r["total_dwell_ms"]),
           medianDwellMs: num.parse(r["median_dwell_ms"]),
         })),
         videos: videos.map((r) => ({
-          mediaAssetId: r["media_asset_id"],
+          mediaAssetId: text.parse(r["media_asset_id"]),
           viewers: num.parse(r["viewers"]),
           totalWatchMs: num.parse(r["total_watch_ms"]),
           completedViewers: num.parse(r["completed_viewers"]),
         })),
         documents: documents.map((r) => ({
-          documentId: r["document_id"],
-          type: r["engagement_type"],
+          documentId: text.parse(r["document_id"]),
+          type: text.parse(r["engagement_type"]),
           views: num.parse(r["views"]),
           viewers: num.parse(r["viewers"]),
           totalMs: num.parse(r["total_ms"]),
@@ -117,6 +122,7 @@ export function createPostgresCompanyEngagementReader(
           const r = ViewerRow.parse(raw);
           return {
             visibility: r.visibility,
+            basis: r.basis,
             viewerUserId: r.viewer_user_id,
             viewerOrganisationId: r.viewer_organisation_id,
             viewerName: r.viewer_user_id === null ? null : r.viewer_name,
@@ -133,6 +139,12 @@ export function createPostgresCompanyEngagementReader(
             lastViewedAt: iso(r.last_viewed_at),
           };
         }),
+        viewerDeckDetail: detail.map((r) => ({
+          viewerUserId: text.parse(r["viewer_user_id"]),
+          documentId: text.parse(r["document_id"]),
+          slideNumber: num.parse(r["slide_number"]),
+          dwellMs: num.parse(r["dwell_ms"]),
+        })),
       });
     },
   };

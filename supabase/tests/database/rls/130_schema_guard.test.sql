@@ -221,6 +221,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- read only through the redacting projection functions. Suite 999_analytics_engagement.
   ('analytics', 'engagement_events',        'RLS_REQUIRED', '{SELECT}'),
   ('analytics', 'viewing_privacy_settings', 'RLS_REQUIRED', '{SELECT}'),
+  -- Admin-controlled analytics settings and their audited history: server only.
+  ('analytics', 'platform_settings',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('analytics', 'platform_setting_changes', 'INTERNAL_SERVER_ONLY', '{}'),
   -- RECOVERY D3: the durable agent work queue; owners read their own rows, suite 892.
   ('q_runtime', 'agent_work_queue', 'RLS_REQUIRED', '{SELECT}'),
   ('q_runtime', 'workforce_agent_runs', 'RLS_REQUIRED', '{SELECT}'),

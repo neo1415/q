@@ -16,7 +16,8 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 // 2: BILLING permissions added (ADR 0034).
 // 4: P14 company claims and publishing (claims.read/decide, companies.publish).
-export const ADMIN_PERMISSIONS_VERSION = 4 as const;
+// 5: analytics privacy settings (owner 2026-11-06, Q Workspace §8).
+export const ADMIN_PERMISSIONS_VERSION = 5 as const;
 
 const ALL: readonly AdminRole[] = ADMIN_ROLES;
 const OWNER_OPERATOR_TS: readonly AdminRole[] = [
@@ -73,6 +74,14 @@ export const ADMIN_PERMISSIONS = {
   },
   "flags.read": { roles: ALL, stepUp: false },
   "flags.write": { roles: ["platform_owner", "operator"], stepUp: true },
+  // Analytics privacy settings: who may see whom (Q Workspace §8). Changing
+  // one can reveal identities, so it is the owner's and operator's, with
+  // step-up, audited.
+  "analytics_settings.read": { roles: ALL, stepUp: false },
+  "analytics_settings.write": {
+    roles: ["platform_owner", "operator"],
+    stepUp: true,
+  },
   "email.read": { roles: ["platform_owner", "operator"], stepUp: false },
   "roles.manage": { roles: ["platform_owner"], stepUp: true },
   // BILLING block (ADR 0034): plans and limits per account, and the fee

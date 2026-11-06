@@ -23,10 +23,11 @@ export type EngagementService = {
     batch: RecordEngagementBatchRequest,
   ) => Promise<RecordEngagementBatchResponse>;
   readonly privacy: (actor: ActorContext) => Promise<ViewingPrivacyDto>;
+  /** NOT_ALLOWED when the platform does not offer that level. */
   readonly setPrivacy: (
     actor: ActorContext,
     visibility: ViewingVisibility,
-  ) => Promise<ViewingPrivacyDto>;
+  ) => Promise<ViewingPrivacyDto | "NOT_ALLOWED">;
 };
 
 export type EngagementServiceDependencies = {
@@ -80,7 +81,11 @@ export function createEngagementService(
     privacy: (actor) => dependencies.repository.privacyFor(actor.userId),
 
     setPrivacy: async (actor, visibility) => {
-      await dependencies.repository.setPrivacy(actor.userId, visibility);
+      const saved = await dependencies.repository.setPrivacy(
+        actor.userId,
+        visibility,
+      );
+      if (saved === "NOT_ALLOWED") return saved;
       return dependencies.repository.privacyFor(actor.userId);
     },
   };

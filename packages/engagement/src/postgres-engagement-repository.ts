@@ -41,16 +41,19 @@ export type EngagementRepository = {
     readonly visibility: ViewingVisibility;
     readonly chosen: boolean;
     readonly defaultVisibility: ViewingVisibility;
+    readonly allowedVisibilities: ViewingVisibility[];
   }>;
+  /** NOT_ALLOWED when the platform does not offer that level. */
   readonly setPrivacy: (
     userId: string,
     visibility: ViewingVisibility,
-  ) => Promise<void>;
+  ) => Promise<"SAVED" | "NOT_ALLOWED">;
 };
 
 const PrivacyRow = z.object({
   visibility: ViewingVisibilitySchema.nullable(),
   default_visibility: ViewingVisibilitySchema,
+  allowed_visibilities: z.array(ViewingVisibilitySchema),
 });
 
 export function createPostgresEngagementRepository(
@@ -131,7 +134,8 @@ export function createPostgresEngagementRepository(
 
     privacyFor: async (userId) => {
       const [row] = await sql`
-        select s.visibility, analytics.default_viewing_visibility() as default_visibility
+        select s.visibility, analytics.default_viewing_visibility() as default_visibility,
+               (analytics.settings()).allowed_visibilities as allowed_visibilities
           from (select 1) one
           left join analytics.viewing_privacy_settings s on s.user_id = ${userId}::uuid`;
       const parsed = PrivacyRow.parse(row);
@@ -139,15 +143,20 @@ export function createPostgresEngagementRepository(
         visibility: parsed.visibility ?? parsed.default_visibility,
         chosen: parsed.visibility !== null,
         defaultVisibility: parsed.default_visibility,
+        allowedVisibilities: parsed.allowed_visibilities,
       };
     },
 
     setPrivacy: async (userId, visibility) => {
-      await sql`
+      // The allowed set is the admin setting, checked in the same statement.
+      const rows = await sql`
         insert into analytics.viewing_privacy_settings (user_id, visibility, updated_at)
-        values (${userId}::uuid, ${visibility}, now())
+        select ${userId}::uuid, ${visibility}, now()
+         where ${visibility} = any((analytics.settings()).allowed_visibilities)
         on conflict (user_id) do update
-          set visibility = excluded.visibility, updated_at = excluded.updated_at`;
+          set visibility = excluded.visibility, updated_at = excluded.updated_at
+        returning user_id`;
+      return rows.length === 1 ? "SAVED" : "NOT_ALLOWED";
     },
   };
 }

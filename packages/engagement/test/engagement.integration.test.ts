@@ -214,6 +214,11 @@ describe("@capital-q/engagement against local Postgres", () => {
         visibility: "ORGANISATION_ONLY",
         chosen: false,
         defaultVisibility: "ORGANISATION_ONLY",
+        allowedVisibilities: [
+          "FULL_IDENTITY",
+          "ORGANISATION_ONLY",
+          "ANONYMOUS",
+        ],
       });
       await repo.setPrivacy(investor.viewer.userId, "ANONYMOUS");
       expect(await repo.privacyFor(investor.viewer.userId)).toMatchObject({
@@ -233,7 +238,7 @@ describe("@capital-q/engagement against local Postgres", () => {
     });
   });
 
-  it("the founder read names only whom the viewer allowed, and floors aggregates", async () => {
+  it("the founder read follows the spec defaults: no names, floored aggregates", async () => {
     await scenario(async (tx) => {
       const repo = createPostgresEngagementRepository(tx.sql);
       const reader = createPostgresCompanyEngagementReader(tx.sql);
@@ -262,11 +267,18 @@ describe("@capital-q/engagement against local Postgres", () => {
       const below = await reader.read(query);
       expect(below?.floorMet).toBe(false);
       expect(below?.daily).toEqual([]);
+      // Named passive viewers is OFF by default: even a Full identity
+      // viewer is shown as their organisation, with no time per person.
       expect(below?.viewers).toHaveLength(1);
       expect(below?.viewers[0]).toMatchObject({
-        visibility: "FULL_IDENTITY",
-        viewerUserId: named.viewer.userId,
+        visibility: "ORGANISATION_ONLY",
+        basis: "VIEWER_CHOICE",
+        viewerUserId: null,
+        viewerName: null,
+        viewerOrganisationId: named.viewer.organisationId,
+        deckDwellMs: null,
       });
+      expect(below?.viewerDeckDetail).toEqual([]);
 
       await viewOf(third.viewer);
       const at3 = await reader.read(query);
@@ -278,8 +290,9 @@ describe("@capital-q/engagement against local Postgres", () => {
       // One anonymous viewer cannot reach the floor on their own.
       expect(anonymous).toEqual([]);
       expect(
-        at3?.viewers.find((v) => v.visibility === "ORGANISATION_ONLY"),
-      ).toMatchObject({ viewerUserId: null, viewerName: null, people: 1 });
+        at3?.viewers.filter((v) => v.visibility === "ORGANISATION_ONLY"),
+      ).toHaveLength(2);
+      expect(at3?.viewers.every((v) => v.viewerUserId === null)).toBe(true);
 
       // Someone outside the company reads nothing.
       expect(

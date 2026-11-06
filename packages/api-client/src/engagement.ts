@@ -1,9 +1,12 @@
 import {
+  ANALYTICS_SETTINGS_PATH,
+  AnalyticsSettingsDtoSchema,
   ENGAGEMENT_EVENTS_PATH,
   RecordEngagementBatchResponseSchema,
   VIEWING_PRIVACY_PATH,
   ViewingPrivacyDtoSchema,
   type RecordEngagementBatchRequest,
+  type UpdateAnalyticsSettingsRequest,
   type ViewingVisibility,
 } from "@capital-q/contracts";
 
@@ -35,4 +38,27 @@ export function setViewingPrivacy(
   return call(session, "PUT", VIEWING_PRIVACY_PATH, ViewingPrivacyDtoSchema, {
     body: { visibility },
   });
+}
+
+/** Admin: the analytics privacy settings (Q Workspace §8). */
+export function getAdminAnalyticsSettings(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    ANALYTICS_SETTINGS_PATH,
+    AnalyticsSettingsDtoSchema,
+  );
+}
+
+export function updateAdminAnalyticsSettings(
+  session: ApiSession,
+  body: UpdateAnalyticsSettingsRequest,
+) {
+  return call(
+    session,
+    "PUT",
+    ANALYTICS_SETTINGS_PATH,
+    AnalyticsSettingsDtoSchema,
+    { body },
+  );
 }

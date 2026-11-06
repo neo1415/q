@@ -101,6 +101,16 @@ export function registerEngagementRoutes(
         getActorContext(request),
         body.data.visibility,
       );
+      if (privacy === "NOT_ALLOWED") {
+        const problem = invalid(
+          request.id,
+          "That visibility level is not offered on Capital Q.",
+        );
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
       void reply.header("Cache-Control", "no-store");
       return ViewingPrivacyDtoSchema.parse(privacy);
     },

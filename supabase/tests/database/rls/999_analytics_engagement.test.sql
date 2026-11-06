@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(31);
+select plan(52);
 
 -- Three more people at the investor organisation B.
 insert into pg_temp.rls_fixture (label, id) values
@@ -117,12 +117,12 @@ select is((select count(*)::int from analytics.my_company_engagement_viewers(pg_
            where visibility = 'ANONYMOUS'), 0,
   'an anonymous bucket from one organisation is withheld');
 select is((select count(*)::int from analytics.my_company_engagement_viewers(pg_temp.rls_id('company_a'))
-           where visibility = 'FULL_IDENTITY' and viewer_user_id = pg_temp.rls_id('user_b2')), 1,
-  'a Full identity viewer is shown by name, by their own choice');
+           where viewer_user_id is not null), 0,
+  'spec default: no passive viewer is named, not even one who chose Full identity');
 select is((select row(viewer_user_id, viewer_organisation_id, people)::text
            from analytics.my_company_engagement_viewers(pg_temp.rls_id('company_a')) where visibility = 'ORGANISATION_ONLY'),
-  row(null::uuid, pg_temp.rls_id('org_b'), 1)::text,
-  'an Organisation only viewer is shown as their organisation, never their person');
+  row(null::uuid, pg_temp.rls_id('org_b'), 2)::text,
+  'Full identity and Organisation only viewers appear as their organisation, people merged');
 
 -- Two more anonymous investors, from two more organisations.
 select pg_temp.reset_test_identity();
@@ -176,6 +176,87 @@ select throws_ok($$ select * from analytics.company_engagement_viewers(pg_temp.r
   '42501', null, 'the actor-parameter projection is server-only');
 select throws_ok($$ insert into analytics.viewing_privacy_settings (user_id, visibility) values (pg_temp.rls_id('user_a'), 'ANONYMOUS') $$,
   '42501', null, 'settings are written by the server only');
+
+-- ---------------------------------------------------------------- admin settings
+-- Each combination, as the founder sees it. Settings change only as the
+-- server (privileged); the founder reads through the projection.
+create function pg_temp.set(p_sql text) returns void language plpgsql as $f$
+begin
+  perform pg_temp.reset_test_identity();
+  execute 'update analytics.platform_settings set ' || p_sql
+       || ', updated_by = pg_temp.rls_id(''user_a''), reason = ''pgTAP combination''';
+end;
+$f$;
+create function pg_temp.shown(p_user text) returns text language sql as $f$
+  select string_agg(visibility || '/' || basis, ',')
+    from analytics.my_company_engagement_viewers(pg_temp.rls_id('company_a'))
+   where viewer_user_id = pg_temp.rls_id(p_user)
+$f$;
+create function pg_temp.dwell_of(p_user text) returns bigint language sql as $f$
+  select total_dwell_ms from analytics.my_company_engagement_viewers(pg_temp.rls_id('company_a'))
+   where viewer_user_id = pg_temp.rls_id(p_user)
+$f$;
+
+select pg_temp.set('named_passive_viewers = true');
+select pg_temp.act_as_user_a();
+select is(pg_temp.shown('user_b2'), 'FULL_IDENTITY/VIEWER_CHOICE',
+  'named passive viewers ON: a Full identity viewer is named, by their own choice');
+select is(pg_temp.shown('user_b'), null, 'named passive viewers ON: an Organisation only viewer is still not named');
+select is(pg_temp.dwell_of('user_b2'), null::bigint, 'per-person time stays off by default');
+select pg_temp.reset_test_identity();
+select is((select count(*)::int from analytics.company_viewer_deck_detail(pg_temp.rls_id('user_a'), pg_temp.rls_id('company_a'), null)), 0,
+  'and per-person slide detail (server-side) is empty');
+
+select pg_temp.set('per_person_passive_analytics = true');
+select pg_temp.act_as_user_a();
+select is(pg_temp.dwell_of('user_b2'), 2000::bigint, 'granular ON: slide dwell per named viewer');
+select pg_temp.reset_test_identity();
+select is((select array_agg(slide_number) from analytics.company_viewer_deck_detail(pg_temp.rls_id('user_a'), pg_temp.rls_id('company_a'), null)), array[1],
+  'granular ON: per-slide detail only for the named viewer');
+select pg_temp.act_as_user_a();
+select is((select total_dwell_ms from analytics.my_company_engagement_viewers(pg_temp.rls_id('company_a'))
+           where visibility = 'ORGANISATION_ONLY'), null::bigint,
+  'granular ON: never time for an organisation row');
+
+select pg_temp.set('per_person_passive_analytics = false, named_passive_viewers = false, paid_identity_reveal = true');
+select pg_temp.act_as_user_a();
+select is(pg_temp.shown('user_b'), null, 'paid reveal ON but the company is not entitled: nobody is revealed');
+
+select pg_temp.reset_test_identity();
+insert into billing.limit_overrides (organisation_id, feature_key, granted_by_user_id, reason)
+  values (pg_temp.rls_id('org_a'), 'analytics.identity_reveal', pg_temp.rls_id('user_a'), 'pgTAP entitlement');
+select pg_temp.act_as_user_a();
+select is(pg_temp.shown('user_b'), 'FULL_IDENTITY/PAID_REVEAL', 'paid reveal ON and entitled: an Organisation only viewer is named, marked as a paid reveal');
+select is(pg_temp.shown('user_b2'), 'FULL_IDENTITY/VIEWER_CHOICE', 'a Full identity viewer stays their own choice');
+select is(pg_temp.shown('user_b3'), null, 'paid reveal never reveals an Anonymous viewer by default');
+select is(pg_temp.shown('user_c'), null, 'nor any other Anonymous viewer');
+
+select pg_temp.set('paid_reveal_overrides_anonymous = true');
+select pg_temp.act_as_user_a();
+select is(pg_temp.shown('user_b3'), 'FULL_IDENTITY/PAID_REVEAL', 'only with the explicit admin override is Anonymous revealed');
+
+select pg_temp.set('paid_identity_reveal = true, paid_reveal_overrides_anonymous = true');
+select pg_temp.reset_test_identity();
+update billing.limit_overrides set revoked_at = now(), revoked_by_user_id = pg_temp.rls_id('user_a')
+ where organisation_id = pg_temp.rls_id('org_a') and feature_key = 'analytics.identity_reveal';
+select pg_temp.act_as_user_a();
+select is(pg_temp.shown('user_b3'), null, 'a revoked entitlement reveals nothing, whatever the settings');
+
+select pg_temp.reset_test_identity();
+select throws_ok($$ update analytics.platform_settings set paid_identity_reveal = false, paid_reveal_overrides_anonymous = true $$,
+  '23514', null, 'the Anonymous override cannot exist without paid reveal');
+select throws_ok($$ update analytics.platform_settings set allowed_visibilities = array['FULL_IDENTITY'], default_visibility = 'FULL_IDENTITY' $$,
+  '23514', null, 'a person may always choose to be stricter than the default');
+select throws_ok($$ delete from analytics.platform_settings $$, '23001', null, 'the settings row cannot be removed');
+insert into analytics.platform_setting_changes (actor_user_id, reason, before, after)
+  values (pg_temp.rls_id('user_a'), 'pgTAP history', '{}', '{}');
+select throws_ok($$ update analytics.platform_setting_changes set reason = 'rewritten' $$, '23001', null, 'setting history is append-only');
+update analytics.platform_settings set default_visibility = 'ANONYMOUS', paid_identity_reveal = false,
+  paid_reveal_overrides_anonymous = false;
+select is(analytics.default_viewing_visibility(), 'ANONYMOUS', 'the default is the admin setting, read in one place');
+select pg_temp.act_as_user_a();
+select throws_ok($$ select * from analytics.platform_settings $$, '42501', null, 'a browser cannot read the settings table');
+select throws_ok($$ select analytics.settings() $$, '42501', null, 'nor call the resolver directly');
 
 -- ---------------------------------------------------------------- investor B
 select pg_temp.act_as_user_b();

@@ -44,10 +44,13 @@ function build(authenticated = true) {
         visibility: stored ?? "ORGANISATION_ONLY",
         chosen: stored !== null,
         defaultVisibility: "ORGANISATION_ONLY",
+        allowedVisibilities: ["ORGANISATION_ONLY", "ANONYMOUS"],
       }),
     setPrivacy: (_user, visibility) => {
+      // The platform here does not offer Full identity.
+      if (visibility === "FULL_IDENTITY") return Promise.resolve("NOT_ALLOWED");
       stored = visibility;
-      return Promise.resolve();
+      return Promise.resolve("SAVED");
     },
   };
   const app = createApp(
@@ -193,6 +196,7 @@ describe("viewing privacy", () => {
       visibility: "ORGANISATION_ONLY",
       chosen: false,
       defaultVisibility: "ORGANISATION_ONLY",
+      allowedVisibilities: ["ORGANISATION_ONLY", "ANONYMOUS"],
     });
     const put = await app.inject({
       method: "PUT",
@@ -201,6 +205,16 @@ describe("viewing privacy", () => {
     });
     expect(put.statusCode).toBe(200);
     expect(put.json()).toMatchObject({ visibility: "ANONYMOUS", chosen: true });
+  });
+
+  it("refuses a level the platform does not offer", async () => {
+    const { app } = build();
+    const put = await app.inject({
+      method: "PUT",
+      url: VIEWING_PRIVACY_PATH,
+      payload: { visibility: "FULL_IDENTITY" },
+    });
+    expect(put.statusCode).toBe(422);
   });
 
   it("refuses an unknown level", async () => {

@@ -64,6 +64,29 @@ function fakeSql(people: ReadonlyMap<string, Person>) {
           : [{ role: person.role }],
       );
     }
+    if (text.includes("from analytics.platform_settings")) {
+      return Promise.resolve([
+        {
+          default_visibility: "ORGANISATION_ONLY",
+          allowed_visibilities: [
+            "FULL_IDENTITY",
+            "ORGANISATION_ONLY",
+            "ANONYMOUS",
+          ],
+          named_passive_viewers: false,
+          paid_identity_reveal: false,
+          paid_reveal_overrides_anonymous: false,
+          per_person_passive_analytics: false,
+          passive_view_notifications: false,
+          intent_signal_notifications: true,
+          q_uses_passive_signals: true,
+          version: 1,
+          updated_by_name: null,
+          reason: null,
+          updated_at: new Date("2026-11-06T00:00:00Z"),
+        },
+      ]);
+    }
     if (text.includes("from platform_ops.step_ups")) {
       const person = people.get(String(values[0]));
       return Promise.resolve(
@@ -196,7 +219,7 @@ function fakeFeeLedger() {
 // end BILLING block
 
 type Route = {
-  readonly method: "GET" | "POST" | "DELETE";
+  readonly method: "GET" | "POST" | "PUT" | "DELETE";
   readonly url: string;
   readonly permission: AdminPermission;
   readonly body?: Record<string, unknown>;
@@ -354,6 +377,36 @@ const ROUTES: readonly Route[] = [
     url: "/v1/admin/flags/q.daily",
     permission: "flags.write",
     body: { enabled: false, ...REASON },
+  },
+  {
+    method: "GET",
+    url: "/v1/admin/analytics-settings",
+    permission: "analytics_settings.read",
+    listOk: true,
+  },
+  {
+    method: "PUT",
+    url: "/v1/admin/analytics-settings",
+    permission: "analytics_settings.write",
+    body: {
+      settings: {
+        defaultVisibility: "ORGANISATION_ONLY",
+        allowedVisibilities: [
+          "FULL_IDENTITY",
+          "ORGANISATION_ONLY",
+          "ANONYMOUS",
+        ],
+        namedPassiveViewers: true,
+        paidIdentityReveal: false,
+        paidRevealOverridesAnonymous: false,
+        perPersonPassiveAnalytics: false,
+        passiveViewNotifications: false,
+        intentSignalNotifications: true,
+        qUsesPassiveSignals: true,
+      },
+      expectedVersion: 1,
+      ...REASON,
+    },
   },
   {
     method: "GET",
