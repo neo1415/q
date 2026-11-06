@@ -21,7 +21,7 @@ describe("TURN_READER v74", () => {
   it("was the active reader (v75 now): v73 with the NEXT STEPS rule extended, nothing else", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(79);
+    expect(active.version).toBe(80);
     expect(registry.get("TURN_READER", 73)?.definition.status).toBe(
       "DEPRECATED",
     );

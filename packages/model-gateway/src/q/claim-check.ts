@@ -626,11 +626,45 @@ function namesIn(sentence: string): string[] {
   return names;
 }
 
+const ACRONYM = /^[A-Z]{2,6}s?$/u;
+
+const sourcedWords = (words: string, corpus: ClaimCorpus): boolean =>
+  new RegExp(
+    `(?<![\\p{L}\\p{N}])${words.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
+    "u",
+  ).test(corpus.text);
+
+/**
+ * Words the sources write that describe and name nobody: an acronym they
+ * use ("SME" of "SME lending") beside a place they name, as itself or as
+ * "<place>-based". Live 2026-11-06 (61b7a85, ORD-016 #0 and CMP-061 #0):
+ * "Silo Credit is a Lagos-based SME lender" read "Lagos-based SME" as an
+ * invented name and lost the line that named Silo Credit. Only with such
+ * an acronym, and only when what is left is itself in the sources: parts
+ * of two names put together ("Kora Credit"), or a place beside a word or
+ * acronym no source writes, are still names.
+ */
+function sourcedDescription(name: string, corpus: ClaimCorpus): boolean {
+  const tokens = name.split(/\s+/u).filter((token) => token.length > 0);
+  const acronyms = tokens.filter(
+    (token) =>
+      ACRONYM.test(token) &&
+      sourcedWords(token.toLowerCase().replace(/s$/u, ""), corpus),
+  );
+  if (acronyms.length === 0) return false;
+  const rest = tokens
+    .filter((token) => !acronyms.includes(token))
+    .map((token) => token.replace(/-based$/iu, ""))
+    .join(" ");
+  return rest.length === 0 || sourcedWords(normaliseText(rest), corpus);
+}
+
 function nameGrounded(name: string, corpus: ClaimCorpus): boolean {
   const normal = normaliseText(name);
   if (KNOWN_PHRASES.has(normal)) return true;
   if (countryOfName(name) !== null) return true;
   if (corpus.text.includes(normal)) return true;
+  if (sourcedDescription(name, corpus)) return true;
   const stripped = normal.replace(CORPORATE_SUFFIX, "");
   if (stripped !== normal && corpus.text.includes(stripped)) return true;
   // Every word is ordinary vocabulary -- ours, or a word the sources
