@@ -15,9 +15,15 @@ import {
   type TemporalClass,
 } from "../domain/comparison.js";
 import {
+  categoryTerms,
+  DISCOVERY_VOCABULARY,
+  type ResearchCategories,
+} from "../domain/category-terms.js";
+import {
   composeEgressQuery,
   namesShown,
   searchPhrase,
+  tokenise,
 } from "../domain/egress.js";
 import {
   boundExcerpt,
@@ -158,6 +164,19 @@ export type ResearchCommand = {
   readonly publicTerms?: readonly string[] | undefined;
   /** Deep research: research vocabulary may travel (egress.ts). */
   readonly researchVocabulary?: boolean | undefined;
+  /**
+   * Web discovery (owner 2026-11-06): companies of a kind. Only real
+   * reference-taxonomy categories and ISO countries are admitted, and
+   * travel as their public names (category-terms.ts).
+   */
+  readonly categories?: ResearchCategories | undefined;
+  /**
+   * Web discovery: names read on pages this run's searches already
+   * surfaced (a company a directory listed), to search for its founders.
+   * A name travels only when every word of it was on those pages in this
+   * run; anything else is dropped, whoever asked.
+   */
+  readonly pageNames?: readonly string[] | undefined;
 };
 
 export type ResearchedSource = {
@@ -330,9 +349,22 @@ export const EXTRACT_BUDGET_MS = 3_000;
 
 const RUN_ALLOWLIST_TTL_MS = 6 * 60 * 60 * 1000;
 const RUN_ALLOWLIST_MAX_RUNS = 500;
+/** Words kept per run for `pageNames` (web discovery). */
+const RUN_PAGE_WORDS_MAX = 20_000;
+/** Names one research call may ask to search for from its run's pages. */
+export const RESEARCH_PAGE_NAMES_MAX = 6;
 const MAX_PER_DOMAIN = 2;
 /** Research calls one run may send to the providers (see `budgeted`). */
 export const RESEARCH_RUN_BUDGET = 1;
+/**
+ * Web discovery (owner 2026-11-06): "find me companies online and their
+ * founders" needs a plan of targeted searches and a founder search per
+ * candidate, which the one-call rule above cannot hold. A discovery call
+ * (one carrying admitted `categories` or `pageNames`) has its own budget
+ * per run, strictly enforced, beside the ordinary one: at most this many
+ * calls, each of at most two searches, so at most ten searches a turn.
+ */
+export const RESEARCH_DISCOVERY_RUN_BUDGET = 5;
 
 const PROVIDER_UNAVAILABLE_MESSAGE =
   "Public sources couldn't be checked right now. Capital Q's own information is still available.";
@@ -460,6 +492,41 @@ export function createPublicWebResearchService(
     extractLatency: meter.createHistogram("q.research.extract_latency_ms"),
   };
   const allowlist = new Map<string, { urls: Set<string>; expiresAt: number }>();
+  /**
+   * The words of the pages each run's searches surfaced (titles, snippets
+   * and the text read), for `pageNames`. Bounded per run and by the same
+   * run window as the allowlist.
+   */
+  const pageWords = new Map<string, Set<string>>();
+  const notePageWords = (runId: string, texts: readonly string[]) => {
+    if (!allowlist.has(runId)) return;
+    const words = pageWords.get(runId) ?? new Set<string>();
+    for (const text of texts) {
+      for (const token of tokenise(text)) {
+        if (words.size >= RUN_PAGE_WORDS_MAX) break;
+        words.add(token);
+      }
+    }
+    pageWords.set(runId, words);
+    for (const key of pageWords.keys()) {
+      if (!allowlist.has(key)) pageWords.delete(key);
+    }
+  };
+  /** The names whose every word was on a page this run surfaced. */
+  const namesOnRunPages = (
+    runId: string,
+    names: readonly string[] | undefined,
+  ): string[] => {
+    const words = pageWords.get(runId);
+    if (words === undefined || names === undefined) return [];
+    return names
+      .slice(0, RESEARCH_PAGE_NAMES_MAX)
+      .map((name) => name.trim().slice(0, 120))
+      .filter((name) => {
+        const tokens = tokenise(name);
+        return tokens.length > 0 && tokens.every((token) => words.has(token));
+      });
+  };
 
   const remember = (runId: string, urls: readonly string[]) => {
     const now = clock().getTime();
@@ -686,9 +753,40 @@ export function createPublicWebResearchService(
       command: Parameters<PublicWebResearchService["research"]>[0],
     ) => Promise<ResearchOutcome>,
   ): Promise<ResearchOutcome> => {
+    if (command.planned === true) return run(command);
+    const discovery =
+      (command.categories !== undefined &&
+        categoryTerms(command.categories).length > 0) ||
+      (command.pageNames !== undefined && command.pageNames.length > 0);
+    if (discovery) {
+      const key = `${command.actor.tenantId}:${command.runId}:discovery`;
+      const spent = byRun.get(key) ?? { calls: 0, last: null };
+      // Counted before the call: calls made side by side are held to the
+      // budget too, never only once one has landed.
+      if (spent.calls >= RESEARCH_DISCOVERY_RUN_BUDGET) {
+        metrics.reused.add(1, { operation: "research_discovery_budget" });
+        logger?.info(
+          { runId: command.runId, calls: spent.calls },
+          "public research discovery budget spent",
+        );
+        return {
+          status: "PROVIDER_UNAVAILABLE",
+          failureClass: "RATE_LIMIT",
+          message: PROVIDER_UNAVAILABLE_MESSAGE,
+        };
+      }
+      if (!byRun.has(key) && byRun.size >= RUN_ALLOWLIST_MAX_RUNS) {
+        const oldest = byRun.keys().next().value;
+        if (oldest !== undefined) byRun.delete(oldest);
+      }
+      spent.calls += 1;
+      byRun.set(key, spent);
+      const outcome = await run(command);
+      spent.last = outcome;
+      return outcome;
+    }
     const key = `${command.actor.tenantId}:${command.runId}`;
     const spent = byRun.get(key) ?? { calls: 0, last: null };
-    if (command.planned === true) return run(command);
     if (spent.calls >= RESEARCH_RUN_BUDGET && spent.last !== null) {
       metrics.reused.add(1, { operation: "research_run_budget" });
       logger?.info(
@@ -726,6 +824,23 @@ export function createPublicWebResearchService(
         prependIdentityFor(command.subject, command.aboutThemselves === true);
       // The one they pointed at ("the top one"), when Q showed its name.
       const shownNames = namesShown([entity?.name], command.shownText);
+      // Web discovery: real categories and names this run's pages carried.
+      const admittedCategories =
+        command.categories === undefined
+          ? []
+          : categoryTerms(command.categories);
+      const admittedNames = namesOnRunPages(command.runId, command.pageNames);
+      const discovering =
+        admittedCategories.length > 0 || admittedNames.length > 0;
+      const discoveryTerms =
+        command.publicTerms === undefined && !discovering
+          ? undefined
+          : [
+              ...(command.publicTerms ?? []),
+              ...admittedCategories,
+              ...admittedNames,
+              ...(admittedNames.length > 0 ? DISCOVERY_VOCABULARY : []),
+            ];
       const compose = (requestedQuery: string, prepend = leadWithSubject) =>
         composeEgressQuery({
           requestedQuery,
@@ -734,8 +849,9 @@ export function createPublicWebResearchService(
           publicIdentity: identity,
           prependIdentity: prepend,
           shownNames,
-          publicTerms: command.publicTerms,
-          researchVocabulary: command.researchVocabulary,
+          publicTerms: discoveryTerms,
+          researchVocabulary:
+            command.researchVocabulary === true || discovering,
         });
       const egress = compose(command.requestedQuery);
       // Plan 2-4 differently-worded queries (web search 2026-10-06: one
@@ -786,7 +902,11 @@ export function createPublicWebResearchService(
       for (const also of command.alsoQueries ?? [])
         plan(also, focused ? false : leadWithSubject);
       if (!focused) plan(command.requestedQuery, false);
-      if (!focused) plan(searchPhrase(command.userText), false);
+      // A founder search for names read on this run's pages is about those
+      // names: the person's own sentence was searched by the discovery's
+      // first round already (owner's spend rule, 2026-10-25).
+      if (!focused && admittedNames.length === 0)
+        plan(searchPhrase(command.userText), false);
       const primary = planned[0];
       if (primary === undefined) {
         return { status: "NO_PUBLIC_IDENTITY", message: NO_IDENTITY_MESSAGE };
@@ -949,6 +1069,10 @@ export function createPublicWebResearchService(
         command.runId,
         safeHits.map((hit) => hit.url),
       );
+      notePageWords(
+        command.runId,
+        safeHits.map((hit) => `${hit.title ?? ""} ${hit.snippet}`),
+      );
       const chosen = rankForReading(
         safeHits,
         extractCount,
@@ -1034,6 +1158,9 @@ export function createPublicWebResearchService(
           now,
           entity,
         );
+        notePageWords(command.runId, [
+          `${built.source.title ?? ""} ${built.source.excerpt}`,
+        ]);
         const persisted =
           command.subject?.kind === "COMPANY" &&
           command.subject.persistAsEvidence
@@ -1246,6 +1373,10 @@ export function createPublicWebResearchService(
       for (const url of extracted.failedUrls) {
         rejectedUrls.push({ url, reason: "COULD_NOT_READ" });
       }
+      notePageWords(
+        command.runId,
+        sources.map((source) => `${source.title ?? ""} ${source.excerpt}`),
+      );
       return { status: "OK", sources, rejectedUrls };
     },
   };

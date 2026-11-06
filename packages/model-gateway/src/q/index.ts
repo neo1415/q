@@ -363,7 +363,16 @@ import {
   withoutUnbackedArtifactClaims,
 } from "./artifact-claims.js";
 import { ownProfileFact } from "./own-profile.js";
-import { asksForOwnMandate, ownMandateAnswer } from "./own-mandate-answer.js";
+import {
+  asksForOwnMandate,
+  mandateCategories,
+  ownMandateAnswer,
+} from "./own-mandate-answer.js";
+import { runWebDiscovery, type WebDiscoveryAsk } from "./web-discovery.js";
+import {
+  createWebDiscoveryReader,
+  type WebDiscoveryReader,
+} from "./web-discovery-reader.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import {
   asksAboutOwnPitch,
@@ -662,6 +671,31 @@ export {
 } from "./transcript-reader.js";
 export { mandateStatement, ownProfileFact } from "./own-profile.js";
 export { asksForOwnMandate } from "./own-mandate-answer.js";
+export {
+  mandateCategories,
+  type MandateCategories,
+} from "./own-mandate-answer.js";
+export {
+  admitDiscoveries,
+  discoveryAnswerText,
+  discoveryFit,
+  DISCOVERY_DEFAULT_COUNT,
+  DISCOVERY_MAX_COUNT,
+  DISCOVERY_MAX_TOOL_CALLS,
+  DISCOVERY_QUERIES,
+  namedIn,
+  planDiscovery,
+  queryIsPublic,
+  runWebDiscovery,
+  type DiscoveredCompany,
+  type DiscoveryPlan,
+  type WebDiscoveryAnswer,
+} from "./web-discovery.js";
+export {
+  createWebDiscoveryReader,
+  type WebDiscoveryReader,
+  type WebDiscoveryReaderInput,
+} from "./web-discovery-reader.js";
 export {
   ownOnboardingFacts,
   type OwnOnboarding,
@@ -2488,6 +2522,11 @@ export type ModelGatewayQAnswerDependencies = {
       ) => readonly string[])
     | undefined;
   /**
+   * Owner 2026-11-06: reads public pages into the companies and founders
+   * they name, for web discovery. Absent: one over this gateway.
+   */
+  readonly webDiscoveryReader?: WebDiscoveryReader | undefined;
+  /**
    * K Part 4 (Tier A): their own mandate read, as `get_investor_mandate`
    * returned it, kept per actor under the context-cache scope and served
    * only while the mandate's version is current. Used only where this
@@ -2882,6 +2921,13 @@ export function createModelGatewayQAnswer(
   // Step 8: what each run's tools really did, the only backing for a
   // sentence in which Q says it prepared, sent, booked or saved something.
   const runActions = createRunActions();
+  const webDiscoveryReader =
+    dependencies.webDiscoveryReader ??
+    createWebDiscoveryReader({
+      gateway,
+      dataPosture: dependencies.dataPosture,
+      logger,
+    });
   const available = baseTools.available;
   // K4: identical concurrent reads within a run share one call. Which
   // tools are reads is the offer's own declaration, per run.
@@ -4278,6 +4324,52 @@ export function createModelGatewayQAnswer(
         available: prefetchTools,
       }).catch(() => null);
     // D1: investors of a region or kind, found by meaning; cards by code.
+    // Owner 2026-11-06: companies out on the public web, found by a
+    // discovery plan from the mandate's categories (web-discovery.ts),
+    // through this run's tools, plan and firewall.
+    const webDiscoveryFor = async (ask: WebDiscoveryAsk, prepared: unknown) => {
+      // The mandate is read through its authorised tool when this turn's
+      // prepared reads did not need it (an investor's own mandate only).
+      let mandate = prepared;
+      const investorOrg = ownInvestorOrganisationIn(request.plan);
+      if (
+        (mandate === null || mandate === undefined) &&
+        investorOrg !== null &&
+        prefetchTools.has("get_investor_mandate")
+      ) {
+        const outcome = await tools
+          .execute(
+            {
+              callId: "q-discovery-mandate",
+              name: "get_investor_mandate",
+              arguments: { investorOrganisationId: investorOrg },
+            },
+            toolContext,
+          )
+          .catch(() => null);
+        if (outcome !== null && outcome.result.ok)
+          mandate = outcome.result.data;
+      }
+      return runWebDiscovery({
+        ask,
+        mandate: mandateCategories(mandate),
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+        reader: webDiscoveryReader,
+        attribution: {
+          tenantId: request.tenantId,
+          userId: request.actorUserId,
+          correlationId: request.correlationId,
+        },
+      }).catch((error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: request.runId },
+          "q web discovery failed",
+        );
+        return null;
+      });
+    };
     const investorsFor = (ask: InvestorAsk, companyId: string | null) =>
       runInvestorDiscovery({
         ask,
@@ -5128,6 +5220,7 @@ export function createModelGatewayQAnswer(
       personFor,
       knownInvestorFor,
       investorsFor,
+      webDiscoveryFor,
       prospectsFor,
       sweepForReading,
       // Owner 2026-10-23: the investor's own candidates, ranked by fit,
@@ -5508,6 +5601,7 @@ export function createModelGatewayQAnswer(
         personFor,
         knownInvestorFor,
         investorsFor,
+        webDiscoveryFor,
         prospectsFor,
         sweepForReading,
         sweepCandidates,
@@ -5862,6 +5956,9 @@ export function createModelGatewayQAnswer(
         claimed: boolean;
       } | null =
         research?.mode === "EXPLICIT" &&
+        // Web discovery plans its own searches from the mandate (owner
+        // 2026-11-06): one search on the person's words is not it.
+        request.webDiscovery === undefined &&
         // A person search's own lookup (W2) runs beside it: when the lane
         // finds no one, the answer has the web already (production
         // 2026-10-23: "Tell me about Zino Aviation and its team" went to the
@@ -7944,6 +8041,66 @@ export function createModelGatewayQAnswer(
               totalMs: Date.now() - startedAt,
             },
             "q answered a company fact from its declared profile",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
+      // Owner 2026-11-06 (Savanna Seed Partners): companies found out on
+      // the public web. A plan of targeted searches from the mandate, the
+      // pages read, the companies they name admitted only when a fetched
+      // page names them, founders searched for; composed by code, labelled
+      // public and unverified. Never one search on the words, never a name
+      // from model memory.
+      if (
+        request.webDiscovery !== undefined &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined
+      ) {
+        const discoveryStarted = Date.now();
+        // The search takes a while (two rounds of searches and page
+        // reads): they see the web search's own stage meanwhile.
+        const webStage = offeredForRun.find(
+          (tool) => tool.definition.name === PUBLIC_WEB_TOOL,
+        )?.visibleStage;
+        if (webStage !== undefined && webStage !== null) {
+          void stageOnce(webStage);
+        }
+        const found = await webDiscoveryFor(
+          request.webDiscovery,
+          prepared.ownMandateData(),
+        );
+        if (found !== null) {
+          for (const source of found.sources) {
+            if (!publicSources.some((known) => known.url === source.url)) {
+              publicSources.push(source);
+            }
+          }
+          const message = await persistCodeAnswer(found.text);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              outcome: found.outcome,
+              listed: found.companies.length,
+              withFounders: found.companies.filter(
+                (company) => company.founders.length > 0,
+              ).length,
+              onCapitalQ: found.companies.filter(
+                (company) => company.onCapitalQ,
+              ).length,
+              queries: found.queries.length,
+              founderSearches: found.founderQueries.length,
+              toolCalls: found.toolCalls,
+              sources: found.sources.length,
+              prepareMs: prepared.prepareMs,
+              discoveryMs: Date.now() - discoveryStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a web discovery",
           );
           return {
             kind: "ANSWERED",

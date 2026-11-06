@@ -183,3 +183,107 @@ export function ownMandateAnswer(data: unknown): string | null {
   const whose = read.displayName ? ` for ${read.displayName}` : "";
   return `Here is the mandate you have declared${whose}.${draft}${more}\n\n${lines.join("\n")}\n\nAnything marked not stated yet is open, not a limit. Tell me what to add or change and I will prepare it for your approval.`;
 }
+
+/**
+ * The public categories of a declared mandate, as taxonomy codes only
+ * (owner 2026-11-06: web discovery searches by the mandate). CONTEXT
+ * FIREWALL for outbound queries: only lower_snake_case taxonomy codes and
+ * two-letter country codes leave this function. A cheque size is a figure
+ * and free-text constraints may carry a private note, so neither is ever
+ * returned; an exclusion is never something to search for.
+ */
+export type MandateCategories = {
+  readonly sectors: readonly string[];
+  /** ISO 3166 alpha-2, upper case. */
+  readonly countries: readonly string[];
+  /** Region taxonomy codes ("africa", "sub_saharan_africa"). */
+  readonly regions: readonly string[];
+  readonly stageMin: string | null;
+  readonly stageMax: string | null;
+  readonly stages: readonly string[];
+};
+
+const TAXONOMY_CODE = /^[a-z][a-z0-9_]{1,60}$/u;
+const COUNTRY_CODE = /^[a-z]{2}$/iu;
+
+export function mandateCategories(data: unknown): MandateCategories | null {
+  if (typeof data !== "object" || data === null) return null;
+  const mandate = (data as MandateRead).mandates?.[0];
+  if (mandate === undefined) return null;
+  const constraints = mandate.constraints ?? [];
+  const prefs = mandate.taxonomyPreferences ?? [];
+  const codes = (value: unknown): string[] => {
+    if (typeof value !== "object" || value === null) return [];
+    const read = value as { kind?: unknown; values?: unknown };
+    // Codes only: a free-text constraint is never searched for.
+    return read.kind === "codes" && Array.isArray(read.values)
+      ? read.values.filter((v): v is string => typeof v === "string")
+      : [];
+  };
+  const included = (dimension: string): string[] =>
+    constraints
+      .filter(
+        (c) =>
+          c.dimension === dimension &&
+          c.isHardExclusion !== true &&
+          c.operator !== "NOT_IN" &&
+          c.operator !== "NEQ",
+      )
+      .flatMap((c) => codes(c.value));
+  const preferred = (vocab: (v: string) => boolean): string[] =>
+    prefs
+      .filter(
+        (p) =>
+          p.isExclusion !== true &&
+          typeof p.canonicalCode === "string" &&
+          vocab(p.vocabularyCode ?? ""),
+      )
+      .map((p) => p.canonicalCode as string);
+  const unique = (list: readonly string[]): string[] => [...new Set(list)];
+  const sectors = unique(
+    [
+      ...included("sector"),
+      ...preferred((v) => SECTOR_VOCABULARIES.has(v)),
+    ].map((code) => code.toLowerCase()),
+  ).filter((code) => TAXONOMY_CODE.test(code));
+  const places = unique([
+    ...included("geography.country"),
+    ...preferred((v) => v === "geography"),
+  ]);
+  const countries = unique(
+    places
+      .filter((code) => COUNTRY_CODE.test(code))
+      .map((code) => code.toUpperCase()),
+  );
+  const regions = unique(
+    places
+      .filter((code) => !COUNTRY_CODE.test(code))
+      .map((code) => code.toLowerCase())
+      .filter((code) => TAXONOMY_CODE.test(code)),
+  );
+  const stageCode = (code: string | null | undefined): string | null =>
+    typeof code === "string" && TAXONOMY_CODE.test(code.toLowerCase())
+      ? code.toLowerCase()
+      : null;
+  const stages = unique(
+    included("stage")
+      .map((code) => code.toLowerCase())
+      .filter((code) => TAXONOMY_CODE.test(code)),
+  );
+  const result: MandateCategories = {
+    sectors,
+    countries,
+    regions,
+    stageMin: stageCode(mandate.stage?.minStageCode),
+    stageMax: stageCode(mandate.stage?.maxStageCode),
+    stages,
+  };
+  return sectors.length === 0 &&
+    countries.length === 0 &&
+    regions.length === 0 &&
+    result.stageMin === null &&
+    result.stageMax === null &&
+    stages.length === 0
+    ? null
+    : result;
+}

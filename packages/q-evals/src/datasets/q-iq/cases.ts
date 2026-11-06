@@ -16,6 +16,7 @@ import {
   type QIqContradiction,
   type QIqPerson,
 } from "./world.js";
+import { discoveryCases } from "./discovery-cases.js";
 
 /**
  * The Q-IQ conversations: 150 in ten categories, 15 each, plus the
@@ -1613,6 +1614,7 @@ export function buildQIqCases(): QIqCase[] {
     ...memoryCases(),
     ...ambiguityCases(),
     ...adversarialCases(),
+    ...discoveryCases(),
   ];
 }
 

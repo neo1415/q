@@ -8109,6 +8109,26 @@ export function createSpecialistQAnswer(
       read.question.subject !== null
         ? { preparedSubject: read.question.subject }
         : {}),
+      // Owner 2026-11-06: companies asked for out on the public web, read
+      // by meaning (discoverWhom COMPANIES, on a turn that asks for the web
+      // or a search: RESEARCH_REQUEST, or a question with asksForWeb), are
+      // found by a discovery plan built from the mandate, never one search
+      // on the words. Investors asked for keep D1's path.
+      ...(read?.discoverWhom === "COMPANIES" &&
+      (read.kind === "RESEARCH_REQUEST" ||
+        (read.kind === "QUESTION_TO_Q" && read.asksForWeb === true))
+        ? {
+            webDiscovery: {
+              text: read.question?.text ?? "",
+              sectors: read.question?.discover?.sectors ?? [],
+              countries: (read.question?.discover?.countries ?? []).map(
+                (code) => code.toUpperCase(),
+              ),
+              stages: read.question?.discover?.stages ?? [],
+              count: read.question?.count ?? null,
+            },
+          }
+        : {}),
       // K1: companies of a kind, with the reader's structure.
       // v65: investors asked for are never a company search.
       ...(read?.kind === "QUESTION_TO_Q" &&

@@ -33,6 +33,8 @@ export type QIqReply = {
   readonly outputTokens: number;
   /** The tools that succeeded in this turn, where the subject reports them. */
   readonly toolsRun?: readonly string[] | undefined;
+  /** DISCOVERY: the public queries that left Capital Q in this turn. */
+  readonly egress?: readonly string[] | undefined;
 };
 
 export type QIqConversation = {
@@ -105,6 +107,7 @@ export async function runQIq(
     }
     const replies: string[] = [];
     const tools: (readonly string[])[] = [];
+    const egress: (readonly string[])[] = [];
     const latencies: number[] = [];
     let cost = 0;
     let error: string | null = null;
@@ -114,6 +117,7 @@ export async function runQIq(
         const reply = await conversation.say(turn.user);
         replies.push(reply.text);
         tools.push(reply.toolsRun ?? []);
+        egress.push(reply.egress ?? []);
         latencies.push(reply.latencyMs);
         cost += reply.costUsd;
         inputTokens += reply.inputTokens;
@@ -145,7 +149,7 @@ export async function runQIq(
       replies,
       latenciesMs: latencies,
       costUsd: cost,
-      grade: gradeQIqCase(Q_IQ_WORLD, evalCase, replies, tools),
+      grade: gradeQIqCase(Q_IQ_WORLD, evalCase, replies, tools, egress),
       helpfulness,
       error,
     };

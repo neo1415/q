@@ -10,6 +10,8 @@ import {
   ENTITY_RESOLUTIONS,
   PUBLIC_WEB_FRESHNESS,
   RESEARCH_BOUNDS,
+  RESEARCH_CATEGORIES_MAX,
+  RESEARCH_PAGE_NAMES_MAX,
   SUBJECT_MATCHES,
   TEMPORAL_CLASSES,
   type PublicWebResearchService,
@@ -122,6 +124,37 @@ export const ResearchPublicWebInputSchema = z
       .optional()
       .describe(
         "Pin the search to these public domains, e.g. the company's own website.",
+      ),
+    categories: z
+      .object({
+        sectors: z
+          .array(z.string().trim().min(2).max(64))
+          .max(RESEARCH_CATEGORIES_MAX)
+          .default([]),
+        countries: z
+          .array(z.string().trim().length(2))
+          .max(RESEARCH_CATEGORIES_MAX)
+          .default([]),
+        stages: z
+          .array(z.string().trim().min(2).max(32))
+          .max(RESEARCH_CATEGORIES_MAX)
+          .default([]),
+        regions: z
+          .array(z.string().trim().min(2).max(64))
+          .max(RESEARCH_CATEGORIES_MAX)
+          .default([]),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "When looking for companies of a kind: taxonomy codes (sectors such as fintech or enterprise_software, stages such as pre_seed or series_a, regions) and ISO country codes. Only real taxonomy categories are searched, by their public names.",
+      ),
+    pageNames: z
+      .array(z.string().trim().min(2).max(120))
+      .max(RESEARCH_PAGE_NAMES_MAX)
+      .optional()
+      .describe(
+        "Names read on pages your earlier research in this turn returned (a company a directory listed), to search for them. A name not on those pages is not searched.",
       ),
   })
   .strict()
@@ -406,6 +439,8 @@ export function createResearchPublicWebTool(
         aboutThemselves: input.aboutThemselves,
         extractCount: input.maxSources,
         includeDomains: input.includeDomains,
+        categories: input.categories,
+        pageNames: input.pageNames,
         signal: context.signal,
       });
       if (outcome.status !== "OK") {

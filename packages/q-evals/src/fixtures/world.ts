@@ -108,6 +108,7 @@ import {
   type QRuntimeRepositories,
   type QRuntimeService,
 } from "@capital-q/q-runtime";
+import type { PublicWebResearchService } from "@capital-q/q-research";
 import { createQTools } from "@capital-q/q-tools";
 import {
   ActorContextSchema,
@@ -177,6 +178,13 @@ export type QEvalWorldOptions = {
    * evidence smoke can drive the SAME Q graph with real authorised
    * retrieval instead of reimplementing the graph beside it.
    */
+  /**
+   * The public-web research capability (Q-IQ DISCOVERY): a research
+   * service over a scripted provider, so the research tools exist with
+   * the real egress composition, URL safety and instruction scanning.
+   * Absent -- every other eval -- the research tools do not exist.
+   */
+  readonly research?: PublicWebResearchService | undefined;
   readonly retrieval?:
     | {
         readonly port: QRetrievalPort;
@@ -641,6 +649,7 @@ export async function createQEvalWorld(
       investors,
       authorization,
       disclosure: permissions.access,
+      ...(options.research === undefined ? {} : { research: options.research }),
     },
     logger,
   });

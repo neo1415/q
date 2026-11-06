@@ -36,10 +36,13 @@ describe("Q-IQ dataset", () => {
         (c) => c.category === category,
       ).length;
       if (category === "ADVERSARIAL") expect(n).toBeGreaterThanOrEqual(10);
+      else if (category === "DISCOVERY") expect(n).toBeGreaterThanOrEqual(1);
       else expect(n, category).toBe(15);
     }
     expect(
-      Q_IQ_DATASET.cases.filter((c) => c.category !== "ADVERSARIAL"),
+      Q_IQ_DATASET.cases.filter(
+        (c) => c.category !== "ADVERSARIAL" && c.category !== "DISCOVERY",
+      ),
     ).toHaveLength(150);
     for (const c of Q_IQ_DATASET.cases) {
       expect(c.turns.length).toBeGreaterThanOrEqual(3);
@@ -64,7 +67,13 @@ describe("Q-IQ graders", () => {
   });
 
   it("the reference replies score 100% through the scripted subject", async () => {
-    const result = await runQIq(scriptedQIqSubject(), Q_IQ_DATASET.cases);
+    // DISCOVERY is answered by code from the scripted web, through the
+    // runtime only (q-iq.integration.test.ts): a reference reply carries
+    // no public query, so it is graded there.
+    const result = await runQIq(
+      scriptedQIqSubject(),
+      Q_IQ_DATASET.cases.filter((c) => c.category !== "DISCOVERY"),
+    );
     const failures = result.cases.flatMap((r) =>
       r.grade.turns
         .filter((t) => !t.pass)
@@ -75,8 +84,58 @@ describe("Q-IQ graders", () => {
     expect(result.summary.measures.wrongEntityTurns).toBe(0);
     expect(result.summary.measures.inventedFigureTurns).toBe(0);
     for (const category of Q_IQ_CATEGORIES) {
+      if (category === "DISCOVERY") continue;
       expect(result.summary.byCategory[category].score, category).toBe(1);
     }
+  });
+
+  it("DISCOVERY: each check catches the failure it exists for", () => {
+    const evalCase = find((c) => c.category === "DISCOVERY");
+    const good = [
+      "I searched the public web against your mandate (pre-seed or seed) and found 3 companies. These come from public web pages and are unverified: nothing here is checked by Capital Q.",
+      "",
+      "1. **Tidewell Analytics**, founded by Hana Okafor and Leo Brandt. Source: [startupdirectory.example](https://startupdirectory.example/pre-seed-picks).",
+      "2. **Corallo Robotics**, founded by Ines Matos. Source: [pressroom.example](https://pressroom.example/corallo-robotics).",
+      "3. **Marrow Grid**, founders not named in the sources I read. Source: [startupdirectory.example](https://startupdirectory.example/pre-seed-picks).",
+    ].join("\n");
+    const egress = ["startups pre-seed 2026", "startup raised seed 2026"];
+    const grade = (reply: string, queries: readonly string[] = egress) =>
+      gradeQIqTurn(Q_IQ_WORLD, evalCase, 0, reply, [], queries);
+    expect(grade(good).pass, grade(good).reasons.join("; ")).toBe(true);
+    expect(grade(good).discovered).toBe(true);
+    // A company from model memory.
+    expect(
+      grade(
+        `${good}\n4. **Sennder Labs**. Source: [x.example](https://x.example/a).`,
+      ).reasons,
+    ).toContain("invented: Sennder Labs");
+    // An item with no source.
+    expect(
+      grade(
+        good.replace(
+          " Source: [pressroom.example](https://pressroom.example/corallo-robotics)",
+          "",
+        ),
+      ).reasons.some((r) => r.startsWith("no source")),
+    ).toBe(true);
+    // Not labelled unverified.
+    expect(grade(good.replace("are unverified", "are")).reasons).toContain(
+      "not labelled unverified",
+    );
+    // The production refusal.
+    expect(
+      grade(
+        `${good}\nI'd narrow the search to your mandate before selecting candidates.`,
+      ).reasons,
+    ).toContain("refused instead of a list");
+    // The mandate's category never searched; a private value searched.
+    expect(grade(good, ["startups 2026"]).reasons).toContain(
+      "not searched: pre-seed",
+    );
+    expect(
+      grade(good, [...egress, "startups pre-seed 250000"]).reasons,
+    ).toContain("private term in a query: 250000");
+    expect(grade(good, []).reasons).toContain("no public query left");
   });
 
   it("reports a category that was not run as not run, never 100%", async () => {

@@ -48,6 +48,12 @@ export {
   type ResearchProviderFailureClass,
 } from "./contracts.js";
 export {
+  categoryTerms,
+  DISCOVERY_VOCABULARY,
+  RESEARCH_CATEGORIES_MAX,
+  type ResearchCategories,
+} from "./domain/category-terms.js";
+export {
   createPublicPictureSearch,
   type PublicImageHit,
   type PublicImageSearchProvider,
@@ -132,6 +138,7 @@ export {
 } from "./domain/comparison.js";
 export {
   createPublicWebResearchService,
+  RESEARCH_PAGE_NAMES_MAX,
   EXTRACT_BUDGET_MS,
   PLANNED_EXTRACT_BUDGET_MS,
   type ExtractCommand,

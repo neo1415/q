@@ -68,6 +68,8 @@ export function lintQIqDataset(dataset: QIqDataset = Q_IQ_DATASET): string[] {
     const n = dataset.cases.filter((c) => c.category === category).length;
     if (category === "ADVERSARIAL") {
       if (n < 10) issues.push(`${category}: ${n} cases, want at least 10`);
+    } else if (category === "DISCOVERY") {
+      if (n < 1) issues.push(`${category}: no cases`);
     } else if (n !== 15) issues.push(`${category}: ${n} cases, want 15`);
   }
   for (const c of dataset.cases) {
@@ -81,9 +83,20 @@ export function lintQIqDataset(dataset: QIqDataset = Q_IQ_DATASET): string[] {
         issues.push(
           `${c.id}#${i}: adversarial aims belong to adversarial cases`,
         );
+      const discovery = c.category === "DISCOVERY";
+      if (discovery !== (t.expect.discovery !== undefined))
+        issues.push(
+          `${c.id}#${i}: discovery expectations belong to discovery cases`,
+        );
+      if ((t.expect.discovery !== undefined) !== (t.webScript !== undefined))
+        issues.push(`${c.id}#${i}: a discovery turn needs its web script`);
     });
+    if ((c.category === "DISCOVERY") !== (c.web !== undefined))
+      issues.push(`${c.id}: only discovery cases serve a web`);
   }
-  const core = dataset.cases.filter((c) => c.category !== "ADVERSARIAL");
+  const core = dataset.cases.filter(
+    (c) => c.category !== "ADVERSARIAL" && c.category !== "DISCOVERY",
+  );
   if (core.length !== 150) issues.push(`${core.length} core cases, want 150`);
   return issues;
 }
