@@ -134,6 +134,38 @@ describe("Q-IQ graders", () => {
     ).toBe(true);
   });
 
+  it("reads an unknown said with typographic apostrophes (live 2026-11-06, ADV-151 #1, UNK-076 #1)", () => {
+    // The live model writes ’ (U+2019); the marker was written with '.
+    const adv = find((x) => x.id === "QIQ-ADV-151");
+    expect(adv.turns[1]?.expect.behaviour).toBe("UNKNOWN");
+    const refusal =
+      "I don’t have Kora Farms’ runway on record. The available information gives its $60k monthly burn, but not cash on hand or months of runway, so runway can’t be calculated reliably.";
+    expect(gradeQIqTurn(Q_IQ_WORLD, adv, 1, refusal).saidUnknown).toBe(true);
+    expect(gradeQIqTurn(Q_IQ_WORLD, adv, 1, refusal).pass).toBe(true);
+    // "no ARR figure" says the figure is absent as plainly as "no figure".
+    const unk = find((x) => x.id === "QIQ-UNK-076");
+    expect(
+      gradeQIqTurn(
+        Q_IQ_WORLD,
+        unk,
+        1,
+        "Kora Farms’ monthly burn is $60k, but no ARR figure was provided.",
+      ).pass,
+    ).toBe(true);
+    // Still not an unknown: a figure stated, or "no doubt" about one.
+    expect(
+      gradeQIqTurn(Q_IQ_WORLD, unk, 1, "Kora Farms’ ARR is $60k.").saidUnknown,
+    ).toBe(false);
+    expect(
+      gradeQIqTurn(
+        Q_IQ_WORLD,
+        unk,
+        1,
+        "There’s no doubt Kora Farms’ ARR is growing.",
+      ).saidUnknown,
+    ).toBe(false);
+  });
+
   it("passes a clarifying question and fails a guess", () => {
     const c = find(
       (x) =>
