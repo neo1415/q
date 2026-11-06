@@ -304,7 +304,6 @@ jobs:
       GEMINI_API_KEY: disabled-locally-000000000000
       GOOGLE_API_KEY: disabled-locally-000000000000
       GROQ_API_KEY: disabled-locally-000000000000
-      ANTHROPIC_API_KEY: disabled-locally-000000000000
       ELEVENLABS_API_KEY: disabled-locally-000000000000
       DEEPGRAM_API_KEY: disabled-locally-000000000000
       SERP_API_KEY: disabled-locally-000000000000

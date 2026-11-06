@@ -870,10 +870,33 @@ export async function createQEvalWorld(
   // passed would depend on how long the run took to reach it. Each case
   // gets a fresh one, so a case's result is its own.
   let providerHealth = createProcessLocalProviderHealth();
+  // Every part of the port is forwarded, the account-block probe and the
+  // exhausted flag included: dropping them (as before 2026-11-06) meant a
+  // scripted credit failure here never blocked anything, unlike production.
   const health: ProviderHealthPort = {
     state: (code, model, at) => providerHealth.state(code, model, at),
-    recordFailure: (code, model, failureClass, at, elapsedMs) =>
-      providerHealth.recordFailure(code, model, failureClass, at, elapsedMs),
+    admit: (code, model, at) => providerHealth.admit?.(code, model, at) ?? true,
+    probeInFlight: (code, model, at) =>
+      providerHealth.probeInFlight?.(code, model, at) ?? null,
+    releaseProbe: (code, model) => providerHealth.releaseProbe?.(code, model),
+    recordFailure: (
+      code,
+      model,
+      failureClass,
+      at,
+      elapsedMs,
+      exhausted,
+      retryAfterMs,
+    ) =>
+      providerHealth.recordFailure(
+        code,
+        model,
+        failureClass,
+        at,
+        elapsedMs,
+        exhausted,
+        retryAfterMs,
+      ),
     recordSuccess: (code, model, at) =>
       providerHealth.recordSuccess(code, model, at),
   };

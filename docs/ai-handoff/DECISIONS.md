@@ -216,3 +216,11 @@ Core Seven remains the governing assessment framework. The new directive authori
 64. **Proactive briefing is opt-in, at most once a day** (owner). It is off by default, ranked by mandate relevance, never engagement.
 65. **Quality feedback is thumbs only; retire dead search providers** (owner). There is no sampling of real conversations until a consent flow exists. ScrapingBee and Serper leave the research rotation; Brave and Tavily remain.
 66. **Illustrative answers** (owner, later): research whether Q should pull images and graphics from the web and compose its own visual layouts ("invent modals"). Run this as a deep-research item after the steps above.
+67. **Claude is the backup; OpenAI stays primary for now** (applying the owner's condition in 62: "if it will take too much time and effort, just stick to OpenAI with the Anthropic stuff as backup", 2026-11-06).
+
+    | Live 1-case Q-IQ runs                           | Correct turns | Cost per case | Turn latency | Cache reads |
+    | ----------------------------------------------- | ------------- | ------------- | ------------ | ----------- |
+    | Q on Claude, after four rounds of adapter fixes | 3–4 of 4      | $0.30–0.49    | 6–17 s       | about 30%   |
+    | Q on OpenAI                                     |               | about $0.03   |              |             |
+
+    Reasoning routes go OpenAI → Claude → Groq → Gemini (PUBLIC only), so Claude serves only when OpenAI is unavailable. Claude-as-primary is parked, with findings in `receipts/2026-11-06-q-claude-reasoning.md`. Revisit it when cache reads are at least 75% live.

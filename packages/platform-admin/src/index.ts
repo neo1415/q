@@ -546,3 +546,11 @@ export {
   type PlatformEtiquetteVersion,
   type PlatformEtiquetteView,
 } from "./etiquette-guide.js";
+export {
+  createOperatorAlerts,
+  createPostgresOperatorEmails,
+  OPERATOR_ALERT_REPEAT_MS,
+  type OperatorAlert,
+  type OperatorAlertEmail,
+  type OperatorAlertLogger,
+} from "./operator-alerts.js";

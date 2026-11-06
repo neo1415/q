@@ -61,7 +61,49 @@ export const researchProviderEnvShape = {
    * BIZ-009); absent means EDGAR is skipped.
    */
   SEC_EDGAR_USER_AGENT: z.string().trim().min(8).max(200).optional(),
+  /**
+   * Research providers left out of the rotation although a key is set:
+   * comma-separated codes from RETIRABLE_RESEARCH_PROVIDERS. Unset means
+   * the owner's default (DECISIONS 65: ScrapingBee and Serper retired, so
+   * Brave and Tavily carry public research with no failed-first calls);
+   * set it empty to bring every keyed provider back. The adapters stay.
+   */
+  CQ_RESEARCH_PROVIDERS_RETIRED: z.string().trim().max(200).optional(),
 };
+
+/** The providers that can be retired by configuration. */
+export const RETIRABLE_RESEARCH_PROVIDERS = [
+  "serper",
+  "scrapingbee",
+  "serpapi",
+  "brave",
+  "tavily",
+  "brightdata",
+] as const;
+export type RetirableResearchProvider =
+  (typeof RETIRABLE_RESEARCH_PROVIDERS)[number];
+
+/** DECISIONS 65 (owner, 2026-11-06). */
+export const DEFAULT_RETIRED_RESEARCH_PROVIDERS: readonly RetirableResearchProvider[] =
+  ["serper", "scrapingbee"];
+
+/**
+ * The retired set: the owner's default when unset, else what is listed.
+ * An unknown code is ignored rather than failing the service's start (a
+ * configuration typo must never take Q down); at worst a resting provider
+ * is asked first and its breaker sets it aside.
+ */
+export function retiredResearchProviders(
+  raw: string | undefined,
+): ReadonlySet<RetirableResearchProvider> {
+  if (raw === undefined) return new Set(DEFAULT_RETIRED_RESEARCH_PROVIDERS);
+  const listed = new Set(
+    raw.split(",").map((code) => code.trim().toLowerCase()),
+  );
+  return new Set(
+    RETIRABLE_RESEARCH_PROVIDERS.filter((code) => listed.has(code)),
+  );
+}
 
 export type BrightDataSecrets = {
   readonly apiKey: ProviderCredential;
@@ -112,39 +154,34 @@ export function toResearchProviderSecrets(parsed: {
   readonly BRAVE_SEARCH_API_KEY?: string | undefined;
   readonly COMPANIES_HOUSE_API_KEY?: string | undefined;
   readonly SEC_EDGAR_USER_AGENT?: string | undefined;
+  readonly CQ_RESEARCH_PROVIDERS_RETIRED?: string | undefined;
 }): ResearchProviderSecrets {
+  const retired = retiredResearchProviders(
+    parsed.CQ_RESEARCH_PROVIDERS_RETIRED,
+  );
+  const keyed = (
+    code: RetirableResearchProvider,
+    key: string | undefined,
+  ): ProviderCredential | undefined =>
+    key === undefined || retired.has(code)
+      ? undefined
+      : new ProviderCredential(key);
   return {
     companiesHouse:
       parsed.COMPANIES_HOUSE_API_KEY === undefined
         ? undefined
         : new ProviderCredential(parsed.COMPANIES_HOUSE_API_KEY),
     secEdgarUserAgent: parsed.SEC_EDGAR_USER_AGENT,
-    serper:
-      parsed.SERPER_API_KEY === undefined
-        ? undefined
-        : new ProviderCredential(parsed.SERPER_API_KEY),
-    scrapingBee:
-      (parsed.SCRAPING_BEE_API ?? parsed.SCRAPIG_BEE_API) === undefined
-        ? undefined
-        : new ProviderCredential(
-            parsed.SCRAPING_BEE_API ?? parsed.SCRAPIG_BEE_API ?? "",
-          ),
-    brave:
-      (parsed.BRAVE_API ?? parsed.BRAVE_SEARCH_API_KEY) === undefined
-        ? undefined
-        : new ProviderCredential(
-            parsed.BRAVE_API ?? parsed.BRAVE_SEARCH_API_KEY ?? "",
-          ),
-    serpApi:
-      parsed.SERP_API_KEY === undefined
-        ? undefined
-        : new ProviderCredential(parsed.SERP_API_KEY),
-    tavily:
-      parsed.TAVILY_API_KEY === undefined
-        ? undefined
-        : new ProviderCredential(parsed.TAVILY_API_KEY),
+    serper: keyed("serper", parsed.SERPER_API_KEY),
+    scrapingBee: keyed(
+      "scrapingbee",
+      parsed.SCRAPING_BEE_API ?? parsed.SCRAPIG_BEE_API,
+    ),
+    brave: keyed("brave", parsed.BRAVE_API ?? parsed.BRAVE_SEARCH_API_KEY),
+    serpApi: keyed("serpapi", parsed.SERP_API_KEY),
+    tavily: keyed("tavily", parsed.TAVILY_API_KEY),
     brightData:
-      parsed.BRIGHT_DATA_API_KEY === undefined
+      parsed.BRIGHT_DATA_API_KEY === undefined || retired.has("brightdata")
         ? undefined
         : {
             apiKey: new ProviderCredential(parsed.BRIGHT_DATA_API_KEY),

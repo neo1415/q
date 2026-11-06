@@ -22,12 +22,31 @@ import type { ModelGateway } from "../gateway.js";
  * words; never a Capital Q record, figure, note or the person's words.
  */
 
-const READER_BUDGET = {
-  maxAttempts: 2,
-  maxEstimatedCostUsd: 0.05,
-  maxOutputTokens: 2_400,
-  attemptTimeoutMs: 12_000,
+/**
+ * Live 2026-11-06 (Savanna Seed, production c71eb2ee4): one call with nine
+ * pages (~5,000 tokens in, up to 2,400 out) timed out twice at 12 s, so the
+ * discovery listed nothing. The pages are now read a few at a time, side by
+ * side: each call is small, has its own deadline, and a call that fails
+ * costs only its own pages. The whole read has one deadline too.
+ */
+export const WEB_DISCOVERY_READER_LIMITS = {
+  /** Pages per reading call. */
+  pagesPerCall: 3,
+  /** Characters of each page a call is given. */
+  pageChars: 2_500,
+  attemptTimeoutMs: 15_000,
+  /** The whole read, every call included. */
+  deadlineMs: 20_000,
+  maxOutputTokens: 1_200,
 } as const;
+
+export type WebDiscoveryReaderLimits = {
+  readonly pagesPerCall: number;
+  readonly pageChars: number;
+  readonly attemptTimeoutMs: number;
+  readonly deadlineMs: number;
+  readonly maxOutputTokens: number;
+};
 
 export type WebDiscoveryReaderInput = {
   /** Public taxonomy words only ("fintech; seed; Nigeria"). */
@@ -46,6 +65,7 @@ export type WebDiscoveryReaderInput = {
   readonly signal?: AbortSignal | undefined;
 };
 
+/** Null only when every reading call failed. */
 export type WebDiscoveryReader = (
   input: WebDiscoveryReaderInput,
 ) => Promise<readonly WebDiscoveryCompany[] | null>;
@@ -54,10 +74,16 @@ export function createWebDiscoveryReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
+  /** Tests only: smaller limits. */
+  readonly limits?: WebDiscoveryReaderLimits | undefined;
 }): WebDiscoveryReader {
   const registry = createDefaultPromptRegistry();
-  return async (input) => {
-    if (input.sources.length === 0) return [];
+  const limits = dependencies.limits ?? WEB_DISCOVERY_READER_LIMITS;
+  const readOne = async (
+    input: WebDiscoveryReaderInput,
+    sources: WebDiscoveryReaderInput["sources"],
+    signal: AbortSignal,
+  ): Promise<readonly WebDiscoveryCompany[] | null> => {
     const rendered = renderPrompt<WebDiscoveryReaderVariables>(registry, {
       task: "WEB_DISCOVERY_READER",
       operatingMode: "ASSESSMENT",
@@ -66,15 +92,13 @@ export function createWebDiscoveryReader(dependencies: {
         "No tools are available to you. Report only what the supplied pages say.",
       variables: {
         looking: input.looking.slice(0, 600),
-        sources: input.sources
-          .slice(0, WEB_DISCOVERY_READER_PAGES_MAX)
-          .map((source, index) => ({
-            index,
-            url: source.url.slice(0, 500),
-            title: source.title === null ? null : source.title.slice(0, 300),
-            publishedAt: source.publishedAt,
-            excerpt: source.excerpt.slice(0, 6_000),
-          })),
+        sources: sources.map((source, index) => ({
+          index,
+          url: source.url.slice(0, 500),
+          title: source.title === null ? null : source.title.slice(0, 300),
+          publishedAt: source.publishedAt,
+          excerpt: source.excerpt.slice(0, limits.pageChars),
+        })),
       },
     });
     try {
@@ -82,7 +106,12 @@ export function createWebDiscoveryReader(dependencies: {
         await dependencies.gateway.execute<WebDiscoveryReaderResult>(
           {
             taskClass: "STRUCTURED_EXTRACTION",
-            budget: READER_BUDGET,
+            budget: {
+              maxAttempts: 2,
+              maxEstimatedCostUsd: 0.03,
+              maxOutputTokens: limits.maxOutputTokens,
+              attemptTimeoutMs: limits.attemptTimeoutMs,
+            },
             ...(dependencies.dataPosture === undefined
               ? {}
               : { dataPosture: dependencies.dataPosture }),
@@ -98,10 +127,7 @@ export function createWebDiscoveryReader(dependencies: {
               correlationId: input.attribution.correlationId,
             },
           },
-          {
-            schema: WebDiscoveryReaderResultSchema,
-            ...(input.signal === undefined ? {} : { signal: input.signal }),
-          },
+          { schema: WebDiscoveryReaderResultSchema, signal },
         );
       if (result.output.kind !== "STRUCTURED") return null;
       const value = WebDiscoveryReaderResultSchema.safeParse(
@@ -110,10 +136,45 @@ export function createWebDiscoveryReader(dependencies: {
       return value.success ? value.data.companies : null;
     } catch (error: unknown) {
       dependencies.logger?.warn(
-        { err: error, correlationId: input.attribution.correlationId },
+        {
+          err: error,
+          correlationId: input.attribution.correlationId,
+          pages: sources.length,
+        },
         "web discovery reader produced nothing",
       );
       return null;
     }
+  };
+  return async (input) => {
+    if (input.sources.length === 0) return [];
+    const deadline = AbortSignal.timeout(limits.deadlineMs);
+    const signal =
+      input.signal === undefined
+        ? deadline
+        : AbortSignal.any([deadline, input.signal]);
+    const groups: WebDiscoveryReaderInput["sources"][] = [];
+    const pages = input.sources.slice(0, WEB_DISCOVERY_READER_PAGES_MAX);
+    for (let i = 0; i < pages.length; i += limits.pagesPerCall) {
+      groups.push(pages.slice(i, i + limits.pagesPerCall));
+    }
+    const read = await Promise.all(
+      groups.map((group) => readOne(input, group, signal)),
+    );
+    const done = read.filter(
+      (companies): companies is readonly WebDiscoveryCompany[] =>
+        companies !== null,
+    );
+    if (done.length < read.length) {
+      dependencies.logger?.warn(
+        {
+          correlationId: input.attribution.correlationId,
+          calls: read.length,
+          failed: read.length - done.length,
+        },
+        "web discovery reader: some page groups were not read",
+      );
+    }
+    return done.length === 0 ? null : done.flat();
   };
 }

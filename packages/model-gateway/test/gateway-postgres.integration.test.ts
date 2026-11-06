@@ -137,6 +137,70 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(classification?.reasoningLevels ?? null).toBeNull();
   });
 
+  it("a CONFIDENTIAL turn falls back to Groq when OpenAI's credit is spent (20261231290000)", async () => {
+    // Live 2026-11-05: OpenAI answered credit_balance_exhausted and, with no
+    // second CONFIDENTIAL route, every Q turn had nowhere to go.
+    const openai = createFakeModelProvider({
+      code: "openai",
+      script: [
+        {
+          kind: "FAIL",
+          failureClass: "PERMANENT",
+          accountExhausted: true,
+        },
+      ],
+    });
+    const groq = createFakeModelProvider({
+      code: "groq",
+      script: [
+        {
+          kind: "TEXT",
+          text: "synthetic groq answer",
+          usage: { inputTokens: 40, cachedInputTokens: 0, outputTokens: 12 },
+        },
+      ],
+    });
+    const google = createFakeModelProvider({
+      code: "google",
+      script: [{ kind: "TEXT", text: "must never be reached" }],
+    });
+    const gateway = createModelGateway({
+      catalog: createPostgresModelCatalog({ sql: db.sql, cacheTtlMs: 0 }),
+      registry: createModelProviderRegistry([openai, groq, google]),
+      usage: createPostgresModelUsageRepository({ sql: db.sql }),
+      sleep: () => Promise.resolve(),
+    });
+    for (const taskClass of [
+      "NORMAL_DIALOGUE",
+      "STRUCTURED_EXTRACTION",
+      "FAST_CLASSIFICATION",
+      "EVIDENCE_SYNTHESIS",
+    ] as const) {
+      const served = await gateway.execute({
+        taskClass,
+        sensitivity: "CONFIDENTIAL",
+        messages: [
+          { role: "USER", content: "Synthetic confidential test sentence." },
+        ],
+        output: { kind: "TEXT" },
+        budget: {
+          maxAttempts: 3,
+          maxEstimatedCostUsd: 0.5,
+          maxOutputTokens: 256,
+          attemptTimeoutMs: 5_000,
+        },
+        attribution: { tenantId, correlationId: "cor_groq_fallback" },
+      });
+      expect(served.providerCode, taskClass).toBe("groq");
+      expect(served.modelCode, taskClass).toBe("openai/gpt-oss-120b");
+      expect(served.fallbackUsed, taskClass).toBe(true);
+    }
+    // OpenAI was asked once per request, never retried on a spent account;
+    // Gemini (PUBLIC-only) was never asked for CONFIDENTIAL material.
+    expect(openai.calls).toHaveLength(4);
+    expect(google.calls).toHaveLength(0);
+  });
+
   it("routes and records against the real catalog and ledger", async () => {
     const google = createFakeModelProvider({
       code: "google",
