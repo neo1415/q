@@ -31,3 +31,22 @@ Q invented no figures, and every multi-part ask was answered.
 | ADV-151 #1 | UNKNOWN   | Correctly refused the runway, but the phrasing didn't match the unknown grader (a grader check is needed).        |
 
 Latency (whole reply): Q p50 7.5 s against the bare model's 1.0 s.
+
+## Re-run on `61b7a8539` (over-asking commits 1+2, live-gap fixes; 08:20 UTC, $0.297)
+
+**Q 85.7% vs bare 95.2%** (was 81.0% vs 97.6%; the same 11 cases, but live replies vary).
+
+- Wrong-entity turns: 0.
+- AMBIGUITY: Q 66.7% vs bare 33.3%.
+- FOLLOW_UPS, NUMBERS and ADVERSARIAL: 100%.
+
+Still failing:
+
+| Case       | Problem                                                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AMB-136 #0 | "Silo" answered as Silo Credit. The name-candidates path didn't fire live; the reader probably doesn't put the partial name in `namedOther`.                |
+| CMP-061 #0 | "It reports $2.4M…": the subject is still unnamed.                                                                                                          |
+| ORD-016 #0 | A list reply omitted Silo Credit.                                                                                                                           |
+| UNK-076 #2 | A correct refusal ("turning that into ARR would be fabrication"). The grader wants the subject named.                                                       |
+| MEM-121 #1 | Recalled the pass reason but not the runway criterion.                                                                                                      |
+| CON-091 #2 | The grader scored a labelled derivation ($310k × 12 = $3.72M, "my calculation") as invented. That is a grader policy question; the grader was not loosened. |
