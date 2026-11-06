@@ -715,11 +715,30 @@ export function jsonObjectOf(text: string): string {
   }
 }
 
-function result(message: Message, structured = false): ModelProviderResult {
+/**
+ * `earlier`: a call of the same generate that this one answered again (an
+ * empty reply, a prose-only one); its tokens were billed too, so they are
+ * counted in the usage the gateway prices.
+ */
+function result(
+  message: Message,
+  structured = false,
+  earlier?: Message,
+): ModelProviderResult {
+  const usage = toUsage(message);
+  const before = earlier === undefined ? undefined : toUsage(earlier);
   return {
     text: structured ? jsonObjectOf(textOf(message)) : textOf(message),
     toolCalls: toToolCalls(message),
-    usage: toUsage(message),
+    usage:
+      before === undefined
+        ? usage
+        : {
+            inputTokens: usage.inputTokens + before.inputTokens,
+            cachedInputTokens:
+              usage.cachedInputTokens + before.cachedInputTokens,
+            outputTokens: usage.outputTokens + before.outputTokens,
+          },
     finish: finishOf(message),
     modelCode: message.model,
     providerReference: message.id,
@@ -853,6 +872,54 @@ export const TOOL_USE_GUIDANCE =
   "When you use tools, answer with what you found, not an account of how you looked: never mention a search, lookup or tool, and never say that one came back empty. If something is not on record, say only that it is not on record.";
 
 /**
+ * Claude adds what was not asked more readily than the models Q's prompts
+ * were tuned on. Live 2026-11-06 (12 cases on Sonnet, 71% of turns): every
+ * "wrong entity" turn had the right reading -- "the second one" bound to
+ * Silo Health, "she" to Ngozi Eze -- and answered it, then added the other
+ * companies or people ("For comparison, Silo Credit reports $180k") or its
+ * own working ("would cover about 33 months"), which named forbidden
+ * entities and invented figures. Said with the tool-round reminder, the
+ * last thing the model reads, after every cache breakpoint. It narrows
+ * what is said, never what is true: a comparison or a calculation they
+ * ask for is still given, and unknown is still said to be unknown.
+ */
+export const ANSWER_SCOPE_GUIDANCE =
+  "Answer only what this message asks, about only whom it asks: do not bring in any other company or person, or their figures, and add no figures of your own working (implied cash, months of cover, differences, ranges), unless the message asks for a comparison or a calculation.";
+
+/**
+ * The same request once more, with the prose reply after it and a note
+ * asking for that answer as the schema's JSON object. Live 2026-11-06 (12
+ * cases): 4 of 52 Sonnet answers came back as prose only; the gateway
+ * then asked again in text and once more without tools, and each of those
+ * re-wrote 20-27k tokens of cache (~$0.06-0.12 each), because a request
+ * without the schema note or the tools is a different prefix. Appended
+ * after the last message, everything the first call cached is read back.
+ * The reply is the model's own words: it is restated, not re-decided.
+ */
+export function repairRequest(
+  params: MessageCreateParamsNonStreaming,
+  prose: string,
+  schemaName: string,
+): MessageCreateParamsNonStreaming {
+  return {
+    ...params,
+    messages: [
+      ...params.messages,
+      { role: "assistant", content: [{ type: "text", text: prose }] },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `[Capital Q note] Say that same answer again as only the ${schemaName} JSON object, its answer field holding your reply: start with { and end with }, nothing before or after it.`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
  * The largest sanitised schema sent for constrained decoding. The API does
  * not publish its grammar-size limit; the live refusal was a schema of
  * about 7.8k characters. Larger schemas go by instruction from the start
@@ -917,7 +984,7 @@ export function toRequest(
       {
         type: "text",
         text: `[Capital Q note] Reply with only the ${structured.schemaName} JSON object: start with { and end with }, nothing before or after it.${
-          toolsOffered ? ` ${TOOL_USE_GUIDANCE}` : ""
+          toolsOffered ? ` ${TOOL_USE_GUIDANCE} ${ANSWER_SCOPE_GUIDANCE}` : ""
         }`,
       },
     ];
@@ -1246,7 +1313,25 @@ export function createAnthropicModelProvider(
                   : retry,
               ),
               structured,
+              message,
             );
+          }
+          // A structured answer said as prose only, no JSON at all, is
+          // asked once more for the same answer as the object, after it on
+          // the same prefix, so the cache holds (repairRequest).
+          const repair =
+            request.output.kind === "STRUCTURED" &&
+            message.stop_reason === "end_turn" &&
+            toToolCalls(message) === undefined &&
+            textShapeOf(textOf(message)) === "PROSE"
+              ? repairRequest(
+                  params,
+                  textOf(message),
+                  request.output.schemaName,
+                )
+              : undefined;
+          if (repair !== undefined) {
+            return result(await send(repair), structured, message);
           }
           return result(message, structured);
         } catch (error: unknown) {

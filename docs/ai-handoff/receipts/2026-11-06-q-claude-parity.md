@@ -121,6 +121,56 @@ The first, cold conversation is $0.149: it writes the shared prefix, 47k tokens.
 
 **Reader and answer cannot share a prefix.** Tools render first and the reader is offered none.
 
+## The 7aa4bf6 paid run: quality first, then cost (offline diagnosis)
+
+Owner's run on `7aa4bf6`: $1.556 for 12 cases ($0.130 a case); 71.1% of turns and 5 of 12 cases passed; 7 "wrong entity" turns. Receipt: `2026-11-06-q-claude-parity-live/`.
+
+**Cause: the answer, not the reader.** In every "wrong entity" turn the reply is about the right subject. "The second one" was answered as Silo Health, "she" as Ngozi Eze, and "the other one" as Silo Credit. Each answer then added the subjects the turn forbids:
+
+- QIQ-ORD-016 t1: "For comparison, Silo Credit reports $180k a month and Brightpath Logistics $150k."
+- t2: "It sits below Silo Credit's $2.4M and above Silo Health's $1.1M."
+- t4: "It's well below Silo Credit's 62%."
+- PRO-001 t1 brought Tunde Bakare into "when did she join".
+- AMB-136 t2 compared runway with Silo Health.
+- UNK-076 t2 gave "the other companies here … between $750k and $5.2M".
+
+The "invented" failures follow the same pattern: unasked working. FUP-031 said "would cover about 33 months" and "about 32 months", and COR-046 said "300000". The reader is therefore not the defect. Moving TURN_READ to Sonnet would cost more and fix none of these, so no routing migration is proposed. (The log had no reader output, so the binding was read from the replies. `CQ_Q_IQ_LOG=debug` now prints a `[q-iq reading]` line for each turn: kind, confidence, answerKind, question, reference, tool. Use it on the next run to confirm.)
+
+I also checked whether `anthropic-sections` reorders the reader prompt and breaks its "above/below" references. It does not. The TURN_READER v81 sections that vary per turn (CONVERSATION STATE, RECENT TURNS, WHAT THEY JUST SAID) are already last, so their order is unchanged.
+
+**Fix (adapter only, Claude only).** `ANSWER_SCOPE_GUIDANCE` is added to the closing reminder of every tool round, after every cache breakpoint: "Answer only what this message asks, about only whom it asks: do not bring in any other company or person, or their figures, and add no figures of your own working (implied cash, months of cover, differences, ranges), unless the message asks for a comparison or a calculation."
+
+- It does not reach OpenAI or the reader, which has no tools.
+- It narrows what is said, never what is true: unknown is still said to be unknown.
+- **Unverified live.** Whether Sonnet holds it is what the next paid run shows.
+
+**Cost: prose-only answers.** In 3 turns Sonnet answered in prose with no JSON. The gateway then asked again in TEXT and once more without tools. Each of those requests is a different prefix (no schema note, no tools), so each re-wrote 20-27k tokens of cache: $0.303 of the run's $1.733 at list prices. The adapter now handles this itself (`repairRequest`). It makes one more call on the same prefix, with the prose reply and a note asking for that answer as the JSON object. The wire double shows that call reading back everything the first call cached and writing nothing new. Both calls' tokens are counted (the empty-reply retry previously dropped the first call's usage).
+
+| Modelled from the run's own log (list prices)   | $ per case |
+| ----------------------------------------------- | ---------- |
+| As run                                          | 0.144      |
+| With the repair in place of the follow-on calls | **0.122**  |
+| Q on OpenAI (owner)                             | ≈0.026     |
+
+**Cache writes: where the ~450k came from.**
+
+- Sonnet answers wrote 205k tokens over 52 calls. About 2.5k a call is the per-turn tail at its 5-minute breakpoint, which is needed for the tool rounds of that turn. The rest is each case's first call.
+- The prose follow-ons wrote 143k. The repair removes these.
+- Haiku's reader wrote 185k, but at $0.125/M that is $0.023 for the run.
+- Nothing writes the same prefix twice. The 1-hour TTL on the head already lets turn 1's write serve every later turn.
+
+What remains is structural. A Sonnet answer call costs about $0.017: about 27k read at $0.20/M, about 2.5k tail write, and about 570 output tokens. That is about 5 calls a case. The levers are the ones above (trim the prompt, fewer rounds, or Haiku answers), for the owner after the quality is fixed.
+
+Two further tool-less final rounds (after a tool loop hit its budget) also re-wrote about 22k each, about $0.01 a case. Keeping the tools there with `tool_choice: none` would let them read the cache. Not done: flattening the tool history is what fixed the empty end_turns.
+
+**Gates.**
+
+- Adapter 31/31 and wire 7/7 (both new tests included).
+- model-gateway, config and q-iq-budget: 1913 passed.
+- Integration: q-iq-claude-wire 2/2, q-iq-claude-cache 1/1, answer-seam and gateway-postgres 10/10.
+- Root `tsc`, plus `tsc` for q-api, workers and api.
+- eslint and prettier on changed files.
+
 ## Anthropic test spend (DECISIONS 68 amended: $50 cap; slow down at $20, very careful past $40)
 
 This lane has made **no** paid call. These are the live runs the integration owner reported to me, with the Anthropic part of each run's cost:
@@ -133,6 +183,7 @@ This lane has made **no** paid call. These are the live runs the integration own
 | `1773825`, 1 case              | $0.490      | —           |
 | `b166e46`, 1 case              | $0.301      | —           |
 | `fa5e455`, 1 case              | $0.354      | —           |
-| Subtotal reported to this lane | **$2.31**   | —           |
+| `7aa4bf6`, 12 cases            | $1.556      | —           |
+| Subtotal reported to this lane | **$3.87**   | —           |
 
-Add to that today's benchmark runs, about $4.40 as the owner reported. The total from what was reported is therefore at least about $6.7. The owner's estimate was about $10, which includes runs not reported here. **The Anthropic console's usage figure governs.** This lane has no admin key, and makes no call to check one.
+Add to that today's benchmark runs, about $4.40 as the owner reported. The total from what was reported is therefore at least about $8.3 (the owner's running figure after `7aa4bf6`: about $6 plus earlier adapter tests). The owner's estimate was about $10, which includes runs not reported here. **The Anthropic console's usage figure governs.** This lane has no admin key, and makes no call to check one.

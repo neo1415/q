@@ -6,6 +6,7 @@ import { ModelProviderFailure } from "../src/errors.js";
 import type { ModelProviderRequest } from "../src/ports.js";
 import {
   TOOL_USE_GUIDANCE,
+  ANSWER_SCOPE_GUIDANCE,
   CONSTRAINED_SCHEMA_MAX_CHARS,
   jsonObjectOf,
   lineHashes,
@@ -812,6 +813,139 @@ describe("anthropic adapter: live 2026-11-06 follow-ups", () => {
     expect(seen[1]?.["thinking"]).toBeUndefined();
   });
 
+  it("a structured answer said as prose only is asked again for the object, on the same prefix", async () => {
+    const prose = {
+      ...recorded,
+      content: [
+        {
+          type: "text",
+          text: "Silo Health burns $95k a month.",
+          citations: null,
+        },
+      ],
+      stop_reason: "end_turn",
+    };
+    const answered = {
+      ...recorded,
+      content: [
+        {
+          type: "text",
+          text: '{"answer":"Silo Health burns $95k a month."}',
+          citations: null,
+        },
+      ],
+      stop_reason: "end_turn",
+    };
+    const seen: Record<string, unknown>[] = [];
+    let call = 0;
+    const client = {
+      messages: {
+        create: (params: Record<string, unknown>) => {
+          seen.push(params);
+          call += 1;
+          return Promise.resolve(call === 1 ? prose : answered);
+        },
+        stream: () => {
+          throw new Error("unused");
+        },
+      },
+    } as unknown as AnthropicClient;
+    const provider = createAnthropicModelProvider({ apiKey: "unused", client });
+    const result = await provider.generate(
+      request({
+        output: {
+          kind: "STRUCTURED",
+          schemaName: "CompanyAnalyst",
+          jsonSchema: {
+            type: "object",
+            properties: { answer: { type: "string" } },
+            required: ["answer"],
+            description: "x".repeat(5_000),
+          },
+        },
+      }),
+      context(),
+    );
+    expect(result.text).toBe('{"answer":"Silo Health burns $95k a month."}');
+    expect(seen).toHaveLength(2);
+    const first = seen[0] as { messages: unknown[]; system: unknown };
+    const second = seen[1] as { messages: unknown[]; system: unknown };
+    // Everything the first call sent is the second's prefix, unchanged.
+    expect(second.system).toEqual(first.system);
+    expect(second.messages.slice(0, first.messages.length)).toEqual(
+      first.messages,
+    );
+    expect(second.messages.slice(first.messages.length)).toEqual([
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Silo Health burns $95k a month." }],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: expect.stringContaining(
+              "CompanyAnalyst JSON object",
+            ) as string,
+          },
+        ],
+      },
+    ]);
+    // Both calls were billed, so both are counted.
+    const one = recorded.usage;
+    const inputOne =
+      one.input_tokens +
+      (one.cache_read_input_tokens ?? 0) +
+      (one.cache_creation_input_tokens ?? 0);
+    expect(result.usage?.inputTokens).toBe(2 * inputOne);
+    expect(result.usage?.outputTokens).toBe(2 * one.output_tokens);
+  });
+
+  it("a prose answer to a TEXT request, or prose then JSON, is not asked again", async () => {
+    for (const [output, text] of [
+      [{ kind: "TEXT" }, "Plain words."],
+      [
+        {
+          kind: "STRUCTURED",
+          schemaName: "CompanyAnalyst",
+          jsonSchema: {
+            type: "object",
+            properties: { answer: { type: "string" } },
+            description: "x".repeat(5_000),
+          },
+        },
+        'Here: {"answer":"x"}',
+      ],
+    ] as const) {
+      let calls = 0;
+      const client = {
+        messages: {
+          create: () => {
+            calls += 1;
+            return Promise.resolve({
+              ...recorded,
+              content: [{ type: "text", text, citations: null }],
+              stop_reason: "end_turn",
+            });
+          },
+          stream: () => {
+            throw new Error("unused");
+          },
+        },
+      } as unknown as AnthropicClient;
+      const provider = createAnthropicModelProvider({
+        apiKey: "unused",
+        client,
+      });
+      await provider.generate(
+        request({ output: output as ModelProviderRequest["output"] }),
+        context(),
+      );
+      expect(calls).toBe(1);
+    }
+  });
+
   it("an empty answer to a tool continuation is retried at default thinking too", async () => {
     const empty = {
       ...recorded,
@@ -985,6 +1119,13 @@ describe("anthropic adapter: tool narration (DECISIONS 67 follow-up)", () => {
     expect(JSON.stringify(body.system)).not.toContain(TOOL_USE_GUIDANCE);
     const last = body.messages.at(-1)?.content as { text: string }[];
     expect(last.at(-1)?.text).toContain(TOOL_USE_GUIDANCE);
+    // The answer-scope line too (live 2026-11-06: unasked comparisons),
+    // after every breakpoint, so the cached prefix is untouched.
+    expect(JSON.stringify(body.system)).not.toContain(ANSWER_SCOPE_GUIDANCE);
+    expect(last.at(-1)?.text).toContain(ANSWER_SCOPE_GUIDANCE);
+    expect(
+      (last.at(-1) as { cache_control?: unknown }).cache_control,
+    ).toBeUndefined();
     // Without tools, no such line at all.
     const plain = toRequest(
       request({
@@ -996,6 +1137,8 @@ describe("anthropic adapter: tool narration (DECISIONS 67 follow-up)", () => {
       }),
     );
     expect(JSON.stringify(plain)).not.toContain(TOOL_USE_GUIDANCE);
+    // The reader and other tool-less tasks never get the answer-scope line.
+    expect(JSON.stringify(plain)).not.toContain(ANSWER_SCOPE_GUIDANCE);
   });
 });
 

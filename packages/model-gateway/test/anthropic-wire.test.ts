@@ -284,3 +284,58 @@ describe("Claude over the Messages API wire, through the gateway", () => {
     expect(requestRefusal(body(short, long))).toContain("ttl '1h'");
   });
 });
+
+describe("Claude over the wire: a prose-only structured answer", () => {
+  it("is asked once more for the object on the same prefix, read back from cache, and validated", async () => {
+    const exchanges: AnthropicExchange[] = [];
+    const double = createAnthropicWireDouble(
+      createFakeModelProvider({
+        code: "anthropic",
+        script: [
+          { kind: "TEXT", text: "Ledgerfold has two founders." },
+          { kind: "JSON", value },
+        ],
+      }),
+      { onExchange: (exchange) => exchanges.push(exchange) },
+    );
+    const gateway = createModelGateway({
+      catalog: createStaticModelCatalog(catalog),
+      registry: createModelProviderRegistry([double]),
+      usage: createInMemoryModelUsageRepository(),
+    });
+    // A schema too large for constrained decoding: by instruction, as Q's
+    // answer schema is live.
+    const large = {
+      ...structured,
+      jsonSchema: { ...structured.jsonSchema, description: "x".repeat(5_000) },
+    };
+    const result = await gateway.execute(
+      request({
+        sensitivity: "CONFIDENTIAL",
+        output: large,
+        reasoning: "NONE",
+        budget: roomy,
+        messages: [
+          { role: "SYSTEM", content: "Rules.\n".repeat(800) },
+          { role: "USER", content: "How many founders?" },
+        ],
+      }),
+      { schema: AnswerSchema, onTextDelta: () => undefined },
+    );
+    expect(result.output).toEqual({ kind: "STRUCTURED", value });
+    expect(double.refusals).toEqual([]);
+    expect(
+      exchanges.map((e) =>
+        e.outcome.kind === "MESSAGE" ? e.outcome.textShape : "ERROR",
+      ),
+    ).toEqual(["PROSE", "JSON"]);
+    const [first, second] = exchanges.map((e) =>
+      e.outcome.kind === "MESSAGE" ? e.outcome : undefined,
+    );
+    // What the first call wrote, the second reads; nothing is re-written.
+    expect(second?.cacheReadTokens).toBeGreaterThan(0);
+    expect(second?.cacheReadTokens).toBe(
+      (first?.cacheReadTokens ?? 0) + (first?.cacheWriteTokens ?? 0),
+    );
+  });
+});
