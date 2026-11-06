@@ -145,6 +145,12 @@ export type QApiVoiceConfig = {
   readonly expressive: boolean;
   /** The ElevenLabs model behind the speak relay and one-way speech. */
   readonly ttsModel: "eleven_turbo_v2_5" | "eleven_v3_conversational";
+  /**
+   * Whether Q_VOICE_TTS_MODEL was set. DECISIONS 68: while the OpenAI
+   * account is out, Q's voice line speaks eleven_v4_turbo unless a
+   * deployment pinned a model here.
+   */
+  readonly ttsModelPinned: boolean;
   /** REHEARSE: the model the person Q plays speaks with. */
   readonly rehearsalTtsModel:
     | "eleven_v4_turbo"
@@ -213,6 +219,7 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       personality: parsed.Q_PERSONALITY ?? "UPBEAT",
       expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
       ttsModel: parsed.Q_VOICE_TTS_MODEL ?? "eleven_v3_conversational",
+      ttsModelPinned: parsed.Q_VOICE_TTS_MODEL !== undefined,
       rehearsalTtsModel: parsed.Q_REHEARSAL_TTS_MODEL ?? "eleven_v4_turbo",
       rehearsalExpressivePeaks: parsed.Q_REHEARSAL_TTS_PEAKS !== "off",
       provider: resolveVoiceProvider(

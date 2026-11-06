@@ -732,15 +732,14 @@ export function registerQVoiceRoutes(
         }
       }
       const elevenLabs = dependencies.provider;
-      // DECISIONS 68: with OpenAI's account out, the line is ElevenLabs'
-      // (speech in and out) with Q's own brain behind it; Deepgram's line
-      // stays the way when ElevenLabs is not composed (it is OpenAI-free
-      // too: its "think" is Q's turn path on this server).
+      // DECISIONS 68 (lead's decision B): with OpenAI's account out, the
+      // line is still Deepgram's -- Deepgram listens, Q's own brain answers
+      // (think.ts, the Model Gateway, on Claude), and q-api's ElevenLabs
+      // relay speaks in Q's own voice on eleven_v4_turbo -- and only the
+      // OpenAI lines (GPT-Live, duplex) are left out. Without Deepgram, the
+      // ElevenLabs Speech Engine (OpenAI-free as well) carries it.
       const openAiOut = dependencies.openAiExhausted?.() === true;
-      const deepgram =
-        openAiOut && elevenLabs !== undefined
-          ? undefined
-          : dependencies.deepgram;
+      const deepgram = dependencies.deepgram;
       // A rehearsal is never GPT-Live, trial or not: the person Q plays
       // speaks in their own ElevenLabs persona voice (owner 2026-10-23,
       // "fully ElevenLabs"); GPT-Live would answer in Q's own voice.
