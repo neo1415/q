@@ -421,7 +421,9 @@ const PERIODS: readonly (readonly [string, RegExp])[] = [
   ["quarter", /\b(?:a|per|each|every)\s+quarter\b|\bquarterly\b/iu],
   [
     "year",
-    /\b(?:a|per|each|every)\s+year\b|\b(?:yearly|annual(?:ly|i[sz]ed)?|per\s+annum)\b|\/\s?yr\b/iu,
+    // "over a full year", "the whole year", "12 months": live NUM-106
+    // (2026-11-06) asked "over a full year" and the reply echoed it.
+    /\b(?:a|per|each|every)\s+year\b|\b(?:a|one|the)\s+(?:full|whole)\s+year\b|\bfull[- ]year\b|\b(?:12|twelve)\s+months\b|\b(?:yearly|annual(?:ly|i[sz]ed)?|per\s+annum)\b|\/\s?yr\b/iu,
   ],
 ];
 const PERIOD_FACTORS: readonly (readonly [string, string, number])[] = [
@@ -430,6 +432,33 @@ const PERIOD_FACTORS: readonly (readonly [string, string, number])[] = [
   ["week", "year", 52],
   ["month", "quarter", 3],
 ];
+
+/**
+ * A calendar factor the sentence writes as its own operand ("$180k × 12",
+ * "× 12 months", "times 52") beside the period it converts to: the
+ * multiplication is on the page, and 12 months to a year is the calendar,
+ * not a fact anyone could have invented. Only these factors, only beside
+ * their period; any other multiplier is a claim like any number.
+ */
+const CALENDAR_OPERAND = /(?:[×x*]|\btimes)\s?(?<n>12|52|4)\b(?!\s?[.,]\d)/giu;
+const CALENDAR_PERIOD: Readonly<Record<string, string>> = {
+  "12": "year",
+  "52": "year",
+  "4": "year",
+};
+
+function calendarOperandsIn(sentence: string): number[] {
+  const said = new Set(
+    PERIODS.filter(([, pattern]) => pattern.test(sentence)).map(([p]) => p),
+  );
+  const out: number[] = [];
+  for (const match of sentence.matchAll(CALENDAR_OPERAND)) {
+    const n = match.groups?.["n"] ?? "";
+    const period = CALENDAR_PERIOD[n];
+    if (period !== undefined && said.has(period)) out.push(Number(n));
+  }
+  return out;
+}
 
 function periodFactorsIn(sentence: string): number[] {
   const said = new Set(
@@ -699,6 +728,12 @@ export interface SentenceCheckOptions {
    * document, Q's own "I don't have a sourced figure" is not theirs to say.
    */
   readonly unknownLine?: boolean | undefined;
+  /**
+   * The grounded figures of the sentence just before, in the same
+   * paragraph: inputs a derivation here may use (never a claim's own
+   * grounding), so arithmetic split over two sentences stays visible.
+   */
+  readonly before?: readonly number[] | undefined;
 }
 
 /**
@@ -711,10 +746,26 @@ export function checkSentence(
   said: Set<string> = new Set(),
   options: SentenceCheckOptions = {},
 ): SentenceCheck {
+  return checkOne(sentence, corpus, said, options).check;
+}
+
+/**
+ * One sentence's check, with the figures it states when it is published
+ * as written: the next sentence of the same paragraph may work from them
+ * ("$2.4M versus $1.1M. That is about 2.2 times.").
+ */
+function checkOne(
+  sentence: string,
+  corpus: ClaimCorpus,
+  said: Set<string>,
+  options: SentenceCheckOptions,
+): { readonly check: SentenceCheck; readonly figures: readonly number[] } {
   const claims = extractClaims(sentence).filter(
     (claim) => options.names !== false || claim.kind !== "NAME",
   );
-  if (claims.length === 0) return { text: sentence, ungrounded: [] };
+  if (claims.length === 0) {
+    return { check: { text: sentence, ungrounded: [] }, figures: [] };
+  }
   const figures = claims.filter(
     (claim) =>
       claim.kind === "NUMBER" ||
@@ -726,12 +777,16 @@ export function checkSentence(
   // figures, its stated sourced durations and its stated period
   // conversions. Every input is said in the sentence, so the arithmetic
   // is visible to the reader.
+  const own = figures
+    .filter((figure) => figureGrounded(figure, corpus, []))
+    .map((figure) => figure.value);
+  const calendar = calendarOperandsIn(sentence);
   const groundedValues = [
-    ...figures
-      .filter((figure) => figureGrounded(figure, corpus, []))
-      .map((figure) => figure.value),
+    ...own,
     ...durationInputsIn(sentence, corpus),
     ...periodFactorsIn(sentence),
+    ...calendar,
+    ...(options.before ?? []),
   ];
   const ungrounded: ClaimKind[] = [];
   for (const claim of claims) {
@@ -739,7 +794,8 @@ export function checkSentence(
       claim.kind === "NAME"
         ? nameGrounded(claim.text, corpus)
         : Number.isFinite(claim.value)
-          ? figureGrounded(claim, corpus, groundedValues)
+          ? (claim.kind === "NUMBER" && calendar.includes(claim.value)) ||
+            figureGrounded(claim, corpus, groundedValues)
           : claim.text.startsWith("time:")
             ? corpus.minutes.has(claim.text.slice("time:".length))
             : corpus.dates.has(claim.text) ||
@@ -747,18 +803,28 @@ export function checkSentence(
               [...corpus.dates].some((key) => key.startsWith(`${claim.text}-`));
     if (!ok) ungrounded.push(claim.kind);
   }
-  if (ungrounded.length === 0) return { text: sentence, ungrounded };
+  if (ungrounded.length === 0) {
+    return {
+      check: { text: sentence, ungrounded },
+      figures: figures.map((figure) => figure.value),
+    };
+  }
   // A name we cannot ground is removed; a figure becomes an honest unknown
   // about its metric when there is one, said once.
   const metric =
     ungrounded.includes("NAME") || options.unknownLine === false
       ? null
       : metricOf(sentence);
-  if (metric === null || said.has(metric)) return { text: null, ungrounded };
+  if (metric === null || said.has(metric)) {
+    return { check: { text: null, ungrounded }, figures: [] };
+  }
   said.add(metric);
   return {
-    text: `I don't have a sourced figure for ${metric} yet.`,
-    ungrounded,
+    check: {
+      text: `I don't have a sourced figure for ${metric} yet.`,
+      ungrounded,
+    },
+    figures: [],
   };
 }
 
@@ -783,6 +849,8 @@ export function createClaimChecker(
   let key: readonly string[] | null = null;
   let corpus: ClaimCorpus | null = null;
   const said = new Set<string>();
+  // The sentence just before, while the paragraph goes on.
+  let before: readonly number[] = [];
   const current = (): ClaimCorpus => {
     const now = sources();
     if (
@@ -797,7 +865,12 @@ export function createClaimChecker(
     return corpus;
   };
   return {
-    sentence: (sentence) => checkSentence(sentence, current(), said),
+    sentence: (sentence) => {
+      const checked = checkOne(sentence, current(), said, { before });
+      // A paragraph break ends what the next sentence may work from.
+      before = /\n\s*$/u.test(sentence) ? [] : checked.figures;
+      return checked.check;
+    },
   };
 }
 
@@ -818,8 +891,11 @@ export function checkAnswer(
     const body = line.slice(lead.length);
     const sentences = body.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"“(*])/u);
     const kept: string[] = [];
+    let before: readonly number[] = [];
     for (const sentence of sentences) {
-      const checked = checkSentence(sentence, corpus, said);
+      const one = checkOne(sentence, corpus, said, { before });
+      const checked = one.check;
+      before = one.figures;
       ungrounded.push(...checked.ungrounded);
       if (checked.text !== null) kept.push(checked.text);
     }
