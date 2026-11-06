@@ -157,6 +157,26 @@ function containsTerm(text: string, term: string): boolean {
 const UNKNOWN_MARKER =
   /\b(?:(?:don't|do not|doesn't|does not|didn't|did not|can't|cannot|couldn't|isn't|is not|aren't|are not|wasn't|haven't|hasn't|have not|has not)\b[^.?!]{0,60}\b(?:know|have|hold|say|state|show|include|mention|record|list|disclose|find|see|tell|confirm|in|available|recorded|stated|listed|given|provided|reported|disclosed|known|on file|on record)|not\s+(?:in|stated|recorded|available|disclosed|provided|given|reported|shown|included|listed|known|specified|mentioned|on record|on file)|no\s+(?:data|record|figure|number|information|evidence|mention|cfo|reliable|basis|way)|no\s+[a-z$-]+\s+(?:data|record|figure|number)s?|unknown|unclear|missing|unavailable|not something i)\b/i;
 
+/**
+ * Live UNK-076 #2 (7a41ff4): "There isn't a defensible number to give:
+ * Kora Farms' ARR isn't established here, and I won't invent one." These
+ * say unknown only when no figure follows them in the reply: "isn't
+ * established, but it's about $60k" is a number, not an unknown.
+ */
+const UNKNOWN_UNLESS_FIGURE_FOLLOWS =
+  /\b(?:(?:isn't|is not|wasn't|was not|hasn't been|has not been|not)\s+(?:yet\s+)?established|(?:no|isn't a|is not a)\s+(?:defensible|reliable|supportable)\s+(?:[a-z]+\s+)?(?:number|figure|estimate)|(?:won't|will not)\s+(?:invent|make\s+up|guess))\b/giu;
+
+function unknownWithNoFigureAfter(reply: string): boolean {
+  for (const match of reply.matchAll(UNKNOWN_UNLESS_FIGURE_FOLLOWS)) {
+    const after = reply.slice(match.index + match[0].length);
+    const figures = extractFigures(after).filter(
+      (f) => !f.bare || f.value > SMALL_COUNT_MAX,
+    );
+    if (figures.length === 0) return true;
+  }
+  return false;
+}
+
 const ZERO_CONVERSION =
   /\b(?:it(?:'s| is)|that(?:'s| is)|they(?:'re| are)|is|was)\s+(?:zero|0|nil|none)\b(?![^.?!]*\b(?:not|isn't|unknown|evidence)\b)/i;
 
@@ -463,7 +483,8 @@ export function gradeQIqTurn(
   let clarified: boolean | null = null;
   let pass: boolean;
   if (expect.behaviour === "UNKNOWN") {
-    const marker = UNKNOWN_MARKER.test(reply);
+    const marker =
+      UNKNOWN_MARKER.test(reply) || unknownWithNoFigureAfter(reply);
     const zero = ZERO_CONVERSION.test(reply);
     saidUnknown = marker && !zero && inventedFigures.length === 0;
     if (!marker) reasons.push("did not say unknown");
