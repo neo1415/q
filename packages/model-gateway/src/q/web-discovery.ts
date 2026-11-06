@@ -65,6 +65,12 @@ export const DISCOVERY_MAX_TOOL_CALLS = 16;
  * the research service's discovery budget per run.
  */
 const FOUNDER_ROUND_MAX = 4;
+/**
+ * Pages each research call reads in full (spend: a page read is a paid
+ * extract). A founder is usually named in a snippet or the first page.
+ */
+const ROUND_ONE_PAGES = 3;
+const FOUNDER_ROUND_PAGES = 2;
 /** Pages read further when a search returned only a snippet. */
 const EXTRACT_MAX = 3;
 /** No new round starts once this share of the budget is spent. */
@@ -696,7 +702,7 @@ export async function runWebDiscovery(input: {
   for (let i = 0; i < plan.queries.length; i += 2) {
     pairs.push(plan.queries.slice(i, i + 2));
   }
-  await Promise.all(pairs.map((pair) => research(pair, 4)));
+  await Promise.all(pairs.map((pair) => research(pair, ROUND_ONE_PAGES)));
   if (answered === 0) {
     return {
       text:
@@ -777,7 +783,7 @@ export async function runWebDiscovery(input: {
       founderPairs.map((pair) =>
         research(
           pair,
-          3,
+          FOUNDER_ROUND_PAGES,
           pair.map((ask) => ask.replace(/ founder$/u, "")),
         ),
       ),

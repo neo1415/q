@@ -8057,6 +8057,14 @@ export function createModelGatewayQAnswer(
         request.askedAction === undefined
       ) {
         const discoveryStarted = Date.now();
+        // The search takes a while (two rounds of searches and page
+        // reads): they see the web search's own stage meanwhile.
+        const webStage = offeredForRun.find(
+          (tool) => tool.definition.name === PUBLIC_WEB_TOOL,
+        )?.visibleStage;
+        if (webStage !== undefined && webStage !== null) {
+          void stageOnce(webStage);
+        }
         const found = await webDiscoveryFor(
           request.webDiscovery,
           prepared.ownMandateData(),
