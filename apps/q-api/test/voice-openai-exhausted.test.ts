@@ -101,7 +101,7 @@ describe("the OpenAI account, as the gateway's health records it", () => {
     expect(accounts.exhausted("openai", at)).toBe(false);
     accounts.health.recordFailure("openai", "m", "PERMANENT", at, 1, true);
     // A plain outage says nothing about the account.
-    accounts.health.recordFailure("openai", "m", "TEMPORARY", at);
+    accounts.health.recordFailure("openai", "m", "TRANSIENT", at);
     expect(accounts.exhausted("openai", at)).toBe(true);
     expect(accounts.exhausted("openai", new Date(at.getTime() + 600_001))).toBe(
       false,
@@ -109,36 +109,21 @@ describe("the OpenAI account, as the gateway's health records it", () => {
   });
 });
 
-function speechEngine(): RealtimeVoiceProvider & {
-  readonly createSession: ReturnType<typeof vi.fn>;
-} {
+function speechEngine(
+  createSession: RealtimeVoiceProvider["createSession"],
+): RealtimeVoiceProvider {
   return {
     name: "fake-speech-engine",
     voices: ["FEMALE", "MALE"],
-    createSession: vi.fn(() =>
-      Promise.resolve({ token: "el_token", providerConversationId: "el_conv" }),
-    ),
+    createSession,
     attach: () => Promise.resolve({ close: () => Promise.resolve() }),
   };
 }
 
-function duplexBroker(): DuplexBroker & {
-  readonly open: ReturnType<typeof vi.fn>;
-} {
+function duplexBroker(open: DuplexBroker["open"]): DuplexBroker {
   return {
     enabled: true,
-    open: vi.fn(() =>
-      Promise.resolve({
-        kind: "DUPLEX" as const,
-        credential: {
-          clientSecret: "ek_fake_secret",
-          callsUrl: "https://realtime.invalid/v1/realtime/calls",
-          expiresAt: "2099-01-01T00:00:00.000Z",
-          maxSessionMs: 600_000,
-          idleMs: 30_000,
-        },
-      }),
-    ),
+    open,
     tool: () => Promise.resolve(null),
     usage: () => Promise.resolve(null),
     rejoin: () => Promise.resolve(null),
@@ -157,8 +142,24 @@ async function app(input: {
   readonly out: () => boolean;
   readonly trial?: boolean;
 }) {
-  const engine = speechEngine();
-  const duplex = duplexBroker();
+  // The mocks are held on their own, so the assertions read plain mocks.
+  const createSession = vi.fn<RealtimeVoiceProvider["createSession"]>(() =>
+    Promise.resolve({ token: "el_token", providerConversationId: "el_conv" }),
+  );
+  const open = vi.fn<DuplexBroker["open"]>(() =>
+    Promise.resolve({
+      kind: "DUPLEX" as const,
+      credential: {
+        clientSecret: "ek_fake_secret",
+        callsUrl: "https://realtime.invalid/v1/realtime/calls",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        maxSessionMs: 600_000,
+        idleMs: 30_000,
+      },
+    }),
+  );
+  const engine = speechEngine(createSession);
+  const duplex = duplexBroker(open);
   const liveBroker = {
     enabled: true,
     isTrialUser: () => input.trial === true,
@@ -201,7 +202,7 @@ async function app(input: {
     openAiExhausted: input.out,
   });
   await server.ready();
-  const open = () =>
+  const issue = () =>
     server.inject({
       method: "POST",
       url: Q_VOICE_SESSIONS_PATH,
@@ -214,27 +215,29 @@ async function app(input: {
       url: Q_VOICE_LIVE_AVAILABLE_PATH,
       headers: { authorization: `Bearer ${BEARER}` },
     });
-  return { server, engine, duplex, open, available };
+  return { server, createSession, open, issue, available };
 }
 
 describe("a voice line while OpenAI's account is out", () => {
   it("is ElevenLabs' (speech in and out), with no duplex line offered", async () => {
-    const { server, engine, duplex, open } = await app({ out: () => true });
-    const response = await open();
+    const { server, createSession, open, issue } = await app({
+      out: () => true,
+    });
+    const response = await issue();
     expect(response.statusCode).toBe(201);
     const body = response.json<Record<string, unknown>>();
     expect(body["provider"]).toBe("elevenlabs");
     expect(body["deepgram"]).toBeUndefined();
     expect(body["duplex"]).toBeUndefined();
     expect(body["liveOnly"]).toBeUndefined();
-    expect(engine.createSession).toHaveBeenCalledTimes(1);
-    expect(duplex.open).not.toHaveBeenCalled();
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
     await server.close();
   });
 
   it("gives a trial person a voice too, never a LIVE-only line that cannot open", async () => {
-    const { server, open } = await app({ out: () => true, trial: true });
-    const body = (await open()).json<Record<string, unknown>>();
+    const { server, issue } = await app({ out: () => true, trial: true });
+    const body = (await issue()).json<Record<string, unknown>>();
     expect(body["liveOnly"]).toBeUndefined();
     expect(body["provider"]).toBe("elevenlabs");
     await server.close();
@@ -256,16 +259,18 @@ describe("a voice line while OpenAI's account is out", () => {
 describe("a voice line when OpenAI is back (the gateway's probe succeeded)", () => {
   it("takes the normal path again: Deepgram's line with the duplex line on top", async () => {
     let out = true;
-    const { server, engine, duplex, open } = await app({ out: () => out });
-    expect((await open()).json<Record<string, unknown>>()["provider"]).toBe(
+    const { server, createSession, open, issue } = await app({
+      out: () => out,
+    });
+    expect((await issue()).json<Record<string, unknown>>()["provider"]).toBe(
       "elevenlabs",
     );
     out = false;
-    const body = (await open()).json<Record<string, unknown>>();
+    const body = (await issue()).json<Record<string, unknown>>();
     expect(body["provider"]).toBe("deepgram");
     expect(body["duplex"]).toBeDefined();
-    expect(duplex.open).toHaveBeenCalledTimes(1);
-    expect(engine.createSession).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(createSession).toHaveBeenCalledTimes(1);
     await server.close();
   });
 });
