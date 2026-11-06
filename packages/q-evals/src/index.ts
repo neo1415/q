@@ -99,6 +99,9 @@ export {
   type QNavTurnGrade,
 } from "./graders/q-nav.js";
 export {
+  naiveReferenceProposer,
+  navigationPipelineSubject,
+  placeByName,
   referenceQNavSubject,
   runQNav,
   type QNavDecisionInput,

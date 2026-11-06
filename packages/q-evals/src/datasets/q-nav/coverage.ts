@@ -2,6 +2,7 @@ import type { QNavSide, QNavSplit, QNavTarget } from "./contracts.js";
 import {
   boardItem,
   type CaseSet,
+  context,
   dataRoomDoc,
   deck,
   decide,
@@ -145,17 +146,24 @@ function destinations(cases: CaseSet): void {
     for (const side of def.sides) {
       const { move } = decide(side);
       const target = dest(def.page);
+      // Asked from somewhere else (from HOME, unless it is HOME).
+      const from = {
+        context: context({
+          at: def.page === "HOME" ? dest("WORK") : dest("HOME"),
+        }),
+      };
       bank.names.forEach((name) => {
         cases.add("COVERAGE", side, [
           turn(
             form(split, `${def.page}${side}${name}`, name),
             move(target, `${def.page}, asked for by name.`),
+            from,
           ),
         ]);
       });
       bank.asks.forEach((ask) => {
         cases.add("COVERAGE", side, [
-          turn(ask, move(target, `The answer lives on ${def.page}.`)),
+          turn(ask, move(target, `The answer lives on ${def.page}.`), from),
         ]);
       });
       const [first] = bank.names;
@@ -164,6 +172,7 @@ function destinations(cases: CaseSet): void {
           turn(
             typo(form(split, `typo${def.page}${side}`, first)),
             move(target, "A typo changes nothing."),
+            from,
           ),
         ]);
       }

@@ -12153,3 +12153,22 @@ export function appActionLineOf(data: unknown): string | null {
     ? record.says.trim()
     : null;
 }
+// Q Workspace W4 (DECISIONS 71): the page pane's MOVE / OFFER / STAY.
+export {
+  applyNavigationPolicy,
+  createQNavigationDecider,
+  decideNavigation,
+  navigationVariables,
+  resolveNavigationPlace,
+  samePlace as sameNavigationPlace,
+  stubSiteMapDigest,
+  type QNavigationDecider,
+  type QNavigationGuard,
+  type QNavigationInput,
+  type QNavigationOutcome,
+  type QNavigationPane,
+  type QNavigationPolicyConfig,
+  type QNavigationRecords,
+  type QNavigationResolution,
+  type QNavigationSide,
+} from "./navigation-decision.js";

@@ -20,6 +20,8 @@ import {
 } from "../src/datasets/q-nav/index.js";
 import { canonicalTarget, gradeQNavTurn } from "../src/graders/q-nav.js";
 import {
+  naiveReferenceProposer,
+  navigationPipelineSubject,
   referenceQNavSubject,
   runQNav,
   type QNavSubject,
@@ -311,5 +313,48 @@ describe("Q-NAV graders", () => {
     const run = await runQNav(still, Q_NAV_DATASET.cases);
     expect(run.summary.overall.moveTargetExact).toBe(0);
     expect(run.summary.labsGate).toBe(false);
+  });
+});
+
+describe("Q-NAV through the W4 pipeline (resolution and hard constraints in code)", () => {
+  it("a proposer that ignores every guard still lands exactly: code resolves the ids and enforces the constraints", async () => {
+    const run = await runQNav(
+      navigationPipelineSubject(
+        "w4:naive-proposer",
+        naiveReferenceProposer(Q_NAV_DATASET.cases),
+      ),
+      Q_NAV_DATASET.cases,
+    );
+    expect(
+      run.grades
+        .filter((g) => !g.pass)
+        .map((g) => `${g.caseId}#${String(g.turn)} ${g.reasons.join("; ")}`),
+    ).toEqual([]);
+    expect(run.summary.overall.forbiddenMoves).toBe(0);
+    expect(run.summary.labsGate).toBe(true);
+    expect(run.summary.onGate).toBe(true);
+  });
+
+  it("below the gate (config), every MOVE becomes an OFFER: no autonomous move at all", async () => {
+    const run = await runQNav(
+      navigationPipelineSubject(
+        "w4:gated",
+        naiveReferenceProposer(Q_NAV_DATASET.cases),
+        { movesAllowed: false },
+      ),
+      Q_NAV_DATASET.cases,
+    );
+    expect(
+      run.grades.filter((g) => g.decided === "MOVE" && g.expected !== "MOVE"),
+    ).toEqual([]);
+    expect(
+      run.grades.some(
+        (g) =>
+          g.decided === "MOVE" &&
+          !g.reasons.includes("the pane was not opened") &&
+          g.category !== "COLLAPSED_PANE",
+      ),
+    ).toBe(false);
+    expect(run.summary.overall.forbiddenMoves).toBe(0);
   });
 });

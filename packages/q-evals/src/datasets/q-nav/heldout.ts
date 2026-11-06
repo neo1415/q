@@ -358,9 +358,8 @@ export function heldoutCurveballs(cases: CaseSet): void {
     ),
     turn(
       "Who are they again?",
-      F.move(
-        investorProfile("inv-harbour-angels"),
-        "They opened Harbour Angels themselves: 'they' is on screen.",
+      F.stay(
+        "They opened Harbour Angels themselves: 'they' is the profile already on screen; answered here.",
       ),
       {
         context: context({

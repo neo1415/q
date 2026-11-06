@@ -329,8 +329,28 @@ export const ANSWERED_IN_PLACE: ReadonlySet<QNavigateDestination> = new Set([
   "RELATIONSHIPS",
 ]);
 
-/** Whether a page request is answered in place first, with the page offered. */
-export function offeredFirst(request: PageRequest | null): boolean {
+/**
+ * The Q Workspace mode (plan §4: the `workspace` flag, off / labs / on,
+ * under the CQ_WORKSPACE_MODE kill switch). W1 owns the flag; this policy
+ * only reads it.
+ */
+export type WorkspaceMode = "off" | "labs" | "on";
+
+/**
+ * Whether a page request is answered in place first, with the page offered.
+ *
+ * DECISIONS 71 (owner, 6 Nov 2026) amends N1: in the Q Workspace Q may
+ * move the page pane on its own, model-led (the NAVIGATION_DECISION step
+ * decides MOVE / OFFER / STAY, with the hard constraints in code). So with
+ * the workspace on (labs or on), a SHOW request is not held back for an
+ * offer here. With it off -- today's app, the default -- N1 stands as it
+ * was (plan §4: old paths stay until the new path is proven).
+ */
+export function offeredFirst(
+  request: PageRequest | null,
+  workspace: WorkspaceMode = "off",
+): boolean {
+  if (workspace !== "off") return false;
   return (
     request?.kind === "PAGE" &&
     request.mode === "SHOW" &&

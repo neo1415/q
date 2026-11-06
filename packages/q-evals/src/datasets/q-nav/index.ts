@@ -1,3 +1,5 @@
+import { sameNavigationPlace } from "@capital-q/model-gateway/q";
+
 import { CaseSet } from "./build.js";
 import {
   Q_NAV_CATEGORIES,
@@ -144,6 +146,13 @@ export function lintQNavDataset(
         if (t.expect.forbiddenPages.includes(target.page))
           issues.push(`${at}: ${name} ${target.page} is also forbidden`);
       }
+      if (
+        t.expect.target !== null &&
+        sameNavigationPlace(t.expect.target, t.context.at)
+      )
+        issues.push(
+          `${at}: a ${t.expect.decision} to where the pane already is`,
+        );
       if (t.expect.decision === "MOVE" && t.expect.target !== null) {
         const set = moved.get(c.split) ?? new Set<string>();
         set.add(`${t.expect.target.page}:${c.side}`);

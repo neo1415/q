@@ -1675,3 +1675,24 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **CI** (`test/q-nav.test.ts`, scripted): lint, determinism, storyboard, hard constraints. The reference scores 100% and passes both gates. Every grader catches its failure; the "always move" and "never move" baselines fail labs.
 - **Gates:** q-evals vitest 88 passed; root tsc 0; eslint and prettier clean; Q-IQ `CQ_Q_IQ_ALL=1` 6/6.
 - **Next:** W4.1–4.3 (NAVIGATION_DECISION), once W2's digest and W3's contract are published.
+
+## 2026-11-06 late — Q Workspace W4, milestone 2: the decision step, resolution and hard constraints (`feat/q-navigation-policy`)
+
+- **q-nav v2** (owner direction ~22:50): the whole site from W3's enums, W3.1 targets, a held-out split written separately. 802 turns, 294 held out (36.7%).
+- **W4.1** NAVIGATION_DECISION v1 (`q-core`: prompt, schema, registry, lock):
+  - FAST_CLASSIFICATION, reasoning NONE.
+  - The model proposes MOVE / OFFER / STAY and names the place by page and record NAME; ids never reach it.
+  - Page and record text is fenced as data.
+  - `createQNavigationDecider` (`model-gateway/src/q/navigation-decision.ts`); a failed call gives STAY.
+- **W4.3** `resolveNavigationPlace`: names become the ids of records the person may open; two matches, none, a deleted record or a bad detail gives STAY. "Back" goes to the previous place.
+- **W4.2** `applyNavigationPolicy` (pure; the model never decides these):
+  - no access or already there: STAY;
+  - collapsed pane: open it only if they asked for a page, otherwise remember the move;
+  - unsaved work or a busy pane: OFFER;
+  - below the gate (`movesAllowed: false`): OFFER;
+  - one outcome per turn.
+- **Stub digest** (`stubSiteMapDigest`) from the contracts, until W2.4 publishes.
+- **Proof:** the real resolution and policy over the eval with a proposer that ignores every guard score 100% on both gates. With `movesAllowed: false`, no MOVE is left. This found 2 dataset errors (HOME from HOME; a held-out stale-context turn), now fixed, with a lint rule against a move to the current place.
+- **N1** (`page-request.ts`): `offeredFirst(request, workspace = "off")`. With the workspace on, a SHOW is not held back for an offer (DECISIONS 71); off is unchanged. Test added.
+- **Not wired yet** into the answer path. It needs W1 (the flag and the pane state on the request), W2 (digest, records, access) and W3 (emit `target` only when workspace ≠ off).
+- **Gates:** package build 54/54; root tsc 0; web tsc 0; vitest q-core/model-gateway/q-specialists/q-evals/contracts 4875 passed; apps/q-api 3131; Q-IQ `CQ_Q_IQ_ALL=1` 6/6; eslint and prettier clean.

@@ -247,6 +247,7 @@ import { TURN_SKIM_V10 } from "./tasks/turn-skim.v10.js";
 import { TURN_SKIM_V11 } from "./tasks/turn-skim.v11.js";
 import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { WEB_DISCOVERY_READER_V1 } from "./tasks/web-discovery-reader.v1.js";
+import { NAVIGATION_DECISION_V1 } from "./tasks/navigation-decision.v1.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -896,6 +897,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_SKIM_V11,
     PERSON_BRIEF_READER_V1,
     WEB_DISCOVERY_READER_V1,
+    NAVIGATION_DECISION_V1,
     BRIEFING_COMMAND_V1,
     GATEQ_DOSSIER_SYNTHESIS_V1,
   ];
