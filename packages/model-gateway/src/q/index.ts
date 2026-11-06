@@ -262,6 +262,7 @@ import {
   checkAnswer,
   claimCorpus,
   createClaimChecker,
+  templateValues,
   type ClaimKind,
 } from "./claim-check.js";
 import {
@@ -272,6 +273,12 @@ import {
   type PromiseGrounds,
 } from "./promise-check.js";
 import { toolLoopBudget } from "./tool-loop-budget.js";
+export {
+  claimCorpus,
+  groundText,
+  type ClaimKind,
+  type GroundedText,
+} from "./claim-check.js";
 export {
   ACTION_CLAIM_KINDS,
   actionClaims,
@@ -8701,6 +8708,10 @@ export function createModelGatewayQAnswer(
         ...workNote,
         CONVERSATION_FINDINGS_NOTE,
       ]);
+      // Step 10: the task message's template is instructions too; only
+      // the values rendered into it are sources (templateValues).
+      const taskTemplate =
+        registry.getActive("COMPANY_ANALYST").definition.template;
       claimSources = () => [
         ...facts.map((fact) => fact.statement),
         latest.content,
@@ -8709,7 +8720,11 @@ export function createModelGatewayQAnswer(
         ...earlier.map((message) => message.content),
         ...messages
           .filter((message) => !instructionMessages.has(message))
-          .map((message) => message.content),
+          .map((message) =>
+            rendered.messages.includes(message)
+              ? templateValues(message.content, taskTemplate)
+              : message.content,
+          ),
         ...(leadLines === undefined ? [] : [leadLines]),
         ...(earlyLead === null ? [] : [earlyLead]),
         ...(compareVerdict === null ? [] : [JSON.stringify(compareVerdict)]),

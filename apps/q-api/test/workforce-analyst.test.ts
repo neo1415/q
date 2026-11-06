@@ -154,6 +154,48 @@ const DOSSIER: ResearchDossier = {
       url: MAJI_PAGES[1]?.url ?? "",
       publishedAt: "2024-06-01",
     },
+    // Step 10: the facts on the pages the revision cites, admitted as the
+    // deep research admits them (their numbers are on their page). The
+    // filed document's cited figures must be among what the writer got.
+    ...[
+      {
+        id: "F2",
+        statement:
+          "Around 4.1 million urban households in Kenya buy water from kiosks or vendors, paying KES 3 to KES 5 per 20 litres.",
+        figure: "4.1 million households",
+        page: 0,
+        lane: "MARKET_SIZE" as const,
+      },
+      {
+        id: "F3",
+        statement:
+          "The Kenyan water vending market grew 7% a year since 2019, with around 12,000 registered water kiosks.",
+        figure: "7% a year",
+        page: 1,
+        lane: "MARKET_SIZE" as const,
+      },
+      {
+        id: "F4",
+        statement:
+          "Majik Water and Grundfos Lifelink operate water ATMs selling 20 litres for KES 5 in Nairobi settlements; household borehole connections cost KES 25,000.",
+        figure: "KES 5 per 20 litres",
+        page: 2,
+        lane: "MARKET_SIZE" as const,
+      },
+    ].map((fact) => ({
+      id: fact.id,
+      statement: fact.statement,
+      figure: fact.figure,
+      asOf: "2024",
+      source: fact.page + 1,
+      lane: fact.lane,
+      kind: "FIGURE" as const,
+      domain: new URL(MAJI_PAGES[fact.page]?.url ?? "https://x.example")
+        .hostname,
+      title: MAJI_PAGES[fact.page]?.title ?? null,
+      url: MAJI_PAGES[fact.page]?.url ?? "",
+      publishedAt: "2024-06-01",
+    })),
   ],
   lanes: [
     {

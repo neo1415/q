@@ -667,3 +667,67 @@ describe("the reviewer on a path's own reply, and learning from approvals", () =
     expect(personal?.text).toContain("They rewrote it warmer.");
   });
 });
+
+describe("Q Intelligence step 10: a job's reply states nothing its material does not hold", () => {
+  it("removes an invented figure and name before the reviewer, the record and the send", async () => {
+    const calls: Call[] = [];
+    const store = createInMemoryWorkforceStore();
+    const models = createWorkforceModels({ gateway: scriptedGateway(calls) });
+    const { ports, record } = world();
+    const writer: WorkforcePorts = {
+      ...ports,
+      // Only Ada's conversation, so one reply is written.
+      openConversations: () =>
+        Promise.resolve([
+          conversation(
+            "r-ada",
+            "Ada Obi",
+            "Thanks for reaching out! Happy to share more.",
+          ),
+        ]),
+      writeReply: () =>
+        Promise.resolve(
+          "Hi Ada, thank you for coming back to us. We closed $2.5M from Lagos Angel Partners last month. I'll share the deck with you today.",
+        ),
+    };
+    const jobs = createWorkforceJobs({
+      store,
+      models,
+      review: createOutwardReview({ models, store }),
+      ports: writer,
+    });
+    const started = await jobs.start(OWNER, {
+      goal: "Express interest in every company matching my mandate, reply warmly to replies, book calls.",
+      permitted: [
+        "search_companies",
+        "relationship.interest.express",
+        "list_messages",
+        "chat.message.send",
+        "find_meeting_times",
+        "schedule.meeting.book",
+      ],
+      budgetUsd: 1,
+      source: { kind: "INSTRUCTION", id: "instruction-grounded" },
+    });
+    if (started.outcome !== "STARTED") throw new Error(started.outcome);
+    const clean =
+      "Hi Ada, thank you for coming back to us. I'll share the deck with you today.";
+    expect(record.sent).toEqual([{ relationshipId: "r-ada", body: clean }]);
+    // The reviewer graded the grounded draft, never the invented one.
+    const reviewed = calls
+      .filter((call) => call.task === "DRAFT_REVIEW")
+      .map((call) => call.prompt);
+    expect(reviewed.length).toBeGreaterThan(0);
+    for (const prompt of reviewed) {
+      expect(prompt).not.toContain("$2.5M");
+      expect(prompt).not.toContain("Lagos Angel Partners");
+      // ...and graded it against the conversation's own material.
+      expect(prompt).toContain("seed fintech in Lagos");
+    }
+    // Nothing invented was recorded on the workforce page either.
+    for (const draft of store.rows.drafts) {
+      expect(draft.body).not.toContain("$2.5M");
+      expect(draft.body).not.toContain("Lagos Angel Partners");
+    }
+  });
+});

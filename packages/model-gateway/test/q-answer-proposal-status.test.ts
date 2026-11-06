@@ -289,6 +289,33 @@ function build(
   return { seam, request, alpha, executed, stored };
 }
 
+/**
+ * Step 10: what a reply's figures rest on. These replies were "sourced"
+ * by arithmetic on numbers in the answer prompt's own instructions, which
+ * the claim check no longer counts; the fixture now holds the facts.
+ */
+function sourced(
+  statement: string,
+): Partial<Parameters<typeof createModelGatewayQAnswer>[0]> {
+  return {
+    context: {
+      assemble: () =>
+        Promise.resolve({
+          facts: [
+            {
+              scope: "COMPANY_PROFILE",
+              statement,
+              truthClass: "VERIFIED",
+              evidenceStatus: "PLATFORM_VERIFIED",
+              source: "Capital Q relationship history",
+            },
+          ],
+          subjectDescription: "their relationships",
+        }),
+    },
+  };
+}
+
 const CLAIM = "The reminder has been saved.";
 const ANSWER = {
   answer: `${CLAIM} Anything else for today?`,
@@ -368,7 +395,12 @@ describe("a reply about a change's status says the engine's status", () => {
         ],
       },
       [],
-      { said: "Show my pipeline" },
+      {
+        said: "Show my pipeline",
+        deps: sourced(
+          "Pipeline, last 30 days: 10 interests expressed; 9 connections.",
+        ),
+      },
     );
     await seam.answer({ ...request, turnKind: "TOOL_REQUEST" });
     const reply = stored.at(-1) ?? "";
@@ -450,6 +482,7 @@ describe("a reply about a change's status says the engine's status", () => {
       undefined,
       { proposalStatus: false },
       [{ id: PROPOSAL, status: "PENDING" }],
+      { deps: sourced("Kora: connected on 25 September 2026.") },
     );
     await seam.answer(request);
     expect(stored.at(-1)).toBe("You connected with Kora on 25 September.");

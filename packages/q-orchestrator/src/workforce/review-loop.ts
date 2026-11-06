@@ -192,6 +192,14 @@ export type ReviewLoopPorts = {
    * to their latest message. Any one fails the draft, whatever it scores.
    */
   readonly consistency?: ((body: string) => readonly string[]) | undefined;
+  /**
+   * Q Intelligence Plan, step 10: code's claim check, run on the first
+   * draft and on every redraft before the reviewer reads it. It returns
+   * the draft with every figure and name the material does not hold taken
+   * out, or null when nothing honest is left (held as INTEGRITY). What is
+   * graded, recorded and sent is always the grounded text.
+   */
+  readonly ground?: ((body: string) => string | null) | undefined;
   /** Code found something open in their latest message (RESPONDS_TO_THREAD). */
   readonly threadRule?: boolean | undefined;
   /**
@@ -268,7 +276,32 @@ export async function writeWithReview(
   ports: ReviewLoopPorts,
   policy: ReviewPolicy = DEFAULT_REVIEW_POLICY,
 ): Promise<ReviewOutcome> {
-  let body = first;
+  const grounded = (draft: string): string | null => {
+    if (ports.ground === undefined) return draft;
+    const kept = ports.ground(draft);
+    return kept === null || kept.trim() === "" ? null : kept;
+  };
+  const firstGrounded = grounded(first);
+  if (firstGrounded === null) {
+    // Recorded, so the person sees on the workforce page what was held.
+    const draftId: string | null = ports.onDraft
+      ? await quietly(
+          () =>
+            ports.onDraft?.({ attempt: 1, body: first, parentDraftId: null }) ??
+            Promise.resolve(null),
+          null,
+        )
+      : null;
+    return {
+      verdict: "HELD",
+      reason: "INTEGRITY",
+      body: first,
+      draftId,
+      grade: null,
+      attempts: 1,
+    };
+  }
+  let body = firstGrounded;
   let parent: string | null = null;
   let last: Grade | null = null;
   // The best draft code had nothing against (no thread problem, no failed
@@ -409,9 +442,23 @@ export async function writeWithReview(
         .catch(() => null);
       if (fixed !== null && fixed.trim() !== "") {
         next = fixed;
-        found = codeProblems(next);
       }
     }
+    // Step 10: code's claim check, then code's own checks once more on
+    // what the reviewer would read.
+    const groundedNext = grounded(next);
+    if (groundedNext === null) {
+      return held({
+        verdict: "HELD",
+        reason: "INTEGRITY",
+        body: next,
+        draftId,
+        grade,
+        attempts: attempt + 1,
+      });
+    }
+    next = groundedNext;
+    found = codeProblems(next);
     if (found.length > 0) {
       const threadOnly = (ports.recheck?.(next) ?? null) === null;
       return held({

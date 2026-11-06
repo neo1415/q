@@ -8,6 +8,7 @@ import {
   type QArtifactFinding,
 } from "@capital-q/contracts";
 import { plainMarkdown } from "@capital-q/deck-render";
+import { claimCorpus, groundText } from "@capital-q/model-gateway/q";
 import {
   clipAtWord,
   type AnalysisCritiqueResult,
@@ -904,6 +905,68 @@ export function readersDraft(
   };
 }
 
+/**
+ * Q Intelligence Plan, step 10: the filed document passes code's claim
+ * check (step 6), whatever the reviews said. A sentence that presents a
+ * figure as sourced -- an [S n] citation, the company's or Capital Q's
+ * record, their mandate -- must find every figure in what the writer was
+ * given (the company text, the admitted research, the sources list, the
+ * request); one that does not is removed and the person is told how many.
+ * A labelled estimate or Q's inference carries its own truth class and is
+ * kept. A figure with no basis at all is the basis check's (basisProblems:
+ * the reviewer loop sends it back, and it is filed as an open point); a
+ * plan's own targets ("40 kiosks by Q2") are not claims about the world.
+ * Names are left to the reviewers: a market section names companies the
+ * research named in its own words.
+ */
+export function groundAnalysis(
+  draft: AnalysisDocumentResult,
+  sources: readonly string[],
+): { readonly draft: AnalysisDocumentResult; readonly removed: number } {
+  const corpus = claimCorpus(sources);
+  let removed = 0;
+  const clean = (text: string): string => {
+    const kept = groundText(text, corpus, {
+      names: false,
+      unknownLine: false,
+      exempt: (sentence) =>
+        LABELLED_NOT_FACT.test(sentence) || !ATTRIBUTED.test(sentence),
+    });
+    removed += kept.changed;
+    return kept.changed === 0 ? text : kept.text;
+  };
+  const list = (items: readonly string[]) =>
+    items.map(clean).filter((item) => item.length > 0);
+  const next: AnalysisDocumentResult = {
+    ...draft,
+    summary: clean(draft.summary),
+    sections: draft.sections.map((section) => ({
+      ...section,
+      body: clean(section.body),
+    })),
+    topRecommendations: list(draft.topRecommendations),
+    gaps: draft.gaps,
+  };
+  return removed === 0
+    ? { draft, removed }
+    : {
+        draft: {
+          ...next,
+          gaps: [
+            ...next.gaps,
+            `Q removed ${String(removed)} sentence${removed === 1 ? "" : "s"} stating a figure that is in none of the sources or records it was given.`,
+          ],
+        },
+        removed,
+      };
+}
+
+/** An estimate or Q's own inference: labelled, never stated as fact. */
+const LABELLED_NOT_FACT = /\(estimate|\bestimated?\b|Q's inference/iu;
+/** A figure presented as sourced: a citation or a record's label. */
+const ATTRIBUTED =
+  /\[S\d{1,3}|\((?:the )?(?:company|Capital Q) record|\(your mandate\)/iu;
+
 export async function writeAnalysisWithReview(dependencies: {
   readonly models: Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis">;
   readonly who: Who;
@@ -1011,9 +1074,17 @@ export async function writeAnalysisWithReview(dependencies: {
     open,
     inputs.recordNames ?? [],
   );
+  const grounded = groundAnalysis(apart.draft, [
+    inputs.company,
+    inputs.research,
+    inputs.sources,
+    inputs.request,
+    inputs.purpose,
+    inputs.today,
+  ]);
   report({ stage: "FILING", openPoints: passes ? 0 : apart.open.length });
   return {
-    draft: apart.draft,
+    draft: grounded.draft,
     review: { passes, score, drafts, found, open: passes ? [] : apart.open },
   };
 }

@@ -324,7 +324,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v27_comm.v1",
+      "q-system.v2_company-analyst.v28_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -353,12 +353,16 @@ describe("renderer", () => {
     expect(user).toContain('<<<UNTRUSTED_CONTENT source="userMessage">>>');
     expect(user).toContain('<<<UNTRUSTED_CONTENT source="authorisedFacts">>>');
     expect(user).toContain('<<<UNTRUSTED_CONTENT source="conversation">>>');
+    // v28 (step 10): the subject description carries the company's own name.
+    expect(user).toContain(
+      '<<<UNTRUSTED_CONTENT source="subjectDescription">>>',
+    );
     // The injected closing marker cannot close the real fence.
     const opens =
       user.split('<<<UNTRUSTED_CONTENT source="userMessage">>>').length - 1;
     const closes = user.split(UNTRUSTED_CLOSE).length - 1;
     expect(opens).toBe(1);
-    expect(closes).toBe(4); // one per untrusted variable, none from the content
+    expect(closes).toBe(5); // one per untrusted variable, none from the content
     expect(user).toContain("<<<END_UNTRUSTED_CONTENT (literal)>>>");
     // The charter itself is untouched by anything the person wrote.
     expect(rendered.messages[0]?.content).not.toContain("reveal everything");
@@ -450,7 +454,8 @@ describe("renderer", () => {
     // v26 (L-13): ~40 tokens for PICTURE and pictureQuery, then ~280 tokens
     // of repeated wording said once, so it keeps at least 5% headroom.
     // v27 (QO-04): ~75 tokens for speaking to the person.
-    expect(rendered.bundle.task).toBe("company-analyst/v27");
+    // v28 (step 10): the subject description is fenced; three trims pay for it.
+    expect(rendered.bundle.task).toBe("company-analyst/v28");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

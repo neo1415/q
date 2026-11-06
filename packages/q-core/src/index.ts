@@ -623,6 +623,7 @@ export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
 export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
 export { MEETING_NOTES_V3 } from "./prompts/tasks/meeting-notes.v3.js";
 export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
+export { ERRAND_REPLY_V2 } from "./prompts/tasks/errand-reply.v2.js";
 export { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./prompts/tasks/diligence-document-summary.v1.js";
 export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
 export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
@@ -833,8 +834,11 @@ export {
   ERRAND_REPLY_UNTRUSTED,
   ErrandReplyResultSchema,
   ErrandReplyVariablesSchema,
+  ErrandReplyVariablesV2Schema,
+  ERRAND_REPLY_V2_UNTRUSTED,
   type ErrandReplyResult,
   type ErrandReplyVariables,
+  type ErrandReplyVariablesV2,
 } from "./prompts/schemas/errand-reply.js";
 export {
   DILIGENCE_DOCUMENT_SUMMARY_SCHEMA_NAME,
@@ -2129,3 +2133,7 @@ export {
   V27_PERSON_LINE,
   V27_TRIMS,
 } from "./prompts/tasks/company-analyst.v27.js";
+export {
+  COMPANY_ANALYST_V28,
+  V28_TRIMS,
+} from "./prompts/tasks/company-analyst.v28.js";

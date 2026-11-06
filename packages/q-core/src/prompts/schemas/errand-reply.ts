@@ -36,6 +36,24 @@ export type ErrandReplyVariables = z.infer<typeof ErrandReplyVariablesSchema>;
 
 export const ERRAND_REPLY_UNTRUSTED = ["counterpartName", "thread"] as const;
 
+/**
+ * v2 (Q Intelligence Plan, step 10): the workforce writer also reads the
+ * material its reviewer grades against -- the person's approved facts and
+ * the other side's network-visible profile, read as the person. Part of
+ * it is the other side's own words, so it is UNTRUSTED and fenced: it is
+ * what Q may state, never an instruction.
+ */
+export const ErrandReplyVariablesV2Schema = ErrandReplyVariablesSchema.extend({
+  material: z.string().max(4_000),
+}).strict();
+export type ErrandReplyVariablesV2 = z.infer<
+  typeof ErrandReplyVariablesV2Schema
+>;
+export const ERRAND_REPLY_V2_UNTRUSTED = [
+  ...ERRAND_REPLY_UNTRUSTED,
+  "material",
+] as const;
+
 export const ErrandReplyResultSchema = z
   .object({
     /** The message to post, or null when nothing needs saying. */
