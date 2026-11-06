@@ -10,10 +10,7 @@ import {
   isModelGatewayError,
   type ModelGateway,
 } from "@capital-q/model-gateway";
-import type {
-  QMemoryRecall,
-  QMemoryRecalled,
-} from "@capital-q/model-gateway/q";
+import type { QMemoryRecall } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -26,7 +23,7 @@ import {
   type PromptRegistry,
 } from "@capital-q/q-core";
 import {
-  planAdmitsOwnMemory,
+  createMemoryRecall,
   renderMemoryBundle,
   type MemoryCandidate,
   type MemoryConversationDigestPort,
@@ -265,32 +262,10 @@ export function createMemoryLearner(
     dependencies;
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
 
-  const recall: QMemoryRecall = {
-    recall: async (input) => {
-      const companyIds = input.subjects.flatMap((s: QSubjectRef) =>
-        s.kind === "COMPANY" ? [s.companyId] : [],
-      );
-      const bundle = await memory.recall({
-        actor: input.actor,
-        conversationId: input.conversationId,
-        companyIds,
-        utterance: input.utterance,
-        earlierWords: input.earlierWords,
-        // Authorisation before retrieval: their own past turns are searched
-        // only when the run's plan admits their own conversations.
-        ownConversationsAdmitted:
-          input.plan !== undefined &&
-          planAdmitsOwnMemory(input.plan, input.actor),
-      });
-      const recalled: QMemoryRecalled = {
-        text: renderMemoryBundle(bundle),
-        ownWords: (bundle.pastTurns ?? [])
-          .filter((turn) => turn.role === "USER")
-          .map((turn) => turn.content),
-      };
-      return recalled;
-    },
-  };
+  // Step 9: one composition of recall (q-knowledge), with the person's own
+  // past turns searched only when the run's plan admits their own
+  // conversations.
+  const recall: QMemoryRecall = createMemoryRecall(memory);
 
   async function extract(
     actor: ActorContext,

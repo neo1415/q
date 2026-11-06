@@ -583,12 +583,14 @@ import {
   createPostgresKnowledgeRepository,
   createPostgresMemoryRepository,
   createPostgresPreferenceLearningConsent,
+  communicationLanguageFromMemory,
 } from "@capital-q/q-knowledge";
 import {
   AuthUserIdSchema,
   OrganisationIdSchema,
   TenantIdSchema,
   createAuthorizationService,
+  ActorContextSchema,
   type ActorContext,
 } from "@capital-q/security";
 import {
@@ -5051,14 +5053,25 @@ const qIntelligence = composeQIntelligence({
     });
   },
   // Multilingual Q: the language they chose, as the words Q is told.
+  // Step 9: where they chose none (AUTO), a language they asked Q to use
+  // in conversation, kept in their memory (stated, or learned with their
+  // consent), applies.
   languageOf: ({ tenantId, userId }) =>
-    standingStore
-      .read(userId, tenantId, new Date())
-      .then((standing) =>
-        standing.language === "AUTO"
-          ? null
-          : writtenLanguageNote(standing.language),
-      ),
+    standingStore.read(userId, tenantId, new Date()).then(async (standing) => {
+      if (standing.language !== "AUTO") {
+        return writtenLanguageNote(standing.language);
+      }
+      const actor = ActorContextSchema.safeParse({
+        userId,
+        tenantId,
+        actorType: "HUMAN",
+      });
+      if (!actor.success) return null;
+      const items = await memoryService.list(actor.data).catch(() => []);
+      return writtenLanguageNote(
+        communicationLanguageFromMemory(items, { conversationId: null }),
+      );
+    }),
   // Their own name and company, from their own record in their own
   // tenant: what they would be annoyed to be asked.
   // Their day (founder demo 2026-10-02): their own finished rehearsals and

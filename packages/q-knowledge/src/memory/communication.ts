@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import {
+  canonicalLanguageTag,
   QCommunicationProfileSchema,
+  QLanguageCodeSchema,
+  type QLanguageCode,
   type PermittedContextPlan,
   type QCommunicationProfile,
 } from "@capital-q/contracts";
@@ -43,10 +46,30 @@ export const COMMUNICATION_ASPECTS = [
 ] as const;
 export type CommunicationAspect = (typeof COMMUNICATION_ASPECTS)[number];
 
+/**
+ * Step 9: the language they want Q to use with them is a communication
+ * aspect too, kept the same way (`preference.communication.language`, or a
+ * session one): stated by them (note_preference, consent by statement) or
+ * learned only with their consent (the learner's PREFERENCE gate). Its
+ * value is a canonical BCP 47 tag (the Settings vocabulary), never prose.
+ * Their choice in Settings outranks it: this applies only where they
+ * chose none there (AUTO).
+ */
+export const LANGUAGE_ASPECT = "language" as const;
+export type PreferenceAspect = CommunicationAspect | typeof LANGUAGE_ASPECT;
+
+/** A language value as kept: its canonical tag, or null when it is not one. */
+export function languagePreferenceValue(value: string): QLanguageCode | null {
+  const tag = canonicalLanguageTag(value.trim());
+  if (tag === null) return null;
+  const parsed = QLanguageCodeSchema.safeParse(tag);
+  return parsed.success ? parsed.data : null;
+}
+
 export const PREFERENCE_PERSISTENCES = ["SESSION", "LONG_TERM"] as const;
 export type PreferencePersistence = (typeof PREFERENCE_PERSISTENCES)[number];
 
-const snake = (aspect: CommunicationAspect): string =>
+const snake = (aspect: PreferenceAspect): string =>
   aspect.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 
 const LONG_TERM_PREFIX = "preference.communication.";
@@ -54,7 +77,7 @@ const SESSION_PREFIX = "preference.session.";
 
 /** The memory key a preference is kept under. Deterministic, closed. */
 export function communicationPreferenceKey(
-  aspect: CommunicationAspect,
+  aspect: PreferenceAspect,
   persistence: PreferencePersistence,
   conversationId: string | null,
 ): string {
@@ -130,6 +153,46 @@ export function communicationProfileFromMemory(
   return QCommunicationProfileSchema.parse(profile);
 }
 
+/**
+ * The language they asked Q to use, from memory: long-term, then this
+ * conversation's session preference, the newest of each winning, as the
+ * profile. Null: none kept (or none valid).
+ */
+export function communicationLanguageFromMemory(
+  items: readonly MemoryItem[],
+  options: { readonly conversationId: string | null },
+): QLanguageCode | null {
+  const live = items.filter(
+    (item) =>
+      (item.status === "active" || item.status === "confirmed") &&
+      item.validTo === null &&
+      item.memoryType === "preference" &&
+      typeof item.structuredValue[LANGUAGE_ASPECT] === "string",
+  );
+  const byTime = (a: MemoryItem, b: MemoryItem) =>
+    a.validFrom.localeCompare(b.validFrom) || a.id.localeCompare(b.id);
+  const ordered = [
+    ...live
+      .filter((item) => item.memoryKey.startsWith(LONG_TERM_PREFIX))
+      .sort(byTime),
+    ...live
+      .filter(
+        (item) =>
+          item.memoryKey.startsWith(SESSION_PREFIX) &&
+          !belongsToAnotherSession(item, options.conversationId),
+      )
+      .sort(byTime),
+  ];
+  let language: QLanguageCode | null = null;
+  for (const item of ordered) {
+    const value = item.structuredValue[LANGUAGE_ASPECT];
+    const tag =
+      typeof value === "string" ? languagePreferenceValue(value) : null;
+    if (tag !== null) language = tag;
+  }
+  return language;
+}
+
 /** The recall bundle without other conversations' session preferences. */
 function forConversation(
   bundle: MemoryBundle,
@@ -160,6 +223,8 @@ export type LoopMemory = {
   /** Rendered recall, UNTRUSTED: for the prompt's memory variable. */
   readonly memory: string;
   readonly profile: QCommunicationProfile;
+  /** Step 9: the language they asked Q to use, from memory; null: none. */
+  readonly language: QLanguageCode | null;
 };
 
 export type LoopMemoryReader = {
@@ -195,7 +260,11 @@ export function createLoopMemoryReader(options: {
   return {
     read: async ({ actor, plan, sessionKey, conversationId, companyIds }) => {
       if (!planAdmitsOwnMemory(plan, actor)) {
-        return { memory: NOTHING_RECALLED, profile: { ...base } };
+        return {
+          memory: NOTHING_RECALLED,
+          profile: { ...base },
+          language: null,
+        };
       }
       try {
         const bundle = forConversation(
@@ -214,9 +283,16 @@ export function createLoopMemoryReader(options: {
             conversationId: sessionKey,
             base,
           }),
+          language: communicationLanguageFromMemory(bundle.person, {
+            conversationId: sessionKey,
+          }),
         };
       } catch {
-        return { memory: NOTHING_RECALLED, profile: { ...base } };
+        return {
+          memory: NOTHING_RECALLED,
+          profile: { ...base },
+          language: null,
+        };
       }
     },
   };

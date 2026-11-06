@@ -3,6 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import { actionClaims } from "@capital-q/model-gateway/q";
 import {
+  inferredPresentedAsStated,
+  PAST_TURNS_LABEL,
+} from "@capital-q/q-knowledge";
+import {
   createRequestDatabaseClient,
   type RequestDatabase,
 } from "@capital-q/database";
@@ -65,7 +69,13 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
         : Q_IQ_CATEGORIES.length,
     );
     const statesBefore = await stateCount();
-    const q = await createQIqWorldSubject({ db, providerMode: "FAKE" });
+    // CQ_Q_IQ_MEMORY=0: without step 9's recall, for a before/after.
+    const memory = process.env["CQ_Q_IQ_MEMORY"] !== "0";
+    const q = await createQIqWorldSubject({
+      db,
+      providerMode: "FAKE",
+      memory,
+    });
     try {
       const result = await runQIq(q.subject, cases);
       for (const run of result.cases) {
@@ -111,6 +121,38 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
         ),
       );
       expect(result.summary.overall.score).toBe(1);
+      // Step 9: a case with earlier conversations was answered with the
+      // person's own past turns recalled into the prompt.
+      if (memory && cases.some((c) => c.priorConversations.length > 0)) {
+        const recalled = q
+          .world()
+          .recorder.calls()
+          .some((c) =>
+            // Up to its first quote: the label JSON-escapes its quotes.
+            JSON.stringify(c).includes(PAST_TURNS_LABEL.split('"')[0] ?? ""),
+          );
+        expect(recalled).toBe(true);
+      }
+      // Step 9: no inferred memory is presented as stated, in any reply or
+      // in the memory the prompts carried (deterministic).
+      const items = await db.sql<
+        { write_mode: string; content: string; quote: string | null }[]
+      >`select write_mode, content, quote from q_knowledge.memory_items
+         where owner_context_id = ${q.world().people.INVESTOR.actor.userId}`;
+      const memories = items.map((row) => ({
+        writeMode: row.write_mode as never,
+        content: row.content,
+        quote: row.quote,
+      }));
+      for (const text of [
+        ...replies,
+        ...q
+          .world()
+          .recorder.calls()
+          .map((c) => c.systemText),
+      ]) {
+        expect(inferredPresentedAsStated(text, memories)).toEqual([]);
+      }
       // The facts reached the model: the answer prompt carries them.
       const prompts = q
         .world()
