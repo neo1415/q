@@ -274,6 +274,7 @@ import {
 } from "./promise-check.js";
 import { toolLoopBudget } from "./tool-loop-budget.js";
 export {
+  checkAnswer,
   claimCorpus,
   groundText,
   type ClaimKind,

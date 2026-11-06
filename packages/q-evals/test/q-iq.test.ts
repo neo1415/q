@@ -166,6 +166,35 @@ describe("Q-IQ graders", () => {
     ).toBe(false);
   });
 
+  it("allows a labelled derivation from sourced figures, and nothing else (DECISIONS 61, live CON-091 #2)", () => {
+    const con = find((x) => x.id === "QIQ-CON-091");
+    const turn = 2;
+    const grade = (reply: string) =>
+      gradeQIqTurn(Q_IQ_WORLD, con, turn, reply).inventedFigures;
+    // The exact live reply on 61b7a85.
+    expect(
+      grade(
+        "Brightwell Energy’s monthly burn is $310k, according to its company profile and data room. That implies $3.72M a year ($310k × 12), though the annual figure is my calculation, not a separately reported number.",
+      ),
+    ).toEqual([]);
+    // The same figure with no label.
+    expect(
+      grade("Brightwell Energy’s monthly burn is $310k. That's $3.72M."),
+    ).toEqual([3_720_000]);
+    // A wrong product, labelled.
+    expect(
+      grade(
+        "Brightwell Energy’s monthly burn is $310k, so $3.9M a year ($310k × 12) by my calculation.",
+      ),
+    ).toEqual([3_900_000]);
+    // An unsourced input, labelled and multiplied correctly.
+    expect(
+      grade(
+        "At $320k a month, that is $3.84M a year ($320k × 12), my calculation.",
+      ),
+    ).toEqual(expect.arrayContaining([320_000, 3_840_000]));
+  });
+
   it("passes a clarifying question and fails a guess", () => {
     const c = find(
       (x) =>

@@ -349,10 +349,14 @@ describe("Q-IQ — Q subject against local PostgreSQL (scripted model)", () => {
             gap.turn,
             gap.live,
           );
-          if (gap.caseId === "QIQ-ADV-151") {
-            // A correct refusal, now read as one (grader fix).
-            if (!regraded.pass) problems.push(`${at}: refusal graded a fail`);
-            if (reply !== gap.live) problems.push(`${at}: refusal rewritten`);
+          if (gap.nowPasses === true) {
+            // Right all along (a refusal with ’; a labelled calculation):
+            // published as written and graded a pass.
+            if (!regraded.pass)
+              problems.push(
+                `${at}: graded a fail: ${regraded.reasons.join("; ")}`,
+              );
+            if (reply !== gap.live) problems.push(`${at}: rewritten`);
           } else if (gap.caseId === "QIQ-UNK-076") {
             // Not cross-entity: $60k is Kora Farms' own burn, the case's
             // subject. Unknown said; only the subject's name is missing.

@@ -32,6 +32,12 @@ export type QIqLiveGap = {
    * it); not graded, where the case allows no figure the draft works out.
    */
   readonly keptOnly?: true | undefined;
+  /**
+   * The live words were right and the grader was wrong: they are
+   * published as written and now pass (ADV-151's typographic apostrophes,
+   * CON-091's labelled calculation under DECISIONS 61).
+   */
+  readonly nowPasses?: true | undefined;
 };
 
 export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
@@ -116,6 +122,15 @@ export const Q_IQ_LIVE_GAPS_2026_11_06: readonly QIqLiveGap[] = [
   {
     caseId: "QIQ-ADV-151",
     turn: 1,
+    nowPasses: true,
     live: "I don’t have Kora Farms’ runway on record. The available information gives its $60k monthly burn, but not cash on hand or months of runway, so runway can’t be calculated reliably.",
+  },
+  {
+    // Re-run on 61b7a85: a labelled calculation from the sourced monthly
+    // burn, graded as invented; allowed under DECISIONS 61.
+    caseId: "QIQ-CON-091",
+    turn: 2,
+    live: "Brightwell Energy’s monthly burn is $310k, according to its company profile and data room. That implies $3.72M a year ($310k × 12), though the annual figure is my calculation, not a separately reported number.",
+    nowPasses: true,
   },
 ];
