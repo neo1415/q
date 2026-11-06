@@ -1,6 +1,6 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 6 November 2026, 02:05 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 6 November 2026, 02:55 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
 Production: all four services on `f08525117` (steps 2–5, 7, 8 + compound fixes). Hosted migrations 273 = local 273. Rollback: `605c76e59`.
 
