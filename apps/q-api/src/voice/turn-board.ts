@@ -55,8 +55,22 @@ export function createVoiceTurnBoard(
       // The conversation, once known, stays known: a later turn that does
       // not name it (a navigation, a hand-off) does not lose it.
       const conversationId = state.conversationId ?? before?.conversationId;
+      // W3: a move's target belongs to its own `navigate`. A state built
+      // by spreading the last one keeps the old target; when the
+      // destination changed that target is not this page's, so it goes
+      // (a section of Capital never lands on Discover).
+      const { navigateTarget, ...rest } = state;
+      const staleTarget =
+        navigateTarget !== undefined &&
+        navigateTarget === before?.navigateTarget &&
+        state.navigate !== before.navigate;
       const next: QVoiceTurnState = {
-        ...state,
+        ...rest,
+        ...(navigateTarget === undefined ||
+        staleTarget ||
+        state.navigate === null
+          ? {}
+          : { navigateTarget }),
         ...(conversationId === undefined ? {} : { conversationId }),
         sequence: previous + 1,
       };
