@@ -221,6 +221,13 @@ export type ElevenLabsSpeechRelayOptions = ElevenLabsSpeechOptions & {
   readonly timings?: VoiceTurnTimings | undefined;
   /** Aura-2, for an utterance ElevenLabs could not voice at all. */
   readonly aura?: DeepgramSpeakStream | undefined;
+  /**
+   * DECISIONS 68: the model for Q's own voice, asked per utterance; when it
+   * names one, Q speaks in it (with turbo v2.5 behind it) instead of
+   * `model`. Persona voices keep their own chain. Absent, or undefined
+   * from it: `model`, as ever.
+   */
+  readonly modelNow?: (() => ElevenLabsSpeechModel | undefined) | undefined;
   readonly now?: (() => number) | undefined;
 };
 
@@ -714,6 +721,18 @@ export function createElevenLabsSpeechRelay(
   const elevenLabsEngines: Engine[] = modelsFor(
     options.model ?? DEFAULT_MODEL,
   ).map((model) => engineFor(model, undefined));
+  /** Q's own voice in another model (`modelNow`), built once per model. */
+  const ownEnginesByModel = new Map<ElevenLabsSpeechModel, Engine[]>();
+  const ownEngines = (): Engine[] => {
+    const model = options.modelNow?.();
+    if (model === undefined) return elevenLabsEngines;
+    let engines = ownEnginesByModel.get(model);
+    if (engines === undefined) {
+      engines = modelsFor(model).map((one) => engineFor(one, undefined));
+      ownEnginesByModel.set(model, engines);
+    }
+    return engines;
+  };
   const auraStream = options.aura;
   const aura: Engine | undefined =
     auraStream === undefined
@@ -832,7 +851,7 @@ export function createElevenLabsSpeechRelay(
         ...(resting
           ? []
           : persona === undefined || speakerId === undefined
-            ? elevenLabsEngines
+            ? ownEngines()
             : personaModels(speakerId, cues).map((model) =>
                 engineFor(model, persona),
               )),

@@ -59,3 +59,42 @@ A trial person's LIVE-only binding "never authorises an unmetered fallback", acc
 - Full q-api vitest: 336 files passed and 1 skipped; 3129 tests passed and 3 skipped; exit 0.
 - Web voice and Q-home vitest (`voice-*`, `q-voice*`, `q-home*`): 39 files and 370 tests passed.
 - prettier: clean.
+
+## Addendum: the lead's decision B (`c75b1bc`)
+
+**Owner detail:** Q's voice on the fallback is `eleven_v4_turbo`, in Q's own Sarah (FEMALE, `EXAVITQu4vr4xnSDxMaL`) or Daniel (MALE, `onwK4e9ZLuTAKqWW03F9`), following the person's choice, and never a persona or story voice.
+
+**Decision B** (replacing the Speech-Engine-first choice above). While OpenAI's account is out:
+
+- **The line stays Deepgram's.** Deepgram listens, and Q's own turn path answers (`think.ts`, the Model Gateway, on Claude).
+- **q-api's ElevenLabs relay speaks** in Q's own voice on `eleven_v4_turbo`, with turbo v2.5 behind it per utterance and Aura-2 as the last resort.
+  - The relay asks for the model per utterance (`modelNow`), so recovery needs no restart.
+  - Persona voices keep their own chain.
+- **`Q_VOICE_TTS_MODEL` still wins when set** (config `ttsModelPinned`). The code default on this path is `eleven_v4_turbo`, with no Railway variable needed.
+- **Without Deepgram composed,** the ElevenLabs Speech Engine carries the line (the earlier path).
+- **Unchanged:** GPT-Live and duplex stay off, and trial people keep a voice (the lead's call under DECISIONS 68).
+
+**Tests:**
+
+- `voice-openai-out-speech.test.ts` (new): while out, the relay speaks `eleven_v4_turbo` in Sarah (FEMALE) and Daniel (MALE). Once OpenAI is back, it speaks the deployment's model again.
+- `voice-openai-exhausted.test.ts` (updated to B, 7 tests):
+  - while out, the line is Deepgram with no duplex mint and no Speech Engine;
+  - without Deepgram, it falls through to the Speech Engine;
+  - a trial person gets Deepgram;
+  - recovery brings back Deepgram plus duplex.
+- **Failing-first** against `f07bb32`: the relay test and 3 route tests failed. The watch tests, the fall-through and GPT-Live availability passed, because those already held there.
+
+### Follow-up, option A (not done)
+
+The Speech Engine's own TTS model is set on the ElevenLabs resource by `dev/voice-setup.ts`, and is currently `eleven_v3_conversational`. The repository's SDK (`@elevenlabs/elevenlabs-js` 2.68) types the Speech Engine's model as `TtsConversationalModel`, which does not list `eleven_v4_turbo`.
+
+Moving the Speech Engine to v4 turbo needs two things: a live admin check that ElevenLabs accepts it there (`pnpm voice:setup -- --dry-run`, then a real run), and an SDK version that types it. There is no SDK change now.
+
+### Gates at `c75b1bc` (exact results)
+
+- `pnpm exec turbo run build --filter=./packages/*`: exit 0.
+- Root tsc: exit 0.
+- q-api tsc: exit 0.
+- eslint on the 6 touched files: exit 0.
+- `vitest run apps/q-api packages/config`: 351 files passed and 1 skipped; 3279 tests passed and 3 skipped; exit 0.
+- prettier: clean.
