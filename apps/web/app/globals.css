@@ -5775,12 +5775,11 @@
 
 /*
  * Owner 2026-10-28: on a phone Q's page is a plain conversation, like
- * ChatGPT: the welcome, the way to talk and the composer. Q's large
- * presence, its particle field, the moving light and the animated corner
- * mark are for the wide screen. The Presence view is still a tap away.
+ * ChatGPT. The moving light and the animated corner mark are for the wide
+ * screen. Owner 2026-11-06: Q's room presence is the Q (voice) view's
+ * whole point, so it shows at every width; the Chat view never draws it.
  */
 @media (max-width: 1023px) {
-  .cq-q-home [data-q-room-presence],
   .cq-q-home [data-q-lumen],
   .cq-q-home [data-q-presence="corner"] {
     display: none;

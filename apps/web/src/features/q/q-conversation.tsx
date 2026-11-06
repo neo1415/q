@@ -30,6 +30,7 @@ import { QComposer } from "@capital-q/ui/q-composer";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
 import { noticeOf } from "@/features/q/control/q-control-runtime";
 import { onUiActReport } from "@/features/q/ui-act-controller";
@@ -54,6 +55,7 @@ import {
   takeAcceptedDeckOffer,
 } from "@/features/onboarding-conversation/deck-offer";
 
+import { QAperture, useStageApertureSize } from "../q-aperture";
 import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
 import {
@@ -631,12 +633,23 @@ export function QConversationPanel({
   // into the top line, small and still live, and comes back after.
   // Read through the store hook: the server has no storage, and the first
   // paint must match what it rendered.
+  // Owner 2026-11-06: Chat is the default view (the ChatGPT-style home);
+  // Q is the voice view. A stored choice still wins.
   const view = useSyncExternalStore(
     subscribeStageView,
     readStageView,
-    () => "presence" as const,
+    () => "chat" as const,
   );
-  const chooseView = writeStageView;
+  const voiceOn = voice.active;
+  // Leaving Q for Chat ends a live line the way End does (owner
+  // 2026-11-06, "like ChatGPT"): the words stay in the one thread.
+  const chooseView = useCallback(
+    (next: QStageView) => {
+      if (next === "chat" && voiceOn) end();
+      writeStageView(next);
+    },
+    [voiceOn, end],
+  );
   // Q intelligence step 1: questions asked here say the Q page and its
   // view; once it unmounts, Q is the dock again.
   useEffect(() => {
@@ -689,6 +702,13 @@ export function QConversationPanel({
   // Presence view is Q's presence only (founder request 2026-10-03): a
   // laid-out answer is shown over it (QPresenceStage), not as a thread.
   const bigPresence = view === "presence";
+  // The voice room (owner 2026-10-19, back 2026-11-06 as the Q view): the
+  // room-sized Q gathers into the stage's cloud whenever Q does anything.
+  const stagePixels = useStageApertureSize();
+  const roomGathered =
+    voice.active ||
+    q.working ||
+    (presence.state !== "IDLE" && presence.state !== "COMPLETE");
   const captions = useSyncExternalStore(
     subscribeCaptions,
     readCaptions,
@@ -1140,7 +1160,15 @@ export function QConversationPanel({
               }
             : {})}
           {...(connected && !voice.active
-            ? { onTalk: () => void talk(), talkLabel: "Talk to Q" }
+            ? {
+                // Owner 2026-11-06: starting voice changes the interface,
+                // like ChatGPT -- to the Q view, then the one talk().
+                onTalk: () => {
+                  chooseView("presence");
+                  void talk();
+                },
+                talkLabel: "Talk to Q",
+              }
             : {})}
           placeholder={voice.active ? "Type instead" : "Ask Q"}
           attachments={attached.attachments}
@@ -1363,15 +1391,45 @@ export function QConversationPanel({
                       spokenPreview={session.spokenPreview}
                       onBoardLanded={onBoardLanded}
                       onPin={boardMarks.pin}
-                      // Client 2026-11-05: no particle field on the Q home.
-                      // The voice view keeps its words: a dot and the state
-                      // ("Listening", "Speaking"), and the way to the thread.
+                      // Owner 2026-11-06: the Q view is the voice view, and
+                      // Q's presence is back on its stage (as before 5 Nov),
+                      // with the state ("Listening", "Speaking") under it.
                       presence={(compact, mini) =>
-                        mini === true ? null : (
+                        mini === true ? (
+                          <ViewTransition
+                            name="q-aperture"
+                            share="cq-q-morph"
+                            default="none"
+                          >
+                            <QAperture
+                              state={presence.state}
+                              size={44}
+                              inputLevel={client.inputLevel}
+                              outputLevel={client.outputLevel}
+                              showing={showingCards}
+                            />
+                          </ViewTransition>
+                        ) : (
                           <div
                             className="flex flex-col items-center gap-2 pt-2"
                             data-q-presence="stage"
                           >
+                            <div aria-hidden="true">
+                              <ViewTransition
+                                name="q-aperture"
+                                share="cq-q-morph"
+                                default="none"
+                              >
+                                <QAperture
+                                  state={presence.state}
+                                  size={compact ? 64 : 200}
+                                  inputLevel={client.inputLevel}
+                                  outputLevel={client.outputLevel}
+                                  stage
+                                  showing={compact || showingCards}
+                                />
+                              </ViewTransition>
+                            </div>
                             {stateLabel === null ? null : (
                               <span
                                 className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
@@ -1742,6 +1800,119 @@ export function QConversationPanel({
                 )}
                 {notices}
               </div>
+            ) : bigPresence ? (
+              // Owner 2026-11-06: the Q view is the voice view -- Q's room
+              // presence, centred, as before the 5 Nov ChatGPT change, with
+              // the state line and one clear way to start talking.
+              <div
+                className={cx(
+                  "cq-arrival mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6",
+                  // The arrival room: decision cards either side of Q.
+                  room.filled && "lg:max-w-6xl",
+                )}
+                data-q-voice-view
+              >
+                <ArrivalRoom>
+                  {room.filled ? (
+                    <div data-q-room-presence="filled" aria-hidden="true">
+                      <ViewTransition
+                        name="q-aperture"
+                        share="cq-q-morph"
+                        default="none"
+                      >
+                        <QAperture
+                          state={presence.state}
+                          size="stage"
+                          inputLevel={client.inputLevel}
+                          outputLevel={client.outputLevel}
+                          stage
+                        />
+                      </ViewTransition>
+                    </div>
+                  ) : (
+                    // With nothing beside Q, the room at rest is a large,
+                    // dim Q that gathers into the stage's cloud the moment
+                    // Q listens or works. Decorative: the state is words.
+                    <div
+                      ref={fitRoomPresence}
+                      className={cx(
+                        "cq-room-presence",
+                        roomGathered && "is-gathered",
+                      )}
+                      style={{
+                        ["--cq-room-box" as string]: `${String(stagePixels)}px`,
+                        ["--cq-room-gather" as string]: String(ROOM_GATHER),
+                      }}
+                      aria-hidden="true"
+                      data-q-room-presence={roomGathered ? "gathered" : "field"}
+                    >
+                      <ViewTransition
+                        name="q-aperture"
+                        share="cq-q-morph"
+                        default="none"
+                      >
+                        <QAperture
+                          state={presence.state}
+                          size={Math.round(stagePixels / ROOM_GATHER)}
+                          inputLevel={client.inputLevel}
+                          outputLevel={client.outputLevel}
+                          stage
+                          room={!roomGathered}
+                        />
+                      </ViewTransition>
+                    </div>
+                  )}
+                  <div className="flex min-h-6 flex-col items-center gap-2">
+                    {stateLabel === null ? null : (
+                      // A dot and a word ("Listening", "Speaking"), quiet.
+                      <span
+                        className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                        role="status"
+                        data-q-state-pill
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cx(
+                            "size-2 rounded-full bg-(--cq-accent)",
+                            voice.active && "motion-safe:animate-pulse",
+                          )}
+                        />
+                        {t(stateLabel)}
+                      </span>
+                    )}
+                    {/* Where Q is, one line, its height kept so the stage
+                        never moves as it changes. */}
+                    <StageLine current={presence.stage} reserve />
+                  </div>
+                </ArrivalRoom>
+                {/* The voice room's invitation: the same talk() as the
+                    composer's Q button -- one way in with two doors,
+                    never a second voice path. */}
+                {connected && !voice.active && !q.working && !q.loading ? (
+                  <button
+                    type="button"
+                    className="cq-room-talk"
+                    onClick={() => void talk()}
+                    data-q-control="talk"
+                  >
+                    <Mic
+                      aria-hidden="true"
+                      size={ICON_SIZE.compact}
+                      strokeWidth={ICON_STROKE}
+                    />
+                    {t("Talk to Q")}
+                  </button>
+                ) : null}
+                {/* "Hey Q" paused from its corner button: the way back. */}
+                {connected && !voice.active ? <WakeResume /> : null}
+                <RoomBelow className="max-w-(--cq-layout-narrow)" />
+                {q.loading ? (
+                  <p className="cq-body-sm text-(--cq-text-secondary)">
+                    {t("Opening your conversation…")}
+                  </p>
+                ) : null}
+                {notices}
+              </div>
             ) : (
               // Client 2026-11-05, "our Q screen should look like ChatGPT":
               // one greeting line, the composer in the middle, at most
@@ -1792,7 +1963,7 @@ export function QConversationPanel({
             {/* E1: the arrival's cards, rendered once whatever the branch,
                 so they outlive the welcome and stay while Q speaks. */}
             {stageLayer === undefined ||
-            !(conversing || voice.active) ? null : (
+            !(conversing || voice.active || bigPresence) ? null : (
               <StageModeProvider value={stageMode}>
                 {stageLayer}
               </StageModeProvider>
@@ -1804,7 +1975,7 @@ export function QConversationPanel({
               grows with what is typed, clear of the home indicator. The
               microphone is in the field; before the first word it is also
               the stage's own button. */}
-          {conversing || q.working ? (
+          {conversing || q.working || bigPresence ? (
             <div
               className="cq-q-controls flex flex-none flex-col items-center gap-2 px-3 pt-2 sm:px-8"
               data-q-voice-stage-controls
@@ -1820,7 +1991,9 @@ export function QConversationPanel({
                   </Button>
                 ) : null}
               </div>
-              {conversing ? composer : null}
+              {/* The Q view keeps the composer at its foot, with Mute and
+                  End while a line is open (the voice controls). */}
+              {conversing || bigPresence ? composer : null}
             </div>
           ) : null}
         </section>
@@ -1950,11 +2123,12 @@ function subscribeStageView(onChange: () => void): () => void {
 let stageViewInMemory: QStageView | null = null;
 
 function writeStageView(next: QStageView): void {
-  stageViewInMemory = next;
   try {
     localStorage.setItem(STAGE_VIEW_KEY, next);
+    stageViewInMemory = null;
   } catch {
     // Private mode: the choice lasts for this page only.
+    stageViewInMemory = next;
   }
   window.dispatchEvent(new Event(STAGE_VIEW_EVENT));
 }
@@ -1966,17 +2140,9 @@ function readStageView(): QStageView {
   } catch {
     // Storage unavailable: fall through to this page's own choice.
   }
-  // Owner 2026-10-28 (founder's direction): a phone opens like ChatGPT,
-  // the conversation itself; Q's presence view stays one tap away.
-  return stageViewInMemory ?? (phoneWidth() ? "chat" : "presence");
-}
-
-function phoneWidth(): boolean {
-  try {
-    return window.matchMedia("(max-width: 1023px)").matches;
-  } catch {
-    return false;
-  }
+  // Owner 2026-11-06 (extending 2026-10-28's phone rule to every width):
+  // everyone without a stored choice opens on Chat; Q is one tap away.
+  return stageViewInMemory ?? "chat";
 }
 
 /*
@@ -1986,6 +2152,29 @@ function phoneWidth(): boolean {
  * like the view itself.
  */
 const CAPTIONS_KEY = "cq.q.captions";
+/** The room's Q at rest is drawn this much larger than the stage's cloud. */
+const ROOM_GATHER = 0.64;
+
+/*
+ * Live 2026-10-29: the room's box is sized by the arrival's layout, which
+ * gives Q only the height the rest leaves (globals.css, .cq-arrival), so
+ * nothing is pushed under the composer. The canvas keeps its pixel size and
+ * is scaled to the box it got; scale never changes layout, so this cannot
+ * feed back into the size it reads.
+ */
+function fitRoomPresence(
+  node: HTMLDivElement | null,
+): (() => void) | undefined {
+  if (node === null || typeof ResizeObserver !== "function") return undefined;
+  const observer = new ResizeObserver(() => {
+    const { clientWidth, clientHeight } = node;
+    if (clientWidth === 0 || clientHeight === 0) return;
+    const fit = Math.min(1, clientHeight / clientWidth);
+    node.style.setProperty("--cq-room-fit", fit.toFixed(3));
+  });
+  observer.observe(node);
+  return () => observer.disconnect();
+}
 const CAPTIONS_EVENT = "cq:q-captions";
 let captionsInMemory: boolean | null = null;
 
