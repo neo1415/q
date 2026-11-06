@@ -266,6 +266,7 @@ describe("the conversation state, read on every turn", () => {
 });
 
 const LEDGERFOLD = "5f0c9a5e-1d1e-4c55-9d2b-3f6c1b7a0a11";
+const SILO_HEALTH = "6a1d0b6f-2e2f-4d66-8e3c-4a7d2c8b1b22";
 
 /** Q showed two companies as cards: E1 Silo Credit, E2 Ledgerfold. */
 function twoCards(references: QTurnReading["references"]) {
@@ -318,15 +319,111 @@ describe("step 3: the reader's references, bound by code against the ledger", ()
     ]);
   });
 
-  it("refuses a ref the ledger does not hold (Context Firewall): says so and asks, never binds it", async () => {
+  it("refuses a ref the ledger does not hold (Context Firewall): binds nothing of it, and the answer reads the words from the turns", async () => {
     const c = twoCards([
       { phrase: "her", entityIds: ["E9"], confidence: "HIGH" },
     ]);
     c.add("USER", "Email her the memo.");
     await c.answer.answer(request());
+    expect(c.inserted).toEqual([]);
+    const asked = c.delegatedWith.at(-1);
+    expect(asked?.references).toContain('"her": nothing in the conversation');
+    expect(asked?.references).not.toContain("E9");
+    expect(asked?.referencedCompanyIds).toBeUndefined();
+  });
+});
+
+/**
+ * Live 2026-11-06, QIQ-PRO-001 on 4c04b5f3e (live reader on). Q named
+ * Silo Credit's CEO and CFO from authorised facts that carry no record
+ * ids, so the ledger held neither, and then asked who "she", "his" and
+ * "they" were. The scripted reader below reads each turn as the live one
+ * did: the phrase with no refs, since no ledger entry held them.
+ */
+describe("live QIQ-PRO-001: pronouns after Q named the people", () => {
+  const CLARIFY = /not sure who or what you mean/u;
+
+  function siloTeam(references: QTurnReading["references"]) {
+    const c = conversation(references);
+    c.add("USER", "Who are Silo Credit's CEO and CFO?");
+    c.add("Q", "Silo Credit's CEO is Tunde Bakare, and its CFO is Ngozi Eze.");
+    return c;
+  }
+
+  for (const [said, phrase] of [
+    ["When did she join?", "she"],
+    ["What did his career look like before?", "his"],
+    ["How much are they raising?", "they"],
+  ] as const) {
+    it(`LIVE_V78 reading of "${phrase}" (no refs): answered from the turns, never the clarify`, async () => {
+      const c = siloTeam([{ phrase, entityIds: [], confidence: "MEDIUM" }]);
+      c.add("USER", said);
+      await c.answer.answer(request());
+      expect(c.inserted.filter((line) => CLARIFY.test(line))).toEqual([]);
+      expect(c.delegatedWith).toHaveLength(1);
+      expect(c.delegatedWith[0]?.references).toContain(
+        `"${phrase}": nothing in the conversation's record fits; read who or what is meant from the recent turns`,
+      );
+    });
+  }
+
+  it('production 1ef895999: "the first one" over the founders Q listed in words is read from the turns, never asked', async () => {
+    const c = conversation([
+      { phrase: "the first one", entityIds: [], confidence: "MEDIUM" },
+    ]);
+    c.add("USER", "Who are Ledgerfold's founders?");
+    c.add(
+      "Q",
+      "Ledgerfold's founders are Adaeze Nwachukwu (CEO) and Obinna Eze (CTO).",
+    );
+    c.add("USER", "What did the first one do before?");
+    await c.answer.answer(request());
+    expect(c.inserted.filter((line) => CLARIFY.test(line))).toEqual([]);
+    expect(c.delegatedWith).toHaveLength(1);
+    expect(c.delegatedWith[0]?.references).toContain(
+      '"the first one": nothing in the conversation',
+    );
+  });
+
+  it("a company they name is never asked about, even when the reader wrote it as a reference with no ledger entry", async () => {
+    const c = conversation([
+      { phrase: "Ledgerfold", entityIds: [], confidence: "LOW" },
+    ]);
+    c.add("USER", "What does Ledgerfold do?");
+    await c.answer.answer(request());
+    expect(c.inserted).toEqual([]);
+    expect(c.delegatedWith).toHaveLength(1);
+  });
+
+  it("the confusable pair still asks one question naming both (Silo Credit vs Silo Health)", async () => {
+    const c = conversation([
+      { phrase: "it", entityIds: ["E1"], confidence: "MEDIUM" },
+      { phrase: "it", entityIds: ["E2"], confidence: "MEDIUM" },
+    ]);
+    c.add("USER", "Show me Silo.");
+    c.add("Q", "Two companies are called Silo.", [
+      {
+        kind: "ANSWER_CARDS",
+        title: "Silo",
+        cards: [
+          {
+            name: "Silo Credit",
+            subject: { kind: "COMPANY", companyId: SILO },
+            measures: [],
+          },
+          {
+            name: "Silo Health",
+            subject: { kind: "COMPANY", companyId: SILO_HEALTH },
+            measures: [],
+          },
+        ],
+      } as unknown as QResultBlock,
+    ]);
+    c.add("USER", "What's its runway?");
+    await c.answer.answer(request());
     expect(c.delegatedWith).toHaveLength(0);
     expect(c.inserted).toEqual([
-      `I'm not sure who or what you mean by "her". Which one do you mean?`,
+      'By "it", do you mean Silo Credit or Silo Health?',
     ]);
   });
 });

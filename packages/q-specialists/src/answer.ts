@@ -6561,12 +6561,14 @@ export function createSpecialistQAnswer(
     // reader against the conversation's ledger and checked here against
     // the very state it was shown. One reading binds (it replaces code's
     // word-pattern binding for the answer); two ask one short question
-    // naming both; none says so and asks -- unless code already bound the
-    // words to their page (a list or a control on it), which the ledger
-    // does not hold. Code's guesses from the conversation itself ("him" as
-    // the last company in focus) never outvote the reader's "nothing
-    // fits". A reply to a waiting card is decided by that card's own exact
-    // payload, never here.
+    // naming both. None (live 2026-11-06, QIQ-PRO-001: Q asked who "she"
+    // was one line after naming her) no longer asks by default: the phrase
+    // goes to the answer, which reads it from the recent turns and asks
+    // only if they leave it open -- unless code already bound the words to
+    // their page (a list or a control on it), which the ledger does not
+    // hold. Code's guesses from the conversation itself ("him" as the last
+    // company in focus) never outvote the reader's reading. A reply to a waiting card
+    // is decided by that card's own exact payload, never here.
     const boundToPage =
       pointed?.control !== undefined ||
       (pointed?.resolved?.kind === "ONE" && pointed.resolved.via === "PAGE");
@@ -6582,9 +6584,7 @@ export function createSpecialistQAnswer(
         );
       }
       const askable =
-        binding.kind === "CLARIFY" &&
-        read.replyTo?.kind !== "WAITING_CARD" &&
-        !(binding.reason === "NO_READING" && boundToPage);
+        binding.kind === "CLARIFY" && read.replyTo?.kind !== "WAITING_CARD";
       if (binding.kind === "CLARIFY" && askable) {
         speculative.current?.cancel("ACTED");
         logger?.info(
@@ -6597,7 +6597,12 @@ export function createSpecialistQAnswer(
         );
         return recordAnswer(request, conversationId, binding.question);
       }
-      if (binding.kind === "BOUND") {
+      // Nothing bound and code already bound the words to their page: the
+      // page's binding stands (the ledger does not hold the page's lists).
+      if (
+        binding.kind === "BOUND" &&
+        !(binding.bound.length === 0 && boundToPage)
+      ) {
         boundRefsInRun.set(
           request.runId,
           binding.bound.flatMap((one) => one.entities.map((e) => e.ref)),
