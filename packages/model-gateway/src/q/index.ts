@@ -1491,12 +1491,16 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
  * Owner 2026-10-23 ("it keeps giving one excuse or another"): once the
  * public web has been read for the turn, the answer is written from it and
  * from Capital Q's records together. Q never says it cannot search; a
- * search that found nothing or failed is said in one sentence.
+ * search that found nothing or failed is said in one sentence. *
+ * Production 2026-11-06 ("In Capital Q, Adaeze previously…"): the records
+ * part was introduced by a quoted label, and the model said the label.
+ * The records come first in plain words; the public part keeps its
+ * attribution.
  */
-const WEB_BESIDE_RECORDS_NOTE: ModelMessage = {
+export const WEB_BESIDE_RECORDS_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    'Capital Q searched the public web for this question, beside its own records; the result is above. Compose from whatever was found. When Capital Q\'s records hold something about them and the public sources do too, give the records first ("In Capital Q: …") and then the public sources ("Public sources also say: …"), naming the site and date for each public fact; keep the two apart and never present a public source as verified. When only one of them holds something, answer from that one. Never mention, list or describe public results that are not about them (other businesses, a namesake, a product of the same name): they are not part of the answer. When public sources add nothing about them and Capital Q\'s records answer the question, say nothing about the web; when neither has anything, say so once, naturally ("I didn\'t find anything more about them online"). Never say you cannot search, browse or access the internet: the search ran. If it failed, say so in one sentence, then give what was found.',
+    'Capital Q searched the public web for this question, beside its own records; the result is above. Compose from whatever was found. When Capital Q\'s records hold something about them and the public sources do too, give what their records hold first, in plain words, with no label before them, and then the public sources ("Public sources also say: …"), naming the site and date for each public fact; keep the two apart and never present a public source as verified. When only one of them holds something, answer from that one. Never mention, list or describe public results that are not about them (other businesses, a namesake, a product of the same name): they are not part of the answer. When public sources add nothing about them and Capital Q\'s records answer the question, say nothing about the web; when neither has anything, say so once, naturally ("I didn\'t find anything more about them online"). Never say you cannot search, browse or access the internet: the search ran. If it failed, say so in one sentence, then give what was found.',
 };
 
 /**
