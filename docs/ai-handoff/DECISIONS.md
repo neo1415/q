@@ -224,3 +224,9 @@ Core Seven remains the governing assessment framework. The new directive authori
     | Q on OpenAI                                     |               | about $0.03   |              |             |
 
     Reasoning routes go OpenAI → Claude → Groq → Gemini (PUBLIC only), so Claude serves only when OpenAI is unavailable. Claude-as-primary is parked, with findings in `receipts/2026-11-06-q-claude-reasoning.md`. Revisit it when cache reads are at least 75% live.
+
+68. **OpenAI credit is for production only; Q must be model-independent** (owner, 6 Nov 2026 evening, after the credit ran out a second time): "this is the last $10 that I'm going to do for OpenAI".
+    - **No live evals on OpenAI.** Benchmarks, Q-IQ runs and live probes never use the OpenAI key. The owner's top-up serves real product use only.
+    - **Paid testing uses Anthropic, within the $20 test cap (DECISIONS 62).** Every paid run is targeted and as small as possible, and runs only after the change passes the scripted and integration harness. Each paid run's cost is recorded in `receipts/` with a running total.
+    - **Goal: Q on Claude reaches parity with Q on OpenAI, at lower cost.** Q's layers, not the underlying model, must carry the quality. The first levers are prompt caching (cache reads about 30% today) and adapter correctness.
+    - **Voice falls back to ElevenLabs** when the OpenAI account is exhausted, with Q's own brain (Model Gateway, on Claude) answering, never a separate assistant.
