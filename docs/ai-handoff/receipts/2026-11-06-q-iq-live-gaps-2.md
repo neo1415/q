@@ -14,6 +14,27 @@ Nothing here is merged or deployed, and no live model was called. CON-091 (the l
 | 4   | MEM-121 #1, "Why?"                         | **Step 9's recall did surface the criterion.** The scripted replay shows last week's words in that turn's MEMORY: "they said: 'I'm going to pass on Ledgerline: the runway is too short for us.'", beside Q's own turn-0 answer. The model answered a bare "Why?" by referring back ("That was your stated reason…") instead of saying the reason again.                                                                                                        | Pinned as a fixture, which asserts the words reach the turn. Not fixed in the prompt: COMPANY_ANALYST v29 has about 3 tokens of headroom left, and the wording is a product call. One option is a line such as 'a short follow-up ("Why?") is answered in full again', paid for by trims.                                                                                                                                        | `b69bce2` |
 | 5   | "In Capital Q, Adaeze previously…"         | `WEB_BESIDE_RECORDS_NOTE` (model-gateway `q/index.ts`), the note for an answer written from the public web beside Capital Q's records, told the model to give the records first as `("In Capital Q: …")`. The model said the label. Nothing else in the code produces the phrase.                                                                                                                                                                               | The records still come first, now "in plain words, with no label before them". The public part keeps its site-and-date attribution and is never presented as verified. A test covers it.                                                                                                                                                                                                                                         | `d711ae1` |
 
+### Item 6 (DECISIONS 61, added by the integration owner): CON-091 #2's labelled calculation (`0b1c7f5`)
+
+- **Grader** (`packages/q-evals/src/graders/q-iq.ts`, `labelledDerivations`): a figure that would be invented is allowed only when all three conditions hold:
+  1. It is labelled as a calculation in its sentence or the adjacent one.
+  2. Every input is a figure of that window that is an authorised fact or the person's words, or a period conversion the window states ("a month" … "a year"; "× 12" beside "a year").
+  3. The arithmetic of two inputs reproduces it within rounding.
+- **Tests:**
+  - CON-091's exact live reply passes.
+  - The same figure without a label fails.
+  - A wrong product fails.
+  - An unsourced input fails.
+- **Agreement:** `q-iq-derivations.test.ts` runs six replies through both the grader and `checkAnswer`. The grader finds nothing invented exactly when the claim check publishes the reply unchanged. The grader mirrors the claim check's period rules (it stays product-independent), and this test keeps the two in step.
+- **Fixture:** CON-091 #2's live reply is now in the runtime fixtures; it passes and is published as written.
+- **Re-run gates:**
+  - package build: 54/54
+  - root and q-api tsc: 0
+  - eslint: 0
+  - prettier: clean
+  - vitest (q-evals + model-gateway + q-api): 524 files, 4825 passed (3 skipped)
+  - `CQ_Q_IQ_ALL=1` q-evals integration: 573 turns, fails `[]`; ADVERSARIAL 1.0 in both modes; live gaps `[]`; references 180 + 180 turns, fails `[]`
+
 Also fixed: `model-gateway/test/q-answer.test.ts` still expected the v28 bundle id. Round 1's v29 broke it, and I had run that suite before v29 was built (`e75a50b`).
 
 ## Fixtures
