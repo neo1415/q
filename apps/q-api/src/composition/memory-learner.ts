@@ -10,7 +10,10 @@ import {
   isModelGatewayError,
   type ModelGateway,
 } from "@capital-q/model-gateway";
-import type { QMemoryRecall } from "@capital-q/model-gateway/q";
+import type {
+  QMemoryRecall,
+  QMemoryRecalled,
+} from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -23,6 +26,7 @@ import {
   type PromptRegistry,
 } from "@capital-q/q-core";
 import {
+  planAdmitsOwnMemory,
   renderMemoryBundle,
   type MemoryCandidate,
   type MemoryConversationDigestPort,
@@ -176,10 +180,29 @@ function candidateOf(
 }
 
 export function createConversationDigestPort(
-  repositories: Pick<QRuntimeRepositories, "conversations">,
+  repositories: Pick<QRuntimeRepositories, "conversations"> &
+    Partial<Pick<QRuntimeRepositories, "messages">>,
   sql: DatabaseExecutor,
 ): MemoryConversationDigestPort {
+  const search = repositories.messages?.searchForOwner;
   return {
+    // Step 9: the actor's own past turns. Tenant and owner come from the
+    // actor; the memory service reads this only when the run's plan
+    // admitted their own conversations.
+    ...(search === undefined
+      ? {}
+      : {
+          pastTurns: async (actor, query) =>
+            (await search(sql, actor.tenantId, actor.userId, query)).map(
+              (turn) => ({
+                conversationId: turn.conversationId,
+                conversationTitle: turn.conversationTitle,
+                role: turn.role,
+                content: turn.content,
+                at: turn.createdAt,
+              }),
+            ),
+        }),
     digestOf: async (actor, conversationId) => {
       const parsed = QConversationIdSchema.safeParse(conversationId);
       if (!parsed.success) return null;
@@ -252,8 +275,20 @@ export function createMemoryLearner(
         conversationId: input.conversationId,
         companyIds,
         utterance: input.utterance,
+        earlierWords: input.earlierWords,
+        // Authorisation before retrieval: their own past turns are searched
+        // only when the run's plan admits their own conversations.
+        ownConversationsAdmitted:
+          input.plan !== undefined &&
+          planAdmitsOwnMemory(input.plan, input.actor),
       });
-      return renderMemoryBundle(bundle);
+      const recalled: QMemoryRecalled = {
+        text: renderMemoryBundle(bundle),
+        ownWords: (bundle.pastTurns ?? [])
+          .filter((turn) => turn.role === "USER")
+          .map((turn) => turn.content),
+      };
+      return recalled;
     },
   };
 

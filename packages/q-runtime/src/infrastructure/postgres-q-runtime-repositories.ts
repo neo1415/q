@@ -75,6 +75,17 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const CONVERSATION_SEARCH_LIMIT = 4;
+/** Step 9: past turns found per search, and the words searched, bounded. */
+export const PAST_TURN_SEARCH_LIMIT = 12;
+const PAST_TURN_TEXT_MAX = 2_000;
+const PastTurnRow = z.object({
+  id: z.string().uuid(),
+  conversation_id: z.string().uuid(),
+  title: z.string().nullable(),
+  role: z.enum(["USER", "Q"]),
+  content: z.string(),
+  created_at: z.union([z.date(), z.string()]).transform((v) => new Date(v)),
+});
 export const CONVERSATION_SEARCH_TERMS = 8;
 
 /** `%`, `_` and the escape itself, so a term only ever matches literally. */
@@ -796,6 +807,62 @@ export function createPostgresQRuntimeRepositories(
            order by m.created_at asc, m.id asc
            limit ${limit}`;
         return rows.map(toMessage);
+      },
+      // Step 9. Tenant and owner come from the caller's actor; the join to
+      // conversations is what makes it the owner's own: a message has no
+      // owner column. The person's words are parsed into lexemes by
+      // Postgres and ORed (as the knowledge lexical search: an AND of a
+      // question's words matches nothing), each quoted as tsquery's own
+      // literal, so no operator syntax is ever taken from them; words that
+      // are all stop words give NULL, which matches nothing.
+      searchForOwner: async (executor, tenantId, userId, query) => {
+        const text = query.text.trim().slice(0, PAST_TURN_TEXT_MAX);
+        if (text.length === 0) return [];
+        const limit = Math.min(
+          Math.max(Math.trunc(query.limit) || 1, 1),
+          PAST_TURN_SEARCH_LIMIT,
+        );
+        const except = query.except.filter((id) => UUID_PATTERN.test(id));
+        const rows = await executor`
+          with q as (
+            select nullif(
+                     array_to_string(
+                       array(
+                         select quote_literal(lexeme)
+                           from unnest(tsvector_to_array(to_tsvector('english', ${text})))
+                             as lexeme
+                       ), ' | '), '')::tsquery as query
+          )
+          select m.id, m.conversation_id, c.title, m.role, m.content, m.created_at
+            from q_runtime.conversation_messages m
+            join q_runtime.conversations c
+              on c.id = m.conversation_id and c.tenant_id = m.tenant_id
+           cross join q
+           where q.query is not null
+             and m.tenant_id = ${tenantId}
+             and c.tenant_id = ${tenantId}
+             and c.user_id = ${userId}
+             and c.archived_at is null
+             and c.id <> all(${except}::uuid[])
+             and to_tsvector('english', m.content) @@ q.query
+             and not exists (
+               select 1 from q_runtime.conversation_message_marks k
+                where k.message_id = m.id and k.tenant_id = m.tenant_id)
+             and ${notSupersededRun(executor)}
+           order by ts_rank_cd(to_tsvector('english', m.content), q.query) desc,
+                    m.created_at desc, m.id desc
+           limit ${limit}`;
+        return rows.map((row) => {
+          const r = PastTurnRow.parse(row);
+          return {
+            messageId: r.id,
+            conversationId: r.conversation_id,
+            conversationTitle: r.title,
+            role: r.role,
+            content: r.content,
+            createdAt: r.created_at.toISOString(),
+          };
+        });
       },
       listRecentForConversation: async (
         executor,

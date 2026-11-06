@@ -356,6 +356,98 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  it("step 9: searches only the owner's own past turns, best match first, never another person's, tenant's, archived or marked line", async () => {
+    await withWorld(async ({ tx, service, adminA, memberA, adminB }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const search = repositories.messages.searchForOwner;
+      if (search === undefined) throw new Error("searchForOwner missing");
+      async function said(person: Person, text: string) {
+        const created = await service.createRun({
+          actor: person.actor,
+          input: request({ message: { text } }),
+          idempotencyKey: `search-${randomUUID()}`,
+          correlationId: CORRELATION(),
+        });
+        return created;
+      }
+      const own = await said(
+        adminA,
+        "I'm going to pass on Ledgerline Systems: the runway is too short for us.",
+      );
+      await said(adminA, "What is the weather like in Lagos?");
+      const current = await said(adminA, "Ledgerline runway, again.");
+      const hidden = await said(adminA, "Ledgerline HIDDEN_LINE runway.");
+      await tx.sql`
+        insert into q_runtime.conversation_message_marks
+          (tenant_id, conversation_id, message_id, mark, marked_by)
+        select m.tenant_id, m.conversation_id, m.id, 'HIDDEN_BY_PERSON', 'PERSON'
+          from q_runtime.conversation_messages m
+         where m.conversation_id = ${hidden.conversation.id}`;
+      const archived = await said(adminA, "Ledgerline ARCHIVED_LINE runway.");
+      await repositories.conversations.archiveForOwner(
+        tx,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        archived.conversation.id,
+      );
+      await said(
+        memberA,
+        "SAME_TENANT_OTHER_PERSON: pass on Ledgerline, runway.",
+      );
+      await said(adminB, "OTHER_TENANT: pass on Ledgerline, runway too short.");
+
+      const found = await search(
+        tx.sql,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        {
+          text: "What did I decide about Ledgerline last week?",
+          except: [current.conversation.id],
+          limit: 8,
+        },
+      );
+      expect(found.map((turn) => turn.conversationId)).toEqual([
+        own.conversation.id,
+      ]);
+      expect(found[0]).toMatchObject({
+        role: "USER",
+        content:
+          "I'm going to pass on Ledgerline Systems: the runway is too short for us.",
+      });
+      const all = JSON.stringify(
+        await search(tx.sql, adminA.actor.tenantId, adminA.actor.userId, {
+          text: "Ledgerline runway pass",
+          except: [],
+          limit: 12,
+        }),
+      );
+      for (const never of [
+        "SAME_TENANT_OTHER_PERSON",
+        "OTHER_TENANT",
+        "HIDDEN_LINE",
+        "ARCHIVED_LINE",
+      ]) {
+        expect(all).not.toContain(never);
+      }
+      // Another tenant's id for this owner: nothing (tenant from the actor).
+      expect(
+        await search(tx.sql, adminB.actor.tenantId, adminA.actor.userId, {
+          text: "Ledgerline runway pass",
+          except: [],
+          limit: 12,
+        }),
+      ).toEqual([]);
+      // Only stop words: nothing, never everything.
+      expect(
+        await search(tx.sql, adminA.actor.tenantId, adminA.actor.userId, {
+          text: "what did I and the",
+          except: [],
+          limit: 12,
+        }),
+      ).toEqual([]);
+    });
+  });
+
   it("accepts a run durably: conversation, run, opening message and first event, nothing analysed", async () => {
     await withWorld(async ({ tx, service, adminA, companyA }) => {
       const result = await service.createRun({

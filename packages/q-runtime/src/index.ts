@@ -134,6 +134,8 @@ export type {
   QConversationRepository,
   QConversationStateRepository,
   QConversationSearch,
+  QPastTurn,
+  QPastTurnSearch,
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
   QRunEventRepository,

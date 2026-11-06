@@ -467,6 +467,7 @@ import {
 import { withTestRouting } from "@capital-q/model-gateway";
 import {
   createReadCache,
+  recalledText,
   situationHeader,
   type QSituationPort,
 } from "@capital-q/model-gateway/q";
@@ -4042,14 +4043,14 @@ const killSwitches = createFlagReader(database.sql);
 const situationAssembler = createSituationAssembler({
   tools: qTools.port,
   memory: async ({ actor, runId, ask, signal }) =>
-    (
+    recalledText(
       await memoryLearner.recall.recall({
         actor,
         runId,
         subjects: [],
         utterance: ask,
         signal,
-      })
+      }),
     )
       .split("\n")
       .map((line) => line.replace(/^[-*\s]+/u, "").trim())

@@ -281,6 +281,7 @@ export {
   type MemoryCandidate,
   type MemoryConversationDigest,
   type MemoryRehearsalDigest,
+  type MemoryPastTurn,
   type MemoryItem,
   type MemoryOwner,
   type MemoryOwnerContextType,
@@ -322,6 +323,8 @@ export {
   REHEARSALS_LABEL,
   RELEVANT_LABEL,
   renderMemoryBundle,
+  PAST_TURNS_LABEL,
+  renderPastTurns,
 } from "./memory/render.js";
 export {
   inferredPresentedAsStated,

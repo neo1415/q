@@ -2,6 +2,7 @@ import type {
   MemoryBundle,
   MemoryConversationDigest,
   MemoryItem,
+  MemoryPastTurn,
   MemoryRehearsalDigest,
 } from "./contracts.js";
 import { renderConnectedRecall } from "./graph.js";
@@ -87,6 +88,27 @@ function digestLine(
   return `${c.lastMessageAt.slice(0, 10)}${
     c.title === null ? "" : ` ${c.title}`
   }: ${summary}`;
+}
+
+export const PAST_TURNS_LABEL =
+  'Their own earlier conversations, word for word (what was said, not verified evidence; "they said" lines are their own words, "Q said" lines are Q\'s):';
+/** Per past turn: eight stay inside MEMORY_TEXT_MAX with room left. */
+const PAST_TURN_MAX = 320;
+
+function pastTurnLine(turn: MemoryPastTurn): string {
+  const where =
+    turn.conversationTitle === null ? "" : ` (in "${turn.conversationTitle}")`;
+  const who = turn.role === "USER" ? "they said" : "Q said";
+  return `- ${turn.at.slice(0, 10)}${where}, ${who}: "${clip(
+    turn.content.replace(/\s+/gu, " ").trim(),
+    PAST_TURN_MAX,
+  )}"`;
+}
+
+/** The past-turn section, or "" when none was searched or found. */
+export function renderPastTurns(turns: MemoryBundle["pastTurns"]): string {
+  if (turns === undefined || turns.length === 0) return "";
+  return `${PAST_TURNS_LABEL}\n${turns.map(pastTurnLine).join("\n")}`;
 }
 
 export const REHEARSALS_LABEL =
@@ -189,6 +211,9 @@ export function renderMemoryBundle(
   // Read only when the turn asks across linked things, so when present it
   // is the spine of the answer; bounded on its own (CONNECTED_MAX).
   sections.push(renderConnectedRecall(bundle.connected));
+  // Found by search for what they are asking now: their own words, so it
+  // comes before any summary of the same conversations.
+  sections.push(renderPastTurns(bundle.pastTurns));
   // First, because it is what the person is asking about: an earlier
   // conversation found by subject or name, however long ago. Each summary
   // is clipped so a few long ones cannot push everything else past the

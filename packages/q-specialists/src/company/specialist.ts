@@ -51,6 +51,7 @@ import {
   type ClearCheck,
   withoutActionTalk,
   requestedChangeValues,
+  recalledText,
   type QMemoryRecall,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
@@ -244,7 +245,7 @@ async function recallMemory(
 ): Promise<string> {
   if (port === undefined) return NOTHING_REMEMBERED;
   try {
-    const text = (
+    const text = recalledText(
       await port.recall({
         actor: context.actor,
         runId: context.runId,
@@ -255,7 +256,7 @@ async function recallMemory(
             ? [{ kind: "COMPANY", companyId: request.company.companyId }]
             : [],
         signal: context.signal,
-      })
+      }),
     ).trim();
     return text.length === 0 ? NOTHING_REMEMBERED : text.slice(0, 4_000);
   } catch (error: unknown) {
