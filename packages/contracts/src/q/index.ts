@@ -576,6 +576,16 @@ export {
   Q_UI_INTENT_KINDS,
   QNavigateDestinationSchema,
   QNavigateIntentSchema,
+  Q_NAVIGATE_POSITIONS,
+  Q_NAVIGATE_SLIDE_MAX,
+  QNavigatePositionSchema,
+  QNavigateTabKeySchema,
+  QNavigateSectionIdSchema,
+  QNavigateTargetDetailSchema,
+  QNavigateTargetSchema,
+  navigateTargetToIntent,
+  intentToNavigateTarget,
+  withoutNavigateTarget,
   QFocusSectionIntentSchema,
   QOpenCompanyIntentSchema,
   QShowComparisonIntentSchema,
@@ -657,6 +667,9 @@ export {
   type QUiIntent,
   type QUiIntentKind,
   type QNavigateDestination,
+  type QNavigatePosition,
+  type QNavigateTargetDetail,
+  type QNavigateTarget,
 } from "./ui-intent.js";
 
 export {
