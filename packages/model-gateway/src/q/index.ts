@@ -267,6 +267,17 @@ import {
   type PromiseGrounds,
 } from "./promise-check.js";
 import { toolLoopBudget } from "./tool-loop-budget.js";
+export {
+  ACTION_CLAIM_KINDS,
+  actionClaims,
+  checkPromises,
+  type ActionClaimKind,
+} from "./promise-check.js";
+export {
+  Q_DEEP_TOOL_LOOP_BUDGET_MS,
+  Q_DEEP_TOOL_LOOP_MAX_CALLS,
+  Q_DEEP_TOOL_LOOP_MAX_ROUNDS,
+} from "./tool-loop-budget.js";
 import {
   corroboratedPictures,
   pageAboutThem,

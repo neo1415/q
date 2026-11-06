@@ -26,7 +26,11 @@ export const Q_DEEP_TOOL_LOOP_BUDGET_MS = 30_000;
 
 /** The task classes that already budget an answer as synthesis. */
 const DEEP_TASK_CLASSES = new Set(["EVIDENCE_SYNTHESIS", "COMPARISON"]);
-const DEEP_KINDS = new Set<TurnAnswerKind>(["ANALYSIS", "COMPARISON", "DOCUMENT"]);
+const DEEP_KINDS = new Set<TurnAnswerKind>([
+  "ANALYSIS",
+  "COMPARISON",
+  "DOCUMENT",
+]);
 
 export interface ToolLoopBudget {
   readonly deep: boolean;

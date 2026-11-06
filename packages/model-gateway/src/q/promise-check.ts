@@ -253,8 +253,7 @@ const KEPT_IN =
 const PRONOUN_OBJECT = /^\s+(?:it|that|this|them|those|these)\b/iu;
 
 /** The claim points at text in this very answer ("drafted it below:"). */
-const IN_THIS_ANSWER =
-  /\b(?:below|here(?:'s| is| are)|as follows)\b|:\s*$/iu;
+const IN_THIS_ANSWER = /\b(?:below|here(?:'s| is| are)|as follows)\b|:\s*$/iu;
 
 /** The sentence is about an earlier turn, which this run cannot back. */
 const EARLIER =

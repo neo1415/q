@@ -103,22 +103,24 @@ describe("promise check: what backs a claim is structured", () => {
     expect(check("I sent the email to Priya.", NONE).text).toBe(
       "I haven't sent it.",
     );
-    expect(check("It's been booked for Thursday at 10.", PREPARED_EMAIL).text).toBe(
-      "I haven't scheduled it; it's ready for your approval.",
-    );
+    expect(
+      check("It's been booked for Thursday at 10.", PREPARED_EMAIL).text,
+    ).toBe("I haven't scheduled it; it's ready for your approval.");
   });
 
   it("only an applied approval backs 'sent' or 'booked'", () => {
     expect(check("I've sent the email to Priya.", APPROVED).unbacked).toEqual(
       [],
     );
-    expect(check("I've booked the call with Kestrel.", APPROVED).unbacked).toEqual(
-      [],
-    );
+    expect(
+      check("I've booked the call with Kestrel.", APPROVED).unbacked,
+    ).toEqual([]);
   });
 
   it("a read, a refusal or a result that says nothing was done backs nothing", () => {
-    expect(runActionOf("get_company", ok({ name: "N" }, "READ_ONLY"))).toBeNull();
+    expect(
+      runActionOf("get_company", ok({ name: "N" }, "READ_ONLY")),
+    ).toBeNull();
     expect(runActionOf("compare", ok({}, "ANALYTICAL"))).toBeNull();
     expect(
       runActionOf("propose_email", ok({ status: "ONE_PER_TURN" })),
@@ -130,16 +132,24 @@ describe("promise check: what backs a claim is structured", () => {
       runActionOf("note_preference", ok({ outcome: "UNCHANGED", reason: "x" })),
     ).toBeNull();
     expect(
-      runActionOf("my_board", ok({ action: "ADD", added: [], alreadyThere: 0, refused: [] })),
+      runActionOf(
+        "my_board",
+        ok({ action: "ADD", added: [], alreadyThere: 0, refused: [] }),
+      ),
     ).toBeNull();
     expect(
       runActionOf("propose_email", {
         status: "DENIED",
         classification: "SIDE_EFFECT",
-        result: { ok: false, error: { code: "NOT_AVAILABLE", safeMessage: "no" } },
+        result: {
+          ok: false,
+          error: { code: "NOT_AVAILABLE", safeMessage: "no" },
+        },
       }),
     ).toBeNull();
-    expect(runActionOf("propose_email", { ...ok({}), classification: null })).toBeNull();
+    expect(
+      runActionOf("propose_email", { ...ok({}), classification: null }),
+    ).toBeNull();
   });
 
   it("an applied change backs 'saved' and 'added'", () => {
@@ -160,9 +170,13 @@ describe("promise check: what backs a claim is structured", () => {
     );
     const remembered: PromiseGrounds = {
       ...NONE,
-      actions: [action("note_preference", ok({ outcome: "REMEMBERED", reason: "OK" }))],
+      actions: [
+        action("note_preference", ok({ outcome: "REMEMBERED", reason: "OK" })),
+      ],
     };
-    expect(check("I've saved that to your preferences.", remembered).unbacked).toEqual([]);
+    expect(
+      check("I've saved that to your preferences.", remembered).unbacked,
+    ).toEqual([]);
     expect(
       check("I've noted that.", { ...NONE, remembering: true }).unbacked,
     ).toEqual([]);

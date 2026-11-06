@@ -3945,6 +3945,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         : {
             ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
             toolName: "app.q_card.handle.claim",
+            classification: "SIDE_EFFECT" as const,
           },
     );
     const { seam, alpha, request } = build({
@@ -3995,6 +3996,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         : {
             ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
             toolName: "app.q_card.handle.claim",
+            classification: "SIDE_EFFECT" as const,
           },
     );
     const { seam, messages, request } = build({
@@ -4035,6 +4037,7 @@ describe("no Q Card yet: one is prepared right there for approval (QA F-34)", ()
         : {
             ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
             toolName: "app.q_card.handle.claim",
+            classification: "SIDE_EFFECT" as const,
           },
     );
     const { seam, messages, request } = build({
@@ -4496,7 +4499,10 @@ describe("Q intelligence step 8: the agentic loop and the promise check", () => 
     const { seam, request, messages } = build({
       script: [
         call("read"),
-        { kind: "JSON", value: analystResult("I've sent the update to Priya.") },
+        {
+          kind: "JSON",
+          value: analystResult("I've sent the update to Priya."),
+        },
       ],
       tools,
     });
@@ -4555,7 +4561,12 @@ describe("Q intelligence step 8: the agentic loop and the promise check", () => 
   );
 
   it("a deep turn starts no extra round once its time budget is spent", async () => {
-    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    let shift = 0;
+    // Each executed call moves the clock past the deep budget.
+    const tools = toolPort([GET_COMPANY], (p) => {
+      shift += Q_DEEP_TOOL_LOOP_BUDGET_MS;
+      return succeeded(p, {});
+    });
     const { seam, alpha, request } = build({
       script: [
         ...chained(Q_TOOL_LOOP_MAX_ROUNDS),
@@ -4564,14 +4575,9 @@ describe("Q intelligence step 8: the agentic loop and the promise check", () => 
       tools,
     });
     const real = Date.now.bind(Date);
-    let shift = 0;
-    const clock = vi.spyOn(Date, "now").mockImplementation(() => real() + shift);
-    // Each executed call moves the clock past the deep budget.
-    const execute = tools.execute;
-    tools.execute = (proposal, context) => {
-      shift += Q_DEEP_TOOL_LOOP_BUDGET_MS;
-      return execute(proposal, context);
-    };
+    const clock = vi
+      .spyOn(Date, "now")
+      .mockImplementation(() => real() + shift);
     try {
       const outcome = await seam.answer({ ...request, answerKind: "ANALYSIS" });
       expect(outcome.kind).toBe("ANSWERED");
