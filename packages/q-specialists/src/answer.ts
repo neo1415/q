@@ -1998,7 +1998,7 @@ export const TURN_UNREAD_REPLY =
  * Q's side; their message is kept on the thread.
  */
 export const TURN_UNREACHABLE_REPLY =
-  "I can't reach my reasoning service right now, so I haven't started anything on that yet. The fault is on my side, not in your message, and your message is kept here; send it again in a minute and I'll take it from there.";
+  "I can't reach my reasoning service right now, so I haven't started anything on that yet. It's a temporary fault on my side, not in your message, and your message is kept here. I check again about every 30 seconds, so send it again in a minute or two and I'll take it from there.";
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).

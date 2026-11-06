@@ -1807,6 +1807,10 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     expect(TURN_UNREACHABLE_REPLY).toMatch(/can't reach my reasoning service/u);
     expect(TURN_UNREACHABLE_REPLY).toMatch(/not in your message/u);
     expect(TURN_UNREACHABLE_REPLY).toMatch(/kept/u);
+    // Temporary, with the one ETA Q knows (its re-check interval); never a
+    // promised time for the provider itself.
+    expect(TURN_UNREACHABLE_REPLY).toMatch(/temporary/u);
+    expect(TURN_UNREACHABLE_REPLY).toMatch(/every 30 seconds/u);
   });
 
   it("the extra reading is cut off at its deadline: one extra try, the turn answered as unread", async () => {

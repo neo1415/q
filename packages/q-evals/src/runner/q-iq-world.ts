@@ -205,6 +205,18 @@ export async function createQIqWorldSubject(options: {
    * Every query that reaches the scripted web is reported per turn.
    */
   readonly web?: boolean | undefined;
+  /**
+   * FAKE mode, Premium Plan P1 chaos: when this returns a behaviour, every
+   * scripted model call of the turn does that (a credit failure, a refused
+   * key, a rate limit, a timeout, a 5xx) instead of answering.
+   */
+  /**
+   * Every investor turn carries their own organisation, as the app sends
+   * it, so the plan holds their own mandate (DISCOVERY turns always do).
+   */
+  readonly investorOwnOrganisation?: boolean | undefined;
+  readonly outage?:
+    ((evalCase: QIqCase, turn: number) => FakeBehaviour | null) | undefined;
 }): Promise<QIqWorldSubject> {
   // Filled once the world exists; the specialist reads it lazily, per run.
   const holder: { world?: QEvalWorld } = {};
@@ -470,19 +482,22 @@ export async function createQIqWorldSubject(options: {
               evalCase.turns[turn]?.reference ??
               "";
             const pageReader = evalCase.turns[turn]?.webScript?.readerReplies;
+            const failing = options.outage?.(evalCase, turn) ?? null;
             w().setScript(
-              options.web === true && pageReader !== undefined
-                ? // DISCOVERY: the page reader's replies, in call order.
-                  pageReader.map((value): FakeBehaviour => ({
-                    kind: "JSON",
-                    value,
-                  }))
-                : [
-                    ...(obeyed === undefined || obeyed.toolCalls.length === 0
-                      ? []
-                      : [toolCallsOf(obeyed.toolCalls)]),
-                    analystReply(reply),
-                  ],
+              failing !== null
+                ? [failing]
+                : options.web === true && pageReader !== undefined
+                  ? // DISCOVERY: the page reader's replies, in call order.
+                    pageReader.map((value): FakeBehaviour => ({
+                      kind: "JSON",
+                      value,
+                    }))
+                  : [
+                      ...(obeyed === undefined || obeyed.toolCalls.length === 0
+                        ? []
+                        : [toolCallsOf(obeyed.toolCalls)]),
+                      analystReply(reply),
+                    ],
             );
           }
           const observedBefore = w().answer.lastObservation();
@@ -502,9 +517,10 @@ export async function createQIqWorldSubject(options: {
               // DISCOVERY: an investor's turn carries their own organisation,
               // as the app sends it, so the plan holds their own mandate.
               subjects:
-                options.web === true &&
                 evalCase.actor === "INVESTOR" &&
-                evalCase.turns[turn - 1]?.webScript !== undefined
+                (options.investorOwnOrganisation === true ||
+                  (options.web === true &&
+                    evalCase.turns[turn - 1]?.webScript !== undefined))
                   ? [
                       {
                         kind: "INVESTOR_ORGANISATION",

@@ -106,8 +106,8 @@ export function subsystemNotice(
   switch (operation) {
     case "MODEL":
       return stopping
-        ? "My reasoning service still isn't answering, so I'll stop trying it for now. What you've already told me is safe; say it again in a minute and I'll pick it up."
-        : "I can't reach my reasoning service just now, so I haven't taken that in. Say it again in a moment.";
+        ? "My reasoning service still isn't answering, so I'll stop trying it for now. It's a temporary fault on my side, and what you've already told me is safe; say it again in a minute or two and I'll pick it up."
+        : "I can't reach my reasoning service just now, so I haven't taken that in. It's a temporary fault on my side; say it again in a minute.";
     case "RESEARCH":
       return stopping
         ? "Live research still isn't reachable, so I'll stop trying it for now and work from what you've told me and what I already know."
