@@ -184,3 +184,54 @@ If the reply is still the old one-search answer, the live turn reader did not se
 - **A founder asking** has no mandate. Discovery then uses only the turn's own categories, or generic queries.
 - **No answer cards.** The list is text with links and Sources. Watchlist or save and outreach are offered for approval, not wired.
 - **Spend** is higher than an ordinary turn (section 3). The discovery budget is a single constant if the owner wants it lower.
+
+## Round 2 (`fix/q-web-discovery-2`): the page reader timed out live
+
+Production `c71eb2ee4`, the fictional investor Savanna Seed, asked "find me new companies online and their founders".
+
+**What worked:** the mandate's categories reached all 6 queries. Brave and Tavily found results, and Tavily read 3 pages per call.
+
+**What failed:**
+
+- `web discovery reader produced nothing`: the gateway gave up after its bounded attempts. One call carried nine pages, about 5,000 tokens, and it timed out twice at 12 s.
+- The reply said the pages "didn't name specific companies".
+- ScrapingBee and Serper were each asked 5 times before they rested, because the parallel calls were already in flight.
+
+### The fix
+
+Branch `fix/q-web-discovery-2`, cut from `origin/fix/resume-asking-cv9ru3` @ `1ae3b64`.
+
+- **The reader reads a few pages at a time** (`WEB_DISCOVERY_READER_LIMITS`). Each call takes 3 pages of up to 2,500 characters, and the calls run side by side. Each call has a 15 s attempt deadline and 1,200 output tokens; the whole read has a 20 s deadline. A failed call costs only its own pages.
+  - The task class stays `STRUCTURED_EXTRACTION`, and the prompt is unchanged (`web-discovery-reader/v1`).
+  - The calls are now small: about 1,500 tokens in.
+- **A reader failure no longer means zero companies.** `namesFromCompanySites` takes a result on a company's own site: a run of up to four title words whose letters are exactly the site's name ("About Kobo Harbour" on koboharbour.example).
+  - Another fetched page, on a different domain, must name it too. Without that, a publisher or a list site named after its own title would count as a company.
+  - Such a name is then admitted the usual way. No founder is named and nothing is guessed.
+  - When nothing at all can be named, Q says it could not read the pages in time, rather than that they named nothing.
+  - The log line `q answered a web discovery` now carries `readerFailed`.
+- **Resting providers are skipped.** Round one's first research call goes alone; the others start once it has landed. A refused or spent key then rests behind its breaker before they go out.
+  - The cost is one search's latency.
+  - Retiring ScrapingBee and Serper in config is left to the reliability lane.
+- **Test** (`packages/model-gateway/test/q-web-discovery-reader-timeout.test.ts`): a real gateway over a scripted model that takes 300 ms for every page it is shown, against a 1.5 s attempt deadline.
+  - With the old shape (all nine pages in one call), it reproduces production: outcome `NONE`, nothing listed.
+  - With the fix, the same pages list the three companies.
+  - With every call failing, the company's own site still names it, and no list site is taken for a company.
+  - The first search lands before the others start.
+
+### Gates (exact results)
+
+| Gate                                                                                                             | Result                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm exec turbo run build --filter=./packages/*`                                                                | 54/54 successful                                                                                                                                                                           |
+| Root tsc / `apps/q-api` tsc                                                                                      | exit 0 / exit 0                                                                                                                                                                            |
+| eslint on the touched files / `npx prettier --check apps packages docs supabase`                                 | exit 0 / all files pass                                                                                                                                                                    |
+| vitest `packages/model-gateway packages/q-evals packages/q-research` / `packages/q-specialists` / `apps/q-api`   | 223 files, 2043/2043 / 84 files, 1531/1531 / 335 files passed (1 skipped), 3123 passed (3 skipped)                                                                                         |
+| Integration on local PG (q-api, model-gateway, q-evals, q-specialists, q-research, q-tools) with `CQ_Q_IQ_ALL=1` | **28 files, 107/107**                                                                                                                                                                      |
+| Q-IQ through the runtime: core, ADVERSARIAL and DISCOVERY                                                        | **Core: 573 turns, no fails**, `actionClaimsKept: 0`, `promiseRewrites: 0`. **ADVERSARIAL:** score 1 with both the resisting and the obeying model. **DISCOVERY:** score 1. `liveGaps: []` |
+
+### What the live re-run should show
+
+- **The reply** is a numbered list of specific companies.
+- **The log line** `q answered a web discovery` shows `readerFailed: false`, `listed` above 0, and `founderSearches` and `toolCalls` above 3.
+- **If a reader call still fails,** the log line `web discovery reader: some page groups were not read` names how many groups failed. The list then comes from the groups that were read, plus companies' own sites.
+- **The first search's ScrapingBee and Serper refusals** should be the only ones in the turn.

@@ -22,6 +22,7 @@ import {
 import {
   createWebDiscoveryReader,
   WEB_DISCOVERY_READER_LIMITS,
+  type WebDiscoveryReaderLimits,
 } from "../src/q/web-discovery-reader.js";
 import { TENANT, testCatalog } from "./fixtures.js";
 
@@ -35,7 +36,7 @@ import { TENANT, testCatalog } from "./fixtures.js";
  */
 
 const PAGE_MS = 300;
-const LIMITS = {
+const LIMITS: WebDiscoveryReaderLimits = {
   ...WEB_DISCOVERY_READER_LIMITS,
   attemptTimeoutMs: 1_500,
   deadlineMs: 6_000,
@@ -171,7 +172,7 @@ const ASK: WebDiscoveryAsk = {
 
 async function discover(
   pages: readonly Page[],
-  limits: typeof LIMITS,
+  limits: WebDiscoveryReaderLimits,
   perPageMs = PAGE_MS,
 ) {
   const web = scriptedWeb(pages);
