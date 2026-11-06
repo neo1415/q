@@ -54,6 +54,8 @@ import type { WebDiscoveryReader } from "./web-discovery-reader.js";
 export type WebDiscoveryAsk = NonNullable<QAnswerRequest["webDiscovery"]>;
 
 const RESEARCH_TOOL = "research_public_web";
+/** The call ids of discovery's own tool calls (code's, never a model's). */
+export const DISCOVERY_CALL_PREFIX = "q-discovery-";
 const EXTRACT_TOOL = "extract_public_web";
 const SEARCH_COMPANIES_TOOL = "search_companies";
 
@@ -897,7 +899,7 @@ export async function runWebDiscovery(input: {
     const outcome = await input.tools
       .execute(
         {
-          callId: `q-discovery-${String(DISCOVERY_MAX_TOOL_CALLS - callsLeft)}`,
+          callId: `${DISCOVERY_CALL_PREFIX}${String(DISCOVERY_MAX_TOOL_CALLS - callsLeft)}`,
           name,
           arguments: args,
         },

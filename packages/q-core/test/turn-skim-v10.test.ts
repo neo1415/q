@@ -17,7 +17,8 @@ import {
 describe("TURN_SKIM v10: a document about someone is not a note to them", () => {
   it("is active, v9 kept whole plus the document rule, by meaning", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_SKIM");
-    expect(active.definition.version).toBe(10);
+    // v11 (2026-11-06) keeps v10 whole and adds onWeb.
+    expect(active.definition.version).toBeGreaterThanOrEqual(10);
     expect(
       TURN_SKIM_V10.template.replace(`${V7_WRITES}${V10_DOCUMENT}`, V7_WRITES),
     ).toBe(TURN_SKIM_V9.template);

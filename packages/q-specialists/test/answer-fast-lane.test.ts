@@ -309,3 +309,29 @@ describe("fastLaneOf (K)", () => {
     expect(fastLaneOf(null, "anything")).toBeNull();
   });
 });
+
+describe("fast lane: a turn asking for the public web waits for the full reading (owner, live 2026-11-06)", () => {
+  // "find me new companies online that i would be interested in" took the
+  // FIT lane to the in-app ranking; "online" was never read.
+  it("takes no company or fit lane when the skim read the turn as asking for the web", () => {
+    const fit = {
+      kind: "FIT",
+      confidence: "HIGH",
+      count: null,
+      discover: null,
+      person: null,
+    } as const;
+    const said = "find me new companies online that i would be interested in";
+    expect(fastLaneOf(fit, said)?.questionKind).toBe("FIT");
+    expect(fastLaneOf({ ...fit, onWeb: true }, said)).toBeNull();
+    expect(
+      fastLaneOf(
+        { ...SKIM_DISCOVER, onWeb: true },
+        "three fintech startups online",
+      ),
+    ).toBeNull();
+    expect(
+      fastLaneOf(SKIM_DISCOVER, "three fintech companies")?.questionKind,
+    ).toBe("DISCOVER_COMPANIES");
+  });
+});

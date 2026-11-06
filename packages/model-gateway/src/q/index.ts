@@ -368,7 +368,11 @@ import {
   mandateCategories,
   ownMandateAnswer,
 } from "./own-mandate-answer.js";
-import { runWebDiscovery, type WebDiscoveryAsk } from "./web-discovery.js";
+import {
+  DISCOVERY_CALL_PREFIX,
+  runWebDiscovery,
+  type WebDiscoveryAsk,
+} from "./web-discovery.js";
 import { tiedToRecordPerson, type PersonAnchor } from "./person-anchor.js";
 import {
   createWebDiscoveryReader,
@@ -2997,7 +3001,15 @@ export function createModelGatewayQAnswer(
     outcome: QToolCallOutcome,
     words: string,
   ): QToolCallOutcome => {
-    const companies = aboutHeldCompaniesOnly(proposal, runId, outcome, words);
+    // Live 2026-11-06 (run ad5c5e5f): web discovery searches for OTHER
+    // companies by design ("…that maybe not exist in capital Q yet"). Its
+    // own searches (made by code, never the model) are not held to the
+    // companies the words name: that filter kept only pages about Capital
+    // Q and the discovery listed nothing. Its admission does its own
+    // grounding (web-discovery.ts); the person rule below still applies.
+    const companies = proposal.callId.startsWith(DISCOVERY_CALL_PREFIX)
+      ? outcome
+      : aboutHeldCompaniesOnly(proposal, runId, outcome, words);
     const anchor = personAnchorByRun.get(runId);
     if (proposal.name !== PUBLIC_WEB_TOOL || anchor === undefined) {
       return companies;
@@ -8125,17 +8137,54 @@ export function createModelGatewayQAnswer(
         if (webStage !== undefined && webStage !== null) {
           void stageOnce(webStage);
         }
-        const found = await webDiscoveryFor(
-          request.webDiscovery,
-          prepared.ownMandateData(),
-        );
+        // Owner's account 2026-11-06: "find me new companies online that i
+        // would be interested in" -- Capital Q's own top matches by mandate
+        // fit first, in one line, then the web's; both side by side.
+        const onCapitalQ =
+          request.webDiscovery.alsoOnCapitalQ === true && investorAsking
+            ? discoverFor({
+                text: request.webDiscovery.text,
+                sectors: [],
+                countries: [],
+                stages: [],
+                count: 3,
+                ranking: "FIT",
+                mandateRelevant: true,
+                previous: false,
+                raising: false,
+              }).catch(() => null)
+            : Promise.resolve(null);
+        const [found, catalog] = await Promise.all([
+          webDiscoveryFor(request.webDiscovery, prepared.ownMandateData()),
+          onCapitalQ,
+        ]);
         if (found !== null) {
           for (const source of found.sources) {
             if (!publicSources.some((known) => known.url === source.url)) {
               publicSources.push(source);
             }
           }
-          const message = await persistCodeAnswer(found.text);
+          const topCards =
+            catalog !== null &&
+            catalog.basis === "FIT" &&
+            catalog.block !== null
+              ? catalog.block.cards.slice(0, 3)
+              : [];
+          const topNames = topCards.map((card) => `**${card.name}**`);
+          const lead =
+            topNames.length === 0
+              ? null
+              : `On Capital Q, your top ${String(topNames.length)} by mandate fit: ${
+                  topNames.length === 1
+                    ? (topNames[0] ?? "")
+                    : `${topNames.slice(0, -1).join(", ")} and ${topNames.at(-1) ?? ""}`
+                } (on the cards). From the public web:`;
+          const message = await persistCodeAnswer(
+            lead === null ? found.text : `${lead}\n\n${found.text}`,
+            lead === null || catalog === null || catalog.block === null
+              ? []
+              : [{ ...catalog.block, cards: topCards }],
+          );
           logger?.info(
             {
               qRunId: request.runId,

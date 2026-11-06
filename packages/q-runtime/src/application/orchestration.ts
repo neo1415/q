@@ -350,6 +350,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly countries: readonly string[];
         readonly stages: readonly string[];
         readonly count: number | null;
+        /**
+         * The ask was also about fit with their mandate ("…that I'd be
+         * interested in", read by meaning): Capital Q's own top matches
+         * are said first, then the web's.
+         */
+        readonly alsoOnCapitalQ?: boolean | undefined;
       }
     | undefined;
   /**

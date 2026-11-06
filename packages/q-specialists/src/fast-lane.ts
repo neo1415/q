@@ -4,6 +4,8 @@ type SkimInvestors = NonNullable<TurnSkimResult["investors"]>;
 
 /** A skim as any version reads it: kinds arrived with v8. */
 type SkimRead = Omit<TurnSkimResult, "subject" | "writes" | "investors"> & {
+  /** v11: they asked for companies or investors on the public web. */
+  readonly onWeb?: boolean | undefined;
   readonly investors?:
     | (Omit<SkimInvestors, "kinds"> & {
         readonly kinds?: readonly string[] | undefined;
@@ -44,6 +46,12 @@ export function fastLaneOf(
   utterance: string,
 ): FastLane | null {
   if (skim === null || skim.confidence !== "HIGH") return null;
+  // Owner's account, live 2026-11-06: "find me new companies online that i
+  // would be interested in" took the FIT lane to Capital Q's own ranking
+  // and "online" was never read. A turn the skim read as asking for the
+  // public web (v11, by meaning) waits for the full reading, which plans
+  // the web discovery. Investors keep their lane: it searches the web too.
+  if (skim.onWeb === true && skim.kind !== "DISCOVER_INVESTORS") return null;
   const text = utterance.trim().slice(0, 1_000);
   if (text.length === 0) return null;
   if (skim.kind === "DISCOVER_COMPANIES") {

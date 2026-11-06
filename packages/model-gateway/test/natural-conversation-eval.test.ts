@@ -139,6 +139,8 @@ function relationshipsData() {
 function tools(options: {
   readonly fit: boolean;
   readonly mandate?: boolean | undefined;
+  /** Owner 2026-11-06: the public web, for a web discovery. */
+  readonly web?: boolean | undefined;
 }): QToolPort & {
   readonly executed: string[];
 } {
@@ -148,6 +150,9 @@ function tools(options: {
     offered("discovery.companies", "discover_companies"),
     ...(options.mandate === true
       ? [offered("investor_mandate.get", "get_investor_mandate")]
+      : []),
+    ...(options.web === true
+      ? [offered("public_web.search", "research_public_web")]
       : []),
     ...(options.fit
       ? [
@@ -183,6 +188,27 @@ function tools(options: {
         result: { ok: true, data },
         latencyMs: 2,
       });
+      if (proposal.name === "research_public_web") {
+        return Promise.resolve(
+          ok("public_web.search", {
+            status: "OK",
+            sources: [
+              {
+                index: 1,
+                url: "https://weetracker.example/fintech",
+                domain: "weetracker.example",
+                title: "Fintech startups to watch",
+                publishedAt: null,
+                retrievedAt: "2026-11-06T13:30:00.000Z",
+                excerpt:
+                  "Fintech startups to watch: Owo Rails, a payments API for Lagos merchants founded in 2025.",
+                extracted: true,
+                instructionRiskSignals: 0,
+              },
+            ],
+          }),
+        );
+      }
       if (proposal.name === "list_my_relationships") {
         return Promise.resolve(
           ok("relationship.own.list", relationshipsData()),
@@ -291,6 +317,7 @@ async function replay(input: {
   readonly fit?: boolean;
   readonly spoken?: boolean;
   readonly mandate?: boolean | undefined;
+  readonly web?: boolean | undefined;
   /** K Part 4: the Tier A copy of their own mandate read. */
   readonly ownMandateReads?: {
     readonly get: (actor: unknown) => Promise<unknown>;
@@ -309,6 +336,7 @@ async function replay(input: {
     | "discoverCompanies"
     | "preparedSubject"
     | "aboutNamedOther"
+    | "webDiscovery"
   >;
 }): Promise<{
   text: string;
@@ -390,7 +418,11 @@ async function replay(input: {
       },
     },
   } as unknown as QRuntimeRepositories;
-  const port = tools({ fit: input.fit ?? true, mandate: input.mandate });
+  const port = tools({
+    fit: input.fit ?? true,
+    mandate: input.mandate,
+    web: input.web,
+  });
   const seam = createModelGatewayQAnswer({
     gateway,
     repositories,
@@ -984,5 +1016,65 @@ describe("their own mandate from the working snapshot (K Part 4)", () => {
     });
     expect(executed).toContain("get_investor_mandate");
     expect(remembered).toHaveLength(1);
+  });
+});
+
+describe("owner's account, live 2026-11-06: 'find me new companies online that i would be interested in'", () => {
+  const words = "find me new companies online that i would be interested in";
+  const reader = {
+    kind: "JSON" as const,
+    value: {
+      companies: [
+        {
+          name: "Owo Rails",
+          founders: [],
+          does: null,
+          sector: null,
+          stage: null,
+          place: null,
+          sourceRefs: [0],
+          quote: "Owo Rails",
+        },
+      ],
+    },
+  };
+  const ask = (alsoOnCapitalQ: boolean) => ({
+    text: words,
+    sectors: [],
+    countries: [],
+    stages: [],
+    count: null,
+    alsoOnCapitalQ,
+  });
+
+  it("answers with both: Capital Q's top 3 by mandate fit in one line, then the web's list", async () => {
+    const { text, blocks, executed } = await replay({
+      question: words,
+      web: true,
+      script: [reader],
+      reading: { questionKind: "FIT", webDiscovery: ask(true) },
+    });
+    expect(executed).toContain("research_public_web");
+    expect(executed).toContain("discover_companies");
+    expect(text).toMatch(
+      /^On Capital Q, your top \d by mandate fit: \*\*[^*]+\*\*/u,
+    );
+    expect(text).toContain("From the public web:");
+    expect(text).toContain("**Owo Rails** · founded 2025");
+    expect(cardsOf(blocks).length).toBeGreaterThan(0);
+    expect(cardsOf(blocks).length).toBeLessThanOrEqual(3);
+  });
+
+  it("an ask for the web alone is the web's list alone", async () => {
+    const { text, executed } = await replay({
+      question: "find me new companies online",
+      web: true,
+      script: [reader],
+      reading: { questionKind: "DISCOVER_COMPANIES", webDiscovery: ask(false) },
+    });
+    expect(executed).toContain("research_public_web");
+    expect(executed).not.toContain("discover_companies");
+    expect(text).not.toContain("On Capital Q, your top");
+    expect(text).toContain("**Owo Rails**");
   });
 });
