@@ -1645,3 +1645,13 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Dataset** (genuinely wrong): ADV-153 #2 "Where are they based?" required the sector, so it now requires the city; ADV-156 #1 (and FUP-040 #2) expected "unknown" for Nyota's schools although 64 vs 52 paying schools are planted.
 - **Found, not fixed (reported):** the claim check publishes a wrong small difference ("33" for 78−41), because a number derivable from any two figures of one source line counts as grounded. COR-054 #1: the correction reply restates the superseded $70k with attribution and the grader calls it wrong-entity; that needs an owner decision. ORD-029 #0 is not reproduced (the claim check keeps every plausible Silo Credit line).
 - **Gates:** package build 54/54; root tsc 0; vitest q-core/model-gateway/q-specialists/q-evals 4221 passed; apps/q-api 3131 passed; Q-IQ `CQ_Q_IQ_ALL=1` 6/6 (573 turns `fails: []`, adversarial 1.0/1.0, follow-ups, live gaps and remaining gaps `[]`, failing-first on the old build); references/retrieval/wire 5/5; eslint and prettier clean. No live calls.
+
+## 2026-11-06 — claim-check arithmetic lane (`fix/q-claim-check-arithmetic`, from `4e890ba`; not merged or deployed)
+
+- **Cause:** the claim check grounded a derived figure if any arithmetic of any two numbers on one source line matched it at the claim's precision. "33" came from 400k ÷ 1.2M × 100 on an unrelated deck line. A figure grounded that way then fed the sentence's own derivations ("45%" = 78 − 33). A date's month grounded "3x". "2.5x"/"3x" were not read as figures at all.
+- **Fix (`claim-check.ts`):** a derived figure is grounded only when one typed operation (sum, mean, difference, ratio, ×100, growth, a period or duration product, a percentage of money) of **visible** inputs reproduces it at its stated precision. The inputs are the sentence's directly sourced figures, the previous sentence's, sourced durations and periods, or a source-line pair of which the sentence says one.
+  - Kinds: money combines only with money of one currency.
+  - A difference of two percentages is points, not "%".
+  - Multiples are figures, grounded only by plain numbers, never by money, a percentage or a date's month.
+- **Tests:** `claim-check-arithmetic.test.ts` (12 keep, 8 remove; 5 failed on the old code). `q-iq-derivations` now asserts grader and claim-check agreement on wrong and unsourced differences too.
+- **Gates:** package build 54/54; vitest all packages 11,928 passed; apps q-api, workers and api 4,218 passed; root tsc 0; Q-IQ `CQ_Q_IQ_ALL=1` 6/6, 573 turns `fails: []`, adversarial 1.0/1.0; references, retrieval and wire 5/5; eslint and prettier clean.

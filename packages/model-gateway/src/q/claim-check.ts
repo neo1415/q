@@ -464,19 +464,15 @@ const POINTS_AFTER = /^\s*(?:percentage[\s-]+)?points?\b/iu;
 
 /** May a result of this kind be said as this claim? */
 function saysKind(claim: Claim, result: ResultKind, after: string): boolean {
-  switch (claim.kind) {
-    case "MONEY":
-      return result === "MONEY";
-    case "PERCENT":
-      return (
-        result === "PERCENT" ||
-        (result === "POINTS" && POINTS_AFTER.test(after))
-      );
-    default:
-      // A plain number: a multiple, months, points, a count, or money said
-      // without its sign ("a difference of 1.3 million").
-      return result !== "PERCENT";
+  if (claim.kind === "MONEY") return result === "MONEY";
+  if (claim.kind === "PERCENT") {
+    return (
+      result === "PERCENT" || (result === "POINTS" && POINTS_AFTER.test(after))
+    );
   }
+  // A plain number: a multiple, months, points, a count, or money said
+  // without its sign ("a difference of 1.3 million").
+  return result !== "PERCENT";
 }
 
 /** Is `figure` a number the sources state, at its stated precision? */
