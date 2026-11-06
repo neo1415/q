@@ -1,0 +1,732 @@
+import Anthropic, {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIError,
+  APIUserAbortError,
+} from "@anthropic-ai/sdk";
+import type {
+  CacheControlEphemeral,
+  ContentBlockParam,
+  Message,
+  MessageCreateParamsNonStreaming,
+  MessageParam,
+  OutputConfig,
+  TextBlockParam,
+  ThinkingConfigParam,
+  Tool,
+} from "@anthropic-ai/sdk/resources/messages/messages";
+
+import {
+  ModelToolNameSchema,
+  type ModelFailureClass,
+  type ModelFinishStatus,
+  type ModelMessage,
+  type ModelOutputSpec,
+  type ModelReasoningLevel,
+  type ModelToolCall,
+  type ModelToolDefinition,
+  type ModelUsage,
+} from "@capital-q/contracts";
+
+import { ModelProviderFailure } from "../errors.js";
+import type {
+  ModelExecutionContext,
+  ModelProvider,
+  ModelProviderRequest,
+  ModelProviderResult,
+} from "../ports.js";
+
+/**
+ * Anthropic adapter, behind the official SDK's Messages API. The only file
+ * in Capital Q that imports it.
+ *
+ * DECISIONS 62 (owner, 2026-11-06): Claude for reasoning, OpenAI for voice,
+ * OpenAI the fallback either way. This adapter is reached only through the
+ * gateway's routing, after the same eligibility as every other provider;
+ * whether a CONFIDENTIAL request may come here is the catalogue's call
+ * (ai_ops.providers, migration 20261231280000), never this file's.
+ *
+ * Held to what the other adapters are held to. Anthropic's shapes stop
+ * here; the only tools declared are the canonical definitions the Tool
+ * Registry offered; SDK retries are off because the gateway owns them;
+ * thinking is never displayed or read back, so no chain of thought reaches
+ * a result; and the key never leaves this process.
+ */
+
+export const ANTHROPIC_PROVIDER_CODE = "anthropic";
+
+/**
+ * The SDK's error classes, for the adapter's tests: the provider-boundary
+ * rule keeps every SDK import inside this directory, and the tests need
+ * real instances to prove the failure mapping.
+ */
+export {
+  APIConnectionTimeoutError as AnthropicConnectionTimeoutError,
+  APIError as AnthropicAPIError,
+  APIUserAbortError as AnthropicUserAbortError,
+};
+
+/** Sonnet-class: answers, synthesis, comparison, investigation. */
+export const ANTHROPIC_ANSWER_MODEL = "claude-sonnet-5-5";
+/** Haiku-class: the turn reader, fast classification and extraction. */
+export const ANTHROPIC_FAST_MODEL = "claude-haiku-5-5";
+
+/**
+ * How each permitted model turns thinking OFF. The two differ: Sonnet 5.5
+ * refuses `disabled` with a 400 and takes `between_tools` (its lowest
+ * setting, only at effort high or below); Haiku 5.5 takes `disabled` at
+ * effort high or below. Anything not listed is refused before a request
+ * is made: a model with unknown request rules is a configuration fault,
+ * and a loud one.
+ */
+const THINKING_OFF: Readonly<Record<string, ThinkingConfigParam>> = {
+  [ANTHROPIC_ANSWER_MODEL]: { type: "between_tools" },
+  [ANTHROPIC_FAST_MODEL]: { type: "disabled" },
+};
+
+export const ANTHROPIC_MODELS: readonly string[] = Object.keys(THINKING_OFF);
+
+/**
+ * The caller's reasoning level as this vendor spells it. These models take
+ * no thinking budget at all (`budget_tokens` is a 400 on both); depth is
+ * set by `output_config.effort` with adaptive thinking. NONE turns thinking
+ * off and asks for the least effort.
+ */
+const EFFORT: Readonly<
+  Record<ModelReasoningLevel, NonNullable<OutputConfig["effort"]>>
+> = {
+  NONE: "low",
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+};
+
+export type AnthropicProviderOptions = {
+  readonly apiKey: string;
+  /** For tests: a client already built. */
+  readonly client?: AnthropicClient | undefined;
+};
+
+/** The part of the SDK client this adapter uses; the test seam. */
+export type AnthropicClient = {
+  readonly messages: Pick<Anthropic["messages"], "create" | "stream">;
+};
+
+// --- thinking ----------------------------------------------------------------
+
+/**
+ * A request continuing its own tool calls: an ASSISTANT turn with tool
+ * calls after the last USER message.
+ *
+ * Capital Q's message contract does not carry thinking blocks (nothing of
+ * a model's reasoning is kept), so an assistant tool-call turn comes back
+ * to the vendor without the thinking that preceded it. With thinking on,
+ * that is a turn the API may refuse; with thinking off it is an ordinary
+ * history. So a continuation runs with thinking off at the requested
+ * effort. The first call of a turn, where the deciding happens, keeps it.
+ */
+export function continuesToolCalls(messages: readonly ModelMessage[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message === undefined) continue;
+    if (message.role === "USER") return false;
+    if (message.role === "ASSISTANT" && (message.toolCalls?.length ?? 0) > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function thinkingFor(
+  modelCode: string,
+  reasoning: ModelReasoningLevel,
+  messages: readonly ModelMessage[],
+): {
+  readonly thinking: ThinkingConfigParam;
+  readonly effort: NonNullable<OutputConfig["effort"]>;
+} {
+  const off = THINKING_OFF[modelCode];
+  if (off === undefined) {
+    throw new ModelProviderFailure(
+      `anthropic adapter refuses model ${modelCode}`,
+      {
+        failureClass: "INVALID_REQUEST",
+        providerCode: ANTHROPIC_PROVIDER_CODE,
+      },
+    );
+  }
+  const effort = EFFORT[reasoning];
+  if (reasoning === "NONE" || continuesToolCalls(messages)) {
+    return { thinking: off, effort };
+  }
+  // Adaptive is the only on-mode these models accept. `display` is left at
+  // its default (omitted): thinking text is never returned, never read.
+  return { thinking: { type: "adaptive" }, effort };
+}
+
+// --- structured output --------------------------------------------------------
+
+/**
+ * Constrained decoding's published limits (structured outputs, checked
+ * 2026-11-06): across every strict schema in a request, at most 24
+ * optional properties and 16 union-typed properties; every object closed
+ * with `additionalProperties: false`; no recursion; no numeric, string or
+ * (beyond minItems 0/1) array bounds. A schema past these is a 400 every
+ * time, which would spend a fallback on every call.
+ */
+const MAX_OPTIONAL_PROPERTIES = 24;
+const MAX_UNION_PROPERTIES = 16;
+const SUPPORTED_FORMATS: ReadonlySet<string> = new Set([
+  "date-time",
+  "time",
+  "date",
+  "duration",
+  "email",
+  "hostname",
+  "uri",
+  "ipv4",
+  "ipv6",
+  "uuid",
+]);
+/**
+ * Bounds the grammar cannot carry. They are dropped from what is SENT
+ * only: the gateway validates every answer against the caller's Zod
+ * schema, so each bound is still enforced, after the fact.
+ */
+const DROPPED_KEYWORDS: ReadonlySet<string> = new Set([
+  "$schema",
+  "minLength",
+  "maxLength",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "maxItems",
+  "uniqueItems",
+  "minProperties",
+  "maxProperties",
+  "pattern",
+  "patternProperties",
+  "propertyNames",
+]);
+
+class UnsupportedSchema extends Error {}
+
+/**
+ * The caller's JSON Schema as constrained decoding accepts it, or null
+ * when it cannot be expressed within the limits (an open record, a
+ * reference, or too many optional or union-typed properties). Null is not
+ * a failure: the schema is then stated in the instructions instead, and
+ * the gateway's validation and correction pass apply exactly as they do
+ * for every provider.
+ */
+export function toOutputSchema(
+  schema: Readonly<Record<string, unknown>>,
+): Record<string, unknown> | null {
+  let optional = 0;
+  let unions = 0;
+  const visit = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(visit);
+    if (typeof node !== "object" || node === null) return node;
+    const source = node as Record<string, unknown>;
+    if ("$ref" in source || "$defs" in source || "definitions" in source) {
+      // References may be recursive, and resolving them is not this file's
+      // business; the instruction route handles them.
+      throw new UnsupportedSchema("reference");
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(source)) {
+      if (DROPPED_KEYWORDS.has(key)) continue;
+      if (key === "format" && !SUPPORTED_FORMATS.has(String(value))) continue;
+      if (key === "minItems") {
+        if (value === 0 || value === 1) out[key] = value;
+        continue;
+      }
+      if (key === "properties" && typeof value === "object" && value !== null) {
+        const properties: Record<string, unknown> = {};
+        for (const [name, child] of Object.entries(value)) {
+          if (
+            typeof child === "object" &&
+            child !== null &&
+            ("anyOf" in child ||
+              Array.isArray((child as { type?: unknown }).type))
+          ) {
+            unions += 1;
+          }
+          properties[name] = visit(child);
+        }
+        out[key] = properties;
+        continue;
+      }
+      out[key] = visit(value);
+    }
+    const isObject =
+      source["type"] === "object" || typeof source["properties"] === "object";
+    if (isObject) {
+      const additional = source["additionalProperties"];
+      if (additional !== undefined && additional !== false) {
+        // An open record: closing it would forbid every key it exists for.
+        throw new UnsupportedSchema("record");
+      }
+      out["additionalProperties"] = false;
+      const names = Object.keys(
+        (source["properties"] as Record<string, unknown> | undefined) ?? {},
+      );
+      const required = new Set(
+        Array.isArray(source["required"]) ? source["required"] : [],
+      );
+      optional += names.filter((name) => !required.has(name)).length;
+    }
+    return out;
+  };
+  try {
+    const result = visit(schema) as Record<string, unknown>;
+    if (optional > MAX_OPTIONAL_PROPERTIES || unions > MAX_UNION_PROPERTIES) {
+      return null;
+    }
+    return result;
+  } catch (error: unknown) {
+    if (error instanceof UnsupportedSchema) return null;
+    throw error;
+  }
+}
+
+/** The JSON instruction used when a schema cannot be constrained. */
+export function schemaInstruction(
+  output: Extract<ModelOutputSpec, { kind: "STRUCTURED" }>,
+): string {
+  return [
+    `Reply with exactly one JSON object named ${output.schemaName}, and nothing else: no prose before or after it.`,
+    "It must conform to this JSON Schema:",
+    JSON.stringify(output.jsonSchema),
+  ].join("\n");
+}
+
+// --- messages ------------------------------------------------------------------
+
+const CACHE: CacheControlEphemeral = { type: "ephemeral" };
+
+/**
+ * Capital Q's messages as a Messages API request. Nothing else travels.
+ *
+ * Only the LEADING system messages become the system prompt (audit F-D3):
+ * a SYSTEM message added later in the turn can carry fetched, untrusted
+ * text, and lifting it into `system` would give web content instruction
+ * authority. It is said where it was added, as a marked note in a user
+ * turn, exactly as the OpenAI and Google adapters place it.
+ *
+ * Prompt caching: one breakpoint closes the system prompt, so the tools
+ * and the charter (the prefix every Q call shares) are written once and
+ * read thereafter. Inside a tool loop, a second closes the conversation so
+ * far, because the next iteration re-sends all of it.
+ */
+export function toMessages(
+  messages: readonly ModelMessage[],
+  extraInstruction?: string,
+): {
+  readonly system: TextBlockParam[] | undefined;
+  readonly messages: MessageParam[];
+} {
+  const leading = messages.findIndex((message) => message.role !== "SYSTEM");
+  const system: TextBlockParam[] = (
+    leading === -1 ? messages : messages.slice(0, leading)
+  ).map((message) => ({ type: "text", text: message.content }));
+  if (extraInstruction !== undefined) {
+    system.push({ type: "text", text: extraInstruction });
+  }
+  const last = system.at(-1);
+  if (last !== undefined) last.cache_control = CACHE;
+
+  const out: MessageParam[] = [];
+  // The API combines consecutive turns of one role; doing it here keeps
+  // every tool result for one assistant turn in the single user turn the
+  // API requires, ahead of any note that follows them.
+  const push = (
+    role: "user" | "assistant",
+    blocks: readonly ContentBlockParam[],
+  ): void => {
+    if (blocks.length === 0) return;
+    const previous = out.at(-1);
+    if (previous !== undefined && previous.role === role) {
+      previous.content = [
+        ...(previous.content as ContentBlockParam[]),
+        ...blocks,
+      ];
+      return;
+    }
+    out.push({ role, content: [...blocks] });
+  };
+
+  let sawToolResult = false;
+  for (const [index, message] of messages.entries()) {
+    if (message.role === "SYSTEM") {
+      if (leading !== -1 && index >= leading) {
+        push("user", [
+          { type: "text", text: `[Capital Q note] ${message.content}` },
+        ]);
+      }
+      continue;
+    }
+    if (message.role === "USER") {
+      push("user", [
+        // A shared screen in a rehearsal (REHEARSE): inline base64 only.
+        ...(message.images ?? []).map((image): ContentBlockParam => ({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: image.mediaType,
+            data: image.dataBase64,
+          },
+        })),
+        { type: "text", text: message.content },
+      ]);
+      continue;
+    }
+    if (message.role === "ASSISTANT") {
+      // The text it said, then the tool calls it made.
+      push("assistant", [
+        ...(message.content.length > 0
+          ? [{ type: "text" as const, text: message.content }]
+          : []),
+        ...(message.toolCalls ?? []).map((call): ContentBlockParam => ({
+          type: "tool_use",
+          id: call.callId,
+          name: call.name,
+          input: call.arguments,
+        })),
+      ]);
+      continue;
+    }
+    // A tool's result, returned against the call it answers.
+    if (message.role !== "TOOL") continue;
+    sawToolResult = true;
+    push("user", [
+      {
+        type: "tool_result",
+        tool_use_id: message.callId,
+        content: message.content,
+      },
+    ]);
+  }
+
+  // The Messages API wants a user turn first, and on these models a final
+  // assistant turn is a prefill, which is a 400. OpenAI accepts both, so a
+  // history shaped that way is bridged here with a marked note rather than
+  // by changing the caller's prompt.
+  if (out[0]?.role === "assistant") {
+    out.unshift({
+      role: "user",
+      content: [{ type: "text", text: "[Capital Q note] Q spoke first here." }],
+    });
+  }
+  if (out.at(-1)?.role === "assistant") {
+    push("user", [
+      { type: "text", text: "[Capital Q note] Continue from your last turn." },
+    ]);
+  }
+
+  if (sawToolResult) {
+    const blocks = out.at(-1)?.content;
+    const tail = Array.isArray(blocks) ? blocks.at(-1) : undefined;
+    if (
+      tail !== undefined &&
+      (tail.type === "text" || tail.type === "tool_result")
+    ) {
+      tail.cache_control = CACHE;
+    }
+  }
+  return { system: system.length === 0 ? undefined : system, messages: out };
+}
+
+/** The canonical tool definitions, and nothing provider-side. */
+function toTools(tools: readonly ModelToolDefinition[]): Tool[] | undefined {
+  if (tools.length === 0) return undefined;
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    input_schema: tool.inputJsonSchema as Tool["input_schema"],
+  }));
+}
+
+// --- response ------------------------------------------------------------------
+
+/**
+ * Usage in the gateway's terms. Anthropic reports uncached, cache-read and
+ * cache-written input separately; the gateway's `inputTokens` is the whole
+ * prompt and `cachedInputTokens` the part served from cache, so the three
+ * are summed. Cache writes are priced by the gateway at the base input
+ * rate; the vendor bills them at 1.25x, so a turn's recorded cost
+ * understates a write by a quarter of its tokens (receipt 2026-11-06).
+ * Thinking is already inside `output_tokens`; it is not reported again as
+ * reasoning tokens, which the gateway would add a second time.
+ */
+export function toUsage(message: Pick<Message, "usage">): ModelUsage {
+  const usage = message.usage;
+  const read = usage.cache_read_input_tokens ?? 0;
+  const written = usage.cache_creation_input_tokens ?? 0;
+  return {
+    inputTokens: usage.input_tokens + read + written,
+    cachedInputTokens: read,
+    outputTokens: usage.output_tokens,
+  };
+}
+
+export function textOf(message: Pick<Message, "content">): string {
+  const parts: string[] = [];
+  for (const block of message.content) {
+    if (block.type === "text") parts.push(block.text);
+  }
+  return parts.join("");
+}
+
+/**
+ * The tool calls the model proposed. A name the Tool Registry would not
+ * recognise is dropped rather than passed on; the executor would refuse it
+ * anyway.
+ */
+export function toToolCalls(
+  message: Pick<Message, "content">,
+): readonly ModelToolCall[] | undefined {
+  const calls: ModelToolCall[] = [];
+  for (const block of message.content) {
+    if (block.type !== "tool_use") continue;
+    const name = ModelToolNameSchema.safeParse(block.name);
+    if (!name.success) continue;
+    const input: unknown = block.input;
+    if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      continue;
+    }
+    calls.push({
+      callId: block.id,
+      name: name.data,
+      arguments: input as Record<string, unknown>,
+    });
+  }
+  return calls.length === 0 ? undefined : calls;
+}
+
+export function finishOf(
+  message: Pick<Message, "stop_reason" | "content">,
+): ModelFinishStatus {
+  switch (message.stop_reason) {
+    case "end_turn":
+    case "stop_sequence":
+      return "COMPLETE";
+    case "tool_use":
+      return toToolCalls(message) === undefined ? "OTHER" : "TOOL_CALLS";
+    case "max_tokens":
+      return "MAX_OUTPUT_TOKENS";
+    case "refusal":
+      return "CONTENT_FILTERED";
+    case "pause_turn":
+    case "model_context_window_exceeded":
+    case null:
+      return "OTHER";
+  }
+  // A stop reason the SDK's types do not know yet.
+  return "OTHER";
+}
+
+function result(message: Message): ModelProviderResult {
+  return {
+    text: textOf(message),
+    toolCalls: toToolCalls(message),
+    usage: toUsage(message),
+    finish: finishOf(message),
+    modelCode: message.model,
+    providerReference: message.id,
+  };
+}
+
+// --- errors --------------------------------------------------------------------
+
+/**
+ * The account, not the request: nothing will be served until someone tops
+ * up. Anthropic says so with a `billing_error` (or a 402), and has also
+ * said it as a 400 `invalid_request_error` whose only distinguishing mark
+ * is its message. That one wording is matched, narrowly, because getting
+ * it wrong is the 2026-10-01 failure again: an empty account treated as a
+ * bad request is retried on every turn instead of being set aside.
+ */
+const CREDIT_EXHAUSTED_MESSAGE = /credit balance is too low/i;
+
+export function accountExhausted(error: APIError): boolean {
+  if (error.status === 402 || error.type === "billing_error") return true;
+  return (
+    error.status === 400 &&
+    error.type === "invalid_request_error" &&
+    CREDIT_EXHAUSTED_MESSAGE.test(error.message)
+  );
+}
+
+export function classify(error: APIError): ModelFailureClass {
+  const status = error.status;
+  if (error.type === "overloaded_error") return "PROVIDER_OUTAGE";
+  if (error.type === "timeout_error") return "TIMEOUT";
+  if (status === 401 || status === 403) return "AUTHENTICATION";
+  if (status === 429) return "RATE_LIMIT";
+  if (status === 408 || status === 504) return "TIMEOUT";
+  if (status === 413) return "CONTEXT_LIMIT";
+  if (status === 400 || status === 404 || status === 422) {
+    return "INVALID_REQUEST";
+  }
+  if (status !== undefined && status >= 500) return "PROVIDER_OUTAGE";
+  return "TRANSIENT";
+}
+
+function retryAfterMs(error: APIError): number | undefined {
+  const header = error.headers?.get("retry-after");
+  if (header === null || header === undefined) return undefined;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.round(seconds * 1000)
+    : undefined;
+}
+
+export function normalizeError(error: unknown): ModelProviderFailure {
+  if (error instanceof ModelProviderFailure) return error;
+  if (error instanceof APIUserAbortError) {
+    return new ModelProviderFailure("anthropic request aborted", {
+      failureClass: "CANCELLED",
+      providerCode: ANTHROPIC_PROVIDER_CODE,
+      cause: error,
+    });
+  }
+  if (error instanceof APIConnectionTimeoutError) {
+    return new ModelProviderFailure("anthropic request timed out", {
+      failureClass: "TIMEOUT",
+      providerCode: ANTHROPIC_PROVIDER_CODE,
+      cause: error,
+    });
+  }
+  if (error instanceof APIConnectionError) {
+    return new ModelProviderFailure("anthropic connection failed", {
+      failureClass: "TRANSIENT",
+      providerCode: ANTHROPIC_PROVIDER_CODE,
+      cause: error,
+    });
+  }
+  if (error instanceof APIError) {
+    // instanceof widens the SDK's generic to any; this is its declared shape.
+    const refused: APIError = error as APIError;
+    const exhausted = accountExhausted(refused);
+    const status = refused.status;
+    const retryAfter = retryAfterMs(refused);
+    return new ModelProviderFailure(
+      `anthropic request refused (${status ?? "no status"})`,
+      {
+        // An exhausted account is PERMANENT for the attempt -- another
+        // candidate may answer -- and flagged, so the provider is set
+        // aside until a probe succeeds rather than retried every turn.
+        failureClass: exhausted ? "PERMANENT" : classify(refused),
+        ...(exhausted ? { accountExhausted: true } : {}),
+        providerCode: ANTHROPIC_PROVIDER_CODE,
+        ...(status === undefined ? {} : { providerStatus: status }),
+        ...(retryAfter === undefined ? {} : { retryAfterMs: retryAfter }),
+        // The vendor's error TYPE token, never its message.
+        ...(refused.type === null ? {} : { vendorErrorCode: refused.type }),
+        cause: refused,
+      },
+    );
+  }
+  if (error instanceof Error && error.name === "AbortError") {
+    return new ModelProviderFailure("anthropic request aborted", {
+      failureClass: "CANCELLED",
+      providerCode: ANTHROPIC_PROVIDER_CODE,
+      cause: error,
+    });
+  }
+  return new ModelProviderFailure("anthropic request failed", {
+    failureClass: "TRANSIENT",
+    providerCode: ANTHROPIC_PROVIDER_CODE,
+    cause: error,
+  });
+}
+
+// --- the request -----------------------------------------------------------------
+
+/** The full request body for one attempt. Exported for the tests. */
+export function toRequest(
+  request: ModelProviderRequest,
+): MessageCreateParamsNonStreaming {
+  const { thinking, effort } = thinkingFor(
+    request.modelCode,
+    request.reasoning,
+    request.messages,
+  );
+  const structured =
+    request.output.kind === "STRUCTURED" ? request.output : undefined;
+  const constrained =
+    structured === undefined ? null : toOutputSchema(structured.jsonSchema);
+  const { system, messages } = toMessages(
+    request.messages,
+    structured !== undefined && constrained === null
+      ? schemaInstruction(structured)
+      : undefined,
+  );
+  const tools = toTools(request.tools);
+  return {
+    model: request.modelCode,
+    max_tokens: request.maxOutputTokens,
+    messages,
+    ...(system === undefined ? {} : { system }),
+    ...(tools === undefined ? {} : { tools }),
+    thinking,
+    output_config: {
+      effort,
+      ...(constrained === null
+        ? {}
+        : { format: { type: "json_schema" as const, schema: constrained } }),
+    },
+    // No temperature: both permitted models refuse non-default sampling
+    // values with a 400, and the gateway's temperature is a hint, not a
+    // contract. No tool_choice: forced choice is a 400 on Sonnet 5.5, and
+    // `auto` is the default. `request.cacheKey` has no Anthropic
+    // counterpart (caching is by exact prefix), so it is not sent.
+  };
+}
+
+export function createAnthropicModelProvider(
+  options: AnthropicProviderOptions,
+): ModelProvider {
+  const client: AnthropicClient =
+    options.client ??
+    new Anthropic({
+      apiKey: options.apiKey,
+      // The gateway owns retry; the SDK gets one shot.
+      maxRetries: 0,
+    });
+
+  return {
+    code: ANTHROPIC_PROVIDER_CODE,
+    capabilities: () => ({
+      structuredOutput: true,
+      toolCalling: true,
+      streaming: true,
+      cancellation: true,
+    }),
+    generate: async (
+      request: ModelProviderRequest,
+      context: ModelExecutionContext,
+    ): Promise<ModelProviderResult> => {
+      try {
+        const params = toRequest(request);
+        const requestOptions = {
+          signal: context.signal,
+          timeout: context.attemptTimeoutMs,
+        };
+        if (context.onTextDelta === undefined) {
+          return result(await client.messages.create(params, requestOptions));
+        }
+        const onTextDelta = context.onTextDelta;
+        const stream = client.messages.stream(params, requestOptions);
+        // Text deltas only: thinking deltas are never surfaced.
+        stream.on("text", (delta: string) => onTextDelta(delta));
+        return result(await stream.finalMessage());
+      } catch (error: unknown) {
+        throw normalizeError(error);
+      }
+    },
+  };
+}

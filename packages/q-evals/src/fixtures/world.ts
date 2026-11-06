@@ -39,6 +39,7 @@ import {
   type ProviderHealthPort,
   type SyntheticDemoRoutingAllowance,
 } from "@capital-q/model-gateway";
+import { createAnthropicModelProvider } from "@capital-q/model-gateway/providers/anthropic";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
@@ -688,7 +689,8 @@ export async function createQEvalWorld(
     if (
       secrets?.google !== undefined &&
       options.providerFilter !== "groq" &&
-      options.providerFilter !== "openai"
+      options.providerFilter !== "openai" &&
+      options.providerFilter !== "anthropic"
     ) {
       providers.push(
         recordingProvider(
@@ -711,10 +713,29 @@ export async function createQEvalWorld(
         ),
       );
     }
+    // Claude (DECISIONS 62): reached only where the routing policies name
+    // it -- the staged v2 policies, switched on in the LOCAL database by the
+    // Q-IQ runner's --provider anthropic. With that filter it is the only
+    // adapter, so a Claude run measures Claude and never a fallback.
+    if (
+      secrets?.anthropic !== undefined &&
+      (options.providerFilter === undefined ||
+        options.providerFilter === "anthropic")
+    ) {
+      providers.push(
+        recordingProvider(
+          createAnthropicModelProvider({
+            apiKey: secrets.anthropic.reveal(),
+          }),
+          recorded,
+        ),
+      );
+    }
     if (
       secrets?.groq !== undefined &&
       options.providerFilter !== "google" &&
-      options.providerFilter !== "openai"
+      options.providerFilter !== "openai" &&
+      options.providerFilter !== "anthropic"
     ) {
       providers.push(
         recordingProvider(

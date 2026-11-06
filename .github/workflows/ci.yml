@@ -300,6 +300,7 @@ jobs:
       # The Q-IQ world's checkpointer and a few suites read DATABASE_URL.
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
       OPENAI_API_KEY: disabled-locally-000000000000
+      ANTHROPIC_API_KEY: disabled-locally-000000000000
       GEMINI_API_KEY: disabled-locally-000000000000
       GOOGLE_API_KEY: disabled-locally-000000000000
       GROQ_API_KEY: disabled-locally-000000000000
@@ -357,6 +358,7 @@ jobs:
     timeout-minutes: 40
     env:
       OPENAI_API_KEY: disabled-locally-000000000000
+      ANTHROPIC_API_KEY: disabled-locally-000000000000
       GEMINI_API_KEY: disabled-locally-000000000000
       GROQ_API_KEY: disabled-locally-000000000000
       ELEVENLABS_API_KEY: disabled-locally-000000000000

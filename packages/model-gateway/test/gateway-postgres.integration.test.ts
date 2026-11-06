@@ -10,6 +10,8 @@ import {
 
 import {
   createFakeModelProvider,
+  createStaticModelCatalog,
+  providerJustifiedCeiling,
   createModelGateway,
   createModelProviderRegistry,
   createPostgresModelCatalog,
@@ -61,10 +63,12 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     await db.close();
   });
 
-  it("loads the seeded catalog: three providers, twelve models, versioned prices, eight policies", async () => {
+  it("loads the seeded catalog: four providers, fourteen models, versioned prices, eight active policies", async () => {
     const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
     const catalog = indexCatalog(snapshot);
     expect(snapshot.providers.map((p) => p.code).sort()).toEqual([
+      // 20261231280000 (DECISIONS 62): staged behind RETIRED v2 policies.
+      "anthropic",
       "google",
       "groq",
       // 20261006090000: added as a diagnostic provider; reviewed for
@@ -76,6 +80,8 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     // (20261203090000) for duplex voice; gemini-3.1-flash-lite-image
     // (20261220192000) and gpt-live-1 (20261221090000).
     expect(snapshot.models.map((m) => m.modelCode).sort()).toEqual([
+      "claude-haiku-5-5",
+      "claude-sonnet-5-5",
       "gemini-2.5-flash-image",
       "gemini-3.1-flash-lite-image",
       "gemini-3.5-flash",
@@ -309,5 +315,134 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       (40 * 0.3 + 10 * 2.5) / 1e6,
       10,
     );
+  });
+
+  it("routes CONFIDENTIAL reasoning Claude -> OpenAI -> Groq once the v2 policies are switched on (20261231280000)", async () => {
+    const loaded = await loadModelCatalogSnapshot(db.sql, new Date());
+    // Before the switch nothing reaches Claude: the staged rows are RETIRED.
+    const anthropicModels = new Set(
+      loaded.models
+        .filter((m) => m.modelCode.startsWith("claude-"))
+        .map((m) => m.id),
+    );
+    expect(anthropicModels.size).toBe(2);
+    for (const policy of loaded.routingPolicies) {
+      if (policy.status !== "ACTIVE") continue;
+      for (const id of [...policy.preferredModels, ...policy.fallbackModels]) {
+        expect(anthropicModels.has(id)).toBe(false);
+      }
+    }
+    // The owner's approval lifts the reviewed INTERNAL to CONFIDENTIAL.
+    const anthropic = loaded.providers.find((p) => p.code === "anthropic");
+    expect(anthropic?.ownerApprovedCeiling).toBe("CONFIDENTIAL");
+    expect(anthropic?.supportsZeroRetention).toBe(false);
+    if (anthropic === undefined) throw new Error("anthropic missing");
+    expect(providerJustifiedCeiling(anthropic)).toBe("CONFIDENTIAL");
+
+    // The switch, applied to the loaded rows exactly as the SQL applies it
+    // (status = 'ACTIVE' on the v2 codes), without touching the shared DB.
+    const switched = {
+      ...loaded,
+      routingPolicies: loaded.routingPolicies.map((p) =>
+        p.version === 2 ? { ...p, status: "ACTIVE" as const } : p,
+      ),
+    };
+    const text = (code: string, answer: string) =>
+      createFakeModelProvider({
+        code,
+        script: [
+          {
+            kind: "TEXT",
+            text: answer,
+            usage: { inputTokens: 40, cachedInputTokens: 0, outputTokens: 12 },
+          },
+        ],
+      });
+    const exhausted = (code: string) =>
+      createFakeModelProvider({
+        code,
+        script: [
+          {
+            kind: "FAIL",
+            failureClass: "PERMANENT",
+            accountExhausted: true,
+          },
+        ],
+      });
+    const runId = randomUUID();
+    const confidential = (
+      taskClass: "NORMAL_DIALOGUE" | "FAST_CLASSIFICATION",
+    ) => ({
+      taskClass,
+      sensitivity: "CONFIDENTIAL" as const,
+      messages: [
+        { role: "USER" as const, content: "Synthetic confidential question." },
+      ],
+      output: { kind: "TEXT" as const },
+      budget: {
+        maxAttempts: 4,
+        maxEstimatedCostUsd: 0.2,
+        maxOutputTokens: 256,
+        attemptTimeoutMs: 5_000,
+      },
+      attribution: { tenantId, qRunId: runId, correlationId: "cor_claude" },
+    });
+    const gatewayWith = (providers: ReturnType<typeof text>[]) =>
+      createModelGateway({
+        catalog: createStaticModelCatalog(switched),
+        registry: createModelProviderRegistry(providers),
+        usage: createPostgresModelUsageRepository({ sql: db.sql }),
+      });
+
+    // Claude answers dialogue (Sonnet) and the reader's class (Haiku).
+    const claude = gatewayWith([
+      text("anthropic", "claude"),
+      text("openai", "openai"),
+      text("groq", "groq"),
+      text("google", "google"),
+    ]);
+    const answered = await claude.execute(confidential("NORMAL_DIALOGUE"));
+    expect(answered.routingPolicyCode).toBe("normal_dialogue.v2");
+    expect(answered.modelCode).toBe("claude-sonnet-5-5");
+    const read = await claude.execute(confidential("FAST_CLASSIFICATION"));
+    expect(read.routingPolicyCode).toBe("fast_classification.v2");
+    expect(read.modelCode).toBe("claude-haiku-5-5");
+
+    // Claude's account empty: OpenAI answers.
+    const toOpenAI = await gatewayWith([
+      exhausted("anthropic"),
+      text("openai", "openai"),
+      text("groq", "groq"),
+      text("google", "google"),
+    ]).execute(confidential("NORMAL_DIALOGUE"));
+    expect(toOpenAI.providerCode).toBe("openai");
+    expect(toOpenAI.fallbackUsed).toBe(true);
+
+    // Both empty: Groq answers.
+    const toGroq = await gatewayWith([
+      exhausted("anthropic"),
+      exhausted("openai"),
+      text("groq", "groq"),
+      text("google", "google"),
+    ]).execute(confidential("NORMAL_DIALOGUE"));
+    expect(toGroq.providerCode).toBe("groq");
+    expect(toGroq.attempts.map((a) => a.providerCode)).toEqual([
+      "anthropic",
+      "openai",
+      "groq",
+    ]);
+
+    // All three empty: the PUBLIC-only Gemini is never sent the
+    // CONFIDENTIAL request; the call fails rather than widening.
+    const google = text("google", "google");
+    await expect(
+      gatewayWith([
+        exhausted("anthropic"),
+        exhausted("openai"),
+        exhausted("groq"),
+        google,
+      ]).execute(confidential("NORMAL_DIALOGUE")),
+    ).rejects.toBeInstanceOf(ModelGatewayError);
+    expect(google.calls).toHaveLength(0);
   });
 });

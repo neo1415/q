@@ -155,6 +155,7 @@ describe("per-service isolation", () => {
       groq: "unconfigured",
       groqKeys: 0,
       openai: "unconfigured",
+      anthropic: "unconfigured",
       testProvider: undefined,
     });
     expect(api.secrets.modelProviders).toEqual({

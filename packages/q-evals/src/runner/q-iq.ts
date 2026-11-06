@@ -100,8 +100,15 @@ export async function runQIq(
   let inputTokens = 0;
   let outputTokens = 0;
   let stoppedForBudget = false;
+  // The budget is hard: a case starts only if the dearest case so far
+  // would still fit, so a run never overshoots by more than one case
+  // costing more than any before it.
+  let dearestCase = 0;
   for (const evalCase of cases) {
-    if (options.budgetUsd !== undefined && spent >= options.budgetUsd) {
+    if (
+      options.budgetUsd !== undefined &&
+      spent + dearestCase > options.budgetUsd
+    ) {
       stoppedForBudget = true;
       break;
     }
@@ -144,6 +151,7 @@ export async function runQIq(
       cost += judged.costUsd;
     }
     spent += cost;
+    dearestCase = Math.max(dearestCase, cost);
     const run: QIqCaseRun = {
       caseId: evalCase.id,
       replies,

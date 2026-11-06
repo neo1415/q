@@ -486,6 +486,7 @@ import {
   geminiEnabled,
 } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { createAnthropicModelProvider } from "@capital-q/model-gateway/providers/anthropic";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
   createCorrelationId,
@@ -1208,6 +1209,17 @@ if (providerSecrets.groq !== undefined) {
 if (providerSecrets.openai !== undefined) {
   providers.push(
     createOpenAIModelProvider({ apiKey: providerSecrets.openai.reveal() }),
+  );
+}
+// DECISIONS 62: Claude for reasoning, OpenAI the fallback. Registered when
+// the key is set; whether any request is routed to it is the catalogue's
+// call (the Claude routing policies, 20261231280000), so a key alone
+// changes nothing.
+if (providerSecrets.anthropic !== undefined) {
+  providers.push(
+    createAnthropicModelProvider({
+      apiKey: providerSecrets.anthropic.reveal(),
+    }),
   );
 }
 /**

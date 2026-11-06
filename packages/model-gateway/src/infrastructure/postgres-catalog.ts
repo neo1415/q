@@ -42,6 +42,13 @@ const ProviderRow = z.object({
   privacy_policy_class: z.string(),
   supports_zero_retention: z.boolean(),
   region_support: z.array(z.string()).catch([]),
+  // Read through to_jsonb so a catalogue from before 20261231280000 loads;
+  // anything but the two approvable ceilings reads as no approval.
+  owner_approved_ceiling: z
+    .enum(["INTERNAL", "CONFIDENTIAL"])
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 const ModelRow = z.object({
@@ -116,8 +123,9 @@ export async function loadModelCatalogSnapshot(
   loadedAt: Date,
 ): Promise<ModelCatalogSnapshot> {
   const [providers, models, prices, policies] = await Promise.all([
-    sql`select id, code, name, status, privacy_policy_class, supports_zero_retention, region_support
-          from ai_ops.providers order by code`,
+    sql`select id, code, name, status, privacy_policy_class, supports_zero_retention, region_support,
+               to_jsonb(p) ->> 'owner_approved_ceiling' as owner_approved_ceiling
+          from ai_ops.providers p order by code`,
     sql`select id, provider_id, model_code, model_family, model_type, status, context_window, max_output_tokens,
                supports_tools, supports_structured_output, supports_vision, supports_audio, supports_realtime,
                supports_prompt_cache, supports_reasoning, sensitivity_ceiling, quality_class, latency_class,
@@ -147,6 +155,7 @@ export async function loadModelCatalogSnapshot(
         privacyPolicyClass: r.privacy_policy_class,
         supportsZeroRetention: r.supports_zero_retention,
         regionSupport: r.region_support,
+        ownerApprovedCeiling: r.owner_approved_ceiling ?? null,
       })),
     models: z
       .array(ModelRow)

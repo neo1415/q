@@ -13,6 +13,10 @@
       "types": "./dist/providers/google.d.ts",
       "default": "./dist/providers/google.js"
     },
+    "./providers/anthropic": {
+      "types": "./dist/providers/anthropic.d.ts",
+      "default": "./dist/providers/anthropic.js"
+    },
     "./providers/groq": {
       "types": "./dist/providers/groq.d.ts",
       "default": "./dist/providers/groq.js"
@@ -66,6 +70,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.4.0",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/evidence": "workspace:*",
