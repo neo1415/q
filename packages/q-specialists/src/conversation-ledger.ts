@@ -806,3 +806,45 @@ export function renderConversationState(input: {
     .join("\n")
     .slice(0, CONVERSATION_STATE_CHARS_MAX);
 }
+
+/**
+ * Live 2026-11-06 (6c8d108cf): the company a person in this conversation
+ * is held against, so public pages about them must name it too. The
+ * person's ledger entry ties them to it (`of`, from the record Q read).
+ * Without that tie, only a person Q itself introduced (from a record or in
+ * its own words, never only in theirs) is tied to the one company in play
+ * in the turns where Q introduced them. Null otherwise: a person they ask
+ * about by name is a public person search, with no record to tie to.
+ */
+export function personAnchorOf(
+  name: string,
+  state: QConversationState | null | undefined,
+): string | null {
+  if (state === null || state === undefined) return null;
+  const key = name.trim().toLowerCase().replace(/\s+/gu, " ");
+  if (key.length < 2) return null;
+  const entities = state.ledger.entities;
+  const person = entities.find(
+    (entity) =>
+      entity.kind === "PERSON" &&
+      entity.name !== null &&
+      entity.name.trim().toLowerCase().replace(/\s+/gu, " ") === key,
+  );
+  if (person === undefined) return null;
+  const owner =
+    person.of === null
+      ? undefined
+      : entities.find(
+          (entity) => entity.ref === person.of && entity.kind === "COMPANY",
+        );
+  if (owner?.name !== null && owner?.name !== undefined) return owner.name;
+  if (!person.via.some((via) => via !== "SAID_BY_THEM")) return null;
+  const inPlay = entities.filter(
+    (entity) =>
+      entity.kind === "COMPANY" &&
+      entity.name !== null &&
+      entity.firstTurn <= person.lastTurn &&
+      entity.lastTurn >= person.firstTurn - 1,
+  );
+  return inPlay.length === 1 ? (inPlay[0]?.name ?? null) : null;
+}

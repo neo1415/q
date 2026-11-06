@@ -3462,3 +3462,136 @@ describe("the first words go out as the web search starts (owner 2026-10-23)", (
     expect(alpha.calls.length).toBeGreaterThan(0);
   });
 });
+
+describe("answer seam: a person held against a record is never a namesake (live 2026-11-06, 6c8d108cf)", () => {
+  const FOUNDERS =
+    "Ledgerfold's founders are Adaeze Nwachukwu (CEO) and Obinna Eze (CTO).";
+  const TIED = {
+    url: "https://techpress.example/ledgerfold-founders",
+    domain: "techpress.example",
+    title: "Ledgerfold's founders on building SME credit",
+    excerpt:
+      "Ledgerfold co-founder Adaeze Nwachukwu previously led SME lending operations at a Lagos microfinance bank.",
+  };
+  const NAMESAKE = {
+    url: "https://profiles.example/adaeze-nwachukwu",
+    domain: "profiles.example",
+    title: "Adaeze Nwachukwu - Economic Intelligence",
+    excerpt:
+      "Adaeze Nwachukwu worked in economic intelligence at Access Bank, risk measurement at UBA Group and research at Proshare Nigeria.",
+  };
+  const outcomeWith = (
+    proposal: QToolProposal,
+    pages: readonly (typeof TIED)[],
+  ): QToolCallOutcome => ({
+    callId: proposal.callId,
+    toolName: "public_web.search",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    status: "SUCCEEDED",
+    failureCode: null,
+    sensitivity: "PUBLIC",
+    result: {
+      ok: true,
+      data: {
+        status: "OK",
+        query: "adaeze nwachukwu",
+        sources: pages.map((page, i) => ({
+          index: i + 1,
+          ...page,
+          publishedAt: null,
+          retrievedAt: "2026-11-06T11:00:00.000Z",
+          instructionRiskSignals: 0,
+          subjectMatch: "MATCH",
+        })),
+        comparison: [],
+        truthClass: "UNKNOWN",
+        guidance: "Public sources are unverified.",
+      },
+    },
+    latencyMs: 3,
+  });
+  const lookUpAdaeze: FakeBehaviour = {
+    kind: "TOOL_CALLS",
+    calls: [
+      {
+        callId: "p1",
+        name: "research_public_web",
+        arguments: {
+          target: "GENERAL",
+          query: "Adaeze Nwachukwu career before Ledgerfold",
+          entityName: "Adaeze Nwachukwu",
+        },
+      },
+    ],
+  };
+  // What a model that trusted the namesake would draft.
+  const DRAFT =
+    "Before co-founding Ledgerfold, Adaeze Nwachukwu led SME lending operations at a Lagos microfinance bank. Public sources also describe an Adaeze Nwachukwu as having worked in economic intelligence at Access Bank and risk measurement at UBA Group.";
+  const about = (anchored: boolean) =>
+    ({
+      aboutNamedOther: true,
+      namedOther: { name: "Adaeze Nwachukwu", kind: "PERSON" },
+      ...(anchored ? { namedOtherAnchor: { company: "Ledgerfold" } } : {}),
+    }) as const;
+
+  const run = async (pages: readonly (typeof TIED)[], anchored = true) => {
+    const tools = toolPort([RESEARCH], (p) => outcomeWith(p, pages));
+    const built = build({
+      script: [
+        lookUpAdaeze,
+        { kind: "TEXT", text: JSON.stringify(analystResult(DRAFT)) },
+      ],
+      tools: tools.port,
+      userText: "What did the first one do before?",
+      earlierQ: FOUNDERS,
+    });
+    const outcome = await built.seam.answer({
+      ...built.request,
+      ...about(anchored),
+    });
+    expect(outcome.kind).toBe("ANSWERED");
+    const toolTurn = built.alpha.calls
+      .flatMap((call) => call.request.messages)
+      .filter((message) => message.role === "TOOL")
+      .map((message) => message.content)
+      .join("\n");
+    const answer = built.messages
+      .filter((message) => message.role === "Q")
+      .map((message) => message.content)
+      .at(-1);
+    return { toolTurn, answer: answer ?? "" };
+  };
+
+  it("a page naming the person but not the company never reaches the model; one naming both does", async () => {
+    const { toolTurn } = await run([TIED, NAMESAKE]);
+    expect(toolTurn).toContain("techpress.example");
+    expect(toolTurn).not.toContain("profiles.example");
+    expect(toolTurn).not.toContain("Access Bank");
+  });
+
+  it("the claim check lets no unanchored person fact through: the namesake's career is not said", async () => {
+    const { answer } = await run([TIED, NAMESAKE]);
+    expect(answer).toContain("SME lending");
+    expect(answer).not.toContain("Access Bank");
+    expect(answer).not.toContain("UBA Group");
+  });
+
+  it("with no page tying them, nothing from the web is said, and Q is told it may offer an anchored search", async () => {
+    const { toolTurn, answer } = await run([NAMESAKE]);
+    expect(toolTurn).not.toContain("profiles.example");
+    expect(toolTurn).toContain(
+      "No public page found here ties Adaeze Nwachukwu to Ledgerfold",
+    );
+    expect(toolTurn).toContain(
+      "look for public profiles of Adaeze Nwachukwu that mention Ledgerfold",
+    );
+    expect(answer).not.toContain("Access Bank");
+    expect(answer).not.toContain("UBA Group");
+  });
+
+  it("a person with no record behind them (a public figure asked by name) is searched as before", async () => {
+    const { toolTurn } = await run([NAMESAKE], false);
+    expect(toolTurn).toContain("profiles.example");
+  });
+});

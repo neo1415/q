@@ -179,6 +179,7 @@ import type {
 } from "@capital-q/q-runtime";
 import {
   foldConversationState,
+  personAnchorOf,
   renderConversationState,
   withFetchedRecords,
   withNamedReferences,
@@ -8086,6 +8087,16 @@ export function createSpecialistQAnswer(
             aboutNamedOther: read.aboutNamedOther,
             namedOther: read.namedOther ?? null,
           }),
+      // Live 2026-11-06 (6c8d108cf): a person Capital Q holds against a
+      // record is searched for only on pages that name that company too.
+      ...(() => {
+        if (read?.namedOther?.kind !== "PERSON") return {};
+        const company = personAnchorOf(
+          read.namedOther.name,
+          shownStateInRun.get(request.runId),
+        );
+        return company === null ? {} : { namedOtherAnchor: { company } };
+      })(),
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),

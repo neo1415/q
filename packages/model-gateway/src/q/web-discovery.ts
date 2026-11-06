@@ -7,6 +7,7 @@ import type {
 } from "@capital-q/q-runtime";
 
 import { countryWords, stageWords } from "./named-company-fact.js";
+import { namedIn, normalForm, pageTiesPerson } from "./person-anchor.js";
 import type { MandateCategories } from "./own-mandate-answer.js";
 import { Q_DEEP_TOOL_LOOP_BUDGET_MS } from "./tool-loop-budget.js";
 import type { WebDiscoveryReader } from "./web-discovery-reader.js";
@@ -256,33 +257,8 @@ export function planDiscovery(
 
 // --- grounding -------------------------------------------------------------
 
-/** One form for comparing names with page text. */
-export function normalForm(text: string): string {
-  return text
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[‘’ʼ`]/gu, "'")
-    .replace(/[‐-―]/gu, "-")
-    .replace(/\s+/gu, " ")
-    .trim();
-}
-
-/** The name, as written, is in the text (not inside a longer word). */
-export function namedIn(name: string, text: string): boolean {
-  const needle = normalForm(name);
-  if (needle.length < 2) return false;
-  const hay = normalForm(text);
-  let at = hay.indexOf(needle);
-  while (at >= 0) {
-    const before = at === 0 ? "" : hay.charAt(at - 1);
-    const after = hay.charAt(at + needle.length);
-    if (!/[\p{L}\p{N}]/u.test(before) && !/[\p{L}\p{N}]/u.test(after)) {
-      return true;
-    }
-    at = hay.indexOf(needle, at + 1);
-  }
-  return false;
-}
+// One form of names and the whole-word check, shared with person-anchor.ts.
+export { namedIn, normalForm };
 
 /** Most of a phrase's content words are on the page (a 5-letter stem). */
 function supportedBy(phrase: string, text: string): boolean {
@@ -357,7 +333,14 @@ export function admitDiscoveries(
         (founder) =>
           founder.length >= 3 &&
           normalForm(founder) !== key &&
-          naming.some((source) => namedIn(founder, pageText(source))),
+          // The same rule as any person Q holds against a record: the page
+          // names the founder AND the company (person-anchor.ts).
+          sources.some((source) =>
+            pageTiesPerson(
+              { text: pageText(source), domain: source.domain },
+              { person: founder, company: name },
+            ),
+          ),
       );
     const stage =
       item.stage !== null && namedIn(item.stage, text) ? item.stage : null;
