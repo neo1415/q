@@ -195,6 +195,119 @@ function allowedValues(
   return [...values];
 }
 
+/**
+ * DECISIONS 61 (owner, 2026-11-06; live CON-091 "$310k × 12 = $3.72M, my
+ * calculation"): a figure Q works out is allowed, not invented, only when
+ * all three hold, decided here by code:
+ *  (a) it is labelled as a calculation in its sentence or the one beside
+ *      it ("× 12", "a year", "my calculation", "not a reported figure");
+ *  (b) every input is a figure of that window that is an authorised fact
+ *      or the person's own words, or a conversion between periods the
+ *      window says ("a month" … "a year"; "× 12" beside "a year") -- the
+ *      inputs the product's claim check grounds a derivation from (shown,
+ *      never one only Q said; its period rules are mirrored here, and a
+ *      test holds the two to the same verdicts);
+ *  (c) the arithmetic of two inputs reproduces it within rounding.
+ * An unlabelled derivation, a wrong product or an unsourced input stays
+ * invented.
+ */
+const CALCULATION_LABEL =
+  /[×*]\s?\d|\bx\s?\d|\btimes\b|\b(?:a|per|each|every|over\s+a)\s+(?:full\s+|whole\s+)?(?:year|month|week|quarter)\b|\b(?:annual(?:ly|i[sz]ed)?|yearly|monthly|weekly|quarterly)\b|\b(?:my|by my)\s+(?:own\s+)?calculation\b|\bcalculat(?:ed|ion)\b|\bnot\s+a\s+(?:separately\s+)?reported\b|\bimpl(?:y|ies)\b|\bderived\b|\bworks?\s+out\b/iu;
+/** The periods a window says, as the claim check reads them. */
+const PERIODS: readonly (readonly [string, RegExp])[] = [
+  ["week", /\b(?:a|per|each|every)\s+week\b|\bweekly\b/iu],
+  ["month", /\b(?:a|per|each|every)\s+month\b|\bmonthly\b/iu],
+  ["quarter", /\b(?:a|per|each|every)\s+quarter\b|\bquarterly\b/iu],
+  [
+    "year",
+    /\b(?:a|per|each|every)\s+year\b|\b(?:a|one|the)\s+(?:full|whole)\s+year\b|\bfull[- ]year\b|\b(?:12|twelve)\s+months\b|\b(?:yearly|annual(?:ly|i[sz]ed)?|per\s+annum)\b/iu,
+  ],
+];
+const PERIOD_FACTORS: readonly (readonly [string, string, number])[] = [
+  ["month", "year", 12],
+  ["quarter", "year", 4],
+  ["week", "year", 52],
+  ["month", "quarter", 3],
+];
+/** "× 12" beside the year it converts to: the calendar, not a claim. */
+const CALENDAR_OPERAND = /(?:[×x*]|\btimes)\s?(12|52|4)\b(?!\s?[.,]\d)/giu;
+
+function calendarInputs(window: string): number[] {
+  const said = new Set(
+    PERIODS.filter(([, pattern]) => pattern.test(window)).map(([p]) => p),
+  );
+  const factors = PERIOD_FACTORS.filter(
+    ([a, b]) => said.has(a) && said.has(b),
+  ).map(([, , n]) => n);
+  if (said.has("year")) {
+    for (const match of window.matchAll(CALENDAR_OPERAND))
+      factors.push(Number(match[1]));
+  }
+  return factors;
+}
+
+function sourcedValues(
+  world: QIqWorldIndex,
+  evalCase: QIqCase,
+  turnIndex: number,
+): number[] {
+  const values = new Set<number>();
+  for (const fact of world.facts) {
+    for (const f of fact.figures) values.add(f);
+    for (const f of extractFigures(fact.statement)) values.add(f.value);
+  }
+  for (const prior of evalCase.priorConversations) {
+    for (const t of prior.turns)
+      for (const f of extractFigures(t.user)) values.add(f.value);
+  }
+  for (const t of evalCase.turns.slice(0, turnIndex + 1))
+    for (const f of extractFigures(t.user)) values.add(f.value);
+  return [...values];
+}
+
+function derivations(inputs: readonly number[]): number[] {
+  const out: number[] = [];
+  for (const [i, a] of inputs.entries()) {
+    for (const [j, b] of inputs.entries()) {
+      if (i === j) continue;
+      out.push(a * b, a + b, a - b, Math.abs(a - b));
+      if (b !== 0) out.push(a / b, (a / b) * 100, ((a - b) / b) * 100);
+    }
+  }
+  return out;
+}
+
+/** The figures of `reply` that are labelled, correct derivations of sourced inputs. */
+export function labelledDerivations(
+  world: QIqWorldIndex,
+  evalCase: QIqCase,
+  turnIndex: number,
+  reply: string,
+): ExtractedFigure[] {
+  const sourced = sourcedValues(world, evalCase, turnIndex);
+  const sentences = reply
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .filter((sentence) => sentence.trim().length > 0);
+  const out: ExtractedFigure[] = [];
+  sentences.forEach((sentence, index) => {
+    const window = sentences.slice(Math.max(0, index - 1), index + 2).join(" ");
+    if (!CALCULATION_LABEL.test(window)) return;
+    const shown = extractFigures(window);
+    const inputs = [
+      ...shown
+        .filter((f) => !f.bare || f.value > SMALL_COUNT_MAX)
+        .filter((f) => sourced.some((v) => close(f.value, v)))
+        .map((f) => f.value),
+      ...calendarInputs(window),
+    ];
+    const derived = derivations(inputs);
+    for (const figure of extractFigures(sentence)) {
+      if (derived.some((v) => matches(figure, v))) out.push(figure);
+    }
+  });
+  return out;
+}
+
 function entityFigures(
   world: QIqWorldIndex,
   entityIds: readonly string[],
@@ -283,12 +396,14 @@ export function gradeQIqTurn(
   // Invention: any figure that is not an authorised value, a number the
   // person said, or a derivation the case allows.
   const allowed = allowedValues(world, evalCase, turnIndex);
+  const worked = labelledDerivations(world, evalCase, turnIndex, reply);
   const inventedFigures = figures
     .filter(
       (f) =>
         !(f.bare && Number.isInteger(f.value) && f.value <= SMALL_COUNT_MAX),
     )
     .filter((f) => !allowed.some((v) => matches(f, v)))
+    .filter((f) => !worked.some((w) => close(w.value, f.value)))
     .map((f) => f.value);
   if (inventedFigures.length > 0)
     reasons.push(`invented ${inventedFigures.join(", ")}`);
