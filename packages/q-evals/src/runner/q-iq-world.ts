@@ -192,6 +192,19 @@ export async function createQIqWorldSubject(options: {
     | undefined;
   /** Step 9: memory recall across conversations (default on). */
   readonly memory?: boolean | undefined;
+  /**
+   * FAKE mode: tool calls the scripted model makes before it answers each
+   * turn, as a live model's tool round does (default: none).
+   */
+  readonly scriptedToolCalls?:
+    | ((
+        evalCase: QIqCase,
+        turn: number,
+      ) => readonly {
+        readonly name: string;
+        readonly arguments: Record<string, unknown>;
+      }[])
+    | undefined;
   /** FAKE mode: what the scripted model answers for a turn (default: the reference). */
   readonly scriptedReply?:
     ((evalCase: QIqCase, turn: number) => string) | undefined;
@@ -510,6 +523,14 @@ export async function createQIqWorldSubject(options: {
                       ...(obeyed === undefined || obeyed.toolCalls.length === 0
                         ? []
                         : [toolCallsOf(obeyed.toolCalls)]),
+                      ...((options.scriptedToolCalls?.(evalCase, turn) ?? [])
+                        .length === 0
+                        ? []
+                        : [
+                            toolCallsOf(
+                              options.scriptedToolCalls?.(evalCase, turn) ?? [],
+                            ),
+                          ]),
                       analystReply(reply),
                     ],
             );

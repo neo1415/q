@@ -366,6 +366,12 @@ export function toMessages(
   options: {
     readonly flattenTools?: boolean | undefined;
     readonly stableHead?: number | undefined;
+    /**
+     * Indexes (in `messages`) of the late SYSTEM notes that hold still from
+     * turn to turn: said, still as marked notes in the same user turn,
+     * right after the stable head, so they join the cached prefix.
+     */
+    readonly stableNotes?: ReadonlySet<number> | undefined;
   } = {},
 ): {
   readonly system: TextBlockParam[] | undefined;
@@ -406,6 +412,14 @@ export function toMessages(
   let firstUser = true;
   for (const [index, message] of messages.entries()) {
     if (message.role === "SYSTEM") {
+      // Already said after the stable head (stableNotes).
+      if (
+        options.stableHead !== undefined &&
+        options.stableHead > 0 &&
+        options.stableNotes?.has(index) === true
+      ) {
+        continue;
+      }
       if (leading !== -1 && index >= leading) {
         push("user", [
           { type: "text", text: `[Capital Q note] ${message.content}` },
@@ -422,14 +436,27 @@ export function toMessages(
         head > 0 &&
         head < message.content.length
       ) {
-        text.push(
-          {
+        const notes = [...(options.stableNotes ?? [])]
+          .sort((x, y) => x - y)
+          .map((at) => messages[at])
+          .filter(
+            (note): note is ModelMessage & { role: "SYSTEM" } =>
+              note !== undefined && note.role === "SYSTEM",
+          )
+          .map((note): TextBlockParam => ({
             type: "text",
-            text: message.content.slice(0, head),
-            cache_control: CACHE,
-          },
-          { type: "text", text: message.content.slice(head) },
-        );
+            text: `[Capital Q note] ${note.content}`,
+          }));
+        const stableBlocks: TextBlockParam[] = [
+          { type: "text", text: message.content.slice(0, head) },
+          ...notes,
+        ];
+        const lastStable = stableBlocks.at(-1);
+        if (lastStable !== undefined) lastStable.cache_control = CACHE;
+        text.push(...stableBlocks, {
+          type: "text",
+          text: message.content.slice(head),
+        });
       } else {
         text.push({ type: "text", text: message.content });
       }
@@ -828,6 +855,7 @@ export function toRequest(
   request: ModelProviderRequest,
   constrain = true,
   stableHead?: number,
+  stableNotes?: ReadonlySet<number>,
 ): MessageCreateParamsNonStreaming {
   const toolsOffered = request.tools.length > 0;
   const { thinking, effort } = thinkingFor(
@@ -861,7 +889,7 @@ export function toRequest(
   const { system, messages } = toMessages(
     request.messages,
     extra.length === 0 ? undefined : extra.join("\n\n"),
-    { flattenTools: !toolsOffered, stableHead },
+    { flattenTools: !toolsOffered, stableHead, stableNotes },
   );
   // By instruction, the last word is the format: a reminder at the end of
   // the final user turn (after every cache breakpoint, so the cached prefix
@@ -1003,8 +1031,9 @@ const STABLE_HEADS_MAX = 128;
 export function plainRequest(
   request: ModelProviderRequest,
   stableHead?: number,
+  stableNotes?: ReadonlySet<number>,
 ): MessageCreateParamsNonStreaming {
-  const params = toRequest(request, false, stableHead);
+  const params = toRequest(request, false, stableHead, stableNotes);
   if (
     (request.tools.length > 0 && continuesToolCalls(request.messages)) ||
     request.maxOutputTokens < THINKING_MIN_OUTPUT_TOKENS
@@ -1129,6 +1158,17 @@ export function createAnthropicModelProvider(
           (message) => message.role === "USER",
         );
         const original = request.messages[firstIndex];
+        // The SYSTEM notes directly after the first user message (Q's
+        // trusted notes on what it can do, how people write, and so on).
+        const noteIndexes: number[] = [];
+        for (
+          let at = firstIndex + 1;
+          firstIndex !== -1 && at < request.messages.length;
+          at += 1
+        ) {
+          if (request.messages[at]?.role !== "SYSTEM") break;
+          noteIndexes.push(at);
+        }
         const ordered =
           original === undefined || original.role !== "USER"
             ? undefined
@@ -1136,7 +1176,14 @@ export function createAnthropicModelProvider(
                 plainKey,
                 request.cacheKey ?? headKey,
                 original.content,
+                noteIndexes.map((at) => request.messages[at]?.content ?? ""),
               );
+        const stableNotes = new Set(
+          (ordered?.stableNotes ?? []).flatMap((i) => {
+            const at = noteIndexes[i];
+            return at === undefined ? [] : [at];
+          }),
+        );
         if (
           ordered !== undefined &&
           original !== undefined &&
@@ -1163,8 +1210,8 @@ export function createAnthropicModelProvider(
           }
         }
         const params = refusedShapes.has(plainKey)
-          ? plainRequest(request, stableHead)
-          : toRequest(request, true, stableHead);
+          ? plainRequest(request, stableHead, stableNotes)
+          : toRequest(request, true, stableHead, stableNotes);
         try {
           const message = await send(params);
           // An empty end_turn -- no text, no tool call -- answers nothing.
@@ -1180,7 +1227,7 @@ export function createAnthropicModelProvider(
             // so the retry always runs at the model's default thinking,
             // continuation or not. If the API refuses that, the refusal is
             // the failure, which is no worse than an empty answer.
-            const again = toRequest(request, false, stableHead);
+            const again = toRequest(request, false, stableHead, stableNotes);
             // A short reply keeps thinking off (it would eat the budget).
             const { thinking: _off, ...retry } = again;
             return result(
@@ -1203,7 +1250,7 @@ export function createAnthropicModelProvider(
           // silences every answer that uses it (live 2026-11-06: every Q
           // turn on Claude published nothing). A 400 is refused before any
           // output, so nothing was streamed and nothing billed.
-          const plain = plainRequest(request, stableHead);
+          const plain = plainRequest(request, stableHead, stableNotes);
           if (
             !(error instanceof APIError) ||
             error.status !== 400 ||

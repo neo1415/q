@@ -992,3 +992,36 @@ describe("anthropic adapter: tool narration (DECISIONS 67 follow-up)", () => {
     expect(JSON.stringify(plain)).not.toContain(TOOL_USE_GUIDANCE);
   });
 });
+
+describe("anthropic adapter: stable notes in the cached head (DECISIONS 68)", () => {
+  it("says a stable note once, after the stable head and before the per-turn tail", () => {
+    const head = "Stable rules.\n".repeat(200);
+    const tail = "THE PERSON'S MESSAGE\nWhen did he join?";
+    const { messages } = toMessages(
+      [
+        { role: "SYSTEM", content: SYSTEM },
+        { role: "USER", content: head + tail },
+        { role: "SYSTEM", content: "THEIR WORDS MAY BE MESSY: stable." },
+        { role: "SYSTEM", content: "WHAT YOU ALREADY SAID: turn 2." },
+      ],
+      undefined,
+      { stableHead: head.length, stableNotes: new Set([2]) },
+    );
+    const blocks = messages[0]?.content as {
+      text: string;
+      cache_control?: unknown;
+    }[];
+    expect(
+      blocks.map((b) => [b.text.slice(0, 24), b.cache_control !== undefined]),
+    ).toEqual([
+      ["Stable rules.\nStable rul", false],
+      ["[Capital Q note] THEIR W", true],
+      ["THE PERSON'S MESSAGE\nWhe", true],
+      ["[Capital Q note] WHAT YO", false],
+    ]);
+    // Said once: the stable note is not repeated where it stood.
+    expect(
+      JSON.stringify(messages).split("THEIR WORDS MAY BE MESSY").length,
+    ).toBe(2);
+  });
+});
