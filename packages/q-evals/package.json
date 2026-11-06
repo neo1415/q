@@ -47,6 +47,7 @@
     "@capital-q/q-firewall": "workspace:*",
     "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/q-orchestrator": "workspace:*",
+    "@capital-q/q-research": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/q-specialists": "workspace:*",
     "@capital-q/q-tools": "workspace:*",

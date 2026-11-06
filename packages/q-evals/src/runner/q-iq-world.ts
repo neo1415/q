@@ -17,6 +17,10 @@ import {
   createPostgresMemoryRepository,
   type MemoryService,
 } from "@capital-q/q-knowledge";
+import {
+  createPublicWebResearchService,
+  type PublicWebResearchProvider,
+} from "@capital-q/q-research";
 import { createSpecialistQAnswer } from "@capital-q/q-specialists";
 
 import {
@@ -194,6 +198,13 @@ export async function createQIqWorldSubject(options: {
   readonly compromised?: boolean | undefined;
   /** The outer layer's logger (default: errors only), e.g. for timings. */
   readonly logger?: Logger | undefined;
+  /**
+   * DISCOVERY: the research tools over a scripted web (each case's `web`
+   * pages, found by the words a query carries), the turn read by its
+   * `webScript` reading and the page reader answered by its replies.
+   * Every query that reaches the scripted web is reported per turn.
+   */
+  readonly web?: boolean | undefined;
 }): Promise<QIqWorldSubject> {
   // Filled once the world exists; the specialist reads it lazily, per run.
   const holder: { world?: QEvalWorld } = {};
@@ -214,7 +225,53 @@ export async function createQIqWorldSubject(options: {
   const turnReader = options.turnReader ?? options.providerMode === "LIVE";
   /** The case and turn being said, for the scripted reader. */
   const saying: { evalCase?: QIqCase; turn: number } = { turn: 0 };
-  const scripted = options.scriptedReader;
+  // DISCOVERY: a discovery turn is read as its script says (by meaning,
+  // as the live reader would); any other turn as the caller scripts it.
+  const scripted =
+    options.web === true
+      ? (
+          evalCase: QIqCase,
+          turn: number,
+          input: Parameters<QTurnReader["read"]>[0],
+        ): QTurnReading | null => {
+          const script = evalCase.turns[turn]?.webScript;
+          if (script === undefined) {
+            return options.scriptedReader?.(evalCase, turn, input) ?? null;
+          }
+          return webReading(evalCase.turns[turn]?.user ?? "", script.reading);
+        }
+      : options.scriptedReader;
+  // DISCOVERY: the scripted public web, and every query that reached it.
+  const egress: string[] = [];
+  const webProvider: PublicWebResearchProvider = {
+    code: "fake",
+    search: (request) => {
+      egress.push(request.query);
+      const words = request.query.toLowerCase();
+      const hits = (saying.evalCase?.web ?? [])
+        .filter((page) => page.foundBy.some((word) => words.includes(word)))
+        .slice(0, request.maxResults)
+        .map((page) => ({
+          url: page.url,
+          title: page.title,
+          snippet: page.snippet.slice(0, 600),
+          publishedAt: null,
+          relevance: null,
+        }));
+      return Promise.resolve({ hits, latencyMs: 1 });
+    },
+    extract: (request) => {
+      const pages = (saying.evalCase?.web ?? [])
+        .filter((page) => request.urls.includes(page.url))
+        .map((page) => ({ url: page.url, title: page.title, text: page.text }));
+      const known = new Set(pages.map((page) => page.url));
+      return Promise.resolve({
+        pages,
+        failedUrls: request.urls.filter((url) => !known.has(url)),
+        latencyMs: 1,
+      });
+    },
+  };
   const turns: QTurnReader | undefined = turnReader
     ? createQTurnReader({
         gateway: proxy(() => w().gateway),
@@ -279,6 +336,14 @@ export async function createQIqWorldSubject(options: {
 
   holder.world = await createQEvalWorld({
     db: options.db,
+    ...(options.web === true
+      ? {
+          research: createPublicWebResearchService({
+            provider: webProvider,
+            logger,
+          }),
+        }
+      : {}),
     ...(recall === null ? {} : { memory: () => recall }),
     providerMode: options.providerMode,
     secrets: options.secrets,
@@ -404,14 +469,24 @@ export async function createQIqWorldSubject(options: {
               options.scriptedReply?.(evalCase, turn) ??
               evalCase.turns[turn]?.reference ??
               "";
-            w().setScript([
-              ...(obeyed === undefined || obeyed.toolCalls.length === 0
-                ? []
-                : [toolCallsOf(obeyed.toolCalls)]),
-              analystReply(reply),
-            ]);
+            const pageReader = evalCase.turns[turn]?.webScript?.readerReplies;
+            w().setScript(
+              options.web === true && pageReader !== undefined
+                ? // DISCOVERY: the page reader's replies, in call order.
+                  pageReader.map((value): FakeBehaviour => ({
+                    kind: "JSON",
+                    value,
+                  }))
+                : [
+                    ...(obeyed === undefined || obeyed.toolCalls.length === 0
+                      ? []
+                      : [toolCallsOf(obeyed.toolCalls)]),
+                    analystReply(reply),
+                  ],
+            );
           }
           const observedBefore = w().answer.lastObservation();
+          const egressBefore = egress.length;
           saying.evalCase = evalCase;
           saying.turn = turn;
           turn += 1;
@@ -424,7 +499,19 @@ export async function createQIqWorldSubject(options: {
               capability: "ANSWER",
               message: { text },
               modality: "TEXT",
-              subjects: [],
+              // DISCOVERY: an investor's turn carries their own organisation,
+              // as the app sends it, so the plan holds their own mandate.
+              subjects:
+                options.web === true &&
+                evalCase.actor === "INVESTOR" &&
+                evalCase.turns[turn - 1]?.webScript !== undefined
+                  ? [
+                      {
+                        kind: "INVESTOR_ORGANISATION",
+                        investorOrganisationId: w().ids.investorApex as never,
+                      },
+                    ]
+                  : [],
               ...(conversationId === null ? {} : { conversationId }),
             },
             idempotencyKey: `q-iq-${randomUUID()}`,
@@ -463,6 +550,7 @@ export async function createQIqWorldSubject(options: {
           return {
             text: reply.length === 0 ? "(no reply)" : reply,
             toolsRun,
+            egress: egress.slice(egressBefore),
             latencyMs,
             costUsd: after.cost - before.cost,
             inputTokens: after.input - before.input,
@@ -481,5 +569,50 @@ export async function createQIqWorldSubject(options: {
       w().setFactList(null);
       await w().close();
     },
+  };
+}
+
+/**
+ * DISCOVERY: the reading a live reader gives a turn that asks Q to find
+ * companies out on the web -- discoverWhom COMPANIES, on a research request
+ * or a question that asks for the web -- with any categories the turn said.
+ */
+function webReading(
+  user: string,
+  reading: NonNullable<QIqCase["turns"][number]["webScript"]>["reading"],
+): QTurnReading {
+  const named =
+    reading.sectors.length > 0 ||
+    reading.countries.length > 0 ||
+    reading.stages.length > 0;
+  return {
+    kind: reading.kind,
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: named
+      ? {
+          kind: "DISCOVER_COMPANIES",
+          text: user,
+          about: [],
+          subject: null,
+          count: null,
+          discover: {
+            sectors: reading.sectors,
+            countries: reading.countries,
+            stages: reading.stages,
+            ranking: "NONE",
+            mandateRelevant: false,
+            previous: false,
+            raising: false,
+            verifiedOnly: false,
+            hasPitch: false,
+            raiseShared: false,
+          },
+        }
+      : null,
+    aboutNamedOther: false,
+    tool: null,
+    discoverWhom: "COMPANIES",
+    asksForWeb: true,
   };
 }

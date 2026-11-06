@@ -1875,6 +1875,9 @@ importers:
       '@capital-q/q-orchestrator':
         specifier: workspace:*
         version: link:../q-orchestrator
+      '@capital-q/q-research':
+        specifier: workspace:*
+        version: link:../q-research
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../q-runtime

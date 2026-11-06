@@ -4322,8 +4322,30 @@ export function createModelGatewayQAnswer(
     // Owner 2026-11-06: companies out on the public web, found by a
     // discovery plan from the mandate's categories (web-discovery.ts),
     // through this run's tools, plan and firewall.
-    const webDiscoveryFor = (ask: WebDiscoveryAsk, mandate: unknown) =>
-      runWebDiscovery({
+    const webDiscoveryFor = async (ask: WebDiscoveryAsk, prepared: unknown) => {
+      // The mandate is read through its authorised tool when this turn's
+      // prepared reads did not need it (an investor's own mandate only).
+      let mandate = prepared;
+      const investorOrg = ownInvestorOrganisationIn(request.plan);
+      if (
+        (mandate === null || mandate === undefined) &&
+        investorOrg !== null &&
+        prefetchTools.has("get_investor_mandate")
+      ) {
+        const outcome = await tools
+          .execute(
+            {
+              callId: "q-discovery-mandate",
+              name: "get_investor_mandate",
+              arguments: { investorOrganisationId: investorOrg },
+            },
+            toolContext,
+          )
+          .catch(() => null);
+        if (outcome !== null && outcome.result.ok)
+          mandate = outcome.result.data;
+      }
+      return runWebDiscovery({
         ask,
         mandate: mandateCategories(mandate),
         tools,
@@ -4342,6 +4364,7 @@ export function createModelGatewayQAnswer(
         );
         return null;
       });
+    };
     const investorsFor = (ask: InvestorAsk, companyId: string | null) =>
       runInvestorDiscovery({
         ask,

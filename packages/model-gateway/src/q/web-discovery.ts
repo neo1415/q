@@ -59,8 +59,12 @@ export const DISCOVERY_DEFAULT_COUNT = 8;
 export const DISCOVERY_MAX_COUNT = 10;
 /** Tool calls the whole discovery may make (the deep loop's call cap). */
 export const DISCOVERY_MAX_TOOL_CALLS = 16;
-/** Candidates searched for founders in round two. */
-const FOUNDER_ROUND_MAX = 6;
+/**
+ * Candidates searched for founders in round two: two to a call, so round
+ * two is at most two research calls and the whole discovery at most five,
+ * the research service's discovery budget per run.
+ */
+const FOUNDER_ROUND_MAX = 4;
 /** Pages read further when a search returned only a snippet. */
 const EXTRACT_MAX = 3;
 /** No new round starts once this share of the budget is spent. */
@@ -98,9 +102,12 @@ export type DiscoveryPlan = {
   readonly sectorCodes: readonly string[];
   readonly countryCodes: readonly string[];
   readonly stageCodes: readonly string[];
+  readonly regionCodes: readonly string[];
   readonly queries: readonly string[];
-  /** From the mandate (true) or only the turn's own words (false). */
+  /** Some category came from the mandate (the turn did not name it). */
   readonly fromMandate: boolean;
+  /** The turn itself named a sector, place or stage. */
+  readonly askNamed: boolean;
 };
 
 const wordsOf = (code: string): string => code.replace(/_/gu, " ").trim();
@@ -233,8 +240,11 @@ export function planDiscovery(
     sectorCodes,
     countryCodes,
     stageCodes,
+    regionCodes,
     queries,
     fromMandate,
+    askNamed:
+      askSectors.length > 0 || askCountries.length > 0 || askStages.length > 0,
   };
 }
 
@@ -551,6 +561,28 @@ function lookingLine(plan: DiscoveryPlan): string {
   return parts.join("; ");
 }
 
+/** What was searched for, as a phrase ("fintech companies in Nigeria"). */
+function lookingPhrase(plan: DiscoveryPlan): string | null {
+  if (
+    plan.sectors.length === 0 &&
+    plan.stages.length === 0 &&
+    plan.places.length === 0
+  ) {
+    return null;
+  }
+  const sectors =
+    plan.sectors.length > 0 ? `${listOf(plan.sectors, "or")} ` : "";
+  const stages =
+    plan.stages.length === 0
+      ? ""
+      : plan.stages.length > 2
+        ? ` at ${plan.stages[0] ?? ""} to ${plan.stages[plan.stages.length - 1] ?? ""}`
+        : ` at ${listOf(plan.stages, "or")}`;
+  const places =
+    plan.places.length > 0 ? ` in ${listOf(plan.places, "or")}` : "";
+  return `${sectors}companies${stages}${places}`;
+}
+
 /**
  * Runs the discovery through the run's own tool port (authorise, Context
  * Firewall, egress composition and the research breakers all apply).
@@ -620,7 +652,21 @@ export async function runWebDiscovery(input: {
   };
   let unavailable = 0;
   let answered = 0;
-  const research = async (queries: readonly string[], maxSources: number) => {
+  // The categories travel as codes: the research tool admits only real
+  // taxonomy categories and ISO countries, by their public names, so the
+  // mandate's categories reach the query although the person never said
+  // them (egress.ts lets out only their own words otherwise).
+  const categories = {
+    sectors: plan.sectorCodes.slice(0, 6),
+    countries: plan.countryCodes.slice(0, 6),
+    stages: plan.stageCodes.slice(0, 6),
+    regions: plan.regionCodes.slice(0, 6),
+  };
+  const research = async (
+    queries: readonly string[],
+    maxSources: number,
+    pageNames?: readonly string[],
+  ) => {
     const [query, ...also] = queries;
     if (query === undefined) return;
     const outcome = await call(RESEARCH_TOOL, {
@@ -628,6 +674,12 @@ export async function runWebDiscovery(input: {
       query,
       ...(also.length === 0 ? {} : { alsoSearch: also }),
       maxSources,
+      categories,
+      // Round two: the companies' names, as the pages of this run wrote
+      // them; the research tool searches a name only if it was there.
+      ...(pageNames === undefined || pageNames.length === 0
+        ? {}
+        : { pageNames }),
     });
     if (outcome === null) return;
     const read = sourcesOf(outcome);
@@ -721,7 +773,15 @@ export async function runWebDiscovery(input: {
     for (let i = 0; i < asks.length; i += 2) {
       founderPairs.push(asks.slice(i, i + 2));
     }
-    await Promise.all(founderPairs.map((pair) => research(pair, 3)));
+    await Promise.all(
+      founderPairs.map((pair) =>
+        research(
+          pair,
+          3,
+          pair.map((ask) => ask.replace(/ founder$/u, "")),
+        ),
+      ),
+    );
     const newPages = readable().filter((source) => !before.has(source.url));
     if (newPages.length > 0) {
       const more =
@@ -821,11 +881,11 @@ export function discoveryAnswerText(
   plan: DiscoveryPlan,
   fetched: ReadonlyMap<string, FetchedSource>,
 ): string {
-  const looking = lookingLine(plan);
+  const looking = lookingPhrase(plan);
   const against =
-    looking.length === 0
+    looking === null
       ? ""
-      : plan.fromMandate
+      : plan.fromMandate && !plan.askNamed
         ? ` against your mandate (${looking})`
         : ` for ${looking}`;
   if (companies.length === 0) {
