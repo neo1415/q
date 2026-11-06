@@ -5,7 +5,7 @@ import type { ModelProviderCode, QConversationId } from "@capital-q/contracts";
 import type { RequestDatabase } from "@capital-q/database";
 import type { FakeBehaviour } from "@capital-q/model-gateway";
 import { createQTurnReader } from "@capital-q/model-gateway/q";
-import { createLogger } from "@capital-q/observability";
+import { createLogger, type Logger } from "@capital-q/observability";
 import type { AuthorisedFact } from "@capital-q/q-core";
 import { createSpecialistQAnswer } from "@capital-q/q-specialists";
 
@@ -77,6 +77,8 @@ export async function createQIqWorldSubject(options: {
   /** FAKE mode: what the scripted model answers for a turn (default: the reference). */
   readonly scriptedReply?:
     ((evalCase: QIqCase, turn: number) => string) | undefined;
+  /** The outer layer's logger (default: errors only), e.g. for timings. */
+  readonly logger?: Logger | undefined;
 }): Promise<QIqWorldSubject> {
   // Filled once the world exists; the specialist reads it lazily, per run.
   const holder: { world?: QEvalWorld } = {};
@@ -88,10 +90,12 @@ export async function createQIqWorldSubject(options: {
     new Proxy({} as T, {
       get: (_target, key: string) => (pick() as Record<string, unknown>)[key],
     });
-  const logger = createLogger(
-    { serviceName: "q-iq", environment: "local" },
-    { level: "error" },
-  );
+  const logger =
+    options.logger ??
+    createLogger(
+      { serviceName: "q-iq", environment: "local" },
+      { level: "error" },
+    );
   const turnReader = options.turnReader ?? options.providerMode === "LIVE";
 
   holder.world = await createQEvalWorld({

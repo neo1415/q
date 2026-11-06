@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { createConversationStateCache } from "../application/conversation-state-cache.js";
 import type { QConversationStateRepository } from "../application/ports.js";
 import {
   EMPTY_CONVERSATION_LEDGER,
@@ -69,6 +70,9 @@ function toState(row: unknown): QConversationState | null {
 
 export function createPostgresConversationStates(): QConversationStateRepository {
   return {
+    // One per repository set, so one per process in q-api: the answer path
+    // and the memory learner share it (step 11).
+    cache: createConversationStateCache(),
     find: async (executor, tenantId, userId, conversationId) => {
       const rows = await executor`
         select conversation_id::text, tenant_id::text, user_id::text, ledger,

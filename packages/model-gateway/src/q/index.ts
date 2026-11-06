@@ -128,6 +128,7 @@ import {
   type TurnAnswerKind,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
+import { createStageClock } from "./stage-clock.js";
 import {
   appendRunEvent,
   appendRunEventAtomic,
@@ -5293,6 +5294,10 @@ export function createModelGatewayQAnswer(
       const startedAt = Date.now();
       let mark = startedAt;
       const phases: Record<string, number> = {};
+      // Step 11: the checks every sentence passes, summed per stage.
+      const stageClock = createStageClock();
+      /** Step 11: the model's first words, from the seam's start. */
+      let firstTextMs: number | null = null;
       /**
        * Code's opening lines for this answer: the caller's (readiness), or
        * an early grounded line this answer composes from its own reads
@@ -5383,7 +5388,7 @@ export function createModelGatewayQAnswer(
         latest,
         earlier,
         toolContext: preparedToolContext,
-        assembled,
+        assembled: warmedAssembled,
         profile,
         offeredForRun,
         availableForRun,
@@ -5475,6 +5480,31 @@ export function createModelGatewayQAnswer(
       const compareIds = lateCompare?.ids ?? preparedCompareIds;
       const compareTable = lateCompare?.table ?? preparedCompareTable;
       const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
+      /**
+       * Step 11 (A2): the warmed prepare searched the documents before the
+       * turn was read, with the person's words alone. The reading's
+       * binding (step 5's ledger focus) and its compound parts arrive on
+       * this request; the search is asked again with them, started now
+       * and awaited only when the prompt is assembled. The evidence port
+       * keeps one result per run and query plan, so a reading that changes
+       * nothing about the searches costs nothing. A failed refinement
+       * keeps the warmed result.
+       */
+      const refinesRetrieval =
+        warmed !== undefined &&
+        (request.retrievalFocus !== undefined ||
+          (request.askParts?.length ?? 0) >= 2);
+      let retrievalRefineMs: number | null = null;
+      const assembledRead: Promise<typeof warmedAssembled> = refinesRetrieval
+        ? (() => {
+            const refineStarted = Date.now();
+            return phased("assemble-refined", () => context.assemble(request))
+              .catch(() => warmedAssembled)
+              .finally(() => {
+                retrievalRefineMs = Date.now() - refineStarted;
+              });
+          })()
+        : Promise.resolve(warmedAssembled);
       /** The selected company, for who "they" is in a research follow-up. */
       const selectedForResearch = (): SelectedCompany | null => {
         const subject = request.subjects.find(
@@ -6222,6 +6252,7 @@ export function createModelGatewayQAnswer(
       // assembled again once the wide reads land (a turn that skipped them
       // and was not, after all, answered by code).
       const assemblePrompt = async (w: WideReads) => {
+        const assembled = await assembledRead;
         const facts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
@@ -6883,13 +6914,16 @@ export function createModelGatewayQAnswer(
         const claimed =
           caveatedRaw === null || caveatedRaw.length === 0
             ? null
-            : claims.sentence(caveatedRaw);
+            : stageClock.time("claimCheck", () => claims.sentence(caveatedRaw));
         if (claimed !== null) logUngrounded(claimed.ungrounded, "stream");
         // No action is said done that no tool of this run did (step 8).
+        const claimedText = claimed?.text;
         const kept =
-          claimed?.text === null || claimed?.text === undefined
+          claimedText === null || claimedText === undefined
             ? null
-            : promised.sentence(claimed.text);
+            : stageClock.time("promiseCheck", () =>
+                promised.sentence(claimedText),
+              );
         if (kept !== null) logUnbacked(kept.unbacked, "stream");
         const caveated = kept?.text ?? null;
         if (caveated === null || caveated.length === 0) {
@@ -6971,6 +7005,9 @@ export function createModelGatewayQAnswer(
       /** What the extras' writer has written so far (parallel-extras.ts). */
       let extrasSeen = "";
       const onTextDelta = (fragment: string): void => {
+        if (firstTextMs === null && fragment.length > 0) {
+          firstTextMs = Date.now() - startedAt;
+        }
         seenText += fragment;
         for (const raw of liveFindings.push(seenText)) showLive(raw);
         const fresh = partial.push(seenText);
@@ -10340,15 +10377,13 @@ export function createModelGatewayQAnswer(
         );
         // Step 6: the stored answer is held to the same check the streamed
         // sentences were, so the screen never shows what voice withheld.
-        const answerClaims = checkAnswer(
-          recommendationGuarded.text,
-          claimCorpus(claimSources()),
+        const answerClaims = stageClock.time("claimCheckAnswer", () =>
+          checkAnswer(recommendationGuarded.text, claimCorpus(claimSources())),
         );
         logUngrounded(answerClaims.ungrounded, "answer");
         // Step 8: the stored answer is held to the same promise check.
-        const answerPromises = checkPromises(
-          answerClaims.text,
-          promiseGrounds(),
+        const answerPromises = stageClock.time("promiseCheckAnswer", () =>
+          checkPromises(answerClaims.text, promiseGrounds()),
         );
         logUnbacked(answerPromises.unbacked, "answer");
         const guarded = {
@@ -11181,6 +11216,22 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             // model wrote its object in an order this cannot read.
             streamedCharacters: streamedText.length,
             firstPublishedMs,
+            // Step 11: per-stage timing past the prepare. The model's first
+            // words (seam start), the first sentence the person got counted
+            // from their message (the p50/p95 bar), the reading-bound
+            // search, and the per-sentence and final checks.
+            firstTextMs,
+            firstSentenceSinceMessageMs:
+              firstPublishedMs === null
+                ? null
+                : (() => {
+                    const at = Date.parse(latest.createdAt);
+                    return Number.isFinite(at)
+                      ? startedAt + firstPublishedMs - at
+                      : null;
+                  })(),
+            retrievalRefineMs,
+            checks: stageClock.snapshot(),
             // Round 5: the answer's output, and which parts it went to.
             outputTokens: final.usage.outputTokens,
             outputSplit: outputSplitOf(analyst),
