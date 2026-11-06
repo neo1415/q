@@ -1,21 +1,20 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 6 November 2026, 03:35 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 6 November 2026, 04:05 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
-Production: all four services on `5ed2f21c8` (steps 2–5, 7, 8, 11 + fixes). Hosted migrations 273 = local 273. Rollback: `f08525117`.
+Production: all four services on `1ef895999`, carrying **Q Intelligence steps 1–11** (3c held). Hosted migrations 274 = local 274. Rollback: `5ed2f21c8`.
 
-| Area                                                                                              | State                                                                   | Evidence / next                                                                                                            |
-| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Steps 2, 3, 4, 5, 7, 8, 11 + fixes                                                                | PRODUCTION VERIFIED                                                     | live14–live18                                                                                                              |
-| **Latency** (first sentence p50 bar 2.5 s)                                                        | NOT MET: 6.2 s / 4.4 s                                                  | live18. The turn reader takes 4–5 s on the critical path. Lane `feat/q-reader-latency`, `session_01Wncmn5z1WBfxuuj9J3xMhW` |
-| Step 9: memory provenance + past-turn recall (scripted memory 45/45)                              | MERGED `2cfa07bb5`, CI running                                          | Then pgTAP → apply `20261231271900` (GIN index; 10,920 rows / 12 MB, builds in under 1 s) → deploy                         |
-| Step 10: grounded workforce + ADVERSARIAL Q-IQ (36/36)                                            | GATES GREEN; re-gating after merging step 9 (conflict in q-iq-world.ts) | `session_01Wncmn4vd5MvBG8wD5fG8Sn`                                                                                         |
-| CI integration job                                                                                | ON (first run green)                                                    | Promote to required in `quality` after a few runs; issue #562 (taxonomy alias) needs a reference-data decision             |
-| Step 3c (remove reference regexes)                                                                | HELD                                                                    | Needs live Q-IQ                                                                                                            |
-| Live Q-IQ / step 12 certification                                                                 | WAITING ON OWNER OK                                                     | About $5.5 per run; check the OpenAI balance first                                                                         |
-| Owner UI follow-ups (phone top bar, "Hide from Q", "Clear")                                       | OWNER TO SAY                                                            | live13                                                                                                                     |
-| 2-hourly continuation                                                                             | ON                                                                      | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                                                                            |
-| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN                                                            | HANDOFF-2026-11-05 §6                                                                                                      |
+| Area                                                                                              | State                       | Evidence / next                                                                                   |
+| ------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
+| Steps 1–11 (3c held) + fixes                                                                      | PRODUCTION VERIFIED         | live12–live19 (`receipts/2026-11-06-live19-1ef8959/`)                                             |
+| Scripted Q-IQ                                                                                     | 573/573 + ADVERSARIAL 36/36 | Step 10 receipt                                                                                   |
+| **Latency** (first sentence p50 bar 2.5 s)                                                        | NOT MET: 6.2 s / 4.4 s      | The turn reader takes 4–5 s. Lane `feat/q-reader-latency`, `session_01Wncmn5z1WBfxuuj9J3xMhW`     |
+| Step 3c (remove reference regexes)                                                                | HELD                        | Needs live Q-IQ with and without                                                                  |
+| Step 12 certification: 3 live Q-IQ runs + 20 owner conversations                                  | WAITING ON OWNER OK         | About $5.5 per run; check the OpenAI balance first                                                |
+| CI integration job                                                                                | ON                          | Promote to required after a few runs; issue #562 (taxonomy alias) needs a reference-data decision |
+| Owner UI follow-ups (phone top bar, "Hide from Q", "Clear")                                       | OWNER TO SAY                | live13                                                                                            |
+| 2-hourly continuation                                                                             | ON                          | `trig_01Lw52gWWexsrrMf7kbrPnPc`                                                                   |
+| Hey Q pause per tab / privacy cap; 20 unreachable pitch videos; refusal-message fix not on remote | OWNER / OPEN                | HANDOFF-2026-11-05 §6                                                                             |
 
 ## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
