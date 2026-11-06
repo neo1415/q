@@ -1645,3 +1645,12 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Dataset** (genuinely wrong): ADV-153 #2 "Where are they based?" required the sector, so it now requires the city; ADV-156 #1 (and FUP-040 #2) expected "unknown" for Nyota's schools although 64 vs 52 paying schools are planted.
 - **Found, not fixed (reported):** the claim check publishes a wrong small difference ("33" for 78−41), because a number derivable from any two figures of one source line counts as grounded. COR-054 #1: the correction reply restates the superseded $70k with attribution and the grader calls it wrong-entity; that needs an owner decision. ORD-029 #0 is not reproduced (the claim check keeps every plausible Silo Credit line).
 - **Gates:** package build 54/54; root tsc 0; vitest q-core/model-gateway/q-specialists/q-evals 4221 passed; apps/q-api 3131 passed; Q-IQ `CQ_Q_IQ_ALL=1` 6/6 (573 turns `fails: []`, adversarial 1.0/1.0, follow-ups, live gaps and remaining gaps `[]`, failing-first on the old build); references/retrieval/wire 5/5; eslint and prettier clean. No live calls.
+
+## 2026-11-06 21:10 UTC — integration owner (session_01Wncmn73d4XJWmh1N9ECao7)
+
+- The OpenAI credit ran out at 18:56; the Claude backup served production. The owner topped up for the last time. DECISIONS 68–70 recorded (no OpenAI evals; Anthropic test budget $50; intelligence first; OpenAI primary and Sonnet backup; one CI run per batch).
+- Deployed 2dba5ed8c (reader thinking off; live26: readMs 1.4–1.7 s, binding held) and c2346a404 (ElevenLabs voice fallback).
+- Q on Claude paid runs (Anthropic):
+  - run 1, 71% ($1.56);
+  - run 2 with Sonnet throughout plus the scope line, 39/42 = Q on OpenAI ($1.74).
+- d09aec914 in CI: Claude parity (migration 20261231360000) plus Q remaining gaps. Full local gates passed first: 7507 tests, root tsc 0.

@@ -1,19 +1,20 @@
 # Active tasks — authoritative cross-model board
 
-## Live board — 6 November 2026, 19:20 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
+## Live board — 6 November 2026, 21:10 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
-Production: all four services on `f0b4503b0` (18:45). Hosted migrations 280. Routes v2: OpenAI → Claude → Groq (small requests only). **The OpenAI credit ran out at 18:56; Claude served production (verified live). The owner is topping up for the last time: DECISIONS 68, no live evals on OpenAI.** Rollback: `f580935bb`.
+Production: all four services on `c2346a404` (20:28). Hosted migrations 280. Routes v2: OpenAI first; Claude backup (Haiku for the fast classes until 20261231360000). Rollback: `2dba5ed8c`. Governing decisions: **68–70** (no OpenAI evals; Anthropic test budget $50; intelligence first; OpenAI primary and Sonnet backup; one CI run per batch).
 
-| Area                                                                                             | State                                                                      | Evidence / next                                               |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Discovery rounds 5+6 (hand-off fix, yield floor ≥5, honest counts, no stray tie line)            | PRODUCTION VERIFIED                                                        | Live 18:58: listed 5, 4 with founders, 12 sources (q-api log) |
-| Follow-ups and numbers fix (reader v81, facts-held names)                                        | PRODUCTION                                                                 | Targeted live: FOLLOW_UPS 100%, NUMBERS 98.6% (BASELINE.md)   |
-| Voice view final (presence + full cards in conversation; Chat releases mic; continuation opener) | PRODUCTION VERIFIED                                                        | receipts/2026-11-06-live25                                    |
-| Q-on-Claude parity + prompt caching (DECISIONS 68)                                               | IN LANE session_01Wncmn3U58HLnxnr7yKuGFf `fix/q-claude-parity`             | Scripted first; one ~12-case Anthropic run, at most $4        |
-| Voice falls back to ElevenLabs when OpenAI is exhausted                                          | IN LANE session_01Wncmn7LanmxRBs1Eoe8por `fix/q-voice-elevenlabs-fallback` |                                                               |
-| Speed (reader reasoning off, parallel waits)                                                     | IN LANE session_01Wncmn4BQnwUu8PoUpcMjfu `fix/q-reader-speed`              | Deterministic timing harness; no OpenAI live                  |
-| Full Q-IQ run 3                                                                                  | BLOCKED by DECISIONS 68                                                    | Re-run only on Anthropic, if at all                           |
-| Talent Q-style sidebar                                                                           | PROPOSAL; owner decisions pending                                          |                                                               |
+| Area                                                                                                                     | State                                                                   | Evidence / next                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Reader thinking OFF (readMs 4–5 s → 1.4–1.7 s)                                                                           | PRODUCTION VERIFIED                                                     | receipts/2026-11-06-live26                                                              |
+| ElevenLabs voice fallback (Deepgram STT + Q on Claude + ElevenLabs eleven_v4_turbo, Sarah/Daniel) when OpenAI is out     | PRODUCTION                                                              | Normal voice and mic release re-checked (live27); the fallback path is covered by tests |
+| Q on Claude: Sonnet throughout, answer-scope line, caching (≈$0.145/case, cache reads 80–99%)                            | IN CI `d09aec914`, migration **20261231360000**                         | Paid run 2: 39/42 = Q on OpenAI's 39/42 on the same cases. Apply 360000 after pgTAP     |
+| Q remaining gaps (pronouns via facts, facts-held names inside an untrusted fence, labelled differences, 2 dataset fixes) | IN CI `d09aec914`                                                       | Then a live spot check                                                                  |
+| Claim check: verify derived arithmetic (a wrong "33 pp" for 78−41 must not publish)                                      | IN LANE session_01Wncmn4BQnwUu8PoUpcMjfu `fix/q-claim-check-arithmetic` |                                                                                         |
+| Owner question                                                                                                           | OPEN                                                                    | COR-054: after a correction, should Q say "the earlier figure was for X"?               |
+| Talent Q-style sidebar                                                                                                   | PROPOSAL; owner decisions pending                                       |                                                                                         |
+
+Anthropic test spend: about $7.7 today (receipts/2026-11-06-q-claude-parity-live).
 
 ## Live board — 5 November 2026, 13:15 UTC (integration owner session_01Eyr9vLWNKc3FEiHheX7Mwc, acting admin per DECISIONS 58/60)
 
