@@ -371,6 +371,17 @@ export function planRoute(
       decide("CONTEXT_WINDOW_TOO_SMALL");
       return;
     }
+    // A provider that refuses any single request above its per-request (or
+    // per-minute) token limit is never planned for a larger one, as primary,
+    // fallback or hedge (live 2026-11-06: Groq 413 on a 17k-token reading).
+    if (
+      model.maxRequestTokens !== undefined &&
+      model.maxRequestTokens !== null &&
+      input.estimatedInputTokens + outputTokens > model.maxRequestTokens
+    ) {
+      decide("CONTEXT_WINDOW_TOO_SMALL");
+      return;
+    }
     if (
       request.budget.maxInputTokens !== undefined &&
       input.estimatedInputTokens > request.budget.maxInputTokens

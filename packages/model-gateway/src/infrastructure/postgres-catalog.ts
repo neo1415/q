@@ -60,6 +60,7 @@ const ModelRow = z.object({
   status: z.string(),
   context_window: z.number().int(),
   max_output_tokens: z.number().int(),
+  max_request_tokens: z.coerce.number().int().nullable(),
   supports_tools: z.boolean(),
   supports_structured_output: z.boolean(),
   supports_vision: z.boolean(),
@@ -127,10 +128,13 @@ export async function loadModelCatalogSnapshot(
                to_jsonb(p) ->> 'owner_approved_ceiling' as owner_approved_ceiling
           from ai_ops.providers p order by code`,
     sql`select id, provider_id, model_code, model_family, model_type, status, context_window, max_output_tokens,
+               -- Read through to_jsonb so this code also runs before
+               -- 20261231320000 adds the column (null: no per-request cap).
+               to_jsonb(m) ->> 'max_request_tokens' as max_request_tokens,
                supports_tools, supports_structured_output, supports_vision, supports_audio, supports_realtime,
                supports_prompt_cache, supports_reasoning, sensitivity_ceiling, quality_class, latency_class,
                effective_from, effective_to
-          from ai_ops.models order by model_code`,
+          from ai_ops.models m order by model_code`,
     sql`select id, model_id, pricing_region, currency, input_per_million, cached_input_per_million,
                output_per_million, effective_from, effective_to
           from ai_ops.model_prices order by effective_from`,
@@ -169,6 +173,7 @@ export async function loadModelCatalogSnapshot(
         status: r.status,
         contextWindow: r.context_window,
         maxOutputTokens: r.max_output_tokens,
+        maxRequestTokens: r.max_request_tokens,
         supportsTools: r.supports_tools,
         supportsStructuredOutput: r.supports_structured_output,
         supportsVision: r.supports_vision,

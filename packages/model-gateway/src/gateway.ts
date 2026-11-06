@@ -1399,17 +1399,20 @@ export function createModelGateway(
         // eligible model is waiting, moving to it now beats sleeping on
         // this one. The same model is retried only when it is the last.
         //
-        // A timeout is the same (CQ-VOICE-010). A model that has just used
-        // up a whole attempt without answering is the likeliest of all to
-        // do it again, and a second wait on it was the 24-second turn in
-        // the hosted ledger. With another model waiting, ask that one.
+        // Every other passing failure (a timeout, an outage, a transient
+        // error, an unusable reply) is retried on the same model first; a
+        // different model is asked only once this one has failed its
+        // retries, or at once when its account is spent or its key refused
+        // (PERMANENT and AUTHENTICATION are not retryable). Live 2026-11-06
+        // 13:00: a single gpt-5.6-luna timeout handed a 17k-token reading to
+        // Groq, whose per-request limit refused it (413), and the turn went
+        // unread; before Groq joined the policy the same timeout was simply
+        // retried on luna, and answered. (CQ-VOICE-010 had moved on after a
+        // timeout to save a second wait; a fallback that cannot take the
+        // request costs the whole turn, which is worse.)
         const canRetryHere =
           isRetryableModelFailure(outcome.failureClass) &&
-          !(
-            (outcome.failureClass === "RATE_LIMIT" ||
-              outcome.failureClass === "TIMEOUT") &&
-            anotherCandidateWaits
-          ) &&
+          !(outcome.failureClass === "RATE_LIMIT" && anotherCandidateWaits) &&
           attemptsOnCandidate < ATTEMPTS_PER_CANDIDATE &&
           attemptNumber < request.budget.maxAttempts;
         if (canRetryHere) {

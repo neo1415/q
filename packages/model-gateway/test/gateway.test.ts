@@ -386,10 +386,35 @@ describe("reliability", () => {
     expect(waits).toEqual([]);
   });
 
-  // CQ-VOICE-010: a timed-out model was asked a second time before the
-  // waiting fallback. That second wait was the 24-second turn in the
-  // hosted ledger.
-  it("bounds a hung provider by the attempt timeout and moves to the waiting model rather than waiting on it twice", async () => {
+  // Live 2026-11-06 13:00: one gpt-5.6-luna timeout handed a 17k-token
+  // reading to a fallback that could not take it, and the turn went unread.
+  // A timed-out model is retried first; another is asked only after it has
+  // failed its retries (this replaces CQ-VOICE-010's move-on-at-once).
+  it("retries a model that timed out once before any fallback, and it answers", async () => {
+    const { gateway, alpha, beta } = build({
+      alpha: [{ kind: "HANG" }, { kind: "TEXT", text: "luna, second time" }],
+    });
+    const result = await gateway.execute(
+      request({
+        budget: {
+          maxAttempts: 3,
+          maxEstimatedCostUsd: 0.5,
+          maxOutputTokens: 256,
+          attemptTimeoutMs: 1_000,
+        },
+      }),
+    );
+    expect(result.providerCode).toBe("alpha");
+    expect(result.fallbackUsed).toBe(false);
+    expect(alpha.calls).toHaveLength(2);
+    expect(beta.calls).toHaveLength(0);
+    expect(result.attempts.map((a) => a.outcome)).toEqual([
+      "TIMEOUT",
+      "SUCCESS",
+    ]);
+  }, 10_000);
+
+  it("moves to the waiting model only after the timed-out one has failed its retries", async () => {
     const { gateway, alpha } = build({
       alpha: [{ kind: "HANG" }, { kind: "HANG" }],
     });
@@ -404,12 +429,22 @@ describe("reliability", () => {
       }),
     );
     expect(result.providerCode).toBe("beta");
-    expect(alpha.calls).toHaveLength(1);
+    expect(alpha.calls).toHaveLength(2);
     expect(result.attempts.map((a) => a.outcome)).toEqual([
+      "TIMEOUT",
       "TIMEOUT",
       "SUCCESS",
     ]);
   }, 10_000);
+
+  it("still moves on at once from a spent per-minute quota when another model waits", async () => {
+    const { gateway, alpha } = build({
+      alpha: [{ kind: "FAIL", failureClass: "RATE_LIMIT" }],
+    });
+    const result = await gateway.execute(request());
+    expect(result.providerCode).toBe("beta");
+    expect(alpha.calls).toHaveLength(1);
+  });
 
   it("still retries a timed-out model when it is the only one there is", async () => {
     const alpha = createFakeModelProvider({
@@ -433,8 +468,10 @@ describe("reliability", () => {
     ]);
   }, 10_000);
 
-  it("holds the first model to the caller's shorter patience when another waits behind it", async () => {
-    const { gateway, alpha } = build({ alpha: [{ kind: "HANG" }] });
+  it("holds the first attempt to the caller's shorter patience, then retries that model with its whole budget", async () => {
+    const { gateway, alpha, beta } = build({
+      alpha: [{ kind: "HANG" }, { kind: "TEXT", text: "alpha, second time" }],
+    });
     const started = Date.now();
     const result = await gateway.execute(
       request({
@@ -448,8 +485,9 @@ describe("reliability", () => {
       { firstAttemptTimeoutMs: 80 },
     );
     expect(Date.now() - started).toBeLessThan(2_000);
-    expect(result.providerCode).toBe("beta");
-    expect(alpha.calls).toHaveLength(1);
+    expect(result.providerCode).toBe("alpha");
+    expect(alpha.calls).toHaveLength(2);
+    expect(beta.calls).toHaveLength(0);
     expect(result.attempts.map((a) => a.outcome)).toEqual([
       "TIMEOUT",
       "SUCCESS",

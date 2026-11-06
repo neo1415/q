@@ -61,6 +61,14 @@ export const ModelRecordSchema = z
     status: ModelStatusSchema,
     contextWindow: z.number().int().positive(),
     maxOutputTokens: z.number().int().positive(),
+    /**
+     * The most tokens one request may carry (input plus the output budget),
+     * where the provider's account caps a single request below the context
+     * window: Groq's per-minute token limit refuses a larger request whole
+     * (413; live 2026-11-06, a 17k-token reading on an 8K TPM tier). Null or
+     * absent: the context window is the only bound.
+     */
+    maxRequestTokens: z.number().int().positive().nullable().optional(),
     supportsTools: z.boolean(),
     supportsStructuredOutput: z.boolean(),
     supportsVision: z.boolean(),
