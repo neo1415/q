@@ -37,8 +37,21 @@ const { replyParts } = await import("../src/features/q/q-answer");
 const { StaticAnswerCards } =
   await import("../src/features/q/static-answer-cards");
 const { AnswerCanvas } = await import("../src/features/q/answer-canvas");
-const { CardsControls } =
-  await import("../src/features/q/cards/cards-controls");
+const { useCardsMenu } = await import("../src/features/q/cards/cards-controls");
+const { QMoreMenu } = await import("../src/features/q/q-more-menu");
+
+/** The Q home's More menu, where clearing the cards lives (owner 2026-11-06). */
+function More() {
+  return (
+    <QMoreMenu
+      voice="FEMALE"
+      onChooseVoice={() => undefined}
+      readAloud={false}
+      onReadAloud={() => undefined}
+      cards={useCardsMenu()}
+    />
+  );
+}
 
 /**
  * N3 (owner 2026-11-04): Q Chat, the Q page's presence view (stage and
@@ -398,7 +411,7 @@ describe("Show again only after the person closed cards here (owner 2026-11-04)"
   const cards = objectBlock("ANSWER_CARDS") as QAnswerCardsBlock;
   const card = cards.cards[0];
 
-  it("is not offered in a conversation where nothing was closed", () => {
+  it("is not offered in a conversation where nothing was closed", async () => {
     if (card === undefined) throw new Error("fixture");
     // A clear in another conversation, earlier in the tab.
     setCardsConversation("conversation-1");
@@ -409,11 +422,16 @@ describe("Show again only after the person closed cards here (owner 2026-11-04)"
     render(
       <>
         <StaticAnswerCards block={cards} />
-        <CardsControls />
+        <More />
       </>,
     );
     expect(isCardHidden(answerCardRef(cards.title, card))).toBe(true);
     expect(screen.queryByRole("button", { name: "Show again" })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "More" }));
+    await screen.findByRole("menu");
+    expect(
+      screen.queryByRole("menuitem", { name: "Show the cards again" }),
+    ).toBeNull();
   });
 
   it("is never offered before a conversation exists", () => {

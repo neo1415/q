@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { SignOutControl } from "@/features/auth";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { IntentLink } from "./intent-link";
 
@@ -142,7 +142,15 @@ export function MobileNavigation() {
  * Discover, Explore, Q, CRM and Work open from this menu button at the
  * header's start, in a drawer from that edge. What You holds is unchanged.
  */
-export function MobileMenu() {
+export function MobileMenu({
+  extras,
+}: {
+  /**
+   * Shown above the sections. The Q home on a phone passes the scope, the
+   * notices bell and You here, since its one top bar has no room for them.
+   */
+  readonly extras?: ReactNode | undefined;
+} = {}) {
   const pathname = usePathname();
   const home = useHomeHref();
   const t = useT();
@@ -175,6 +183,7 @@ export function MobileMenu() {
         </button>
       </SheetTrigger>
       <SheetContent title="Capital Q" side="start">
+        {extras}
         <nav aria-label={t("Primary")}>
           <ul className="flex flex-col">
             {MOBILE_NAVIGATION.map((item) => {

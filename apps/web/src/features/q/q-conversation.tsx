@@ -72,7 +72,7 @@ import {
   writtenAnswerNote,
 } from "./q-attachments";
 import { WorkingLine } from "@/components/working/working-line";
-import { CardsControls } from "./cards/cards-controls";
+import { useCardsMenu } from "./cards/cards-controls";
 import { setCardsConversation } from "./cards/card-visibility-store";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
@@ -92,6 +92,7 @@ import {
 import { useBoardMarks } from "./q-board";
 import { QNow } from "./q-now";
 import { QMoreMenu } from "./q-more-menu";
+import { PhoneShellLead } from "@/components/app-shell/phone-lead";
 import { QStarters, startersOf, type QStarter } from "./q-starters";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { noteQPageView } from "./screen";
@@ -803,6 +804,7 @@ export function QConversationPanel({
   // transcript opens in the reader; "Save a copy" there writes the file.
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const hasTranscript = turns.length > 0 || spoken.length > 0;
+  const cardsMenu = useCardsMenu();
 
   // One way to say something to Q from the page: down the open line when
   // there is one (answered aloud), otherwise as a question.
@@ -1196,7 +1198,16 @@ export function QConversationPanel({
                 switch in the middle; Board, Conversations and More at the
                 end. The empty start keeps the line's width so the switch
                 stays centred. */}
-            <div className="flex-1 max-sm:hidden" aria-hidden="true" />
+            {/* Owner 2026-11-06: on a phone this is the page's one top
+                bar. The shell's header steps aside on the Q home there
+                (globals.css), and its menu leads this line; the scope,
+                bell and You are the drawer's first row. On a desktop the
+                start stays empty so the switch stays centred. */}
+            <div className="flex min-w-0 flex-1 items-center">
+              <div className="-ms-2 lg:hidden" data-q-phone-lead>
+                <PhoneShellLead />
+              </div>
+            </div>
             {/* Owner 2026-11-04: Q and Chat are always there, not only
                 once a conversation has begun. */}
             <div
@@ -1266,6 +1277,7 @@ export function QConversationPanel({
                 {...(hasTranscript
                   ? { onTranscript: () => setTranscriptOpen(true) }
                   : {})}
+                cards={cardsMenu}
               />
             </div>
           </div>
@@ -1785,7 +1797,6 @@ export function QConversationPanel({
                 {stageLayer}
               </StageModeProvider>
             )}
-            <CardsControls />
             <div ref={threadEnd} aria-hidden="true" />
           </div>
 

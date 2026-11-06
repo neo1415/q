@@ -48,7 +48,10 @@ test("clearing cards by words is presentation only and reversible", async ({
   // By typed words (the voice path reads the same sentence by the same code).
   await say(page, "Q, clear all cards");
   await expect(cards).toHaveCount(0);
+  // Owner 2026-11-06: Show again lives in the header's More menu.
+  await page.locator("[data-q-control='more']").click();
   await expect(page.locator("[data-q-cards-show]")).toBeVisible();
+  await page.keyboard.press("Escape");
 
   // Holds across in-app navigation, then returns on the Q page.
   await page.evaluate(() => {
@@ -62,9 +65,11 @@ test("clearing cards by words is presentation only and reversible", async ({
   await say(page, "show me the cards again");
   await expect(cards).toHaveCount(before);
 
-  // Click twins.
+  // Click twins, in the header's More menu (owner 2026-11-06).
+  await page.locator("[data-q-control='more']").click();
   await page.locator("[data-q-cards-clear]").click();
   await expect(cards).toHaveCount(0);
+  await page.locator("[data-q-control='more']").click();
   await page.locator("[data-q-cards-show]").click();
   await expect(cards).toHaveCount(before);
 

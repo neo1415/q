@@ -4,10 +4,12 @@ import type { QVoiceChoice } from "@capital-q/contracts";
 import {
   Captions,
   Check,
+  EyeOff,
   FileText,
   ICON_SIZE,
   ICON_STROKE,
   MoreHorizontal,
+  Eye,
 } from "@capital-q/ui/icons";
 import {
   MenuContent,
@@ -19,6 +21,7 @@ import {
   MenuTrigger,
 } from "@capital-q/ui/menu";
 
+import type { CardsMenu } from "./cards/cards-controls";
 import { useT } from "@/features/i18n/language";
 import { VOICE_LABELS } from "@/features/voice/voice-menu";
 
@@ -29,7 +32,8 @@ function isVoice(value: string): value is QVoiceChoice {
 /**
  * The Q home's one "More" menu (client 2026-11-05: "the top is too
  * cluttered"): Q's voice, reading answers aloud, captions and the
- * transcript, which used to be four controls of their own on the top line.
+ * transcript, which used to be four controls of their own on the top line,
+ * and (owner 2026-11-06) clearing the screen's cards.
  */
 export function QMoreMenu({
   voice,
@@ -39,6 +43,7 @@ export function QMoreMenu({
   captions,
   onCaptions,
   onTranscript,
+  cards,
 }: {
   readonly voice: QVoiceChoice;
   readonly onChooseVoice: (voice: QVoiceChoice) => void;
@@ -49,8 +54,15 @@ export function QMoreMenu({
   readonly onCaptions?: ((on: boolean) => void) | undefined;
   /** Absent until there is a conversation to save. */
   readonly onTranscript?: (() => void) | undefined;
+  /**
+   * Clear the cards on this screen, and bring them back (owner 2026-11-06:
+   * no floating "Clear" in the thread). Each only when it would act.
+   */
+  readonly cards?: CardsMenu | undefined;
 }) {
   const t = useT();
+  const clear = cards?.clear ?? null;
+  const restore = cards?.restore ?? null;
   const check = (
     <Check
       aria-hidden="true"
@@ -106,7 +118,10 @@ export function QMoreMenu({
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>
-        {onCaptions === undefined && onTranscript === undefined ? null : (
+        {onCaptions === undefined &&
+        onTranscript === undefined &&
+        clear === null &&
+        restore === null ? null : (
           <MenuSeparator />
         )}
         {onCaptions === undefined ? null : (
@@ -129,6 +144,26 @@ export function QMoreMenu({
               strokeWidth={ICON_STROKE}
             />
             <span data-q-control="transcript">{t("Open the transcript")}</span>
+          </MenuItem>
+        )}
+        {clear === null ? null : (
+          <MenuItem onClick={clear}>
+            <EyeOff
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
+            <span data-q-cards-clear>{t("Clear the cards")}</span>
+          </MenuItem>
+        )}
+        {restore === null ? null : (
+          <MenuItem onClick={restore}>
+            <Eye
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
+            <span data-q-cards-show>{t("Show the cards again")}</span>
           </MenuItem>
         )}
       </MenuContent>
