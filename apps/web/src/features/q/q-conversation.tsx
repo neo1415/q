@@ -622,6 +622,17 @@ export function QConversationPanel({
           (line) => !(line.role === "person" && words(line.text) === liveWords),
         );
 
+  // Documents still being made, asked for before the latest exchange: the
+  // presence view keeps a line for each (pinned-work.tsx).
+  const pinnedWork = useMemo(() => {
+    const latest = latestExchange(thread);
+    const turnsOf = (some: readonly (typeof thread)[number][]) =>
+      some.flatMap((line) => (line.turn === undefined ? [] : [line.turn]));
+    return earlierWork(
+      turnsOf(thread.slice(0, thread.length - latest.length)),
+      turnsOf(latest),
+    );
+  }, [thread]);
   // Owner 2026-10-28: the voice room draws no thread, so every job the
   // conversation named keeps its line there (each hides once finished).
   const roomWork = useMemo(() => {
@@ -710,12 +721,13 @@ export function QConversationPanel({
   // by a later answer too) get the same wide layout as fresh ones.
   const [stageCards, setStageCards] = useState(false);
   const showingCards =
-    latestAnswer?.kind === "Q" &&
-    !latestAnswer.streaming &&
-    latestAnswer.blocks.some(
-      (block) =>
-        block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
-    );
+    (latestAnswer?.kind === "Q" &&
+      !latestAnswer.streaming &&
+      latestAnswer.blocks.some(
+        (block) =>
+          block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
+      )) ||
+    (view === "presence" && stageCards);
   // Presence view is Q's presence only (founder request 2026-10-03): a
   // laid-out answer is shown over it (QPresenceStage), not as a thread.
   const bigPresence = view === "presence";
@@ -894,9 +906,7 @@ export function QConversationPanel({
       .findLast((turn) => turn.kind === "Q" && !turn.streaming);
     if (answer === undefined || answer.kind !== "Q") return;
     lineNote.current = null;
-    if (lineOpen)
-      briefLine?.(writtenAnswerNote(waiting.question, answer.text)) ||
-        (view === "presence" && stageCards);
+    if (lineOpen) briefLine?.(writtenAnswerNote(waiting.question, answer.text));
   }, [q.working, turns, lineOpen, briefLine]);
 
   // Owner 2026-10-16: Q opens by asking whether to look at what waits or
@@ -1426,7 +1436,45 @@ export function QConversationPanel({
                       )}
                       <StageLine current={presence.stage} reserve />
                     </div>
+                    {/* The exchange for a screen reader, each turn with
+                        its id and disposition (G-R3; audit 06 §9). Text
+                        only: nothing focusable is hidden here. The words
+                        on screen below are not read a second time. */}
+                    <ol className="sr-only" aria-label={t("Latest exchange")}>
+                      {latestExchange(thread).map((line) =>
+                        line.role === "person" ? (
+                          <li
+                            key={line.id}
+                            data-q-turn-id={line.turnId ?? line.id}
+                            data-q-turn-role="USER"
+                            data-q-disposition={rowDisposition(line)}
+                          >
+                            {t("You:")} {line.text}
+                          </li>
+                        ) : (
+                          <li
+                            key={line.id}
+                            data-q-turn-id={line.turnId ?? line.id}
+                            data-q-turn-role="Q"
+                            data-q-disposition={rowDisposition(line)}
+                            data-q-failure={rowFailure(line)}
+                          >
+                            Q: {plainFromMarkdown(line.text)}
+                          </li>
+                        ),
+                      )}
+                      {liveIsPerson ? (
+                        <li
+                          key={live.id}
+                          data-q-turn-id={live.id}
+                          data-q-turn-role="USER"
+                        >
+                          You, speaking: {live.text}
+                        </li>
+                      ) : null}
+                    </ol>
                     <QCurrentExchange
+                      announce={false}
                       lines={latestExchange(thread)}
                       live={liveIsPerson ? live.text : null}
                       qSaying={voice.active ? qSaying : null}
@@ -1479,6 +1527,18 @@ export function QConversationPanel({
                           </div>
                         ) : (
                           <div className="flex w-full flex-col items-center gap-3">
+                            {/* A document still being made, asked for
+                                earlier: its line stays in view (owner
+                                2026-10-24, coordinator 25 Oct). */}
+                            <div className="w-full max-w-md empty:hidden">
+                              <PinnedWorkLines
+                                jobs={pinnedWork.filter(
+                                  (job) => !stageJobs.has(job.jobId),
+                                )}
+                                onOpenArtifact={showArtifact}
+                                onAsk={sayOrAsk}
+                              />
+                            </div>
                             <QWorkProgress jobs={false} />
                             {connected && !q.working ? (
                               <button

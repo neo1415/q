@@ -442,6 +442,18 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
       ).toBeGreaterThan(0);
     }
     screen.getByRole("button", { name: "Earlier in this conversation" });
+    // G-R3: the exchange's rows, with their ids, for screen readers and
+    // the voice scripts; the words on screen are not read twice.
+    const rows = screen.getByRole("list", { name: "Latest exchange" });
+    expect(
+      rows.querySelector('[data-q-turn-role="USER"]')?.textContent,
+    ).toContain("Find me founders raising in fintech");
+    expect(rows.querySelector('[data-q-turn-role="Q"]')).not.toBeNull();
+    expect(
+      document
+        .querySelector("[data-q-exchange-caption]")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
   });
 
   it("Earlier in this conversation opens Chat, where the whole transcript is", async () => {
