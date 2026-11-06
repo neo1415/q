@@ -164,6 +164,7 @@ import { createExternalEntityFinder } from "./composition/external-entity-finder
 import { createExternalSubjectResolver } from "./composition/external-resolve.js";
 import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
+import { watchProviderAccounts } from "./voice/provider-accounts.js";
 import { createPostgresLiveSpend } from "./voice/live/spend.js";
 import { createPostgresLiveTrialClaims } from "./voice/live/trial-claim.js";
 import { createPostgresLiveTrialUsage } from "./voice/live/trial.js";
@@ -1294,12 +1295,17 @@ const operatorAlert: { send: (alert: OperatorAlert) => Promise<boolean> } = {
     return Promise.resolve(true);
   },
 };
+const providerAccounts = watchProviderAccounts(
+  createProcessLocalProviderHealth(),
+);
 const modelGateway = timedModelGateway(
   createModelGateway({
     catalog: modelCatalog,
     registry: createModelProviderRegistry(providers),
     usage: createPostgresModelUsageRepository({ sql: database.sql }),
-    health: createProcessLocalProviderHealth(),
+    // DECISIONS 68: the same health, watched, so voice can tell when the
+    // OpenAI account is out and fall back to ElevenLabs.
+    health: providerAccounts.health,
     onProviderBlocked: (event) =>
       operatorAlert.send(providerBlockedAlertText(event)).then(() => undefined),
     syntheticDemo,
@@ -8232,6 +8238,9 @@ const { app, logger: appLogger } = createApp(
               quota: speechQuotaFrom(process.env),
             }),
             bindings: voiceBindings,
+            // DECISIONS 68: OpenAI's account out -> ElevenLabs speech,
+            // Q's own brain (the Model Gateway, on Claude) answering.
+            openAiExhausted: () => providerAccounts.exhausted("openai"),
             // Multilingual Q: their chosen language, on every voice line.
             languageOf: (actor: ActorContext) =>
               standingStore

@@ -230,3 +230,9 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **Paid testing uses Anthropic, within the $20 test cap (DECISIONS 62).** Every paid run is targeted and as small as possible, and runs only after the change passes the scripted and integration harness. Each paid run's cost is recorded in `receipts/` with a running total.
     - **Goal: Q on Claude reaches parity with Q on OpenAI, at lower cost.** Q's layers, not the underlying model, must carry the quality. The first levers are prompt caching (cache reads about 30% today) and adapter correctness.
     - **Voice falls back to ElevenLabs** when the OpenAI account is exhausted, with Q's own brain (Model Gateway, on Claude) answering, never a separate assistant.
+    - **Amendment (owner, same evening):**
+      - Benchmarks are allowed when reasonable for a product. Prefer Anthropic for paid testing.
+      - **The Anthropic test budget is $50 total.** Slow down and be careful from $20 spent; be very careful past $40; stop at $50.
+      - **Prompt caching is top priority.** Even 2× OpenAI's cost per turn is unacceptable; the target is cost parity.
+      - **Claude becomes the main model** once its cost is near OpenAI's. It is staged as a data-only routing switch.
+      - The ElevenLabs voice fallback uses `eleven_v4_turbo` with Q's own voices: Sarah (female) and Daniel (male).
