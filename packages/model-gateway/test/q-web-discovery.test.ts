@@ -151,7 +151,7 @@ const ok = (
   data: unknown,
 ): QToolCallOutcome => ({
   callId: proposal.callId,
-  toolName: toolName as never,
+  toolName: toolName,
   toolVersion: 1,
   classification: "READ_ONLY",
   status: "SUCCEEDED",

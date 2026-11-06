@@ -508,7 +508,7 @@ export async function createQIqWorldSubject(options: {
                   ? [
                       {
                         kind: "INVESTOR_ORGANISATION",
-                        investorOrganisationId: w().ids.investorApex as never,
+                        investorOrganisationId: w().ids.investorApex,
                       },
                     ]
                   : [],

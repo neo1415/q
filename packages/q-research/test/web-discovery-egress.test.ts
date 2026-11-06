@@ -45,7 +45,7 @@ const DIRECTORY = {
 const command = (overrides: Partial<Command>): Command => ({
   actor,
   runId: RUN,
-  correlationId: "cor_test" as Command["correlationId"],
+  correlationId: "cor_test",
   requestedQuery: "fintech startups Nigeria pre-seed 2026",
   userText: "hey, find me new companies online and their founders",
   subject: null,
