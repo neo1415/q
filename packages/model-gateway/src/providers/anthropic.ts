@@ -55,6 +55,17 @@ import type {
 
 export const ANTHROPIC_PROVIDER_CODE = "anthropic";
 
+/**
+ * The SDK's error classes, for the adapter's tests: the provider-boundary
+ * rule keeps every SDK import inside this directory, and the tests need
+ * real instances to prove the failure mapping.
+ */
+export {
+  APIConnectionTimeoutError as AnthropicConnectionTimeoutError,
+  APIError as AnthropicAPIError,
+  APIUserAbortError as AnthropicUserAbortError,
+};
+
 /** Sonnet-class: answers, synthesis, comparison, investigation. */
 export const ANTHROPIC_ANSWER_MODEL = "claude-sonnet-5-5";
 /** Haiku-class: the turn reader, fast classification and extraction. */
@@ -396,6 +407,22 @@ export function toMessages(
         tool_use_id: message.callId,
         content: message.content,
       },
+    ]);
+  }
+
+  // The Messages API wants a user turn first, and on these models a final
+  // assistant turn is a prefill, which is a 400. OpenAI accepts both, so a
+  // history shaped that way is bridged here with a marked note rather than
+  // by changing the caller's prompt.
+  if (out[0]?.role === "assistant") {
+    out.unshift({
+      role: "user",
+      content: [{ type: "text", text: "[Capital Q note] Q spoke first here." }],
+    });
+  }
+  if (out.at(-1)?.role === "assistant") {
+    push("user", [
+      { type: "text", text: "[Capital Q note] Continue from your last turn." },
     ]);
   }
 

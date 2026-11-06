@@ -1,8 +1,3 @@
-import {
-  APIConnectionTimeoutError,
-  APIError,
-  APIUserAbortError,
-} from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
 
 import type { ModelMessage } from "@capital-q/contracts";
@@ -10,6 +5,9 @@ import type { ModelMessage } from "@capital-q/contracts";
 import { ModelProviderFailure } from "../src/errors.js";
 import type { ModelProviderRequest } from "../src/ports.js";
 import {
+  AnthropicAPIError as APIError,
+  AnthropicConnectionTimeoutError as APIConnectionTimeoutError,
+  AnthropicUserAbortError as APIUserAbortError,
   ANTHROPIC_ANSWER_MODEL,
   ANTHROPIC_FAST_MODEL,
   createAnthropicModelProvider,
@@ -248,6 +246,25 @@ describe("anthropic adapter: request mapping", () => {
         },
       ],
     });
+  });
+
+  it("bridges a history that starts or ends with Q's own turn (no prefill)", () => {
+    const { messages } = toMessages([
+      { role: "SYSTEM", content: SYSTEM },
+      { role: "ASSISTANT", content: "Welcome back." },
+      { role: "USER", content: "Thanks." },
+      { role: "ASSISTANT", content: "Here is the start of it" },
+    ]);
+    expect(messages.map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "user",
+    ]);
+    expect(messages.at(-1)?.content).toEqual([
+      { type: "text", text: "[Capital Q note] Continue from your last turn." },
+    ]);
   });
 
   it("sends no temperature and no tool_choice; projects tools as declared", () => {
