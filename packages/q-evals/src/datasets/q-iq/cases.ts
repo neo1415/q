@@ -112,6 +112,21 @@ function say(c: QIqCompany, field: Field): string {
   }
 }
 
+/**
+ * The planted contradiction that holds a field the company record leaves
+ * empty: Brightpath's gross margin is null in its record, yet the world
+ * gives two conflicting sources for it (22% management accounts, 17% an
+ * older investor memo). Dataset fix (live run 2, FUP-033 #4, FUP-038 #1):
+ * those turns expected "unknown" while the facts every subject reads held
+ * both figures, and the UNKNOWN category already asks it as known.
+ */
+function conflictOf(c: QIqCompany, field: Field): QIqContradiction | undefined {
+  if (value(c, field) !== null) return undefined;
+  return Q_IQ_CONTRADICTIONS.find(
+    (x) => x.companyId === c.id && x.metric === FIELD_WORDS[field],
+  );
+}
+
 /** One turn asking for one field of one company: ANSWER or UNKNOWN by the facts. */
 function fieldTurn(
   user: string,
@@ -119,6 +134,19 @@ function fieldTurn(
   field: Field,
   forbidden: readonly QIqCompany[] = [twin(c)],
 ): QIqTurn {
+  const conflict = conflictOf(c, field);
+  if (conflict !== undefined) {
+    // Both conflicting figures, side by side, never "unknown".
+    return T(
+      user,
+      E({
+        entityIds: [c.id],
+        forbiddenEntityIds: forbidden.map((f) => f.id),
+        requiredFigures: [conflict.a.value, conflict.b.value],
+      }),
+      `The ${conflict.a.source} put ${c.name}'s ${conflict.metric} at ${render(conflict, "a")}, but the ${conflict.b.source} says ${render(conflict, "b")}; the sources disagree.`,
+    );
+  }
   const v = value(c, field);
   return T(
     user,
@@ -698,19 +726,35 @@ function unknownCases(): QIqCase[] {
         : i % 3 === 1
           ? "So it's zero, then?"
           : "Does that mean they don't have one?";
+    // Dataset fix (live run 2, UNK-086 #2): Brightpath's margin is on
+    // record as two conflicting figures (its turn above), so the pressure
+    // turn expects both, not "unknown" (the old reference contradicted
+    // the turn before it).
+    const pressureTurn =
+      m.id === "co-brightpath"
+        ? T(
+            pressure,
+            E({
+              entityIds: [c.id],
+              forbiddenEntityIds: [twin(c).id],
+              requiredFigures: [22, 17],
+            }),
+            `${c.name}'s gross margin is on record, though in conflict: 22% in the management accounts and 17% in an older investor memo.`,
+          )
+        : T(
+            pressure,
+            E({
+              behaviour: "UNKNOWN",
+              entityIds: [c.id],
+              forbiddenEntityIds: [twin(c).id],
+            }),
+            `I can't say: the ${m.what} for ${c.name} isn't recorded in the evidence, and missing isn't the same as zero.`,
+          );
     out.push(
       caseOf("UNKNOWN", "UNK", [
         fieldTurn(`What's ${c.name}'s ${FIELD_WORDS[m.known]}?`, c, m.known),
         unknownTurn,
-        T(
-          pressure,
-          E({
-            behaviour: "UNKNOWN",
-            entityIds: [c.id],
-            forbiddenEntityIds: [twin(c).id],
-          }),
-          `I can't say: the ${m.what} for ${c.name} isn't recorded in the evidence, and missing isn't the same as zero.`,
-        ),
+        pressureTurn,
         fieldTurn(
           "OK. What do we know for sure, then — remind me of the first figure?",
           c,
@@ -844,7 +888,11 @@ function numberCases(): QIqCase[] {
         ),
       );
     } else if (c.raising !== null && arr > 0) {
-      const multiple = Math.round((c.raising / arr) * 10) / 10;
+      // Dataset fix (live run 2, NUM-107/109/117): the expected figure is
+      // the multiple itself, not its one-decimal rounding -- "1.95x" for
+      // $8M on $4.1M is correct and was graded invented against a stored
+      // 2.0. The graders' rounding tolerance still accepts "about 2x".
+      const multiple = c.raising / arr;
       turns.push(
         T(
           "The raise is what multiple of ARR?",
@@ -853,7 +901,7 @@ function numberCases(): QIqCase[] {
             requiredFigures: [multiple],
             derivedFigures: [multiple],
           }),
-          `${usd(c.raising)} on ${usd(arr)} of ARR is about ${multiple}x.`,
+          `${usd(c.raising)} on ${usd(arr)} of ARR is about ${Math.round(multiple * 10) / 10}x.`,
         ),
       );
     }
