@@ -38,6 +38,7 @@ import {
   VoiceChoice,
   WakeRow,
 } from "./settings-controls";
+import { WorkspaceRow } from "@/features/workspace/workspace-setting";
 import { SettingsJumpIndex } from "./settings-index";
 
 const SECTIONS = [
@@ -397,6 +398,7 @@ export function SettingsView({
                     <VoiceChoice />
                   </SRow>
                   <WakeRow />
+                  <WorkspaceRow />
                   <SRow
                     title={t("Listening sounds")}
                     description={t(

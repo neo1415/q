@@ -1,0 +1,54 @@
+const { chromium } = require("playwright");
+const OUT = process.argv[2];
+const BASE = "http://127.0.0.1:3100/dev/workspace";
+(async () => {
+  const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+  const results = [];
+  async function shot(name, { ws, width, height, before }) {
+    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const errors = [];
+    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 160)); });
+    page.on("pageerror", (e) => errors.push(String(e).slice(0, 160)));
+    await page.addInitScript(() => {
+      window.__cls = 0;
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
+      }).observe({ type: "layout-shift", buffered: true });
+    });
+    if (before) await page.addInitScript(before);
+    await page.goto(`${BASE}?ws=${ws}`, { waitUntil: "load", timeout: 120000 });
+    await page.waitForTimeout(2500);
+    const cls = await page.evaluate(() => window.__cls);
+    await page.screenshot({ path: `${OUT}/${name}.png` });
+    results.push({ name, cls: Number(cls.toFixed(4)), errors });
+    return page;
+  }
+  await shot("off-1440", { ws: "off", width: 1440, height: 900 });
+  await shot("off-390", { ws: "off", width: 390, height: 844 });
+  const on = await shot("on-1440", { ws: "on", width: 1440, height: 900 });
+  await on.getByRole("button", { name: "Hide pages" }).click();
+  await on.waitForTimeout(300);
+  await on.screenshot({ path: `${OUT}/on-1440-pages-collapsed.png` });
+  await on.getByRole("button", { name: "Show pages" }).click();
+  await on.getByRole("button", { name: "Hide Q" }).click();
+  await on.waitForTimeout(300);
+  await on.screenshot({ path: `${OUT}/on-1440-q-collapsed.png` });
+  await on.getByRole("button", { name: "Show Q" }).click();
+  const sep = on.getByRole("separator", { name: "Resize Q" });
+  await sep.focus();
+  for (let i = 0; i < 5; i++) await on.keyboard.press("ArrowRight");
+  results.push({ name: "keyboard-resize", value: await sep.getAttribute("aria-valuenow") });
+  await on.screenshot({ path: `${OUT}/on-1440-resized.png` });
+  // Reload keeps the layout, painted before the first frame.
+  await on.reload({ waitUntil: "load", timeout: 120000 });
+  await on.waitForTimeout(600);
+  results.push({ name: "reload-cls", cls: await on.evaluate(() => window.__cls), width: await on.evaluate(() => document.querySelector(".cq-ws-q").getBoundingClientRect().width) });
+  // Reset for other shots
+  const phone = await shot("on-390", { ws: "on", width: 390, height: 844, before: () => localStorage.removeItem("cq-workspace-layout") });
+  await phone.getByRole("button", { name: "Back to Q" }).click();
+  await phone.waitForTimeout(500);
+  await phone.screenshot({ path: `${OUT}/on-390-sheet-closed.png` });
+  await on.evaluate(() => localStorage.removeItem("cq-workspace-layout"));
+  console.log(JSON.stringify(results, null, 1));
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });

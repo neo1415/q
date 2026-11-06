@@ -6,6 +6,9 @@ import { redirect } from "next/navigation";
 import { HomeScreen } from "@/features/home/home-screen";
 import { PendingInvitations } from "@/features/team/pending-invitations";
 import { onboardingPath, resolveOnboardingState } from "@/features/q/context";
+import { workspaceMode } from "@/features/workspace/mode";
+import { WorkspaceHomeDirective } from "@/features/workspace/workspace-home";
+import { WorkspaceHomePage } from "@/features/workspace/workspace-home-page";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -49,6 +52,28 @@ export default async function HomePage({
   const params = await searchParams;
   const raw = params["c"];
   const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;
+  const ask =
+    typeof params["ask"] === "string" && params["ask"].length <= 300
+      ? params["ask"]
+      : undefined;
+  // Q Workspace (W1.2): Q is the pane in the layout; this page is the page
+  // side, and what the URL asks of Q goes to that one pane.
+  if ((await workspaceMode()).enabled) {
+    return (
+      <>
+        <Suspense fallback={null}>
+          <PendingInvitations />
+        </Suspense>
+        <WorkspaceHomeDirective
+          conversationId={conversationId}
+          fresh={params["new"] === "1"}
+          ask={ask}
+          board={params["board"] === "1"}
+        />
+        <WorkspaceHomePage />
+      </>
+    );
+  }
   return (
     <>
       {/* F2: an invitation to their verified email, where they land.
@@ -60,11 +85,7 @@ export default async function HomePage({
         conversationId={conversationId}
         fresh={params["new"] === "1"}
         openBoard={params["board"] === "1"}
-        ask={
-          typeof params["ask"] === "string" && params["ask"].length <= 300
-            ? params["ask"]
-            : undefined
-        }
+        ask={ask}
       />
     </>
   );
