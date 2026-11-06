@@ -1611,3 +1611,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - live22 (receipts/2026-11-06-live22): Chat default PASS; fresh Q view presence PASS; in-conversation Q view FAIL (transcript, no presence) → voice lane; discovery A and B fixed; round 4 defects → discovery lane.
 - Merged into integration but not yet in CI: fix/q-claude-backup-on (f3ec022, migration 20261231340000) and fix/q-voice-view-2 (eb84989). Waiting for the mic-release and in-conversation presence commits before CI.
 - Owner asks today: remove the "Q is working on" panel; Q switch auto-connects and greets with specifics; Chat switch turns voice fully off.
+
+## 2026-11-06 17:00 UTC — integration owner (session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Deployed d3829431a (15:31): Claude backup v2 ACTIVE (20261231340000 applied), voice round 2. live23: the normal question answered; a duplex mic track stayed live after Chat → fixed by the voice lane (c98555c).
+- Deployed 3547127f2 (16:16): discovery round 4 plus the pinned presence. live24: **discovery regression**, no companies listed; logs show DISCOVER_COMPANIES never reached discovery. Fixed in fix/q-web-discovery-5 (30ee4109d).
+- f1a8d851b in CI: the discovery fix plus the final voice view (full cards, mic release, continuation opener).
+- Q-IQ run 2 recorded in BASELINE.md: Q 91.1% / bare OpenAI 92.9% / bare Claude 87.9%. Started the gaps lane session_01Wncmn4BQnwUu8PoUpcMjfu.
