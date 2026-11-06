@@ -1242,6 +1242,9 @@ describe("@capital-q/media against local PostgreSQL", () => {
         aspectRatio: "9:16",
         durationSeconds: 87,
         captionState: "NOT_REQUESTED",
+        // 20261231240000: whether the captions are burned into the picture;
+        // a fresh pitch's are not.
+        captionsInPicture: false,
         title: null,
         audience: "INVESTORS",
         downloadable: false,

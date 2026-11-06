@@ -56,6 +56,7 @@ import {
   createInvestorOnboardingIntegration,
   INVESTOR_REVISABLE_STEPS,
   INVESTOR_STEPS,
+  INVESTOR_WEBSITE_STEP,
   InvestorHandoffContextSchema,
   InvestorMandatesContextSchema,
   InvestorReviewContextSchema,
@@ -433,6 +434,8 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
     } else {
       await journey.submit(INVESTOR_STEPS.businessTitle, text(input.title));
     }
+    // v2 (QO-27c) added the firm's optional website to I0, after the title.
+    await journey.skip(INVESTOR_WEBSITE_STEP);
     await journey.submit(
       INVESTOR_STEPS.deploymentStatus,
       single("actively_investing"),
@@ -1021,6 +1024,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
         INVESTOR_STEPS.businessTitle,
         text("Managing Partner"),
       );
+      await journey.skip(INVESTOR_WEBSITE_STEP);
       const investorId = investorIdOf(journey.view());
       const [before] = await tx.sql<
         { deployment_state: string | null; version: number }[]
@@ -1058,6 +1062,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
         text("Doe Family Office"),
       );
       await journey.skip(INVESTOR_STEPS.businessTitle);
+      await journey.skip(INVESTOR_WEBSITE_STEP);
       await journey.submit(
         INVESTOR_STEPS.deploymentStatus,
         single("selective"),
@@ -1120,6 +1125,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
 
       // The deployment step creates nothing more, and I1 offers that draft.
       await journey.skip(INVESTOR_STEPS.businessTitle);
+      await journey.skip(INVESTOR_WEBSITE_STEP);
       await journey.submit(
         INVESTOR_STEPS.deploymentStatus,
         single("actively_investing"),

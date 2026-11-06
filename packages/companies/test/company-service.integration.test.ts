@@ -329,7 +329,10 @@ describe("@capital-q/companies against local PostgreSQL", () => {
       // and founder_background_entries (a112dd84, deck extractions),
       // company_claim_requests (10ba5ed0, Find my startup F4),
       // capital_round_events (c2aaec60, P8 round lifecycle) and the
-      // company_readiness_* pair (d79060cb, readiness rules v1).
+      // company_readiness_* pair (d79060cb, readiness rules v1). Then
+      // company_investability_assessments and investor_company_suitability
+      // (20261228171500) and company_unicorn_potential_assessments
+      // (20261228200000).
       const tables = await sql<{ table_name: string }[]>`
         select table_name from information_schema.tables where table_schema = 'core' order by 1`;
       expect(tables.map((t) => t.table_name)).toEqual([
@@ -341,16 +344,19 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "companies",
         "company_claim_requests",
         "company_creation_requests",
+        "company_investability_assessments",
         "company_members",
         "company_readiness_action_events",
         "company_readiness_assessments",
         "company_team_facts",
+        "company_unicorn_potential_assessments",
         "founder_background_entries",
         "founder_person_facts",
         "founder_profiles",
         "handles",
         "human_reviews",
         "identity_submissions",
+        "investor_company_suitability",
         "investor_creation_requests",
         "investor_mandate_constraints",
         "investor_mandate_creation_requests",
