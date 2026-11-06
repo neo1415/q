@@ -388,3 +388,43 @@ The five defects come from the live run on `309143f51`. Each has a test, recorde
    - "I searched the public web further … found N new companies (leaving out the M I listed earlier)", with none of the first reply's companies;
    - no top-3 line, no cards and no tie line;
    - if nothing new is found, it says so.
+
+## Round 5 (`fix/q-web-discovery-5`): URGENT, discovery stopped running on 3547127f2
+
+**What happened.** In a fresh conversation as the fictional investor, neither of these asks ran discovery:
+
+- "find me new companies online that i would be interested in" (run `01bef0a1`);
+- "can you find more online? that maybe not exist in capital Q yet" (run `f477cbe4`).
+
+The early web search answered both with broad lists.
+
+**Cause.** Round 4 did not cause this. The hand-off in `answer.ts` has been unchanged since round 3, and it required the reader's `discoverWhom: COMPANIES`.
+
+- Run 1 was read as `RESEARCH_REQUEST`, `DISCOVER_COMPANIES`, research `EXPLICIT`, without that field.
+- Run 2 was read as `PUBLIC_FACTS`.
+- In both, `request.webDiscovery` was never set, so the early web search ran. This matches the logs: no `q-discovery-*` calls and no `q answered a web discovery` line.
+
+**Fix.** A web ask is a `RESEARCH_REQUEST`, or a question with `asksForWeb`. It now hands over to discovery when either:
+
+- the reading asks for companies: `discoverWhom` COMPANIES, or a `DISCOVER_COMPANIES` or `FIT` question; or
+- Q already listed a discovery in this conversation. This uses `priorListings` over Q's own lines, never the person's words.
+
+Investors never hand over.
+
+**Tests.**
+
+- **`q-specialists/test/web-discovery-handover.test.ts`** runs the full specialist seam with a scripted reading. Both live readings and the FIT-plus-web reading failed before the fix and pass now. A plain public-facts search and an investor ask stay out.
+- **`model-gateway/test/q-answer-research.test.ts`** ("URGENT …"): a hand-off with research `EXPLICIT` is answered only by discovery's own searches, never the early web search.
+
+**Gates.**
+
+| Gate                                                                      | Result                                                                                                                                 |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec turbo run build --filter=./packages/*`                         | 54/54 successful                                                                                                                       |
+| Root tsc / `apps/q-api` tsc                                               | exit 0 / exit 0                                                                                                                        |
+| eslint on touched files                                                   | exit 0                                                                                                                                 |
+| `npx prettier --check apps packages docs supabase`                        | clean, except `docs/ai-handoff/receipts/2026-11-06-qiq-run2-q-failures.json`, a base file from another lane this branch does not touch |
+| vitest `packages/q-specialists packages/model-gateway`                    | 3285 passed                                                                                                                            |
+| vitest `apps/q-api packages/q-evals packages/q-research packages/q-tools` | 5441 passed (3 skipped)                                                                                                                |
+| Integration on a freshly set-up local PG, `CQ_Q_IQ_ALL=1`                 | **31 files, 116/116**                                                                                                                  |
+| Q-IQ through the runtime                                                  | **Core: 573 turns, no fails.** ADVERSARIAL: score 1 in both modes. DISCOVERY: score 1. `liveGaps: []`                                  |
