@@ -88,6 +88,8 @@ node packages/q-evals/dist/dev/q-iq-baseline.js --live --provider anthropic --q-
 
 ## Raised bar: cost near OpenAI's; Claude-first staged
 
+> **Superseded by DECISIONS 69.** Claude-first is not wanted. The v3 migration and its pgTAP were dropped before merge, and the Q-IQ runner switches the v2 backup routes again. See "Decision 69" below.
+
 **Staged Claude-first routing: `20261231350000_ai_ops_claude_first_staged.sql`** (ordered after the base's `20261231340000`).
 
 - **What it inserts.** Seven v3 policies, RETIRED: Claude (Sonnet for answers and analysis, Haiku for the fast classes) → gpt-5.6-luna → the v2 row's remaining fallbacks. Other columns are copied from v2.
@@ -116,7 +118,7 @@ The first, cold conversation is $0.149: it writes the shared prefix, 47k tokens.
 **The structural gap to OpenAI.** Sonnet's cache-read price ($0.20 per million tokens) is ten times gpt-5.6-luna's cached input price ($0.02). With caching now near its ceiling (90–99% reads), Q on Sonnet can match OpenAI's cost per case only by sending fewer tokens or using a cheaper model:
 
 - **Trim the prompt.** About 19k tokens a call, the analyst prompt alone about 39k characters. That is a q-core prompt change, so it also changes OpenAI's prompt: the reader/prompt lane, one owner at a time.
-- **Haiku 5.5 for answers.** Cache reads at $0.01 per million make it about 20× cheaper, a data-only change (the v3 rows' model). This is a quality decision for the owner, after a live Q-IQ comparison.
+- **Haiku 5.5 for answers.** _(Ruled out by DECISIONS 69: no smaller model for understanding or answers.)_ Cache reads at $0.01 per million make it about 20× cheaper, a data-only change (the v3 rows' model). This is a quality decision for the owner, after a live Q-IQ comparison.
 - **Fewer calls a turn.** Each tool round re-reads the whole prompt. The tool-round design is shared by every provider.
 
 **Reader and answer cannot share a prefix.** Tools render first and the reader is offered none.
@@ -159,7 +161,7 @@ I also checked whether `anthropic-sections` reorders the reader prompt and break
 - Haiku's reader wrote 185k, but at $0.125/M that is $0.023 for the run.
 - Nothing writes the same prefix twice. The 1-hour TTL on the head already lets turn 1's write serve every later turn.
 
-What remains is structural. A Sonnet answer call costs about $0.017: about 27k read at $0.20/M, about 2.5k tail write, and about 570 output tokens. That is about 5 calls a case. The levers are the ones above (trim the prompt, fewer rounds, or Haiku answers), for the owner after the quality is fixed.
+What remains is structural. A Sonnet answer call costs about $0.017: about 27k read at $0.20/M, about 2.5k tail write, and about 570 output tokens. That is about 5 calls a case. The levers left under DECISIONS 69 are a leaner prompt and fewer calls a turn; Haiku is ruled out.
 
 Two further tool-less final rounds (after a tool loop hit its budget) also re-wrote about 22k each, about $0.01 a case. Keeping the tools there with `tool_choice: none` would let them read the cache. Not done: flattening the tool history is what fixed the empty end_turns.
 
@@ -170,6 +172,41 @@ Two further tool-less final rounds (after a tool loop hit its budget) also re-wr
 - Integration: q-iq-claude-wire 2/2, q-iq-claude-cache 1/1, answer-seam and gateway-postgres 10/10.
 - Root `tsc`, plus `tsc` for q-api, workers and api.
 - eslint and prettier on changed files.
+
+## Decision 69: Sonnet throughout the Claude backup; no Claude-first
+
+- **Dropped:** `20261231350000_ai_ops_claude_first_staged.sql` and its pgTAP. They were never merged, so they were removed in a new commit with no history rewrite. The Q-IQ runner switches the v2 codes again and restores each row's prior status. The wire world activates v2 only.
+- **`20261231360000_ai_ops_claude_backup_sonnet_throughout.sql` (data only, rollback in the header):**
+  - The three v2 rows that fell back to Haiku now fall back to Sonnet: `fast_classification.v2` (the turn reader and Q's other readers), `structured_extraction.v2` and `taxonomy_mapping.v2`.
+  - No offline check proves Haiku equal on any of them, so none keeps it.
+  - OpenAI stays first on every row and v1 is untouched.
+  - A guard refuses the migration if any active route still reaches Haiku afterwards. The Haiku model and price rows stay as catalogue data.
+- **The ceilings had to move too.** The gateway estimates an attempt with no cache credit. A ~31k-token reading on Sonnet is estimated at ~$0.075, so the policy ceiling ($0.02) and the reader's own budget ($0.01) would have skipped Sonnet for Groq or Gemini, which is the downgrade decision 69 forbids. Changes:
+  - `fast_classification.v2`: $0.15; `structured_extraction.v2`: $0.30; `taxonomy_mapping.v2`: $0.05.
+  - `TURN_READER_BUDGET` (code): $0.15.
+  - These are bounds, not spend; a reading on OpenAI costs what it did.
+  - **Proven offline:** the new wire test "reads each turn on Sonnet, never Haiku" passes at $0.15. At the old $0.01 the same test made no Sonnet reading at all.
+- **Not changed (for the owner):** other callers on these classes carry their own small budgets. Above a certain prompt size, the Claude backup skips Sonnet for Groq or Gemini, as before. The largest prompt Sonnet fits within each budget, at the gateway's no-cache estimate:
+
+  | Caller               | Budget | Largest prompt on Sonnet |
+  | -------------------- | ------ | ------------------------ |
+  | words-readers        | $0.003 | never                    |
+  | taxonomy-chooser     | $0.006 | never                    |
+  | delegation-reader    | $0.01  | ~1k tokens               |
+  | voice spoken-reply   | $0.005 | ~1.4k tokens             |
+  | navigation-chooser   | $0.005 | ~2.3k tokens             |
+  | turn-skim            | $0.01  | ~3.4k tokens             |
+  | app-action-arguments | $0.01  | ~3.5k tokens             |
+  | voice decision       | $0.01  | ~4k tokens               |
+  | app-action-router    | $0.01  | ~4.4k tokens             |
+
+  Raising them is a bounds-only change in their owners' files. In Q-IQ only the reader and the answer run, so the 12-case check is unaffected.
+
+- **pgTAP, local:**
+  - `999_ai_ops_claude_backup_sonnet_throughout` 8/8, which also exercises the rollback.
+  - Updated to the post-migration state: `999_ai_ops_claude_as_backup` 8/8, `999_ai_ops_claude_backup_on` 8/8, `999_ai_ops_anthropic_claude_reasoning` 24/24.
+  - `320_ai_ops` 35/35.
+- **Still Haiku:** the Q-IQ baseline's _judge_ (an eval grader, not Q). The run's pass/fail reasons come from deterministic checks; `--no-judge` turns the judge off.
 
 ## Anthropic test spend (DECISIONS 68 amended: $50 cap; slow down at $20, very careful past $40)
 

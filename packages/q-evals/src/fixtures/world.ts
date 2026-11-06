@@ -380,10 +380,7 @@ function claudeRoutesOn(
       return {
         ...snapshot,
         routingPolicies: snapshot.routingPolicies.map((policy) =>
-          // v2 (OpenAI first, Claude backup) and v3 (Claude first,
-          // 20261231350000): the highest active version, v3, routes.
-          (policy.version === 2 && policy.code.endsWith(".v2")) ||
-          (policy.version === 3 && policy.code.endsWith(".v3"))
+          policy.version === 2 && policy.code.endsWith(".v2")
             ? { ...policy, status: "ACTIVE" as const }
             : policy,
         ),

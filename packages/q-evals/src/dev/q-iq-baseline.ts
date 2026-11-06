@@ -37,10 +37,10 @@ import { createQIqWorldSubject } from "../runner/q-iq-world.js";
  * stops and reports the cases it ran. Keys are read from files and never
  * printed. Needs DATABASE_URL (local), NODE_USE_ENV_PROXY=1 in the cloud.
  *
- * The staged Claude-first routing policies (v3, 20261231350000) are
- * switched ON in the LOCAL database for the run and back to their prior
- * status afterwards -- the same single UPDATE the receipt gives for
- * production -- and Claude is the only adapter
+ * The Claude backup routing policies (v2: OpenAI first, Claude the
+ * backup; DECISIONS 67 and 69) are switched ON in the LOCAL database for
+ * the run and back to their prior status afterwards, and Claude is the
+ * only adapter
  * registered, so the Q subject measures Claude and never a fallback. The
  * bare subject runs on claude-sonnet-5-5 and the judge on claude-haiku-5-5
  * (--no-judge: none). Claude spend is held to the owner's $20 test cap: a
@@ -67,18 +67,18 @@ const CLAUDE_TEST_CAP_USD = 20;
 /** The cache-write factor: ledger cost times this bounds real Claude spend. */
 const CLAUDE_WRITE_FACTOR = 1.25;
 /**
- * The staged Claude-FIRST policies (20261231350000); the receipt's switch
- * names the same codes. v2 (OpenAI first, Claude the backup) is what
- * production runs; v3 is what is being evaluated.
+ * The Claude backup policies (v2, ACTIVE in production by 20261231340000).
+ * With OpenAI not registered, every route reaches Claude: Sonnet
+ * throughout (20261231360000, DECISIONS 69). No Claude-first policy exists.
  */
 export const CLAUDE_POLICY_CODES = [
-  "normal_dialogue.v3",
-  "evidence_synthesis.v3",
-  "comparison.v3",
-  "deep_investigation.v3",
-  "fast_classification.v3",
-  "structured_extraction.v3",
-  "taxonomy_mapping.v3",
+  "normal_dialogue.v2",
+  "evidence_synthesis.v2",
+  "comparison.v2",
+  "deep_investigation.v2",
+  "fast_classification.v2",
+  "structured_extraction.v2",
+  "taxonomy_mapping.v2",
 ] as const;
 
 function arg(name: string): string | undefined {
@@ -241,7 +241,7 @@ async function main(): Promise<number> {
       });
   const results: QIqRunResult[] = [];
   // The receipt's switch, on the LOCAL database only (checked above):
-  // Claude first for the run, and every row back to the status it had.
+  // the Claude backup on for the run, and every row back to the status it had.
   let before: readonly { code: string; status: string }[] = [];
   const setClaudeRoutes = async (on: boolean): Promise<void> => {
     if (on) {
@@ -250,7 +250,7 @@ async function main(): Promise<number> {
          where code in ${db.sql([...CLAUDE_POLICY_CODES])}`;
       if (before.length !== CLAUDE_POLICY_CODES.length) {
         throw new Error(
-          `expected ${String(CLAUDE_POLICY_CODES.length)} staged Claude-first policies, found ${String(before.length)}: is 20261231350000 applied locally?`,
+          `expected ${String(CLAUDE_POLICY_CODES.length)} Claude backup policies, found ${String(before.length)}: is 20261231280000 applied locally?`,
         );
       }
       await db.sql`
