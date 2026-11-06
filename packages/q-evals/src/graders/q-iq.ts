@@ -222,7 +222,8 @@ function allowedValues(
  * calculation"): a figure Q works out is allowed, not invented, only when
  * all three hold, decided here by code:
  *  (a) it is labelled as a calculation in its sentence or the one beside
- *      it ("× 12", "a year", "my calculation", "not a reported figure");
+ *      it ("× 12", "a year", "my calculation", "not a reported figure",
+ *      "a 37-percentage-point difference");
  *  (b) every input is a figure of that window that is an authorised fact
  *      or the person's own words, or a conversion between periods the
  *      window says ("a month" … "a year"; "× 12" beside "a year") -- the
@@ -234,7 +235,7 @@ function allowedValues(
  * invented.
  */
 const CALCULATION_LABEL =
-  /[×*]\s?\d|\bx\s?\d|\btimes\b|\b(?:a|per|each|every|over\s+a)\s+(?:full\s+|whole\s+)?(?:year|month|week|quarter)\b|\b(?:annual(?:ly|i[sz]ed)?|yearly|monthly|weekly|quarterly)\b|\b(?:my|by my)\s+(?:own\s+)?calculation\b|\bcalculat(?:ed|ion)\b|\bnot\s+a\s+(?:separately\s+)?reported\b|\bimpl(?:y|ies)\b|\bderived\b|\bworks?\s+out\b/iu;
+  /[×*]\s?\d|\bx\s?\d|\btimes\b|\b(?:a|per|each|every|over\s+a)\s+(?:full\s+|whole\s+)?(?:year|month|week|quarter)\b|\b(?:annual(?:ly|i[sz]ed)?|yearly|monthly|weekly|quarterly)\b|\b(?:my|by my)\s+(?:own\s+)?calculation\b|\bcalculat(?:ed|ion)\b|\bnot\s+a\s+(?:separately\s+)?reported\b|\bimpl(?:y|ies)\b|\bderived\b|\bworks?\s+out\b|\bdifference\b|\bgap\b|\bpercentage[\s-]points?\b/iu;
 /** The periods a window says, as the claim check reads them. */
 const PERIODS: readonly (readonly [string, RegExp])[] = [
   ["week", /\b(?:a|per|each|every)\s+week\b|\bweekly\b/iu],
