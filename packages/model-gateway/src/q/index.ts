@@ -260,6 +260,14 @@ import {
   type ClaimKind,
 } from "./claim-check.js";
 import {
+  checkPromises,
+  createPromiseChecker,
+  createRunActions,
+  type ActionClaimKind,
+  type PromiseGrounds,
+} from "./promise-check.js";
+import { toolLoopBudget } from "./tool-loop-budget.js";
+import {
   corroboratedPictures,
   pageAboutThem,
   type HeldIdentity,
@@ -2718,6 +2726,9 @@ export function createModelGatewayQAnswer(
   // The fits each run's tools returned, for cards code builds when the
   // model wrote none (Zino live 2026-10-07).
   const runFits = createRunFits();
+  // Step 8: what each run's tools really did, the only backing for a
+  // sentence in which Q says it prepared, sent, booked or saved something.
+  const runActions = createRunActions();
   const available = baseTools.available;
   // K4: identical concurrent reads within a run share one call. Which
   // tools are reads is the offer's own declaration, per run.
@@ -2984,6 +2995,7 @@ export function createModelGatewayQAnswer(
       }
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
+      runActions.note(toolContext.runId, proposal.name, outcome);
       if (
         outcome.status === "SUCCEEDED" &&
         outcome.result.ok &&
@@ -6666,6 +6678,33 @@ export function createModelGatewayQAnswer(
       let claimSources: () => readonly string[] = () =>
         facts.map((fact) => fact.statement);
       const claims = createClaimChecker(() => claimSources());
+      /**
+       * Step 8: what backs a sentence claiming an action -- this run's
+       * successful acting tool results, read at each sentence -- and the
+       * promise check over Q's own sentences (promise-check.ts).
+       */
+      const promiseGrounds = (): PromiseGrounds => ({
+        actions: runActions.read(request.runId),
+        writingDocument: request.writingDocument === true,
+        remembering: rememberConfirmation(request.rememberAsk) !== null,
+      });
+      const promised = createPromiseChecker(promiseGrounds);
+      const logUnbacked = (
+        unbacked: readonly ActionClaimKind[],
+        where: "stream" | "answer",
+      ): void => {
+        if (unbacked.length === 0) return;
+        logger?.warn(
+          {
+            qRunId: request.runId,
+            where,
+            unbacked: unbacked.length,
+            kinds: [...new Set(unbacked)],
+            toolsActed: runActions.read(request.runId).length,
+          },
+          "unbacked action claims rewritten in a Q answer",
+        );
+      };
       const logUngrounded = (
         ungrounded: readonly ClaimKind[],
         where: "stream" | "answer",
@@ -6721,7 +6760,13 @@ export function createModelGatewayQAnswer(
             ? null
             : claims.sentence(caveatedRaw);
         if (claimed !== null) logUngrounded(claimed.ungrounded, "stream");
-        const caveated = claimed?.text ?? null;
+        // No action is said done that no tool of this run did (step 8).
+        const kept =
+          claimed?.text === null || claimed?.text === undefined
+            ? null
+            : promised.sentence(claimed.text);
+        if (kept !== null) logUnbacked(kept.unbacked, "stream");
+        const caveated = kept?.text ?? null;
         if (caveated === null || caveated.length === 0) {
           return;
         }
@@ -8720,6 +8765,17 @@ export function createModelGatewayQAnswer(
           took("prepare");
           let rounds = 0;
           let calls = 0;
+          // Step 8: a turn read as deep work (analysis, comparison, a
+          // document) may chain up to five rounds within a time budget;
+          // every other turn keeps the standard two. Same tools, same
+          // authorisation, same firewall (tool-loop-budget.ts).
+          const loopBudget = toolLoopBudget({
+            kinds: readAnswerKinds(request),
+            taskClass: budgetClass,
+            standardRounds: Q_TOOL_LOOP_MAX_ROUNDS,
+            standardCalls: Q_TOOL_LOOP_MAX_CALLS,
+            startedAt: Date.now(),
+          });
           /**
            * Guard run on 2632e2cb9 (runs 5728c8df, 0ce9c2bc): a tool the run
            * may use but did not offer up front (it loads on demand) is
@@ -8880,7 +8936,7 @@ export function createModelGatewayQAnswer(
                   MESSAGE_TOOLS.has(call.providerName) ||
                   call.providerName === FIRST_CONTACT_TOOL,
               ) ||
-              calls >= Q_TOOL_LOOP_MAX_CALLS ||
+              calls >= loopBudget.maxCalls ||
               request.signal?.aborted === true
             ) {
               return false;
@@ -8896,14 +8952,16 @@ export function createModelGatewayQAnswer(
           while (
             (rounds <
               1 +
-                (chainedRoundAllowed() ? Q_TOOL_LOOP_MAX_ROUNDS - 1 : 0) +
+                (chainedRoundAllowed()
+                  ? loopBudget.maxRounds(Date.now()) - 1
+                  : 0) +
                 recoveryRounds +
                 sayDoRounds +
                 gapsRounds +
                 loadRounds +
                 redirectRounds +
                 askedRounds &&
-              calls < Q_TOOL_LOOP_MAX_CALLS) ||
+              calls < loopBudget.maxCalls) ||
             askedRoundDue()
           ) {
             modelCalls += 1;
@@ -9004,7 +9062,7 @@ export function createModelGatewayQAnswer(
               defersAskedWork(value.answer, askedNow, lastQText) &&
               !startedWork() &&
               sayDoRounds === 0 &&
-              calls < Q_TOOL_LOOP_MAX_CALLS &&
+              calls < loopBudget.maxCalls &&
               request.signal?.aborted !== true;
             const saidInsteadOfDone = (
               value: CompanyAnalystV26Result,
@@ -9026,7 +9084,7 @@ export function createModelGatewayQAnswer(
                 );
               }) &&
               sayDoRounds === 0 &&
-              calls < Q_TOOL_LOOP_MAX_CALLS &&
+              calls < loopBudget.maxCalls &&
               request.signal?.aborted !== true;
             /**
              * Asked what the screen already answers. The answer puts a
@@ -9045,7 +9103,7 @@ export function createModelGatewayQAnswer(
               screenNote !== null &&
               value.clarifyingQuestions.length > 0 &&
               sayDoRounds === 0 &&
-              calls < Q_TOOL_LOOP_MAX_CALLS &&
+              calls < loopBudget.maxCalls &&
               request.signal?.aborted !== true;
             /**
              * Guard run 1 (2026-10-25, run b6f9236c): "Draft a short update
@@ -9068,7 +9126,7 @@ export function createModelGatewayQAnswer(
                 ) &&
                 sayDoRounds === 0 &&
                 askedRounds === 0 &&
-                calls < Q_TOOL_LOOP_MAX_CALLS &&
+                calls < loopBudget.maxCalls &&
                 request.signal?.aborted !== true
               );
             };
@@ -9224,7 +9282,7 @@ export function createModelGatewayQAnswer(
             // 2026-10-24, "show my pipeline": 1 + 9 calls, run FAILED).
             const proposed = result.output.calls.slice(
               0,
-              Math.min(MODEL_TOOL_CALLS_MAX, Q_TOOL_LOOP_MAX_CALLS - calls),
+              Math.min(MODEL_TOOL_CALLS_MAX, loopBudget.maxCalls - calls),
             );
             const assistant: ModelMessage = {
               role: "ASSISTANT",
@@ -9397,7 +9455,7 @@ export function createModelGatewayQAnswer(
                 offer !== null &&
                 cardOffer === null &&
                 !proposals.some((other) => other.name === Q_CARD_CLAIM_TOOL) &&
-                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+                calls + chainedThisRound.length + 1 < loopBudget.maxCalls
               ) {
                 cardOffer = {
                   handle: offer.handle,
@@ -9418,7 +9476,7 @@ export function createModelGatewayQAnswer(
                 canOffer(CHAT_INSTEAD_TOOL) &&
                 !proposals.some((other) => other.name === CHAT_INSTEAD_TOOL) &&
                 calls + chainedThisRound.length + 1 <=
-                  Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
+                  loopBudget.maxCalls + OUTWARD_FOLLOW_ON_RESERVE
               ) {
                 chatInsteadWhy =
                   outcome.result.ok &&
@@ -9442,7 +9500,7 @@ export function createModelGatewayQAnswer(
                 canOffer(FIRST_CONTACT_TOOL) &&
                 !proposals.some((other) => other.name === FIRST_CONTACT_TOOL) &&
                 calls + chainedThisRound.length + 1 <=
-                  Q_TOOL_LOOP_MAX_CALLS + OUTWARD_FOLLOW_ON_RESERVE
+                  loopBudget.maxCalls + OUTWARD_FOLLOW_ON_RESERVE
               ) {
                 firstContactWithNote = "note" in contact;
                 firstContact = callTool(
@@ -9469,7 +9527,7 @@ export function createModelGatewayQAnswer(
                         } | null
                       )?.companyId === chainedId,
                   ) ||
-                  calls + chainedThisRound.length >= Q_TOOL_LOOP_MAX_CALLS
+                  calls + chainedThisRound.length >= loopBudget.maxCalls
                 ) {
                   continue;
                 }
@@ -9720,7 +9778,7 @@ export function createModelGatewayQAnswer(
               gapsRounds === 0 &&
               (gaps as { readonly status: string } | null)?.status ===
                 "RESEARCHED" &&
-              calls < Q_TOOL_LOOP_MAX_CALLS
+              calls < loopBudget.maxCalls
             ) {
               gapsRounds = 1;
             }
@@ -10156,9 +10214,15 @@ export function createModelGatewayQAnswer(
           claimCorpus(claimSources()),
         );
         logUngrounded(answerClaims.ungrounded, "answer");
+        // Step 8: the stored answer is held to the same promise check.
+        const answerPromises = checkPromises(
+          answerClaims.text,
+          promiseGrounds(),
+        );
+        logUnbacked(answerPromises.unbacked, "answer");
         const guarded = {
           ...recommendationGuarded,
-          text: answerClaims.text,
+          text: answerPromises.text,
         };
         if (guarded.removed > 0) {
           logger?.warn(
