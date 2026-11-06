@@ -104,6 +104,45 @@ Reading it:
   - cases go round-robin across categories, so a budget stop samples all 10;
   - pass `--out` to keep per-turn JSON.
 
+### Live run 2 — 6 Nov 2026: Q vs the bare model (gpt-5.6-luna, reasoning NONE)
+
+Q at integration head `5a58671d6` (steps 0–11 plus the pronoun, discovery and person-identity fixes), local eval world, `--budget 5.5`, cases round-robin across categories. Total cost **$4.198** ($4.100 Q, $0.098 bare model and judge). Q stopped for budget at 159 of 163 cases.
+
+| Category                                                        | Q, 5 Nov                 | **Q, 6 Nov**                  | Bare model, 6 Nov |
+| --------------------------------------------------------------- | ------------------------ | ----------------------------- | ----------------- |
+| PRONOUNS_PEOPLE                                                 | 86.7%                    | **95.0%**                     | 98.3%             |
+| ORDINALS_LISTS                                                  | 83.1%                    | **92.3%**                     | 100.0%            |
+| FOLLOW_UPS                                                      | 82.7%                    | **81.3%**                     | 97.3%             |
+| CORRECTIONS                                                     | 86.7%                    | **96.7%**                     | 100.0%            |
+| COMPOUND                                                        | 75.6%                    | **86.7%**                     | 80.0%             |
+| UNKNOWN                                                         | 75.0%                    | **95.0%**                     | 81.7%             |
+| CONTRADICTIONS                                                  | 95.6%                    | **95.2%**                     | 100.0%            |
+| NUMBERS                                                         | 64.4%                    | **86.8%**                     | 95.9%             |
+| CROSS_CONVERSATION_MEMORY                                       | 44.4%                    | **97.6%**                     | 100.0%            |
+| AMBIGUITY                                                       | not run                  | **90.5%**                     | 68.9%             |
+| ADVERSARIAL                                                     | —                        | **88.9%**                     | 91.7%             |
+| DISCOVERY                                                       | —                        | 0.0% (harness: no web search) | 0.0% (same)       |
+| **Overall (turns), like-for-like, 158 cases without DISCOVERY** | 79.2% (5 Nov, 126 cases) | **91.1% (542/595)**           | 92.9% (553/595)   |
+| References resolved                                             | 92.2%                    | 98.6%                         | 98.8%             |
+| Wrong-entity turns                                              | 7                        | 2                             | 1                 |
+| Turns with an invented figure                                   | 6                        | 8                             | 10                |
+| Unknowns said as unknown                                        | 46.3%                    | 89.1%                         | 67.4%             |
+| Ambiguous asks clarified                                        | not run                  | 78.6%                         | 6.7%              |
+| Multi-part asks fully answered                                  | 81.3%                    | 90.5%                         | 88.0%             |
+| Helpfulness (1–5)                                               | 4.67                     | 4.91                          | 4.99              |
+| Latency p50 / p95 (whole reply)                                 | 6.9 s / 11.9 s           | 7.6 s / 18.4 s                | 1.1 s / 1.8 s     |
+
+Reading it:
+
+- The like-for-like gap fell from **15.0 points to 1.8**.
+- Q now **beats** the bare model on COMPOUND, UNKNOWN and AMBIGUITY.
+- Q trails by 3 points or less on PRONOUNS, CORRECTIONS and ADVERSARIAL.
+- The largest remaining gaps are FOLLOW_UPS (−16.0) and NUMBERS (−9.1).
+- Invented figures are not yet 0 for either subject.
+- DISCOVERY needs web search in the eval world; until then it scores 0 for every subject and is excluded.
+- Latency is unchanged: the turn reader (4–5 s) is the planned target, with reader thinking OFF next.
+- The bare Claude run (`--provider anthropic --bare-only`) follows.
+
 ## Cost
 
 Actual, first live run: **$3.476** ($3.390 Q, $0.086 bare model and judge). The estimate below undercounted Q: Q's actual cost per case was about 2.5× the estimate.
