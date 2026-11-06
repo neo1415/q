@@ -7,7 +7,6 @@ import { createQTurnReader } from "../src/q/index.js";
 import {
   TURN_READER_ATTEMPT_TIMEOUT_MS,
   TURN_READER_FAST_FIRST_ATTEMPT_MS,
-  TURN_READER_REASONING_KEY,
   TURN_READER_SAME_MODEL_HEDGE_MS,
 } from "../src/q/turn-reader.js";
 
@@ -73,16 +72,6 @@ describe("the turn reader's data posture", () => {
     expect(requests[0]?.dataPosture).toBe("SYNTHETIC_DEMO");
     expect(requests[0]?.taskClass).toBe("FAST_CLASSIFICATION");
     expect(requests[0]?.sensitivity).toBe("CONFIDENTIAL");
-  });
-
-  // Reader latency (2026-11-06): the routing policy may set the reading's
-  // reasoning level by this key (reasoning_levels); LOW is the default.
-  it("names its kind of work to the routing policy, LOW by default", async () => {
-    const { gateway, requests } = recording();
-    await createQTurnReader({ gateway, logger }).read(input);
-    expect(requests[0]?.reasoningKey).toBe(TURN_READER_REASONING_KEY);
-    expect(requests[0]?.reasoningKey).toBe("TURN_READER");
-    expect(requests[0]?.reasoning).toBe("LOW");
   });
 
   it("is not declared when the composition has none", async () => {

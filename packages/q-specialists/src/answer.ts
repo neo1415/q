@@ -33,7 +33,6 @@ import {
 } from "./team-job.js";
 import {
   readingMisfit,
-  SPECULATIVE_ANSWER_KIND,
   SPECULATIVE_READING,
   speculationMisfit,
   startSpeculation,
@@ -4744,12 +4743,6 @@ export function createSpecialistQAnswer(
     readonly reading: Promise<Awaited<ReturnType<QTurnReader["read"]>> | null>;
   };
   const prereads = new Map<string, Promise<EarlyReading | null>>();
-  /**
-   * The turn reading begun inside a run's answer (reader latency): stopped
-   * when the run's answer ends, so a code lane that answered the turn
-   * before the reading was needed does not leave it running.
-   */
-  const readersInRun = new Map<string, AbortController>();
   /** K fast lane: the short first read, begun beside the firewall. */
   const preskims = new Map<
     string,
@@ -5729,10 +5722,6 @@ export function createSpecialistQAnswer(
       // Any path that did not adopt the speculation drops it (a no-op once
       // adopted): nothing of it is said, stored or done.
       speculative.current?.cancel("ACTED");
-      // A reading still in flight is not wanted once the answer has ended
-      // (a no-op once it landed).
-      readersInRun.get(request.runId)?.abort();
-      readersInRun.delete(request.runId);
     });
     await persistCore(request.runId);
     // One status per card per answer: a card this turn handed to the
@@ -5927,104 +5916,6 @@ export function createSpecialistQAnswer(
         "q bound a reference",
       );
     }
-    // Reader latency (2026-11-06; live18: the reading was 3.9-4.9 s of a
-    // 4.4-6.2 s first sentence): the reading starts as soon as its inputs
-    // exist -- the words, the turns, the actions, what was shown and what
-    // the words point at -- beside the code lanes below (an ordinal recall,
-    // a card, a screen tab, a record or researched entity by name, a page),
-    // each a database read, rather than after them. Nothing of it is used
-    // until the turn reaches the reading, exactly as before; a lane that
-    // answers the turn stops it (the run's end aborts readerAbort). Only
-    // when no early reading (ADR 0035) is in flight with the same actions
-    // is a reading started here; that one is taken up as before.
-    // K6: the full reading is dropped (its provider call aborted) when the
-    // fast lane's skim answers the turn first; the run's own abort still
-    // reaches it.
-    const readerAbort = new AbortController();
-    request.signal?.addEventListener("abort", () => readerAbort.abort(), {
-      once: true,
-    });
-    // Why this turn's latest reading failed: no reasoning route at all, or
-    // a model that answered nothing usable (live 2026-10-31).
-    const readFailure = { serviceUnavailable: false };
-    const situationText = situationFor(
-      request.actor,
-      request.plan.screen,
-      latest.utteranceRef !== undefined,
-    );
-    const stateText = conversationStateTextOf(
-      {
-        tenantId: request.tenantId,
-        userId: request.actor.userId,
-        runId: request.runId,
-      },
-      history,
-      request.fetchedInConversation,
-    );
-    const readTurn = async (signal: AbortSignal = readerAbort.signal) =>
-      turns.read(
-        turnReaderInput(
-          history,
-          latest,
-          actions,
-          {
-            tenantId: request.tenantId,
-            userId: request.actor.userId,
-            correlationId: request.correlationId,
-            runId: request.runId,
-            signal,
-            onFailure: (failure) => {
-              readFailure.serviceUnavailable = failure.serviceUnavailable;
-            },
-          },
-          withResolution(referenceNote(shown, lastAction), pointed),
-          request.plan.screen?.manifest?.controls,
-          await situationText,
-          await stateText,
-        ),
-      );
-    // Read early, beside the firewall (ADR 0035), with the same words, the
-    // same turns and the same actions as now: taken up only when all three
-    // match; anything else is read again here.
-    const early = prereads.get(request.runId);
-    prereads.delete(request.runId);
-    let readingStartedAt = 0;
-    let readingStarted: Promise<Awaited<ReturnType<typeof readTurn>>> | null =
-      null;
-    const startReading = (): Promise<Awaited<ReturnType<typeof readTurn>>> => {
-      if (readingStarted !== null) return readingStarted;
-      readingStartedAt = Date.now();
-      readingStarted = readTurnFirst();
-      readingStarted.catch(() => undefined);
-      return readingStarted;
-    };
-    const readTurnFirst = async (): Promise<
-      Awaited<ReturnType<typeof readTurn>>
-    > => {
-      const ready = early === undefined ? null : await early;
-      const earlyRead =
-        ready !== null &&
-        ready.messageId === latest.id &&
-        ready.actionsKey === actionsKey(actions)
-          ? await ready.reading
-          : null;
-      if (ready !== null && earlyRead === null) {
-        logger?.info(
-          {
-            qRunId: request.runId,
-            sameActions: ready.actionsKey === actionsKey(actions),
-          },
-          "q early reading not used",
-        );
-      }
-      return earlyRead ?? (await readTurn().catch(() => null));
-    };
-    readersInRun.set(request.runId, readerAbort);
-    while (readersInRun.size > PREREADS_MAX) {
-      const oldest = readersInRun.keys().next().value;
-      if (oldest === undefined) break;
-      readersInRun.delete(oldest);
-    }
     // "What was the second one?": the name in Q's own list, said by code
     // with no reading and no model call (never an opened page: defect B).
     const recalled =
@@ -6117,16 +6008,6 @@ export function createSpecialistQAnswer(
     // question (the answer path, with the corrected subject); code opens
     // nothing by name unless the words ask to go somewhere.
     const continuesQ = continuesQsQuestion(history, latest.content);
-    // Every lane above is decided by code with no database read; the ones
-    // below read the database (a tab, a record or researched entity by
-    // name). The reading starts now, beside them, unless the page lane
-    // further down -- also by code, also no read -- answers the turn alone
-    // (a page by name with nothing more asked), where no reading is made.
-    const pagedAlone =
-      !continuesQ &&
-      pageAnswer(latest.content, history, capabilities) !== null &&
-      !questionAfterMove(latest.content);
-    if (!pagedAlone) void startReading();
     if (continuesQ) {
       logger?.info(
         { qRunId: request.runId },
@@ -6291,10 +6172,6 @@ export function createSpecialistQAnswer(
           research: Promise.resolve(speculativeResearch),
           capabilities: manifestOf(capabilities),
           turnKind: SPECULATIVE_READING.kind,
-          // What the default reading asks of the answer: the turn's answer
-          // is this one only when its reading says the same (a reading's
-          // answerKind sets the answer's task class and reasoning).
-          answerKind: SPECULATIVE_ANSWER_KIND,
           spoken: true,
           // What a plain question's focus is (toolFocusOf): the purpose's
           // list with the public-web tools leading, so the speculation
@@ -6319,6 +6196,57 @@ export function createSpecialistQAnswer(
     };
     // No skim composed: nothing to gate on, so it starts at once.
     if (speculate && dependencies.turnSkim === undefined) startSpoken();
+    // K6: the full reading is dropped (its provider call aborted) when the
+    // fast lane's skim answers the turn first; the run's own abort still
+    // reaches it.
+    const readerAbort = new AbortController();
+    request.signal?.addEventListener("abort", () => readerAbort.abort(), {
+      once: true,
+    });
+    // Why this turn's latest reading failed: no reasoning route at all, or
+    // a model that answered nothing usable (live 2026-10-31).
+    const readFailure = { serviceUnavailable: false };
+    const situationText = situationFor(
+      request.actor,
+      request.plan.screen,
+      latest.utteranceRef !== undefined,
+    );
+    const stateText = conversationStateTextOf(
+      {
+        tenantId: request.tenantId,
+        userId: request.actor.userId,
+        runId: request.runId,
+      },
+      history,
+      request.fetchedInConversation,
+    );
+    const readTurn = async (signal: AbortSignal = readerAbort.signal) =>
+      turns.read(
+        turnReaderInput(
+          history,
+          latest,
+          actions,
+          {
+            tenantId: request.tenantId,
+            userId: request.actor.userId,
+            correlationId: request.correlationId,
+            runId: request.runId,
+            signal,
+            onFailure: (failure) => {
+              readFailure.serviceUnavailable = failure.serviceUnavailable;
+            },
+          },
+          withResolution(referenceNote(shown, lastAction), pointed),
+          request.plan.screen?.manifest?.controls,
+          await situationText,
+          await stateText,
+        ),
+      );
+    // Read early, beside the firewall (ADR 0035), with the same words, the
+    // same turns and the same actions as now: taken up only when all three
+    // match; anything else is read again here.
+    const early = prereads.get(request.runId);
+    prereads.delete(request.runId);
     lastActions.delete(conversationId);
     lastActions.set(conversationId, actionsKey(actions));
     if (lastActions.size > MAX_CONVERSATIONS) {
@@ -6350,7 +6278,25 @@ export function createSpecialistQAnswer(
     // time before the answer goes, per stage, on every turn (counts and
     // milliseconds only; nothing they said). See "q turn timing" below.
     const turnStartedAt = Date.now();
-    const readingFirst = startReading();
+    const readingFirst = (async () => {
+      const ready = early === undefined ? null : await early;
+      const earlyRead =
+        ready !== null &&
+        ready.messageId === latest.id &&
+        ready.actionsKey === actionsKey(actions)
+          ? await ready.reading
+          : null;
+      if (ready !== null && earlyRead === null) {
+        logger?.info(
+          {
+            qRunId: request.runId,
+            sameActions: ready.actionsKey === actionsKey(actions),
+          },
+          "q early reading not used",
+        );
+      }
+      return earlyRead ?? (await readTurn().catch(() => null));
+    })();
     // Read beside the reading rather than after it: a request to act that
     // names one of their counterparts needs these names once it is read.
     if (!companyAcrossRelationship(request)) void counterpartsOf(request);
@@ -8186,7 +8132,6 @@ export function createSpecialistQAnswer(
             ownRecords,
             speculative: speculation.request,
             speculativeResearch,
-            bound: resolvedInRun.has(request.runId),
           });
     if (misfit !== null) speculation?.cancel(misfit);
     // Still unread after the extra try: no answer path is guessed for it
@@ -8219,10 +8164,6 @@ export function createSpecialistQAnswer(
         {
           qRunId: request.runId,
           readMs,
-          // Reader latency: how long before this point the reading began
-          // (the code lanes it now runs beside). 0 on an early reading's
-          // turn, which began before the answer.
-          readerHeadStartMs: turnStartedAt - readingStartedAt,
           // Step 11: the conversation state's read and fold, and whether
           // this process's committed copy stood in for the store.
           stateMs: loadedState?.loadMs ?? null,
