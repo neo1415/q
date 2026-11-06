@@ -22,7 +22,7 @@ describe("TURN_READER v76", () => {
   it("is the active reader: v75 kept whole plus one CONVERSATION STATE rule and the state before RECENT TURNS", () => {
     const active =
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
-    expect(active.version).toBe(79);
+    expect(active.version).toBe(80);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
       TurnReaderV79ResultSchema,
     );
@@ -87,7 +87,7 @@ describe("TURN_READER v76", () => {
       },
     });
     const text = rendered.messages.map((m) => m.content).join("\n");
-    expect(rendered.bundle.task).toMatch(/\/v79$/u);
+    expect(rendered.bundle.task).toMatch(/\/v80$/u);
     const state = text.indexOf("Ngozi Eze");
     expect(state).toBeGreaterThan(0);
     expect(state).toBeLessThan(text.indexOf("Who is Silo Credit's CFO?"));

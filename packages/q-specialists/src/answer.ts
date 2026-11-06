@@ -6621,14 +6621,30 @@ export function createSpecialistQAnswer(
             ? [read.namedOther.name]
             : []),
           ...(binding.kind === "BOUND" ? binding.open : []),
+          // v79: a company bound only by its name as said (no record
+          // behind it) is still a name to check (live AMB-136, 61b7a85).
+          ...(binding.kind === "BOUND"
+            ? binding.bound.flatMap((one) =>
+                one.entities.flatMap((entity) =>
+                  entity.kind === "COMPANY" &&
+                  entity.id === null &&
+                  entity.name !== null
+                    ? [entity.name]
+                    : [],
+                ),
+              )
+            : []),
         ].filter(
           (name, index, all) =>
             all.findIndex(
               (other) => other.toLowerCase() === name.toLowerCase(),
             ) === index &&
-            // A name the conversation already holds is that entry.
+            // A name the conversation already holds as a record is that
+            // record; a name with no record behind it decides nothing.
             !shownState.ledger.entities.some(
-              (entity) => entity.name?.toLowerCase() === name.toLowerCase(),
+              (entity) =>
+                entity.id !== null &&
+                entity.name?.toLowerCase() === name.toLowerCase(),
             ),
         );
         for (const name of heard.slice(0, 2)) {

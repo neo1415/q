@@ -25,7 +25,7 @@ describe("TURN_READER v77", () => {
   it("is v76 kept whole plus one REFERENCES rule (v78 is active)", () => {
     const active =
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
-    expect(active.version).toBe(79);
+    expect(active.version).toBe(80);
     expect(
       TURN_READER_V77.output.kind === "STRUCTURED" &&
         TURN_READER_V77.output.schema,
