@@ -281,56 +281,64 @@ export async function CapitalScreen({
             data-capital-investor
           >
             <QControl id="section.mandate" kind="SECTION">
-              <aside
-                id="mandate"
-                aria-label={t("Your mandate")}
-                className="flex flex-col gap-3.5 lg:sticky lg:top-4"
-              >
-                <MandateSummary
-                  investorOrganisationId={context.investorOrganisationId}
-                  given={review?.mandate}
-                />
-                <Suspense fallback={null}>
-                  <MandateObservation
-                    relationships={relationships}
-                    given={review?.fit}
+              <QSection id="mandate" kind="OTHER" label={t("Your mandate")}>
+                <aside
+                  id="mandate"
+                  aria-label={t("Your mandate")}
+                  className="flex flex-col gap-3.5 lg:sticky lg:top-4"
+                >
+                  <MandateSummary
+                    investorOrganisationId={context.investorOrganisationId}
+                    given={review?.mandate}
                   />
-                </Suspense>
-                <Suspense fallback={null}>
-                  <SavedCompaniesCard
-                    {...(review === undefined ? {} : { given: review.saved })}
-                  />
-                </Suspense>
-                <AskQChips asks={INVESTOR_ASKS} />
-              </aside>
+                  <Suspense fallback={null}>
+                    <MandateObservation
+                      relationships={relationships}
+                      given={review?.fit}
+                    />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <SavedCompaniesCard
+                      {...(review === undefined ? {} : { given: review.saved })}
+                    />
+                  </Suspense>
+                  <AskQChips asks={INVESTOR_ASKS} />
+                </aside>
+              </QSection>
             </QControl>
             {/* Q reaches the book by name, as it reached the old section. */}
             <QControl id="section.commitments" kind="SECTION">
-              <section
+              <QSection
                 id="commitments"
-                aria-labelledby="book-title"
-                className="flex min-w-0 flex-col gap-3"
+                kind="CAPITAL_ROUNDS"
+                label={t("Your book")}
               >
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <h2
-                    id="book-title"
-                    className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
-                  >
-                    {t("Your book")}
-                  </h2>
-                  <span className="text-xs text-(--cq-text-tertiary)">
-                    {t("Received is confirmed by the company")}
-                  </span>
-                </div>
-                {mine === null ? (
-                  <QuietEmpty
-                    sentence="Your commitments couldn't load."
-                    retry
-                  />
-                ) : (
-                  <InvestorBook mine={mine} unrecorded={unrecorded} />
-                )}
-              </section>
+                <section
+                  id="commitments"
+                  aria-labelledby="book-title"
+                  className="flex min-w-0 flex-col gap-3"
+                >
+                  <div className="flex flex-wrap items-baseline gap-3">
+                    <h2
+                      id="book-title"
+                      className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+                    >
+                      {t("Your book")}
+                    </h2>
+                    <span className="text-xs text-(--cq-text-tertiary)">
+                      {t("Received is confirmed by the company")}
+                    </span>
+                  </div>
+                  {mine === null ? (
+                    <QuietEmpty
+                      sentence="Your commitments couldn't load."
+                      retry
+                    />
+                  ) : (
+                    <InvestorBook mine={mine} unrecorded={unrecorded} />
+                  )}
+                </section>
+              </QSection>
             </QControl>
           </div>
         </CrmToastProvider>

@@ -63,6 +63,7 @@ import {
   type OpenedFile,
 } from "./material-actions";
 import { RequestSheet, type RoomRequestTarget } from "./request-sheet";
+import { QSection } from "@/features/q/q-section";
 import { setMaterialDocument } from "@/features/q/screen";
 import { useT } from "@/features/i18n/language";
 
@@ -1364,43 +1365,48 @@ export function OwnerDataRoom({
       </div>
 
       {view.checklist.length === 0 ? null : (
-        <div
-          className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
-          data-readiness
-        >
-          <p className="cq-title-sm text-(--cq-text-primary)">
-            {present} of {view.checklist.length} recommended for a{" "}
-            {stage.toLowerCase()} round
-          </p>
-          <div className="flex gap-1" aria-hidden="true">
-            {view.checklist.map((item) => (
-              <span
-                key={item.code}
-                className={`h-1.5 flex-1 rounded-full ${item.present ? "bg-(--cq-positive)" : "bg-(--cq-border-subtle)"}`}
-              />
-            ))}
+        // Q Workspace W2: what the data room still lacks for their stage.
+        <QSection id="missing" kind="DATA_ROOM" label={t("Missing")}>
+          <div
+            className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+            data-readiness
+          >
+            <p className="cq-title-sm text-(--cq-text-primary)">
+              {present} of {view.checklist.length} recommended for a{" "}
+              {stage.toLowerCase()} round
+            </p>
+            <div className="flex gap-1" aria-hidden="true">
+              {view.checklist.map((item) => (
+                <span
+                  key={item.code}
+                  className={`h-1.5 flex-1 rounded-full ${item.present ? "bg-(--cq-positive)" : "bg-(--cq-border-subtle)"}`}
+                />
+              ))}
+            </div>
+            {missing.length === 0 ? (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                {t(
+                  "Everything investors usually ask for at this stage is here.",
+                )}
+              </p>
+            ) : (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                Still to add:{" "}
+                {missing
+                  .slice(0, 3)
+                  .map(
+                    (item) =>
+                      item.label.charAt(0).toLowerCase() + item.label.slice(1),
+                  )
+                  .join(", ")}
+                {missing.length > 3
+                  ? `, and ${String(missing.length - 3)} more`
+                  : ""}
+                . A recommendation, not a requirement.
+              </p>
+            )}
           </div>
-          {missing.length === 0 ? (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              {t("Everything investors usually ask for at this stage is here.")}
-            </p>
-          ) : (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              Still to add:{" "}
-              {missing
-                .slice(0, 3)
-                .map(
-                  (item) =>
-                    item.label.charAt(0).toLowerCase() + item.label.slice(1),
-                )
-                .join(", ")}
-              {missing.length > 3
-                ? `, and ${String(missing.length - 3)} more`
-                : ""}
-              . A recommendation, not a requirement.
-            </p>
-          )}
-        </div>
+        </QSection>
       )}
 
       {waiting.length === 0 ? null : inDocuments ? (
