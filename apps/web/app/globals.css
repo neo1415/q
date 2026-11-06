@@ -298,6 +298,30 @@
       transition: none;
     }
   }
+  /* Q Workspace W3.3: where a move landed (a section, message or Board
+     item), marked briefly the way Q points: a ring outside the box, so
+     nothing moves. No fade with reduced motion. */
+  [data-q-section] > *,
+  [data-q-message],
+  [data-board-item] {
+    scroll-margin-top: 5rem;
+  }
+  [data-q-arrived] {
+    box-shadow:
+      0 0 0 2px var(--cq-gold-mid),
+      0 0 0 6px color-mix(in oklch, var(--cq-gold-light) 28%, transparent);
+    animation: cq-q-arrived var(--cq-motion-emphasis) var(--cq-ease) both;
+  }
+  @keyframes cq-q-arrived {
+    from {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-q-arrived] {
+      animation: none;
+    }
+  }
   /* The "fictional" foot note never sits under a full-height stage or a
      thread, where it added a strip and a second scroll. The names on those
      pages still lose their mark; the note shows on the next page. */

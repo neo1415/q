@@ -12,7 +12,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { CompanyAvatar } from "../company/company-avatar";
-import { destinationPath } from "../voice/destinations";
+import { navigateIntentPath } from "./control/deep-link";
 import { ArtifactCard } from "./artifact-card";
 import { CalendarConnectCard } from "./calendar-connect-card";
 import { HideableCard } from "./cards/hideable-card";
@@ -126,7 +126,7 @@ const COMPANY_SECTION_TABS: Readonly<Record<QUiCompanySection, string | null>> =
 export function intentHref(intent: QUiIntent): string | null {
   // A named surface, through the same route map spoken navigation uses.
   if (intent.kind === "NAVIGATE") {
-    return destinationPath(intent.destination);
+    return navigateIntentPath(intent);
   }
   // Client actions happen as the answer arrives (client-actions.ts); a
   // website also gets its own link card below, never an in-app route.

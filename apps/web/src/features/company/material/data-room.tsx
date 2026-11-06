@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -531,6 +532,7 @@ function ConnectedDataRoom({
   const brief = useBrief();
   const { askNow } = useGlobalQ();
   const [measure, wide] = useRoomWide();
+  const askedDocument = useSearchParams()?.get("doc") ?? null;
   const [shelf, setShelf] = useState<Shelf>("ALL");
   const [asking, setAsking] = useState<RoomRequestTarget | null>(null);
   const { requested, markRequested, shared } = useRoomRequests();
@@ -595,21 +597,6 @@ function ConnectedDataRoom({
   );
   const step = steps[at];
 
-  if (view.documents.length === 0) {
-    return (
-      <div className="flex flex-col gap-2 py-6" data-data-room="investor-empty">
-        <p className="cq-body text-(--cq-text-primary)">
-          Nothing in {companyName}&rsquo;s data room is open to you yet.
-        </p>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {t(
-            "Documents they share with you, or list for you to request, appear here. Nothing here means nothing is shared with you yet, not that nothing exists.",
-          )}
-        </p>
-      </div>
-    );
-  }
-
   const open = async (document: DataRoomInvestorDocument) => {
     const ticket = ++latest.current;
     setOpening(document.documentId);
@@ -670,6 +657,42 @@ function ConnectedDataRoom({
       );
     }
   };
+
+  // W3.2: a deep link names one document (`?doc=<id>`): the viewer opens
+  // on it once, only when it is open to this reader (the server authorises
+  // the open again, as for a click); any other id is ignored.
+  const askedDoc = askedDocument?.toLowerCase() ?? null;
+  const target =
+    askedDoc === null
+      ? undefined
+      : documents.find(
+          (document) =>
+            document.documentId.toLowerCase() === askedDoc &&
+            document.access === "OPEN",
+        );
+  const openedForLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (target === undefined || openedForLink.current === target.documentId) {
+      return;
+    }
+    openedForLink.current = target.documentId;
+    void open(target);
+  });
+
+  if (view.documents.length === 0) {
+    return (
+      <div className="flex flex-col gap-2 py-6" data-data-room="investor-empty">
+        <p className="cq-body text-(--cq-text-primary)">
+          Nothing in {companyName}&rsquo;s data room is open to you yet.
+        </p>
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {t(
+            "Documents they share with you, or list for you to request, appear here. Nothing here means nothing is shared with you yet, not that nothing exists.",
+          )}
+        </p>
+      </div>
+    );
+  }
 
   const shelves: readonly (readonly [Shelf, string, number, boolean])[] = [
     ["ALL", t("All documents"), documents.length, false],

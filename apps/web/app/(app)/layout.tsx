@@ -13,6 +13,7 @@ import {
   resolveOwnContext,
   resolveQStanding,
 } from "@/features/q/context";
+import { QArrival } from "@/features/q/control/q-arrival";
 import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
@@ -188,6 +189,11 @@ export default async function ApplicationLayout({
                 admin,
               }}
             />
+          </Suspense>
+          {/* Q Workspace W3: a move's arrival (scroll, mark, focus) and
+          the history mark on Q's moves, from the navigation lifecycle. */}
+          <Suspense fallback={null}>
+            <QArrival />
           </Suspense>
         </AppShell>
       </CapabilitiesProvider>

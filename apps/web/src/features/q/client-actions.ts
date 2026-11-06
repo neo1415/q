@@ -19,6 +19,7 @@ import {
   beginNavigationTurn,
   lastNavigationTo,
 } from "./control/navigation-lifecycle";
+import { withNavigateTarget } from "./control/deep-link";
 import { currentRoute } from "./control/route-state";
 import {
   doneByScreen,
@@ -175,6 +176,13 @@ const RELATIONSHIP_TAB_NAMES: readonly string[] = [
  * authorises what it shows as the person, as for a typed URL.
  */
 export function recordIntentPath(
+  intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): string {
+  // W3.2: the exact place on the page (document, slide, message, section).
+  return withNavigateTarget(recordIntentBasePath(intent), intent.target);
+}
+
+function recordIntentBasePath(
   intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
 ): string {
   const base = recordPagePath(intent.page, intent.id, intent.companyId);
