@@ -541,6 +541,8 @@ export function RelationshipChat({
             <li
               className={`group flex max-w-[72%] min-w-0 flex-col gap-0.5 max-sm:max-w-[86%] ${message.mine ? "items-end self-end" : "items-start self-start"}`}
               data-chat-message={message.mine ? "mine" : "theirs"}
+              // W3.2: a message deep link (`?message=<id>`) lands here.
+              data-q-message={message.messageId}
             >
               <div
                 className={`flex max-w-full min-w-0 flex-col gap-1 rounded-(--cq-radius-xl) px-3.5 py-2.5 ${

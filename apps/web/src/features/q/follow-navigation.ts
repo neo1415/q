@@ -1,6 +1,7 @@
 import type {
   QClientActionIntent,
   QNavigateDestination,
+  QNavigateTargetDetail,
 } from "@capital-q/contracts";
 
 import { asksForMove } from "@capital-q/q-core/speech";
@@ -55,14 +56,17 @@ export function followOfTurns(
   seen: Set<string>,
 ): {
   readonly navigate: QNavigateDestination | null;
+  /** W3.2: where on the destination the move lands (absent: its top). */
+  readonly navigateTarget?: QNavigateTargetDetail | undefined;
   readonly actions: readonly QClientActionIntent[];
 } {
   let navigate: QNavigateDestination | null = null;
+  let navigateTarget: QNavigateTargetDetail | undefined;
   const actions: QClientActionIntent[] = [];
   // W7: nothing is followed, or marked followed, before the wire's
   // contracts are in; the caller looks again once they are (useWire).
   const schema = wireNow()?.QClientActionIntentSchema;
-  if (schema === undefined) return { navigate, actions };
+  if (schema === undefined) return { navigate, navigateTarget, actions };
   let asked: string | null = null;
   for (const turn of turns) {
     if (turn.kind === "PERSON") {
@@ -84,6 +88,7 @@ export function followOfTurns(
         // The latest one wins: two in one render is a conversation that
         // moved on, and the person should land where it ended.
         navigate = block.intent.destination;
+        navigateTarget = block.intent.target;
         continue;
       }
       const action = schema.safeParse(block.intent);
@@ -96,7 +101,7 @@ export function followOfTurns(
   // tab") has its UI acts wait for that page. Registering a move here that
   // another surface was meant to make is what left a spoken move reported
   // FAILED with nothing ever pushed (hosted 2026-10-09).
-  return { navigate, actions };
+  return { navigate, navigateTarget, actions };
 }
 
 /**
