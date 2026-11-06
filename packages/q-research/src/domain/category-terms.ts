@@ -61,6 +61,9 @@ export const DISCOVERY_VOCABULARY: readonly string[] = [
   "watch",
   "emerging",
   "accelerator",
+  // The top-up round below a yield floor (round 6, 2026-11-06).
+  "cohort",
+  "top",
 ];
 
 function nodeName(

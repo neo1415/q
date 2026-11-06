@@ -91,6 +91,13 @@ const ROUND_CUTOFF = 0.7;
  * until 70% of it.
  */
 export const DISCOVERY_BUDGET_MS = 45_000;
+/**
+ * Round 6 (live 2026-11-06 on f580935bb: one company listed after round
+ * 4's filters): below this many, one more round with other angles runs.
+ */
+export const DISCOVERY_YIELD_FLOOR = 5;
+/** Research calls one discovery makes: the research service's own budget. */
+export const DISCOVERY_RESEARCH_CALLS_MAX = 6;
 
 const STAGE_ORDER = [
   "pre_seed",
@@ -119,6 +126,8 @@ const HINT_WORDS = [
   "watch",
   "emerging",
   "accelerator",
+  "cohort",
+  "top",
 ] as const;
 
 export type DiscoveryPlan = {
@@ -315,6 +324,42 @@ export function planDiscovery(
     askNamed:
       askSectors.length > 0 || askCountries.length > 0 || askStages.length > 0,
   };
+}
+
+/**
+ * Round 6: the top-up round's queries -- an accelerator cohort, then a list
+ * per country -- none already sent, each checked like every other query.
+ */
+export function topUpQueries(
+  plan: DiscoveryPlan,
+  year: number,
+  sent: readonly string[],
+): string[] {
+  const sectors = plan.sectors.length > 0 ? plan.sectors : [""];
+  const places = plan.places.length > 0 ? plan.places : [""];
+  const join = (...parts: readonly string[]) =>
+    parts
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
+      .join(" ");
+  const candidates = [
+    join(
+      sectors[0] ?? "",
+      "startup accelerator cohort",
+      places[0] ?? "",
+      String(year),
+    ),
+    ...places.flatMap((place) =>
+      sectors
+        .slice(0, 2)
+        .map((sector) => join("top", sector, "startups", place, String(year))),
+    ),
+  ];
+  const already = new Set(sent.map((query) => query.toLowerCase()));
+  return [...new Set(candidates)]
+    .filter((query) => !already.has(query.toLowerCase()))
+    .filter((query) => queryIsPublic(query, plan, year))
+    .slice(0, 2);
 }
 
 // --- grounding -------------------------------------------------------------
@@ -1109,6 +1154,8 @@ export async function runWebDiscovery(input: {
   };
   let unavailable = 0;
   let answered = 0;
+  let researchCalls = 0;
+  const sentQueries: string[] = [];
   // The categories travel as codes: the research tool admits only real
   // taxonomy categories and ISO countries, by their public names, so the
   // mandate's categories reach the query although the person never said
@@ -1126,6 +1173,9 @@ export async function runWebDiscovery(input: {
   ) => {
     const [query, ...also] = queries;
     if (query === undefined) return;
+    if (researchCalls >= DISCOVERY_RESEARCH_CALLS_MAX) return;
+    researchCalls += 1;
+    sentQueries.push(...queries);
     const outcome = await call(RESEARCH_TOOL, {
       target: "GENERAL",
       query,
@@ -1225,6 +1275,7 @@ export async function runWebDiscovery(input: {
     ...namesFromCompanySites(firstPages),
   ];
   const candidateNames = firstProposed.map((item) => item.name);
+  let droppedListings = 0;
   const today = new Date(now());
   const thisYear = today.getUTCFullYear();
   // Round 4: a listing is not a company; what this conversation already
@@ -1257,19 +1308,59 @@ export async function runWebDiscovery(input: {
         if (old) droppedOld += 1;
         return !old;
       });
-  let companies = admitDiscoveries(firstProposed, firstPages).filter(
-    (company) => {
-      if (isListingName(company.name, firstPages, candidateNames)) {
+  const admitRound = (
+    items: readonly Proposed[],
+    pages: readonly FetchedSource[],
+    known: readonly DiscoveredCompany[],
+  ): DiscoveredCompany[] => {
+    const knownKeys = new Set(known.map((company) => companyKey(company.name)));
+    return admitDiscoveries(items, pages).filter((company) => {
+      const key = companyKey(company.name);
+      if (knownKeys.has(key)) return false;
+      if (isListingName(company.name, pages, candidateNames)) {
+        droppedListings += 1;
         return false;
       }
-      if (priorKeys.has(companyKey(company.name))) {
+      if (priorKeys.has(key)) {
         excludedPrior += 1;
         return false;
       }
       return true;
-    },
-  );
-  companies = settle(companies);
+    });
+  };
+  let companies = settle(admitRound(firstProposed, firstPages, []));
+
+  // Round 6: a yield floor. Round one's pages may name mostly lists and
+  // long-established companies; below the floor, one more round with
+  // other angles (an accelerator cohort, a list per country) runs while
+  // the budget allows, and what it finds is admitted the same way.
+  if (
+    companies.length < DISCOVERY_YIELD_FLOOR &&
+    roundMayStart() &&
+    researchCalls < DISCOVERY_RESEARCH_CALLS_MAX
+  ) {
+    const extra = topUpQueries(plan, thisYear, sentQueries);
+    if (extra.length > 0) {
+      const before = new Set(fetched.keys());
+      await research(extra, ROUND_ONE_PAGES);
+      const newPages = readable().filter((source) => !before.has(source.url));
+      if (newPages.length > 0) {
+        const more = await input.reader({
+          looking:
+            looking.length === 0 ? "new companies and their founders" : looking,
+          sources: newPages,
+          attribution: input.attribution,
+          signal: input.signal,
+        });
+        const items = [...(more ?? []), ...namesFromCompanySites(newPages)];
+        candidateNames.push(...items.map((item) => item.name));
+        companies = [
+          ...companies,
+          ...settle(admitRound(items, readable(), companies)),
+        ];
+      }
+    }
+  }
 
   // Round 2: founders for the candidates the pages left without one.
   const count = Math.min(
@@ -1288,14 +1379,17 @@ export async function runWebDiscovery(input: {
     for (let i = 0; i < asks.length; i += 2) {
       founderPairs.push(asks.slice(i, i + 2));
     }
+    // Within the research budget the top-up may have used.
     await Promise.all(
-      founderPairs.map((pair) =>
-        research(
-          pair,
-          FOUNDER_ROUND_PAGES,
-          pair.map((ask) => ask.replace(/ founder CEO$/u, "")),
+      founderPairs
+        .slice(0, Math.max(0, DISCOVERY_RESEARCH_CALLS_MAX - researchCalls))
+        .map((pair) =>
+          research(
+            pair,
+            FOUNDER_ROUND_PAGES,
+            pair.map((ask) => ask.replace(/ founder CEO$/u, "")),
+          ),
         ),
-      ),
     );
     const newPages = readable().filter((source) => !before.has(source.url));
     if (newPages.length > 0) {
@@ -1402,6 +1496,7 @@ export async function runWebDiscovery(input: {
       further: prior.length > 0,
       excludedPrior,
       droppedOld,
+      droppedListings,
     }),
     outcome: marked.length > 0 ? "FOUND" : "NONE",
     readerFailed,
@@ -1426,6 +1521,7 @@ export function discoveryAnswerText(
     readonly further: boolean;
     readonly excludedPrior: number;
     readonly droppedOld: number;
+    readonly droppedListings?: number | undefined;
   } = { further: false, excludedPrior: 0, droppedOld: 0 },
 ): string {
   const looking = lookingPhrase(plan);
@@ -1482,15 +1578,28 @@ export function discoveryAnswerText(
     } Source: ${links}.${onQ}`;
   });
   const n = companies.length;
-  const found = left.further
-    ? `found ${String(n)} new ${n === 1 ? "company" : "companies"}${
-        left.excludedPrior > 0
-          ? ` (leaving out the ${String(left.excludedPrior)} I listed earlier)`
-          : ""
-      }`
-    : `found ${String(n)} ${n === 1 ? "company" : "companies"}`;
+  // Round 6: what was left out, said with the count (owner: "found N
+  // (left out M older than 8 years, K that were lists)").
+  const lists = left.droppedListings ?? 0;
+  const leftOut = [
+    left.droppedOld > 0
+      ? `${String(left.droppedOld)} that the sources say ${left.droppedOld === 1 ? "was" : "were"} founded more than 8 years ago`
+      : null,
+    lists > 0
+      ? `${String(lists)} that ${lists === 1 ? "was a list or directory" : "were lists or directories"}`
+      : null,
+  ].filter((part): part is string => part !== null);
+  const notes = [
+    left.further && left.excludedPrior > 0
+      ? `leaving out the ${String(left.excludedPrior)} I listed earlier`
+      : null,
+    leftOut.length > 0 ? `left out ${leftOut.join(", ")}` : null,
+  ].filter((part): part is string => part !== null);
+  const found = `found ${String(n)} ${left.further ? "new " : ""}${n === 1 ? "company" : "companies"}${
+    notes.length > 0 ? ` (${notes.join("; ")})` : ""
+  }`;
   return [
-    `${searched} and ${found}.${oldLine} These come from public web pages and are unverified: nothing here is checked by Capital Q, and anything marked unknown wasn't stated in the sources.`,
+    `${searched} and ${found}. These come from public web pages and are unverified: nothing here is checked by Capital Q, and anything marked unknown wasn't stated in the sources.`,
     lines.join("\n"),
     "Would you like me to look deeper into any of them, or prepare an introduction note for your approval? I won't contact anyone unless you approve it.",
   ].join("\n\n");

@@ -141,6 +141,8 @@ function tools(options: {
   readonly mandate?: boolean | undefined;
   /** Owner 2026-11-06: the public web, for a web discovery. */
   readonly web?: boolean | undefined;
+  /** Round 6: every named company fits the same, so the top cards tie. */
+  readonly tied?: boolean | undefined;
 }): QToolPort & {
   readonly executed: string[];
 } {
@@ -256,6 +258,25 @@ function tools(options: {
                 ? null
                 : {
                     entries: named.flatMap((id) => {
+                      if (options.tied === true) {
+                        const name =
+                          Object.entries(C).find(
+                            ([, cid]) => cid === id,
+                          )?.[0] ?? "Company";
+                        return [
+                          fitFixture(
+                            id,
+                            name,
+                            {
+                              STAGE: "STRONG",
+                              SECTOR: "STRONG",
+                              GEOGRAPHY: "STRONG",
+                            },
+                            "STRONG_FIT",
+                            "Nigeria",
+                          ).result.data,
+                        ];
+                      }
                       const fit = FITS[id];
                       return fit?.ok === true ? [fit.data] : [];
                     }),
@@ -318,6 +339,7 @@ async function replay(input: {
   readonly spoken?: boolean;
   readonly mandate?: boolean | undefined;
   readonly web?: boolean | undefined;
+  readonly tied?: boolean | undefined;
   /** K Part 4: the Tier A copy of their own mandate read. */
   readonly ownMandateReads?: {
     readonly get: (actor: unknown) => Promise<unknown>;
@@ -422,6 +444,7 @@ async function replay(input: {
     fit: input.fit ?? true,
     mandate: input.mandate,
     web: input.web,
+    tied: input.tied,
   });
   const seam = createModelGatewayQAnswer({
     gateway,
@@ -1132,5 +1155,49 @@ describe("round 4 · 5: 'find more online' after a discovery list is the web onl
     expect(cardsOf(blocks)).toEqual([]);
     // Owo Rails was listed already: nothing new, said honestly.
     expect(text).toMatch(/only named companies I've already listed/u);
+  });
+});
+
+describe("round 6: no stray tie line after a web discovery (live 2026-11-06)", () => {
+  it("names Capital Q's top 3 in the line itself and appends no tie line, even when they tie", async () => {
+    const { text } = await replay({
+      question: "find me new companies online that i would be interested in",
+      web: true,
+      tied: true,
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            companies: [
+              {
+                name: "Owo Rails",
+                founders: [],
+                does: null,
+                sector: null,
+                stage: null,
+                place: null,
+                sourceRefs: [0],
+                quote: "Owo Rails",
+              },
+            ],
+          },
+        },
+      ],
+      reading: {
+        questionKind: "FIT",
+        webDiscovery: {
+          text: "find me new companies online that i would be interested in",
+          sectors: [],
+          countries: [],
+          stages: [],
+          count: null,
+          alsoOnCapitalQ: true,
+        },
+      },
+    });
+    expect(text).toMatch(/^On Capital Q, your top \d by mandate fit:/u);
+    expect(text).not.toMatch(/\btied\b/u);
+    expect(text).not.toContain("(on the cards)");
+    expect(text).toContain("**Owo Rails**");
   });
 });

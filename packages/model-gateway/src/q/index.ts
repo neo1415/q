@@ -7532,6 +7532,12 @@ export function createModelGatewayQAnswer(
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
       const publicSources: PublicSourceLike[] = [];
       /**
+       * Round 6 (live 2026-11-06): a web discovery's answer names Capital
+       * Q's top 3 in its own line; a tie line about cards the person may
+       * not see (Chat shows no cards) is never appended to it.
+       */
+      let tieLineAllowed = true;
+      /**
        * Every page this turn's public searches read, with the research's
        * verdict on whether it is about whom it searched for: the evidence a
        * picture of them must stand on (QA QO-09).
@@ -7679,7 +7685,9 @@ export function createModelGatewayQAnswer(
         // are tied on mandate fit at 7", about cards they had not asked to
         // rank). Any other turn says the tie on its cards only.
         const tie =
-          ranked === undefined || !tieIsAsked(request) ? null : tieLine(ranked);
+          ranked === undefined || !tieIsAsked(request) || !tieLineAllowed
+            ? null
+            : tieLine(ranked);
         content =
           tie === null || /\btied\b/iu.test(content)
             ? content
@@ -8271,7 +8279,8 @@ export function createModelGatewayQAnswer(
                   topNames.length === 1
                     ? (topNames[0] ?? "")
                     : `${topNames.slice(0, -1).join(", ")} and ${topNames.at(-1) ?? ""}`
-                } (on the cards). From the public web:`;
+                }. From the public web:`;
+          tieLineAllowed = false;
           const message = await persistCodeAnswer(
             lead === null ? found.text : `${lead}\n\n${found.text}`,
             lead === null || catalog === null || catalog.block === null

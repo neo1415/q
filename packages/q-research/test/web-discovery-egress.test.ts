@@ -281,3 +281,21 @@ describe("round 4: a search for more keeps its words", () => {
     expect(sent).toContain("accelerator");
   });
 });
+
+describe("round 6: the top-up round keeps its words", () => {
+  it("sends 'accelerator cohort' and 'top … startups {country}' with real categories", async () => {
+    const provider = createFakeResearchProvider({ pages: [DIRECTORY] });
+    const service = createPublicWebResearchService({ provider });
+    await service.research(
+      command({
+        runId: `${RUN}-topup`,
+        requestedQuery: "fintech startup accelerator cohort Nigeria 2026",
+        alsoQueries: ["top fintech startups Nigeria 2026"],
+        categories: { sectors: ["fintech"], countries: ["NG"] },
+      }),
+    );
+    const sent = provider.searches.map((s) => s.query).join(" | ");
+    expect(sent).toContain("accelerator cohort");
+    expect(sent).toContain("top fintech startups");
+  });
+});
