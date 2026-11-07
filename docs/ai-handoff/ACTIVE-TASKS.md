@@ -1,5 +1,27 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 7 November 2026, 13:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7) — PAUSED FOR OWNER DECISIONS
+
+Production: **batch 4 `2262fed36`** on all four services (12:05; CI 42368232859 green; live-checked as investor and founder). Rollback `b87961156`. Hosted migrations **286**. `CQ_WORKSPACE_MODE` off; `CQ_Q_NAV_MOVES_ALLOWED` unset (OFFER-only).
+
+Shipped today:
+
+- batch 1: workspace shell, site map, deep links, navigation;
+- batch 2: analytics, approvals, arrival;
+- batch 3: q-nav D75 v8, metrics P0, onboarding P0;
+- batch 4: onboarding P1 and judged summaries, research jobs, metrics methods.
+
+Lanes, all idle and waiting on the owner:
+
+- W4/W2 q-nav: the next round needs approval (self-consistency ×3 plus a third sealed held-out set, ~$14). W2's held change d013eaa (Work as one scroll) goes in with it.
+- W5 onboarding: D-OWN-1/2/3 ("I don't know" on required, the mandatory set, read-back of figures). Deepgram fallback on one engine is deferred.
+- Metrics: PADL #046 (Unicorn naming vs predictive positioning) and P1-7 (Business Quality and Readiness shown separately).
+- Q Pitch: the story card shows "Strong · Low confidence", which contradicts the band cap. Needs the owner (blueprint).
+- Blocked: the onboarding e2e on fresh fictional accounts needs SB_KEY (the fetch was refused by the permission policy).
+- Next after the decisions: the workspace in labs for fictional accounts (W1), a speed measurement, the owner's review, then on.
+
+Anthropic test spend: about $26.2 of $50. The 2-hourly continuation is paused until the owner replies.
+
 ## Live board — 7 November 2026, 09:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: batch 2 `64d51b965` (rollback `f3b0d9847`), hosted migrations 285, `CQ_WORKSPACE_MODE` off. Decisions in force: 75 (q-nav understands people's own words; 98% is the aim, 95–97% is acceptable for the MVP), 76 (metric methods from research with no caveat spam; PADL #046 flagged), 77 (onboarding as a real conversation, fixing what exists).
