@@ -1,0 +1,756 @@
+{
+  "split": "dev",
+  "promptVersion": 11,
+  "categories": [
+    "FOLLOW_UP",
+    "LOOKALIKE_MOVE",
+    "LOOKALIKE_STAY",
+    "TYPO",
+    "NOT_THAT_ONE",
+    "STALE_CONTEXT",
+    "COLLAPSED_PANE",
+    "DIRTY_FORM",
+    "STAY_IN_CHAT"
+  ],
+  "turns": 143,
+  "summary": {
+    "overall": {
+      "turns": 143,
+      "passRate": 0.9300699300699301,
+      "decisionAccuracy": 0.965034965034965,
+      "moveTargetExact": 0.9369369369369369,
+      "wrongPageMoveRate": 0.03496503496503497,
+      "forbiddenMoves": 0
+    },
+    "bySplit": {
+      "dev": {
+        "turns": 143,
+        "passRate": 0.9300699300699301,
+        "decisionAccuracy": 0.965034965034965,
+        "moveTargetExact": 0.9369369369369369,
+        "wrongPageMoveRate": 0.03496503496503497,
+        "forbiddenMoves": 0
+      },
+      "heldout": {
+        "turns": 0,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 1,
+        "forbiddenMoves": 0
+      },
+      "heldout4": {
+        "turns": 0,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 1,
+        "forbiddenMoves": 0
+      }
+    },
+    "byCategory": {
+      "TYPO": {
+        "turns": 75,
+        "passRate": 0.96,
+        "decisionAccuracy": 0.9733333333333334,
+        "moveTargetExact": 0.96,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FOLLOW_UP": {
+        "turns": 20,
+        "passRate": 0.95,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 0.9473684210526315,
+        "wrongPageMoveRate": 0.05,
+        "forbiddenMoves": 0
+      },
+      "STAY_IN_CHAT": {
+        "turns": 15,
+        "passRate": 0.8666666666666667,
+        "decisionAccuracy": 0.8666666666666667,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0.13333333333333333,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_STAY": {
+        "turns": 7,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_MOVE": {
+        "turns": 5,
+        "passRate": 0.6,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 0.6,
+        "wrongPageMoveRate": 0.4,
+        "forbiddenMoves": 0
+      },
+      "NOT_THAT_ONE": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "STALE_CONTEXT": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "DIRTY_FORM": {
+        "turns": 5,
+        "passRate": 0.8,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "COLLAPSED_PANE": {
+        "turns": 6,
+        "passRate": 0.8333333333333334,
+        "decisionAccuracy": 0.8333333333333334,
+        "moveTargetExact": 0.6666666666666666,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      }
+    },
+    "labsGate": false,
+    "onGate": false
+  },
+  "missesByCategory": {
+    "TYPO": 3,
+    "FOLLOW_UP": 1,
+    "STAY_IN_CHAT": 2,
+    "LOOKALIKE_MOVE": 2,
+    "DIRTY_FORM": 1,
+    "COLLAPSED_PANE": 1
+  },
+  "calls": 429,
+  "tokens": {
+    "input": 4826136,
+    "cached": 4032306,
+    "output": 51484,
+    "cost": 2.9089612000000002
+  },
+  "latency": {
+    "p50Ms": 1425,
+    "p95Ms": 1947,
+    "maxMs": 2753,
+    "votes": 3,
+    "concurrency": 4
+  },
+  "misses": [
+    {
+      "id": "QNAV-D-TYP-052#0",
+      "category": "TYPO",
+      "reasons": ["decided STAY (want MOVE)", "no target"],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own company's data room, which is the Your data room page, documents tab.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own company's data room; the founder's data room page serves it.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own company's data room; /company/data-room, Data room tab, serves that.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-TYP-053#0",
+      "category": "TYPO",
+      "reasons": ["decided STAY (want MOVE)", "no target"],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "deck",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own pitch deck; the Pitch deck tab of their data room serves it.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "deck",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own pitch deck; the founder's data room page has a Pitch deck tab for their company's deck.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "deck",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own pitch deck; the founder's data room page has a Pitch deck tab for their company's deck.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-TYP-065#0",
+      "category": "TYPO",
+      "reasons": ["sectionId plan (want -)", "position section (want -)"],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships",
+            "record": null,
+            "tab": "capital-plan",
+            "document": null,
+            "slide": null,
+            "sectionId": "plan",
+            "position": "section"
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to see their own 3, 6 and 12-month plan, which lives on the Capital: Your plan tab of Relationships.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships",
+            "record": null,
+            "tab": "capital-plan",
+            "document": null,
+            "slide": null,
+            "sectionId": "plan",
+            "position": "section"
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to see their 3, 6 and 12-month plan, which is the Capital: Your plan tab on Relationships.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships",
+            "record": null,
+            "tab": "capital-plan",
+            "document": null,
+            "slide": null,
+            "sectionId": "plan",
+            "position": "section"
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to see their 3, 6 and 12-month plan; the Capital: Your plan tab on Relationships holds it by horizon.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-FUP-004#1",
+      "category": "FOLLOW_UP",
+      "reasons": [
+        "page RELATIONSHIP_INVESTOR (want RELATIONSHIP_INVESTOR_MESSAGES)",
+        "position - (want latest)",
+        "moved to the wrong page"
+      ],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships/investor/[investorOrganisationId]",
+            "record": {
+              "kind": "INVESTOR",
+              "name": "Baobab Ridge Capital"
+            },
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether there has been prior contact with Baobab Ridge Capital, which is where things stand between them, so the relationship page serves it rather than the investor's profile.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships/investor/[investorOrganisationId]",
+            "record": {
+              "kind": "INVESTOR",
+              "name": "Baobab Ridge Capital"
+            },
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether there has been prior contact with Baobab Ridge Capital, which is the relationship page showing where things stand with that investor, not the investor's profile already on screen.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships/investor/[investorOrganisationId]",
+            "record": {
+              "kind": "INVESTOR",
+              "name": "Baobab Ridge Capital"
+            },
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether Ledgerfold has had contact with Baobab Ridge before, which is the relationship page, where things stand between them, not the investor's own profile.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-STY-004#0",
+      "category": "STAY_IN_CHAT",
+      "reasons": [
+        "decided MOVE (want STAY)",
+        "a target on a STAY turn",
+        "moved to the wrong page"
+      ],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/investors/top",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want companies that best fit their mandate; Top companies exists to show exactly those, so it serves browsing them.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/investors/top",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want companies that best fit their mandate, and Top companies shows exactly those.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/investors/top",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want companies that best fit their mandate; Top companies exists to show exactly those, so it serves browsing them.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-STY-012#0",
+      "category": "STAY_IN_CHAT",
+      "reasons": [
+        "decided MOVE (want STAY)",
+        "a target on a STAY turn",
+        "moved to the wrong page"
+      ],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/investors",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know which new investors to approach; the Investors page exists to find investors who fit their company.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/investors",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know which new investors fit their company to pitch next; the Investors page is where Capital Q shows investors who fit Ledgerfold.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/investors",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know which investors fit their company to approach next; the Investors page is where new investors who fit Ledgerfold are found.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-LKM-004#0",
+      "category": "LOOKALIKE_MOVE",
+      "reasons": [
+        "page ANALYTICS (want COMPANY_INTEREST)",
+        "moved to the wrong page"
+      ],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/analytics",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": "intent",
+            "position": "section"
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether investors are warming to Ledgerfold; the intent section of Analytics shows investors saving them or asking for more, as it happens.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/analytics",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": "intent",
+            "position": "section"
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether investors are warming to Ledgerfold; the intent section of Analytics shows investors saving them or asking for more, as it happens.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/analytics",
+            "record": null,
+            "tab": null,
+            "document": null,
+            "slide": null,
+            "sectionId": "intent",
+            "position": "section"
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether investors are warming to Ledgerfold; the intent section of Analytics shows investors saving them or asking for more, as it happens.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-LKM-005#0",
+      "category": "LOOKALIKE_MOVE",
+      "reasons": [
+        "page CAPITAL_READINESS (want COMPANY)",
+        "recordId - (want 201cbe96-bbfe-451b-aead-3beccd3a2214)",
+        "tab - (want dataroom)",
+        "sectionId - (want missing)",
+        "position - (want section)",
+        "moved to the wrong page"
+      ],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships",
+            "record": null,
+            "tab": "capital-readiness",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They doubt their company is ready for diligence; how ready Ledgerfold looks to investors is on the Capital: Readiness tab.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships",
+            "record": null,
+            "tab": "capital-readiness",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "Their goal is to judge whether their own company is ready for investor diligence; the Capital: Readiness tab shows how ready the company looks to investors.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/relationships",
+            "record": null,
+            "tab": "capital-readiness",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They doubt their own company's readiness for diligence; the Capital: Readiness tab shows how ready their company looks to investors.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-DRT-004#0",
+      "category": "DIRTY_FORM",
+      "reasons": ["sectionId - (want missing)", "position - (want section)"],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": null,
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know if their own data room is ready; their data room page, documents tab, shows what is there and what is still missing."
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": null,
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether their own data room is complete; their data room tab shows their documents and what is still missing."
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": null,
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": false,
+          "reason": "They want to know whether their own data room is complete; their data room page shows their documents and what is still missing.",
+          "alternative": null
+        }
+      ]
+    },
+    {
+      "id": "QNAV-D-COL-005#0",
+      "category": "COLLAPSED_PANE",
+      "reasons": [
+        "decided STAY (want MOVE)",
+        "no target",
+        "the pane was not opened"
+      ],
+      "proposed": [
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": {
+              "kind": "COMPANY",
+              "name": "Ledgerfold"
+            },
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own company's data room, which is the page for their documents and what is missing.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": null,
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own company's data room; /company/data-room is where Ledgerfold's documents live.",
+          "alternative": null
+        },
+        {
+          "decision": "MOVE",
+          "place": {
+            "route": "/company/data-room",
+            "record": null,
+            "tab": "dataroom",
+            "document": null,
+            "slide": null,
+            "sectionId": null,
+            "position": null
+          },
+          "back": false,
+          "askedForPage": true,
+          "reason": "They want to open their own company's data room; /company/data-room is where Ledgerfold's documents live.",
+          "alternative": null
+        }
+      ]
+    }
+  ]
+}
