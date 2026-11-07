@@ -439,3 +439,37 @@ describe("W5 AWAITING_APPROVAL receipt status (contract owned by W3)", () => {
     expect(Q_UI_ACT_STATUSES).toContain("AWAITING_APPROVAL");
   });
 });
+
+describe("batch 3: a relationship's Deal tab", () => {
+  it("is a record tab of the relationship pages only; old tabs unchanged", () => {
+    for (const page of [
+      "RELATIONSHIP_COMPANY",
+      "RELATIONSHIP_INVESTOR",
+    ] as const) {
+      expect(
+        QOpenRecordPageIntentSchema.safeParse({
+          kind: "OPEN_RECORD_PAGE",
+          page,
+          id: COMPANY,
+          tab: "deal",
+        }).success,
+      ).toBe(true);
+    }
+    expect(
+      QOpenRecordPageIntentSchema.safeParse({
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: COMPANY,
+        tab: "deal",
+      }).success,
+    ).toBe(false);
+    expect(
+      QOpenRecordPageIntentSchema.safeParse({
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY",
+        id: COMPANY,
+        tab: "calls",
+      }).success,
+    ).toBe(true);
+  });
+});

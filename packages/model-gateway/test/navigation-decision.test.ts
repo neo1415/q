@@ -593,6 +593,21 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
     ).toBeNull();
   });
 
+  it("reads a relationship's Deal tab back as that tab (batch 3)", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/relationships/investor/[investorOrganisationId]/deal",
+          tab: null,
+          sectionId: null,
+          slide: null,
+          position: null,
+        },
+        { ...none, recordId: SILO },
+      ),
+    ).toEqual({ page: "RELATIONSHIP_INVESTOR", recordId: SILO, tab: "deal" });
+  });
+
   it("says a target back in the site map's words", () => {
     expect(targetToSitePlace({ page: "WORK_NEEDS" })).toMatchObject({
       route: "/work",
