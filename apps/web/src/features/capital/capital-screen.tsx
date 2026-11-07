@@ -281,56 +281,64 @@ export async function CapitalScreen({
             data-capital-investor
           >
             <QControl id="section.mandate" kind="SECTION">
-              <aside
-                id="mandate"
-                aria-label={t("Your mandate")}
-                className="flex flex-col gap-3.5 lg:sticky lg:top-4"
-              >
-                <MandateSummary
-                  investorOrganisationId={context.investorOrganisationId}
-                  given={review?.mandate}
-                />
-                <Suspense fallback={null}>
-                  <MandateObservation
-                    relationships={relationships}
-                    given={review?.fit}
+              <QSection id="mandate" kind="OTHER" label={t("Your mandate")}>
+                <aside
+                  id="mandate"
+                  aria-label={t("Your mandate")}
+                  className="flex flex-col gap-3.5 lg:sticky lg:top-4"
+                >
+                  <MandateSummary
+                    investorOrganisationId={context.investorOrganisationId}
+                    given={review?.mandate}
                   />
-                </Suspense>
-                <Suspense fallback={null}>
-                  <SavedCompaniesCard
-                    {...(review === undefined ? {} : { given: review.saved })}
-                  />
-                </Suspense>
-                <AskQChips asks={INVESTOR_ASKS} />
-              </aside>
+                  <Suspense fallback={null}>
+                    <MandateObservation
+                      relationships={relationships}
+                      given={review?.fit}
+                    />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <SavedCompaniesCard
+                      {...(review === undefined ? {} : { given: review.saved })}
+                    />
+                  </Suspense>
+                  <AskQChips asks={INVESTOR_ASKS} />
+                </aside>
+              </QSection>
             </QControl>
             {/* Q reaches the book by name, as it reached the old section. */}
             <QControl id="section.commitments" kind="SECTION">
-              <section
+              <QSection
                 id="commitments"
-                aria-labelledby="book-title"
-                className="flex min-w-0 flex-col gap-3"
+                kind="CAPITAL_ROUNDS"
+                label={t("Your book")}
               >
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <h2
-                    id="book-title"
-                    className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
-                  >
-                    {t("Your book")}
-                  </h2>
-                  <span className="text-xs text-(--cq-text-tertiary)">
-                    {t("Received is confirmed by the company")}
-                  </span>
-                </div>
-                {mine === null ? (
-                  <QuietEmpty
-                    sentence="Your commitments couldn't load."
-                    retry
-                  />
-                ) : (
-                  <InvestorBook mine={mine} unrecorded={unrecorded} />
-                )}
-              </section>
+                <section
+                  id="commitments"
+                  aria-labelledby="book-title"
+                  className="flex min-w-0 flex-col gap-3"
+                >
+                  <div className="flex flex-wrap items-baseline gap-3">
+                    <h2
+                      id="book-title"
+                      className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+                    >
+                      {t("Your book")}
+                    </h2>
+                    <span className="text-xs text-(--cq-text-tertiary)">
+                      {t("Received is confirmed by the company")}
+                    </span>
+                  </div>
+                  {mine === null ? (
+                    <QuietEmpty
+                      sentence="Your commitments couldn't load."
+                      retry
+                    />
+                  ) : (
+                    <InvestorBook mine={mine} unrecorded={unrecorded} />
+                  )}
+                </section>
+              </QSection>
             </QControl>
           </div>
         </CrmToastProvider>
@@ -375,16 +383,23 @@ export async function FounderTab({
         reads.readiness(),
       ]);
       return (
-        <div className="flex flex-col gap-[22px]" data-capital-overview>
-          <RaiseSummary ledger={ledger} />
-          <StopYourRaise readiness={readiness} />
-          <NextSteps
-            readiness={readiness}
-            ledger={ledger}
-            currentRoundId={ledger?.currentRoundId ?? null}
-          />
-          <AskQChips asks={FOUNDER_ASKS} />
-        </div>
+        // Q Workspace W2: each Capital tab is a section Q can name.
+        <QSection
+          id="capital-overview"
+          kind="CAPITAL_ROUNDS"
+          label={t("Overview")}
+        >
+          <div className="flex flex-col gap-[22px]" data-capital-overview>
+            <RaiseSummary ledger={ledger} />
+            <StopYourRaise readiness={readiness} />
+            <NextSteps
+              readiness={readiness}
+              ledger={ledger}
+              currentRoundId={ledger?.currentRoundId ?? null}
+            />
+            <AskQChips asks={FOUNDER_ASKS} />
+          </div>
+        </QSection>
       );
     }
     case "raise": {
@@ -439,58 +454,68 @@ export async function FounderTab({
     case "readiness": {
       const readiness = await reads.readiness();
       return (
-        <PageSection
-          id="readiness"
-          title={t("Readiness")}
-          description={t(
-            "How ready your company looks to an investor today, from what you have shared. Each pillar in words, with the evidence behind it.",
-          )}
-        >
-          <div className="flex flex-col gap-4">
-            <PrivateNote />
-            {readiness === null ? (
-              <QuietEmpty sentence="Your readiness couldn't load." retry />
-            ) : (
-              <ReadinessSection readiness={readiness} />
+        <QSection id="readiness" kind="OTHER" label={t("Readiness")}>
+          <PageSection
+            id="readiness"
+            title={t("Readiness")}
+            description={t(
+              "How ready your company looks to an investor today, from what you have shared. Each pillar in words, with the evidence behind it.",
             )}
-          </div>
-        </PageSection>
+          >
+            <div className="flex flex-col gap-4">
+              <PrivateNote />
+              {readiness === null ? (
+                <QuietEmpty sentence="Your readiness couldn't load." retry />
+              ) : (
+                <ReadinessSection readiness={readiness} />
+              )}
+            </div>
+          </PageSection>
+        </QSection>
       );
     }
     case "action-plan": {
       const readiness = await reads.readiness();
       return (
-        <PageSection
-          id="action-plan"
-          title={t("Action plan")}
-          description={t(
-            "Built from your readiness gaps. Steps close themselves when Q sees the evidence.",
-          )}
-        >
-          <div className="flex flex-col gap-4">
-            <PrivateNote />
-            {readiness === null ? (
-              <QuietEmpty sentence="Your action plan couldn't load." retry />
-            ) : (
-              <ActionPlanBoard readiness={readiness} />
+        <QSection id="action-plan" kind="OTHER" label={t("Action plan")}>
+          <PageSection
+            id="action-plan"
+            title={t("Action plan")}
+            description={t(
+              "Built from your readiness gaps. Steps close themselves when Q sees the evidence.",
             )}
-          </div>
-        </PageSection>
+          >
+            <div className="flex flex-col gap-4">
+              <PrivateNote />
+              {readiness === null ? (
+                <QuietEmpty sentence="Your action plan couldn't load." retry />
+              ) : (
+                <ActionPlanBoard readiness={readiness} />
+              )}
+            </div>
+          </PageSection>
+        </QSection>
       );
     }
     // BILLING-2 (ADR 0036) / Q.04: the Readiness Blueprint as "Your
     // 3/6/12-month plan"; a plan without it shows the Pro entry instead.
     case "plan":
       return (
-        <ReadinessBlueprintSection
-          companyId={context.companyId}
-          horizon={horizon}
-          given={blueprint}
-        />
+        <QSection id="plan" kind="OTHER" label={t("Your plan")}>
+          <ReadinessBlueprintSection
+            companyId={context.companyId}
+            horizon={horizon}
+            given={blueprint}
+          />
+        </QSection>
       );
     case "investors": {
       const relationships = await reads.relationships(context);
-      return <InvestorsCard relationships={relationships} />;
+      return (
+        <QSection id="investors" kind="INVESTOR_LIST" label={t("Investors")}>
+          <InvestorsCard relationships={relationships} />
+        </QSection>
+      );
     }
   }
 }

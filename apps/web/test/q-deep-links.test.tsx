@@ -211,7 +211,7 @@ describe("W3.3 arrival: link → page → the target in view", () => {
       "/relationships/x/messages#latest",
       `<ol><li data-q-message="a">1</li><li data-q-message="b" id="last">2</li></ol>`,
     ],
-  ])("%s", async (href, content) => {
+  ] as const)("%s", async (href: string, content: string) => {
     page(content);
     expect(await arrive({ byQ: false, href, waitMs: 200 })).toBe("ARRIVED");
     const [first] = scrolled;

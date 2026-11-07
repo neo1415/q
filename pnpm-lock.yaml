@@ -89,6 +89,9 @@ importers:
       '@capital-q/discovery':
         specifier: workspace:*
         version: link:../../packages/discovery
+      '@capital-q/engagement':
+        specifier: workspace:*
+        version: link:../../packages/engagement
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -982,6 +985,31 @@ importers:
 
   packages/email:
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/engagement:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

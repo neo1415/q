@@ -1,5 +1,6 @@
 import {
   QClientActionIntentSchema,
+  QNavigateTargetDetailSchema,
   QVoiceDestinationSchema,
   QVoiceLiveTrialSchema,
 } from "@capital-q/contracts";
@@ -111,6 +112,8 @@ export type LiveDelegationRequest = z.infer<typeof LiveDelegationRequestSchema>;
 export const LiveMoveSchema = z
   .object({
     navigate: QVoiceDestinationSchema.nullable(),
+    /** Q Workspace W3: where on `navigate`'s page (absent: its top). */
+    navigateTarget: QNavigateTargetDetailSchema.optional(),
     action: QClientActionIntentSchema.nullable(),
   })
   .strict();

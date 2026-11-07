@@ -30,7 +30,9 @@ import {
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
 import { BackLink } from "@/features/company/back-link";
+import { EngagementView } from "@/features/engagement/engagement-view";
 import {
+  ProfileOpenTabQSection,
   ProfileTabQSection,
   ProfileTabs,
 } from "@/features/company/profile-tabs";
@@ -256,6 +258,37 @@ export default async function CompanyPage({
           total={1}
           label={`${profile.canonicalName} profile`}
         />
+        {/* Q Workspace W2: the open tab, as a section Q can name. */}
+        <ProfileOpenTabQSection
+          id="overview"
+          kind="COMPANY_PROFILE"
+          on="overview"
+          label={t("Overview")}
+        />
+        <ProfileOpenTabQSection
+          id="diligence"
+          kind="DILIGENCE"
+          on="diligence"
+          label={t("Diligence")}
+        />
+        <ProfileOpenTabQSection
+          id="elevator"
+          kind="ELEVATOR"
+          on="elevator"
+          label={t("Elevator")}
+        />
+        <ProfileOpenTabQSection
+          id="deck"
+          kind="DECK"
+          on="deck"
+          label={t("Pitch deck")}
+        />
+        <ProfileOpenTabQSection
+          id="team"
+          kind="TEAM"
+          on="team"
+          label={t("Team")}
+        />
         {dataRoom === null ? null : (
           <ProfileTabQSection
             id="data-room"
@@ -287,6 +320,10 @@ export default async function CompanyPage({
           <BackLink fallbackHref="/home" label="Q" />
         ) : (
           <BackLink fallbackHref="/discover" label={t("Discover")} />
+        )}
+        {/* Q Workspace §8 A1: a passive view, analytics only. */}
+        {profile.viewer === "OWNER" ? null : (
+          <EngagementView type="PROFILE_VIEW" companyId={profile.companyId} />
         )}
         <CompanyProfileView
           translate={t}

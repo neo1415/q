@@ -1041,6 +1041,12 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/dev/voice-preview": exempt("development-only page (local env + flag)"),
   "/dev/q-nav/work": exempt("development-only page"),
+  // Q Workspace W3: the deep-links harness (e2e/deep-links.spec.ts).
+  "/dev/deep-links": exempt("development-only page (deep-links harness)"),
+  "/dev/deep-links/board": exempt("development-only page"),
+  "/dev/deep-links/thread": exempt("development-only page"),
+  "/dev/deep-links/sections": exempt("development-only page"),
+  "/dev/deep-links/dataroom": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
   "/dev/deal-close": exempt("development-only page"),
   "/dev/gateq-v2": exempt("development-only page"),

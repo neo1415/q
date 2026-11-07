@@ -1,6 +1,6 @@
 import type {
-  QNavigateDestination,
   QNavigateTargetDetail,
+  QVoiceDestination,
 } from "@capital-q/contracts";
 
 import { destinationPath } from "@/features/voice/destinations";
@@ -66,9 +66,12 @@ export function withNavigateTarget(
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** NAVIGATE's path: the destination's, at the target (null: no page). */
+/**
+ * NAVIGATE's path (or a spoken move's): the destination's, at the target
+ * (null: no page, such as an interview hand-off).
+ */
 export function navigateIntentPath(intent: {
-  readonly destination: QNavigateDestination;
+  readonly destination: QVoiceDestination;
   readonly target?: QNavigateTargetDetail | undefined;
 }): string | null {
   const path = destinationPath(intent.destination);

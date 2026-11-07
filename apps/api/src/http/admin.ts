@@ -29,6 +29,9 @@ import {
   ADMIN_EMAIL_PATH,
   ADMIN_FLAG_PATH,
   ADMIN_FLAGS_PATH,
+  ANALYTICS_SETTINGS_PATH,
+  AnalyticsSettingsDtoSchema,
+  UpdateAnalyticsSettingsRequestSchema,
   ADMIN_ME_PATH,
   ADMIN_ORGANISATION_PATH,
   ADMIN_ORGANISATION_SUSPENSION_PATH,
@@ -842,6 +845,49 @@ export function registerAdminRoutes(
       return AdminFlagChangedDtoSchema.parse({
         changed: outcome === "CHANGED",
       });
+    },
+  );
+
+  // --- analytics privacy settings (Q Workspace §8) --------------------------
+
+  app.get(
+    ANALYTICS_SETTINGS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "analytics_settings.read");
+      if (grant === null) return reply;
+      void reply.header("Cache-Control", "no-store");
+      return AnalyticsSettingsDtoSchema.parse(
+        await admin.readAnalyticsSettings(grant),
+      );
+    },
+  );
+
+  app.put(
+    ANALYTICS_SETTINGS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "analytics_settings.write");
+      if (grant === null) return reply;
+      const input = await body(
+        request,
+        reply,
+        UpdateAnalyticsSettingsRequestSchema,
+      );
+      if (input === null) return reply;
+      const outcome = await admin.updateAnalyticsSettings(grant, input);
+      if (outcome === "STALE") {
+        return send(
+          request,
+          reply,
+          "VERSION_CONFLICT",
+          "Someone changed these settings. Reload and try again.",
+        );
+      }
+      void reply.header("Cache-Control", "no-store");
+      return AnalyticsSettingsDtoSchema.parse(
+        await admin.readAnalyticsSettings(grant),
+      );
     },
   );
 
