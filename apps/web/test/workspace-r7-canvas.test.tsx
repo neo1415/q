@@ -32,7 +32,11 @@ beforeAll(async () => {
 }, 30_000);
 
 let canvasWidth = 0;
-const realRect = HTMLElement.prototype.getBoundingClientRect;
+// Kept as a property descriptor so restoring it never detaches `this`.
+const realRect = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "getBoundingClientRect",
+);
 beforeEach(() => {
   // A wide viewport, as a desktop screen with the Q pane beside the page.
   window.matchMedia = ((query: string) => ({
@@ -45,7 +49,7 @@ beforeEach(() => {
     observe() {}
     unobserve() {}
     disconnect() {}
-  } as unknown as typeof ResizeObserver;
+  };
   HTMLElement.prototype.getBoundingClientRect = function rect(
     this: HTMLElement,
   ) {
@@ -60,12 +64,18 @@ beforeEach(() => {
       right: width,
       bottom: 0,
       toJSON: () => ({}),
-    } as DOMRect;
+    };
   };
 });
 afterEach(() => {
   cleanup();
-  HTMLElement.prototype.getBoundingClientRect = realRect;
+  if (realRect !== undefined) {
+    Object.defineProperty(
+      HTMLElement.prototype,
+      "getBoundingClientRect",
+      realRect,
+    );
+  }
 });
 
 async function settled(): Promise<void> {
