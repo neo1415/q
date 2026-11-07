@@ -138,7 +138,7 @@ export function registerEngagementRoutes(
         }
         await investorViews.record(getActorContext(request), body.data);
         void reply.header("Cache-Control", "no-store");
-        return reply.status(202).send();
+        return reply.status(202).send({});
       },
     );
 
