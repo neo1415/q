@@ -52,7 +52,35 @@ export type QNavDestinationDef = {
   readonly heldout: QNavBank;
   /** Null when the decision can name it; otherwise why not. */
   readonly unreachable: string | null;
+  /** The section of one page it now is (Q_NAV_FOLDED); null otherwise. */
+  readonly folded: QNavFolded | null;
 };
+
+export type QNavFolded = {
+  readonly page: QNavigateDestination;
+  /** Null for the leading section: the page opens on it, so it is the page. */
+  readonly sectionId: string | null;
+};
+
+/**
+ * Destinations W2 folded into sections of one page (d013eaa, owner
+ * decision 78): Work's needs, progress and done are sections of the one
+ * Work scroll, not tabs, so asking for one is Work at that section. The
+ * contract keeps the old names as deep links (/work?view=needs lands on
+ * Work); the place is graded as the section.
+ */
+export const Q_NAV_FOLDED: Readonly<
+  Partial<Record<QNavigateDestination, QNavFolded>>
+> = {
+  // Needs you leads the scroll: Work opens on it (isLeadingSection).
+  WORK_NEEDS: { page: "WORK", sectionId: null },
+  WORK_PROGRESS: { page: "WORK", sectionId: "progress" },
+  WORK_DONE: { page: "WORK", sectionId: "done" },
+};
+
+/** The section a page name was folded into, if it was. */
+export const foldedOf = (page: string): QNavFolded | undefined =>
+  Object.entries(Q_NAV_FOLDED).find(([name]) => name === page)?.[1];
 
 const bank = (names: readonly string[], asks: readonly string[]): QNavBank => ({
   names,
@@ -298,7 +326,8 @@ const BANKS: readonly {
   {
     page: "WORK_DONE",
     dev: bank(
-      ["finished work", "the done tab"],
+      // Not "the done tab": Done is a section of the Work scroll now (W2 d013eaa).
+      ["finished work", "the done list"],
       ["What did you finish for me this week?"],
     ),
     heldout: bank(["completed jobs"], ["What's wrapped up lately?"]),
@@ -612,27 +641,25 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] =
       dev: words?.dev ?? bank([], []),
       heldout: words?.heldout ?? bank([], []),
       unreachable,
+      folded: Q_NAV_FOLDED[page] ?? null,
     };
   });
 
 /**
  * Same-route and same-place names, graded as equal: destinations.ts sends
  * SEARCH and EXPLORE to /explore; /gateq opens each side's own GateQ tab;
- * /mandate redirects to the profile's mandate section; Work's needs,
- * progress and done are one decision scroll (apps/web/app/(app)/work/
- * page.tsx pageViewOf: a deep link to any of them lands on that page).
+ * /mandate redirects to the profile's mandate section. (Work's needs,
+ * progress and done are sections now: Q_NAV_FOLDED, graded exactly.)
  */
 export const Q_NAV_SAME_PLACE: Readonly<
   Record<QNavSide, readonly (readonly string[])[]>
 > = {
   INVESTOR: [
     ["SEARCH", "EXPLORE"],
-    ["WORK", "WORK_NEEDS", "WORK_PROGRESS", "WORK_DONE"],
     ["GATEWAY", "GATEQ_INBOX"],
   ],
   FOUNDER: [
     ["SEARCH", "EXPLORE"],
-    ["WORK", "WORK_NEEDS", "WORK_PROGRESS", "WORK_DONE"],
     ["GATEWAY", "GATEQ_APPLICATIONS"],
   ],
 };

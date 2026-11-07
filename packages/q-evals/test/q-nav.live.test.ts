@@ -10,7 +10,10 @@ import {
   type ModelCatalogSnapshot,
 } from "@capital-q/model-gateway";
 import { createAnthropicModelProvider } from "@capital-q/model-gateway/providers/anthropic";
-import { createQNavigationDecider } from "@capital-q/model-gateway/q";
+import {
+  createQNavigationDecider,
+  NAVIGATION_VOTES,
+} from "@capital-q/model-gateway/q";
 
 import { Q_NAV_DATASET } from "../src/datasets/q-nav/index.js";
 import { navigationPipelineSubject, runQNav } from "../src/runner/q-nav.js";
@@ -18,8 +21,11 @@ import { navigationPipelineSubject, runQNav } from "../src/runner/q-nav.js";
 /**
  * LIVE q-nav (plan W4.4; the owner's paid check, DECISIONS 62/73): the real
  * NAVIGATION_DECISION on the hosted NORMAL_DIALOGUE model (Claude Sonnet
- * 5.5 at its hosted price, reasoning LOW), each proposal through the real
- * resolution and hard constraints. Synthetic records only.
+ * 5.5 at its hosted price, reasoning MEDIUM), sampled NAVIGATION_VOTES
+ * times in parallel and voted (DECISIONS 78), each sample through the real
+ * resolution and hard constraints. Synthetic records only. Reports each
+ * turn's decision latency (the slowest of its parallel samples, plus
+ * resolution): p50 and p95.
  *
  * Off unless CQ_LIVE_MODEL_TESTS=1 and ANTHROPIC_API_KEY is set:
  *   CQ_LIVE_MODEL_TESTS=1 CQ_QNAV_SPLIT=dev node scripts/live-model-tests.mjs packages/q-evals/test/q-nav.live.test.ts
@@ -27,6 +33,8 @@ import { navigationPipelineSubject, runQNav } from "../src/runner/q-nav.js";
  * are reported by category only, never turn by turn, so nobody tunes
  * against it). CQ_QNAV_LIMIT=n: only the first n cases (a smoke run).
  * CQ_QNAV_REPORT=<file>: the JSON summary (dev: with every miss).
+ * CQ_QNAV_CONCURRENCY=n: cases decided at once (default 4; latency is
+ * per turn either way).
  * Prints calls, tokens, cost and the gates; never the key.
  */
 
@@ -35,6 +43,15 @@ const KEY = process.env["ANTHROPIC_API_KEY"];
 const SPLIT = process.env["CQ_QNAV_SPLIT"] === "heldout" ? "heldout" : "dev";
 const LIMIT = Number(process.env["CQ_QNAV_LIMIT"] ?? "0");
 const REPORT = process.env["CQ_QNAV_REPORT"];
+const CONCURRENCY = Number(process.env["CQ_QNAV_CONCURRENCY"] ?? "4");
+
+/** The p-th percentile (nearest rank) of milliseconds. */
+function percentile(values: readonly number[], p: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (sorted.length === 0) return 0;
+  const rank = Math.ceil((p / 100) * sorted.length) - 1;
+  return Math.round(sorted[Math.max(0, rank)] ?? 0);
+}
 const NOW = "2026-11-06T00:00:00.000Z";
 const PROVIDER = "a1000000-0000-4000-8000-000000000004";
 const SONNET = "a2000000-0000-4000-8000-000000000030";
@@ -125,10 +142,12 @@ describe.skipIf(!LIVE || KEY === undefined)(
       });
       const all = Q_NAV_DATASET.cases.filter((c) => c.split === SPLIT);
       const cases = LIMIT > 0 ? all.slice(0, LIMIT) : all;
-      // What the model proposed per turn, before resolution and policy.
-      const proposed = new Map<string, unknown>();
-      const run = await runQNav(
-        navigationPipelineSubject(`live:${SPLIT}`, async (turn, navigation) => {
+      // What the model proposed per turn (each sample), before resolution
+      // and policy.
+      const proposed = new Map<string, unknown[]>();
+      const subject = navigationPipelineSubject(
+        `live:${SPLIT}`,
+        async (turn, navigation) => {
           const proposal = await decider.decide(navigation, {
             tenantId: "c0000000-0000-4000-8000-000000000001",
             // One person per side, as in production (a person is one
@@ -139,14 +158,36 @@ describe.skipIf(!LIVE || KEY === undefined)(
                 : "c0000000-0000-4000-8000-000000000003",
             correlationId: `cor_live_qnav_${SPLIT}`,
           });
-          proposed.set(
-            `${turn.caseId}#${String(turn.history.length)}`,
-            proposal,
-          );
+          const key = `${turn.caseId}#${String(turn.history.length)}`;
+          proposed.set(key, [...(proposed.get(key) ?? []), proposal]);
           return proposal;
-        }),
-        cases,
+        },
+        { movesAllowed: true },
+        NAVIGATION_VOTES,
       );
+      const latencies: number[] = [];
+      const run = await runQNav(
+        {
+          ...subject,
+          decide: async (input) => {
+            const started = performance.now();
+            try {
+              return await subject.decide(input);
+            } finally {
+              latencies.push(performance.now() - started);
+            }
+          },
+        },
+        cases,
+        { concurrency: CONCURRENCY },
+      );
+      const latency = {
+        p50Ms: percentile(latencies, 50),
+        p95Ms: percentile(latencies, 95),
+        maxMs: percentile(latencies, 100),
+        votes: NAVIGATION_VOTES,
+        concurrency: CONCURRENCY,
+      };
       const spent = usage.entries.reduce(
         (sum, r) => ({
           input: sum.input + r.inputTokens,
@@ -165,6 +206,7 @@ describe.skipIf(!LIVE || KEY === undefined)(
           `q-nav live ${SPLIT}: ${String(run.grades.length)} turns, ${String(misses.length)} misses`,
           `by category ${JSON.stringify(byCategory)}`,
           `labs gate ${String(run.summary.labsGate)}; on gate ${String(run.summary.onGate)}`,
+          `latency p50 ${String(latency.p50Ms)} ms, p95 ${String(latency.p95Ms)} ms, max ${String(latency.maxMs)} ms (${String(NAVIGATION_VOTES)} samples in parallel per turn)`,
           `calls ${String(usage.entries.length)}; tokens in ${String(spent.input)} (cached ${String(spent.cached)}) out ${String(spent.output)}; cost $${spent.cost.toFixed(4)}`,
         ].join("\n"),
       );
@@ -179,6 +221,7 @@ describe.skipIf(!LIVE || KEY === undefined)(
               missesByCategory: byCategory,
               calls: usage.entries.length,
               tokens: spent,
+              latency,
               // Held-out misses are never listed turn by turn.
               misses:
                 SPLIT === "dev"
@@ -186,7 +229,8 @@ describe.skipIf(!LIVE || KEY === undefined)(
                       id: `${g.caseId}#${String(g.turn)}`,
                       category: g.category,
                       reasons: g.reasons,
-                      // The model's own proposal (decision, place, reason).
+                      // The model's own proposals (decision, place, reason),
+                      // one per sample.
                       proposed:
                         proposed.get(`${g.caseId}#${String(g.turn)}`) ?? null,
                     }))
@@ -198,6 +242,6 @@ describe.skipIf(!LIVE || KEY === undefined)(
         );
       // A measurement: the plan's gates are the report, not this assertion.
       expect(run.grades.length).toBeGreaterThan(0);
-    }, 3_600_000);
+    }, 10_800_000);
   },
 );

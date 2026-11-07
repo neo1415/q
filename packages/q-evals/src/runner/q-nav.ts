@@ -1,8 +1,6 @@
 import {
-  applyNavigationPolicy,
+  decideNavigation,
   listedRecordResolver,
-  resolveAlternative,
-  resolveNavigationPlaceWith,
   sameNavigationPlace,
   navigationSiteMap,
   targetToSitePlace,
@@ -63,9 +61,13 @@ export type QNavRun = {
 export async function runQNav(
   subject: QNavSubject,
   cases: readonly QNavCase[],
+  options: {
+    /** Cases decided at once (turns within a case stay in order). */
+    readonly concurrency?: number;
+  } = {},
 ): Promise<QNavRun> {
-  const grades: QNavTurnGrade[] = [];
-  for (const evalCase of cases) {
+  const byCase: QNavTurnGrade[][] = cases.map(() => []);
+  const runCase = async (evalCase: QNavCase, into: QNavTurnGrade[]) => {
     for (const [index, turn] of evalCase.turns.entries()) {
       const reply = await subject.decide({
         caseId: evalCase.id,
@@ -90,9 +92,24 @@ export async function runQNav(
               }
             : Q_NAV_RECORDS,
       });
-      grades.push(gradeQNavTurn(evalCase, index, reply));
+      into.push(gradeQNavTurn(evalCase, index, reply));
     }
-  }
+  };
+  let next = 0;
+  const worker = async () => {
+    while (next < cases.length) {
+      const i = next;
+      next += 1;
+      const evalCase = cases[i];
+      const into = byCase[i];
+      if (evalCase !== undefined && into !== undefined)
+        await runCase(evalCase, into);
+    }
+  };
+  const workers = Math.max(1, Math.min(options.concurrency ?? 1, cases.length));
+  await Promise.all(Array.from({ length: workers }, worker));
+  // Graded in the dataset's order, however many ran at once.
+  const grades = byCase.flat();
   return { subject: subject.name, grades, summary: summariseQNav(grades) };
 }
 
@@ -143,6 +160,8 @@ export function navigationPipelineSubject(
     navigation: QNavigationInput,
   ) => Promise<NavigationDecisionResult | null>,
   config: QNavigationPolicyConfig = { movesAllowed: true },
+  /** Samples voted per turn (decision 78; production's NAVIGATION_VOTES). */
+  votes = 1,
 ): QNavSubject {
   return {
     name,
@@ -162,24 +181,22 @@ export function navigationPipelineSubject(
         records: input.records,
         siteMap: navigationSiteMap(input.side),
       };
-      const proposal = await propose(input, pipelineInput);
-      const resolver = listedRecordResolver(pipelineInput.records);
-      const [resolution, alternative] =
-        proposal === null || proposal.decision === "STAY"
-          ? [null, null]
-          : await Promise.all([
-              resolveNavigationPlaceWith(proposal, pipelineInput, resolver),
-              resolveAlternative(proposal, pipelineInput, resolver),
-            ]);
-      const outcome = applyNavigationPolicy({
-        proposal,
-        resolution,
-        pane: pipelineInput.pane,
-        canOpen: (page) => sidesOf(page).includes(input.side),
-        config,
-        records: input.records,
-        alternative,
-      });
+      // The production pipeline itself: decide (voted), resolve, policy.
+      const outcome = await decideNavigation(
+        {
+          decider: { decide: (navigation) => propose(input, navigation) },
+          canOpen: (page) => sidesOf(page).includes(input.side),
+          config,
+          resolver: listedRecordResolver(pipelineInput.records),
+          votes,
+        },
+        pipelineInput,
+        {
+          tenantId: "00000000-0000-4000-8000-000000000000",
+          userId: "00000000-0000-4000-8000-000000000000",
+          correlationId: `q-nav:${input.caseId}`,
+        },
+      );
       return {
         decision: outcome.decision,
         target: outcome.target,

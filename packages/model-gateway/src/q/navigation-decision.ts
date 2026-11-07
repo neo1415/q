@@ -125,7 +125,9 @@ export type QNavigationGuard =
   | "BELOW_GATE"
   | "UNSURE"
   | "TWO_PLACES"
-  | "NOTHING_BEFORE";
+  | "NOTHING_BEFORE"
+  /** Decision 78: the samples did not all name one place. */
+  | "SPLIT_VOTE";
 
 // --- 0. The site map (W2) ---------------------------------------------
 
@@ -587,13 +589,19 @@ export type QNavigationDecider = {
  * (NORMAL_DIALOGUE), never a smaller one, with the whole site map; it is
  * kept cheap by the cached prefix, and fast by running beside retrieval.
  * Its reasoning level is keyed, so routing data can raise it.
+ *
+ * DECISIONS 78 (owner, 7 Nov 2026): reasoning MEDIUM, sampled three times
+ * in parallel (NAVIGATION_VOTES). The output budget leaves room for
+ * thinking (the Anthropic adapter turns thinking off below 4,096 output
+ * tokens), and the cost ceiling covers that room; a decision itself is a
+ * few hundred tokens.
  */
 export const NAVIGATION_DECISION_TASK_CLASS = "NORMAL_DIALOGUE" as const;
-export const NAVIGATION_DECISION_REASONING = "LOW" as const;
+export const NAVIGATION_DECISION_REASONING = "MEDIUM" as const;
 const NAVIGATION_DECISION_BUDGET = {
   maxAttempts: 2,
-  maxEstimatedCostUsd: 0.05,
-  maxOutputTokens: 1_200,
+  maxEstimatedCostUsd: 0.12,
+  maxOutputTokens: 4_096,
   attemptTimeoutMs: 9_000,
 } as const;
 
@@ -1200,7 +1208,88 @@ export async function resolveAlternative(
   );
 }
 
-/** The three steps together: decide, resolve, apply the policy. */
+/**
+ * DECISIONS 78: self-consistency. The decision is sampled this many times
+ * at once (thinking on, so the samples can differ), each through the same
+ * resolution and policy; the page pane moves only when every sample lands
+ * on one place. It turns the model's own uncertainty into an OFFER without
+ * any rule about words.
+ */
+export const NAVIGATION_VOTES = 3;
+
+/** How much a decision does on its own: the most careful one wins a tie. */
+const AUTHORITY: Readonly<Record<QNavigationOutcome["decision"], number>> = {
+  STAY: 0,
+  OFFER: 1,
+  MOVE: 2,
+};
+
+/** Where an outcome would take them: its target, or the one remembered. */
+const votedPlace = (outcome: QNavigationOutcome): QNavigateTarget | null =>
+  outcome.target ?? outcome.remembered;
+
+const leastAuthority = (
+  outcomes: readonly QNavigationOutcome[],
+): QNavigationOutcome =>
+  outcomes.reduce((careful, o) =>
+    AUTHORITY[o.decision] < AUTHORITY[careful.decision] ? o : careful,
+  );
+
+/**
+ * The samples' outcomes, voted (decision 78):
+ * - all name one place: the most careful of them (a MOVE only if all move);
+ * - a strict majority names one place: never a move -- an OFFER of it, or,
+ *   with the pane collapsed, it is remembered for when it opens;
+ * - a strict majority names no place: their STAY;
+ * - otherwise: STAY (SPLIT_VOTE).
+ */
+export function voteNavigation(
+  outcomes: readonly QNavigationOutcome[],
+): QNavigationOutcome {
+  const [first] = outcomes;
+  if (first === undefined) return STAY("SPLIT_VOTE");
+  if (outcomes.length === 1) return first;
+  const groups: QNavigationOutcome[][] = [];
+  const placeless: QNavigationOutcome[] = [];
+  for (const outcome of outcomes) {
+    const at = votedPlace(outcome);
+    if (at === null) {
+      placeless.push(outcome);
+      continue;
+    }
+    const group = groups.find((g) => {
+      const there = g[0] === undefined ? null : votedPlace(g[0]);
+      return there !== null && samePlace(there, at);
+    });
+    if (group === undefined) groups.push([outcome]);
+    else group.push(outcome);
+  }
+  const majority = (n: number) => n * 2 > outcomes.length;
+  const [largest] = [...groups].sort((a, b) => b.length - a.length);
+  if (largest !== undefined && largest.length === outcomes.length)
+    return leastAuthority(largest);
+  if (largest !== undefined && majority(largest.length)) {
+    const careful = leastAuthority(largest);
+    if (careful.decision !== "MOVE") return { ...careful, guard: "SPLIT_VOTE" };
+    const at = votedPlace(careful);
+    return careful.openPane
+      ? STAY("SPLIT_VOTE", at)
+      : {
+          decision: "OFFER",
+          target: at,
+          openPane: false,
+          remembered: null,
+          guard: "SPLIT_VOTE",
+        };
+  }
+  if (majority(placeless.length)) return placeless[0] ?? STAY("SPLIT_VOTE");
+  return STAY("SPLIT_VOTE");
+}
+
+/**
+ * The three steps together -- decide, resolve, apply the policy -- for each
+ * of NAVIGATION_VOTES samples at once, then the vote.
+ */
 export async function decideNavigation(
   dependencies: {
     readonly decider: QNavigationDecider;
@@ -1208,28 +1297,36 @@ export async function decideNavigation(
     readonly config: QNavigationPolicyConfig;
     /** W2.3's resolve_page_target in the answer path; else `input.records`. */
     readonly resolver?: QNavigationRecordResolver | undefined;
+    /** Samples to vote over (decision 78); 1 is the plain pipeline. */
+    readonly votes?: number | undefined;
   },
   input: QNavigationInput,
   attribution: Parameters<QNavigationDecider["decide"]>[1],
 ): Promise<QNavigationOutcome> {
-  const proposal = await dependencies.decider.decide(input, attribution);
   const resolver = dependencies.resolver ?? listedRecordResolver(input.records);
-  const [resolution, alternative] =
-    proposal === null || proposal.decision === "STAY"
-      ? [null, null]
-      : await Promise.all([
-          resolveNavigationPlaceWith(proposal, input, resolver),
-          resolveAlternative(proposal, input, resolver),
-        ]);
-  return applyNavigationPolicy({
-    proposal,
-    resolution,
-    pane: input.pane,
-    canOpen: dependencies.canOpen,
-    config: dependencies.config,
-    records: input.records,
-    alternative,
-  });
+  const sample = async (): Promise<QNavigationOutcome> => {
+    const proposal = await dependencies.decider.decide(input, attribution);
+    const [resolution, alternative] =
+      proposal === null || proposal.decision === "STAY"
+        ? [null, null]
+        : await Promise.all([
+            resolveNavigationPlaceWith(proposal, input, resolver),
+            resolveAlternative(proposal, input, resolver),
+          ]);
+    return applyNavigationPolicy({
+      proposal,
+      resolution,
+      pane: input.pane,
+      canOpen: dependencies.canOpen,
+      config: dependencies.config,
+      records: input.records,
+      alternative,
+    });
+  };
+  const votes = Math.max(1, dependencies.votes ?? NAVIGATION_VOTES);
+  // In parallel: the vote costs no serial latency over one decision.
+  const outcomes = await Promise.all(Array.from({ length: votes }, sample));
+  return voteNavigation(outcomes);
 }
 
 // --- 4. The answer path: one move per turn, beside the answer ------------

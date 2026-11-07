@@ -226,9 +226,11 @@ describe("every place says what it is for, in everyday words (DECISIONS 75)", ()
 
   it("W4's confusable places are told apart by purpose", () => {
     const work = page("/work");
-    expect(work.tabs.find((tab) => tab.id === "needs")?.purpose).toMatch(
-      /decide or do/u,
-    );
+    expect(
+      work.sections.find((section) => section.id === "needs")?.purpose,
+    ).toMatch(/decide or do/u);
+    // One scroll: needs, progress and done are sections, not tabs (r3).
+    expect(work.tabs.map((tab) => tab.id)).toEqual(["team", "cost"]);
     expect(page("/company/data-room").purpose).toMatch(/missing/u);
     expect(page("/profile").purpose).toMatch(/Not how others see you/u);
     expect(page("/company/[companyId]").purpose).toMatch(/as others see it/u);

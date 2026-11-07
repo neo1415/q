@@ -354,9 +354,6 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     audience: "ANY",
     shows: ["WORK_ITEM"],
     tabs: [
-      { id: "needs", title: "Needs you", href: "/work?view=needs" },
-      { id: "progress", title: "In progress", href: "/work?view=progress" },
-      { id: "done", title: "Done", href: "/work?view=done" },
       {
         id: "team",
         title: "Q's team",
@@ -364,7 +361,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       },
       { id: "cost", title: "Cost", href: "/work?view=cost" },
     ],
+    // Needs you, In progress and Done are one scroll (work/page.tsx
+    // pageViewOf: ?view=needs|progress|done all open it), so they are its
+    // sections; Team and Cost are its tabs.
     sections: [
+      { id: "needs", title: "Needs you", kind: "WORK_LIST" },
+      { id: "progress", title: "In progress", kind: "WORK_LIST" },
+      { id: "done", title: "Done", kind: "WORK_LIST" },
       { id: "work", title: "Q's work", kind: "WORK_LIST" },
       {
         id: "approvals",
@@ -1350,13 +1353,13 @@ export const SITE_MAP_PURPOSES: Readonly<
   "/verification": { sections: { verification: "your verification steps" } },
   "/work": {
     tabs: {
-      needs: "what waits for you to decide or do",
-      progress: "what Q is doing right now",
-      done: "what Q finished",
       team: "the specialists Q uses for your work; not your colleagues",
       cost: "Q's spending day by day and by job, against your limit",
     },
     sections: {
+      needs: "what waits for you to decide or do",
+      progress: "what Q is doing right now",
+      done: "what Q finished",
       work: "Q's tasks for you",
       approvals: "what waits for your approval",
       "q-room-card": "Q's card",
