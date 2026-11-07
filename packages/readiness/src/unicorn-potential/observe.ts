@@ -383,9 +383,12 @@ export function observeUnicornPotential(
           pillar.id === "P4"
             ? [...text.matchAll(/\b(20\d\d)\b/gu)].map((m) => Number(m[1]))
             : [];
+        // P1-12: a period is stale once its year ended more than the
+        // criterion's freshness ago, not on every 1 January.
         const oldPeriod =
           periodYears.length > 0 &&
-          Math.max(...periodYears) < new Date(now).getUTCFullYear();
+          now - Date.UTC(Math.max(...periodYears), 11, 31) >
+            criterion.freshnessDays * 86400000;
         const asserted = source.at === null ? NaN : Date.parse(source.at);
         const invalidProvenance =
           source.kind === "CLAIM" &&

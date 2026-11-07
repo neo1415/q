@@ -78,10 +78,8 @@ export function unicornObservationsCurrent(
       now - date > rule.freshnessDays * 86400000
     )
       return false;
-    return (
-      pillar?.id !== "P4" ||
-      new Date(date).getUTCFullYear() === new Date(now).getUTCFullYear()
-    );
+    // P1-12: freshness alone decides; no calendar-year cliff.
+    return true;
   });
 }
 

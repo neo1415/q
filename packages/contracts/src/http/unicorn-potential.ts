@@ -206,7 +206,7 @@ export function notAssessedUnicornPotential(
     coverage: 0,
     stage: null,
     methodVersion,
-    inputRulesVersion: "unicorn-potential-inputs.v1",
+    inputRulesVersion: "unicorn-potential-inputs.v5",
     assessedAt: null,
     pillars: [],
     up: [],

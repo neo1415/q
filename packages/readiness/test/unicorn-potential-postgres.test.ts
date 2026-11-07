@@ -187,7 +187,7 @@ describe("clock-driven source aging", () => {
     stale: false,
     source: { at: "2026-10-01T00:00:00.000Z" },
   };
-  it("suppresses a previously current growth score once its measurement year expires without a write", () => {
+  it("ages growth evidence by its freshness window, with no 1 January cliff (P1-12)", () => {
     expect(
       unicornObservationsCurrent(
         [observation],
@@ -198,6 +198,12 @@ describe("clock-driven source aging", () => {
       unicornObservationsCurrent(
         [observation],
         Date.parse("2027-01-01T00:00:00Z"),
+      ),
+    ).toBe(true);
+    expect(
+      unicornObservationsCurrent(
+        [observation],
+        Date.parse("2028-01-01T00:00:00Z"),
       ),
     ).toBe(false);
   });
