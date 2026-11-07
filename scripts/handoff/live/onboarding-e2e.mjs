@@ -682,6 +682,10 @@ if (STEPS.has("J6")) {
           // Making the mandate live is a yes, not the discovery style.
           [/mandate live|make .* live|go live|activate/i, "Yes, make it live."],
           READ_BACK,
+          // Batch 9: Q's one short follow-up about a theme's lists the
+          // first answer left open ("Anything on green flags, or no
+          // preference?"): an explicit none, so it is not asked again.
+          [/^\s*anything on\b/i, "No preference."],
           // The themed "what makes you lean in" question (batch 9) and a
           // green-flags question name "anything else" and "revenue" too.
           [/lean in|green flag/i, "Repeat founders and capital efficiency."],
