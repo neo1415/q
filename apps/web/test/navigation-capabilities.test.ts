@@ -21,6 +21,10 @@ import { WORK_DATA_ROOM_HREF, workTabs } from "../src/features/work/work-tabs";
 const EXCLUDED: Readonly<Record<string, string>> = {
   // Owner 2026-10-23: Work's Board tab (tab.work-board); Q reads and
   // changes the board with my_board, and opens it from Work's tab strip.
+  // Q Workspace §8 (integration 2026-11-07): the sidebar's Analytics entry.
+  // Until W3 adds an ANALYTICS destination (contracts), Q reaches it by
+  // the page's own Q tools and the site map, not by NAVIGATE.
+  "/analytics": "no NAVIGATE destination yet (W3 owns the contract)",
 };
 
 describe("every navigation screen is a screen Q can open", () => {

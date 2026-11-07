@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 
 import {
+  ChartColumn,
   CircleUser,
   FileText,
   Compass,
@@ -50,6 +51,7 @@ export type NavigationItem = {
     | "/settings/usage"
     | "/documents"
     | "/work"
+    | "/analytics"
     | "/admin"
     | "/gateq"
     | "/q-pitch";
@@ -192,6 +194,17 @@ export const GATEQ_NAVIGATION: NavigationItem = {
  */
 export const WORK_NAVIGATION: NavigationItem = byHref("/work");
 
+/**
+ * Analytics (Q Workspace §8): who engaged with their company, or what
+ * they reviewed, within the specification's visibility rules. Both sides;
+ * the page decides what each side sees.
+ */
+export const ANALYTICS_NAVIGATION: NavigationItem = {
+  href: "/analytics",
+  label: "Analytics",
+  icon: ChartColumn,
+};
+
 /** What Q used for them this month (lead 2026-10-03), under You. */
 export const USAGE_NAVIGATION: NavigationItem = {
   href: "/settings/usage",
@@ -274,7 +287,8 @@ export function navigationGroupsFor(
     // Owner 2026-10-18: Documents, Pitch & media (with the data room),
     // Rehearsals and The Q Daily are Work's tabs (workTabs). Their pages
     // and addresses are unchanged (Q still opens them).
-    { label: null, items: PRIMARY_NAVIGATION },
+    // Integration 2026-11-07 (Q Workspace §8): Analytics after Work.
+    { label: null, items: [...PRIMARY_NAVIGATION, ANALYTICS_NAVIGATION] },
     {
       label: "You",
       items: [PROFILE_NAVIGATION, USAGE_NAVIGATION, SETTINGS_NAVIGATION],

@@ -41,6 +41,8 @@ describe("the sidebar's groups", () => {
         // GateQ and company requests are CRM tabs (owner 2026-10-17);
         // Documents, Pitch, Rehearsals and The Q Daily are Work's tabs.
         "/work",
+        // Q Workspace §8: Analytics, both sides.
+        "/analytics",
         "/profile",
         "/settings/usage",
         "/settings",
