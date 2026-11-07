@@ -189,3 +189,95 @@ describe("the turn reader is told the situation", () => {
     );
   });
 });
+
+/**
+ * Owner live test, 7 Nov 2026 (R2, R3, R6): "i meant me" became the
+ * company on screen; "their elevator" opened an older company while the
+ * screen and the conversation were Spheros; "where is Zino Aviation" (their
+ * own firm) went to company search; replies said "the user" and "on the
+ * person's screen". The one situation every reader and answer is told now
+ * says who they are, what is theirs, what is on their screen, how pointing
+ * words resolve, and how Q speaks to them.
+ */
+describe("situationHeader: self, screen, reference and voice", () => {
+  const INVESTOR = {
+    displayName: "Zino Ade",
+    role: "INVESTOR" as const,
+    organisation: "Zino Aviation",
+    timeZone: "Africa/Lagos",
+    own: {
+      kind: "INVESTOR_ORGANISATION" as const,
+      city: null,
+      country: "NG",
+      website: "https://zino.aero",
+    },
+    onScreen: { kind: "COMPANY" as const, name: "Spheros" },
+  };
+  const header = situationHeader({
+    now: new Date("2026-11-07T16:22:00.000Z"),
+    asker: INVESTOR,
+    surface: "CHAT",
+    page: "COMPANY",
+  });
+
+  it("names their own organisation as theirs, with where it is and its site", () => {
+    expect(header).toContain(
+      "Their own organisation: Zino Aviation (an investor organisation; based in Nigeria; website https://zino.aero).",
+    );
+    expect(header).toMatch(/my firm[^.]*mean Zino Aviation/u);
+  });
+
+  it("says what is on their screen now, by name", () => {
+    expect(header).toContain("On their screen now: Spheros (a company).");
+  });
+
+  it("first person is always them; pointing words follow the conversation, then the screen, never them", () => {
+    expect(header).toMatch(
+      /me, my, I or myself[^.]*mean themselves \(Zino Ade\), never a company or the record on their screen/u,
+    );
+    expect(header).toMatch(
+      /their, it, this or that[^.]*what the conversation is about; only when the conversation names nothing, what is on their screen; never themselves/u,
+    );
+  });
+
+  it("tells Q to speak to them, not about them", () => {
+    expect(header).toMatch(/Speak to them as you/u);
+    expect(header).toMatch(/never call them the user or the person/u);
+    expect(header).toMatch(/never narrate screen actions/u);
+  });
+
+  it("stays one bounded line, and a founder's company reads with its city", () => {
+    expect(header).not.toContain("\n");
+    expect(header.length).toBeLessThanOrEqual(SITUATION_HEADER_MAX_CHARS);
+    const founder = situationHeader({
+      now: new Date("2026-11-07T16:22:00.000Z"),
+      asker: {
+        ...FOUNDER,
+        own: {
+          kind: "COMPANY",
+          city: "Lagos",
+          country: "NG",
+          website: null,
+        },
+      },
+      surface: "CHAT",
+      page: "HOME",
+    });
+    expect(founder).toContain(
+      "Their own organisation: Nixo (a company; based in Lagos, Nigeria).",
+    );
+    expect(founder).not.toContain("On their screen now");
+  });
+
+  it("with nothing known of their organisation or screen, still states the rules", () => {
+    const bare = situationHeader({
+      now: new Date("2026-11-07T16:22:00.000Z"),
+      asker: null,
+      surface: "CHAT",
+      page: null,
+    });
+    expect(bare).not.toContain("Their own organisation");
+    expect(bare).toMatch(/me, my, I or myself[^.]*mean themselves/u);
+    expect(bare).toMatch(/Speak to them as you/u);
+  });
+});

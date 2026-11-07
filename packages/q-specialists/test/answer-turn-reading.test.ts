@@ -7295,4 +7295,43 @@ describe("the turn reader is given the situation header", () => {
       expect(situation).toContain(surface);
     }
   });
+  // Owner live 7 Nov (R2): "can i see their elevator" with Spheros on
+  // screen opened another company; the reader was never told what is on
+  // their screen. The port now gets the screen's record to name it.
+  it("hands the situation port the record on their screen, and says it by name", async () => {
+    const asked: unknown[] = [];
+    const told: (string | undefined)[] = [];
+    const SPHEROS = "3f1d2c4b-5a6e-4f70-8a91-0b2c3d4e5f61";
+    const run = seam({
+      said: "can i see their elevator",
+      reading: null,
+      read: (input) => {
+        told.push(input.situation);
+        return Promise.resolve(null);
+      },
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      situationOf: (_actor, screen) => {
+        asked.push(screen);
+        return Promise.resolve({
+          displayName: "Zino Ade",
+          role: "INVESTOR" as const,
+          organisation: "Zino Aviation",
+          timeZone: "Africa/Lagos",
+          onScreen:
+            screen?.companyId === SPHEROS
+              ? { kind: "COMPANY" as const, name: "Spheros" }
+              : null,
+        });
+      },
+      now: () => NOW,
+      turnRereadDeadlineMs: 40,
+    });
+    await run.answer.answer(request({ route: "COMPANY", companyId: SPHEROS }));
+    expect(asked).toContainEqual({ companyId: SPHEROS });
+    expect(told.length).toBeGreaterThan(0);
+    for (const situation of told) {
+      expect(situation).toContain("On their screen now: Spheros (a company).");
+      expect(situation).toMatch(/me, my, I or myself[^.]*mean themselves/u);
+    }
+  });
 });

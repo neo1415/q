@@ -5078,6 +5078,8 @@ export function createSpecialistQAnswer(
           readonly route?: QScreenRoute | undefined;
           readonly timeZone?: string | undefined;
           readonly surface?: QAskSurface | undefined;
+          readonly companyId?: string | undefined;
+          readonly investorOrganisationId?: string | undefined;
         }
       | null
       | undefined,
@@ -5085,8 +5087,19 @@ export function createSpecialistQAnswer(
   ): Promise<string> =>
     situationHeader({
       now: (dependencies.now ?? (() => new Date()))(),
+      // R2 (owner live 7 Nov): the record on their screen, named by the
+      // port from the ids the firewall passed on.
       asker:
-        (await dependencies.situationOf?.(actor).catch(() => null)) ?? null,
+        (await dependencies
+          .situationOf?.(actor, {
+            ...(screen?.companyId === undefined
+              ? {}
+              : { companyId: screen.companyId }),
+            ...(screen?.investorOrganisationId === undefined
+              ? {}
+              : { investorOrganisationId: screen.investorOrganisationId }),
+          })
+          .catch(() => null)) ?? null,
       deviceTimeZone: screen?.timeZone,
       surface: situationSurfaceOf(spoken, screen?.surface),
       page: screen?.route ?? null,

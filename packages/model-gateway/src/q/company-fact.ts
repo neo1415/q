@@ -70,7 +70,9 @@ const text = (value: unknown): string | null =>
 
 export function onScreenCompanyFact(
   data: unknown,
-  label = 'The company on their screen (the one they mean by "this company")',
+  // R2 (owner live 7 Nov): the screen answers a pointing word only when
+  // the conversation names no other, and never first person.
+  label = 'The company on their screen (what they mean by "this company" when the conversation names no other; never what they mean by me or my)',
 ): AuthorisedFact | null {
   if (typeof data !== "object" || data === null) return null;
   const read = data as CompanyRead;

@@ -258,7 +258,11 @@ describe("the prospects fallback (gap 1)", () => {
           }),
           available,
         );
-        expect(result.mode, `${kind}/${String(available)}`).toBe("NEVER");
+        // Owner live 7 Nov (R3): a correction re-aims the turn it
+        // corrects, so it keeps the research tools in hand (OFFERED).
+        expect(result.mode, `${kind}/${String(available)}`).toBe(
+          kind === "CORRECTION" && available ? "OFFERED" : "NEVER",
+        );
         expect(result.fallback === true, `${kind}/${String(available)}`).toBe(
           kind === "QUESTION_TO_Q" && available,
         );
@@ -306,5 +310,36 @@ describe("an instruction keeps the research tools in hand", () => {
     expect(directive(read({ kind: "TOOL_REQUEST" }), false).mode).toBe("NEVER");
     // A remark is still not a search.
     expect(directive(read({ kind: "SMALL_TALK" })).mode).toBe("NEVER");
+  });
+});
+
+/**
+ * Owner live test, 7 Nov 2026 (R3): "what can you find about e online?"
+ * then "i meant me, what can you find about me online" ran no web research:
+ * the correction was read with no question of its own, which made it an
+ * answer turn and took the web tool away. A correction re-aims what it
+ * corrects; it never takes the tools away.
+ */
+describe("a correction keeps the research tools in hand (R3)", () => {
+  it("is OFFERED with research up, outside an interview and in one", () => {
+    expect(directive(read({ kind: "CORRECTION", question: null })).mode).toBe(
+      "OFFERED",
+    );
+    expect(
+      directive(read({ kind: "CORRECTION", question: null }), false).mode,
+    ).toBe("NEVER");
+  });
+
+  it("is withheld once research is exhausted", () => {
+    let state = INITIAL_CONVERSATION_STATE;
+    for (let i = 0; i < 5; i += 1) {
+      state = reduceConversation(state, {
+        type: "FAILED",
+        operation: "RESEARCH",
+      });
+    }
+    expect(
+      directive(read({ kind: "CORRECTION", question: null }), true, state).mode,
+    ).toBe("NEVER");
   });
 });

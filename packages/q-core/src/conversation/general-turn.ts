@@ -142,8 +142,13 @@ export function researchDirectiveFor(
     // An instruction, or a clarification of one outside an interview,
     // keeps the research tools in Q's hands: what it was asked to do may
     // need them. Nothing is forced.
+    // Owner live 7 Nov (R3): a correction re-aims the turn it corrects
+    // ("i meant me, what can you find about me online"), so it keeps the
+    // tools that turn had; read with no question of its own, it took the
+    // web away and nothing was searched.
     const directing =
       reading.kind === "TOOL_REQUEST" ||
+      reading.kind === "CORRECTION" ||
       (reading.kind === "CLARIFICATION" && state.asked === null);
     if (
       directing &&

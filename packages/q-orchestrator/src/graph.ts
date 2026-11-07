@@ -317,6 +317,17 @@ export function buildQGraph(
                 ...(state.screen.surface === undefined
                   ? {}
                   : { surface: state.screen.surface }),
+                // R2 (owner live 7 Nov): the record on screen, by id, as
+                // the firewall passed it on; named for the reader.
+                ...(state.screen.companyId === undefined
+                  ? {}
+                  : { companyId: state.screen.companyId }),
+                ...(state.screen.investorOrganisationId === undefined
+                  ? {}
+                  : {
+                      investorOrganisationId:
+                        state.screen.investorOrganisationId,
+                    }),
               },
             }),
       }),
