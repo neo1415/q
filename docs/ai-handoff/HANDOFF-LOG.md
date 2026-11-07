@@ -2109,3 +2109,20 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Q-IQ 38;
   - eslint and prettier clean on the changed files.
 - **Risk to measure:** MEDIUM thinking adds output tokens and latency per sample. Run `CQ_QNAV_LIMIT=20` first to check cost per turn and p95 before the full dev run. The answer path waits at most 2.5 s after the answer for a decision still running (`settleWithinMs`).
+
+## 2026-11-07 15:45 UTC — batch 5 deployed; WORKSPACE LIVE IN LABS (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Batch 5 041e754f0:
+  - q-nav D78: self-consistency ×3, MEDIUM, v9; Work as one scroll.
+  - Third held-out: move-target 88.1%, wrong-page 1.6%, forbidden 0, p95 2.3 s.
+  - The per-user q-api workspace gate (e4e948f).
+- Local gates: full vitest 20,709 passed, plus q-api 3150 after the gate merge; tsc 0; lint clean. CI 42382378374 green. No migrations.
+- Fast-forwarded recovery/2026-09-12 from 2262fed36 to 041e754f0 (rollback 2262fed36). Flag-off live check is clean; Q turn correct in 10.3 s.
+- Railway variables (owner DECISIONS 78), previously unset:
+  - web CQ_WORKSPACE_MODE=labs;
+  - q-api CQ_WORKSPACE_MODE=labs;
+  - q-api CQ_Q_NAV_MOVES_ALLOWED=1.
+  - Rollback: unset them, or set web/q-api CQ_WORKSPACE_MODE=off.
+- Labs live (fictional investor savanna-seed, Settings toggle on): Q moved to /analytics in 0.3 s, /profile mandate 0.8 s, /work 3.0 s, /discover 0.3 s. Phone: an ambiguous ask got STAY and asked who was meant.
+- Defects (to W1): React #418 hydration error with the workspace on; a redundant "Where this lives / Open X" card after a move.
+- Anthropic test spend is about $33.1 of $50.
