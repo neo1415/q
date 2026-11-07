@@ -273,7 +273,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/analytics": {
     title: "Analytics",
     purpose:
-      "Who engaged with you: a founder's investor interest, deck views and viewers; an investor's visibility and activity.",
+      "Who engaged with you: a founder's investor interest and deck views; an investor's visibility and activity.",
     audience: "ANY",
     shows: ["COMPANY"],
     sections: [
@@ -344,8 +344,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/daily/[editionId]": {
     title: "Q Daily edition",
-    purpose:
-      "One edition of the Q Daily, story by story (#story-<id>, #section-<code>).",
+    purpose: "One edition of the Q Daily, story by story.",
     audience: "ANY",
     sections: [{ id: "daily", title: "The Q Daily", kind: "DAILY" }],
   },
@@ -378,13 +377,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/work/[delegationId]": {
     title: "Work item",
-    purpose: "One task Q is doing: its steps, results and what it needs.",
+    purpose: "One task Q is doing: steps, results, what it needs.",
     audience: "ANY",
     sections: WORK,
   },
   "/work/[delegationId]/report/[laneId]": {
     title: "Work report",
-    purpose: "The report from one part of a task Q did.",
+    purpose: "The report on one part of a task.",
     audience: "ANY",
     sections: WORK,
   },
@@ -468,7 +467,8 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/investors": {
     title: "Investors",
-    purpose: "Investors who could fund your company, and requests to connect.",
+    purpose:
+      "Find new investors who fit your company, and requests to connect.",
     audience: "FOUNDER",
     shows: ["INVESTOR_ORGANISATION"],
   },
@@ -599,8 +599,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/documents": {
     title: "Documents",
-    purpose:
-      "Memos, reports and spreadsheets Q wrote for you, and your brand kit.",
+    purpose: "Memos, reports and spreadsheets Q wrote for you; your brand kit.",
     audience: "ANY",
     shows: ["OWN_DOCUMENT"],
     sections: [
@@ -609,7 +608,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/documents/unavailable": {
     title: "Document unavailable",
-    purpose: "Shown when a document link can't be opened.",
+    purpose: "Where a document link that can't open lands.",
     audience: "ANY",
   },
 
@@ -839,8 +838,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/rehearsals": {
     title: "Rehearsals",
-    purpose:
-      "Practise with investors, companies or people played by Q, and past practice.",
+    purpose: "Practise with people played by Q, and past practice.",
     audience: "ANY",
     shows: ["REHEARSAL"],
     sections: [
@@ -916,8 +914,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/verification": {
     title: "Verification",
-    purpose:
-      "Get verified: what is confirmed about you and your organisation, and next steps.",
+    purpose: "Get verified: what is confirmed about you and your organisation.",
     audience: "ANY",
     sections: [
       { id: "verification", title: "Verification", kind: "VERIFICATION" },
@@ -925,7 +922,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/join/[token]": {
     title: "Invitation",
-    purpose: "Accept an invitation to join a team.",
+    purpose: "Accept an invitation to a team.",
     audience: "ANY",
     sections: [{ id: "invitation", title: "Invitation", kind: "OTHER" }],
   },
@@ -949,7 +946,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/settings": {
     title: "Settings",
     purpose:
-      "Your account, security, team, appearance, Q, notifications, connections, plan and privacy.",
+      "Your account, security, team, look, Q, notifications, connections, plan and privacy.",
     audience: "ANY",
     sections: [
       { id: "settings", title: "Settings", kind: "SETTINGS" },
@@ -976,13 +973,14 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/settings/plan": {
     title: "Plan and billing",
-    purpose: "Your subscription and billing: plan, limits and payment.",
+    purpose:
+      "Your subscription and billing: your plan, what it allows, and payment.",
     audience: "ANY",
     sections: [{ id: "plan", title: "Your plan", kind: "BILLING" }],
   },
   "/settings/usage": {
     title: "Usage",
-    purpose: "How much of your plan Q used this month.",
+    purpose: "What Q did for you this month, in words; not a bill.",
     audience: "ANY",
     sections: [{ id: "usage", title: "Usage", kind: "BILLING" }],
   },
@@ -1142,7 +1140,7 @@ export const SITE_MAP_PURPOSES: Readonly<
   "/discover": {
     tabs: {
       "for-you": "new companies matched to your mandate",
-      yours: "companies you already follow, saved or in touch with",
+      yours: "companies you follow: saved or in touch",
       founders: "other founders' pitch videos",
     },
     sections: {
@@ -1178,8 +1176,8 @@ export const SITE_MAP_PURPOSES: Readonly<
   "/explore": { sections: { explore: "network search and pitches" } },
   "/gateq": {
     tabs: {
-      inbox: "applications founders sent you, to decide",
-      gate: "who may apply and what they send",
+      inbox: "applications sent to you, to decide",
+      gate: "who may apply, and how",
       find: "find companies by describing them",
       claim: "claim your company as yours",
       applications: "applications you sent, and their status",
@@ -1249,17 +1247,17 @@ export const SITE_MAP_PURPOSES: Readonly<
   },
   "/relationships": {
     tabs: {
-      overview: "everyone at a glance",
+      overview: "all your relationships at a glance, whatever the stage",
       pipeline: "relationships by stage",
       capital: "a founder's raise; an investor's mandate and book",
       "capital-raise": "your current round and who is in it",
       "capital-readiness": "how ready your company looks to investors",
       "capital-action-plan": "the steps to get investor-ready",
       "capital-plan": "your 3, 6 and 12-month plan",
-      "capital-investors": "the investors in your raise",
+      "capital-investors": "investors already in touch about this raise",
     },
     sections: {
-      "hub-overview": "everyone at a glance",
+      "hub-overview": "the overview",
       pipeline: "relationships by stage",
       relationships: "everyone, as a list",
       mandate: "what you invest in",
@@ -1269,7 +1267,7 @@ export const SITE_MAP_PURPOSES: Readonly<
       readiness: "by pillar",
       "action-plan": "your steps",
       plan: "by horizon",
-      investors: "the investors",
+      investors: "investors already in touch",
     },
   },
   ...Object.fromEntries(
@@ -1325,16 +1323,16 @@ export const SITE_MAP_PURPOSES: Readonly<
       speaking: "how Q speaks on your behalf",
       notifications: "emails and alerts",
       connections: "Google calendar and mail",
-      billing: "your plan and payment",
+      billing: "your subscription and payment",
       privacy: "your data choices",
     },
   },
   "/settings/activity": { sections: { activity: "your team's actions" } },
   "/settings/memory": { sections: { memory: "what Q remembers" } },
-  "/settings/plan": { sections: { plan: "your plan and its limits" } },
+  "/settings/plan": { sections: { plan: "your plan and what it allows" } },
   "/settings/team": { sections: { team: "members, roles and invitations" } },
   "/settings/team/[userId]": { sections: { member: "the teammate" } },
-  "/settings/usage": { sections: { usage: "this month's use" } },
+  "/settings/usage": { sections: { usage: "the work Q did, in words" } },
   "/verification": { sections: { verification: "your verification steps" } },
   "/work": {
     tabs: {
@@ -1342,7 +1340,7 @@ export const SITE_MAP_PURPOSES: Readonly<
       progress: "what Q is doing right now",
       done: "what Q finished",
       team: "the specialists Q uses for your work; not your colleagues",
-      cost: "what Q's work cost",
+      cost: "Q's spending day by day and by job, against your limit",
     },
     sections: {
       work: "Q's tasks for you",
