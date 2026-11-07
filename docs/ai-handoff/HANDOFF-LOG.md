@@ -2077,3 +2077,35 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - metrics methods: Investability v3, Suitability ranking-config v8, Unicorn v1.1.0, with METRICS-METHODS.md and SOURCES.md.
 - Live (investor and founder, 1440/390): /home, /discover, /profile, /analytics and /work return 200 with no errors. The investor /profile shows the canonical mandate. Q turn correct in 11.4 s.
 - BLOCKED: the onboarding e2e on fresh fictional accounts needs SB_KEY (Supabase admin) for account creation. Fetching it through the management API was refused by the session's permission policy. It needs the owner, either by setting SB_KEY in the environment or by allowing the fetch.
+
+## 2026-11-07 — W4 q-nav decision 78 built, ready for the owner's paid runs (session_01Wncmn4BQnwUu8PoUpcMjfu)
+
+- **Built, all OFFER-only until CQ_Q_NAV_MOVES_ALLOWED=1:**
+  - **Self-consistency ×3:** `decideNavigation` samples NAVIGATION_DECISION `NAVIGATION_VOTES` (3) times in parallel. Each sample goes through the same resolution and policy, then `voteNavigation` combines them:
+    - all three name one place → the most careful of the three (MOVE only if all move);
+    - a strict majority on one place → OFFER (guard `SPLIT_VOTE`), or, with the pane collapsed, the place is remembered;
+    - otherwise → STAY.
+  - **Reasoning MEDIUM:** the output budget is 4,096 tokens so adaptive thinking actually runs (below that the Anthropic adapter turns thinking off; at the old 1,200 tokens, LOW meant no thinking), and the cost ceiling is $0.12 per call.
+  - **NAVIGATION_DECISION v9 (the collapsed-pane fix):** the pane's state is code's to handle, so the model decides as if the pane were open and names the place. Lock `0728727…`.
+- **W2 d013eaa merged (Work as one scroll):**
+  - The q-nav vocabulary has `Q_NAV_FOLDED`:
+    - needs → WORK (the leading section);
+    - progress → WORK#progress;
+    - done → WORK#done.
+  - Coverage lint counts a folded destination as its section.
+  - Fixtures moved to WORK_TEAM.
+- **Third held-out set:**
+  - `heldout-third.ts` has 385 turns in 344 cases. A separate author wrote it from the app code only, without the prompt, the dev banks or earlier held-out sets.
+  - Every context category has at least 12 turns.
+  - Sealed `a4e5a047…` before any run. The decision-75 set (`heldout-fresh.ts`) is retired.
+- **Live suite:**
+  - It runs the production `decideNavigation` with 3 votes.
+  - `CQ_QNAV_CONCURRENCY` (default 4) runs cases in parallel, with turns in order within each case.
+  - It reports the per-turn latency (p50, p95, max: the slowest of the parallel samples plus resolution) to the console and the JSON report.
+  - Dev misses list every sample's proposal.
+- **Gates:**
+  - package build 55/55; root tsc 0;
+  - vitest: model-gateway and q-specialists 3386, q-evals 102, q-core 860;
+  - Q-IQ 38;
+  - eslint and prettier clean on the changed files.
+- **Risk to measure:** MEDIUM thinking adds output tokens and latency per sample. Run `CQ_QNAV_LIMIT=20` first to check cost per turn and p95 before the full dev run. The answer path waits at most 2.5 s after the answer for a decision still running (`settleWithinMs`).

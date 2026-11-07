@@ -41,6 +41,7 @@ import {
   readQApprovalAction,
   rejectQApprovalAction,
 } from "@/features/q/actions";
+import { QSection } from "@/features/q/q-section";
 import { QControl } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { CrmSheet, QRing, useCrmToast } from "@/features/relationships/crm-kit";
@@ -386,82 +387,84 @@ export function WorkInbox({
       <div className="cq-wk-inbox">
         <QControl id="section.work-needs-you" kind="SECTION">
           <div className="flex flex-col gap-3.5" data-work-needs-you>
-            <section
-              className="cq-wk-qgroup"
-              aria-labelledby="inbox-needs"
-              data-inbox-group="needs"
-            >
-              <h2 id="inbox-needs" className="cq-wk-qh m-0">
-                {t("Needs you")}
-                {needs.length === 0 ? null : (
-                  // Status grammar: the count inline with its words,
-                  // counting up to a new value, never a filled pill.
-                  <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                    <CountUp value={needs.length} /> {t("waiting on you")}
-                  </span>
-                )}
-              </h2>
-              {approvalsFailed ? (
-                <p
-                  className="m-0 px-2.5 cq-body-sm text-(--cq-text-secondary)"
-                  role="status"
-                >
-                  {t(
-                    "What waits for your yes couldn’t load. Nothing is sent without it; try again in a moment.",
-                  )}
-                </p>
-              ) : null}
-              <QControl
-                id="list.work-decisions"
-                kind="LIST"
-                count={needs.length}
+            <QSection id="needs" kind="WORK_LIST" label={t("Needs you")}>
+              <section
+                className="cq-wk-qgroup"
+                aria-labelledby="inbox-needs"
+                data-inbox-group="needs"
               >
-                {needs.length === 0 && !approvalsFailed ? (
-                  <div className="cq-wk-qempty">
-                    <Check size={16} aria-hidden="true" />
+                <h2 id="inbox-needs" className="cq-wk-qh m-0">
+                  {t("Needs you")}
+                  {needs.length === 0 ? null : (
+                    // Status grammar: the count inline with its words,
+                    // counting up to a new value, never a filled pill.
+                    <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                      <CountUp value={needs.length} /> {t("waiting on you")}
+                    </span>
+                  )}
+                </h2>
+                {approvalsFailed ? (
+                  <p
+                    className="m-0 px-2.5 cq-body-sm text-(--cq-text-secondary)"
+                    role="status"
+                  >
                     {t(
-                      "Nothing waits for you. Q will ask when something does.",
+                      "What waits for your yes couldn’t load. Nothing is sent without it; try again in a moment.",
                     )}
-                  </div>
-                ) : (
-                  needs.map((need) =>
-                    rowButton(
-                      need,
-                      <>
-                        {need.kind === "NOTICE" ? (
-                          <span className="grid size-7 shrink-0 place-items-center text-(--cq-accent)">
-                            <QRing />
-                          </span>
-                        ) : need.kind === "TIMES" ? (
-                          <Mark
-                            name={needName(need)}
-                            named={need.lane.lane.counterpart}
-                            size={28}
-                          />
-                        ) : (
-                          <Mark
-                            name={needName(need) || "Q"}
-                            named={need.group.named}
-                            size={28}
-                          />
-                        )}
-                        <span className="cq-wk-qbody">
-                          <b>{t(needTitle(need))}</b>
-                          {needName(need) === "" ? null : (
-                            <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                              {needName(need)}
+                  </p>
+                ) : null}
+                <QControl
+                  id="list.work-decisions"
+                  kind="LIST"
+                  count={needs.length}
+                >
+                  {needs.length === 0 && !approvalsFailed ? (
+                    <div className="cq-wk-qempty">
+                      <Check size={16} aria-hidden="true" />
+                      {t(
+                        "Nothing waits for you. Q will ask when something does.",
+                      )}
+                    </div>
+                  ) : (
+                    needs.map((need) =>
+                      rowButton(
+                        need,
+                        <>
+                          {need.kind === "NOTICE" ? (
+                            <span className="grid size-7 shrink-0 place-items-center text-(--cq-accent)">
+                              <QRing />
                             </span>
+                          ) : need.kind === "TIMES" ? (
+                            <Mark
+                              name={needName(need)}
+                              named={need.lane.lane.counterpart}
+                              size={28}
+                            />
+                          ) : (
+                            <Mark
+                              name={needName(need) || "Q"}
+                              named={need.group.named}
+                              size={28}
+                            />
                           )}
-                        </span>
-                        <span className="shrink-0 cq-label font-normal whitespace-nowrap text-(--cq-text-tertiary)">
-                          {t(ageWords(needAt(need), now))}
-                        </span>
-                      </>,
-                    ),
-                  )
-                )}
-              </QControl>
-            </section>
+                          <span className="cq-wk-qbody">
+                            <b>{t(needTitle(need))}</b>
+                            {needName(need) === "" ? null : (
+                              <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                                {needName(need)}
+                              </span>
+                            )}
+                          </span>
+                          <span className="shrink-0 cq-label font-normal whitespace-nowrap text-(--cq-text-tertiary)">
+                            {t(ageWords(needAt(need), now))}
+                          </span>
+                        </>,
+                      ),
+                    )
+                  )}
+                </QControl>
+              </section>
+            </QSection>
             {cards.length === 0 && !suggestionsFailed ? null : (
               <section
                 className="cq-wk-qgroup"
@@ -504,187 +507,196 @@ export function WorkInbox({
               </section>
             )}
             <QControl id="section.work-in-progress" kind="SECTION">
-              <section
-                className="cq-wk-qgroup"
-                aria-labelledby="inbox-running"
-                data-work-running
-              >
-                <h2 id="inbox-running" className="cq-wk-qh m-0">
-                  {t("Moving")}
-                </h2>
-                {workFailed ? (
-                  <p
-                    className="m-0 px-2.5 cq-body-sm text-(--cq-text-secondary)"
-                    role="status"
-                  >
-                    {t("Q’s work couldn’t load. Try again in a moment.")}
-                  </p>
-                ) : rows.some(
-                    (row) => row.kind === "RUNNING" || row.kind === "JOB",
-                  ) ? (
-                  <QControl
-                    id="list.work-jobs"
-                    kind="LIST"
-                    count={
-                      rows.filter(
-                        (row) => row.kind === "RUNNING" || row.kind === "JOB",
-                      ).length
-                    }
-                  >
-                    {rows.flatMap((row) =>
-                      row.kind === "RUNNING"
-                        ? [
-                            rowButton(
-                              row,
-                              <>
-                                <span className="mx-1">
-                                  <StepMark
-                                    state={
-                                      row.item.run?.state === "PAUSED"
-                                        ? "next"
-                                        : "now"
-                                    }
-                                  />
-                                </span>
-                                <span className="cq-wk-qbody">
-                                  <b>{t(runningGoal(row.item))}</b>
-                                  <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                                    {t(runningLine(row.item))}
-                                  </span>
-                                </span>
-                              </>,
-                            ),
-                          ]
-                        : row.kind === "JOB" && !jobLine(row.item.job).stopped
+              <QSection id="progress" kind="WORK_LIST" label={t("In progress")}>
+                <section
+                  className="cq-wk-qgroup"
+                  aria-labelledby="inbox-running"
+                  data-work-running
+                >
+                  <h2 id="inbox-running" className="cq-wk-qh m-0">
+                    {t("Moving")}
+                  </h2>
+                  {workFailed ? (
+                    <p
+                      className="m-0 px-2.5 cq-body-sm text-(--cq-text-secondary)"
+                      role="status"
+                    >
+                      {t("Q’s work couldn’t load. Try again in a moment.")}
+                    </p>
+                  ) : rows.some(
+                      (row) => row.kind === "RUNNING" || row.kind === "JOB",
+                    ) ? (
+                    <QControl
+                      id="list.work-jobs"
+                      kind="LIST"
+                      count={
+                        rows.filter(
+                          (row) => row.kind === "RUNNING" || row.kind === "JOB",
+                        ).length
+                      }
+                    >
+                      {rows.flatMap((row) =>
+                        row.kind === "RUNNING"
                           ? [
                               rowButton(
                                 row,
                                 <>
                                   <span className="mx-1">
-                                    <StepMark state="now" />
+                                    <StepMark
+                                      state={
+                                        row.item.run?.state === "PAUSED"
+                                          ? "next"
+                                          : "now"
+                                      }
+                                    />
                                   </span>
                                   <span className="cq-wk-qbody">
-                                    <b>{t(row.item.job.goal)}</b>
+                                    <b>{t(runningGoal(row.item))}</b>
                                     <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                                      {t(jobLine(row.item.job).state)}
+                                      {t(runningLine(row.item))}
                                     </span>
-                                    {/* live7: a running plan's own steps,
-                                        from the server's job record (one row
-                                        per plan, at every width). */}
-                                    {(row.item.plan?.steps.length ?? 0) > 0 ? (
-                                      <span
-                                        className="mt-1 flex flex-col gap-0.5"
-                                        data-work-plan-steps
-                                      >
-                                        {jobPlan(row.item).steps.map((step) => (
-                                          <span
-                                            key={step.key}
-                                            className="flex items-start gap-1.5 cq-label font-normal text-(--cq-text-secondary)"
-                                            data-work-plan-step={step.state}
-                                          >
-                                            <StepMark state={step.state} />
-                                            <span>{t(step.title)}</span>
-                                          </span>
-                                        ))}
-                                      </span>
-                                    ) : null}
                                   </span>
                                 </>,
                               ),
                             ]
-                          : [],
-                    )}
-                    {stoppedJobs.length === 0 ? null : (
-                      <>
-                        <h3 className="m-0 mt-2 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
-                          {t("Stopped this week")}
-                        </h3>
-                        {stoppedJobs.map((row) =>
-                          rowButton(
-                            row,
-                            <span className="cq-wk-qbody">
-                              <b>{t(row.item.job.goal)}</b>
-                              <StatusDot
-                                tone={
-                                  row.item.job.status === "FAILED" ||
-                                  row.item.job.workState === "FAILED"
-                                    ? "failed"
-                                    : "idle"
-                                }
-                                label={t(jobLine(row.item.job).state)}
-                              />
-                            </span>,
-                          ),
-                        )}
-                      </>
-                    )}
-                  </QControl>
-                ) : (
-                  <p className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
-                    {t(
-                      "Nothing running. Give Q a task above, and it shows here as one line.",
-                    )}
-                  </p>
-                )}
-              </section>
+                          : row.kind === "JOB" && !jobLine(row.item.job).stopped
+                            ? [
+                                rowButton(
+                                  row,
+                                  <>
+                                    <span className="mx-1">
+                                      <StepMark state="now" />
+                                    </span>
+                                    <span className="cq-wk-qbody">
+                                      <b>{t(row.item.job.goal)}</b>
+                                      <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                                        {t(jobLine(row.item.job).state)}
+                                      </span>
+                                      {/* live7: a running plan's own steps,
+                                        from the server's job record (one row
+                                        per plan, at every width). */}
+                                      {(row.item.plan?.steps.length ?? 0) >
+                                      0 ? (
+                                        <span
+                                          className="mt-1 flex flex-col gap-0.5"
+                                          data-work-plan-steps
+                                        >
+                                          {jobPlan(row.item).steps.map(
+                                            (step) => (
+                                              <span
+                                                key={step.key}
+                                                className="flex items-start gap-1.5 cq-label font-normal text-(--cq-text-secondary)"
+                                                data-work-plan-step={step.state}
+                                              >
+                                                <StepMark state={step.state} />
+                                                <span>{t(step.title)}</span>
+                                              </span>
+                                            ),
+                                          )}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </>,
+                                ),
+                              ]
+                            : [],
+                      )}
+                      {stoppedJobs.length === 0 ? null : (
+                        <>
+                          <h3 className="m-0 mt-2 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
+                            {t("Stopped this week")}
+                          </h3>
+                          {stoppedJobs.map((row) =>
+                            rowButton(
+                              row,
+                              <span className="cq-wk-qbody">
+                                <b>{t(row.item.job.goal)}</b>
+                                <StatusDot
+                                  tone={
+                                    row.item.job.status === "FAILED" ||
+                                    row.item.job.workState === "FAILED"
+                                      ? "failed"
+                                      : "idle"
+                                  }
+                                  label={t(jobLine(row.item.job).state)}
+                                />
+                              </span>,
+                            ),
+                          )}
+                        </>
+                      )}
+                    </QControl>
+                  ) : (
+                    <p className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
+                      {t(
+                        "Nothing running. Give Q a task above, and it shows here as one line.",
+                      )}
+                    </p>
+                  )}
+                </section>
+              </QSection>
             </QControl>
             <QControl id="section.work-done" kind="SECTION">
-              <section
-                className="cq-wk-qgroup"
-                aria-labelledby="inbox-done"
-                data-work-done
-              >
-                <h2 id="inbox-done" className="cq-wk-qh m-0">
-                  {t("Done today")}
-                  {doneToday.length === 0 ? null : (
-                    <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                      <CountUp value={doneToday.length} />
-                    </span>
-                  )}
-                </h2>
-                {done === null ? (
-                  <p
-                    className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)"
-                    role="status"
-                  >
-                    {t("What Q did couldn’t load.")}
-                  </p>
-                ) : shownDone.length === 0 ? (
-                  <p className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
-                    {t("Nothing done yet today.")}
-                  </p>
-                ) : (
-                  shownDone.map((item) => {
-                    const row = rows.find((one) => one.key === `d:${item.id}`);
-                    if (row === undefined) return null;
-                    return rowButton(
-                      row,
-                      <>
-                        <span className="mx-1">
-                          <StepMark state="done" />
-                        </span>
-                        <span className="cq-wk-qbody">
-                          <b>{t(item.words)}</b>
-                          <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                            {t(whenWords(item.at, now))}
-                          </span>
-                        </span>
-                      </>,
-                    );
-                  })
-                )}
-                {allDone || doneItems.length <= shownDone.length ? null : (
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center px-2.5 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-                    onClick={() => setAllDone(true)}
-                  >
-                    {t(
-                      `Earlier this week, ${String(doneItems.length - shownDone.length)}`,
+              <QSection id="done" kind="WORK_LIST" label={t("Done")}>
+                <section
+                  className="cq-wk-qgroup"
+                  aria-labelledby="inbox-done"
+                  data-work-done
+                >
+                  <h2 id="inbox-done" className="cq-wk-qh m-0">
+                    {t("Done today")}
+                    {doneToday.length === 0 ? null : (
+                      <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                        <CountUp value={doneToday.length} />
+                      </span>
                     )}
-                  </button>
-                )}
-              </section>
+                  </h2>
+                  {done === null ? (
+                    <p
+                      className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)"
+                      role="status"
+                    >
+                      {t("What Q did couldn’t load.")}
+                    </p>
+                  ) : shownDone.length === 0 ? (
+                    <p className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
+                      {t("Nothing done yet today.")}
+                    </p>
+                  ) : (
+                    shownDone.map((item) => {
+                      const row = rows.find(
+                        (one) => one.key === `d:${item.id}`,
+                      );
+                      if (row === undefined) return null;
+                      return rowButton(
+                        row,
+                        <>
+                          <span className="mx-1">
+                            <StepMark state="done" />
+                          </span>
+                          <span className="cq-wk-qbody">
+                            <b>{t(item.words)}</b>
+                            <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                              {t(whenWords(item.at, now))}
+                            </span>
+                          </span>
+                        </>,
+                      );
+                    })
+                  )}
+                  {allDone || doneItems.length <= shownDone.length ? null : (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center px-2.5 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+                      onClick={() => setAllDone(true)}
+                    >
+                      {t(
+                        `Earlier this week, ${String(doneItems.length - shownDone.length)}`,
+                      )}
+                    </button>
+                  )}
+                </section>
+              </QSection>
             </QControl>
           </div>
         </QControl>

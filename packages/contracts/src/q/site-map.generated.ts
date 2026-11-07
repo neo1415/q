@@ -2669,34 +2669,10 @@ export const Q_SITE_MAP: QSiteMap = {
       audience: "ANY",
       params: [],
       shows: ["WORK_ITEM"],
-      destinations: ["WORK"],
+      destinations: ["WORK", "WORK_NEEDS", "WORK_PROGRESS", "WORK_DONE"],
       recordPages: [],
       settingsSections: [],
       tabs: [
-        {
-          id: "needs",
-          title: "Needs you",
-          href: "/work?view=needs",
-          destinations: ["WORK_NEEDS"],
-          subs: [],
-          purpose: "what waits for you to decide or do",
-        },
-        {
-          id: "progress",
-          title: "In progress",
-          href: "/work?view=progress",
-          destinations: ["WORK_PROGRESS"],
-          subs: [],
-          purpose: "what Q is doing right now",
-        },
-        {
-          id: "done",
-          title: "Done",
-          href: "/work?view=done",
-          destinations: ["WORK_DONE"],
-          subs: [],
-          purpose: "what Q finished",
-        },
         {
           id: "team",
           title: "Q's team",
@@ -2715,6 +2691,24 @@ export const Q_SITE_MAP: QSiteMap = {
         },
       ],
       sections: [
+        {
+          id: "needs",
+          title: "Needs you",
+          kind: "WORK_LIST",
+          purpose: "what waits for you to decide or do",
+        },
+        {
+          id: "progress",
+          title: "In progress",
+          kind: "WORK_LIST",
+          purpose: "what Q is doing right now",
+        },
+        {
+          id: "done",
+          title: "Done",
+          kind: "WORK_LIST",
+          purpose: "what Q finished",
+        },
         {
           id: "work",
           title: "Q's work",

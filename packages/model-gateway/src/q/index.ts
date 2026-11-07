@@ -12192,6 +12192,8 @@ export {
   resolveNavigationPlaceWith,
   resolveAlternative,
   NAVIGATION_DECISION_REASONING,
+  NAVIGATION_VOTES,
+  voteNavigation,
   NAVIGATION_DECISION_TASK_CLASS,
   navigateTargetFromPath,
   navigationPaneFromWorkspace,

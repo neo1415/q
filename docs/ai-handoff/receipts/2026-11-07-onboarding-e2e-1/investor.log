@@ -1,0 +1,21 @@
+account e2e-inv-202611071332-xnac@fictional.capitalq.local
+FAIL J1 one introduction on opening — 0 "I'm Q" lines
+FAIL J1 one dense line answers several topics
+NOTE J1 Q's next question (judge: conversational, not a label) — 
+NOTE J3 Q's reply to an optional skip and a required refusal — 
+FAIL J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What's your firm's website?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Fintech, Clean Energy, and West Africa are saved for Kestrel Bay Capital. Are you actively writing cheques at the moment,
+FAIL J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /discover
+NOTE J5 Q on return — 
+PASS J5 no new introduction on return
+FAIL J5 the same open question is picked up
+PASS J5 form continue later matches the conversation's destination (P2-1) — /discover
+PASS J5 the form reopens on the same step — How do you invest? / How do you invest?
+FAIL J6 finish lands on verification — /onboarding/investor
+PASS J7 the edit waits for approval
+FAIL J7 the change shows on the page
+7 FAIL; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/onb-e2e/investor-1440

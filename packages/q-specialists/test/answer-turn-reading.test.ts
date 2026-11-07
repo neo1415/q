@@ -891,7 +891,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
               place: {
                 route: "/work",
                 record: null,
-                tab: "needs",
+                tab: "team",
                 document: null,
                 slide: null,
                 sectionId: null,
@@ -926,11 +926,12 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       pageMoves: pageMoves(),
     });
     expect((await on.answer.answer(request(WORKSPACE))).kind).toBe("ANSWERED");
-    expect(decided).toEqual(["Stay here"]);
+    // Decision 78: the decision is sampled three times, in parallel.
+    expect(decided).toEqual(["Stay here", "Stay here", "Stay here"]);
     expect(on.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
-        intent: { kind: "NAVIGATE", destination: "WORK_NEEDS" },
+        intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
       },
     ]);
     // "Yes, open it" is code's own move: one move per turn, code's.

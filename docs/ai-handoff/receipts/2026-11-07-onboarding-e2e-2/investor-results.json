@@ -1,0 +1,127 @@
+{
+  "email": "e2e-inv-202611071407-rwkv@fictional.capitalq.local",
+  "journey": "investor",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": true,
+      "detail": "1 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": true,
+      "detail": "I0.investor_type, I0.organisation_name, I1.mandate_context, I2.stages, I2.currency, I2.cheque_min, I2.cheque_max"
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": "Understood — Kestrel Bay Capital is a venture capital fund, actively deploying $100,000–$500,000 in US dollars at pre-seed and seed. You can skip either of these if you prefer: what’s the fund’s websi"
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": "Noted — we’ll leave geography and founder outreach preferences for later. Before moving on, do you want to share Kestrel Bay Capital’s website and your role there, or skip either one?"
+    },
+    {
+      "journey": "J3",
+      "name": "stored for I10.inbound_preference",
+      "ok": null,
+      "detail": "null"
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": false,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. What's your firm's website?"
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Fintech, Clean Energy and West Africa are saved for Kestrel Bay Capital. Are you actively writing cheques at the moment, "
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/discover"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": "Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Are you actively writing cheques at the moment, or being more selective right now? And when I show you companies, should "
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": true,
+      "detail": "before: elective right now? And when I show you companies, should I stay close to this mandate or include a few just outside it? | after: Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Are you actively writing cheques at the moment, or being more selective right now"
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/discover"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "How do you invest? / How do you invest?"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": false,
+      "detail": "/onboarding/investor"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": false,
+      "detail": ""
+    }
+  ]
+}

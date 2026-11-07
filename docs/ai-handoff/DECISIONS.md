@@ -316,3 +316,13 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **Investability:** show its parts (Business Quality and Readiness) separately, with plain names and one short sentence each, no jargon, under the headline number.
     - **Q Pitch:** the demo should stay consistent with the product's own score rules, so the story card follows the same band cap.
     - **SB_KEY:** the owner permits fetching the Supabase keys with the management token, for creating fictional test accounts only. Never printed or committed.
+79. **Mandatory onboarding fields approved; Q stops advertising "optional"** (owner, 7 Nov 2026 ~14:30 UTC).
+    - The proposed mandatory list (ONBOARDING-TEST-PLAN.md §8, W5 fix/onboarding-2 4f2dc55aa) is approved, together with the integration owner's recommendations:
+      - the deck is encouraged but not blocking;
+      - website is required, and "no website yet" counts as unknown;
+      - the founder's role is enough;
+      - add the investor's HQ country;
+      - every mandatory step offers an unknown answer;
+      - discovery mode is optional.
+    - Additionally, **every field that appears on the profile is mandatory**. The profile must not show fields onboarding never asked. "I don't know" is still accepted and recorded as unknown (DECISIONS 78).
+    - **Q does not keep telling people that something is optional or can be skipped.** It asks naturally. Optionality is for Q's logic, not for the person. Q accepts a skip or "I don't know" when it is offered.

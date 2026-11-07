@@ -159,7 +159,12 @@ function destinations(cases: CaseSet): void {
     const bank = def[split];
     for (const side of def.sides) {
       const { move } = decide(side);
-      const target = dest(def.page);
+      const target =
+        def.folded === null
+          ? dest(def.page)
+          : def.folded.sectionId === null
+            ? dest(def.folded.page)
+            : section(def.folded.page, def.folded.sectionId);
       // Asked from somewhere else (from HOME, unless it is HOME).
       const from = {
         context: context({
