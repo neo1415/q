@@ -50,6 +50,34 @@ export const QControlStateSchema = z.enum(Q_CONTROL_STATES);
 /** Bound on a tab's visible name in the manifest. */
 export const Q_CONTROL_LABEL_MAX = 48;
 
+/** Bounds on a page action's description in the manifest (R4). */
+export const Q_CONTROL_ACTION_SUMMARY_MAX = 160;
+export const Q_CONTROL_ACTION_ITEMS_MAX = 8;
+export const Q_CONTROL_ACTION_ITEM_MAX = 300;
+
+/**
+ * R4 (owner live test 2026-11-07, page awareness): what a consequential
+ * control on the page would do, so Q uses the page's own action when the
+ * request is that action, never a parallel one of its own. Written by the
+ * page's code from what the person is already shown (its summary, and the
+ * exact items it would carry: the questions it would send); never by a
+ * model. The approval class is the page's own, and acting still goes
+ * through it: an APPROVAL action is only prepared for the person's yes.
+ */
+export const QManifestControlActionSchema = z
+  .object({
+    approval: z.enum(["CONFIRM", "APPROVAL"]),
+    summary: z.string().trim().min(1).max(Q_CONTROL_ACTION_SUMMARY_MAX),
+    items: z
+      .array(z.string().trim().min(1).max(Q_CONTROL_ACTION_ITEM_MAX))
+      .max(Q_CONTROL_ACTION_ITEMS_MAX)
+      .optional(),
+  })
+  .strict();
+export type QManifestControlAction = z.infer<
+  typeof QManifestControlActionSchema
+>;
+
 export const QManifestControlSchema = z
   .object({
     id: QControlIdSchema,
@@ -71,6 +99,8 @@ export const QManifestControlSchema = z
       .max(Q_CONTROL_LABEL_MAX)
       .regex(/^[\p{L}\p{M}][\p{L}\p{M} &'’-]*$/u)
       .optional(),
+    /** A consequential control: what it would do, in the page's words. */
+    action: QManifestControlActionSchema.optional(),
   })
   .strict();
 export type QManifestControl = z.infer<typeof QManifestControlSchema>;

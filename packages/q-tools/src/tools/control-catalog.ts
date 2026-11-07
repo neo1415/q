@@ -46,6 +46,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "button.relationship-resume", kind: "BUTTON" },
   { id: "button.reminder-set", kind: "BUTTON" },
   { id: "button.schedule-find", kind: "BUTTON" },
+  { id: "button.send-questions", kind: "BUTTON" },
   { id: "button.team-invite", kind: "BUTTON" },
   { id: "carousel.feed", kind: "CAROUSEL" },
   { id: "dialog.book-call", kind: "DIALOG" },

@@ -2,6 +2,7 @@ import type { ApprovalAction, ApprovalClass } from "./approval";
 import type {
   QControlKind,
   QManifestControl,
+  QManifestControlAction,
   QUiAct,
   QUiActIntent,
   QUiActReceipt,
@@ -16,7 +17,9 @@ import type {
  * each time it is asked for, so registering adds no second state model and
  * cannot drift from what assistive technology announces. Only ids, kinds,
  * states and list sizes leave the browser (q.screen.v2); labels never do,
- * except a tab's own visible name, letters only (`tabLabel`).
+ * except a tab's own visible name, letters only (`tabLabel`), and (R4) a
+ * consequential control's own summary and the items it would carry,
+ * written by the page's code (`actionOf`).
  *
  * W7: no runtime import from the contracts package (it would load with
  * the first paint). The id rule and the bound below are the contract's
@@ -400,10 +403,47 @@ const KIND_RANK: Readonly<Record<QControlKind, number>> = {
   LIST_ITEM: 11,
 };
 
+const ACTION_SUMMARY_MAX = 160;
+const ACTION_ITEMS_MAX = 8;
+const ACTION_ITEM_MAX = 300;
+
+/**
+ * R4 (owner live test 2026-11-07): what a consequential control would do,
+ * in the page's own words, so Q uses the page's action when the request is
+ * that action instead of composing a parallel one. Only for a control the
+ * page classed APPROVAL with something prepared (a CONFIRM control's
+ * summary is a generic default unless the page wrote one); the summary and
+ * items are what the person is already shown, bounded. Never authority:
+ * acting still goes through the control's own approval class.
+ */
+function actionOf(entry: ControlEntry): QManifestControlAction | undefined {
+  try {
+    if (entry.approval === "APPROVAL" && entry.action !== undefined) {
+      const payload = entry.action.prepare();
+      if (payload === null) return undefined;
+      const summary = entry.action.summary(payload).trim();
+      if (summary.length === 0) return undefined;
+      const items = (entry.action.items?.(payload) ?? [])
+        .map((item) => item.trim().slice(0, ACTION_ITEM_MAX))
+        .filter((item) => item.length > 0)
+        .slice(0, ACTION_ITEMS_MAX);
+      return {
+        approval: "APPROVAL",
+        summary: summary.slice(0, ACTION_SUMMARY_MAX),
+        ...(items.length === 0 ? {} : { items }),
+      };
+    }
+  } catch {
+    // A page's summary that throws describes nothing; the control stays.
+  }
+  return undefined;
+}
+
 /**
  * What travels in the manifest's `controls`: every mounted, visible
  * control (an open dialog first, then tabs, sections, lists, the rest),
- * bounded to the contract's maximum. Ids, kinds, states and counts only.
+ * bounded to the contract's maximum. Ids, kinds, states and counts, and
+ * (R4) a consequential control's own summary and items.
  */
 export function manifestControls(): QManifestControl[] {
   const out: { readonly control: QManifestControl; readonly rank: number }[] =
@@ -422,6 +462,7 @@ export function manifestControls(): QManifestControl[] {
       entry.kind === "TAB"
         ? tabLabel(stateElement(entry.kind, element))
         : undefined;
+    const action = actionOf(entry);
     out.push({
       control: {
         id: entry.id,
@@ -429,6 +470,7 @@ export function manifestControls(): QManifestControl[] {
         ...(state === undefined ? {} : { state }),
         ...(count === undefined ? {} : { count }),
         ...(label === undefined ? {} : { label }),
+        ...(action === undefined ? {} : { action }),
       },
       rank: KIND_RANK[entry.kind] * 1_000_000 + entry.order,
     });

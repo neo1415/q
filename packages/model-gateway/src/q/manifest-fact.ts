@@ -417,6 +417,45 @@ export function controlsLine(
   return `${line}.`;
 }
 
+/** Bound on the page-actions line (R4). */
+const PAGE_ACTIONS_CHARS = 2_400;
+
+/**
+ * R4 (owner live test 2026-11-07): the page's own consequential actions,
+ * with what each would carry, and the rule that Q uses them. On Spheros's
+ * page the next step was "Send 3 questions to Kathryn Outlaw"; asked to
+ * "send those questions to kathryn", Q drafted four of its own as a
+ * message and then a request: two parallel approvals, neither the page's.
+ * The summary and items are the page code's words for what the person is
+ * already shown; acting still goes through the page's own approval.
+ */
+export function pageActionsLine(
+  controls: NonNullable<QPageManifest["controls"]>,
+): string | null {
+  const acting = controls.filter((control) => control.action !== undefined);
+  if (acting.length === 0) return null;
+  const described = acting.map((control) => {
+    const action = control.action;
+    if (action === undefined) return "";
+    const items =
+      action.items === undefined || action.items.length === 0
+        ? ""
+        : `: ${action.items.map((item, index) => `(${String(index + 1)}) ${item}`).join(" ")}`;
+    return `${control.id} [${action.approval === "APPROVAL" ? "prepared for their approval" : "after their one tap"}] "${action.summary}"${items}`;
+  });
+  let line =
+    "- The page's own actions. When what they ask is what one of these does (the same thing to the same person), operate it with operate_screen ACTIVATE by its id, so the page prepares its own action with exactly these contents for their approval, and say what it holds. Never draft your own message, request or questions for it in its place, and never prepare a second one beside it: ";
+  for (const [index, one] of described.entries()) {
+    const next = `${index === 0 ? "" : "; "}${one}`;
+    if (line.length + next.length > PAGE_ACTIONS_CHARS) {
+      line += `; and ${String(described.length - index)} more`;
+      break;
+    }
+    line += next;
+  }
+  return `${line}.`;
+}
+
 const NOTICE_KIND_WORDS: Readonly<Record<QManifestNoticeKind, string>> = {
   ERROR: "an error message",
   EMPTY: "an empty state (nothing to show yet)",
@@ -562,6 +601,8 @@ export function manifestFacts(
   // operate_screen accepts. Semantic ids and closed kinds only.
   const controls = controlsLine(manifest.controls ?? []);
   if (controls !== null) parts.push(controls);
+  const pageActions = pageActionsLine(manifest.controls ?? []);
+  if (pageActions !== null) parts.push(pageActions);
   if (manifest.media !== undefined) {
     parts.push(mediaLine(manifest.media, results));
   }
