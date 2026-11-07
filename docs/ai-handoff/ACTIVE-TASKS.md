@@ -1,5 +1,20 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 7 November 2026, 09:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: batch 2 `64d51b965` (rollback `f3b0d9847`), hosted migrations 285, `CQ_WORKSPACE_MODE` off. Decisions in force: 75 (q-nav understands people's own words; 98% is the aim, 95–97% is acceptable for the MVP), 76 (metric methods from research with no caveat spam; PADL #046 flagged), 77 (onboarding as a real conversation, fixing what exists).
+
+| Lane            | Session                          | State                                                                                                                                                                                                    |
+| --------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| W4 navigation   | session_01Wncmn4BQnwUu8PoUpcMjfu | D75 dev: r1 84.6% move-target / 1.0% wrong-page; r2 93.8 / 0.8; r3 91.8 / 0.4. **r4 on 44a79ef running now, then the sealed held-out once** (on r4 if its wrong-page ≤0.5%, else on r3 9d9207f)          |
+| W2 site map     | session_01Wncmn4SKUdLWXcpXd7KKVm | Purposes for D75 merged (d671242, e0afc1b, a4e3c5d, 331c3c2). Next: /work needs/progress/done as one scroll (hold until held-out is done)                                                                |
+| W3 contracts    | session_01Wncmn6yZzXx1xtFxaXwp9b | Deal tab f8b83c1 merged. Idle                                                                                                                                                                            |
+| W5 → onboarding | session_01Wncmn7LanmxRBs1Eoe8por | Plan merged (ONBOARDING-TEST-PLAN.md). Fixing on fix/onboarding: P0 chat→voice re-greet, required re-ask with reason, research failures logged, worker SERP key; then the P1s. Owner D-OWN-1/2/3 pending |
+| Metrics         | session_01Wncmn6n2wuJcJPM1ZeWXX3 | fix/metrics-p0 Day 1 e339746 done; Day 2 amended (one compact confidence line, no caveat spam). Then the research, METRICS-METHODS.md and method v-next (fix/metrics-methods)                            |
+| W1 shell        | session_01Wncmn4AftvVnCCbs7qHobz | Idle until labs                                                                                                                                                                                          |
+
+Batch 3 (assembling on integration): W4 dataset fix and v8, W2 purposes, W3 deal tab, metrics P0 (Days 1 and 2), onboarding P0. Anthropic test spend is about $21.8 of $50 (r4 plus held-out add about $3.5).
+
 ## Live board — 7 November 2026, 05:40 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: **batch 2 `64d51b965`** on all four services (06:23, CI 42344043063 green; live-checked as investor and founder at 07:05, /analytics live). Rollback `f3b0d9847`. Hosted migrations **285** (400000, 410000). Batch 1 `f3b0d9847` went live at 05:21. **DECISIONS 75:** q-nav pushes on (W4: v5 and a fresh held-out set; W2: purposes); batch 3 = the W4 dataset fix 6b19ffdc6 plus that work. `CQ_WORKSPACE_MODE` unset (off); `CQ_Q_NAV_MOVES_ALLOWED` unset (Q offers, never moves).
