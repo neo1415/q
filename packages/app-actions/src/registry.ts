@@ -38,6 +38,7 @@ import {
 import { READINESS_ACTIONS } from "./actions/readiness.js";
 import { INVESTOR_PROMISE_ACTIONS } from "./actions/investor-promises.js";
 import { DEAL_CLOSE_ACTIONS } from "./actions/deal-close.js";
+import { ENGAGEMENT_ACTIONS } from "./actions/engagement.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -47,6 +48,7 @@ import { DEAL_CLOSE_ACTIONS } from "./actions/deal-close.js";
 export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   SET_PITCH_SHARING,
   ...DISCOVERY_DECISIONS,
+  ...ENGAGEMENT_ACTIONS,
   ...PROFILE_AND_RECORDS,
   ...CAPITAL_ACTIONS,
   ...COMMITMENT_ACTIONS,

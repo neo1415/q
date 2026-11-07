@@ -1,96 +1,56 @@
 -- Q Workspace §8 A2 + A3 · the founder-facing engagement projection.
 --
--- The ONLY way a company's team reads engagement. Identity is redacted here,
--- in SQL, so no application code path can obtain an identity the viewer did
--- not allow (Product Specification §6.7.13):
+-- The ONLY way a company's team reads passive engagement. Every identity,
+-- floor and batching decision is made here, in SQL, from the admin settings
+-- (analytics.settings()), so no application path can show more than the
+-- settings and each viewer allow (Product Specification §6.7.12-6.7.14;
+-- owner decisions 6 Nov 2026, DECISIONS 72/74).
 --
---   FULL_IDENTITY       person and organisation, one row per person
---   ORGANISATION_ONLY   organisation only, one row per organisation (people
---                       merged, so row counts cannot reveal individuals)
---   ANONYMOUS           one merged row with no identity and no timestamp
+-- A viewer's OWN level is the more private of the level stamped when they
+-- viewed and their current one. What the founder is SHOWN:
 --
--- What the founder is SHOWN also follows the admin settings in
--- analytics.platform_settings (spec defaults: named passive viewers OFF, so a
--- Full identity viewer appears as their organisation; paid reveal OFF;
--- overriding Anonymous NO; per-person time OFF).
+--   entitled founder (paid reveal ON and the plan includes
+--   analytics.identity_reveal), or named_passive_viewers ON:
+--     FULL_IDENTITY       by name, one row per person
+--     ORGANISATION_ONLY   by organisation, people merged
+--     ANONYMOUS           "an investor": merged, no organisation, no time
+--   otherwise (a free plan): one merged AGGREGATE row, no identity at all.
 --
--- The effective level is the MORE PRIVATE of the level stamped when the view
--- happened and the viewer's current setting.
+--   Only paid_reveal_overrides_anonymous (OFF, locked) ever names an
+--   Anonymous viewer, and only to an entitled founder (basis PAID_REVEAL).
 --
--- Passive aggregates appear only when at least analytics.engagement_floor()
--- distinct organisations engaged in the window (the Results page's floor).
--- Named rows appear because the viewer chose to be named; the anonymous
--- bucket appears only when it spans the floor itself.
+-- Floors: no passive total below headline_floor distinct organisations
+-- (min 3); no breakdown slice below slice_floor (min 5), with complementary
+-- suppression. Merged rows need the headline floor themselves.
+-- Batching: passive figures cover completed periods only (WEEKLY by
+-- default) and carry the period, never a per-view time.
 --
--- Viewing is not contact permission (§6.7.14): nothing here returns a way
--- to reach a viewer, and the company's own team is never counted.
+-- Viewing is not contact permission (§6.7.14): nothing here returns a way to
+-- reach a viewer, and the company's own team is never counted.
 --
--- Two layers of functions:
---   analytics.company_engagement_*(p_actor_user_id, ...)   server only; the
---     API passes the actor it resolved. Not executable by any client role.
---   analytics.my_company_engagement_*(...)                 authenticated;
---     the actor is always private.current_app_user_id(), never an argument.
--- Both check an ACTIVE membership of the company's organisation and return
--- nothing otherwise, the same as for a company that does not exist.
+-- Two layers:
+--   analytics.company_*(p_actor_user_id, ...)   server only; the API passes
+--     the actor it resolved. Not executable by any client role.
+--   analytics.my_company_*(...)                 authenticated; the actor is
+--     always private.current_app_user_id(), never an argument.
+-- Both require an ACTIVE membership of the company's organisation and
+-- return nothing otherwise, the same as for a company that does not exist.
 
 -- ---------------------------------------------------------------------------
--- Helpers.
+-- Paid identity reveal: a founder plan feature (subscription, not credits).
+-- Founder Pro includes it; Free and Launch do not; investor plans never do,
+-- because investors never pay for visibility or anonymity.
 -- ---------------------------------------------------------------------------
 
-create function analytics.visibility_rank(p_visibility text)
-  returns integer
-  language sql
-  immutable
-  set search_path = ''
-as $$
-  select case p_visibility
-    when 'FULL_IDENTITY' then 0
-    when 'ORGANISATION_ONLY' then 1
-    else 2 -- ANONYMOUS, and anything unrecognised fails private
-  end
-$$;
-revoke all on function analytics.visibility_rank(text) from public;
-
--- The k-anonymity floor for founder-facing passive figures, the same 3 the
--- Results page already uses (packages/results ENGAGEMENT_FLOOR): below 3
--- distinct viewing organisations in the window, aggregates are withheld,
--- because with one or two a count IS a person. One value, here.
-create function analytics.engagement_floor()
-  returns integer
-  language sql
-  immutable
-  set search_path = ''
-as $$ select 3 $$;
-revoke all on function analytics.engagement_floor() from public;
-grant execute on function analytics.engagement_floor() to authenticated;
-
-create function analytics.may_read_company_engagement(p_actor_user_id uuid, p_company_id uuid)
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = ''
-as $$
-  select p_actor_user_id is not null and exists (
-    select 1
-    from core.companies c
-    join identity.organisation_memberships m
-      on m.organisation_id = c.organisation_id
-     and m.tenant_id = c.tenant_id
-    where c.id = p_company_id
-      and m.user_id = p_actor_user_id
-      and m.membership_status = 'active'
-  )
-$$;
-revoke all on function analytics.may_read_company_engagement(uuid, uuid) from public, anon, authenticated;
-
--- Paid identity reveal is a plan feature (owner, 6 Nov 2026), off in every
--- plan until billing includes it, and inert unless the admin setting
--- paid_identity_reveal is also on.
 insert into billing.features (key, name, description, kind, unit_singular, unit_plural) values
-  ('analytics.identity_reveal', 'Viewer identity reveal',
-   'See the people behind views of your company where the platform allows it. Never overrides an investor''s Anonymous choice unless the platform explicitly allows that.',
+  ('analytics.identity_reveal', 'Viewer identity',
+   'See who viewed your company at the level each investor chose: their name, their organisation, or "an investor". Never reveals an investor who chose to be anonymous.',
    'ACCESS', 'reveal', 'reveals');
+
+insert into billing.plan_features (plan_id, feature_key, included)
+select p.id, 'analytics.identity_reveal', p.key = 'founder_pro'
+  from billing.plans p
+ where p.key in ('founder_pro', 'free', 'launch', 'investor_pro', 'fund');
 
 -- The same resolution the billing entitlement service uses: the account's
 -- current plan (or the launch default), plus any live override.
@@ -130,15 +90,109 @@ as $$
 $$;
 revoke all on function analytics.organisation_has_identity_reveal(uuid) from public, anon, authenticated;
 
--- Events about one company from outside its own team. Each carries:
---   effective_visibility  the viewer's own level: the more private of the
---                         level at view time and their current one;
---   display_visibility    what the founder is shown, after the admin
---                         settings (named_passive_viewers, paid reveal);
---   basis                 VIEWER_CHOICE, or PAID_REVEAL where the display is
---                         less private than the viewer's own level.
--- Anonymous stays anonymous unless paid reveal is on, the company is
--- entitled to it AND the admin allowed overriding Anonymous.
+-- ---------------------------------------------------------------------------
+-- Helpers.
+-- ---------------------------------------------------------------------------
+
+create function analytics.visibility_rank(p_visibility text)
+  returns integer
+  language sql
+  immutable
+  set search_path = ''
+as $$
+  select case p_visibility
+    when 'FULL_IDENTITY' then 0
+    when 'ORGANISATION_ONLY' then 1
+    else 2 -- ANONYMOUS, and anything unrecognised fails private
+  end
+$$;
+revoke all on function analytics.visibility_rank(text) from public;
+
+-- The floors, from the admin settings (never below 3 and 5: the table
+-- constraints hold them, and so does greatest() here).
+create function analytics.engagement_floor()
+  returns integer
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$ select greatest(3, coalesce((analytics.settings()).headline_floor, 3)) $$;
+revoke all on function analytics.engagement_floor() from public;
+grant execute on function analytics.engagement_floor() to authenticated;
+
+create function analytics.slice_floor()
+  returns integer
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$ select greatest(5, coalesce((analytics.settings()).slice_floor, 5)) $$;
+revoke all on function analytics.slice_floor() from public;
+grant execute on function analytics.slice_floor() to authenticated;
+
+-- The batch unit: passive figures stop at the start of the current batch.
+create function analytics.passive_period_unit()
+  returns text
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$ select case (analytics.settings()).passive_batch when 'DAILY' then 'day' else 'week' end $$;
+revoke all on function analytics.passive_period_unit() from public;
+
+create function analytics.may_read_company_engagement(p_actor_user_id uuid, p_company_id uuid)
+  returns boolean
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  select p_actor_user_id is not null and exists (
+    select 1
+    from core.companies c
+    join identity.organisation_memberships m
+      on m.organisation_id = c.organisation_id
+     and m.tenant_id = c.tenant_id
+    where c.id = p_company_id
+      and m.user_id = p_actor_user_id
+      and m.membership_status = 'active'
+  )
+$$;
+revoke all on function analytics.may_read_company_engagement(uuid, uuid) from public, anon, authenticated;
+
+-- Whether this company's founders see per-viewer rows, and why.
+create function analytics.company_viewer_access(p_actor_user_id uuid, p_company_id uuid)
+  returns table (per_viewer boolean, entitled boolean, override_anonymous boolean)
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  select
+    (r.reveal or st.named_passive_viewers),
+    r.reveal,
+    (r.reveal and st.paid_reveal_overrides_anonymous)
+  from core.companies c
+  cross join analytics.settings() st
+  cross join lateral (
+    select st.paid_identity_reveal and analytics.organisation_has_identity_reveal(c.organisation_id) as reveal
+  ) r
+  where c.id = p_company_id
+    and analytics.may_read_company_engagement(p_actor_user_id, p_company_id)
+$$;
+revoke all on function analytics.company_viewer_access(uuid, uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Passive events about one company from outside its own team, in completed
+-- batches only, each with:
+--   effective_visibility  the viewer's own level;
+--   display_visibility    what the founder is shown (AGGREGATE for a founder
+--                         without per-viewer access);
+--   basis                 VIEWER_CHOICE, or PAID_REVEAL where the override
+--                         named an Anonymous viewer;
+--   period_start          the batch the view belongs to (never its time).
+-- ---------------------------------------------------------------------------
+
 create function analytics.company_external_events(p_actor_user_id uuid, p_company_id uuid, p_since timestamptz)
   returns table (
     viewer_user_id uuid,
@@ -153,7 +207,7 @@ create function analytics.company_external_events(p_actor_user_id uuid, p_compan
     duration_ms integer,
     max_position_ms integer,
     media_duration_ms integer,
-    occurred_at timestamptz
+    period_start date
   )
   language sql
   stable
@@ -161,17 +215,14 @@ create function analytics.company_external_events(p_actor_user_id uuid, p_compan
   set search_path = ''
 as $$
   with company as (
-    select c.id, c.tenant_id, c.organisation_id,
-           st.named_passive_viewers as named,
-           st.paid_reveal_overrides_anonymous as override_anonymous,
-           (st.paid_identity_reveal and analytics.organisation_has_identity_reveal(c.organisation_id)) as reveal
+    select c.id, c.tenant_id, c.organisation_id, a.per_viewer, a.override_anonymous,
+           analytics.passive_period_unit() as unit
       from core.companies c
-      cross join analytics.settings() st
+      cross join analytics.company_viewer_access(p_actor_user_id, p_company_id) a
      where c.id = p_company_id
-       and analytics.may_read_company_engagement(p_actor_user_id, p_company_id)
   ),
   levels as (
-    select e.*, company.named, company.reveal, company.override_anonymous,
+    select e.*, company.per_viewer, company.override_anonymous, company.unit,
            case greatest(
              analytics.visibility_rank(e.visibility_at_view),
              analytics.visibility_rank(coalesce(s.visibility, analytics.default_viewing_visibility())))
@@ -180,24 +231,25 @@ as $$
       join company on company.id = e.company_id and company.tenant_id = e.company_tenant_id
       left join analytics.viewing_privacy_settings s on s.user_id = e.viewer_user_id
      where e.occurred_at >= coalesce(p_since, '-infinity'::timestamptz)
+       -- Completed batches only: the current week is not shown yet.
+       and e.occurred_at < date_trunc(company.unit, now())
        and e.viewer_organisation_id <> company.organisation_id
   ),
   shown as (
     select l.*,
            case
-             when l.eff = 'ANONYMOUS' then
-               case when l.reveal and l.override_anonymous then 'FULL_IDENTITY' else 'ANONYMOUS' end
-             when l.reveal then 'FULL_IDENTITY'
-             when l.eff = 'FULL_IDENTITY' and l.named then 'FULL_IDENTITY'
-             else 'ORGANISATION_ONLY'
+             when l.eff = 'ANONYMOUS' and l.override_anonymous then 'FULL_IDENTITY'
+             when not l.per_viewer then 'AGGREGATE'
+             else l.eff
            end as display
       from levels l
   )
   select x.viewer_user_id, x.viewer_organisation_id, x.eff, x.display,
-         case when analytics.visibility_rank(x.display) < analytics.visibility_rank(x.eff)
+         case when x.eff = 'ANONYMOUS' and x.display = 'FULL_IDENTITY'
               then 'PAID_REVEAL' else 'VIEWER_CHOICE' end,
          x.engagement_type, x.document_id, x.slide_number, x.media_asset_id,
-         x.duration_ms, x.max_position_ms, x.media_duration_ms, x.occurred_at
+         x.duration_ms, x.max_position_ms, x.media_duration_ms,
+         date_trunc(x.unit, x.occurred_at)::date
     from shown x
 $$;
 revoke all on function analytics.company_external_events(uuid, uuid, timestamptz) from public, anon, authenticated;
@@ -215,12 +267,15 @@ $$;
 revoke all on function analytics.window_meets_floor(uuid, uuid, timestamptz) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- Aggregates (no identity at all), withheld below the floor.
+-- Aggregates (no identity), withheld below the headline floor.
 -- ---------------------------------------------------------------------------
 
-create function analytics.company_engagement_daily(p_actor_user_id uuid, p_company_id uuid, p_since timestamptz)
+-- One row per completed batch (week by default); a batch below the floor
+-- is withheld on its own too, since a count from one or two is a person.
+create function analytics.company_engagement_periods(p_actor_user_id uuid, p_company_id uuid, p_since timestamptz)
   returns table (
-    day date,
+    period_start date,
+    organisations integer,
     viewers integer,
     profile_views integer,
     deck_opens integer,
@@ -234,7 +289,8 @@ create function analytics.company_engagement_daily(p_actor_user_id uuid, p_compa
   set search_path = ''
 as $$
   select
-    (x.occurred_at at time zone 'UTC')::date,
+    x.period_start,
+    count(distinct x.viewer_organisation_id)::integer,
     count(distinct x.viewer_user_id)::integer,
     count(*) filter (where x.engagement_type = 'PROFILE_VIEW')::integer,
     count(*) filter (where x.engagement_type = 'DECK_OPEN')::integer,
@@ -242,14 +298,14 @@ as $$
     count(*) filter (where x.engagement_type = 'Q_CARD_VIEW')::integer,
     count(*) filter (where x.engagement_type = 'DATA_ROOM_DOCUMENT_VIEW')::integer
   from analytics.company_external_events(p_actor_user_id, p_company_id, p_since) x
-  where analytics.window_meets_floor(p_actor_user_id, p_company_id, p_since)
   group by 1
+  having count(distinct x.viewer_organisation_id) >= analytics.engagement_floor()
   order by 1
 $$;
-revoke all on function analytics.company_engagement_daily(uuid, uuid, timestamptz) from public, anon, authenticated;
+revoke all on function analytics.company_engagement_periods(uuid, uuid, timestamptz) from public, anon, authenticated;
 
 -- Deck funnel: for each slide, how many people reached it and how long they
--- stayed. "Opened" is the top of the funnel.
+-- stayed.
 create function analytics.company_deck_funnel(p_actor_user_id uuid, p_company_id uuid, p_since timestamptz)
   returns table (
     document_id uuid,
@@ -339,7 +395,69 @@ $$;
 revoke all on function analytics.company_document_views(uuid, uuid, timestamptz) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- Viewers, at the level each is shown (A2 + admin settings).
+-- Breakdowns: who viewed, by investor type and by geography. A slice needs
+-- slice_floor distinct organisations. Complementary suppression: when only
+-- one slice of a dimension is below the floor, the next-smallest is hidden
+-- too, so nothing can be found by subtraction. Hidden slices are merged into
+-- one OTHER row with no count and no name.
+-- ---------------------------------------------------------------------------
+
+create function analytics.company_engagement_slices(p_actor_user_id uuid, p_company_id uuid, p_since timestamptz)
+  returns table (
+    dimension text,
+    slice text,
+    organisations integer,
+    suppressed boolean
+  )
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  with orgs as (
+    select distinct x.viewer_organisation_id as organisation_id
+      from analytics.company_external_events(p_actor_user_id, p_company_id, p_since) x
+     where analytics.window_meets_floor(p_actor_user_id, p_company_id, p_since)
+  ),
+  attributes as (
+    select o.organisation_id,
+           coalesce(io.investor_type, 'NOT_AN_INVESTOR') as investor_type,
+           coalesce(io.hq_country, 'UNKNOWN') as geography
+      from orgs o
+      left join core.investor_organisations io on io.organisation_id = o.organisation_id
+  ),
+  cells as (
+    select 'INVESTOR_TYPE'::text as dimension, a.investor_type as slice, count(*)::integer as n
+      from attributes a group by 2
+    union all
+    select 'GEOGRAPHY', a.geography, count(*)::integer from attributes a group by 2
+  ),
+  marked as (
+    select c.*, c.n < analytics.slice_floor() as primary_hidden,
+           count(*) filter (where c.n < analytics.slice_floor()) over (partition by c.dimension) as hidden_in_dimension,
+           row_number() over (partition by c.dimension, c.n < analytics.slice_floor() order by c.n, c.slice) as rank_in_group
+      from cells c
+  ),
+  decided as (
+    select m.dimension, m.slice, m.n,
+           m.primary_hidden or (m.hidden_in_dimension = 1 and m.rank_in_group = 1) as hidden
+      from marked m
+  )
+  select r.dimension, r.slice, r.organisations, r.suppressed
+    from (
+      select d.dimension, d.slice, d.n as organisations, false as suppressed
+        from decided d where not d.hidden
+      union all
+      select d.dimension, 'OTHER', null::integer, true
+        from decided d where d.hidden
+       group by d.dimension
+    ) r
+   order by r.dimension, r.suppressed, r.organisations desc nulls last, r.slice
+$$;
+revoke all on function analytics.company_engagement_slices(uuid, uuid, timestamptz) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Viewers, at the level each is shown.
 -- ---------------------------------------------------------------------------
 
 create function analytics.company_engagement_viewers(p_actor_user_id uuid, p_company_id uuid, p_since timestamptz)
@@ -348,6 +466,7 @@ create function analytics.company_engagement_viewers(p_actor_user_id uuid, p_com
     basis text,
     viewer_user_id uuid,
     viewer_organisation_id uuid,
+    organisations integer,
     people integer,
     events integer,
     profile_views integer,
@@ -356,7 +475,7 @@ create function analytics.company_engagement_viewers(p_actor_user_id uuid, p_com
     video_watch_ms bigint,
     q_card_views integer,
     data_room_document_views integer,
-    last_viewed_at timestamptz
+    last_period_start date
   )
   language sql
   stable
@@ -371,7 +490,7 @@ as $$
       case when x.display_visibility in ('FULL_IDENTITY', 'ORGANISATION_ONLY') then x.viewer_organisation_id end as shown_org,
       x.viewer_user_id as hidden_user,
       x.viewer_organisation_id as hidden_org,
-      x.engagement_type, x.duration_ms, x.occurred_at
+      x.engagement_type, x.duration_ms, x.period_start
     from analytics.company_external_events(p_actor_user_id, p_company_id, p_since) x
   ),
   granular as (select (analytics.settings()).per_person_passive_analytics as on_)
@@ -380,6 +499,7 @@ as $$
     r.basis,
     r.shown_user,
     r.shown_org,
+    count(distinct r.hidden_org)::integer,
     count(distinct r.hidden_user)::integer,
     count(*)::integer,
     count(*) filter (where r.engagement_type = 'PROFILE_VIEW')::integer,
@@ -392,14 +512,15 @@ as $$
          then coalesce(sum(r.duration_ms) filter (where r.engagement_type = 'VIDEO_WATCH'), 0)::bigint end,
     count(*) filter (where r.engagement_type = 'Q_CARD_VIEW')::integer,
     count(*) filter (where r.engagement_type = 'DATA_ROOM_DOCUMENT_VIEW')::integer,
-    -- An anonymous bucket carries no time: a timestamp is enough to
-    -- re-identify a single quiet viewer.
-    case when r.visibility = 'ANONYMOUS' then null else max(r.occurred_at) end
+    -- Merged rows carry no period: one quiet viewer is re-identifiable by it.
+    case when r.visibility in ('ANONYMOUS', 'AGGREGATE') then null else max(r.period_start) end
   from redacted r
   group by r.visibility, r.basis, r.shown_user, r.shown_org
-  having r.visibility <> 'ANONYMOUS'
+  having r.visibility not in ('ANONYMOUS', 'AGGREGATE')
       or count(distinct r.hidden_org) >= analytics.engagement_floor()
-  order by analytics.visibility_rank(r.visibility), max(r.occurred_at) desc
+  order by case r.visibility when 'FULL_IDENTITY' then 0 when 'ORGANISATION_ONLY' then 1
+                             when 'ANONYMOUS' then 2 else 3 end,
+           max(r.period_start) desc
 $$;
 revoke all on function analytics.company_engagement_viewers(uuid, uuid, timestamptz) from public, anon, authenticated;
 
@@ -432,17 +553,18 @@ revoke all on function analytics.company_viewer_deck_detail(uuid, uuid, timestam
 -- parameter.
 -- ---------------------------------------------------------------------------
 
-create function analytics.my_company_engagement_daily(p_company_id uuid, p_since timestamptz default null)
-  returns table (day date, viewers integer, profile_views integer, deck_opens integer,
-                 video_watches integer, q_card_views integer, data_room_document_views integer)
+create function analytics.my_company_engagement_periods(p_company_id uuid, p_since timestamptz default null)
+  returns table (period_start date, organisations integer, viewers integer, profile_views integer,
+                 deck_opens integer, video_watches integer, q_card_views integer,
+                 data_room_document_views integer)
   language sql stable security definer set search_path = ''
-as $$ select * from analytics.company_engagement_daily((select private.current_app_user_id()), p_company_id, p_since) $$;
+as $$ select * from analytics.company_engagement_periods((select private.current_app_user_id()), p_company_id, p_since) $$;
 
 create function analytics.my_company_engagement_viewers(p_company_id uuid, p_since timestamptz default null)
-  returns table (visibility text, basis text, viewer_user_id uuid, viewer_organisation_id uuid, people integer,
-                 events integer, profile_views integer, deck_opens integer, total_dwell_ms bigint,
-                 video_watch_ms bigint, q_card_views integer, data_room_document_views integer,
-                 last_viewed_at timestamptz)
+  returns table (visibility text, basis text, viewer_user_id uuid, viewer_organisation_id uuid,
+                 organisations integer, people integer, events integer, profile_views integer,
+                 deck_opens integer, total_dwell_ms bigint, video_watch_ms bigint, q_card_views integer,
+                 data_room_document_views integer, last_period_start date)
   language sql stable security definer set search_path = ''
 as $$ select * from analytics.company_engagement_viewers((select private.current_app_user_id()), p_company_id, p_since) $$;
 
@@ -452,9 +574,16 @@ create function analytics.my_company_deck_funnel(p_company_id uuid, p_since time
   language sql stable security definer set search_path = ''
 as $$ select * from analytics.company_deck_funnel((select private.current_app_user_id()), p_company_id, p_since) $$;
 
-revoke all on function analytics.my_company_engagement_daily(uuid, timestamptz) from public, anon;
+create function analytics.my_company_engagement_slices(p_company_id uuid, p_since timestamptz default null)
+  returns table (dimension text, slice text, organisations integer, suppressed boolean)
+  language sql stable security definer set search_path = ''
+as $$ select * from analytics.company_engagement_slices((select private.current_app_user_id()), p_company_id, p_since) $$;
+
+revoke all on function analytics.my_company_engagement_periods(uuid, timestamptz) from public, anon;
 revoke all on function analytics.my_company_engagement_viewers(uuid, timestamptz) from public, anon;
 revoke all on function analytics.my_company_deck_funnel(uuid, timestamptz) from public, anon;
-grant execute on function analytics.my_company_engagement_daily(uuid, timestamptz) to authenticated;
+revoke all on function analytics.my_company_engagement_slices(uuid, timestamptz) from public, anon;
+grant execute on function analytics.my_company_engagement_periods(uuid, timestamptz) to authenticated;
 grant execute on function analytics.my_company_engagement_viewers(uuid, timestamptz) to authenticated;
 grant execute on function analytics.my_company_deck_funnel(uuid, timestamptz) to authenticated;
+grant execute on function analytics.my_company_engagement_slices(uuid, timestamptz) to authenticated;

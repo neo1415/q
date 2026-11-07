@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
   CompanyEngagementDtoSchema,
-  ENGAGEMENT_ORGANISATION_FLOOR,
   type CompanyEngagementDto,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
@@ -26,12 +25,6 @@ export type CompanyEngagementReader = {
   }) => Promise<CompanyEngagementDto | null>;
 };
 
-const iso = (value: unknown): string | null => {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === "string") return new Date(value).toISOString();
-  throw new TypeError("expected a timestamp");
-};
 const day = (value: unknown): string => {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === "string") return value.slice(0, 10);
@@ -48,6 +41,7 @@ const ViewerRow = z.object({
   viewer_organisation_id: z.string().nullable(),
   viewer_name: z.string().nullable(),
   organisation_name: z.string().nullable(),
+  organisations: num,
   people: num,
   events: num,
   profile_views: num,
@@ -56,7 +50,7 @@ const ViewerRow = z.object({
   video_watch_ms: nullableNum,
   q_card_views: num,
   data_room_document_views: num,
-  last_viewed_at: z.unknown(),
+  last_period_start: z.unknown(),
 });
 
 export function createPostgresCompanyEngagementReader(
@@ -64,15 +58,30 @@ export function createPostgresCompanyEngagementReader(
 ): CompanyEngagementReader {
   return {
     read: async ({ actorUserId, companyId, since }) => {
-      const [access] = await sql<{ allowed: boolean; floor_met: boolean }[]>`
+      const [access] = await sql<
+        {
+          allowed: boolean;
+          floor_met: boolean;
+          per_viewer: boolean | null;
+          entitled: boolean | null;
+          floor: number;
+          slice_floor: number;
+          batch: string;
+        }[]
+      >`
         select analytics.may_read_company_engagement(${actorUserId}::uuid, ${companyId}::uuid) as allowed,
-               analytics.window_meets_floor(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz) as floor_met`;
+               analytics.window_meets_floor(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz) as floor_met,
+               a.per_viewer, a.entitled,
+               analytics.engagement_floor() as floor, analytics.slice_floor() as slice_floor,
+               (analytics.settings()).passive_batch as batch
+          from (select 1) one
+          left join analytics.company_viewer_access(${actorUserId}::uuid, ${companyId}::uuid) a on true`;
       // Not a member, or no such company: the same answer.
       if (access?.allowed !== true) return null;
 
-      const [daily, funnel, videos, documents, viewers, detail] =
+      const [periods, funnel, videos, documents, viewers, detail, slices] =
         await Promise.all([
-          sql`select * from analytics.company_engagement_daily(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+          sql`select * from analytics.company_engagement_periods(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
           sql`select * from analytics.company_deck_funnel(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
           sql`select * from analytics.company_video_completion(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
           sql`select * from analytics.company_document_views(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
@@ -82,15 +91,21 @@ export function createPostgresCompanyEngagementReader(
               left join identity.user_profiles p on p.id = v.viewer_user_id
               left join identity.organisations o on o.id = v.viewer_organisation_id`,
           sql`select * from analytics.company_viewer_deck_detail(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+          sql`select * from analytics.company_engagement_slices(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
         ]);
 
       return CompanyEngagementDtoSchema.parse({
         companyId,
         since,
         floorMet: access.floor_met,
-        floor: ENGAGEMENT_ORGANISATION_FLOOR,
-        daily: daily.map((r) => ({
-          day: day(r["day"]),
+        floor: num.parse(access.floor),
+        sliceFloor: num.parse(access.slice_floor),
+        passiveBatch: access.batch,
+        perViewer: access.per_viewer === true,
+        entitled: access.entitled === true,
+        periods: periods.map((r) => ({
+          periodStart: day(r["period_start"]),
+          organisations: num.parse(r["organisations"]),
           viewers: num.parse(r["viewers"]),
           profileViews: num.parse(r["profile_views"]),
           deckOpens: num.parse(r["deck_opens"]),
@@ -128,6 +143,7 @@ export function createPostgresCompanyEngagementReader(
             viewerName: r.viewer_user_id === null ? null : r.viewer_name,
             organisationName:
               r.viewer_organisation_id === null ? null : r.organisation_name,
+            organisations: r.organisations,
             people: r.people,
             events: r.events,
             profileViews: r.profile_views,
@@ -136,7 +152,8 @@ export function createPostgresCompanyEngagementReader(
             videoWatchMs: r.video_watch_ms,
             qCardViews: r.q_card_views,
             dataRoomDocumentViews: r.data_room_document_views,
-            lastViewedAt: iso(r.last_viewed_at),
+            lastPeriodStart:
+              r.last_period_start === null ? null : day(r.last_period_start),
           };
         }),
         viewerDeckDetail: detail.map((r) => ({
@@ -144,6 +161,12 @@ export function createPostgresCompanyEngagementReader(
           documentId: text.parse(r["document_id"]),
           slideNumber: num.parse(r["slide_number"]),
           dwellMs: num.parse(r["dwell_ms"]),
+        })),
+        slices: slices.map((r) => ({
+          dimension: text.parse(r["dimension"]),
+          slice: text.parse(r["slice"]),
+          organisations: nullableNum.parse(r["organisations"]),
+          suppressed: z.boolean().parse(r["suppressed"]),
         })),
       });
     },

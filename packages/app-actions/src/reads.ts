@@ -51,6 +51,9 @@ export const OWN_READ_KINDS = [
   // their documents (level in words, investors with access, until when).
   "requests",
   "access",
+  // Q Workspace §8 A5: their own viewing visibility, and for a founder how
+  // investors viewed their company, at each viewer's allowed level.
+  "engagement",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -103,6 +106,12 @@ export type OwnReadPorts = AppActionPorts & {
     ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
   /** Their relationships' diligence areas, as the relationship page shows them. */
   readonly diligenceAreas?:
+    ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
+  /**
+   * Q Workspace §8 A5: viewing privacy and company engagement, already
+   * redacted by the analytics projection.
+   */
+  readonly engagement?:
     ((actor: ActorContext) => Promise<readonly OwnReadItem[]>) | undefined;
   /** Their own company's name, to name an untitled pitch video by. */
   readonly ownCompanyName?:
@@ -221,6 +230,8 @@ export async function readOwn(
       return requestItems(ports, actor);
     case "access":
       return accessItems(ports, actor);
+    case "engagement":
+      return ports.engagement === undefined ? null : ports.engagement(actor);
   }
 }
 
@@ -240,6 +251,8 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   questions: "Questions Q still wants answered",
   requests: "What investors asked them for: documents and questions",
   access: "Who can see each of their documents",
+  engagement:
+    "Their viewing visibility, and how investors viewed their company",
 };
 
 /**
@@ -253,6 +266,8 @@ const NOT_INDEXED: ReadonlySet<OwnReadKind> = new Set([
   "questions",
   // One access read per document: on demand only.
   "access",
+  // Several projection reads: on demand only.
+  "engagement",
 ]);
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

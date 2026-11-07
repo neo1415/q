@@ -397,6 +397,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/admin.ts GET ADMIN_Q_RUN_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts GET ADMIN_AUDIT_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts GET ADMIN_FLAGS_PATH": OPERATIONS_CONSOLE,
+  // Q Workspace §8: the analytics privacy settings, an operator's switch.
+  "api/http/admin.ts GET ANALYTICS_SETTINGS_PATH": OPERATIONS_CONSOLE,
+  "api/http/admin.ts PUT ANALYTICS_SETTINGS_PATH": OPERATIONS_CONSOLE,
   "api/http/admin.ts POST ADMIN_FLAG_PATH": OPERATIONS_CONSOLE,
   // P14: claims on unclaimed companies, and public company profiles.
   "api/http/admin.ts GET ADMIN_COMPANY_CLAIMS_PATH": OPERATIONS_CONSOLE,
@@ -653,6 +656,15 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/q-cards.ts GET `${PUBLIC_HANDLES_PATH}/:handle`": PUBLIC,
   "api/http/q-cards.ts GET `${PUBLIC_CARD_CODES_PATH}/:code`": PUBLIC,
 
+  // Q Workspace §8 A1: the page's batched engagement beacon (what was on
+  // screen, for how long); the person's own visibility and their company's
+  // engagement are read_my "engagement", and the visibility is set by the
+  // declared action engagement.viewing_privacy.set.
+  "api/http/engagement.ts POST ENGAGEMENT_EVENTS_PATH": exempt(
+    "observations the page reports (what was on screen and for how long), batched; never an action a person asks for",
+  ),
+  "api/http/engagement.ts GET VIEWING_PRIVACY_PATH": cap("tool.read_my"),
+  "api/http/engagement.ts GET COMPANY_ENGAGEMENT_PATH": cap("tool.read_my"),
   "api/http/recommendation-interactions.ts POST DISCOVERY_INTERACTIONS_PATH":
     exempt(
       "observations the feed reports (impressions, watch milestones); never an action a person asks for",
@@ -1086,6 +1098,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/admin/q/runs/[runId]": OPERATIONS_CONSOLE,
   "/admin/audit": OPERATIONS_CONSOLE,
   "/admin/flags": OPERATIONS_CONSOLE,
+  "/admin/analytics": OPERATIONS_CONSOLE,
   "/admin/claims": OPERATIONS_CONSOLE,
   "/admin/billing": OPERATIONS_CONSOLE,
   "/admin/email": OPERATIONS_CONSOLE,
@@ -1328,6 +1341,15 @@ const Q_STANDING_SETTINGS: ReadonlySet<string> = new Set([
  * prepares a new draft (propose_email / propose_chat_message) for its own
  * approval. Never Q's to call, so never declarable as an app action.
  */
+/**
+ * Q Workspace §8 A1: what the page reports it showed (engagement), like the
+ * feed's impressions. Not an action anyone asks for, so never a declared
+ * action; the server resolves the viewer and the database their visibility.
+ */
+const ANALYTICS_OBSERVATIONS: ReadonlySet<string> = new Set([
+  "api/http/engagement.ts POST ENGAGEMENT_EVENTS_PATH",
+]);
+
 const DRAFT_WORD_EDITS: ReadonlySet<string> = new Set([
   "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`",
   "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`",
@@ -1532,6 +1554,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_STANDING_SETTINGS.has(key) &&
         !HELD_RETRY.has(key) &&
         !DRAFT_WORD_EDITS.has(key) &&
+        !ANALYTICS_OBSERVATIONS.has(key) &&
         // A read by POST (a search with a body) changes nothing.
         !READS_BY_POST.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act

@@ -10,7 +10,6 @@ import {
   PROBLEM_CONTENT_TYPE,
   RecordEngagementBatchRequestSchema,
   RecordEngagementBatchResponseSchema,
-  UpdateViewingPrivacyRequestSchema,
   VIEWING_PRIVACY_PATH,
   ViewingPrivacyDtoSchema,
 } from "@capital-q/contracts";
@@ -85,36 +84,9 @@ export function registerEngagementRoutes(
     },
   );
 
-  app.put(
-    VIEWING_PRIVACY_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const body = UpdateViewingPrivacyRequestSchema.safeParse(request.body);
-      if (!body.success) {
-        const problem = invalid(request.id, "Choose a viewing visibility.");
-        return reply
-          .status(problem.status)
-          .type(PROBLEM_CONTENT_TYPE)
-          .send(problem);
-      }
-      const privacy = await engagement.setPrivacy(
-        getActorContext(request),
-        body.data.visibility,
-      );
-      if (privacy === "NOT_ALLOWED") {
-        const problem = invalid(
-          request.id,
-          "That visibility level is not offered on Capital Q.",
-        );
-        return reply
-          .status(problem.status)
-          .type(PROBLEM_CONTENT_TYPE)
-          .send(problem);
-      }
-      void reply.header("Cache-Control", "no-store");
-      return ViewingPrivacyDtoSchema.parse(privacy);
-    },
-  );
+  // PUT VIEWING_PRIVACY_PATH is the declared app action
+  // engagement.viewing_privacy.set (ADR 0040): one declaration for the
+  // Settings control and Q's set_viewing_privacy.
 
   /**
    * A3: the company's engagement, read by a member of its own
