@@ -39,6 +39,8 @@ import { dealDay } from "./deal-stage-strip";
 import { QCircle, QLine, RecordSheet, Tag } from "./record-parts";
 import { since } from "./relationships-view";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 
 /**
  * The Diligence tab as the CRM prototype's request checklist (diligence
@@ -1208,6 +1210,32 @@ function AskSheet({
   if (!open && opened !== null) setOpened(null);
 
   const title = (chosen ?? own).trim();
+  // W5.1b: a request reaches the company (they are told), so Q may send
+  // it only on the person's approval of exactly what is asked, and why.
+  const sendRef = useRef<HTMLSpanElement>(null);
+  useQControl({
+    id: "button.diligence-ask",
+    kind: "BUTTON",
+    ref: sendRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.diligence-ask",
+      summary: (payload) =>
+        `Ask ${counterpart} for ${String(payload["document"])}`,
+      prepare: (): ApprovalPayload | null =>
+        !open || title.length === 0
+          ? null
+          : { to: counterpart, document: title, note: note.trim() },
+      execute: async (payload, approvedKey) =>
+        (await onSend(
+          String(payload["document"]),
+          payload["note"] === "" ? null : String(payload["note"]),
+          approvedKey,
+        ))
+          ? "DONE"
+          : "FAILED",
+    },
+  });
   return (
     <RecordSheet
       open={open}
@@ -1298,15 +1326,17 @@ function AskSheet({
           className="cq-body min-h-[84px] w-full resize-y rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
         />
       </label>
-      <Button
-        variant="primary"
-        disabled={busy || title.length === 0}
-        onClick={() =>
-          void onSend(title, note.trim() === "" ? null : note.trim(), key)
-        }
-      >
-        {busy ? t("Sending…") : t("Send request")}
-      </Button>
+      <span ref={sendRef} className="contents">
+        <Button
+          variant="primary"
+          disabled={busy || title.length === 0}
+          onClick={() =>
+            void onSend(title, note.trim() === "" ? null : note.trim(), key)
+          }
+        >
+          {busy ? t("Sending…") : t("Send request")}
+        </Button>
+      </span>
     </RecordSheet>
   );
 }

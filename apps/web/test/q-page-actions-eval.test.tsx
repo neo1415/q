@@ -37,6 +37,22 @@ vi.mock("../src/features/onboarding-kit/material-actions", () => ({
   materialUploadTargetAction: vi.fn(),
 }));
 
+const findSlotsAction = vi.fn();
+const bookMeetingAction = vi.fn();
+const cancelMeetingAction = vi.fn();
+vi.mock("../src/features/schedule/schedule-actions", () => ({
+  findSlotsAction: (...args: unknown[]) => findSlotsAction(...args) as unknown,
+  bookMeetingAction: (...args: unknown[]) =>
+    bookMeetingAction(...args) as unknown,
+  cancelMeetingAction: (...args: unknown[]) =>
+    cancelMeetingAction(...args) as unknown,
+  createReminderAction: vi.fn(),
+  dismissReminderAction: vi.fn(),
+  joinCallAction: vi.fn(),
+}));
+
+const { RelationshipScheduleControls } =
+  await import("../src/features/schedule/relationship-schedule-controls");
 const { RelationshipChat } =
   await import("../src/features/chat/relationship-chat");
 const { IncomingInterest } =
@@ -73,6 +89,9 @@ beforeEach(() => {
   resetApprovals();
   resetApprovalRequests();
   sendChatMessageAction.mockReset();
+  findSlotsAction.mockReset();
+  bookMeetingAction.mockReset();
+  cancelMeetingAction.mockReset();
   stopWatching = subscribeApprovals((next) => {
     requests = next;
   });
@@ -295,6 +314,105 @@ describe("eval: Q answering an investor's interest", () => {
   });
 });
 
+describe("eval: Q finding a time and sending the invite", () => {
+  const RELATIONSHIP = "7a000000-0000-4000-8000-000000000003";
+  const SLOT = {
+    startsAt: "2026-11-10T09:00:00.000Z",
+    endsAt: "2026-11-10T09:30:00.000Z",
+  };
+  const meeting = (id: string, organisedByYou: boolean) => ({
+    id,
+    relationshipId: RELATIONSHIP,
+    purpose: "Intro call",
+    startsAt: "2099-11-12T09:00:00.000Z",
+    endsAt: "2099-11-12T09:30:00.000Z",
+    timeZone: "UTC",
+    status: "SCHEDULED" as const,
+    organisedByYou,
+    organiserName: organisedByYou ? "You" : "Brightwell",
+    meetLink: null,
+    attendees: [],
+    hasBrief: false,
+  });
+
+  it("finding times is NONE; the invite is APPROVAL on the exact time, sent once", async () => {
+    findSlotsAction.mockResolvedValue({ ok: true, value: { slots: [SLOT] } });
+    bookMeetingAction.mockResolvedValue({
+      ok: true,
+      value: { ...meeting("7f000000-0000-4000-8000-000000000001", true) },
+    });
+    await act(async () => {
+      render(
+        <RelationshipScheduleControls
+          focus="call"
+          relationshipId={RELATIONSHIP}
+          counterpart="Brightwell"
+          connected
+          initialMeetings={[]}
+          initialReminders={[]}
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(findSlotsAction).toHaveBeenCalled();
+    const { held } = await qActivates("button.meeting-book");
+    expect(held).toBe("AWAITING_APPROVAL");
+    expect(bookMeetingAction).not.toHaveBeenCalled();
+    expect(requests[0]?.payload).toMatchObject({
+      with: "Brightwell",
+      startsAt: SLOT.startsAt,
+      topic: "Call with Brightwell",
+    });
+    const id = requests[0]?.id ?? "";
+    await act(() => approveRequest(id));
+    await act(() => approveRequest(id));
+    expect(bookMeetingAction).toHaveBeenCalledTimes(1);
+    expect(bookMeetingAction.mock.calls[0]?.[0]).toMatchObject({
+      startsAt: SLOT.startsAt,
+      idempotencyKey: id,
+    });
+  });
+
+  it("cancel targets only a call the person organised, never one they were invited to", async () => {
+    findSlotsAction.mockResolvedValue({ ok: true, value: { slots: [] } });
+    render(
+      <RelationshipScheduleControls
+        relationshipId={RELATIONSHIP}
+        counterpart="Brightwell"
+        connected
+        initialMeetings={[
+          meeting("7f000000-0000-4000-8000-000000000002", false),
+        ]}
+        initialReminders={[]}
+      />,
+    );
+    const { receipt } = await qActivates("button.meeting-cancel");
+    expect(receipt.status).not.toBe("DONE");
+    expect(requests).toEqual([]);
+    expect(cancelMeetingAction).not.toHaveBeenCalled();
+  });
+
+  it("cancelling their own call is prepared for approval, never run by the act", async () => {
+    render(
+      <RelationshipScheduleControls
+        relationshipId={RELATIONSHIP}
+        counterpart="Brightwell"
+        connected
+        initialMeetings={[
+          meeting("7f000000-0000-4000-8000-000000000003", true),
+        ]}
+        initialReminders={[]}
+      />,
+    );
+    const { held } = await qActivates("button.meeting-cancel");
+    expect(held).toBe("AWAITING_APPROVAL");
+    expect(requests[0]?.payload["meeting"]).toBe(
+      "7f000000-0000-4000-8000-000000000003",
+    );
+    expect(cancelMeetingAction).not.toHaveBeenCalled();
+  });
+});
+
 describe("eval: an act cannot claim its own class", () => {
   it("an act carrying approval: NONE is not a valid act at all", async () => {
     const { QUiActIntentSchema } = await import("@capital-q/contracts");
@@ -319,7 +437,7 @@ function sources(dir: string): string[] {
   });
 }
 const CONSEQUENTIAL =
-  /(send|share|invite|accept|decline|commit|record|confirm|withdraw|adopt|pay|transfer|sign|revoke|publish|delete)/u;
+  /(send|share|invite|accept|decline|commit|record|confirm|withdraw|adopt|pay|transfer|sign|revoke|publish|delete|book|cancel|pass|ask|close)/u;
 
 describe("eval: every consequential action on every page", () => {
   const registrations: { id: string; approval: string | null }[] = [];
@@ -336,7 +454,23 @@ describe("eval: every consequential action on every page", () => {
         /\bapproval: "(NONE|CONFIRM|APPROVAL|NEVER)"/u.exec(body)?.[1] ?? null;
       registrations.push({ id, approval });
     }
+    for (const tag of source.matchAll(/<QControl\b([^>]*?)>/gsu)) {
+      const attrs = tag[1] ?? "";
+      const id = /\bid="([a-z]+\.[a-z0-9-]+)"/u.exec(attrs)?.[1];
+      if (id === undefined) continue;
+      const approval =
+        /\bapproval="(NONE|CONFIRM|APPROVAL|NEVER)"/u.exec(attrs)?.[1] ?? null;
+      registrations.push({ id, approval });
+    }
   }
+
+  it("signing and closing a deal are NEVER Q's", () => {
+    for (const id of ["button.deal-signed", "button.deal-close"]) {
+      expect(registrations.find((one) => one.id === id)?.approval, id).toBe(
+        "NEVER",
+      );
+    }
+  });
 
   it("finds the page actions", () => {
     expect(registrations.length).toBeGreaterThan(5);
@@ -347,6 +481,8 @@ describe("eval: every consequential action on every page", () => {
       (one) =>
         // "-open" only opens the form the person (or Q's approval) acts in.
         !one.id.endsWith("-open") &&
+        // View kinds (sections, tabs, lists) are NONE by nature.
+        /^(button|toggle|input|item)\./u.test(one.id) &&
         CONSEQUENTIAL.test(one.id.split(".")[1] ?? "") &&
         one.approval !== "APPROVAL" &&
         one.approval !== "NEVER",
@@ -370,6 +506,10 @@ describe("eval: every consequential action on every page", () => {
       "button.commitment-confirm",
       "button.commitment-withdraw",
       "button.commitment-adopt",
+      "button.meeting-book",
+      "button.meeting-cancel",
+      "button.diligence-ask",
+      "button.relationship-pass",
     ]) {
       expect(approval.has(id), id).toBe(true);
     }
