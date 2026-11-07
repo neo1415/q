@@ -174,6 +174,15 @@ const LISTED: Readonly<Record<string, readonly string[]>> = {
   "/settings": SETTINGS_PAGE_SECTIONS.map((section) => section.id),
 };
 
+/**
+ * A page that sends this side on to another page's view: its site-map
+ * sections may be the ones that page registers (a founder's
+ * /company/data-room opens their company's data-room tab).
+ */
+const OPENS_AS: Readonly<Record<string, string>> = {
+  "/company/data-room": "/company/[companyId]",
+};
+
 const siteMap = new Map(Q_SITE_MAP.pages.map((page) => [page.route, page]));
 
 describe("the site map covers every page, tab and section (W2.2)", () => {
@@ -204,6 +213,14 @@ describe("the site map covers every page, tab and section (W2.2)", () => {
       const entry = siteMap.get(route);
       if (entry === undefined || route.startsWith("/admin")) continue;
       const scanned = new Set(pageSectionIds(page));
+      const opensAs = OPENS_AS[route];
+      const opened = new Set(
+        opensAs === undefined
+          ? []
+          : pages
+              .filter((one) => routeOf(one) === opensAs)
+              .flatMap((one) => pageSectionIds(one)),
+      );
       const elsewhere = new Set(SCANNED_ELSEWHERE[route] ?? []);
       const listed = new Set(LISTED[route] ?? []);
       const declared = new Set(entry.sections.map((section) => section.id));
@@ -216,7 +233,7 @@ describe("the site map covers every page, tab and section (W2.2)", () => {
         }
       }
       for (const id of declared) {
-        if (!scanned.has(id) && !listed.has(id)) {
+        if (!scanned.has(id) && !listed.has(id) && !opened.has(id)) {
           problems.push(
             `${route}: site map names "${id}", the page never registers it`,
           );
