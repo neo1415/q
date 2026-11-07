@@ -3,7 +3,14 @@
 import "./answer-canvas.css";
 
 import { AnimatePresence, LazyMotion, m, useReducedMotion } from "motion/react";
-import { useSyncExternalStore, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import type {
   QAnswerCard,
@@ -86,14 +93,39 @@ function subscribeWide(onChange: () => void): () => void {
   query.addEventListener("change", onChange);
   return () => query.removeEventListener("change", onChange);
 }
-function useWideCanvas(): boolean {
-  return useSyncExternalStore(
+/** The canvas is "wide" from this many pixels of its own width. */
+const WIDE_MIN_PX = 761;
+
+/**
+ * Wide or narrow by the canvas's OWN width (R7, owner live test
+ * 2026-11-07): in the Q Workspace's 300-640 px pane on a wide screen, the
+ * viewport said "wide" and the cards were squeezed side by side until
+ * their text broke per letter. The width is read before paint and
+ * followed as the pane resizes. Where it cannot be measured (no
+ * ResizeObserver, or not laid out yet), the viewport decides, as before.
+ */
+function useWideCanvas(root: RefObject<HTMLElement | null>): boolean {
+  const viewportWide = useSyncExternalStore(
     subscribeWide,
     () =>
       typeof window.matchMedia !== "function" ||
       window.matchMedia(WIDE_QUERY).matches,
     () => true,
   );
+  const [measured, setMeasured] = useState<boolean | null>(null);
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (element === null || typeof ResizeObserver === "undefined") return;
+    const read = () => {
+      const width = element.getBoundingClientRect().width;
+      setMeasured(width > 0 ? width >= WIDE_MIN_PX : null);
+    };
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [root]);
+  return measured ?? viewportWide;
 }
 
 /** A measure's level as a shape, including a cross for a known mismatch. */
@@ -938,7 +970,8 @@ export function AnswerCanvas({
   ...actions
 }: AnswerCanvasProps) {
   const t = useT();
-  const wide = useWideCanvas();
+  const rootRef = useRef<HTMLElement>(null);
+  const wide = useWideCanvas(rootRef);
   const reduced = useReducedMotion() === true;
   // Founder P5: cards the person cleared, by voice or click, are not drawn
   // and take no space (presentation only; the answer itself is untouched).
@@ -958,6 +991,7 @@ export function AnswerCanvas({
   return (
     <LazyMotion features={loadFeatures} strict>
       <section
+        ref={rootRef}
         className="cq-ac"
         aria-label={block.title}
         data-ac-shape={block.shape}

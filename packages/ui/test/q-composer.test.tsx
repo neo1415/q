@@ -40,6 +40,31 @@ describe("QComposer, pill (the Q home, client 2026-11-05)", () => {
     expect(onSubmit).toHaveBeenCalledWith("Hi");
   });
 
+  it("is one row again once a long question is sent (R7: no tall empty box)", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(() => Promise.resolve());
+    render(
+      <QComposer variant="pill" onSubmit={onSubmit} placeholder="Ask Q" />,
+    );
+    const field = screen.getByRole("textbox", { name: "Ask Q" });
+    // A tall field, as a long question leaves it.
+    Object.defineProperty(field, "scrollHeight", {
+      configurable: true,
+      get: () =>
+        field instanceof HTMLTextAreaElement && field.value ? 120 : 0,
+    });
+    await user.type(
+      field,
+      "A long question{Shift>}{Enter}{/Shift}over two lines",
+    );
+    expect((field as HTMLTextAreaElement).style.height).toBe("120px");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect((field as HTMLTextAreaElement).value).toBe("");
+    // No inline height left from the long question: the class's one row.
+    expect((field as HTMLTextAreaElement).style.height).toBe("");
+  });
+
   it("without a voice path, the trailing button is always Send", () => {
     render(<QComposer variant="pill" />);
     expect(screen.queryByRole("button", { name: "Talk to Q" })).toBeNull();

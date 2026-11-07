@@ -5876,6 +5876,10 @@
     height: 100dvh;
     border-inline-end: 1px solid var(--cq-border-subtle);
     background: var(--cq-stage-canvas);
+    /* R7: one scroll owner. Nothing in the pane (an off-screen screen-
+       reader line in the thread) may stretch the document and give the
+       window a second scrollbar; the separator still overhangs sideways. */
+    overflow-y: clip;
   }
   .cq-ws-q-body {
     display: flex;
@@ -5890,19 +5894,21 @@
   .cq-ws-peek {
     display: none;
   }
+  /* R7: the hit area lies wholly outside the pane, so it never sits on
+     the Q pane's own scrollbar (they read as two indicators). */
   .cq-ws-separator {
     position: absolute;
     inset-block: 0;
-    inset-inline-end: -6px;
+    inset-inline-end: -10px;
     z-index: var(--cq-z-sticky);
-    width: 12px;
+    width: 10px;
     cursor: col-resize;
     touch-action: none;
   }
   .cq-ws-separator::after {
     position: absolute;
     inset-block: 0;
-    inset-inline-start: 5px;
+    inset-inline-start: -1px;
     width: 2px;
     content: "";
     background: transparent;
@@ -5924,10 +5930,11 @@
     user-select: none;
   }
   /* The subtle pane controls (owner: one small icon at each pane's foot). */
+  /* Clear of the composer's edge in a 300 px pane (R7). */
   .cq-ws-q-foot {
     position: absolute;
-    inset-block-end: 6px;
-    inset-inline-start: 6px;
+    inset-block-end: 0;
+    inset-inline-start: 0;
     z-index: var(--cq-z-sticky);
     display: flex;
   }
@@ -5983,6 +5990,39 @@
   /* Q collapsed: a thin edge with Q's mark, one tap from open. */
   :root[data-cq-ws-q="collapsed"] .cq-ws-q {
     width: 46px;
+  }
+  /*
+   * One quiet scroll indicator in the Q pane (R7, owner live test): the
+   * page's brand scrollbar (gold, inherited from html/body) drew a thin bar
+   * with gold arrow buttons at the pane's edge. Here the standard
+   * properties are reset so Chrome draws one slim thumb, no buttons;
+   * browsers without ::-webkit-scrollbar get the standard thin bar.
+   */
+  .cq-ws-q,
+  .cq-ws-q * {
+    scrollbar-color: auto;
+    scrollbar-width: auto;
+  }
+  .cq-ws-q ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .cq-ws-q ::-webkit-scrollbar-button {
+    display: none;
+  }
+  .cq-ws-q ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .cq-ws-q ::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background: var(--cq-stage-border);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .cq-ws-q,
+    .cq-ws-q * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--cq-stage-border) transparent;
+    }
   }
   :root[data-cq-ws-q="collapsed"] .cq-ws-q-body,
   :root[data-cq-ws-q="collapsed"] .cq-ws-separator,
@@ -6150,6 +6190,18 @@
 @layer components {
   .cq-q-pane {
     container: q-pane / inline-size;
+  }
+}
+/*
+ * R7 (owner live test 2026-11-07): Q's answer cards lay out by the width
+ * they actually have (unnamed @container queries in answer-canvas.css).
+ * The page itself is the outermost container, as wide as the viewport, so
+ * everywhere outside a narrower container (the Q Workspace pane) the cards
+ * behave exactly as their old viewport media queries did.
+ */
+@layer base {
+  body {
+    container-type: inline-size;
   }
 }
 @layer utilities {

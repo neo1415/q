@@ -1,0 +1,29 @@
+const { chromium } = require("playwright");
+(async () => {
+  const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+  const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  await p.addInitScript(() => { try { sessionStorage.setItem("cq.splash.seen", "1"); } catch {} });
+  await p.goto("http://127.0.0.1:3100/dev/workspace/blocks", { waitUntil: "load", timeout: 240000 });
+  await p.waitForTimeout(4000);
+  for (const w of [320, 380, 480, 640, 1000]) {
+    await p.locator(`[data-harness-pane="${w}"]`).scrollIntoViewIfNeeded();
+    await p.waitForTimeout(1500);
+  }
+  await p.emulateMedia({ reducedMotion: "reduce" });
+  await p.reload({ waitUntil: "load" });
+  await p.waitForTimeout(4000);
+  const report = await p.evaluate(() => [...document.querySelectorAll("[data-harness-pane]")].map((pane) => {
+    const w = Number(pane.getAttribute("data-harness-pane"));
+    const overflow = [...pane.querySelectorAll("*")].filter((n) => n.scrollWidth > n.clientWidth + 1 && getComputedStyle(n).overflowX === "visible" && n.clientWidth > 0).length;
+    const wide = [...pane.querySelectorAll("*")].filter((n) => n.getBoundingClientRect().right > pane.getBoundingClientRect().right + 1).map((n) => n.tagName + "." + String(n.className).slice(0, 40)).slice(0, 4);
+    const cards = [...pane.querySelectorAll(".cq-ac-cards")].map((c) => `${c.getAttribute("data-layout")}:${[...c.children].map((x) => Math.round(x.getBoundingClientRect().width)).join("/")}`);
+    const narrowest = Math.min(...[...pane.querySelectorAll(".cq-ac-card h3, [data-q-comparison-card]")].map((n) => n.getBoundingClientRect().width).filter((x) => x > 0));
+    return { w, cards, narrowestHeading: Math.round(narrowest), outside: wide, overflowVisible: overflow };
+  }));
+  console.log(JSON.stringify(report, null, 1));
+  for (const w of [320, 380, 480, 640, 1000]) {
+    const el = p.locator(`[data-harness-pane="${w}"]`);
+    await el.screenshot({ path: `${process.argv[2]}/blocks-${w}.png` });
+  }
+  await b.close();
+})();

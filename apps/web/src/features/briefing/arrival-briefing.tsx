@@ -92,6 +92,7 @@ import { loadArrival } from "./arrival-browser";
 import { setRoomFilled, useRoomSlots } from "./arrival-room";
 import { useUiLanguage } from "@/features/i18n/language";
 import { useT } from "@/features/i18n/language";
+import { useQPaneWidth, wideEnough } from "@/features/workspace/q-pane-width";
 
 /**
  * Q on arrival (Zino, 2026-10-08; designs docs/design/2026-10-08/briefing
@@ -1126,13 +1127,15 @@ function subscribeWide(onChange: () => void): () => void {
 }
 /** Room for columns either side of Q (Tailwind's lg). */
 function useWide(): boolean {
-  return useSyncExternalStore(
+  const viewportWide = useSyncExternalStore(
     subscribeWide,
     () =>
       typeof window.matchMedia === "function" &&
       window.matchMedia(WIDE_QUERY).matches,
     () => false,
   );
+  // R7: in the Q Workspace pane, the pane's own width decides.
+  return wideEnough(useQPaneWidth(), viewportWide, 1280);
 }
 
 export const defaultLoad: ArrivalLoader = loadArrival;
