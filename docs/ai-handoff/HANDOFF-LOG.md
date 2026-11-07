@@ -1794,3 +1794,23 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - eslint and prettier clean.
 - **Owner:** the Anthropic test budget is $50 (about $7.7 used). Smoke run first, then dev, then held-out once.
 - **Prompt note for tuning:** NAVIGATION_DECISION v1 still names "who viewed their deck" as a page. Deck views are not built (W2), so v2 should drop it.
+
+## 2026-11-07 — q-nav tuning round 1 (`feat/q-navigation-policy`)
+
+- **Paid smoke on 3239110** (owner, Anthropic): 20 dev turns, 17 exact, $0.1986, 51% of input cached.
+- **Misses and root causes:**
+  - D-COV-007: the model added sectionId `about` to a page-level ask. The grader is right (the target has no section), so the model over-specified.
+  - D-COV-011 and D-TYP-005 ("Open Capital." from an investor): STAY. W2's /relationships purpose line says "...and a founder's Capital", although the investor digest lists the capital tab and its commitments section. Reported to W2: fix the purpose text and the founder-only audience of the capital-raise, readiness, action-plan, plan and investors tabs.
+- **NAVIGATION_DECISION v2** (v1 deprecated, lock pinned). All changes are general rules; no dev sentence is quoted:
+  - no deck-views example (not built);
+  - a section only when they ask about that part of a page, so a page-level ask is the page;
+  - SITE MAP lists only what their side may open, whatever a purpose line says.
+- **Live harness:**
+  - one synthetic user per side, as in production, so each side's prompt cache holds its own site map (51% cached came from sides alternating under one key);
+  - dev misses now carry the model's own proposal (decision, place, reason).
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0;
+  - vitest packages: 4912 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6, after restarting local Postgres;
+  - eslint and prettier clean.
