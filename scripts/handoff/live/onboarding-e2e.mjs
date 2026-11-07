@@ -6,8 +6,8 @@
 // step. Voice is driven over HTTP the way voice-http.mjs does it: a real
 // q-api voice session, opened on the onboarding session, with the speech
 // provider's part played by this script (transcript text to the think
-// endpoint). Q's lines are read back from onboarding.interview_turns with
-// a read-only query, never guessed from the page.
+// endpoint). Q's lines and the saved answers are read through the product
+// API as the person (their own session), never guessed from the page.
 //
 // Nothing runs against production unless CQ_E2E_GO=1: without it the
 // script prints what it would do and exits 0. Q turns are kept few (dense
@@ -17,7 +17,7 @@
 //   CQ_E2E_GO=1 NODE_USE_ENV_PROXY=1 JOURNEY=founder|investor \
 //   STEPS=J1,J2,J3,J4,J5,J6,J7 VIEWPORT=1440|390 OUT=<dir> \
 //   SB_URL=... SB_KEY=<admin, for creating the account only> \
-//   SB_PUBLISHABLE=... CQ_SEED_ACCOUNT_PASSWORD=... SUPABASE_ACCESS_TOKEN=... \
+//   SB_PUBLISHABLE=... CQ_SEED_ACCOUNT_PASSWORD=... \
 //   node scripts/handoff/live/onboarding-e2e.mjs
 //
 // Secrets are read from env by name and never printed.
@@ -30,7 +30,6 @@ const API =
 const QAPI =
   process.env.CQ_Q_API_URL ??
   "https://capital-qq-api-production.up.railway.app";
-const PROJECT = process.env.SUPABASE_PROJECT ?? "vcohxiqsmnkzxnvawgri";
 const JOURNEY = process.env.JOURNEY === "investor" ? "investor" : "founder";
 const STEPS = new Set(
   (process.env.STEPS ?? "J1,J2,J3,J4,J5,J6").split(",").map((s) => s.trim()),
@@ -79,7 +78,6 @@ for (const name of [
   "SB_KEY",
   "SB_PUBLISHABLE",
   "CQ_SEED_ACCOUNT_PASSWORD",
-  "SUPABASE_ACCESS_TOKEN",
 ]) {
   if (!process.env[name]) {
     console.error(`missing ${name}`);
@@ -136,34 +134,64 @@ const note = (journey, name, detail) => {
   console.log(`account ${EMAIL}`);
 }
 
-// ---- read-only reads of the hosted record -----------------------------------
-const sql = async (query) => {
-  const r = await fetch(
-    `https://api.supabase.com/v1/projects/${PROJECT}/database/query`,
+// ---- reads of the record, as the person (their own data, the product API) --
+// Run 1 (7 Nov) read these through the management API, and every read came
+// back empty: a refused or failed query was taken for "no rows". These are
+// the person's own onboarding session and thread, read with their own
+// session, and a failed read stops the run instead of passing for empty.
+let accessToken = null;
+const token = async () => {
+  if (accessToken !== null) return accessToken;
+  const signedIn = await fetch(
+    `${process.env.SB_URL}/auth/v1/token?grant_type=password`,
     {
       method: "POST",
       headers: {
-        authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
+        apikey: process.env.SB_PUBLISHABLE,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ query, read_only: true }),
+      body: JSON.stringify({
+        email: EMAIL,
+        password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
+      }),
     },
   );
-  const rows = await r.json().catch(() => []);
-  return Array.isArray(rows) ? rows : [];
+  if (!signedIn.ok) throw new Error(`HTTP sign-in: ${signedIn.status}`);
+  accessToken = (await signedIn.json()).access_token;
+  return accessToken;
 };
-const quoted = EMAIL.replace(/'/g, "''");
-const SESSION_OF = `select s.id from onboarding.sessions s join identity.user_profiles p on p.id=s.user_id join auth.users u on u.id=p.auth_user_id where u.email='${quoted}' order by s.created_at desc limit 1`;
-const turns = async () =>
-  sql(
-    `select t.role, t.channel, t.text, t.created_at from onboarding.interview_turns t where t.session_id=(${SESSION_OF}) order by t.created_at`,
+const apiGet = async (path) => {
+  const response = await fetch(`${API}${path}`, {
+    headers: { authorization: `Bearer ${await token()}` },
+  });
+  if (!response.ok) {
+    throw new Error(`read ${path.split("?")[0]}: HTTP ${response.status}`);
+  }
+  return response.json();
+};
+/** The person's current onboarding session view (null before one exists). */
+const view = async () => {
+  try {
+    return await apiGet(
+      `/v1/onboarding/sessions/current?journeyType=${JOURNEY}`,
+    );
+  } catch (error) {
+    if (String(error.message).includes("HTTP 404")) return null;
+    throw error;
+  }
+};
+/** The interview thread, oldest first: role, text, channel, createdAt. */
+const turns = async () => {
+  const current = await view();
+  if (current === null) return [];
+  const listed = await apiGet(
+    `/v1/onboarding/sessions/${current.session.id}/turns?limit=100`,
   );
+  return listed.items ?? [];
+};
+/** Step keys with a current response. */
 const answered = async () =>
-  (
-    await sql(
-      `select r.step_key from onboarding.responses r where r.session_id=(${SESSION_OF}) and r.superseded_by_response_id is null`,
-    )
-  ).map((row) => String(row.step_key));
+  ((await view())?.responses ?? []).map((r) => String(r.stepKey));
 const lastQ = async () => {
   const all = await turns();
   return String(all.filter((t) => t.role === "Q").at(-1)?.text ?? "");
@@ -319,26 +347,45 @@ if (STEPS.has("J2") && JOURNEY === "founder") {
   // saved without a read-back.
   const CLEAR =
     "The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkward to send, and there is no simple way for a customer to pay a debt by transfer.";
-  const before = new Set(await answered());
+  // Run 3: the say-back above already saved F9.problem, so this answer
+  // UPDATES it. Judge the problem's stored text, not newly answered keys
+  // (which an update never adds).
+  const problemText = async () => {
+    const value = ((await view())?.responses ?? []).find(
+      (r) => r.stepKey === "F9.problem",
+    )?.value;
+    return value?.type === "TEXT" ? value.text : "";
+  };
+  const problemBefore = await problemText();
   await say(CLEAR);
   const reply = await lastQ();
-  const gained = (await answered()).filter((key) => !before.has(key));
+  await new Promise((resolve) => setTimeout(resolve, 6000));
+  const problemAfter = await problemText();
   note("J2", "Q after a clear typed answer", reply.slice(0, 200));
+  note(
+    "J2",
+    "F9.problem before → after",
+    `${problemBefore.slice(0, 80)} → ${problemAfter.slice(0, 120)}`,
+  );
   check(
     "J2",
     "a clear typed answer is saved in their words, not read back",
-    gained.some((key) => key.startsWith("F9.")) &&
+    /a fifth of what they are owed/i.test(problemAfter) &&
       !/is that right|did I get that|shall I save/i.test(reply),
-    gained.join(", "),
+    problemAfter.slice(0, 120),
   );
 }
 
 // ---- J3 required vs optional ---------------------------------------------------------
 if (STEPS.has("J3")) {
+  // Founder v9 / investor v4 (DECISIONS 79): the founder's website and
+  // the investor's geography and inbound are REQUIRED; team size is
+  // optional. So: an optional skip (team size; for the investor the
+  // discovery style), and a required refusal (website; inbound).
   await say(
     JOURNEY === "founder"
-      ? "Skip the website for now, and I'd rather not say how many people work here."
-      : "Skip geography for now, and I'd rather not say how we handle inbound.",
+      ? "Skip the team size for now, and I'd rather not give the website."
+      : "Skip the discovery style for now, and I'd rather not say how we handle inbound.",
   );
   const reply = await lastQ();
   note(
@@ -346,10 +393,25 @@ if (STEPS.has("J3")) {
     "Q's reply to an optional skip and a required refusal",
     reply.slice(0, 260),
   );
+  // What is stored for the required step they would rather not give, after
+  // stating it earlier (J1): a decline of an answered required step is
+  // refused, so their earlier answer should still stand.
+  const requiredStep =
+    JOURNEY === "founder" ? "F1.website" : "I10.inbound_preference";
+  const stored = ((await view())?.responses ?? []).find(
+    (r) => r.stepKey === requiredStep,
+  );
+  note(
+    "J3",
+    `stored for ${requiredStep}`,
+    JSON.stringify(stored?.value ?? null),
+  );
   check(
     "J3",
     "a required refusal is re-asked with the reason",
-    /verif|need(ed)? (it|this)|because|so (that|we|I) can/i.test(reply),
+    /verif|need(ed)? (it|this)|because|so (that|we|I) can|matching|your profile|investors (can|see)/i.test(
+      reply,
+    ),
     "expected a reason (P0-2)",
   );
   await shot("j3-required");
@@ -357,30 +419,12 @@ if (STEPS.has("J3")) {
 
 // ---- J4 chat → voice → chat -----------------------------------------------------------
 if (STEPS.has("J4")) {
-  // The voice leg signs in over HTTP, as voice-http.mjs does.
-  const signIn = await fetch(
-    `${process.env.SB_URL}/auth/v1/token?grant_type=password`,
-    {
-      method: "POST",
-      headers: {
-        apikey: process.env.SB_PUBLISHABLE,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        email: EMAIL,
-        password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
-      }),
-    },
-  );
-  const { access_token: accessToken } = await signIn.json();
+  // The voice leg, as voice-http.mjs drives it, with the person's token.
   const authed = {
-    authorization: `Bearer ${accessToken}`,
+    authorization: `Bearer ${await token()}`,
     "content-type": "application/json",
   };
-  const current = await fetch(
-    `${API}/v1/onboarding/sessions/current?journeyType=${JOURNEY}`,
-    { headers: authed },
-  ).then((r) => r.json());
+  const current = await view();
   const sessionId = current?.session?.id;
   const onScreen = await lastQ();
   // As talkWithQ sends it when the on-screen question is Q's own.
@@ -504,7 +548,11 @@ if (STEPS.has("J5")) {
   check(
     "J5",
     "the same open question is picked up",
-    before.length > 0 && resumed.length > 0,
+    before.length > 0 &&
+      resumed.length > 0 &&
+      (/picking up where we left off/i.test(resumed) ||
+        resumed.includes(before.split(/(?<=[.?!])\s+/u).at(-1) ?? before)),
+    `before: ${before.slice(-120)} | after: ${resumed.slice(0, 160)}`,
   );
   await shot("j5-resumed");
   // The form path: one step, leave, come back to the same step.
@@ -560,40 +608,149 @@ if (STEPS.has("J6")) {
     await backToQ.click();
     await settle(6000);
   }
-  // Answer what Q asks from the fact table, a few turns at most.
+  // Answer what Q asks from the fact table, a few turns at most. Matched
+  // on the question Q actually put (its last sentence ending "?"), most
+  // specific first: run 2 answered "Which currency are you raising in?"
+  // with the raising line because /raising/ came before /currency/.
+  const READ_BACK = [
+    // Run 4: "right\?" matched "excluded outright?", so the exclusions
+    // were answered "Yes, that's right." three times. A whole word now.
+    /shall i keep|keep that|is that right|\bright\?|correct\?|confirm|look right|shall i save/i,
+    "Yes, that's right.",
+  ];
+  // Run 3: the founder v9/v10 and investor v4/v5 required steps too, so J6
+  // can finish (website, founders, team, city, year, one line; the
+  // investor's website, country, role, lists and description). Most
+  // specific first; matched on Q's question sentence only.
   const FACTS =
     JOURNEY === "founder"
       ? [
+          READ_BACK,
+          [/website|site\b|web address/i, "tamarindledger.example"],
+          [
+            /one line|in a line|one sentence|tagline/i,
+            "Tamarind Ledger helps market traders track and collect what they're owed.",
+          ],
+          [/which city|what city|\bcity\b/i, "Lagos."],
+          [/what year|which year|founded|start(ed)? the company/i, "2021."],
+          [
+            /how many founders|number of founders|founders are there/i,
+            "Two founders.",
+          ],
+          [/full[- ]time/i, "Both of us are full-time."],
+          [
+            /how many people|team size|people work|employees|headcount/i,
+            "Nine people.",
+          ],
+          [/your role|role at|what do you do at/i, "I'm the CEO."],
+          [/cover|functions|between you/i, "Product, engineering and sales."],
+          [/which country|what country|based|where is/i, "Lagos, Nigeria."],
+          [/currency/i, "US dollars."],
+          [
+            /how much|amount|target|size of the round/i,
+            "One and a half million dollars.",
+          ],
+          [/instrument|safe|equity|convertible|structure/i, "A SAFE."],
+          [/when .*close|timeframe|timeline|by when/i, "Within six months."],
+          [/use of funds|money .*go|spend|go towards/i, "Product and hiring."],
+          [/growth|growing/i, "Growing about ten percent a month."],
+          [/pilots|design partners/i, "Three pilots."],
           [/stage/i, "Seed."],
+          [/problem/i, "Market traders lose track of what they're owed."],
+          [
+            /sector|industry|categor|space you're in/i,
+            "Fintech for small merchants.",
+          ],
+          [/deck|material|document|upload/i, "I don't have a deck yet."],
           [
             /signal|traction|customers/i,
             "Paying customers, about forty shops.",
           ],
           [/revenue/i, "Recurring and growing."],
-          [/raising|raise/i, "Yes, actively raising."],
-          [/currency/i, "US dollars."],
-          [/how much|amount|target/i, "One and a half million dollars."],
-          [/right\?|correct|confirm|look right|save/i, "Yes, that's right."],
+          [/raising|raise|fundrais/i, "Yes, actively raising."],
+          [/anything else|anything more|missed/i, "No, that's everything."],
         ]
       : [
-          [/type/i, "A VC fund."],
+          // Run 4: one answer for every cheque question, all three figures,
+          // before the read-back: a proposal of other figures is corrected,
+          // never agreed to, and never answered one figure at a time (the
+          // range looped ten turns on mismatched single figures).
+          [
+            /cheque|ticket|minimum|typical|maximum|smallest|largest/i,
+            "Minimum $250,000, typical $500,000, maximum $1,000,000.",
+          ],
+          // Making the mandate live is a yes, not the discovery style.
+          [/mandate live|make .* live|go live|activate/i, "Yes, make it live."],
+          READ_BACK,
+          // Batch 9: Q's one short follow-up about a theme's lists the
+          // first answer left open ("Anything on green flags, or no
+          // preference?"): an explicit none, so it is not asked again.
+          [/^\s*anything on\b/i, "No preference."],
+          // The themed "what makes you lean in" question (batch 9) and a
+          // green-flags question name "anything else" and "revenue" too.
+          [/lean in|green flag/i, "Repeat founders and capital efficiency."],
+          // Before "founder" and "look for": what else, and inbound, are
+          // their own questions (run 4: both got the founder answer).
+          [
+            /anything else|anything more|missed|haven.t covered/i,
+            "No, that's everything.",
+          ],
+          [
+            /inbound|reaching out|reach (you|out)|approach/i,
+            "Only well-matched founders.",
+          ],
+          [/website|site\b|web address/i, "wadden.example"],
+          [/which country|what country|based|headquarter/i, "The Netherlands."],
+          [/your role|role there|title/i, "Partner."],
+          [
+            /describe your firm|firm to a founder|about your firm/i,
+            "We back early fintech and climate companies in West Africa.",
+          ],
+          [/currency/i, "US dollars."],
+          [/lead|co-?invest|follow/i, "We lead and co-invest."],
+          [
+            /how firm|must match|strong preference|nice to have/i,
+            "A strong preference.",
+          ],
+          [/where do you invest|geograph|region/i, "West Africa."],
+          [
+            /off the table|rather not see|avoid|never (want|show|be shown)|exclude|exclusion/i,
+            "None.",
+          ],
+          [/sector|industr|product area/i, "Fintech and climate."],
+          [
+            /company fits|business model|customer type|capital[- ]intens|regulat|revenue/i,
+            "No preference.",
+          ],
+          [
+            /lean in|founder|founding team|green flag|signal|look for/i,
+            "Repeat founders and capital efficiency.",
+          ],
+          [/portfolio/i, "None yet."],
           [/deploy/i, "Actively deploying."],
           [/stage/i, "Pre-seed and seed."],
-          [/currency/i, "US dollars."],
+          [/type of investor|what kind of investor|type/i, "A VC fund."],
           [/discover|how.*see|mode/i, "Show me everything that fits."],
-          [/inbound|approach/i, "Founders can reach out directly."],
           [
-            /mandate|in your own words|describe/i,
+            /mandate|thesis|in your own words|describe/i,
             "Early fintech and climate in West Africa.",
           ],
-          [/right\?|correct|confirm|look right|save/i, "Yes, that's right."],
+          [/anything else|anything more|missed/i, "No, that's everything."],
         ];
-  for (let turn = 0; turn < Number(process.env.TURNS ?? 10); turn += 1) {
+  const questionOf = (line) => {
+    const asks = line.match(/[^.?!]*\?/gu);
+    return asks === null ? line : asks[asks.length - 1];
+  };
+  const answers = [];
+  for (let turn = 0; turn < Number(process.env.TURNS ?? 30); turn += 1) {
     if (!new URL(page.url()).pathname.startsWith("/onboarding")) break;
-    const q = await lastQ();
+    const q = questionOf(await lastQ());
     const hit = FACTS.find(([re]) => re.test(q));
-    await say(hit ? hit[1] : "Yes, that's right. That's all for now.");
+    const answer = hit ? hit[1] : "Yes, that's right. That's all for now.";
+    answers.push({ q: q.trim().slice(0, 120), answer });
+    await say(answer);
   }
+  note("J6", "questions answered from the fact table", JSON.stringify(answers));
   await settle(8000);
   const at = new URL(page.url()).pathname;
   check(
