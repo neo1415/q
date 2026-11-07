@@ -378,6 +378,10 @@ import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createApiCompanyRaiseReader } from "./company-raise.js";
 import { createRaiseSharing, storedPitchSections } from "./pitch-claims.js";
 import {
+  founderSectionsFor,
+  storedFounderSections,
+} from "./founder-sections.js";
+import {
   createBoardJobStatusPort,
   createQWorkPagePort,
   createWorkforceJobPort,
@@ -2866,6 +2870,16 @@ const { app, logger } = createApp(config, security, {
       }
       return storedPitchSections(database.sql, parsed.data);
     },
+    // Owner 2026-11-07: the founder's F9 answers, for the sections neither
+    // the deck nor a pitch covers. The route asks only for the owner and
+    // an investor the pitch rule admits; this reads the F9 steps alone.
+    founderSections: async (company) =>
+      founderSectionsFor(
+        await storedFounderSections(database.sql, {
+          tenantId: company.tenantId,
+          id: company.id,
+        }),
+      ),
     raiseSharing: createRaiseSharing({
       sql: database.sql,
       companies: disclosurePorts.companies,

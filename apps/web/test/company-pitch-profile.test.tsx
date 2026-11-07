@@ -664,3 +664,84 @@ describe("the pitch transcript fills every section the deck lacks (lane ov, step
     ]);
   });
 });
+
+describe("the founder's own words fill what the deck and pitch leave (owner 2026-11-07, step 3)", () => {
+  const theirs = (sectionKey: string, text: string) => ({
+    sectionKey,
+    text,
+    answeredAt: "2026-11-07T10:00:00.000Z",
+    truthClass: "USER_CLAIM" as const,
+    evidenceStatus: "SELF_REPORTED" as const,
+    source: "FOUNDER_ANSWER" as const,
+  });
+  const PITCH_SAID = {
+    sectionKey: "go_to_market",
+    label: "Forwarders",
+    value: "Forwarders as said",
+    pitchId: PITCH,
+    pitchTitle: null,
+    atSeconds: 34,
+    truthClass: "USER_CLAIM" as const,
+    evidenceStatus: "SELF_REPORTED" as const,
+    source: "PITCH_VIDEO" as const,
+  };
+
+  it("shows their answer, labelled as their words, where neither said it", () => {
+    const sections = build({
+      deckSections: null,
+      pitchClaims: [],
+      founderSections: [
+        theirs("competition", "Brokers by phone; we clear in hours, not days."),
+      ],
+    });
+    const competition = byKey(sections, "competition");
+    expect(competition.provided).toBe(true);
+    expect(competition.summary).toBe(
+      "Brokers by phone; we clear in hours, not days.",
+    );
+    expect(competition.summarySource).toBe("Founder's words");
+    expect(competition.gapQuestion).toBeNull();
+  });
+
+  it("the deck wins, then the pitch: their answer is not shown over either", () => {
+    const sections = build({
+      pitchSections: [PITCH_SAID],
+      founderSections: [
+        theirs("problem", "Our own words on the problem."),
+        theirs("go_to_market", "Our own words on go-to-market."),
+      ],
+    });
+    const problem = byKey(sections, "problem");
+    expect(problem.summary).toBe(
+      "Ports lose a day per container to paperwork.",
+    );
+    expect(problem.summarySource ?? null).not.toBe("Founder's words");
+    const gtm = byKey(sections, "go_to_market");
+    expect(gtm.summary).toBeNull();
+    expect(gtm.facts.map((row) => row.label)).toEqual(["Forwarders"]);
+  });
+
+  it("their answer for the solution comes before the one-line description", () => {
+    const solution = byKey(
+      build({
+        deckSections: null,
+        pitchClaims: [],
+        founderSections: [theirs("solution", "We file and track every form.")],
+      }),
+      "solution",
+    );
+    expect(solution.summary).toBe("We file and track every form.");
+    expect(solution.summarySource).toBe("Founder's words");
+  });
+
+  it("an investor the server sent none sees the section as not provided", () => {
+    const competition = byKey(
+      build({ deckSections: null, pitchClaims: [] }),
+      "competition",
+    );
+    expect(competition.provided).toBe(false);
+    expect(competition.emptyText).toBe(
+      "Not provided. Unknown, not zero: ask them.",
+    );
+  });
+});

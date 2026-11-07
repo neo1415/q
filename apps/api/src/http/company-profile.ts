@@ -22,6 +22,7 @@ import {
   NO_RAISE_VIEW,
   parseContract,
   type CompanyRaiseView,
+  type FounderSectionAnswerDto,
   type CompanyProfileTeamMember,
   type CompanyProfileViewer,
   type Money,
@@ -213,6 +214,16 @@ export type CompanyProfilePorts = {
         companyId: string,
         mediaAssetId: string,
       ) => Promise<readonly StoredPitchSection[] | null>)
+    | undefined;
+  /**
+   * The company's profile sections in the founder's own words (their F9
+   * answers, founder-sections.ts). Asked only for the owner and an
+   * investor the pitch rule admits, as the team is (ADR 0041). Absent: none.
+   */
+  readonly founderSections?:
+    | ((
+        company: CompanyProfileFacts,
+      ) => Promise<readonly FounderSectionAnswerDto[]>)
     | undefined;
   /** How the founder set the current raise's sharing (pitch-claims.ts). */
   readonly raiseSharing?:
@@ -418,6 +429,17 @@ export function registerCompanyProfileRoutes(
               ),
             )
           : [];
+      // The founder's own words for the profile's sections: the owner and
+      // an investor the pitch rule admits (ADR 0041, as the team); never
+      // asked for anyone else, so it cannot reach them.
+      const founderSections =
+        (viewer === "OWNER" || findable) &&
+        profile.founderSections !== undefined
+          ? await quietly(
+              profile.founderSections(company),
+              [] as readonly FounderSectionAnswerDto[],
+            )
+          : ([] as readonly FounderSectionAnswerDto[]);
       const sharing: RaiseSharing =
         claims.some((claim) => claim.kind === "RAISE") &&
         profile.raiseSharing !== undefined
@@ -479,6 +501,7 @@ export function registerCompanyProfileRoutes(
               team: [...team],
               pitchClaims: pitch.pitchClaims,
               pitchSections: sections,
+              founderSections: [...founderSections].slice(0, 24),
               raiseFromPitch,
               pitchRaiseNotice: pitch.pitchRaiseNotice,
               ...(view === null ? {} : { raiseView: view }),

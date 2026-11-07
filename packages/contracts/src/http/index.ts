@@ -1220,6 +1220,8 @@ export {
   CompanyProfileOverviewSchema,
   PitchClaimDtoSchema,
   PitchSectionFactDtoSchema,
+  FounderSectionAnswerDtoSchema,
+  type FounderSectionAnswerDto,
   PitchClaimKindSchema,
   PitchRaiseNoticeSchema,
   type PitchClaimDto,

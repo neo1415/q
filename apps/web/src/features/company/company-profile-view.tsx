@@ -450,6 +450,7 @@ function sectionsFor(
     deckSections: deck?.extraction?.sections ?? null,
     pitchClaims: overview?.pitchClaims ?? [],
     pitchSections: overview?.pitchSections ?? [],
+    founderSections: overview?.founderSections ?? [],
     answers: {
       shortDescription: profile.shortDescription,
       sectorLabels,
