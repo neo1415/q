@@ -51,7 +51,12 @@ export function MandateSelectStep({
   }
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <form
+      data-q-editing
+      id={formId}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-6"
+    >
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       {step.candidates.length === 0 ? (
         <InlineNotice tone="info">

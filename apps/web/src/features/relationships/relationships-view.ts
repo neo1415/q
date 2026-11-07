@@ -559,6 +559,11 @@ function actionFor(
     case "COMMITMENT":
     case "STARTUP_ALERT":
       return { label: "Review", href };
+    // Q Workspace §8: never "get in touch"; viewing and saving are not
+    // an invitation (§6.7.14).
+    case "COMPANY_SAVED":
+    case "VIEWING_DIGEST":
+      return { label: "See analytics", href };
     case "REMINDER":
     case "MEETING_SCHEDULED":
     case "MEETING_CANCELLED":

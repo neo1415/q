@@ -133,6 +133,7 @@ export function RaiseTerms({
 
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-4"
       aria-label={t("Raise terms")}
       data-raise-terms

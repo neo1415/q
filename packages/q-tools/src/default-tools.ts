@@ -76,6 +76,7 @@ import {
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
+import { createReadMeetingRecordTool } from "./tools/meeting-record.js";
 import { createReadCompanyPitchesTool } from "./tools/pitch-transcripts.js";
 import { createReadCompanyFiguresTool } from "./tools/company-figures.js";
 import { createExploreTools } from "./tools/explore.js";
@@ -240,6 +241,9 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
           }),
         ]),
     // R18: what is said in the pitch being watched, around a moment.
+    ...(ports.meetings === undefined || ports.relationships?.brief === undefined
+      ? []
+      : [createReadMeetingRecordTool(ports.meetings, ports.relationships)]),
     ...(ports.pitchMoments === undefined
       ? []
       : [createGetPitchMomentTool(ports.pitchMoments)]),

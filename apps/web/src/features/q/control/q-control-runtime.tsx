@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { registerClientPrefetch, registerShellRouter } from "../client-actions";
 import { registerNavigationViewer, type NavigationViewer } from "./app-routes";
@@ -14,6 +14,12 @@ import {
   type UiActReport,
 } from "../ui-act-controller";
 import { startReceiptReporter } from "./receipt-reporter";
+import { heldReason } from "./approval-requests";
+import { QActPrompts } from "./q-act-prompts";
+import { QArrivalNews } from "@/features/q/arrival-news-line";
+import { watchDirtyForms } from "@/features/workspace/dirty-forms";
+import { useT } from "@/features/i18n/language";
+import { pagesHoldDirtyWork } from "@/features/workspace/workspace-screen";
 
 /**
  * RECOVERY-2026-10 (C2/C3): the shell's part of Q's control of the app,
@@ -58,6 +64,23 @@ export function QControlRuntime({
 
   useEffect(() => startReceiptReporter(currentManifest), []);
 
+  // W5.4: unsaved work on editing pages -- Q's moves offer instead, and
+  // the person's own leaving asks first (dirty-forms.ts).
+  // The question is asked in the person's language.
+  const t = useT();
+  const translate = useRef(t);
+  useEffect(() => {
+    translate.current = t;
+  }, [t]);
+  useEffect(
+    () =>
+      watchDirtyForms(document, {
+        alsoDirty: pagesHoldDirtyWork,
+        ask: (question) => window.confirm(translate.current(question)),
+      }),
+    [],
+  );
+
   // The fast path prefetches the page a partial transcript points at, so
   // the move when the sentence ends costs nothing.
   const router = useRouter();
@@ -99,18 +122,24 @@ export function QControlRuntime({
   }, []);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      data-q-self
-      className={
-        notice === null
-          ? "sr-only"
-          : "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto w-fit max-w-[min(32rem,calc(100vw-2rem))] rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-2 cq-caption text-(--cq-text-secondary) shadow-(--cq-shadow-overlay)"
-      }
-    >
-      {notice}
-    </div>
+    <>
+      {/* W5.1: what Q asks the person to confirm or approve. */}
+      <QActPrompts />
+      {/* W5.2: what is new on this page since the person last looked. */}
+      <QArrivalNews />
+      <div
+        role="status"
+        aria-live="polite"
+        data-q-self
+        className={
+          notice === null
+            ? "sr-only"
+            : "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto w-fit max-w-[min(32rem,calc(100vw-2rem))] rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-2 cq-caption text-(--cq-text-secondary) shadow-(--cq-shadow-overlay)"
+        }
+      >
+        {notice}
+      </div>
+    </>
   );
 }
 
@@ -126,6 +155,20 @@ export function noticeOf(report: UiActReport): string | null {
         ? "Q couldn't find that item in the list on this page."
         : "Q couldn't find that on this page.";
     case "NOT_APPLICABLE":
+      // W5.1: why Q held it, when it did (approval-requests.ts).
+      switch (heldReason(report.receipt.actId)) {
+        case "AWAITING_APPROVAL":
+        case "DECLINED":
+          // The approval card is on screen, or the person said no.
+          return null;
+        case "NOTHING_PREPARED":
+          return "There's nothing ready to approve there yet.";
+        case "NEVER":
+          return "Q never does that for you. Moving money or signing is always yours to do.";
+        case "UNCLASSIFIED":
+        case undefined:
+          break;
+      }
       return report.intent.act === "BACK"
         ? "There's no earlier page here to go back to."
         : "Q can't do that with this part of the page.";

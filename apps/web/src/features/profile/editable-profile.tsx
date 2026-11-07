@@ -391,6 +391,7 @@ function FieldEditor({
 
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-3"
       onSubmit={(event) => void submit(event)}
       aria-busy={pending}

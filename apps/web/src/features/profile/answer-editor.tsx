@@ -21,6 +21,7 @@ import {
 } from "./answer-actions";
 import type { ProfileJourney } from "./profile-answers";
 import { useT } from "@/features/i18n/language";
+import { useDirty } from "@/features/workspace/workspace-screen";
 
 /**
  * Edit one profile card's facts (ADR 0024): each fact is the step the
@@ -78,6 +79,15 @@ export function AnswerEditor({
   const [draft, setDraft] = useState<Draft>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // W5.4: an open editor with a changed answer is unsaved work.
+  useDirty(
+    open &&
+      steps.some(
+        (s) =>
+          draft[s.stepKey] !== undefined &&
+          !same(draft[s.stepKey], responses[s.stepKey] ?? null),
+      ),
+  );
 
   const start = () => {
     setDraft(

@@ -238,6 +238,7 @@ export function MaterialsStep({
       ) : null}
 
       <form
+        data-q-editing
         id={formId}
         onSubmit={(event) => {
           event.preventDefault();

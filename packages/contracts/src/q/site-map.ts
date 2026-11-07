@@ -114,6 +114,8 @@ export const QSiteMapTabSchema = z
     subs: z.array(QSiteMapSubSchema).max(24),
     /** Who sees this tab, when narrower than the page; absent: the page's. */
     audience: QSiteMapAudienceSchema.optional(),
+    /** What the tab is for, when its title alone could be mistaken. */
+    purpose: z.string().trim().min(1).max(90).optional(),
   })
   .strict();
 export type QSiteMapTab = z.infer<typeof QSiteMapTabSchema>;
@@ -322,10 +324,9 @@ export function qSiteMapDigest(
     if (tabs.length > 0) {
       lines.push(
         ` tabs: ${tabs
-          .map((tab) =>
-            tab.subs.length === 0
-              ? `${tab.id}=${tab.title}${mark(audienceOf(page, tab))}`
-              : `${tab.id}=${tab.title}${mark(audienceOf(page, tab))}(sub: ${tab.subs.map((sub) => sub.id).join(",")})`,
+          .map(
+            (tab) =>
+              `${tab.id}=${tab.title}${mark(audienceOf(page, tab))}${tab.purpose === undefined ? "" : ` [${tab.purpose}]`}${tab.subs.length === 0 ? "" : `(sub: ${tab.subs.map((sub) => sub.id).join(",")})`}`,
           )
           .join("; ")}`,
       );

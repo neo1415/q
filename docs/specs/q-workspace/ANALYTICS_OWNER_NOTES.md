@@ -47,14 +47,32 @@ Billing feature `analytics.identity_reveal` (ACCESS, a subscription, not credits
   - Intent signals stay real time.
 - **Own team:** never counted.
 
-## Still to build (milestone 2)
+## Milestone 2 (built)
 
-- **Intent signals:** shown in full and real time, named per the viewer's visibility, with no floor.
-- **Founder and investor pages:** the founder page shows the floor message "Fewer than 3 investor organisations viewed this week".
-- **Q:** Safe Read tools.
-- **Notifications.**
-- **Stage and sector slices:** they need the investor's mandate, which is a separate context. Investor type and geography are built.
+- **`/analytics` for founders:**
+  - Intent: saves, connection and data-room requests; real time, every plan, no floor.
+    - Saves follow the investor's level.
+    - Requests always show the firm; they name the person only at Full identity (owner-approved).
+  - Deck views by slide (QSection `deck-views`), who viewed, by week, breakdowns, documents.
+  - Below the floor: "Fewer than 3 investor organisations viewed this week".
+- **`/analytics` for investors:** their visibility (the `set_viewing_privacy` action), companies they viewed, and founders' answers.
+- **Collection:** deck open and slide dwell, pitch watch time, data-room views.
+- **Q:** `read_my` "engagement" puts intent first, and gives passive context only while "Q uses viewing" is on.
 
-## Backlog
+## Milestone 3 (built)
 
-- The investor-side "Your activity as founders see it" preview. It is cheap once the pages exist; I'll build it with A4 if time allows.
+- **Save notices (`COMPANY_SAVED`):**
+  - Worded at the saver's level: name, firm, or "An investor".
+  - Gated by `intent_signal_notifications` (ON). One per firm, company and day; links to `/analytics`.
+  - The text says saving is not interest yet.
+- **Weekly viewing digest (`VIEWING_DIGEST`):**
+  - A worker checks hourly. Gated by `passive_view_notifications` (OFF).
+  - Aggregate only, above the floor, once per company and week.
+- **Migration `20261231410000`:** widens the notification kinds by drop and re-add, keeping all 25 values. Apply it with `--founder-approved`.
+- **Q Card views:** ingested by handle, resolved server-side to an ACTIVE company handle. Only a signed-in participant's view of a company card counts.
+
+## Open
+
+- **Q destination:** Q reaches `/analytics` through the site map route; there is no named destination, per the integration owner.
+- **Navigation link:** a sidebar link to `/analytics` belongs to W1.
+- **Breakdowns:** stage and sector need the mandate context.

@@ -419,7 +419,13 @@ export function DocumentLibrary({
   // RECOVERY-2026-10 (C1): the list (grid or rows) and its search, for Q.
   const libraryRef = useRef<HTMLElement>(null);
   useQControlGroup({ kind: "LIST", ref: libraryRef, ids: Q_LIBRARY_LIST });
-  useQControlGroup({ kind: "INPUT", ref: libraryRef, ids: Q_LIBRARY_SEARCH });
+  // W5.1: typing a search only filters what is shown.
+  useQControlGroup({
+    kind: "INPUT",
+    ref: libraryRef,
+    ids: Q_LIBRARY_SEARCH,
+    approval: "NONE",
+  });
   const [items, setItems] = useState<readonly LibraryItem[]>(
     initial?.items ?? [],
   );
@@ -442,6 +448,8 @@ export function DocumentLibrary({
     id: "button.documents-by-q",
     kind: "BUTTON",
     ref: byQRef,
+    // W5.1: a filter, nothing written.
+    approval: "NONE",
     onAct: async (intent) => {
       if (intent.act !== "ACTIVATE") return "NOT_APPLICABLE";
       setFilter("BY_Q");

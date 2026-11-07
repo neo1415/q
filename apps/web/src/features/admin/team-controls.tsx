@@ -29,6 +29,7 @@ export function GrantRole() {
   const reasonId = useId();
   return (
     <form
+      data-q-editing
       className="flex max-w-(--cq-layout-narrow) flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();

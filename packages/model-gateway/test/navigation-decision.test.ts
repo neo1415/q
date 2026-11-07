@@ -568,7 +568,10 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
   });
 
   it("refuses what the site map does not have: a route, a tab, a section, a page with no target", () => {
-    expect(at("/analytics")).toBeNull();
+    // Q Workspace batch 2: /analytics now has its destination (W3);
+    // An unavailable document's notice stays a page with no target.
+    expect(at("/analytics")).toEqual({ page: "ANALYTICS" });
+    expect(at("/documents/unavailable")).toBeNull();
     expect(at("/work", { tab: "nope" })).toBeNull();
     expect(
       at("/settings", { sectionId: "billing-history", position: "section" }),

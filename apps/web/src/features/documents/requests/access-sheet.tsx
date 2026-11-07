@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   DATA_ROOM_GRANT_DAYS,
@@ -30,6 +30,8 @@ import {
 } from "./request-actions";
 import { shortDate } from "./requests-model";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 import { GateNote, useGate } from "@/features/organisation/capabilities";
 import { CAP } from "@/features/organisation/role-words";
 
@@ -107,13 +109,42 @@ function AddInvestor({
     readonly relationshipId: string;
     readonly accessLevel: DocumentAccessLevel;
     readonly days: number;
-  }) => void;
+  }) => Promise<boolean>;
 }) {
   const t = useT();
 
   const [relationshipId, setRelationshipId] = useState("");
   const [accessLevel, setAccessLevel] = useState<DocumentAccessLevel>("view");
   const [days, setDays] = useState<number>(DATA_ROOM_GRANT_DEFAULT_DAYS);
+  // W5.1b: sharing is outward (the investor is told), so Q may do it only
+  // on the person's approval of exactly who, what access and how long.
+  const shareRef = useRef<HTMLSpanElement>(null);
+  const chosen = candidates.find(
+    (candidate) => candidate.relationshipId === relationshipId,
+  );
+  useQControl({
+    id: "button.dataroom-share",
+    kind: "BUTTON",
+    ref: shareRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.dataroom-share",
+      summary: (payload) =>
+        `Share this with ${String(payload["with"])}: they will be told.`,
+      prepare: (): ApprovalPayload | null =>
+        chosen === undefined
+          ? null
+          : {
+              with: chosen.investorOrganisationName,
+              access: DOCUMENT_ACCESS_LEVEL_WORDS[accessLevel],
+              days,
+            },
+      execute: async () =>
+        (await onShare({ relationshipId, accessLevel, days }))
+          ? "DONE"
+          : "FAILED",
+    },
+  });
   if (candidates.length === 0) {
     return (
       <div className="flex flex-col gap-2">
@@ -181,15 +212,17 @@ function AddInvestor({
         </select>
       </label>
       <div className="sm:col-span-2">
-        <button
-          type="button"
-          disabled={busy || relationshipId === ""}
-          onClick={() => onShare({ relationshipId, accessLevel, days })}
-          className={buttonClassName("primary", "regular", "min-h-11")}
-          data-access-share
-        >
-          {t(label)}
-        </button>
+        <span ref={shareRef} className="contents">
+          <button
+            type="button"
+            disabled={busy || relationshipId === ""}
+            onClick={() => void onShare({ relationshipId, accessLevel, days })}
+            className={buttonClassName("primary", "regular", "min-h-11")}
+            data-access-share
+          >
+            {t(label)}
+          </button>
+        </span>
       </div>
       <div className="sm:col-span-2">
         <AwaitingConnection awaiting={awaiting} />
@@ -289,6 +322,7 @@ function DocumentAccess({
     setBusy(false);
     say(out.ok ? words : (out.message ?? "That didn't go through."));
     await reload();
+    return out.ok;
   };
   return (
     <div className="flex flex-col gap-5" data-document-access-sheet>
@@ -364,7 +398,7 @@ function DocumentAccess({
           label={t("Share")}
           busy={busy || !manage.allowed}
           onShare={(input) =>
-            void run(
+            run(
               () => shareDocumentAction(access.documentId, input),
               "Shared. They've been told.",
             )
@@ -430,6 +464,7 @@ function FolderAccess({
     setBusy(false);
     say(out.ok ? words : (out.message ?? "That didn't go through."));
     await reload();
+    return out.ok;
   };
   return (
     <div className="flex flex-col gap-5" data-folder-access-sheet>
@@ -483,7 +518,7 @@ function FolderAccess({
           label={t("Share the folder")}
           busy={busy || !manage.allowed}
           onShare={(input) =>
-            void run(
+            run(
               () => shareFolderAction(companyId, access.folderCode, input),
               "Shared. They've been told.",
             )

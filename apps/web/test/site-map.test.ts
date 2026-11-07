@@ -114,7 +114,9 @@ describe("the site-map digest for the model (W2.4)", () => {
     expect(digest).not.toContain("/crm |");
     expect(digest).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
     expect(digest).toContain("/company/[companyId] [companyId=COMPANY]");
-    expect(digest).toContain("deck=Pitch deck(sub:");
+    expect(digest).toContain(
+      "deck=Pitch deck [the deck and Q's reading of it, by section](sub:",
+    );
   });
 
   it("a side sees its own pages and the shared ones only", () => {

@@ -518,6 +518,7 @@ export function GateView({
           <h3 id="gq2-promise">{t("Promise to founders")}</h3>
           {changingPromise && canDecide ? (
             <form
+              data-q-editing
               className="flex flex-wrap items-center gap-2"
               onSubmit={(event) => {
                 event.preventDefault();

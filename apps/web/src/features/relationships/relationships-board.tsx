@@ -154,7 +154,13 @@ export function RelationshipsBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   useQControlGroup({ kind: "LIST", ref: boardRef, ids: Q_BOARD_LIST });
-  useQControlGroup({ kind: "INPUT", ref: boardRef, ids: Q_BOARD_SEARCH });
+  // W5.1: typing a search only filters what is shown.
+  useQControlGroup({
+    kind: "INPUT",
+    ref: boardRef,
+    ids: Q_BOARD_SEARCH,
+    approval: "NONE",
+  });
   useQControl({
     id: "filter.relationships",
     kind: "FILTER",

@@ -80,7 +80,12 @@ export function RedFlagsStep({
   );
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-7">
+    <form
+      data-q-editing
+      id={formId}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-7"
+    >
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       <section className="flex flex-col gap-2" data-red-flags="avoid">
         <MultiChoiceList

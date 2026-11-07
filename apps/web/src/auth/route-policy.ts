@@ -44,6 +44,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/work",
   // The work board (owner 2026-10-23), a Work tab.
   "/board",
+  // Q Workspace §8: a founder's or investor's own analytics.
+  "/analytics",
   // DAILY: The Q Daily reader.
   "/daily",
   "/gateway",

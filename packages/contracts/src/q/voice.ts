@@ -798,6 +798,8 @@ export const Q_VOICE_DESTINATIONS = [
   // 18 s): an investor's mandate (/mandate, resolved on the server to their
   // profile's mandate, or the setup that creates one).
   "MANDATE",
+  // Q Workspace batch 2: Analytics, for both sides (/analytics).
+  "ANALYTICS",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

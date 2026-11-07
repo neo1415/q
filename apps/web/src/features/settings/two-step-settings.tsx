@@ -96,7 +96,11 @@ function TurnOn() {
         </li>
         <li>
           {t("Enter the 6-digit code the app shows.")}
-          <form action={confirmAction} className="mt-3 flex flex-col gap-3">
+          <form
+            data-q-editing
+            action={confirmAction}
+            className="mt-3 flex flex-col gap-3"
+          >
             <input type="hidden" name="factorId" value={current.factorId} />
             <CodeField label={t("6-digit code")} />
             {confirmed.status === "error" ? (
@@ -134,7 +138,7 @@ function TurnOff() {
         )}
       </p>
       {open ? (
-        <form action={action} className="flex flex-col gap-3">
+        <form data-q-editing action={action} className="flex flex-col gap-3">
           <CodeField
             label={t("6-digit code")}
             description={t(

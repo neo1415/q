@@ -1817,6 +1817,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   Q_PITCH: "Let me show you Capital Q.",
   BOARD: "Opening your board.",
   MANDATE: "Opening your mandate.",
+  ANALYTICS: "Opening your analytics.",
 };
 
 /**
@@ -1908,6 +1909,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   Q_PITCH: "Q Pitch",
   BOARD: "Work (Board)",
   MANDATE: "your mandate",
+  ANALYTICS: "your analytics",
 };
 
 /**
