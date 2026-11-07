@@ -98,6 +98,9 @@ function typedWorld(options: {
     logger,
     readAfterMs: 5,
     reader,
+    // As production wires it: a held value (an inference, or a figure for
+    // its read-back, D-OWN-3) waits there for their yes.
+    recommendations: options.world.recommendations,
   });
   const { gateway, seen } = replies(options.script);
   const typed = createTypedOnboarding({
@@ -138,7 +141,7 @@ const SENTENCE =
   "I'm actively investing, pre-seed and seed, cheques in dollars from 25k up to 100k, we like to lead sometimes but mostly follow, stick closely to my mandate, I'm the managing partner, open to well-matched founders";
 
 describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
-  it("the investor's sentence: kept in the thread, Q asks one next thing and records nothing; the reading saves 8 steps", async () => {
+  it("the investor's sentence: kept in the thread, Q asks one next thing and records nothing; the reading saves what they stated and holds the figures for their read-back (D-OWN-3)", async () => {
     const world = investorSession({
       currentStepKey: "I1.deployment_status",
       subject: FIRM,
@@ -208,14 +211,22 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     // Live final re-check 2026-10-31: whether they are deploying now and
     // how open they are to founders are judgements about their current
     // state (askOnly): said unasked, they are held for their yes, never
-    // read in; the other six are saved.
+    // read in. D-OWN-3 (DECISIONS 78): the cheque figures are read back for
+    // their yes, so they are held too; the other four are saved.
     expect(saved.map(([stepKey]) => stepKey)).toEqual([
       "I2.stages",
       "I2.currency",
-      "I2.cheque_min",
-      "I2.cheque_max",
       "I2.investment_role",
       "I9.discovery_mode",
+    ]);
+    expect(
+      world
+        .heldSuggestions()
+        .filter((s) => s.stepKey.startsWith("I2.cheque_"))
+        .map((s) => [s.stepKey, s.value]),
+    ).toEqual([
+      ["I2.cheque_min", { type: "RANGE", value: "25000" }],
+      ["I2.cheque_max", { type: "RANGE", value: "100000" }],
     ]);
     expect(world.recordedValue("I1.deployment_status")).toBeUndefined();
     expect(world.recordedValue("I10.inbound_preference")).toBeUndefined();
@@ -225,7 +236,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     });
   });
 
-  it("a correction supersedes: the latest settled word is saved", async () => {
+  it("a correction is held for its read-back; the record keeps the earlier figure until their yes (D-OWN-3)", async () => {
     const world = investorSession({
       currentStepKey: "I2.cheque_min",
       subject: FIRM,
@@ -258,15 +269,19 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
       ],
     });
     await say("actually sorry, make that 50 to 100k, not 25");
-    await settled(
-      () =>
-        JSON.stringify(world.recordedValue("I2.cheque_min")) ===
-        JSON.stringify({ type: "RANGE", value: "50000" }),
+    await settled(() =>
+      world.heldSuggestions().some((s) => s.stepKey === "I2.cheque_min"),
     );
+    // D-OWN-3 (DECISIONS 78): a number is read back for their yes, always;
+    // the correction is held as exactly the figure they gave, and the
+    // record keeps the earlier one until they agree.
     expect(world.recordedValue("I2.cheque_min")).toEqual({
       type: "RANGE",
-      value: "50000",
+      value: "25000",
     });
+    expect(
+      world.heldSuggestions().find((s) => s.stepKey === "I2.cheque_min")?.value,
+    ).toEqual({ type: "RANGE", value: "50000" });
   });
 
   it('"that\'s all" finishes: nothing is recorded as an answer, and the open things are named', async () => {

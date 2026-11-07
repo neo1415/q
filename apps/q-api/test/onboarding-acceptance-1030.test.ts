@@ -220,6 +220,39 @@ describe("not knowing is an answer (Kortrijk Polder)", () => {
     expect(w.skippedSteps()).toContain("F4.functions");
   });
 
+  it('"I don\'t know" to a REQUIRED question is recorded as unknown and counts as answered, never zero (D-OWN-1, DECISIONS 78)', async () => {
+    const w = world();
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: w.fetch,
+      logger,
+      readAfterMs: 5,
+      reader: reader(() => ({
+        answers: [],
+        declined: [],
+        notKnown: [{ stepKey: "F4.team_size", quote: "I don't know" }],
+      })),
+      recommendations: w.recommendations,
+    });
+    await conversation.said?.(
+      line,
+      "Q",
+      "How many people work on the company?",
+      "F4.team_size",
+    );
+    await conversation.said?.(line, "PERSON", "I don't know");
+    await conversation.flush?.(line);
+    const recorded = w.recordedValue("F4.team_size");
+    // Answered: the person carries on, and the step no longer blocks.
+    expect(recorded).toBeDefined();
+    // Unknown stays unknown: never a number.
+    expect(JSON.stringify(recorded)).not.toMatch(
+      /"(?:min|max|value|number)":\s*0\b/u,
+    );
+    expect(recorded).not.toMatchObject({ type: "RANGE" });
+    expect(w.skippedSteps()).not.toContain("F4.team_size");
+  });
+
   it("a decline said to another question leaves what is on record", async () => {
     const w = world();
     w.record("F4.functions", {
@@ -341,5 +374,76 @@ describe("a read-back never cuts an answer mid-sentence (Kortrijk Polder thesis)
     expect(cut).toMatch(/(?:\.|…)$/u);
     const words = wholeWordsWithin("alpha beta gamma delta", 12);
     expect(words).toBe("alpha beta…");
+  });
+});
+
+describe("numbers are read back for their yes, always (D-OWN-3, DECISIONS 78)", () => {
+  it("a team size they typed is held for the read-back, not saved, and saved on their yes to Q's read-back", async () => {
+    const w = world();
+    const said = "There are nine of us working on it.";
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: w.fetch,
+      logger,
+      readAfterMs: 5,
+      reader: reader(() => ({
+        answers: [
+          {
+            stepKey: "F4.team_size",
+            value: 9,
+            quote: said,
+            ownWords: true,
+            source: "STATED",
+          },
+        ],
+        declined: [],
+      })),
+      recommendations: w.recommendations,
+    });
+    await conversation.said?.(
+      line,
+      "Q",
+      "How many people work on the company?",
+      "F4.team_size",
+    );
+    await conversation.said?.(line, "PERSON", said);
+    await conversation.flush?.(line);
+    // Before D-OWN-3 a figure in their words was written at once.
+    expect(w.recordedValue("F4.team_size")).toBeUndefined();
+    expect(
+      w
+        .heldSuggestions()
+        .filter((s) => s.status === "PENDING")
+        .map((s) => s.stepKey),
+    ).toContain("F4.team_size");
+  });
+
+  it("their yes to Q's read-back of the figure is the agreement: it is saved", async () => {
+    const w = world();
+    const readBack = "So that's nine people on the team, right?";
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: w.fetch,
+      logger,
+      readAfterMs: 5,
+      reader: reader(() => ({
+        answers: [
+          {
+            stepKey: "F4.team_size",
+            value: 9,
+            quote: "Yes, that's right.",
+            ownWords: false,
+            source: "STATED",
+            affirms: true,
+          },
+        ],
+        declined: [],
+      })),
+      recommendations: w.recommendations,
+    });
+    await conversation.said?.(line, "Q", readBack, "F4.team_size");
+    await conversation.said?.(line, "PERSON", "Yes, that's right.");
+    await conversation.flush?.(line);
+    expect(w.recordedValue("F4.team_size")).toBeDefined();
   });
 });

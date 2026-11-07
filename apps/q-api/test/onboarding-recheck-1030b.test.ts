@@ -344,6 +344,8 @@ describe("item 3: a cheque range said to another question is saved on its own tu
       fetch: world.fetch,
       logger,
       readAfterMs: 5,
+      // As production wires it: a held figure waits there (D-OWN-3).
+      recommendations: world.recommendations,
       reader,
     });
     const line = lineFor("investor");
@@ -360,13 +362,17 @@ describe("item 3: a cheque range said to another question is saved on its own tu
     );
     await conversation.flush?.(line);
     expect(reads).toHaveLength(1);
-    expect(world.recordedValue("I2.cheque_min")).toEqual({
-      type: "RANGE",
-      value: "500000",
-    });
-    expect(world.recordedValue("I2.cheque_max")).toEqual({
-      type: "RANGE",
-      value: "2000000",
-    });
+    // D-OWN-3 (DECISIONS 78): a number is held for its read-back, never saved
+    // before their yes; the value held is exactly the figure they gave.
+    expect(world.recordedValue("I2.cheque_min")).toBeUndefined();
+    expect(
+      world.heldSuggestions().find((s) => s.stepKey === "I2.cheque_min")?.value,
+    ).toEqual({ type: "RANGE", value: "500000" });
+    // D-OWN-3 (DECISIONS 78): a number is held for its read-back, never saved
+    // before their yes; the value held is exactly the figure they gave.
+    expect(world.recordedValue("I2.cheque_max")).toBeUndefined();
+    expect(
+      world.heldSuggestions().find((s) => s.stepKey === "I2.cheque_max")?.value,
+    ).toEqual({ type: "RANGE", value: "2000000" });
   });
 });

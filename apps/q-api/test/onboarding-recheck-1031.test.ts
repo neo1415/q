@@ -68,7 +68,7 @@ const PACE_Q =
   "What's the current deployment pace: actively investing, selective, paused, or exploring only?";
 
 describe("1. only what the person stated is saved; Q's inference waits for their yes", () => {
-  it("an inferred deployment status is held as a suggestion, never written; their stated cheque is saved", async () => {
+  it("an inferred deployment status is held as a suggestion, never written; their stated cheque is held for its read-back (D-OWN-3)", async () => {
     const world = investorSession({
       currentStepKey: "I1.deployment_status",
       subject: FIRM,
@@ -106,17 +106,22 @@ describe("1. only what the person stated is saved; Q's inference waits for their
     await conversation.said?.(line, "PERSON", CHEQUES);
     await conversation.flush?.(line);
     expect(world.recordedValue("I1.deployment_status")).toBeUndefined();
+    // The inferred status waits for their yes, and (D-OWN-3) so does the
+    // cheque figure they stated: both are pending, nothing else.
     expect(world.heldSuggestions()).toEqual([
       expect.objectContaining({
         stepKey: "I1.deployment_status",
         value: { type: "SINGLE_SELECT", optionKey: "actively_investing" },
         status: "PENDING",
       }),
+      expect.objectContaining({ stepKey: "I2.cheque_min", status: "PENDING" }),
     ]);
-    expect(world.recordedValue("I2.cheque_min")).toEqual({
-      type: "RANGE",
-      value: "750000",
-    });
+    // D-OWN-3 (DECISIONS 78): a number is held for its read-back, never saved
+    // before their yes; the value held is exactly the figure they gave.
+    expect(world.recordedValue("I2.cheque_min")).toBeUndefined();
+    expect(
+      world.heldSuggestions().find((s) => s.stepKey === "I2.cheque_min")?.value,
+    ).toEqual({ type: "RANGE", value: "750000" });
   });
 
   it('"I don\'t know" to a needed step records it as not known, never their sentence and never a value; it stays answerable', async () => {

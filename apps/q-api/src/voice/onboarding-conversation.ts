@@ -690,11 +690,25 @@ export function createOnboardingConversation(dependencies: {
         "onboarding conversation reading held an unasked judgement",
       );
     }
+    // D-OWN-3 (DECISIONS 78): a number is read back for their yes, always,
+    // typed or spoken. A figure they stated is held like an inferred value
+    // (Q says it back; their yes saves it); only their agreement to Q's own
+    // read-back of it (affirms) goes straight to the record.
+    const figureToReadBack = (answer: {
+      readonly value: unknown;
+      readonly affirms?: boolean | undefined;
+    }): boolean => typeof answer.value === "number" && answer.affirms !== true;
     const stated = answers.filter(
-      (answer) => answer.source !== "INFERRED" && fromQuestion(answer),
+      (answer) =>
+        answer.source !== "INFERRED" &&
+        fromQuestion(answer) &&
+        !figureToReadBack(answer),
     );
     const inferred = answers.filter(
-      (answer) => answer.source === "INFERRED" || !fromQuestion(answer),
+      (answer) =>
+        answer.source === "INFERRED" ||
+        !fromQuestion(answer) ||
+        figureToReadBack(answer),
     );
     if (
       answers.length === 0 &&
@@ -1495,7 +1509,7 @@ export function briefOf(
     ...lines,
     ...(neededOpen
       ? [
-          "Needed topics are required: Capital Q needs them to verify the profile, and setup can't finish without them. If they'd rather not answer one, don't drop it and don't press: say briefly why it's needed (to verify their profile), that they can answer it later, then move on and come back to it. Optional topics they skip are simply left.",
+          "Needed topics are required: Capital Q needs them for their profile, their matching and verification, and setup can't finish without an answer. \"I don't know\" is an answer: it is recorded as not known and they carry on. If they'd rather not answer one, don't drop it and don't press: say briefly why it's needed (what it is used for, in plain words), that they can answer it later, then move on and come back to it. Optional topics they skip are simply left.",
         ]
       : []),
     // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long

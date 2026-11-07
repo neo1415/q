@@ -129,6 +129,9 @@ function typedWorld(options: {
     logger,
     readAfterMs: 5,
     reader,
+    // As production wires it: a held value (an inference, or a figure for
+    // its read-back, D-OWN-3) waits there for their yes.
+    recommendations: options.world.recommendations,
     categories: options.categories,
     ...(options.held === true
       ? {
@@ -338,7 +341,7 @@ describe('defect 2: "we like to lead sometimes but mostly follow" is follow', ()
 });
 
 describe("defect 3: a correction to a held cheque keeps its history (25000 -> 50000)", () => {
-  it("the held original is written first, then the correction", async () => {
+  it("neither figure is written before its read-back; their latest figure waits (D-OWN-3)", async () => {
     const world = investorSession({
       currentStepKey: "I0.investor_type",
       subject: FIRM,
@@ -384,15 +387,25 @@ describe("defect 3: a correction to a held cheque keeps its history (25000 -> 50
     await settled(() => world.attempts().includes("I2.cheque_min"));
     expect(world.recordedValue("I2.cheque_min")).toBeUndefined();
     await say("actually sorry, make that 50 to 100k, not 25");
-    await settled(
-      () =>
-        JSON.stringify(world.recordedValue("I2.cheque_min")) ===
-        JSON.stringify({ type: "RANGE", value: "50000" }),
+    await settled(() =>
+      world
+        .heldSuggestions()
+        .some(
+          (s) =>
+            s.stepKey === "I2.cheque_min" &&
+            JSON.stringify(s.value) ===
+              JSON.stringify({ type: "RANGE", value: "50000" }),
+        ),
     );
-    expect(world.history("I2.cheque_min")).toEqual([
-      { type: "RANGE", value: "25000" },
-      { type: "RANGE", value: "50000" },
-    ]);
+    // D-OWN-3 (DECISIONS 78): figures are read back for their yes, so
+    // neither is written before it; what waits is their latest figure.
+    expect(world.history("I2.cheque_min")).toEqual([]);
+    expect(
+      world
+        .heldSuggestions()
+        .filter((s) => s.stepKey === "I2.cheque_min" && s.status === "PENDING")
+        .map((s) => s.value),
+    ).toEqual([{ type: "RANGE", value: "50000" }]);
   });
 });
 
