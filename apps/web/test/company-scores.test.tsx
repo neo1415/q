@@ -172,7 +172,7 @@ describe("CompanyScores", () => {
     render(<CompanyScores scores={scored} variant="minimal" />);
     const tile = document.querySelector('[data-company-scores="minimal"]');
     expect(tile?.querySelector(".sr-only")?.textContent).toContain(
-      "Investability 58 · based on 15 of 46 factors",
+      "Investability 58 · Low confidence · based on 15 of 46 factors",
     );
     // One clean signal on the tile: the fit with this viewer.
     expect(tile?.querySelector('[aria-hidden="true"]')?.textContent).toBe(

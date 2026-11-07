@@ -3,7 +3,6 @@
 import {
   UNICORN_CONFIDENCE_LABELS,
   UNICORN_POTENTIAL_CAVEAT,
-  UNICORN_POTENTIAL_SHORT_CAVEAT,
   type UnicornPotentialDto,
   type UnicornSource,
 } from "@capital-q/contracts";
@@ -51,7 +50,7 @@ function decimal(value: number): string {
 export function unicornPotentialLine(score: UnicornPotentialDto): string {
   return score.overallScore === null
     ? `Unicorn Potential: ${score.status === "NOT_ASSESSED" ? "not assessed yet" : "insufficient evidence"}`
-    : `Unicorn Potential ${String(score.overallScore)}/100 · ${CONFIDENCE[score.confidence]} · ${percent(score.coverage)} coverage · ${UNICORN_POTENTIAL_SHORT_CAVEAT}`;
+    : `Unicorn Potential ${String(score.overallScore)}/100 · ${CONFIDENCE[score.confidence]} · ${percent(score.coverage)} coverage`;
 }
 
 function Source({ source }: { readonly source: UnicornSource }) {
@@ -145,9 +144,6 @@ export function UnicornPotential({
             {CONFIDENCE[score.confidence]}
             {" · "}
             {percent(score.coverage)} coverage
-            {score.overallScore === null ? null : (
-              <span className="block">{UNICORN_POTENTIAL_SHORT_CAVEAT}</span>
-            )}
           </span>
         </span>
         <span className="flex shrink-0 items-baseline gap-3">

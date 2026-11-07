@@ -214,9 +214,8 @@ describe("Unicorn Potential progressive assessment", () => {
     expect(summary?.textContent).toContain("75/100");
     expect(summary?.textContent).toContain("Moderate confidence");
     expect(summary?.textContent).toContain("100% coverage");
-    // Metrics audit P0-6: the short caveat travels with the number; the
-    // full caveat is on expansion.
-    expect(summary?.textContent).toContain("An indicator, not a probability");
+    // Owner decision 76: the caveat is on expansion only, once.
+    expect(summary?.textContent).not.toContain("probability");
     expect(screen.getByText(UNICORN_POTENTIAL_CAVEAT).closest("details")).toBe(
       root,
     );

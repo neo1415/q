@@ -270,11 +270,10 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Raise not shared": "الجولة غير مُشارَكة",
   "Suitability for you": "الملاءمة لك",
   "The other": "العوامل الأخرى",
+  "are unknown.": "غير معروفة.",
   "There is not enough shared evidence for a number yet.":
     "لا توجد أدلة مُشارَكة كافية لرقم بعد.",
   "Unicorn potential": "مؤشر Unicorn Potential",
-  "An indicator, not a probability": "مؤشر، وليس احتمالاً",
-  "Open the assessment": "افتح التقييم",
   coverage: "تغطية",
   // UNICORN_POTENTIAL_CAVEAT (metrics audit P0-7): shown wherever the
   // score is, in every language.

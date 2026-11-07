@@ -249,7 +249,12 @@ export function investabilityLine(dto: InvestabilityDto): string {
   if (dto.status === "INSUFFICIENT_EVIDENCE" || dto.score === null) {
     return `Investability: not enough shared evidence yet · ${factors}`;
   }
-  return `Investability ${dto.score} · ${factors}`;
+  // One compact indicator per score (owner decision 76; audit P2-4).
+  const confidence =
+    dto.confidence === null
+      ? ""
+      : ` · ${SCORE_CONFIDENCE_LABELS[dto.confidence]}`;
+  return `Investability ${dto.score}${confidence} · ${factors}`;
 }
 
 /** "Suitability 80 · 6 of 7 known", or the honest words. */

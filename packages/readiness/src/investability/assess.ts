@@ -450,16 +450,9 @@ function viewOf(
       `${DIMENSION_LABELS[d.dimension]}: ${DIMENSION_ASKS[d.dimension]}`,
     );
   }
+  // Owner decision 76: confidence is shown once, compactly, beside the
+  // score; no generic "stronger evidence would help" line on every card.
   const overall = a.overall;
-  if (
-    overall.status === "BANDED" &&
-    overall.confidence !== "HIGH" &&
-    missing.length < 4
-  ) {
-    missing.push(
-      "Document-supported or verified evidence would raise confidence",
-    );
-  }
 
   const coverage = {
     areasScored: scoredAreas.length,

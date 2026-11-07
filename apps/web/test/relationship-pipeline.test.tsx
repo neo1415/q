@@ -703,7 +703,7 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
       "Unicorn Potential",
     ]);
     const score = screen.getByRole("link", {
-      name: "Unicorn Potential 67. An indicator, not a probability. Open the assessment",
+      name: "Unicorn Potential 67. Open the assessment",
     });
     expect(score.getAttribute("href")).toBe(
       `/company/${kivu}#unicorn-potential-${kivu}`,

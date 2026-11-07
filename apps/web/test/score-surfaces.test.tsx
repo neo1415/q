@@ -6,15 +6,15 @@ import {
   CompanyScoresDtoSchema,
   notAssessedInvestability,
   UNICORN_PILLAR_IDS,
-  UNICORN_POTENTIAL_SHORT_CAVEAT,
   type CompanyScoresDto,
   type UnicornPotentialDto,
 } from "@capital-q/contracts";
 
 /**
- * Metrics audit P0-6 (ADR 0076, PADL #046): wherever a Unicorn Potential
- * number is shown, its confidence, its coverage and "an indicator, not a
- * probability" are shown with it. Unknown is words, never 0.
+ * Metrics audit P0-6 as amended by owner decision 76: wherever a Unicorn
+ * Potential number is shown, one compact indicator (confidence · coverage)
+ * goes with it, and no caveat sentence is repeated on every surface.
+ * Unknown is words, never 0.
  */
 
 const q = vi.hoisted(() => ({ askAbout: vi.fn(), askNow: vi.fn() }));
@@ -102,9 +102,10 @@ const scores: CompanyScoresDto = CompanyScoresDtoSchema.parse({
   unicornPotential: unicorn,
 });
 
-const CAVEAT = new RegExp(UNICORN_POTENTIAL_SHORT_CAVEAT, "iu");
+/** Owner decision 76: one compact indicator, no caveat sentence repeated. */
+const CAVEAT = /probability|forecast/iu;
 
-describe("Unicorn Potential: caveat, confidence and coverage on every surface", () => {
+describe("Unicorn Potential: one compact confidence and coverage indicator on every surface", () => {
   it("the pipeline figure (UnicornFigure)", () => {
     const cell = pipelineScoresOf(scores).unicorn;
     if (cell === undefined || cell === null) throw new Error("no cell");
@@ -113,7 +114,6 @@ describe("Unicorn Potential: caveat, confidence and coverage on every surface", 
     expect(figure?.textContent).toMatch(/62/u);
     expect(figure?.textContent).toMatch(/Low confidence/u);
     expect(figure?.textContent).toMatch(/100% coverage/u);
-    expect(screen.getByRole("link").getAttribute("aria-label")).toMatch(CAVEAT);
   });
 
   it("Q's read row in Discover", () => {
@@ -123,13 +123,14 @@ describe("Unicorn Potential: caveat, confidence and coverage on every surface", 
     );
     expect(row?.textContent).toMatch(/Low confidence/u);
     expect(row?.textContent).toMatch(/100% coverage/u);
-    expect(row?.textContent).toMatch(CAVEAT);
+    expect(row?.textContent).not.toMatch(CAVEAT);
   });
 
   it("the collapsed assessment summary", () => {
     render(<UnicornPotential score={unicorn} companyId={COMPANY} />);
     const summary = document.querySelector("summary");
-    expect(summary?.textContent).toMatch(CAVEAT);
+    expect(summary?.textContent).toMatch(/100% coverage/u);
+    expect(summary?.textContent).not.toMatch(CAVEAT);
     expect(summary?.textContent).toMatch(/Low confidence/u);
   });
 
@@ -137,8 +138,10 @@ describe("Unicorn Potential: caveat, confidence and coverage on every surface", 
     render(<CompanyScores scores={scores} variant="compact" />);
     const line = document.querySelector('[data-score="unicorn-potential"]');
     expect(line?.textContent).toMatch(/Low confidence/u);
-    expect(line?.textContent).toMatch(CAVEAT);
-    expect(unicornPotentialLine(unicorn)).toMatch(CAVEAT);
+    expect(line?.textContent).not.toMatch(CAVEAT);
+    expect(unicornPotentialLine(unicorn)).toBe(
+      "Unicorn Potential 62/100 · Low confidence · 100% coverage",
+    );
   });
 });
 
@@ -163,7 +166,7 @@ describe("compact score lines are heard by screen readers (metrics audit P1-18)"
       expect(line?.getAttribute("aria-label")).toBeNull();
       const spoken = line?.querySelector(".sr-only")?.textContent ?? "";
       expect(spoken).toMatch(/Investability 58/u);
-      expect(spoken).toMatch(CAVEAT);
+      expect(spoken).toMatch(/Low confidence/u);
     });
   }
 });

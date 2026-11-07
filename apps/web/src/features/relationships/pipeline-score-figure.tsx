@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 
-import {
-  UNICORN_CONFIDENCE_LABELS,
-  UNICORN_POTENTIAL_SHORT_CAVEAT,
-} from "@capital-q/contracts";
+import { UNICORN_CONFIDENCE_LABELS } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 
 import { useT } from "@/features/i18n/language";
@@ -111,10 +108,9 @@ export function UnicornFigure({
       )}
       aria-label={
         words === null
-          ? `${t("Unicorn Potential")} ${String(cell.score)}. ${t(UNICORN_POTENTIAL_SHORT_CAVEAT)}. ${t("Open the assessment")}`
-          : `${t("Unicorn Potential")}: ${words}. ${t("Open the assessment")}`
+          ? t(`Unicorn Potential ${String(cell.score)}. Open the assessment`)
+          : t(`Unicorn Potential: ${words}. Open the assessment`)
       }
-      title={words === null ? t(UNICORN_POTENTIAL_SHORT_CAVEAT) : undefined}
       data-unicorn-link
     >
       {words ?? String(cell.score)}
