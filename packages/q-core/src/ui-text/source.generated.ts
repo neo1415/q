@@ -4269,6 +4269,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "See all",
   "See all in Chat",
   "See all {n}",
+  "See analytics",
   "See companies with what you've told Q so far.",
   "See it as an investor would",
   "See it in the plan",

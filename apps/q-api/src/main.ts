@@ -679,6 +679,8 @@ import {
 } from "@capital-q/discovery";
 import {
   createAnalyticsSettingsReader,
+  createEngagementNotices,
+  noticeSaves,
   createEngagementService,
   createPostgresCompanyEngagementReader,
   createPostgresMyEngagementReader,
@@ -3198,13 +3200,23 @@ const appActionPorts: OwnReadPorts = {
         documentId: DocumentIdSchema.parse(command.documentId),
       }),
   },
-  interactions: createInteractionSignalService({
-    ports: slateRead.eligibilityPorts,
-    eligibility: slateRead.eligibility,
-    slates: slateRead.slates,
-    repository: createPostgresInteractionRepository({ sql: database.sql }),
-    logger,
-  }),
+  // Q Workspace §8 A6: a save Q makes for them tells the founders too.
+  interactions: (() => {
+    const service = createInteractionSignalService({
+      ports: slateRead.eligibilityPorts,
+      eligibility: slateRead.eligibility,
+      slates: slateRead.slates,
+      repository: createPostgresInteractionRepository({ sql: database.sql }),
+      logger,
+    });
+    return {
+      ...service,
+      decide: noticeSaves(
+        service.decide,
+        createEngagementNotices(database.sql),
+      ),
+    };
+  })(),
   ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
   ownInvestorOrganisationId: (actor) =>
     runtimeDependencies.ownInvestorOrganisation(actor),

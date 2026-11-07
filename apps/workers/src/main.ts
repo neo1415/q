@@ -184,6 +184,8 @@ import { withOutcomeNotices } from "./network/outcome-notice-handler.js";
 import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
 import { createStartupAlertWatcher } from "./network/startup-alert-watcher.js";
+import { runViewingDigest } from "./analytics/viewing-digest.js";
+import { createEngagementNotices } from "@capital-q/engagement";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
 import {
   checkStoredDeckReadings,
@@ -1839,6 +1841,14 @@ await Promise.all([
           signal: shutdownController.signal,
         }),
       ]),
+  // Q Workspace §8 A6: the weekly viewing digest (admin setting, OFF by
+  // default; aggregate only, above the floor, once per company and week).
+  runViewingDigest({
+    digest: createEngagementNotices(database.sql).weeklyDigest,
+    intervalMs: 60 * 60 * 1000,
+    signal: shutdownController.signal,
+    logger,
+  }),
   // ADMIN-4 block
   runAutoVerificationRequests({
     sweep: autoVerificationSweep,

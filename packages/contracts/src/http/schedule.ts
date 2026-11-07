@@ -380,6 +380,10 @@ export const NotificationKindSchema = z.enum([
   "COMMITMENT",
   // P14 (20261209132000): a new company matches a saved startup alert.
   "STARTUP_ALERT",
+  // Q Workspace §8 A6 (20261231410000): an investor saved the company, at
+  // the saver's viewing level; and the week's passive viewing, aggregate.
+  "COMPANY_SAVED",
+  "VIEWING_DIGEST",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

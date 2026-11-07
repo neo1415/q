@@ -14,6 +14,7 @@ import {
 } from "@/features/q-card/public-card-data";
 import { qrSvg } from "@/features/q-card/qr";
 import { PublicCardView } from "@/features/q-card/public-card-view";
+import { QCardViewBeacon } from "@/features/engagement/q-card-view-beacon";
 
 /**
  * `/@handle` (BIZ-004; reached through a rewrite to `/u/[handle]`): an
@@ -132,6 +133,11 @@ export default async function PublicCardPage({
         displayUrl={displayUrlFor(card.handle)}
         qrSvg={qrSvg(`${appOrigin()}/@${card.handle}`)}
       />
+      {/* Q Workspace §8 A1: only a signed-in participant's view of a
+          company's card is engagement; the public reader is not. */}
+      {card.audience === "PARTICIPANT" && card.subjectType === "COMPANY" ? (
+        <QCardViewBeacon handle={card.handle} />
+      ) : null}
     </main>
   );
 }

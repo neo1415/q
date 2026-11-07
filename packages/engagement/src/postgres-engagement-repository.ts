@@ -62,6 +62,10 @@ export function createPostgresEngagementRepository(
   return {
     append: async (viewer, event) => {
       const documentId = "documentId" in event ? event.documentId : null;
+      // A Q Card view may name the card's handle instead of the company:
+      // only an ACTIVE company handle resolves, in this same statement.
+      const companyId = event.companyId ?? null;
+      const handle = "handle" in event ? (event.handle ?? null) : null;
       const mediaAssetId = "mediaAssetId" in event ? event.mediaAssetId : null;
       const slideNumber =
         event.type === "DECK_SLIDE_DWELL" ? event.slideNumber : null;
@@ -87,7 +91,11 @@ export function createPostgresEngagementRepository(
                ${event.clientEventId}, ${event.sessionId ?? null},
                least(${event.occurredAt}::timestamptz, now())
           from core.companies c
-         where c.id = ${event.companyId}::uuid
+         where c.id = coalesce(
+                 ${companyId}::uuid,
+                 (select h.subject_id from core.handles h
+                   where h.handle = ${handle}::text and h.subject_type = 'COMPANY'
+                     and h.status = 'ACTIVE'))
            and c.company_status = 'active'
            and c.organisation_id <> ${viewer.organisationId}::uuid
            and (
