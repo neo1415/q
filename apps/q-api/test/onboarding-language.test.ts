@@ -87,9 +87,10 @@ describe("the questions code adds, in the person's language", () => {
   });
 
   it("Arabic's hand copy covers every founder and investor step", () => {
-    const missing = [...founderSteps, ...INVESTOR_DEFINITION_CURRENT.steps].filter(
-      (step) => SPOKEN_QUESTIONS_AR[step.stepKey] === undefined,
-    );
+    const missing = [
+      ...founderSteps,
+      ...INVESTOR_DEFINITION_CURRENT.steps,
+    ].filter((step) => SPOKEN_QUESTIONS_AR[step.stepKey] === undefined);
     expect(missing.map((step) => step.stepKey)).toEqual([]);
   });
 

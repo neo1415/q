@@ -209,9 +209,7 @@ describe("1. only what the person stated is saved; Q's inference waits for their
         {
           answers: [],
           declined: [],
-          notKnown: [
-            { stepKey: "I9.discovery_mode", quote: "not sure yet" },
-          ],
+          notKnown: [{ stepKey: "I9.discovery_mode", quote: "not sure yet" }],
         },
       ]),
     });
