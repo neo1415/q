@@ -1292,6 +1292,10 @@ export const NAVIGATION_VOTES = 3;
  * (batch-8 replay) with room. A stored answer never waits past it.
  */
 export const NAVIGATION_DECISION_DEADLINE_MS = 6_000;
+/** The most a stored answer waits for the decision before it goes alone. */
+export const NAVIGATION_SETTLE_GRACE_MS = 1_500;
+/** A late decision still moves the pane up to this long into the turn. */
+export const NAVIGATION_LATE_LIMIT_MS = 20_000;
 
 /** How much a decision does on its own: the most careful one wins a tie. */
 const AUTHORITY: Readonly<Record<QNavigationOutcome["decision"], number>> = {
@@ -1460,7 +1464,27 @@ export type QPageMovePort = {
   readonly settle: (
     request: QAnswerRequest,
     blocks: readonly QResultBlock[] | undefined,
+    options?: {
+      /**
+       * The answer's own moves are code's exact commands (a page by its
+       * name, "yes, open it" to Q's offer): they stand over the decision.
+       * Absent: the answer model's own acts, which the decision outranks.
+       */
+      readonly keepAnswerMoves?: boolean | undefined;
+    },
   ) => Promise<readonly QResultBlock[] | undefined>;
+  /**
+   * Batch-8 replay: a decision still running when the answer was stored
+   * (and the answer moved nothing itself) follows it: its move and a short
+   * line, for the answer path to store before the run completes. Null when
+   * there is none.
+   */
+  readonly late?:
+    | ((request: QAnswerRequest) => Promise<{
+        readonly content: string;
+        readonly blocks: readonly QResultBlock[];
+      } | null>)
+    | undefined;
 };
 
 const NO_RECORDS: QNavigationRecords = {
@@ -1471,6 +1495,31 @@ const NO_RECORDS: QNavigationRecords = {
 };
 
 /** A move the answer already makes: code's own move wins (one per turn). */
+/** UI acts that change where the page pane is (a tab, an item, history). */
+const PLACE_ACTS: ReadonlySet<string> = new Set([
+  "SELECT_TAB",
+  "SELECT_ITEM",
+  "BACK",
+  "FORWARD",
+]);
+
+/** A block that moves the page pane to another place (not a page action). */
+function changesPlace(block: QResultBlock): boolean {
+  return (
+    movesAlready([block]) ||
+    (block.kind === "UI_INTENT" &&
+      block.intent.kind === "UI_ACT" &&
+      PLACE_ACTS.has(block.intent.act))
+  );
+}
+
+const blockKind = (block: QResultBlock): string =>
+  block.kind === "UI_INTENT"
+    ? block.intent.kind === "UI_ACT"
+      ? `UI_ACT:${block.intent.act}`
+      : `UI_INTENT:${block.intent.kind}`
+    : block.kind;
+
 function movesAlready(blocks: readonly QResultBlock[]): boolean {
   return blocks.some(
     (block) =>
@@ -1548,11 +1597,70 @@ export function createQPageMoves(dependencies: {
    * decision's own deadline, counted from the turn's start: a long answer
    * never waits, a fast one waits only as long as the decision needs.
    */
+  const lateRuns = new Map<
+    string,
+    {
+      readonly decided: Promise<QNavigationOutcome | null>;
+      readonly began: number;
+    }
+  >();
+  /** The place's own name, as the site map titles it (its tab, else its page). */
+  const placeTitle = (target: QNavigateTarget): string => {
+    const landing = qSiteMapLandingFor(map, target.page);
+    const tabId = target.tab ?? landing?.tab?.id;
+    const tab = landing?.page.tabs.find((t) => t.id === tabId);
+    return (tab?.title ?? landing?.page.title ?? "the page").slice(
+      0,
+      Q_NAVIGATION_OFFER_LABEL_MAX - 5,
+    );
+  };
+  /** The page pane's blocks for an outcome with a place; null for none. */
+  const blocksOf = (outcome: QNavigationOutcome): QResultBlock[] | null => {
+    if (outcome.target === null || outcome.decision === "STAY") return null;
+    let intent: ReturnType<typeof navigateTargetToIntent>;
+    try {
+      intent = navigateTargetToIntent(outcome.target);
+    } catch {
+      return null;
+    }
+    if (outcome.decision === "OFFER") {
+      const title = (
+        qSiteMapLandingFor(map, outcome.target.page)?.page.title ?? "the page"
+      ).slice(0, Q_NAVIGATION_OFFER_LABEL_MAX - 5);
+      return [
+        {
+          kind: "NAVIGATION_OFFER",
+          intent,
+          place: title,
+          openLabel: `Open ${title}`,
+        },
+      ];
+    }
+    return [
+      ...(outcome.openPane
+        ? [
+            {
+              kind: "UI_INTENT" as const,
+              intent: {
+                kind: "LAYOUT_SET" as const,
+                pagePane: "open" as const,
+              },
+            },
+          ]
+        : []),
+      { kind: "UI_INTENT", intent },
+    ];
+  };
   const waitFor = (runId: string): number => {
     if (dependencies.settleWithinMs !== undefined)
       return dependencies.settleWithinMs;
     const since = Date.now() - (startedAt.get(runId) ?? Date.now());
-    return Math.max(0, NAVIGATION_DECISION_DEADLINE_MS - since);
+    // Never more than a short grace: a decision later than that follows
+    // the answer (late), so a fast answer stays fast.
+    return Math.min(
+      NAVIGATION_SETTLE_GRACE_MS,
+      Math.max(0, NAVIGATION_DECISION_DEADLINE_MS - since),
+    );
   };
   return {
     start: (request, turn) => {
@@ -1629,83 +1737,96 @@ export function createQPageMoves(dependencies: {
       setTimeout(() => {
         pending.delete(request.runId);
         startedAt.delete(request.runId);
+        lateRuns.delete(request.runId);
       }, 120_000).unref?.();
     },
-    settle: async (request, blocks) => {
+    settle: async (request, blocks, options) => {
       const decided = pending.get(request.runId);
       if (decided === undefined) return blocks;
+      const began = startedAt.get(request.runId) ?? Date.now();
       const waitMs = waitFor(request.runId);
       pending.delete(request.runId);
       startedAt.delete(request.runId);
       const current = blocks ?? [];
-      if (movesAlready(current)) {
-        // Batch-8 replay: the answer's own move wins; say so, by kind only.
+      const answerMoves = current.filter(changesPlace);
+      if (options?.keepAnswerMoves === true && answerMoves.length > 0) {
         dependencies.logger?.info(
-          {
-            qRunId: request.runId,
-            answerMoves: current
-              .filter((block) => movesAlready([block]))
-              .map((block) =>
-                block.kind === "UI_INTENT"
-                  ? `UI_INTENT:${block.intent.kind}`
-                  : block.kind,
-              ),
-          },
+          { qRunId: request.runId, answerMoves: answerMoves.map(blockKind) },
           "q page move skipped: the answer already moves the pane",
         );
         return blocks;
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const late = Symbol("late");
+      const notYet = Symbol("not yet");
       const settled = await Promise.race([
         decided,
-        new Promise<typeof late>((resolve) => {
-          timer = setTimeout(() => resolve(late), waitMs);
+        new Promise<typeof notYet>((resolve) => {
+          timer = setTimeout(() => resolve(notYet), waitMs);
         }),
       ]).finally(() => clearTimeout(timer));
-      if (settled === late)
+      if (settled === notYet) {
+        if (answerMoves.length > 0) {
+          dependencies.logger?.info(
+            { qRunId: request.runId, answerMoves: answerMoves.map(blockKind) },
+            "q page move skipped: the answer already moves the pane",
+          );
+          return blocks;
+        }
+        // Batch-8 replay: never dropped. The answer goes now; the move
+        // follows it (late), before the run completes.
+        lateRuns.set(request.runId, { decided, began });
         dependencies.logger?.info(
           { qRunId: request.runId, waitedMs: waitMs },
-          "q page move not ready when the answer was stored; the pane stays",
+          "q page move not ready when the answer was stored; it follows the answer",
         );
-      const outcome = settled === late ? null : settled;
-      if (outcome === null || outcome.target === null) return blocks;
-      if (outcome.decision === "STAY") return blocks;
-      let intent: ReturnType<typeof navigateTargetToIntent>;
-      try {
-        intent = navigateTargetToIntent(outcome.target);
-      } catch {
         return blocks;
       }
-      if (outcome.decision === "OFFER") {
-        const title = (
-          qSiteMapLandingFor(map, outcome.target.page)?.page.title ?? "the page"
-        ).slice(0, Q_NAVIGATION_OFFER_LABEL_MAX - 5);
-        return [
-          ...current,
-          {
-            kind: "NAVIGATION_OFFER",
-            intent,
-            place: title,
-            openLabel: `Open ${title}`,
-          },
-        ];
-      }
-      return [
-        ...current,
-        ...(outcome.openPane
-          ? [
-              {
-                kind: "UI_INTENT" as const,
-                intent: {
-                  kind: "LAYOUT_SET" as const,
-                  pagePane: "open" as const,
-                },
-              },
-            ]
-          : []),
-        { kind: "UI_INTENT", intent },
-      ];
+      const moved = settled === null ? null : blocksOf(settled);
+      if (moved === null) return blocks;
+      // One authority in the Q Workspace: the decision's place replaces the
+      // answer's own place moves; the page's own actions stay.
+      if (answerMoves.length > 0)
+        dependencies.logger?.info(
+          { qRunId: request.runId, answerMoves: answerMoves.map(blockKind) },
+          "q page move replaced the answer's own move",
+        );
+      return [...current.filter((block) => !changesPlace(block)), ...moved];
+    },
+    late: async (request) => {
+      const waiting = lateRuns.get(request.runId);
+      if (waiting === undefined) return null;
+      lateRuns.delete(request.runId);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const tooLate = Symbol("too late");
+      const settled = await Promise.race([
+        waiting.decided,
+        new Promise<typeof tooLate>((resolve) => {
+          timer = setTimeout(
+            () => resolve(tooLate),
+            Math.max(0, waiting.began + NAVIGATION_LATE_LIMIT_MS - Date.now()),
+          );
+        }),
+      ]).finally(() => clearTimeout(timer));
+      if (settled === tooLate || settled === null) return null;
+      const moved = blocksOf(settled);
+      if (moved === null || settled.target === null) return null;
+      const title = placeTitle(settled.target);
+      dependencies.logger?.info(
+        {
+          qRunId: request.runId,
+          decision: settled.decision,
+          page: settled.target.page,
+          ms: Date.now() - waiting.began,
+        },
+        "q page move applied after the answer",
+      );
+      return {
+        content:
+          settled.decision === "OFFER"
+            ? `${title} is ready to open.`
+            : `I've opened ${title}.`,
+        blocks: moved,
+      };
     },
   };
 }

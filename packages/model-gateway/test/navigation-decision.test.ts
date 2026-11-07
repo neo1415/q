@@ -816,7 +816,7 @@ describe("the answer path's page moves (createQPageMoves)", () => {
     expect(await moves.settle(request, undefined)).toBeUndefined();
   });
 
-  it("opens a collapsed page pane first, offers away from unsaved work, and leaves code's own move alone", async () => {
+  it("opens a collapsed page pane first, offers away from unsaved work; code's exact commands stand, the answer model's own moves yield", async () => {
     const collapsed = createQPageMoves({
       decider: proposing(deck).decider,
       config: { movesAllowed: true },
@@ -853,7 +853,23 @@ describe("the answer path's page moves (createQPageMoves)", () => {
         intent: { kind: "NAVIGATE" as const, destination: "WORK" as const },
       },
     ];
-    expect(await own.settle(r3, codes)).toBe(codes);
+    // Code's exact command (a page by name, "yes, open it") stands.
+    expect(await own.settle(r3, codes, { keepAnswerMoves: true })).toBe(codes);
+    // Batch-8 replay (owner via integration): one authority in the Q
+    // Workspace. The answer model's own move yields to the decision's place.
+    const r4 = answerRequest(ON);
+    own.start(r4, turn);
+    expect(await own.settle(r4, codes)).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "OPEN_RECORD_PAGE",
+          page: "COMPANY",
+          id: SILO,
+          tab: "deck",
+        },
+      },
+    ]);
   });
 
   it("a page the person may not open, or a decision too slow or failed, leaves the answer as it was", async () => {
@@ -1638,10 +1654,11 @@ describe("batch-8 replay: settle says why the decision's move was not used", () 
   }
   const turn = { utterance: "open my work", recentTurns: [], pageText: null };
 
-  it("the answer already moves the pane: logged with the moving block's kind", async () => {
+  it("the answer already moves the pane and the decision is not ready: logged with the moving block's kind", async () => {
     const { lines, logger } = logged();
     const moves = createQPageMoves({
-      decider: { decide: () => Promise.resolve(null) },
+      decider: { decide: () => new Promise(() => undefined) },
+      settleWithinMs: 5,
       config: { movesAllowed: true },
       logger,
     });
@@ -1671,60 +1688,148 @@ describe("batch-8 replay: settle says why the decision's move was not used", () 
       lines.some(
         (l) =>
           l.msg ===
-          "q page move not ready when the answer was stored; the pane stays",
+          "q page move not ready when the answer was stored; it follows the answer",
       ),
     ).toBe(true);
   });
 });
 
-describe("batch-8 replay: a fast answer waits for the decision's own deadline, counted from the turn's start", () => {
-  it("a decision ready 4 s into the turn joins an answer stored at 0.5 s (a fixed 2.5 s window after the answer dropped it)", async () => {
+describe("batch-8 replay: late decisions still move the pane; the decision outranks the answer's own place moves", () => {
+  const request = (runId: string) =>
+    ({
+      runId,
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "HOME",
+          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+        },
+      },
+    }) as unknown as QAnswerRequest;
+  const team = proposal({ place: place({ route: "/work", tab: "team" }) });
+  const stay = proposal({ decision: "STAY", askedForPage: false });
+  const turn = {
+    utterance: "who is on Q's team",
+    recentTurns: [],
+    pageText: null,
+  };
+  const TEAM_MOVE = {
+    kind: "UI_INTENT",
+    intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
+  };
+  const later = (answer: NavigationDecisionResult, ms: number) => ({
+    decide: () =>
+      new Promise<NavigationDecisionResult>((resolve) =>
+        setTimeout(() => resolve(answer), ms),
+      ),
+  });
+
+  it("a decision that lands after the answer is stored is applied late, with a short line", async () => {
     vi.useFakeTimers();
     try {
       const moves = createQPageMoves({
-        decider: {
-          decide: () =>
-            new Promise((resolve) =>
-              setTimeout(
-                () =>
-                  resolve(
-                    proposal({ place: place({ route: "/work", tab: "team" }) }),
-                  ),
-                4_000,
-              ),
-            ),
-        },
+        decider: later(team, 4_000),
         config: { movesAllowed: true },
       });
-      const request = {
-        runId: "r3",
-        tenantId: "t",
-        actorUserId: "u",
-        correlationId: "c",
-        plan: {
-          scopes: [],
-          screen: {
-            route: "HOME",
-            workspace: { qPane: "open", pagePane: "open", at: "/home" },
-          },
-        },
-      } as unknown as QAnswerRequest;
-      moves.start(request, {
-        utterance: "who is on Q's team",
-        recentTurns: [],
-        pageText: null,
-      });
+      const r = request("late-1");
+      moves.start(r, turn);
       await vi.advanceTimersByTimeAsync(500);
-      const settling = moves.settle(request, []);
-      await vi.advanceTimersByTimeAsync(4_000);
-      expect(await settling).toEqual([
-        {
-          kind: "UI_INTENT",
-          intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
-        },
-      ]);
+      const settling = moves.settle(r, []);
+      await vi.advanceTimersByTimeAsync(2_000);
+      // The answer is not held for the decision: it goes as it is.
+      expect(await settling).toEqual([]);
+      const late = moves.late?.(r);
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(await late).toEqual({
+        content: "I've opened Q's team.",
+        blocks: [TEAM_MOVE],
+      });
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("no late move when the answer already moved the pane itself, or the decision stays", async () => {
+    vi.useFakeTimers();
+    try {
+      for (const [answer, blocks] of [
+        [
+          team,
+          [
+            {
+              kind: "UI_INTENT",
+              intent: { kind: "NAVIGATE", destination: "WORK" },
+            },
+          ],
+        ],
+        [stay, []],
+      ] as const) {
+        const moves = createQPageMoves({
+          decider: later(answer, 4_000),
+          config: { movesAllowed: true },
+        });
+        const r = request(`late-${answer.decision}`);
+        moves.start(r, turn);
+        const settling = moves.settle(r, blocks);
+        await vi.advanceTimersByTimeAsync(2_000);
+        await settling;
+        const late = moves.late?.(r);
+        await vi.advanceTimersByTimeAsync(5_000);
+        expect(await late).toBeNull();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a decision ready in time replaces the answer's own place moves (navigate, a tab act), and keeps its page actions", async () => {
+    const moves = createQPageMoves({
+      decider: { decide: () => Promise.resolve(team) },
+      config: { movesAllowed: true },
+    });
+    const r = request("replace-1");
+    moves.start(r, turn);
+    const pressSend = {
+      kind: "UI_INTENT",
+      intent: {
+        kind: "UI_ACT",
+        actId: "uia_send000001",
+        act: "ACTIVATE",
+        target: "button.send-questions",
+      },
+    };
+    const selectTab = {
+      kind: "UI_INTENT",
+      intent: {
+        kind: "UI_ACT",
+        actId: "uia_tab0000001",
+        act: "SELECT_TAB",
+        target: "tab.elevator",
+      },
+    };
+    const own = {
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "PROFILE" },
+    };
+    expect(await moves.settle(r, [own, selectTab, pressSend] as never)).toEqual(
+      [pressSend, TEAM_MOVE],
+    );
+  });
+
+  it("a decision that stays leaves the answer's own move as it is", async () => {
+    const moves = createQPageMoves({
+      decider: { decide: () => Promise.resolve(stay) },
+      config: { movesAllowed: true },
+    });
+    const r = request("keep-1");
+    moves.start(r, turn);
+    const own = {
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "WORK" },
+    };
+    expect(await moves.settle(r, [own] as never)).toEqual([own]);
   });
 });
