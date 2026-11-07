@@ -1583,6 +1583,9 @@ export function screenActMissLine(
 ): string | null {
   const newest = facts.at(-1);
   if (newest === undefined || !/\bNOT done\b/u.test(newest)) return null;
+  // Owner replay batch 7 (#9): an act prepared for their approval is not a
+  // miss; the approval card is what they act on.
+  if (/\(AWAITING_APPROVAL\)\.?$/u.test(newest)) return null;
   const reason = /NOT done: (.+?) \([A-Z_]+\)\.?$/u.exec(newest)?.[1];
   const why =
     reason === undefined
@@ -2066,8 +2069,15 @@ export const SAVE_NOT_VERIFY_NOTE =
 export const REMEMBER_FIRST_NOTE =
   "REMEMBER: when they ask you to remember something about themselves or how they work or invest ('remember: I pass on consumer lending'), say first, in one short sentence, that you will remember it; it is kept from what they say, no tool needed. Their declared mandate is separate: change it only when they ask, and otherwise you may offer that as one short question.";
 
+/**
+ * Owner replay batch 7 (#9): "who has viewed my profile?" was answered
+ * "Capital Q doesn't show profile viewers by design" -- this note said so
+ * before Analytics existed. Who viewed them is read (read_my engagement),
+ * shown at the level each viewer chose; viewing stays apart from interest
+ * and is never a reason to contact (Product Specification §6.7.12-14).
+ */
 export const VIEWING_NOT_DISCLOSED_NOTE =
-  "VIEWING IS NOT INTEREST: founders never see who viewed or played their pitch or profile, by design. Asked who looked, say so as how Capital Q works (never as a missing record), then give what they can see: investors who expressed interest or asked to connect, counted from list_incoming_interest or list_my_relationships, never estimated.";
+  "WHO VIEWED THEM: asked who viewed or played their profile, pitch or deck, read it with read_my with kind engagement before answering, never what they themselves viewed. It shows viewers at the level each viewer chose (a founder may see some only as an investor, an investor sees founder organisations by week, never by name); say what it shows and never say Capital Q does not show viewers. Viewing is not interest and never a reason to contact anyone: give their intent signals (expressed interest, requests to connect) from list_incoming_interest or list_my_relationships beside it, counted, never estimated.";
 
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, research, investigation, screen change or record change can be started on this turn, and no public search is run. If they asked for any of those, say plainly that you could not read the request just now and offer to start it: asking again in a moment should work. Never write a requested document's or report's content into the chat instead, never present an answer from what you hold as the research they asked for, and never say it is done.";
@@ -2862,10 +2872,25 @@ export function toolResultMessage(
   };
 }
 
+/**
+ * Owner replay batch 7 (#8): after a screen act Q said "The page action was
+ * activated to prepare the three questions for …'s approval". The result
+ * of a screen act says, at the moment Q writes, how to tell them.
+ */
+export const SCREEN_ACT_TELL_THEM =
+  "Tell them in the first person, to them, what you did: I've prepared it for your approval, I've opened it, I've switched it. Name what it holds when it is prepared for approval; never describe the step (activated, the page action, on screen) and never call them the user or the person.";
+
 function toolResultBody(outcome: QToolCallOutcome): string {
+  const screenAct =
+    outcome.result.ok &&
+    QClientActionToolResultSchema.safeParse(outcome.result.data).success;
   const body = JSON.stringify(
     outcome.result.ok
-      ? { ok: true, data: outcome.result.data }
+      ? {
+          ok: true,
+          data: outcome.result.data,
+          ...(screenAct ? { tellThem: SCREEN_ACT_TELL_THEM } : {}),
+        }
       : { ok: false, error: outcome.result.error },
   );
   return body.slice(0, MODEL_TOOL_RESULT_MAX_CHARS - 200);

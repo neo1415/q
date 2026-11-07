@@ -925,6 +925,57 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     }
   });
 
+  // Owner replay batch 7 (#3): "okay take me to harbourline cargos
+  // profile" moved the pane to Harbourline while the reply said "I can't
+  // open \"Harbourline Cargo\" from here right now". A code line that says
+  // a record could not be opened yields to the move that was made.
+  it("a can't-open line never contradicts the move the pane made", async () => {
+    const pageMoves = createQPageMoves({
+      decider: {
+        decide: () =>
+          Promise.resolve({
+            decision: "MOVE",
+            place: {
+              route: "/work",
+              record: null,
+              tab: null,
+              document: null,
+              slide: null,
+              sectionId: null,
+              position: null,
+            },
+            back: false,
+            askedForPage: true,
+            reason: "",
+          }),
+      },
+      config: { movesAllowed: true },
+    });
+    const run = seam({
+      said: "okay take me to harbourline cargos profile",
+      reading: null,
+      outcomes: [],
+      counterpartNames: ["Harbourline Cargo"],
+      openRecord: { open: () => Promise.resolve(null) },
+      pageMoves,
+    });
+    await run.answer.answer(
+      request({
+        route: "DISCOVER",
+        workspace: { qPane: "open", pagePane: "open", at: "/discover" },
+      }),
+    );
+    const stored = run.stored[0];
+    expect(stored?.blocks ?? []).toContainEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "WORK" },
+    });
+    expect(stored?.content ?? "").not.toMatch(
+      /can't open|isn't one of yours|don't see/iu,
+    );
+    expect(stored?.content ?? "").toMatch(/I've opened it/u);
+  });
+
   it("W4: with the workspace on screen, the page pane's move joins the stored answer; code's own move wins; off, nothing runs", async () => {
     const decided: string[] = [];
     const pageMoves = () =>

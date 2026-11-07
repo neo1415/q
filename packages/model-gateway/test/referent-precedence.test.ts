@@ -57,3 +57,95 @@ describe("the screen receipts note (R6)", () => {
     );
   });
 });
+
+/**
+ * Owner replay batch 7 (#9): a page action prepared for their approval was
+ * read as a miss, and the next turn opened "My last step on your screen
+ * didn't go through". A prepared act is not a miss.
+ */
+describe("a prepared act is never a miss (#9)", () => {
+  it("screenActMissLine passes over an act waiting for their approval", async () => {
+    const { screenActMissLine } = await import("../src/q/index.js");
+    expect(
+      screenActMissLine(
+        [
+          "ACTIVATE button.send-questions: prepared, NOT done: it waits for their approval of exactly this (AWAITING_APPROVAL).",
+        ],
+        null,
+      ),
+    ).toBeNull();
+    expect(
+      screenActMissLine(
+        [
+          "ACTIVATE button.x: NOT done: that control cannot do that (NOT_APPLICABLE).",
+        ],
+        null,
+      ),
+    ).toMatch(/didn't go through/u);
+  });
+});
+
+/**
+ * Owner replay batch 7 (#9): "who has viewed my profile?" was answered
+ * "Capital Q doesn't show profile viewers by design": an always-on note
+ * written before Analytics said founders never see who viewed. Who viewed
+ * them is read now (read_my engagement), at the level each viewer chose;
+ * viewing is still not interest and never a reason to contact.
+ */
+describe("the viewing note (#9)", () => {
+  it("reads who viewed them, and keeps viewing apart from interest", async () => {
+    const { VIEWING_NOT_DISCLOSED_NOTE } = await import("../src/q/index.js");
+    expect(VIEWING_NOT_DISCLOSED_NOTE).not.toMatch(/never see who viewed/u);
+    expect(VIEWING_NOT_DISCLOSED_NOTE).not.toMatch(/by design/u);
+    expect(VIEWING_NOT_DISCLOSED_NOTE).toMatch(/read_my with kind engagement/u);
+    expect(VIEWING_NOT_DISCLOSED_NOTE).toMatch(
+      /at the level each viewer chose/u,
+    );
+    expect(VIEWING_NOT_DISCLOSED_NOTE).toMatch(/never a reason to contact/u);
+  });
+});
+
+/**
+ * Owner replay batch 7 (#8): after operate_screen prepared the page's own
+ * three questions, Q said "The page action was activated to prepare the
+ * three questions for Babatunde Oyelaran's approval." The result Q reads
+ * when a screen act is under way now says how to tell them.
+ */
+describe("a screen act's result says how to tell them (#8)", () => {
+  it("SCREEN_WILL_DO_IT carries tellThem; other results are unchanged", async () => {
+    const { toolResultMessage } = await import("../src/q/index.js");
+    const call = { callId: "c1", name: "operate_screen", arguments: {} };
+    const acted = toolResultMessage(
+      call as never,
+      {
+        result: {
+          ok: true,
+          data: {
+            status: "SCREEN_WILL_DO_IT",
+            clientAction: {
+              kind: "UI_ACT",
+              actId: "uia_send000001",
+              act: "ACTIVATE",
+              target: "button.send-questions",
+            },
+          },
+        },
+      } as never,
+    );
+    const body = JSON.parse(acted.content) as { tellThem?: string };
+    expect(body.tellThem).toMatch(
+      /Tell them in the first person, to them, what you did: I've prepared it for your approval/u,
+    );
+    expect(body.tellThem).toMatch(
+      /never describe the step \(activated, the page action, on screen\)/u,
+    );
+    const read = toolResultMessage(
+      { callId: "c2", name: "read_my", arguments: {} } as never,
+      { result: { ok: true, data: { kind: "media", items: [] } } } as never,
+    );
+    expect(JSON.parse(read.content)).toEqual({
+      ok: true,
+      data: { kind: "media", items: [] },
+    });
+  });
+});

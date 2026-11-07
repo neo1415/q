@@ -150,7 +150,8 @@ describe("eval: Q sending a message in the relationship chat", () => {
     const { type } = mount();
     type("Happy to share the Q3 numbers on Thursday.");
     const { receipt, held } = await qActivates("button.chat-send");
-    expect(receipt.status).toBe("NOT_APPLICABLE");
+    // Owner replay batch 7 (#9): prepared, waiting for approval.
+    expect(receipt.status).toBe("AWAITING_APPROVAL");
     expect(held).toBe("AWAITING_APPROVAL");
     expect(sendChatMessageAction).not.toHaveBeenCalled();
     const [request] = requests;
