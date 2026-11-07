@@ -545,6 +545,42 @@ describe("Q leads", () => {
     expect(again.appended).toEqual([]);
   });
 
+  it("a step whose answer waits for their yes is put back to them on resume, never asked from scratch (e2e run 2)", async () => {
+    // Production e2e run 2: "actively deploying" was held from their first
+    // line (an unasked judgement), and the reopened line asked "Are you
+    // actively writing cheques at the moment?" as if never said.
+    const kept = [
+      { role: "Q" as const, text: "Hi Aria, welcome to Capital Q." },
+      { role: "PERSON" as const, text: "Hi." },
+    ];
+    const plain = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!"))),
+      portFor: fakePorts().portFor,
+      logger,
+    });
+    const before = await plain.turn(input(api({ kept }).fetch, ""));
+    const stepKey = before.asking?.stepKey;
+    expect(stepKey).toBeDefined();
+    const ports = fakePorts();
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!"))),
+      portFor: (args) => ({
+        ...ports.portFor(args),
+        pendingRecommendations: () =>
+          Promise.resolve([
+            { stepKey: stepKey ?? "", value: "Raising right now" },
+          ]),
+      }),
+      logger,
+    });
+    const outcome = await conductor.turn(input(api({ kept }).fetch, ""));
+    expect(outcome.reply).toContain("From what you said earlier");
+    expect(outcome.reply).toContain("Raising right now");
+    expect(outcome.reply).toMatch(/Shall I keep that\?/u);
+    // The question is not asked again from scratch.
+    expect(outcome.reply).not.toBe(before.reply);
+  });
+
   it("a reopening whose resume line is already last keeps it once, not again (live AG: twice per load)", async () => {
     const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
     const line = resumeLine(stuckView(), "founder");
