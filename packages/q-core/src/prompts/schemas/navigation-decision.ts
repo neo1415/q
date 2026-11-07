@@ -104,6 +104,24 @@ export const NavigationDecisionResultSchema = z
     reason: z.string().trim().max(300).default(""),
   })
   .strict();
-export type NavigationDecisionResult = z.infer<
+/** The v1-v3 output (schema version 1), kept as published. */
+export type NavigationDecisionResultV1 = z.infer<
   typeof NavigationDecisionResultSchema
+>;
+
+/**
+ * Schema version 2 (NAVIGATION_DECISION v4, q-nav round 3): `sure` is
+ * false when another page could equally be what they mean. Code then
+ * offers instead of moving (a wrong-page move is worse than an offer).
+ * Absent (an older version's output) reads as sure.
+ */
+export const NAVIGATION_DECISION_SCHEMA_VERSION_2 = 2;
+export const NavigationDecisionResultV2Schema = z
+  .object({
+    ...NavigationDecisionResultSchema.shape,
+    sure: z.boolean().optional().catch(undefined),
+  })
+  .strict();
+export type NavigationDecisionResult = z.infer<
+  typeof NavigationDecisionResultV2Schema
 >;

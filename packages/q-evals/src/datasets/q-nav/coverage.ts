@@ -81,7 +81,7 @@ const SECTION_ASKS: readonly {
   {
     // Deck views are not built (W2): asking for them is a STAY
     // (curveballs); investor interest is the interest section.
-    target: section("COMPANY_INTEREST", "interest"),
+    target: dest("COMPANY_INTEREST"),
     side: "FOUNDER",
     dev: [
       "Which investors have shown interest in us?",
@@ -111,7 +111,7 @@ const SECTION_ASKS: readonly {
     heldout: ["Is anything blocked on my yes?"],
   },
   {
-    target: section("CAPITAL_RAISE", "rounds"),
+    target: dest("CAPITAL_RAISE"),
     side: "FOUNDER",
     dev: ["Show me all my rounds."],
     heldout: ["List every round we've done, on screen."],
@@ -141,7 +141,12 @@ const SETTINGS_WORDS: Readonly<Record<string, readonly [string, string]>> = {
  * Discover is its founders' videos tab, which has no destination (a W3
  * gap), so "open Discover" is no access question for them.
  */
-const NO_ACCESS_CASE: readonly string[] = ["DISCOVER:FOUNDER"];
+// An investor's "visibility settings" are plainly their privacy settings
+// to a human (a page of theirs), so not a founder-only access question.
+const NO_ACCESS_CASE: readonly string[] = [
+  "DISCOVER:FOUNDER",
+  "COMPANY_VISIBILITY:INVESTOR",
+];
 
 function destinations(cases: CaseSet): void {
   const split = cases.split;
@@ -296,10 +301,12 @@ const COMPANY_ASKS: readonly RecordAsk[] = [
   },
   {
     side: "INVESTOR",
-    dev: (n) => `What evidence backs ${n}'s numbers?`,
-    heldout: (n) => `What's ${n}'s proof for its figures?`,
+    // Not "evidence for its numbers": that is open between the overview
+    // and the data room to a human.
+    dev: (n) => `What headline figures does ${n} report?`,
+    heldout: (n) => `What are ${n}'s top-line numbers?`,
     target: (k) => profile(k, "overview"),
-    why: "A company's evidence lives on its overview tab.",
+    why: "A company's headline figures live on its overview tab.",
   },
   {
     side: "INVESTOR",
@@ -375,7 +382,8 @@ function records(cases: CaseSet): void {
               "An investor's profile.",
             ],
             [
-              `What did ${inv.short} ask me?`,
+              // Not "ask me": diligence questions are asks too.
+              `What did ${inv.short} last write to me?`,
               threadWithInvestor(inv.key),
               "The conversation: the thread, latest.",
             ],
@@ -576,7 +584,7 @@ function records(cases: CaseSet): void {
       "Bring up the seed round page.",
       // /capital only redirects, so the round has no page of its own to
       // name: it is a row of the raise tab's rounds (reported to W3).
-      section("CAPITAL_RAISE", "rounds"),
+      dest("CAPITAL_RAISE"),
       "Their round is listed on the raise tab's rounds.",
     ],
     [

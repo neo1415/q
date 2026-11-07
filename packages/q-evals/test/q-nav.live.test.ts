@@ -125,14 +125,26 @@ describe.skipIf(!LIVE || KEY === undefined)(
       });
       const all = Q_NAV_DATASET.cases.filter((c) => c.split === SPLIT);
       const cases = LIMIT > 0 ? all.slice(0, LIMIT) : all;
+      // What the model proposed per turn, before resolution and policy.
+      const proposed = new Map<string, unknown>();
       const run = await runQNav(
-        navigationPipelineSubject(`live:${SPLIT}`, (_turn, navigation) =>
-          decider.decide(navigation, {
+        navigationPipelineSubject(`live:${SPLIT}`, async (turn, navigation) => {
+          const proposal = await decider.decide(navigation, {
             tenantId: "c0000000-0000-4000-8000-000000000001",
-            userId: "c0000000-0000-4000-8000-000000000002",
+            // One person per side, as in production (a person is one
+            // side): each side's prompt cache holds its own site map.
+            userId:
+              turn.side === "INVESTOR"
+                ? "c0000000-0000-4000-8000-000000000002"
+                : "c0000000-0000-4000-8000-000000000003",
             correlationId: `cor_live_qnav_${SPLIT}`,
-          }),
-        ),
+          });
+          proposed.set(
+            `${turn.caseId}#${String(turn.history.length)}`,
+            proposal,
+          );
+          return proposal;
+        }),
         cases,
       );
       const spent = usage.entries.reduce(
@@ -174,6 +186,9 @@ describe.skipIf(!LIVE || KEY === undefined)(
                       id: `${g.caseId}#${String(g.turn)}`,
                       category: g.category,
                       reasons: g.reasons,
+                      // The model's own proposal (decision, place, reason).
+                      proposed:
+                        proposed.get(`${g.caseId}#${String(g.turn)}`) ?? null,
                     }))
                   : undefined,
             },

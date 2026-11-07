@@ -10,6 +10,7 @@ import {
   Q_NAV_SAME_PLACE,
   recordPageDef,
 } from "../datasets/q-nav/vocabulary.js";
+import { company, Q_NAV_FOUNDER_COMPANY_KEY } from "../datasets/q-nav/world.js";
 
 /**
  * Q-NAV graders (plan W4.4): exact, by code, never a model's judgement
@@ -95,6 +96,18 @@ export function canonicalTarget(
   ) {
     t = { ...t, page: `${String(t["page"])}_MESSAGES`, tab: undefined };
   }
+  // A founder's own data room and deck are their company's tabs: the page
+  // sends them there (same place, like SEARCH and EXPLORE).
+  if (
+    side === "FOUNDER" &&
+    (t["page"] === "OWN_DATA_ROOM" || t["page"] === "OWN_DECK")
+  )
+    t = {
+      ...t,
+      tab: t["page"] === "OWN_DATA_ROOM" ? "dataroom" : "deck",
+      page: "COMPANY",
+      recordId: company(Q_NAV_FOUNDER_COMPANY_KEY).id,
+    };
   // /mandate redirects to the profile's mandate section (W2's site map).
   if (t["page"] === "MANDATE")
     t = { ...t, page: "PROFILE", sectionId: "mandate", position: "section" };
