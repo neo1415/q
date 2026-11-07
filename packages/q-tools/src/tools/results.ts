@@ -158,7 +158,7 @@ export function summariseResults(results: ResultsDto): ResultsToolOutput {
       "Investor firms that opened the profile",
       results.engagement.profileOpens.belowFloor
         ? "Fewer than 3"
-        : (results.engagement.profileOpens.value ?? 0),
+        : (results.engagement.profileOpens.value ?? "Not recorded"),
     );
     add("Rehearsals finished", results.rehearsals.length);
     add(
@@ -179,7 +179,9 @@ export function summariseResults(results: ResultsDto): ResultsToolOutput {
     };
   }
   const f = results.funnel;
-  add("Seen", f.seen);
+  // As the Results page reads it: fewer seen than acted on means the
+  // views were not all recorded, so Seen is unknown, never a count.
+  add("Seen", f.seen < Math.max(f.saved, f.interest) ? "Not recorded" : f.seen);
   add("Saved", f.saved);
   add("Interest expressed", f.interest);
   add("Connected", f.connected);

@@ -585,6 +585,18 @@ function responseTile(
 }
 
 /**
+ * A floored count as words: below the floor, "Fewer than 3"; unknown,
+ * "Not recorded"; never a 0 for something not counted (metrics audit P1-17).
+ */
+export function flooredCount(value: {
+  readonly value: number | null;
+  readonly belowFloor: boolean;
+}): string {
+  if (value.belowFloor) return "Fewer than 3";
+  return value.value === null ? "Not recorded" : String(value.value);
+}
+
+/**
  * The investor's funnel for the period. "Seen" counts feed views only;
  * when fewer companies were seen than saved or sent interest, the views
  * were not all recorded and Seen is unknown (null), never a 0.
@@ -963,8 +975,7 @@ function FounderDashboard(
       />
     ),
   }));
-  const floored = (value: { value: number | null; belowFloor: boolean }) =>
-    value.belowFloor ? "Fewer than 3" : String(value.value ?? 0);
+  const floored = flooredCount;
   const scored = results.rehearsals.filter((r) => r.score !== null);
   const latest = scored[0];
   const before = scored[1];

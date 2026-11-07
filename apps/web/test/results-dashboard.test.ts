@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { scoreChanges } from "@/features/rehearsal/rehearsals-home";
+import { flooredCount } from "@/features/results/results-dashboard";
 import {
   activityTotals,
   commitmentLines,
@@ -14,6 +15,16 @@ import {
 /** Results dashboard and Rehearsals page: the words and sums, by code. */
 
 describe("results words", () => {
+  it("an unknown count is Not recorded, never 0 (metrics audit P1-17)", () => {
+    expect(flooredCount({ value: null, belowFloor: false })).toBe(
+      "Not recorded",
+    );
+    expect(flooredCount({ value: null, belowFloor: true })).toBe(
+      "Fewer than 3",
+    );
+    expect(flooredCount({ value: 0, belowFloor: false })).toBe("0");
+  });
+
   it("reads a known period, else 30 days", () => {
     expect(rangeOf("7d")).toBe("7d");
     expect(rangeOf("12m")).toBe("12m");
