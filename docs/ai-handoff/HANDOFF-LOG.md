@@ -1664,3 +1664,133 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Multiples are figures, grounded only by plain numbers, never by money, a percentage or a date's month.
 - **Tests:** `claim-check-arithmetic.test.ts` (12 keep, 8 remove; 5 failed on the old code). `q-iq-derivations` now asserts grader and claim-check agreement on wrong and unsourced differences too.
 - **Gates:** package build 54/54; vitest all packages 11,928 passed; apps q-api, workers and api 4,218 passed; root tsc 0; Q-IQ `CQ_Q_IQ_ALL=1` 6/6, 573 turns `fails: []`, adversarial 1.0/1.0; references, retrieval and wire 5/5; eslint and prettier clean.
+
+## 2026-11-06 — Q Workspace W4 (navigation policy), milestone 1: the q-nav eval (`feat/q-navigation-policy`, from `e187b87`; not merged)
+
+- **Dataset** `packages/q-evals/src/datasets/q-nav/`: 437 cases, **487 turns** (358 MOVE, 26 OFFER, 103 STAY), 151 held out (third phrasings, unseen wording).
+  - 16 categories, both sides each: STORYBOARD (the ten turns), EXPLICIT, RECORD, THREAD, OWN_RECORDS, STAY_IN_CHAT, FOLLOW_UP (pronouns, ordinals), AMBIGUITY, DIRTY_FORM, BUSY_PANE, COLLAPSED_PANE, VOICE, NON_ENGLISH (fr, es, pt, sw, de, yo, ar), ACCESS, ADVERSARIAL (page text), ALREADY_THERE.
+- **Targets** are W3.1's shape: page, subject, tab, document {kind, ref}, thread {kind, counterpart}, sectionId, position. Records, documents and threads are named by type and fictional key; W2.3 fills the ids.
+  - `vocabulary.ts` holds every page, tab and section under one name, with side access. It marks EXISTS (app/, destinations.ts, ui-intent enums, QSection ids) or PROPOSED, the four the storyboard needs: `CAPITAL#commitments`, `COMPANY_INTEREST#deck-views`, `OWN_DATA_ROOM#missing`, `RELATIONSHIP messages#draft`. Renames for W2/W3 go here only.
+- **Graders** (`graders/q-nav.ts`): decision exact; target exact field by field; pane open and remembered moves; wrong-page MOVE; forbidden move (a forbidden page, or a MOVE from unsaved work or a busy pane). Gates per plan §6: labs ≥98% / ≤0.5% / 0 overall; on ≥99% / 0 / 0 on held-out.
+- **CI** (`test/q-nav.test.ts`, scripted): lint, determinism, storyboard, hard constraints. The reference scores 100% and passes both gates. Every grader catches its failure; the "always move" and "never move" baselines fail labs.
+- **Gates:** q-evals vitest 88 passed; root tsc 0; eslint and prettier clean; Q-IQ `CQ_Q_IQ_ALL=1` 6/6.
+- **Next:** W4.1–4.3 (NAVIGATION_DECISION), once W2's digest and W3's contract are published.
+
+## 2026-11-06 late — Q Workspace W4, milestone 2: the decision step, resolution and hard constraints (`feat/q-navigation-policy`)
+
+- **q-nav v2** (owner direction ~22:50): the whole site from W3's enums, W3.1 targets, a held-out split written separately. 802 turns, 294 held out (36.7%).
+- **W4.1** NAVIGATION_DECISION v1 (`q-core`: prompt, schema, registry, lock):
+  - FAST_CLASSIFICATION, reasoning NONE.
+  - The model proposes MOVE / OFFER / STAY and names the place by page and record NAME; ids never reach it.
+  - Page and record text is fenced as data.
+  - `createQNavigationDecider` (`model-gateway/src/q/navigation-decision.ts`); a failed call gives STAY.
+- **W4.3** `resolveNavigationPlace`: names become the ids of records the person may open; two matches, none, a deleted record or a bad detail gives STAY. "Back" goes to the previous place.
+- **W4.2** `applyNavigationPolicy` (pure; the model never decides these):
+  - no access or already there: STAY;
+  - collapsed pane: open it only if they asked for a page, otherwise remember the move;
+  - unsaved work or a busy pane: OFFER;
+  - below the gate (`movesAllowed: false`): OFFER;
+  - one outcome per turn.
+- **Stub digest** (`stubSiteMapDigest`) from the contracts, until W2.4 publishes.
+- **Proof:** the real resolution and policy over the eval with a proposer that ignores every guard score 100% on both gates. With `movesAllowed: false`, no MOVE is left. This found 2 dataset errors (HOME from HOME; a held-out stale-context turn), now fixed, with a lint rule against a move to the current place.
+- **N1** (`page-request.ts`): `offeredFirst(request, workspace = "off")`. With the workspace on, a SHOW is not held back for an offer (DECISIONS 71); off is unchanged. Test added.
+- **Not wired yet** into the answer path. It needs W1 (the flag and the pane state on the request), W2 (digest, records, access) and W3 (emit `target` only when workspace ≠ off).
+- **Gates:** package build 54/54; root tsc 0; web tsc 0; vitest q-core/model-gateway/q-specialists/q-evals/contracts 4875 passed; apps/q-api 3131; Q-IQ `CQ_Q_IQ_ALL=1` 6/6; eslint and prettier clean.
+
+## 2026-11-07 — Q Workspace W4, milestone 3: aligned with W2's site map; DECISIONS 73 (`feat/q-navigation-policy`)
+
+- **Merged W2** (`feat/q-site-map` a4027887). The stub digest is gone.
+- **DECISIONS 73.** NAVIGATION_DECISION runs as NORMAL_DIALOGUE with reasoning LOW, keyed `NAVIGATION_DECISION`. The model sees the full digest for its side, `navigationSiteMap(side) = qSiteMapDigest(Q_SITE_MAP, {side})`. No smaller model and no trimmed digest; cheapness comes only from caching.
+- **Proposal in the site map's words:** route, tab, sectionId, record by name, document title, slide and position. `sitePlaceToTarget` and `targetToSitePlace` map between that place and W3's QNavigateTarget. An unknown route, tab or section gives null, so the turn STAYs.
+- **q-nav vocabulary derived from Q_SITE_MAP:** sides come from audience, tabs and sections from the site map. Only the phrasing banks are hand-written.
+  - **PROPOSED sections, pending W2:** CAPITAL#commitments (investor), COMPANY_INTEREST#deck-views, OWN_DATA_ROOM#missing and RELATIONSHIP_*_MESSAGES#draft.
+  - **Side overrides from app code, reported to W2:** the Capital tab is open to both sides; its raise, readiness, action-plan, plan and investors tabs are founder-only; GateQ inbox and find are investor-only; claim is founder-only.
+- **Dataset changes:**
+  - MANDATE becomes PROFILE#mandate; the grader treats them as the same place.
+  - RESULTS and CAPITAL_ROUND are unreachable (redirect-only pages). The seed round is now the CAPITAL_RAISE#rounds section.
+  - Company financials, capital objective and evidence now point at the overview tab.
+  - Settings sections follow the site map.
+  - TOP_INVESTORS is investor-only ("top companies").
+  - The INVESTOR profile is open to both sides, so investor-side cases were added.
+  - Founder DISCOVER has no target, so it gets no coverage and no ACCESS case.
+- **Pipeline proof:** a proposer that ignores every guard lands every turn exactly, apart from the 19 turns pending W2's PROPOSED sections. Those resolve to STAY, never a guess, and the test pins that list.
+- **W3 gaps:**
+  - QNavigateTarget has no `sub`, so "their raise" or "financials" can only land on the overview tab.
+  - The founder's Discover (founders tab) has no destination.
+  - `/settings/plan` has no destination.
+  - CAPITAL_ROUND and RESULTS exist only on redirect pages.
+
+## 2026-11-07 — W4 milestone 3b: integration bc8f7ac and W2 e26564a merged (`feat/q-navigation-policy`)
+
+- **Merged:** integration `fix/resume-asking-cv9ru3` @ bc8f7ac (W1 `workspaceScreen()`, set_layout, W3 deep links) and W2 `e26564a`, which adds the sections and `qSiteMapLandingFor`.
+- **`targetToSitePlace` uses W2's `qSiteMapLandingFor`.**
+- **Sections:**
+  - commitments (CAPITAL) and draft (both thread pages) now EXIST in the site map.
+  - `missing` lives on `/company/[companyId]` tab dataroom. `/company/data-room` redirects a founder there, so those turns now target the founder's own COMPANY record, data-room tab, section `missing` (`ownMissing()`).
+  - deck-views is PLANNED, not built (W2: the analytics page, A3), and the lint refuses it as a target. Its turns became one of two things:
+    - investor interest asks to `/company/interest#interest`, with the wording changed to ask about interest;
+    - NO_SUCH_PAGE STAY turns for "who looked at my deck": 2 dev, 1 held-out. Viewing is not interest.
+- **Pipeline proof:** every turn is exact again. No pending list; labs and on gates pass.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0, web tsc 0;
+  - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4890 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+  - apps/q-api was not re-run; no q-api files changed since the 4932 pass beyond the merge itself.
+- **Open:**
+  - `screen.workspace` sends `at`/`previous` as paths; W4 needs path → QNavigateTarget, either from W3 or from site-map route matching.
+  - resolve_page_target as the resolver port in decideNavigation.
+  - Wiring in answer.ts waits on W3's schema SHA.
+
+## 2026-11-07 — W4 milestone 4: resolver port, screen.workspace reading, live q-nav suite (`feat/q-navigation-policy`)
+
+- **Resolver port (W4.3):** `decideNavigation` takes `resolver?: QNavigationRecordResolver`. The answer path will pass W2.3's resolve_page_target, called from code as the person and never offered to the model.
+  - The port is asked by kind, name, document, route and tab, never by id.
+  - NONE, WHICH_ONE or a failed lookup gives no move. DELETED says so.
+  - A place with no record needs no lookup.
+  - The eval and tests use `listedRecordResolver(records)`.
+  - New exports: `resolveNavigationPlaceWith` and `findListedRecord`.
+- **Pane from the screen:** `navigateTargetFromPath(path)` reads W3's deep links back through the site map (the inverse of `withNavigateTarget`): route params, `?tab`/`view`, doc, slide, item, message, `#section-<id>` and `#latest`.
+  - `navigationPaneFromWorkspace(screen.workspace)` gives the policy its pane state.
+  - An unknown path sets `at` to null, which is never "already there".
+  - busy:true becomes ACTIVE.
+- **Live suite:** `packages/q-evals/test/q-nav.live.test.ts` runs the real NAVIGATION_DECISION on the hosted NORMAL_DIALOGUE row (Claude Sonnet 5.5, $2/$0.20/$10 per M), through resolution and policy.
+  - Command: `CQ_LIVE_MODEL_TESTS=1 CQ_QNAV_SPLIT=dev|heldout [CQ_QNAV_LIMIT=n] [CQ_QNAV_REPORT=file] node scripts/live-model-tests.mjs packages/q-evals/test/q-nav.live.test.ts`.
+  - It is skipped otherwise. Held-out misses are reported by category only.
+  - `scripts/live-model-tests.mjs` now also reads ANTHROPIC_API_KEY by name.
+- **Size and cost:** a dev pass is 492 calls of about 20k characters (about 5.5k tokens) each. Estimated about $2.5 with the template and site map cached, up to about $7 uncached. Held-out (284 calls) is about 58% of that. This is against decision 62's $20 Anthropic test cap.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0;
+  - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4896 passed;
+  - the live suite skips when off;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+- **Open:**
+  - The answer.ts wiring waits on W3's screen.workspace schema SHA.
+  - resolve_page_target has no plain COMPANY/INVESTOR profile kind and no Board-item kind (W2.3 gap). The adapter will use it for threads, decks and documents, and the existing authorised `findRecordByName` for profiles.
+
+## 2026-11-07 — W4 milestone 5: the page pane's move in the answer path (`feat/q-navigation-policy` d276719 and after)
+
+- **Merged** integration 36b5763 (W3 `QWorkspaceScreenSchema` on `screen.workspace`).
+- **`createQPageMoves`** (model-gateway):
+  - `start` runs NAVIGATION_DECISION beside the turn, only when `screen.workspace` is present.
+  - `settle` is awaited just before the answer's message is stored, outside the transaction.
+  - Code's own move wins, one move per turn.
+  - A collapsed pane gets LAYOUT_SET pagePane open first.
+  - An OFFER becomes a NAVIGATION_OFFER.
+  - A slow decision (over 2.5 s) or a failed one leaves the answer unchanged.
+- **Wired** into the specialist (start, plus settle at recordAnswer and the analyst store) and the conversational answer (settle at both stores). Both get the same port, composed in q-api.
+- **Resolution as the person:** open_page by name covers COMPANY, INVESTOR, relationships and threads, own DOCUMENT and rehearsals. The prompt lists the person's counterpart names; ids never reach the model.
+  - Unresolved, so STAY: data-room documents by title and Board items, until resolve_page_target is callable from code. W2 is to add proper kinds.
+- **Flag:** `CQ_Q_NAV_MOVES_ALLOWED=1` turns on autonomous moves. Off by default: every MOVE is an OFFER (plan §6 gate).
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0, web tsc 0, q-api tsc 0;
+  - vitest packages: 4912 passed;
+  - apps/q-api: 3131 passed, 3 failed. The failures are route-capability-parity on integration's analytics and engagement routes. Their inputs are identical to integration's, so they are pre-existing there.
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+- **Owner:** the Anthropic test budget is $50 (about $7.7 used). Smoke run first, then dev, then held-out once.
+- **Prompt note for tuning:** NAVIGATION_DECISION v1 still names "who viewed their deck" as a page. Deck views are not built (W2), so v2 should drop it.

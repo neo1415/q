@@ -8,6 +8,8 @@ import type { ModelGateway } from "@capital-q/model-gateway";
 import type { ReadCache } from "@capital-q/model-gateway/q";
 import {
   createModelGatewayQAnswer,
+  createQNavigationDecider,
+  createQPageMoves,
   createConversationRecall,
   createQTurnReader,
   createSmallTalkReply,
@@ -70,6 +72,8 @@ import {
   createNamedCompanyPort,
   createToolNameCandidatesPort,
   createToolOpenRecordPort,
+  counterpartNavigationRecords,
+  createOpenRecordNavigationResolver,
   createToolProfileGapsPort,
   createToolOwnMandatePort,
   createToolOwnRecordsPort,
@@ -236,6 +240,12 @@ export type QIntelligenceDependencies = {
   readonly counterpartNames: (
     request: QAnswerRequest,
   ) => Promise<readonly string[]>;
+  /**
+   * Q Workspace W4 (DECISIONS 71): whether the page pane may MOVE on Q's
+   * own decision. False (the default until the q-nav eval's gate holds,
+   * plan §6): every MOVE is an OFFER. A config value, never a code change.
+   */
+  readonly navigationMovesAllowed?: boolean | undefined;
   /** A move to their pipeline says what is in it first (coordinator 10-23). */
   readonly destinationSummary?: SpecialistQAnswerDependencies["destinationSummary"];
   readonly diligenceSummary?: SpecialistQAnswerDependencies["diligenceSummary"];
@@ -418,10 +428,30 @@ export function composeQIntelligence(
     ...(logger === undefined ? {} : { logger }),
   });
 
+  // Q Workspace W4: the page pane's move, decided beside the turn (only
+  // with the workspace on screen) and settled into whichever answer stores
+  // the turn's message. Records are found as the person (open_page).
+  const pageMoves = createQPageMoves({
+    decider: createQNavigationDecider({
+      gateway,
+      ...(logger === undefined ? {} : { logger }),
+    }),
+    config: { movesAllowed: dependencies.navigationMovesAllowed === true },
+    records: counterpartNavigationRecords(dependencies.counterpartNames),
+    resolver: createOpenRecordNavigationResolver(
+      createToolOpenRecordPort({
+        tools,
+        ...(logger === undefined ? {} : { logger }),
+      }),
+    ),
+    ...(logger === undefined ? {} : { logger }),
+  });
+
   // The conversational answer path, now holding the real authorised context
   // port instead of falling through to `noAuthorisedContext`.
   const conversational = createModelGatewayQAnswer({
     gateway,
+    pageMoves,
     repositories,
     sql,
     transactions,
@@ -568,6 +598,7 @@ export function composeQIntelligence(
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
+    pageMoves,
     // Step 1: the turn reader is told the same situation as the answer.
     ...(dependencies.situationOf === undefined
       ? {}

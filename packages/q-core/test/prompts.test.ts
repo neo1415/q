@@ -147,6 +147,8 @@ describe("registry", () => {
         "INVESTOR_RESEARCH_READER",
         // Owner 2026-11-06: public pages read into the companies and founders they name.
         "WEB_DISCOVERY_READER",
+        // Q Workspace W4.1 (DECISIONS 71): MOVE / OFFER / STAY for the page pane.
+        "NAVIGATION_DECISION",
         // Founder direction 2026-09-29: Q replying inside an approved errand.
         "ERRAND_REPLY",
         // Founder direction 2026-09-30: an investor, for a rehearsal.

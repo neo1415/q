@@ -1774,6 +1774,9 @@ export { TURN_SKIM_V3 } from "./prompts/tasks/turn-skim.v3.js";
 export { TURN_SKIM_V4 } from "./prompts/tasks/turn-skim.v4.js";
 export { PERSON_BRIEF_READER_V1 } from "./prompts/tasks/person-brief-reader.v1.js";
 export { WEB_DISCOVERY_READER_V1 } from "./prompts/tasks/web-discovery-reader.v1.js";
+// Q Workspace W4.1: the page pane's MOVE / OFFER / STAY.
+export { NAVIGATION_DECISION_V1 } from "./prompts/tasks/navigation-decision.v1.js";
+export * from "./prompts/schemas/navigation-decision.js";
 export {
   WEB_DISCOVERY_READER_COMPANIES_MAX,
   WEB_DISCOVERY_READER_PAGES_MAX,

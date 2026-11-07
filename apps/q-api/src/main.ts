@@ -5038,6 +5038,9 @@ const qIntelligence = composeQIntelligence({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
   }),
+  // Q Workspace W4: Q's own page-pane moves stay OFFERs until the owner
+  // turns them on, once the q-nav eval's gate holds (plan §6).
+  navigationMovesAllowed: process.env["CQ_Q_NAV_MOVES_ALLOWED"] === "1",
   // Coordinator 23 Oct 2026: "show me my pipeline" says what is in it, in
   // one line from their own relationships, as it opens it.
   destinationSummary: async (request, destination) => {

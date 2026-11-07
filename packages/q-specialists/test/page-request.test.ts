@@ -337,6 +337,26 @@ describe("show versus go (N1)", () => {
     }
   });
 
+  // DECISIONS 71 (owner, 6 Nov 2026) amends N1: in the Q Workspace Q may
+  // move the page pane on its own, model-led, so a SHOW is not held back
+  // for an offer; with the workspace off, N1 is unchanged (plan §4).
+  it("DECISIONS 71: with the workspace on, a SHOW is not held back for an offer; off, N1 stands", () => {
+    for (const said of [
+      "Show me my investor pipeline",
+      "Can you pull up my pipeline?",
+      "show me the CRM",
+    ]) {
+      const asked = pageRequestOf(said);
+      expect(offeredFirst(asked), said).toBe(true);
+      expect(offeredFirst(asked, "off"), said).toBe(true);
+      expect(offeredFirst(asked, "labs"), said).toBe(false);
+      expect(offeredFirst(asked, "on"), said).toBe(false);
+    }
+    expect(offeredFirst(pageRequestOf("Take me to my pipeline"), "on")).toBe(
+      false,
+    );
+  });
+
   it("offers only pages Q can answer in place", () => {
     expect(offeredFirst(pageRequestOf("Show me Discover"))).toBe(false);
     expect(offeredFirst(pageRequestOf("show me my settings"))).toBe(false);

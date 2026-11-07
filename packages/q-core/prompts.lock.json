@@ -186,6 +186,7 @@
     "memory-extractor/v1": "9a8cb14a00f114b12ed1f4c57144ba6cfc58f942e30354da21e923da9bdf2929",
     "memory-extractor/v2": "03f459f9f9a6f7f199354fc59571d4d25b419e69ae9c88832f45841a187a0145",
     "navigation-chooser/v1": "fa0a4035e4ecdff30761c18d49e29a57333c7e52ecc33ab6095f32e0c8e634e4",
+    "navigation-decision/v1": "91091262e8c06033f10dd80f2d50044cb7bbc551bd5e524d119bb789b6301ff9",
     "onboarding-move-reader/v1": "9617f6a4c1a2f2ad9cddb4a1896766b5f37bdc8057a45cb4324a0f7ab1fcf44a",
     "onboarding-transcript-reader/v1": "3c09e7a97bcf0dcb9fec03203bb10c0d9c1d0481bc0f88f1a4c21da1e3c5a09a",
     "onboarding-transcript-reader/v10": "922b3897088e93599c37d26728b72aa85fc51b9a7aa44e8ef4b500b49728952b",

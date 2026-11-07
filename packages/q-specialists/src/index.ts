@@ -401,6 +401,11 @@ export {
   type QOpenRecordPort,
   type ShownItem,
 } from "./references.js";
+export {
+  counterpartNavigationRecords,
+  createOpenRecordNavigationResolver,
+  recordPageForRoute,
+} from "./page-moves.js";
 // RECOVERY-2026-10 (C): navigation read by code at the end of the utterance.
 export {
   resolveFastNavigation,

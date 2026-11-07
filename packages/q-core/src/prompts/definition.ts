@@ -153,6 +153,8 @@ export const PROMPT_IDS = [
   "PLAN_READ",
   /** Owner 2026-11-06: public pages read into the companies and founders they name, quoted. */
   "WEB_DISCOVERY_READER",
+  /** Q Workspace W4.1 (DECISIONS 71): MOVE / OFFER / STAY for the page pane. */
+  "NAVIGATION_DECISION",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -242,6 +244,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PLAN_REVIEW: "plan-review",
   PLAN_READ: "plan-read",
   WEB_DISCOVERY_READER: "web-discovery-reader",
+  NAVIGATION_DECISION: "navigation-decision",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
