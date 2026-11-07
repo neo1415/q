@@ -4478,6 +4478,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Show reviewed reports too",
   "Show the cards again",
   "Show the latest",
+  "Show the page",
   "Show the product in the deck",
   "Show the trend over time, with dates on every number.",
   "Show {n} earlier steps",

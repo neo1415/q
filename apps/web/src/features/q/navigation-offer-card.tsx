@@ -10,6 +10,8 @@ import { useT } from "@/features/i18n/language";
 import { openOfferedPage } from "./client-actions";
 import { offerAnsweredLater, offerKey } from "./navigation-offers";
 import { useQSessionOptional } from "./q-session";
+import { setPane } from "@/features/workspace/layout-store";
+import { useWorkspacePlace } from "@/features/workspace/workspace-place";
 
 /**
  * N1 (owner 2026-11-04): Q answered where the person is and offers the page
@@ -84,7 +86,15 @@ export function NavigationOfferCard({
   // durable conversation, so the card goes on every device and on reload.
   const turns = useQSessionOptional()?.turns ?? NO_TURNS;
   const answered = turnId !== undefined && offerAnsweredLater(turns, turnId);
-  if (href === null || settledHereNow || settledOnDevice || answered) {
+  // Q Workspace: the page pane is already on the offered place.
+  const place = useWorkspacePlace(href);
+  if (
+    href === null ||
+    settledHereNow ||
+    settledOnDevice ||
+    answered ||
+    place === "SHOWN"
+  ) {
     return null;
   }
   const done = (how: "OPENED" | "STAYED") => {
@@ -112,10 +122,12 @@ export function NavigationOfferCard({
           className={buttonClassName("secondary", "compact")}
           onClick={() => {
             done("OPENED");
-            openOfferedPage(href);
+            // Folded over the same place: show it rather than move.
+            if (place === "COLLAPSED") setPane("pagePane", "open");
+            else openOfferedPage(href);
           }}
         >
-          {t(block.openLabel)}
+          {place === "COLLAPSED" ? t("Show the page") : t(block.openLabel)}
         </button>
         <button
           type="button"

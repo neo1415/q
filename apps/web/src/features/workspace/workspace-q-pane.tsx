@@ -2,6 +2,8 @@ import { ArrivalStage } from "@/features/briefing/arrival-stage";
 import { resolveHomeQ } from "@/features/home/home-screen";
 import { QConversationPanel } from "@/features/q/q-conversation";
 
+import { AfterHydration } from "./after-hydration";
+
 /**
  * The Q pane's conversation (W1.2): Home's Q, rendered once by the layout.
  * A layout is not re-rendered on client navigation, so the panel, the
@@ -11,18 +13,22 @@ import { QConversationPanel } from "@/features/q/q-conversation";
  */
 export async function WorkspaceQConversation() {
   const home = await resolveHomeQ(null);
+  // The conversation is the browser's (this tab's session store), so the
+  // panel is drawn after hydration; the server sends the pane's shape.
   return (
-    <QConversationPanel
-      workspace
-      connected={home.qConnected}
-      context={home.surface}
-      greeting={home.greeting}
-      starters={home.starters}
-      welcomeLine={home.welcomeLine}
-      welcomeLead={home.welcomeLead}
-      briefing={home.briefing}
-      stageLayer={home.returning ? <ArrivalStage /> : undefined}
-    />
+    <AfterHydration fallback={<WorkspaceQPending />}>
+      <QConversationPanel
+        workspace
+        connected={home.qConnected}
+        context={home.surface}
+        greeting={home.greeting}
+        starters={home.starters}
+        welcomeLine={home.welcomeLine}
+        welcomeLead={home.welcomeLead}
+        briefing={home.briefing}
+        stageLayer={home.returning ? <ArrivalStage /> : undefined}
+      />
+    </AfterHydration>
   );
 }
 
