@@ -20,6 +20,7 @@ import {
   WifiOff,
 } from "@capital-q/ui/icons";
 
+import { useWatchEngagement } from "@/features/engagement/use-engagement";
 import { registerQMedia } from "@/features/q/screen-media";
 
 import type { FeedPreloadPolicy } from "../feed/feed-state";
@@ -476,6 +477,8 @@ export function PitchPlayer({
   }, [failed, cannotPlay]);
   const onScreen = policy === "ACTIVE" || playing;
   const companyId = company.companyId;
+  // Q Workspace §8 A1: time played and how far, batched, never awaited.
+  useWatchEngagement({ video: videoRef, playing, companyId, mediaAssetId });
   useEffect(() => {
     if (!onScreen) return;
     return registerQMedia({

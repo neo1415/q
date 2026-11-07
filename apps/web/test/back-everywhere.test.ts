@@ -24,6 +24,8 @@ const ROOTS = [
   "work",
   // Work's board view, chosen from the Work header's tabs.
   "board",
+  // Q Workspace §8: their own analytics, reached from the main navigation.
+  "analytics",
   "profile",
   "settings",
   "pitch",
