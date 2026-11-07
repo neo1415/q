@@ -596,6 +596,11 @@ export function composeQIntelligence(
 
   const openRecord = createToolOpenRecordPort({
     tools,
+    // Owner replay batch 8 (#3): one opener -- a record named in the turn
+    // opens under the same actor-wide plan as the web's fast route.
+    ...(dependencies.firewall === undefined
+      ? {}
+      : { firewall: dependencies.firewall }),
     ...(logger === undefined ? {} : { logger }),
   });
   const answer = createSpecialistQAnswer({

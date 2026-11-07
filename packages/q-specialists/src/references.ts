@@ -1,4 +1,5 @@
 import type {
+  PermittedContextPlan,
   QClientActionIntent,
   QRecordPage,
   QResultBlock,
@@ -9,6 +10,7 @@ import {
 } from "@capital-q/q-core";
 import { movePhaseLine } from "@capital-q/q-core/speech";
 import type {
+  ContextFirewallPort,
   QAnswerRequest,
   QConversationMessage,
   QToolPort,
@@ -326,7 +328,87 @@ export type QOpenRecordPort = {
 export function createToolOpenRecordPort(dependencies: {
   readonly tools: QToolPort;
   readonly logger?: Logger | undefined;
+  /**
+   * Owner replay batch 8 (#3; production 22:00:37-38): one opener. The web's
+   * fast route opens a named record under the actor's own plan (the
+   * firewall's, with no subjects); the answer opened it under the run's
+   * narrower plan, was refused, and said "I can't open …" while the pane
+   * had moved. A record opened by its name, refused under the run's plan,
+   * is opened under that same actor-wide plan -- through open_page's own
+   * authorize step, and the page authorises itself, as for a click.
+   */
+  readonly firewall?: ContextFirewallPort | undefined;
 }): QOpenRecordPort {
+  const actorWide = new Map<string, Promise<PermittedContextPlan | null>>();
+  const actorWidePlan = (
+    request: QAnswerRequest,
+  ): Promise<PermittedContextPlan | null> => {
+    const firewall = dependencies.firewall;
+    if (firewall === undefined) return Promise.resolve(null);
+    const known = actorWide.get(request.runId);
+    if (known !== undefined) return known;
+    const planned = firewall
+      .plan({
+        actor: request.actor,
+        runId: request.runId,
+        correlationId: request.correlationId,
+        capability: request.capability,
+        subjects: [],
+      })
+      .then((decision) =>
+        decision.outcome === "AUTHORISED" ? decision.plan : null,
+      )
+      .catch(() => null);
+    actorWide.set(request.runId, planned);
+    while (actorWide.size > 64) {
+      const oldest = actorWide.keys().next().value;
+      if (oldest === undefined) break;
+      actorWide.delete(oldest);
+    }
+    return planned;
+  };
+  const openUnder = async (
+    request: QAnswerRequest,
+    target: {
+      readonly page: QRecordPage;
+      readonly id?: string | undefined;
+      readonly name?: string | undefined;
+    },
+    plan: PermittedContextPlan,
+  ): Promise<Extract<
+    QClientActionIntent,
+    { kind: "OPEN_RECORD_PAGE" }
+  > | null> => {
+    const outcome = await dependencies.tools.execute(
+      {
+        callId: `q-open-record-${target.page.toLowerCase()}`,
+        name: "open_page",
+        arguments: {
+          page: target.page,
+          ...(target.id === undefined ? {} : { id: target.id }),
+          ...(target.id !== undefined || target.name === undefined
+            ? {}
+            : { name: target.name }),
+        },
+      },
+      {
+        actor: request.actor,
+        runId: request.runId,
+        correlationId: request.correlationId,
+        capability: request.capability,
+        plan,
+        focus: { areas: [], tools: ["open_page"] },
+        ...(request.signal === undefined ? {} : { signal: request.signal }),
+      },
+    );
+    if (!outcome.result.ok) return null;
+    const data = outcome.result.data as {
+      readonly clientAction?: QClientActionIntent;
+    };
+    return data.clientAction?.kind === "OPEN_RECORD_PAGE"
+      ? data.clientAction
+      : null;
+  };
   return {
     deck: async (request, companyId) => {
       try {
@@ -372,35 +454,17 @@ export function createToolOpenRecordPort(dependencies: {
     },
     open: async (request, target) => {
       try {
-        const outcome = await dependencies.tools.execute(
-          {
-            callId: `q-open-record-${target.page.toLowerCase()}`,
-            name: "open_page",
-            arguments: {
-              page: target.page,
-              ...(target.id === undefined ? {} : { id: target.id }),
-              ...(target.id !== undefined || target.name === undefined
-                ? {}
-                : { name: target.name }),
-            },
-          },
-          {
-            actor: request.actor,
-            runId: request.runId,
-            correlationId: request.correlationId,
-            capability: request.capability,
-            plan: request.plan,
-            focus: { areas: [], tools: ["open_page"] },
-            ...(request.signal === undefined ? {} : { signal: request.signal }),
-          },
-        );
-        if (!outcome.result.ok) return null;
-        const data = outcome.result.data as {
-          readonly clientAction?: QClientActionIntent;
-        };
-        return data.clientAction?.kind === "OPEN_RECORD_PAGE"
-          ? data.clientAction
-          : null;
+        const opened = await openUnder(request, target, request.plan);
+        if (
+          opened !== null ||
+          target.id !== undefined ||
+          target.name === undefined
+        ) {
+          return opened;
+        }
+        // #3: by its name, the same actor-wide plan the fast route opens with.
+        const wide = await actorWidePlan(request);
+        return wide === null ? null : await openUnder(request, target, wide);
       } catch (error: unknown) {
         if (request.signal?.aborted === true) throw error;
         dependencies.logger?.warn(
