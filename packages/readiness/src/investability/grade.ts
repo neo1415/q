@@ -18,7 +18,7 @@ import type { StageBand } from "../investiq/method-v1.js";
  * measure it to the dollar.
  */
 
-export const INVESTABILITY_GRADING_VERSION = "investability-grading.v1";
+export const INVESTABILITY_GRADING_VERSION = "investability-grading.v2";
 
 /** Approximate USD per unit, October 2026 (`fx-2026-10.v1`). Order of magnitude only. */
 export const FX_USD: Readonly<Record<string, number>> = {
@@ -201,8 +201,19 @@ const HEADCOUNT =
   /(\d[\d,]*)\s*(people|staff|employees|engineers|fte|team members|headcount)/iu;
 const EXPERIENCE =
   /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\+?\s*years|\bex-|\bformer(?:ly)?\b|\bpreviously\b|\bphd\b|\bmba\b|\bled\b|\bbuilt\b|\bscaled\b|\bsenior\b|\bdirector\b|\bpartner at\b|\bat (?:a|an|the) [a-z]/iu;
-const PRIOR_DELIVERY =
-  /\b(exit(?:ed)?|acquired by|sold (?:to|it|the company)|ipo|serial (?:founder|entrepreneur)|previously (?:co-?)?founded|founded and sold|second-time founder|repeat founder)\b/iu;
+/**
+ * investability-grading.v2 (metrics methods 2026-11-07): a prior exit and
+ * a prior founding are different signals. A founder whose earlier company
+ * went public reaches IPO again 30% of the time against 21% for first-time
+ * founders, while a founder whose earlier company failed does no better
+ * (22%) (Gompers, Kovner, Lerner & Scharfstein 2010, JFE). So an exit is
+ * well above the norm (4); founding before, outcome unstated, is above it
+ * (3), as relevant experience is (Azoulay et al. 2020); neither is lower.
+ */
+const PRIOR_EXIT =
+  /\b(exit(?:ed)?|acquired by|sold (?:to|it|the company)|ipo|founded and sold)\b/iu;
+const PRIOR_FOUNDING =
+  /\b(serial (?:founder|entrepreneur)|previously (?:co-?)?founded|second-time founder|repeat founder)\b/iu;
 const BOTTOM_UP =
   /\b(sam|som|serviceable|obtainable|bottom[- ]up|addressable segment)\b/iu;
 const HEADCOUNT_LABEL =
@@ -471,7 +482,9 @@ export function gradeTeam(
 export function gradeFounders(facts: readonly Fact[]): Grade[] {
   if (facts.length === 0) return [];
   const all = facts.map(text).join(" ");
-  const prior = facts.some((f) => PRIOR_DELIVERY.test(text(f)));
+  const exit = facts.some((f) => PRIOR_EXIT.test(text(f)));
+  const founded = facts.some((f) => PRIOR_FOUNDING.test(text(f)));
+  const prior = exit || founded;
   const experience = facts.filter((f) => EXPERIENCE.test(text(f))).length;
   const technical = /\bcto\b|technical|engineer/iu.test(all);
   const commercial = /\bceo\b|commercial|sales|business/iu.test(all);
@@ -481,12 +494,14 @@ export function gradeFounders(facts: readonly Fact[]): Grade[] {
   return [
     {
       criterion: "fl.founder_quality",
-      anchor: prior ? 4 : 3,
-      statement: prior
-        ? "A founder has founded or exited a company before"
-        : experience >= 1
-          ? "Founders' relevant experience stated"
-          : "Technical and commercial founders",
+      anchor: exit ? 4 : 3,
+      statement: exit
+        ? "A founder has exited a company before"
+        : founded
+          ? "A founder has founded a company before"
+          : experience >= 1
+            ? "Founders' relevant experience stated"
+            : "Technical and commercial founders",
     },
   ];
 }

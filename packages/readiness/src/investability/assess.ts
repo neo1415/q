@@ -10,17 +10,17 @@ import {
 import {
   assessInvestIQV1,
   bandOf,
-  INVESTIQ_V2_ARITHMETIC,
+  INVESTIQ_V3_ARITHMETIC,
   observationWeight,
   type InvestIQV1Assessment,
 } from "../investiq/assess-v1.js";
 import type { InvestIQObservation } from "../investiq/contracts.js";
 import {
   GRADED_DIMENSIONS,
-  STAGE_WEIGHTS,
   type GradedDimension,
   type ReadinessBand,
 } from "../investiq/method-v1.js";
+import { STAGE_WEIGHTS_V3, STRONG_REQUIRES } from "../investiq/method-v3.js";
 import {
   INVESTOR_ELIGIBLE_SCOPES,
   type InvestabilityInputs,
@@ -34,7 +34,9 @@ import {
 } from "./observe.js";
 
 /**
- * Investability: FDN InvestIQ v1, investor-facing (owner 2026-10-16).
+ * Investability: FDN InvestIQ, investor-facing (owner 2026-10-16); since
+ * 2026-11-07 investiq/v3 (research-based stage weights, method-v3.ts; the
+ * equation and sources are in docs/specs/metrics/METRICS-METHODS.md).
  *
  *   inputs (investor-eligible only) -> observations (investability-inputs.v1)
  *   -> assessInvestIQV1 (weights, anchors, evidence multipliers, coverage
@@ -59,7 +61,10 @@ import {
  * nothing is content-graded. The grading rules (benchmarks, FX) are in the
  * basis hash, so a calibration change records new history.
  */
-export const INVESTABILITY_METHOD_VERSION = `${INVESTIQ_V2_ARITHMETIC.version}+${INVESTABILITY_INPUTS_VERSION}`;
+export const INVESTABILITY_METHOD_VERSION = `${INVESTIQ_V3_ARITHMETIC.version}+${INVESTABILITY_INPUTS_VERSION}`;
+
+/** The stage weights the score uses: investiq/v3 (method-v3.ts). */
+const STAGE_WEIGHTS = STAGE_WEIGHTS_V3;
 
 /**
  * PADL #017/#068, ADR 0074: a band above Developing needs at least
@@ -79,6 +84,27 @@ function cappedBand(
   const capped =
     (provisional || confidence === "LOW") && CAPPED_BANDS.has(band);
   return { band: capped ? "DEVELOPING" : band, capped };
+}
+
+/**
+ * investiq/v3: Strong needs Team and Fundamentals each graded at 2.5 or
+ * more (STRONG_REQUIRES); otherwise the band is Investable. Unknown is not
+ * above the norm, so an ungraded Team or Fundamentals cannot be Strong.
+ */
+export function strongHeld(
+  band: InvestabilityBand,
+  a: InvestIQV1Assessment,
+): InvestabilityBand {
+  if (band !== "STRONG") return band;
+  const ok = STRONG_REQUIRES.dimensions.every((dimension) => {
+    const d = a.dimensions.find((x) => x.dimension === dimension);
+    return (
+      d !== undefined &&
+      d.score !== null &&
+      d.score >= STRONG_REQUIRES.minDimensionScore
+    );
+  });
+  return ok ? band : "INVESTABLE";
 }
 
 export const INVESTABILITY_SCALE = 25;
@@ -168,7 +194,7 @@ export function assessInvestability(
       context,
       observations,
     },
-    INVESTIQ_V2_ARITHMETIC,
+    INVESTIQ_V3_ARITHMETIC,
   );
   const basisHash = createHash("sha256")
     .update(INVESTABILITY_METHOD_VERSION)
@@ -521,7 +547,7 @@ function viewOf(
     const score = Math.round(point * INVESTABILITY_SCALE);
     const confidence = overall.confidence ?? "LOW";
     const { band, capped } = cappedBand(
-      BAND_WORDS[bandOf(point)],
+      strongHeld(BAND_WORDS[bandOf(point)], a),
       confidence,
       false,
     );
