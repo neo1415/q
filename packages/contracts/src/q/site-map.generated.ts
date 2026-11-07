@@ -302,7 +302,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/analytics",
       title: "Analytics",
       purpose:
-        "A founder's intent signals and investor viewing by week and slide; an investor's own visibility, views and founders' answers.",
+        "Who engaged with you: a founder's investor interest, deck views and viewers; an investor's visibility and activity.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY"],
@@ -315,53 +315,72 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "intent",
           title: "Intent",
           kind: "INTEREST_LIST",
+          audience: "FOUNDER",
+          purpose: "who saved you, asked to connect or asked for documents",
         },
         {
           id: "deck-views",
           title: "Deck views",
           kind: "DECK",
+          audience: "FOUNDER",
+          purpose: "how far investors read your deck",
         },
         {
           id: "viewers",
           title: "Who viewed",
           kind: "OTHER",
+          audience: "FOUNDER",
+          purpose: "who viewed you, as each allows",
         },
         {
           id: "trend",
           title: "By week",
           kind: "OTHER",
+          audience: "FOUNDER",
+          purpose: "attention week by week",
         },
         {
           id: "breakdown",
           title: "By investor type and geography",
           kind: "OTHER",
+          audience: "FOUNDER",
+          purpose: "kinds of investors and where",
         },
         {
           id: "documents",
           title: "Documents",
           kind: "DOCUMENT_LIST",
+          audience: "FOUNDER",
+          purpose: "which documents investors opened",
         },
         {
           id: "visibility",
           title: "Your visibility",
           kind: "VISIBILITY",
+          audience: "INVESTOR",
+          purpose: "how founders see you",
         },
         {
           id: "my-activity",
           title: "Companies you viewed",
           kind: "COMPANY_LIST",
+          audience: "INVESTOR",
+          purpose: "companies you viewed",
         },
         {
           id: "responses",
           title: "Founders' answers",
           kind: "OTHER",
+          audience: "INVESTOR",
+          purpose: "founders' answers to you",
         },
       ],
     },
     {
       route: "/board",
       title: "Board",
-      purpose: "Your work board: what Q and you are working on.",
+      purpose:
+        "Your to-do board: the tasks you and Q are working on, by column.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -374,6 +393,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "board",
           title: "Your board",
           kind: "WORK_LIST",
+          purpose: "your tasks by column",
         },
       ],
     },
@@ -409,7 +429,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/company/[companyId]",
       title: "Company profile",
       purpose:
-        "A company's profile: overview, diligence, elevator pitch, data room, deck and team.",
+        "A company's profile as others see it: story, figures, diligence, documents, deck, team.",
       audience: "ANY",
       params: [
         {
@@ -492,7 +512,7 @@ export const Q_SITE_MAP: QSiteMap = {
               title: "Closing",
             },
           ],
-          purpose: "headline figures, the story and the raise, by section",
+          purpose: "headline figures, the story and the raise",
         },
         {
           id: "diligence",
@@ -500,7 +520,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/[companyId]?tab=diligence",
           destinations: [],
           subs: [],
-          purpose: "questions, evidence and risks",
+          purpose: "questions to check, the evidence and the risks",
         },
         {
           id: "elevator",
@@ -573,7 +593,7 @@ export const Q_SITE_MAP: QSiteMap = {
               title: "Team",
             },
           ],
-          purpose: "the deck and Q's reading of it, by section",
+          purpose: "the deck and Q's reading of it",
         },
         {
           id: "team",
@@ -581,7 +601,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/[companyId]?tab=team",
           destinations: [],
           subs: [],
-          purpose: "the founders and team",
+          purpose: "the founders and the team",
         },
       ],
       sections: [
@@ -589,30 +609,35 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "profile",
           title: "Profile",
           kind: "COMPANY_PROFILE",
+          purpose: "the company",
         },
         {
           id: "overview",
           title: "Overview",
           kind: "COMPANY_PROFILE",
           tab: "overview",
+          purpose: "headline figures, the story and the raise",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
           tab: "diligence",
+          purpose: "questions, evidence and risks",
         },
         {
           id: "elevator",
           title: "Elevator pitch",
           kind: "ELEVATOR",
           tab: "elevator",
+          purpose: "the short pitch",
         },
         {
           id: "data-room",
           title: "Data room",
           kind: "DATA_ROOM",
           tab: "dataroom",
+          purpose: "the list of documents",
         },
         {
           id: "missing",
@@ -620,25 +645,28 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "DATA_ROOM",
           tab: "dataroom",
           audience: "FOUNDER",
+          purpose: "documents investors expect that are missing",
         },
         {
           id: "deck",
           title: "Pitch deck",
           kind: "DECK",
           tab: "deck",
+          purpose: "the deck",
         },
         {
           id: "team",
           title: "Team",
           kind: "TEAM",
           tab: "team",
+          purpose: "the founders and the team",
         },
       ],
     },
     {
       route: "/company/[companyId]/founder/[position]",
       title: "Founder",
-      purpose: "One founder's page at a company.",
+      purpose: "One founder's background and track record.",
       audience: "ANY",
       params: [
         {
@@ -660,13 +688,15 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "founder",
           title: "Founder",
           kind: "TEAM",
+          purpose: "the founder's background",
         },
       ],
     },
     {
       route: "/company/data-room",
       title: "Your data room",
-      purpose: "Your own company's data room and deck.",
+      purpose:
+        "Your company's documents and deck for investors, and what is still missing.",
       audience: "FOUNDER",
       params: [],
       shows: ["DATA_ROOM_DOCUMENT", "DECK"],
@@ -680,6 +710,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/data-room",
           destinations: ["OWN_DATA_ROOM"],
           subs: [],
+          purpose: "your documents, and what is still missing",
         },
         {
           id: "deck",
@@ -687,6 +718,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/data-room?tab=deck",
           destinations: ["OWN_DECK"],
           subs: [],
+          purpose: "your pitch deck",
         },
       ],
       sections: [
@@ -694,13 +726,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "data-room",
           title: "Data room",
           kind: "DATA_ROOM",
+          purpose: "your documents to share with investors",
         },
       ],
     },
     {
       route: "/company/interest",
       title: "Interest",
-      purpose: "Investors' interest in your company, and your answers.",
+      purpose: "Investors interested in your company, and your replies.",
       audience: "FOUNDER",
       params: [],
       shows: ["INVESTOR_ORGANISATION"],
@@ -713,13 +746,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "interest",
           title: "Interest",
           kind: "INTEREST_LIST",
+          purpose: "each investor's interest and your answer",
         },
       ],
     },
     {
       route: "/company/visibility",
       title: "Visibility",
-      purpose: "Who sees what of your company.",
+      purpose: "Choose who can see which parts of your company.",
       audience: "FOUNDER",
       params: [],
       shows: [],
@@ -732,6 +766,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "visibility",
           title: "Visibility",
           kind: "VISIBILITY",
+          purpose: "who sees what of your company",
         },
       ],
     },
@@ -752,7 +787,8 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/daily",
       title: "The Q Daily",
-      purpose: "Your newspaper from Q, and its archive.",
+      purpose:
+        "Today's Q Daily, Q's morning briefing for you, and past editions.",
       audience: "ANY",
       params: [],
       shows: ["DAILY_EDITION"],
@@ -765,6 +801,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "daily",
           title: "The Q Daily",
           kind: "DAILY",
+          purpose: "today's edition and the archive",
         },
       ],
     },
@@ -772,7 +809,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/daily/[editionId]",
       title: "Q Daily edition",
       purpose:
-        "One edition; stories and sections by #story-<id> / #section-<code>.",
+        "One edition of the Q Daily, story by story (#story-<id>, #section-<code>).",
       audience: "ANY",
       params: [
         {
@@ -790,6 +827,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "daily",
           title: "The Q Daily",
           kind: "DAILY",
+          purpose: "the edition's stories",
         },
       ],
     },
@@ -797,7 +835,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/discover",
       title: "Discover",
       purpose:
-        "Investors: companies picked for your mandate. Founders: investors and founders' videos.",
+        "New matches: companies picked for an investor's mandate; investors and founders' videos for a founder.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY", "INVESTOR_ORGANISATION", "PITCH_VIDEO"],
@@ -812,6 +850,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["DISCOVER"],
           subs: [],
           audience: "INVESTOR",
+          purpose: "new companies matched to your mandate",
         },
         {
           id: "yours",
@@ -820,6 +859,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["YOUR_COMPANIES"],
           subs: [],
           audience: "INVESTOR",
+          purpose: "companies you already follow, saved or in touch with",
         },
         {
           id: "founders",
@@ -828,6 +868,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: [],
           subs: [],
           audience: "FOUNDER",
+          purpose: "other founders' pitch videos",
         },
       ],
       sections: [
@@ -836,17 +877,20 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Your feed",
           kind: "COMPANY_FEED",
           audience: "INVESTOR",
+          purpose: "companies recommended to you",
         },
         {
           id: "investors",
           title: "Investors",
           kind: "INVESTOR_LIST",
           audience: "FOUNDER",
+          purpose: "investors you could approach",
         },
         {
           id: "q-room-card",
           title: "Q's card",
           kind: "Q_ROOM_CARD",
+          purpose: "Q's card",
         },
       ],
     },
@@ -866,23 +910,26 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "saved",
           title: "Saved",
           kind: "COMPANY_LIST",
+          purpose: "the companies you saved",
         },
         {
           id: "passed",
           title: "Passed",
           kind: "COMPANY_LIST",
+          purpose: "the companies you passed on",
         },
         {
           id: "compare",
           title: "Compare",
           kind: "COMPANY_LIST",
+          purpose: "your saved companies side by side",
         },
       ],
     },
     {
       route: "/discover/saved",
       title: "Saved",
-      purpose: "Companies you saved.",
+      purpose: "Companies you saved to look at again.",
       audience: "INVESTOR",
       params: [],
       shows: ["COMPANY"],
@@ -895,23 +942,26 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "saved",
           title: "Saved",
           kind: "COMPANY_LIST",
+          purpose: "the companies you saved",
         },
         {
           id: "passed",
           title: "Passed",
           kind: "COMPANY_LIST",
+          purpose: "the companies you passed on",
         },
         {
           id: "compare",
           title: "Compare",
           kind: "COMPANY_LIST",
+          purpose: "your saved companies side by side",
         },
       ],
     },
     {
       route: "/discover/saved/compare",
       title: "Compare saved",
-      purpose: "Saved companies side by side.",
+      purpose: "Your saved companies side by side.",
       audience: "INVESTOR",
       params: [],
       shows: ["COMPANY"],
@@ -924,16 +974,19 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "saved",
           title: "Saved",
           kind: "COMPANY_LIST",
+          purpose: "the companies you saved",
         },
         {
           id: "passed",
           title: "Passed",
           kind: "COMPANY_LIST",
+          purpose: "the companies you passed on",
         },
         {
           id: "compare",
           title: "Compare",
           kind: "COMPANY_LIST",
+          purpose: "your saved companies side by side",
         },
       ],
     },
@@ -954,7 +1007,8 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/documents",
       title: "Documents",
-      purpose: "Documents Q made for you, and your brand kit.",
+      purpose:
+        "Memos, reports and spreadsheets Q wrote for you, and your brand kit.",
       audience: "ANY",
       params: [],
       shows: ["OWN_DOCUMENT"],
@@ -967,13 +1021,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "documents",
           title: "Your documents",
           kind: "DOCUMENT_LIST",
+          purpose: "everything Q wrote for you",
         },
       ],
     },
     {
       route: "/documents/unavailable",
       title: "Document unavailable",
-      purpose: "Where a refused document link lands.",
+      purpose: "Shown when a document link can't be opened.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -987,7 +1042,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/explore",
       title: "Explore the network",
       purpose:
-        "Search Capital Q's own network of companies and browse pitches; not people on the public web.",
+        "Search Capital Q's own network of companies and pitches; not the public web.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY", "PITCH_VIDEO"],
@@ -1000,6 +1055,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "explore",
           title: "Explore",
           kind: "EXPLORE",
+          purpose: "network search and pitches",
         },
       ],
     },
@@ -1021,7 +1077,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/gateq",
       title: "GateQ",
       purpose:
-        "GateQ: an investor's inbox of applications, gate and find; a founder's applications and company claim.",
+        "Inbound pitches: an investor reviews applications and sets their gate; a founder applies and claims their company.",
       audience: "ANY",
       params: [],
       shows: ["GATEQ_APPLICATION"],
@@ -1036,6 +1092,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["GATEQ_INBOX"],
           subs: [],
           audience: "INVESTOR",
+          purpose: "applications founders sent you, to decide",
         },
         {
           id: "gate",
@@ -1044,6 +1101,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: [],
           subs: [],
           audience: "INVESTOR",
+          purpose: "who may apply and what they send",
         },
         {
           id: "find",
@@ -1052,6 +1110,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["GATEQ_FIND"],
           subs: [],
           audience: "INVESTOR",
+          purpose: "find companies by describing them",
         },
         {
           id: "claim",
@@ -1060,6 +1119,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["GATEQ_CLAIM"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "claim your company as yours",
         },
         {
           id: "applications",
@@ -1068,6 +1128,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["GATEQ_APPLICATIONS"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "applications you sent, and their status",
         },
       ],
       sections: [
@@ -1076,30 +1137,35 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Inbox",
           kind: "GATEQ_INBOX",
           tab: "inbox",
+          purpose: "the inbox",
         },
         {
           id: "gateq-inbox",
           title: "Applications",
           kind: "GATEQ_INBOX",
           tab: "inbox",
+          purpose: "applications received",
         },
         {
           id: "gateq-application",
           title: "Application",
           kind: "GATEQ_APPLICATION",
           tab: "inbox",
+          purpose: "one application",
         },
         {
           id: "gateq-selection",
           title: "Selected applications",
           kind: "GATEQ_INBOX",
           tab: "inbox",
+          purpose: "your picks",
         },
         {
           id: "gateq-comparison",
           title: "Comparison",
           kind: "GATEQ_APPLICATION",
           tab: "inbox",
+          purpose: "your picks side by side",
         },
       ],
     },
@@ -1120,7 +1186,8 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/home",
       title: "Q",
-      purpose: "Talk to Q: answers, cards, documents and the Board.",
+      purpose:
+        "Talk to Q: ask anything and see the answers, cards and documents.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1133,23 +1200,27 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "q",
           title: "Ask Q (workspace off)",
           kind: "OTHER",
+          purpose: "talking with Q",
         },
         {
           id: "board",
           title: "Your board (workspace on)",
           kind: "WORK_LIST",
+          purpose: "your board, beside Q",
         },
         {
           id: "q-room-card",
           title: "Q's card",
           kind: "Q_ROOM_CARD",
+          purpose: "Q's card",
         },
       ],
     },
     {
       route: "/investors",
       title: "Investors",
-      purpose: "Investors that fit your company, and requests to connect.",
+      purpose:
+        "Investors who could fund your company, and requests to connect.",
       audience: "FOUNDER",
       params: [],
       shows: ["INVESTOR_ORGANISATION"],
@@ -1162,7 +1233,8 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/investors/[investorOrganisationId]",
       title: "Investor",
-      purpose: "An investor organisation's page: thesis, team and fit.",
+      purpose:
+        "An investor firm's page: what they invest in, their team and how you fit.",
       audience: "ANY",
       params: [
         {
@@ -1180,6 +1252,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "investor",
           title: "Investor",
           kind: "INVESTOR_PROFILE",
+          purpose: "the firm, its thesis and team",
         },
       ],
     },
@@ -1205,7 +1278,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/investors/top",
       title: "Top companies",
-      purpose: "The companies that fit your mandate best.",
+      purpose: "The companies that best fit your mandate right now.",
       audience: "INVESTOR",
       params: [],
       shows: ["COMPANY"],
@@ -1218,13 +1291,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "top",
           title: "Your top companies",
           kind: "COMPANY_LIST",
+          purpose: "your best-fitting companies",
         },
       ],
     },
     {
       route: "/join/[token]",
       title: "Invitation",
-      purpose: "An invitation to join a team.",
+      purpose: "Accept an invitation to join a team.",
       audience: "ANY",
       params: [
         {
@@ -1242,6 +1316,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "invitation",
           title: "Invitation",
           kind: "OTHER",
+          purpose: "the invitation to accept",
         },
       ],
     },
@@ -1288,7 +1363,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/pitch",
       title: "Pitch",
-      purpose: "Your pitch videos.",
+      purpose: "Your recorded pitch videos.",
       audience: "FOUNDER",
       params: [],
       shows: ["PITCH_VIDEO"],
@@ -1301,13 +1376,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "pitch",
           title: "Your pitch",
           kind: "PITCH",
+          purpose: "your pitch videos",
         },
       ],
     },
     {
       route: "/pitch/[mediaAssetId]",
       title: "Pitch video",
-      purpose: "One pitch video.",
+      purpose: "Watch or manage one of your pitch videos.",
       audience: "FOUNDER",
       params: [
         {
@@ -1325,13 +1401,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "pitch",
           title: "Your pitch",
           kind: "PITCH",
+          purpose: "the video",
         },
       ],
     },
     {
       route: "/pitch/new",
       title: "New pitch",
-      purpose: "Record or upload a pitch video.",
+      purpose: "Record or upload a new pitch video.",
       audience: "FOUNDER",
       params: [],
       shows: [],
@@ -1344,6 +1421,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "pitch",
           title: "Your pitch",
           kind: "PITCH",
+          purpose: "recording or uploading",
         },
       ],
     },
@@ -1351,7 +1429,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/profile",
       title: "Your profile",
       purpose:
-        "You, edited in place: a founder's company and traction; an investor's firm, mandate and thesis.",
+        "Your own details, edited by you: a founder's company; an investor's firm, mandate and thesis. Not how others see you.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1364,78 +1442,91 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "about",
           title: "In your words",
           kind: "OTHER",
+          purpose: "about you, in your words",
         },
         {
           id: "company",
           title: "Company",
           kind: "OTHER",
           audience: "FOUNDER",
+          purpose: "your company's details",
         },
         {
           id: "traction",
           title: "Traction",
           kind: "OTHER",
           audience: "FOUNDER",
+          purpose: "traction and numbers",
         },
         {
           id: "team",
           title: "Team",
           kind: "OTHER",
+          purpose: "your team",
         },
         {
           id: "mandate",
           title: "Mandate",
           kind: "OTHER",
           audience: "INVESTOR",
+          purpose: "what you invest in",
         },
         {
           id: "thesis",
           title: "How Q reads your thesis",
           kind: "OTHER",
           audience: "INVESTOR",
+          purpose: "how Q reads your thesis",
         },
         {
           id: "firm",
           title: "Firm",
           kind: "OTHER",
           audience: "INVESTOR",
+          purpose: "your firm's details",
         },
         {
           id: "organisation",
           title: "Organisation",
           kind: "OTHER",
+          purpose: "set up your organisation",
         },
         {
           id: "you",
           title: "You",
           kind: "OTHER",
+          purpose: "your name, photo and role",
         },
         {
           id: "found",
           title: "What Q found in public",
           kind: "OTHER",
+          purpose: "what Q found in public",
         },
         {
           id: "verification",
           title: "Signals and verification",
           kind: "OTHER",
+          purpose: "what is verified",
         },
         {
           id: "q-card",
           title: "Q Card",
           kind: "OTHER",
+          purpose: "your organisation's Q Card",
         },
         {
           id: "my-q-card",
           title: "Your own Q Card",
           kind: "OTHER",
+          purpose: "your personal Q Card",
         },
       ],
     },
     {
       route: "/q-pitch",
       title: "Capital Q tour",
-      purpose: "Q presents Capital Q, a guided tour.",
+      purpose: "A guided tour of Capital Q, presented by Q.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1448,13 +1539,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "q-pitch",
           title: "The Capital Q tour",
           kind: "PITCH",
+          purpose: "the tour",
         },
       ],
     },
     {
       route: "/q-pitch/capital-q",
       title: "Capital Q pitch",
-      purpose: "The Capital Q pitch.",
+      purpose: "Capital Q's own investor pitch.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1467,6 +1559,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "capital-q-pitch",
           title: "The Capital Q pitch",
           kind: "PITCH",
+          purpose: "the pitch",
         },
       ],
     },
@@ -1474,7 +1567,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/rehearsals",
       title: "Rehearsals",
       purpose:
-        "Rehearse with investors, companies and people Q plays; your history.",
+        "Practise with investors, companies or people played by Q, and past practice.",
       audience: "ANY",
       params: [],
       shows: ["REHEARSAL"],
@@ -1487,13 +1580,15 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsals",
           title: "Your rehearsals",
           kind: "REHEARSAL",
+          purpose: "who to practise with, and past sessions",
         },
       ],
     },
     {
       route: "/rehearsals/company/[companyId]",
       title: "Rehearse with a company",
-      purpose: "Rehearse with a company you are connected to.",
+      purpose:
+        "Practise a meeting with a company you know, played by Q; no booking needed.",
       audience: "INVESTOR",
       params: [
         {
@@ -1511,13 +1606,15 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsal",
           title: "Rehearsal",
           kind: "REHEARSAL",
+          purpose: "the practice session",
         },
       ],
     },
     {
       route: "/rehearsals/investor/[investorOrganisationId]",
       title: "Rehearse with an investor",
-      purpose: "Rehearse your pitch with an investor, played by Q.",
+      purpose:
+        "Practise a pitch or meeting with an investor played by Q; no booking needed.",
       audience: "FOUNDER",
       params: [
         {
@@ -1535,13 +1632,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsal",
           title: "Rehearsal",
           kind: "REHEARSAL",
+          purpose: "the practice session",
         },
       ],
     },
     {
       route: "/rehearsals/live/[rehearsalId]",
       title: "Live rehearsal",
-      purpose: "A rehearsal in progress.",
+      purpose: "A practice session in progress.",
       audience: "ANY",
       params: [
         {
@@ -1559,13 +1657,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsal",
           title: "Rehearsal",
           kind: "REHEARSAL",
+          purpose: "the practice session",
         },
       ],
     },
     {
       route: "/rehearsals/meeting/[meetingId]",
       title: "Rehearse a meeting",
-      purpose: "Rehearse for one booked meeting.",
+      purpose: "Prepare for one meeting already booked in your calendar.",
       audience: "ANY",
       params: [
         {
@@ -1583,13 +1682,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsal",
           title: "Rehearsal",
           kind: "REHEARSAL",
+          purpose: "the practice session",
         },
       ],
     },
     {
       route: "/rehearsals/person/[externalPersonId]",
       title: "Rehearse with a person",
-      purpose: "Rehearse with a researched person or organisation.",
+      purpose: "Practise with a person or organisation Q researched.",
       audience: "ANY",
       params: [
         {
@@ -1607,13 +1707,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsal",
           title: "Rehearsal",
           kind: "REHEARSAL",
+          purpose: "the practice session",
         },
       ],
     },
     {
       route: "/rehearsals/r/[rehearsalId]",
       title: "Rehearsal",
-      purpose: "One rehearsal and its feedback.",
+      purpose: "One finished practice session, with Q's feedback.",
       audience: "ANY",
       params: [
         {
@@ -1631,6 +1732,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "rehearsal",
           title: "Rehearsal",
           kind: "REHEARSAL",
+          purpose: "the session and Q's feedback",
         },
       ],
     },
@@ -1638,7 +1740,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/relationships",
       title: "Relationships",
       purpose:
-        "Your relationships: overview, pipeline, and Capital (a founder's raise and plan; an investor's mandate and commitments).",
+        "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate and commitments.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
@@ -1652,6 +1754,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=overview",
           destinations: ["RELATIONSHIPS"],
           subs: [],
+          purpose: "everyone at a glance",
         },
         {
           id: "pipeline",
@@ -1659,6 +1762,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=pipeline",
           destinations: ["CRM_PIPELINE"],
           subs: [],
+          purpose: "relationships by stage",
         },
         {
           id: "capital",
@@ -1666,6 +1770,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=capital",
           destinations: ["CAPITAL"],
           subs: [],
+          purpose: "a founder's raise; an investor's mandate and book",
         },
         {
           id: "capital-raise",
@@ -1674,6 +1779,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_RAISE"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "your current round and who is in it",
         },
         {
           id: "capital-readiness",
@@ -1682,6 +1788,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_READINESS"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "how ready your company looks to investors",
         },
         {
           id: "capital-action-plan",
@@ -1690,6 +1797,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_ACTION_PLAN"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "the steps to get investor-ready",
         },
         {
           id: "capital-plan",
@@ -1698,6 +1806,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_PLAN"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "your 3, 6 and 12-month plan",
         },
         {
           id: "capital-investors",
@@ -1706,6 +1815,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_INVESTORS"],
           subs: [],
           audience: "FOUNDER",
+          purpose: "the investors in your raise",
         },
       ],
       sections: [
@@ -1714,17 +1824,20 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Overview",
           kind: "RELATIONSHIP_LIST",
           tab: "overview",
+          purpose: "everyone at a glance",
         },
         {
           id: "pipeline",
           title: "Pipeline",
           kind: "RELATIONSHIP_LIST",
           tab: "pipeline",
+          purpose: "relationships by stage",
         },
         {
           id: "relationships",
           title: "Relationships",
           kind: "RELATIONSHIP_LIST",
+          purpose: "everyone, as a list",
         },
         {
           id: "mandate",
@@ -1732,6 +1845,7 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "OTHER",
           tab: "capital",
           audience: "INVESTOR",
+          purpose: "what you invest in",
         },
         {
           id: "commitments",
@@ -1739,6 +1853,7 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "CAPITAL_ROUNDS",
           tab: "capital",
           audience: "INVESTOR",
+          purpose: "what you committed and what was received",
         },
         {
           id: "capital-overview",
@@ -1746,44 +1861,49 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "CAPITAL_ROUNDS",
           tab: "capital",
           audience: "FOUNDER",
+          purpose: "your raise at a glance",
         },
         {
           id: "rounds",
           title: "Your raise",
           kind: "CAPITAL_ROUNDS",
           tab: "capital-raise",
+          purpose: "your round",
         },
         {
           id: "readiness",
           title: "Readiness",
           kind: "OTHER",
           tab: "capital-readiness",
+          purpose: "by pillar",
         },
         {
           id: "action-plan",
           title: "Action plan",
           kind: "OTHER",
           tab: "capital-action-plan",
+          purpose: "your steps",
         },
         {
           id: "plan",
           title: "Your plan",
           kind: "OTHER",
           tab: "capital-plan",
+          purpose: "by horizon",
         },
         {
           id: "investors",
           title: "Investors",
           kind: "INVESTOR_LIST",
           tab: "capital-investors",
+          purpose: "the investors",
         },
       ],
     },
     {
       route: "/relationships/company/[companyId]",
       title: "Relationship",
-      purpose:
-        "Your relationship with a company: where it stands, fit, notes and next steps.",
+      purpose: "One company: where it stands, fit, notes and next steps.",
       audience: "INVESTOR",
       params: [
         {
@@ -1802,6 +1922,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/company/[companyId]/messages",
           destinations: [],
           subs: [],
+          purpose: "your conversation",
         },
         {
           id: "calls",
@@ -1809,6 +1930,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/company/[companyId]/calls",
           destinations: [],
           subs: [],
+          purpose: "your calls and meetings",
         },
         {
           id: "diligence",
@@ -1816,6 +1938,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/company/[companyId]/diligence",
           destinations: [],
           subs: [],
+          purpose: "questions, answers and shared documents",
         },
         {
           id: "deal",
@@ -1823,6 +1946,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/company/[companyId]/deal",
           destinations: [],
           subs: [],
+          purpose: "terms, commitments and closing",
         },
       ],
       sections: [
@@ -1830,18 +1954,20 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
     {
       route: "/relationships/company/[companyId]/calls",
       title: "Calls",
-      purpose: "Calls and meetings with a company, booked and past.",
+      purpose: "Your calls and meetings with a company, booked and past.",
       audience: "INVESTOR",
       params: [
         {
@@ -1859,18 +1985,21 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
     {
       route: "/relationships/company/[companyId]/deal",
       title: "Deal and close",
-      purpose: "Terms, commitments and closing with a company.",
+      purpose:
+        "Agreeing terms, commitments and closing the deal with a company.",
       audience: "INVESTOR",
       params: [
         {
@@ -1888,11 +2017,13 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
@@ -1900,7 +2031,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/relationships/company/[companyId]/diligence",
       title: "Diligence",
       purpose:
-        "Diligence with a company: questions, answers and shared documents.",
+        "Diligence with a company: their questions, your answers and shared documents.",
       audience: "INVESTOR",
       params: [
         {
@@ -1918,11 +2049,13 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
@@ -1930,7 +2063,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/relationships/company/[companyId]/messages",
       title: "Messages",
       purpose:
-        "The message thread with a company; drafts are sent only on your approval.",
+        "Your conversation with a company; Q's drafts are sent only when you approve.",
       audience: "INVESTOR",
       params: [
         {
@@ -1948,29 +2081,32 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "chat",
           title: "Messages",
           kind: "CHAT",
+          purpose: "the messages so far",
         },
         {
           id: "draft",
           title: "Your reply (Q's draft)",
           kind: "CHAT",
+          purpose: "your reply; Q's draft waits here",
         },
         {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
     {
       route: "/relationships/investor/[investorOrganisationId]",
       title: "Relationship",
-      purpose:
-        "Your relationship with an investor: where it stands, fit, notes and next steps.",
+      purpose: "One investor: where it stands, fit, notes and next steps.",
       audience: "FOUNDER",
       params: [
         {
@@ -1989,6 +2125,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/investor/[investorOrganisationId]/messages",
           destinations: [],
           subs: [],
+          purpose: "your conversation",
         },
         {
           id: "calls",
@@ -1996,6 +2133,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/investor/[investorOrganisationId]/calls",
           destinations: [],
           subs: [],
+          purpose: "your calls and meetings",
         },
         {
           id: "diligence",
@@ -2003,6 +2141,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/investor/[investorOrganisationId]/diligence",
           destinations: [],
           subs: [],
+          purpose: "questions, answers and shared documents",
         },
         {
           id: "deal",
@@ -2010,6 +2149,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships/investor/[investorOrganisationId]/deal",
           destinations: [],
           subs: [],
+          purpose: "terms, commitments and closing",
         },
       ],
       sections: [
@@ -2017,18 +2157,20 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
     {
       route: "/relationships/investor/[investorOrganisationId]/calls",
       title: "Calls",
-      purpose: "Calls and meetings with an investor, booked and past.",
+      purpose: "Your calls and meetings with an investor, booked and past.",
       audience: "FOUNDER",
       params: [
         {
@@ -2046,18 +2188,21 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
     {
       route: "/relationships/investor/[investorOrganisationId]/deal",
       title: "Deal and close",
-      purpose: "Terms, commitments and closing with an investor.",
+      purpose:
+        "Agreeing terms, commitments and closing the deal with an investor.",
       audience: "FOUNDER",
       params: [
         {
@@ -2075,11 +2220,13 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
@@ -2087,7 +2234,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/relationships/investor/[investorOrganisationId]/diligence",
       title: "Diligence",
       purpose:
-        "Diligence with an investor: questions, answers and shared documents.",
+        "Diligence with an investor: their questions, your answers and shared documents.",
       audience: "FOUNDER",
       params: [
         {
@@ -2105,11 +2252,13 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
@@ -2117,7 +2266,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/relationships/investor/[investorOrganisationId]/messages",
       title: "Messages",
       purpose:
-        "The message thread with an investor; drafts are sent only on your approval.",
+        "Your conversation with an investor; Q's drafts are sent only when you approve.",
       audience: "FOUNDER",
       params: [
         {
@@ -2135,21 +2284,25 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "chat",
           title: "Messages",
           kind: "CHAT",
+          purpose: "the messages so far",
         },
         {
           id: "draft",
           title: "Your reply (Q's draft)",
           kind: "CHAT",
+          purpose: "your reply; Q's draft waits here",
         },
         {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
+          purpose: "your calls and meetings together",
         },
         {
           id: "diligence",
           title: "Diligence",
           kind: "DILIGENCE",
+          purpose: "their questions and the shared documents",
         },
       ],
     },
@@ -2170,7 +2323,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/reviews",
       title: "Reviews",
-      purpose: "Human reviews you asked for, and their answers.",
+      purpose: "Expert human reviews you asked for, and their answers.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2183,6 +2336,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "reviews",
           title: "Reviews",
           kind: "REVIEW_LIST",
+          purpose: "the reviews you asked for",
         },
       ],
     },
@@ -2190,7 +2344,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/search",
       title: "People search (public web)",
       purpose:
-        "Find people, organisations and agencies on the public web; not Capital Q's own network.",
+        "Find people and organisations on the public web; not Capital Q's network.",
       audience: "ANY",
       params: [],
       shows: ["EXTERNAL_PERSON"],
@@ -2203,6 +2357,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "search",
           title: "Search results",
           kind: "SEARCH_RESULTS",
+          purpose: "the people and organisations found",
         },
       ],
     },
@@ -2210,7 +2365,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/settings",
       title: "Settings",
       purpose:
-        "Account, appearance, Q, notifications, connections and privacy.",
+        "Your account, security, team, appearance, Q, notifications, connections, plan and privacy.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2231,68 +2386,80 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "settings",
           title: "Settings",
           kind: "SETTINGS",
+          purpose: "everything",
         },
         {
           id: "profile",
           title: "Your profile",
           kind: "SETTINGS",
+          purpose: "your photo",
         },
         {
           id: "account",
           title: "Account",
           kind: "SETTINGS",
+          purpose: "name, email, sign out",
         },
         {
           id: "security",
           title: "Security",
           kind: "SETTINGS",
+          purpose: "two-step sign-in",
         },
         {
           id: "team",
           title: "Team",
           kind: "SETTINGS",
+          purpose: "your team and roles",
         },
         {
           id: "appearance",
           title: "Appearance",
           kind: "SETTINGS",
+          purpose: "light, dark, motion",
         },
         {
           id: "q",
           title: "Q",
           kind: "SETTINGS",
+          purpose: "Q's personality and language",
         },
         {
           id: "speaking",
           title: "How Q speaks for you",
           kind: "SETTINGS",
+          purpose: "how Q speaks on your behalf",
         },
         {
           id: "notifications",
           title: "Notifications",
           kind: "SETTINGS",
+          purpose: "emails and alerts",
         },
         {
           id: "connections",
           title: "Connections",
           kind: "SETTINGS",
+          purpose: "Google calendar and mail",
         },
         {
           id: "billing",
           title: "Plan and billing",
           kind: "SETTINGS",
+          purpose: "your plan and payment",
         },
         {
           id: "privacy",
           title: "Privacy",
           kind: "SETTINGS",
+          purpose: "your data choices",
         },
       ],
     },
     {
       route: "/settings/activity",
       title: "Team activity",
-      purpose: "What your team did.",
+      purpose: "What people on your team did, and when.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2305,6 +2472,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "activity",
           title: "Your team's activity",
           kind: "OTHER",
+          purpose: "your team's actions",
         },
       ],
     },
@@ -2325,7 +2493,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/settings/memory",
       title: "Memory",
-      purpose: "What Q remembers about you, and forgetting it.",
+      purpose: "What Q remembers about you, and making it forget.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2338,13 +2506,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "memory",
           title: "What Q remembers",
           kind: "MEMORY",
+          purpose: "what Q remembers",
         },
       ],
     },
     {
       route: "/settings/plan",
       title: "Plan and billing",
-      purpose: "Your plan, its limits and billing.",
+      purpose: "Your subscription and billing: plan, limits and payment.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2357,6 +2526,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "plan",
           title: "Your plan",
           kind: "BILLING",
+          purpose: "your plan and its limits",
         },
       ],
     },
@@ -2376,7 +2546,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/settings/security",
       title: "Security",
-      purpose: "Two-step sign-in (Q is never told what it shows).",
+      purpose: "Turn on two-step sign-in.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2389,7 +2559,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/settings/team",
       title: "Team",
-      purpose: "Your team: members, roles and invitations.",
+      purpose: "Your team, their roles, and inviting people.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2402,13 +2572,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "team",
           title: "Your team",
           kind: "TEAM",
+          purpose: "members, roles and invitations",
         },
       ],
     },
     {
       route: "/settings/team/[userId]",
       title: "Team member",
-      purpose: "One team member: role and activity.",
+      purpose: "One teammate's role and activity.",
       audience: "ANY",
       params: [
         {
@@ -2426,13 +2597,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "member",
           title: "Team member",
           kind: "TEAM",
+          purpose: "the teammate",
         },
       ],
     },
     {
       route: "/settings/usage",
       title: "Usage",
-      purpose: "What Q used for you this month.",
+      purpose: "How much of your plan Q used this month.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2445,6 +2617,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "usage",
           title: "Usage",
           kind: "BILLING",
+          purpose: "this month's use",
         },
       ],
     },
@@ -2452,7 +2625,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/verification",
       title: "Verification",
       purpose:
-        "What is verified about you and your organisation, and what is next.",
+        "Get verified: what is confirmed about you and your organisation, and next steps.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -2465,6 +2638,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "verification",
           title: "Verification",
           kind: "VERIFICATION",
+          purpose: "your verification steps",
         },
       ],
     },
@@ -2484,7 +2658,8 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/work",
       title: "Work",
-      purpose: "What Q suggests, runs, needs from you and finished.",
+      purpose:
+        "What Q is doing for you: what needs you, what is running or done, Q's team and its cost.",
       audience: "ANY",
       params: [],
       shows: ["WORK_ITEM"],
@@ -2498,6 +2673,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/work?view=needs",
           destinations: ["WORK_NEEDS"],
           subs: [],
+          purpose: "what waits for you to decide or do",
         },
         {
           id: "progress",
@@ -2505,6 +2681,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/work?view=progress",
           destinations: ["WORK_PROGRESS"],
           subs: [],
+          purpose: "what Q is doing right now",
         },
         {
           id: "done",
@@ -2512,6 +2689,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/work?view=done",
           destinations: ["WORK_DONE"],
           subs: [],
+          purpose: "what Q finished",
         },
         {
           id: "team",
@@ -2519,7 +2697,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/work?view=team",
           destinations: ["WORK_TEAM"],
           subs: [],
-          purpose: "the specialists Q runs for your work; not your colleagues",
+          purpose: "the specialists Q uses for your work; not your colleagues",
         },
         {
           id: "cost",
@@ -2527,6 +2705,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/work?view=cost",
           destinations: ["WORK_COST"],
           subs: [],
+          purpose: "what Q's work cost",
         },
       ],
       sections: [
@@ -2534,23 +2713,26 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "work",
           title: "Q's work",
           kind: "WORK_LIST",
+          purpose: "Q's tasks for you",
         },
         {
           id: "approvals",
           title: "Waiting for your approval",
           kind: "APPROVAL_LIST",
+          purpose: "what waits for your approval",
         },
         {
           id: "q-room-card",
           title: "Q's card",
           kind: "Q_ROOM_CARD",
+          purpose: "Q's card",
         },
       ],
     },
     {
       route: "/work/[delegationId]",
       title: "Work item",
-      purpose: "One piece of Q's work: its steps, results and what it needs.",
+      purpose: "One task Q is doing: its steps, results and what it needs.",
       audience: "ANY",
       params: [
         {
@@ -2568,13 +2750,14 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "work",
           title: "Q's work",
           kind: "WORK_LIST",
+          purpose: "the task's steps and results",
         },
       ],
     },
     {
       route: "/work/[delegationId]/report/[laneId]",
       title: "Work report",
-      purpose: "The report of one lane of Q's work.",
+      purpose: "The report from one part of a task Q did.",
       audience: "ANY",
       params: [
         {
@@ -2596,6 +2779,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "work",
           title: "Q's work",
           kind: "WORK_LIST",
+          purpose: "the report",
         },
       ],
     },

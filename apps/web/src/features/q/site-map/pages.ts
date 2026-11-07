@@ -41,6 +41,8 @@ export type SiteMapSectionEntry = {
   readonly tab?: string | undefined;
   /** Narrower than the page or tab: who the code renders it for. */
   readonly audience?: QSiteMapAudience | undefined;
+  /** What it is for, in everyday words (usually in SITE_MAP_PURPOSES). */
+  readonly purpose?: string | undefined;
 };
 
 export type SiteMapPageEntry = {
@@ -111,18 +113,21 @@ function relationshipPage(
   const words = {
     record: [
       "Relationship",
-      `Your relationship with ${who}: where it stands, fit, notes and next steps.`,
+      `One ${side === "company" ? "company" : "investor"}: where it stands, fit, notes and next steps.`,
     ],
     messages: [
       "Messages",
-      `The message thread with ${who}; drafts are sent only on your approval.`,
+      `Your conversation with ${who}; Q's drafts are sent only when you approve.`,
     ],
-    calls: ["Calls", `Calls and meetings with ${who}, booked and past.`],
+    calls: ["Calls", `Your calls and meetings with ${who}, booked and past.`],
     diligence: [
       "Diligence",
-      `Diligence with ${who}: questions, answers and shared documents.`,
+      `Diligence with ${who}: their questions, your answers and shared documents.`,
     ],
-    deal: ["Deal and close", `Terms, commitments and closing with ${who}.`],
+    deal: [
+      "Deal and close",
+      `Agreeing terms, commitments and closing the deal with ${who}.`,
+    ],
   } as const;
   const [title, purpose] = words[part];
   return {
@@ -254,7 +259,8 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   // --- Q and the day ---
   "/home": {
     title: "Q",
-    purpose: "Talk to Q: answers, cards, documents and the Board.",
+    purpose:
+      "Talk to Q: ask anything and see the answers, cards and documents.",
     audience: "ANY",
     sections: [
       // Workspace off: Home is Q itself. On: Q is the layout pane and
@@ -267,7 +273,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/analytics": {
     title: "Analytics",
     purpose:
-      "A founder's intent signals and investor viewing by week and slide; an investor's own visibility, views and founders' answers.",
+      "Who engaged with you: a founder's investor interest, deck views and viewers; an investor's visibility and activity.",
     audience: "ANY",
     shows: ["COMPANY"],
     sections: [
@@ -324,13 +330,14 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/board": {
     title: "Board",
-    purpose: "Your work board: what Q and you are working on.",
+    purpose: "Your to-do board: the tasks you and Q are working on, by column.",
     audience: "ANY",
     sections: [{ id: "board", title: "Your board", kind: "WORK_LIST" }],
   },
   "/daily": {
     title: "The Q Daily",
-    purpose: "Your newspaper from Q, and its archive.",
+    purpose:
+      "Today's Q Daily, Q's morning briefing for you, and past editions.",
     audience: "ANY",
     shows: ["DAILY_EDITION"],
     sections: [{ id: "daily", title: "The Q Daily", kind: "DAILY" }],
@@ -338,13 +345,14 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/daily/[editionId]": {
     title: "Q Daily edition",
     purpose:
-      "One edition; stories and sections by #story-<id> / #section-<code>.",
+      "One edition of the Q Daily, story by story (#story-<id>, #section-<code>).",
     audience: "ANY",
     sections: [{ id: "daily", title: "The Q Daily", kind: "DAILY" }],
   },
   "/work": {
     title: "Work",
-    purpose: "What Q suggests, runs, needs from you and finished.",
+    purpose:
+      "What Q is doing for you: what needs you, what is running or done, Q's team and its cost.",
     audience: "ANY",
     shows: ["WORK_ITEM"],
     tabs: [
@@ -355,7 +363,6 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         id: "team",
         title: "Q's team",
         href: "/work?view=team",
-        purpose: "the specialists Q runs for your work; not your colleagues",
       },
       { id: "cost", title: "Cost", href: "/work?view=cost" },
     ],
@@ -371,13 +378,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/work/[delegationId]": {
     title: "Work item",
-    purpose: "One piece of Q's work: its steps, results and what it needs.",
+    purpose: "One task Q is doing: its steps, results and what it needs.",
     audience: "ANY",
     sections: WORK,
   },
   "/work/[delegationId]/report/[laneId]": {
     title: "Work report",
-    purpose: "The report of one lane of Q's work.",
+    purpose: "The report from one part of a task Q did.",
     audience: "ANY",
     sections: WORK,
   },
@@ -386,7 +393,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/discover": {
     title: "Discover",
     purpose:
-      "Investors: companies picked for your mandate. Founders: investors and founders' videos.",
+      "New matches: companies picked for an investor's mandate; investors and founders' videos for a founder.",
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "PITCH_VIDEO"],
     tabs: [
@@ -410,7 +417,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/discover/saved": {
     title: "Saved",
-    purpose: "Companies you saved.",
+    purpose: "Companies you saved to look at again.",
     audience: "INVESTOR",
     shows: ["COMPANY"],
     sections: [
@@ -432,7 +439,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/discover/saved/compare": {
     title: "Compare saved",
-    purpose: "Saved companies side by side.",
+    purpose: "Your saved companies side by side.",
     audience: "INVESTOR",
     shows: ["COMPANY"],
     sections: [
@@ -444,7 +451,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/explore": {
     title: "Explore the network",
     purpose:
-      "Search Capital Q's own network of companies and browse pitches; not people on the public web.",
+      "Search Capital Q's own network of companies and pitches; not the public web.",
     audience: "ANY",
     shows: ["COMPANY", "PITCH_VIDEO"],
     sections: [{ id: "explore", title: "Explore", kind: "EXPLORE" }],
@@ -452,7 +459,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/search": {
     title: "People search (public web)",
     purpose:
-      "Find people, organisations and agencies on the public web; not Capital Q's own network.",
+      "Find people and organisations on the public web; not Capital Q's network.",
     audience: "ANY",
     shows: ["EXTERNAL_PERSON"],
     sections: [
@@ -461,13 +468,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/investors": {
     title: "Investors",
-    purpose: "Investors that fit your company, and requests to connect.",
+    purpose: "Investors who could fund your company, and requests to connect.",
     audience: "FOUNDER",
     shows: ["INVESTOR_ORGANISATION"],
   },
   "/investors/top": {
     title: "Top companies",
-    purpose: "The companies that fit your mandate best.",
+    purpose: "The companies that best fit your mandate right now.",
     audience: "INVESTOR",
     shows: ["COMPANY"],
     sections: [
@@ -476,7 +483,8 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/investors/[investorOrganisationId]": {
     title: "Investor",
-    purpose: "An investor organisation's page: thesis, team and fit.",
+    purpose:
+      "An investor firm's page: what they invest in, their team and how you fit.",
     audience: "ANY",
     sections: [{ id: "investor", title: "Investor", kind: "INVESTOR_PROFILE" }],
   },
@@ -485,7 +493,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   [COMPANY]: {
     title: "Company profile",
     purpose:
-      "A company's profile: overview, diligence, elevator pitch, data room, deck and team.",
+      "A company's profile as others see it: story, figures, diligence, documents, deck, team.",
     audience: "ANY",
     shows: ["DATA_ROOM_DOCUMENT", "DECK"],
     tabs: [
@@ -493,39 +501,33 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         id: "overview",
         title: "Overview",
         href: `${COMPANY}?tab=overview`,
-        purpose: "headline figures, the story and the raise, by section",
         subs: OVERVIEW_SUBS,
       },
       {
         id: "diligence",
         title: "Diligence",
         href: `${COMPANY}?tab=diligence`,
-        purpose: "questions, evidence and risks",
       },
       {
         id: "elevator",
         title: "Elevator pitch",
         href: `${COMPANY}?tab=elevator`,
-        purpose: "the short pitch",
       },
       {
         id: "dataroom",
         title: "Data room",
         href: `${COMPANY}?tab=dataroom`,
-        purpose: "the company's documents",
       },
       {
         id: "deck",
         title: "Pitch deck",
         href: `${COMPANY}?tab=deck`,
-        purpose: "the deck and Q's reading of it, by section",
         subs: DECK_SUBS,
       },
       {
         id: "team",
         title: "Team",
         href: `${COMPANY}?tab=team`,
-        purpose: "the founders and team",
       },
     ],
     sections: [
@@ -566,13 +568,14 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/company/[companyId]/founder/[position]": {
     title: "Founder",
-    purpose: "One founder's page at a company.",
+    purpose: "One founder's background and track record.",
     audience: "ANY",
     sections: [{ id: "founder", title: "Founder", kind: "TEAM" }],
   },
   "/company/data-room": {
     title: "Your data room",
-    purpose: "Your own company's data room and deck.",
+    purpose:
+      "Your company's documents and deck for investors, and what is still missing.",
     audience: "FOUNDER",
     shows: ["DATA_ROOM_DOCUMENT", "DECK"],
     tabs: [
@@ -583,20 +586,21 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/company/interest": {
     title: "Interest",
-    purpose: "Investors' interest in your company, and your answers.",
+    purpose: "Investors interested in your company, and your replies.",
     audience: "FOUNDER",
     shows: ["INVESTOR_ORGANISATION"],
     sections: [{ id: "interest", title: "Interest", kind: "INTEREST_LIST" }],
   },
   "/company/visibility": {
     title: "Visibility",
-    purpose: "Who sees what of your company.",
+    purpose: "Choose who can see which parts of your company.",
     audience: "FOUNDER",
     sections: [{ id: "visibility", title: "Visibility", kind: "VISIBILITY" }],
   },
   "/documents": {
     title: "Documents",
-    purpose: "Documents Q made for you, and your brand kit.",
+    purpose:
+      "Memos, reports and spreadsheets Q wrote for you, and your brand kit.",
     audience: "ANY",
     shows: ["OWN_DOCUMENT"],
     sections: [
@@ -605,7 +609,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/documents/unavailable": {
     title: "Document unavailable",
-    purpose: "Where a refused document link lands.",
+    purpose: "Shown when a document link can't be opened.",
     audience: "ANY",
   },
 
@@ -613,7 +617,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/relationships": {
     title: "Relationships",
     purpose:
-      "Your relationships: overview, pipeline, and Capital (a founder's raise and plan; an investor's mandate and commitments).",
+      "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate and commitments.",
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
     tabs: [
@@ -756,7 +760,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/gateq": {
     title: "GateQ",
     purpose:
-      "GateQ: an investor's inbox of applications, gate and find; a founder's applications and company claim.",
+      "Inbound pitches: an investor reviews applications and sets their gate; a founder applies and claims their company.",
     audience: "ANY",
     shows: ["GATEQ_APPLICATION"],
     tabs: [
@@ -802,32 +806,32 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   // --- pitch and rehearsal ---
   "/pitch": {
     title: "Pitch",
-    purpose: "Your pitch videos.",
+    purpose: "Your recorded pitch videos.",
     audience: "FOUNDER",
     shows: ["PITCH_VIDEO"],
     sections: [{ id: "pitch", title: "Your pitch", kind: "PITCH" }],
   },
   "/pitch/new": {
     title: "New pitch",
-    purpose: "Record or upload a pitch video.",
+    purpose: "Record or upload a new pitch video.",
     audience: "FOUNDER",
     sections: [{ id: "pitch", title: "Your pitch", kind: "PITCH" }],
   },
   "/pitch/[mediaAssetId]": {
     title: "Pitch video",
-    purpose: "One pitch video.",
+    purpose: "Watch or manage one of your pitch videos.",
     audience: "FOUNDER",
     sections: [{ id: "pitch", title: "Your pitch", kind: "PITCH" }],
   },
   "/q-pitch": {
     title: "Capital Q tour",
-    purpose: "Q presents Capital Q, a guided tour.",
+    purpose: "A guided tour of Capital Q, presented by Q.",
     audience: "ANY",
     sections: [{ id: "q-pitch", title: "The Capital Q tour", kind: "PITCH" }],
   },
   "/q-pitch/capital-q": {
     title: "Capital Q pitch",
-    purpose: "The Capital Q pitch.",
+    purpose: "Capital Q's own investor pitch.",
     audience: "ANY",
     sections: [
       { id: "capital-q-pitch", title: "The Capital Q pitch", kind: "PITCH" },
@@ -836,7 +840,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/rehearsals": {
     title: "Rehearsals",
     purpose:
-      "Rehearse with investors, companies and people Q plays; your history.",
+      "Practise with investors, companies or people played by Q, and past practice.",
     audience: "ANY",
     shows: ["REHEARSAL"],
     sections: [
@@ -845,43 +849,45 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/rehearsals/company/[companyId]": {
     title: "Rehearse with a company",
-    purpose: "Rehearse with a company you are connected to.",
+    purpose:
+      "Practise a meeting with a company you know, played by Q; no booking needed.",
     audience: "INVESTOR",
     sections: REHEARSAL,
   },
   "/rehearsals/investor/[investorOrganisationId]": {
     title: "Rehearse with an investor",
-    purpose: "Rehearse your pitch with an investor, played by Q.",
+    purpose:
+      "Practise a pitch or meeting with an investor played by Q; no booking needed.",
     audience: "FOUNDER",
     sections: REHEARSAL,
   },
   "/rehearsals/person/[externalPersonId]": {
     title: "Rehearse with a person",
-    purpose: "Rehearse with a researched person or organisation.",
+    purpose: "Practise with a person or organisation Q researched.",
     audience: "ANY",
     sections: REHEARSAL,
   },
   "/rehearsals/meeting/[meetingId]": {
     title: "Rehearse a meeting",
-    purpose: "Rehearse for one booked meeting.",
+    purpose: "Prepare for one meeting already booked in your calendar.",
     audience: "ANY",
     sections: REHEARSAL,
   },
   "/rehearsals/r/[rehearsalId]": {
     title: "Rehearsal",
-    purpose: "One rehearsal and its feedback.",
+    purpose: "One finished practice session, with Q's feedback.",
     audience: "ANY",
     sections: REHEARSAL,
   },
   "/rehearsals/live/[rehearsalId]": {
     title: "Live rehearsal",
-    purpose: "A rehearsal in progress.",
+    purpose: "A practice session in progress.",
     audience: "ANY",
     sections: REHEARSAL,
   },
   "/reviews": {
     title: "Reviews",
-    purpose: "Human reviews you asked for, and their answers.",
+    purpose: "Expert human reviews you asked for, and their answers.",
     audience: "ANY",
     sections: [{ id: "reviews", title: "Reviews", kind: "REVIEW_LIST" }],
   },
@@ -890,7 +896,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/profile": {
     title: "Your profile",
     purpose:
-      "You, edited in place: a founder's company and traction; an investor's firm, mandate and thesis.",
+      "Your own details, edited by you: a founder's company; an investor's firm, mandate and thesis. Not how others see you.",
     audience: "ANY",
     sections: [
       { id: "about", title: "In your words", kind: "OTHER" },
@@ -911,7 +917,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/verification": {
     title: "Verification",
     purpose:
-      "What is verified about you and your organisation, and what is next.",
+      "Get verified: what is confirmed about you and your organisation, and next steps.",
     audience: "ANY",
     sections: [
       { id: "verification", title: "Verification", kind: "VERIFICATION" },
@@ -919,7 +925,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/join/[token]": {
     title: "Invitation",
-    purpose: "An invitation to join a team.",
+    purpose: "Accept an invitation to join a team.",
     audience: "ANY",
     sections: [{ id: "invitation", title: "Invitation", kind: "OTHER" }],
   },
@@ -942,7 +948,8 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   // --- settings ---
   "/settings": {
     title: "Settings",
-    purpose: "Account, appearance, Q, notifications, connections and privacy.",
+    purpose:
+      "Your account, security, team, appearance, Q, notifications, connections, plan and privacy.",
     audience: "ANY",
     sections: [
       { id: "settings", title: "Settings", kind: "SETTINGS" },
@@ -955,7 +962,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/settings/activity": {
     title: "Team activity",
-    purpose: "What your team did.",
+    purpose: "What people on your team did, and when.",
     audience: "ANY",
     sections: [
       { id: "activity", title: "Your team's activity", kind: "OTHER" },
@@ -963,37 +970,37 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/settings/memory": {
     title: "Memory",
-    purpose: "What Q remembers about you, and forgetting it.",
+    purpose: "What Q remembers about you, and making it forget.",
     audience: "ANY",
     sections: [{ id: "memory", title: "What Q remembers", kind: "MEMORY" }],
   },
   "/settings/plan": {
     title: "Plan and billing",
-    purpose: "Your plan, its limits and billing.",
+    purpose: "Your subscription and billing: plan, limits and payment.",
     audience: "ANY",
     sections: [{ id: "plan", title: "Your plan", kind: "BILLING" }],
   },
   "/settings/usage": {
     title: "Usage",
-    purpose: "What Q used for you this month.",
+    purpose: "How much of your plan Q used this month.",
     audience: "ANY",
     sections: [{ id: "usage", title: "Usage", kind: "BILLING" }],
   },
   "/settings/team": {
     title: "Team",
-    purpose: "Your team: members, roles and invitations.",
+    purpose: "Your team, their roles, and inviting people.",
     audience: "ANY",
     sections: [{ id: "team", title: "Your team", kind: "TEAM" }],
   },
   "/settings/team/[userId]": {
     title: "Team member",
-    purpose: "One team member: role and activity.",
+    purpose: "One teammate's role and activity.",
     audience: "ANY",
     sections: [{ id: "member", title: "Team member", kind: "TEAM" }],
   },
   "/settings/security": {
     title: "Security",
-    purpose: "Two-step sign-in (Q is never told what it shows).",
+    purpose: "Turn on two-step sign-in.",
     audience: "ANY",
   },
   "/settings/reconnect/google": {
@@ -1062,4 +1069,289 @@ export const SITE_MAP_AUDIENCES: Readonly<
       thesis: "INVESTOR",
     },
   },
+};
+
+/**
+ * DECISIONS 75 (owner, 2026-11-07): Q understands which place a person
+ * means from their own words, not keywords. Each tab and section says what
+ * it is for -- what a person goes there to do or see -- in plain everyday
+ * words. Never a keyword or synonym list. A test requires one for every tab
+ * and section of every page Q can move to.
+ */
+export const SITE_MAP_PURPOSES: Readonly<
+  Record<
+    string,
+    {
+      readonly tabs?: Readonly<Record<string, string>>;
+      readonly sections?: Readonly<Record<string, string>>;
+    }
+  >
+> = {
+  "/analytics": {
+    sections: {
+      intent: "who saved you, asked to connect or asked for documents",
+      "deck-views": "how far investors read your deck",
+      viewers: "who viewed you, as each allows",
+      trend: "attention week by week",
+      breakdown: "kinds of investors and where",
+      documents: "which documents investors opened",
+      visibility: "how founders see you",
+      "my-activity": "companies you viewed",
+      responses: "founders' answers to you",
+    },
+  },
+  "/board": { sections: { board: "your tasks by column" } },
+  [COMPANY]: {
+    tabs: {
+      overview: "headline figures, the story and the raise",
+      diligence: "questions to check, the evidence and the risks",
+      elevator: "the short pitch",
+      dataroom: "the company's documents",
+      deck: "the deck and Q's reading of it",
+      team: "the founders and the team",
+    },
+    sections: {
+      profile: "the company",
+      overview: "headline figures, the story and the raise",
+      diligence: "questions, evidence and risks",
+      elevator: "the short pitch",
+      "data-room": "the list of documents",
+      missing: "documents investors expect that are missing",
+      deck: "the deck",
+      team: "the founders and the team",
+    },
+  },
+  "/company/[companyId]/founder/[position]": {
+    sections: { founder: "the founder's background" },
+  },
+  "/company/data-room": {
+    tabs: {
+      dataroom: "your documents, and what is still missing",
+      deck: "your pitch deck",
+    },
+    sections: { "data-room": "your documents to share with investors" },
+  },
+  "/company/interest": {
+    sections: { interest: "each investor's interest and your answer" },
+  },
+  "/company/visibility": {
+    sections: { visibility: "who sees what of your company" },
+  },
+  "/daily": { sections: { daily: "today's edition and the archive" } },
+  "/daily/[editionId]": { sections: { daily: "the edition's stories" } },
+  "/discover": {
+    tabs: {
+      "for-you": "new companies matched to your mandate",
+      yours: "companies you already follow, saved or in touch with",
+      founders: "other founders' pitch videos",
+    },
+    sections: {
+      feed: "companies recommended to you",
+      investors: "investors you could approach",
+      "q-room-card": "Q's card",
+    },
+  },
+  "/discover/saved": {
+    sections: {
+      saved: "the companies you saved",
+      passed: "the companies you passed on",
+      compare: "your saved companies side by side",
+    },
+  },
+  "/discover/passed": {
+    sections: {
+      saved: "the companies you saved",
+      passed: "the companies you passed on",
+      compare: "your saved companies side by side",
+    },
+  },
+  "/discover/saved/compare": {
+    sections: {
+      saved: "the companies you saved",
+      passed: "the companies you passed on",
+      compare: "your saved companies side by side",
+    },
+  },
+  "/documents": {
+    sections: { documents: "everything Q wrote for you" },
+  },
+  "/explore": { sections: { explore: "network search and pitches" } },
+  "/gateq": {
+    tabs: {
+      inbox: "applications founders sent you, to decide",
+      gate: "who may apply and what they send",
+      find: "find companies by describing them",
+      claim: "claim your company as yours",
+      applications: "applications you sent, and their status",
+    },
+    sections: {
+      inbox: "the inbox",
+      "gateq-inbox": "applications received",
+      "gateq-application": "one application",
+      "gateq-selection": "your picks",
+      "gateq-comparison": "your picks side by side",
+    },
+  },
+  "/home": {
+    sections: {
+      q: "talking with Q",
+      board: "your board, beside Q",
+      "q-room-card": "Q's card",
+    },
+  },
+  "/investors/[investorOrganisationId]": {
+    sections: { investor: "the firm, its thesis and team" },
+  },
+  "/investors/top": { sections: { top: "your best-fitting companies" } },
+  "/join/[token]": { sections: { invitation: "the invitation to accept" } },
+  "/pitch": { sections: { pitch: "your pitch videos" } },
+  "/pitch/[mediaAssetId]": { sections: { pitch: "the video" } },
+  "/pitch/new": { sections: { pitch: "recording or uploading" } },
+  "/profile": {
+    sections: {
+      about: "about you, in your words",
+      company: "your company's details",
+      traction: "traction and numbers",
+      team: "your team",
+      mandate: "what you invest in",
+      thesis: "how Q reads your thesis",
+      firm: "your firm's details",
+      organisation: "set up your organisation",
+      you: "your name, photo and role",
+      found: "what Q found in public",
+      verification: "what is verified",
+      "q-card": "your organisation's Q Card",
+      "my-q-card": "your personal Q Card",
+    },
+  },
+  "/q-pitch": { sections: { "q-pitch": "the tour" } },
+  "/q-pitch/capital-q": { sections: { "capital-q-pitch": "the pitch" } },
+  "/rehearsals": {
+    sections: { rehearsals: "who to practise with, and past sessions" },
+  },
+  "/rehearsals/company/[companyId]": {
+    sections: { rehearsal: "the practice session" },
+  },
+  "/rehearsals/investor/[investorOrganisationId]": {
+    sections: { rehearsal: "the practice session" },
+  },
+  "/rehearsals/live/[rehearsalId]": {
+    sections: { rehearsal: "the practice session" },
+  },
+  "/rehearsals/meeting/[meetingId]": {
+    sections: { rehearsal: "the practice session" },
+  },
+  "/rehearsals/person/[externalPersonId]": {
+    sections: { rehearsal: "the practice session" },
+  },
+  "/rehearsals/r/[rehearsalId]": {
+    sections: { rehearsal: "the session and Q's feedback" },
+  },
+  "/relationships": {
+    tabs: {
+      overview: "everyone at a glance",
+      pipeline: "relationships by stage",
+      capital: "a founder's raise; an investor's mandate and book",
+      "capital-raise": "your current round and who is in it",
+      "capital-readiness": "how ready your company looks to investors",
+      "capital-action-plan": "the steps to get investor-ready",
+      "capital-plan": "your 3, 6 and 12-month plan",
+      "capital-investors": "the investors in your raise",
+    },
+    sections: {
+      "hub-overview": "everyone at a glance",
+      pipeline: "relationships by stage",
+      relationships: "everyone, as a list",
+      mandate: "what you invest in",
+      commitments: "what you committed and what was received",
+      "capital-overview": "your raise at a glance",
+      rounds: "your round",
+      readiness: "by pillar",
+      "action-plan": "your steps",
+      plan: "by horizon",
+      investors: "the investors",
+    },
+  },
+  ...Object.fromEntries(
+    (["company", "investor"] as const).flatMap((side) => {
+      const base =
+        side === "company"
+          ? "/relationships/company/[companyId]"
+          : "/relationships/investor/[investorOrganisationId]";
+      const sections = {
+        calls: "your calls and meetings together",
+        diligence: "their questions and the shared documents",
+      };
+      return [
+        [
+          base,
+          {
+            tabs: {
+              messages: "your conversation",
+              calls: "your calls and meetings",
+              diligence: "questions, answers and shared documents",
+              deal: "terms, commitments and closing",
+            },
+            sections,
+          },
+        ],
+        [`${base}/calls`, { sections }],
+        [`${base}/deal`, { sections }],
+        [`${base}/diligence`, { sections }],
+        [
+          `${base}/messages`,
+          {
+            sections: {
+              chat: "the messages so far",
+              draft: "your reply; Q's draft waits here",
+              ...sections,
+            },
+          },
+        ],
+      ];
+    }),
+  ),
+  "/reviews": { sections: { reviews: "the reviews you asked for" } },
+  "/search": { sections: { search: "the people and organisations found" } },
+  "/settings": {
+    sections: {
+      settings: "everything",
+      profile: "your photo",
+      account: "name, email, sign out",
+      security: "two-step sign-in",
+      team: "your team and roles",
+      appearance: "light, dark, motion",
+      q: "Q's personality and language",
+      speaking: "how Q speaks on your behalf",
+      notifications: "emails and alerts",
+      connections: "Google calendar and mail",
+      billing: "your plan and payment",
+      privacy: "your data choices",
+    },
+  },
+  "/settings/activity": { sections: { activity: "your team's actions" } },
+  "/settings/memory": { sections: { memory: "what Q remembers" } },
+  "/settings/plan": { sections: { plan: "your plan and its limits" } },
+  "/settings/team": { sections: { team: "members, roles and invitations" } },
+  "/settings/team/[userId]": { sections: { member: "the teammate" } },
+  "/settings/usage": { sections: { usage: "this month's use" } },
+  "/verification": { sections: { verification: "your verification steps" } },
+  "/work": {
+    tabs: {
+      needs: "what waits for you to decide or do",
+      progress: "what Q is doing right now",
+      done: "what Q finished",
+      team: "the specialists Q uses for your work; not your colleagues",
+      cost: "what Q's work cost",
+    },
+    sections: {
+      work: "Q's tasks for you",
+      approvals: "what waits for your approval",
+      "q-room-card": "Q's card",
+    },
+  },
+  "/work/[delegationId]": {
+    sections: { work: "the task's steps and results" },
+  },
+  "/work/[delegationId]/report/[laneId]": { sections: { work: "the report" } },
 };
