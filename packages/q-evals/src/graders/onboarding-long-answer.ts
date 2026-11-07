@@ -1,8 +1,4 @@
-import {
-  checkTheirWords,
-  THEIR_WORDS_MIN_KEPT,
-  wordTokens,
-} from "@capital-q/q-core";
+import { checkTheirWords, wordTokens } from "@capital-q/q-core";
 
 import type {
   LongAnswerCase,
@@ -91,7 +87,7 @@ export function gradeLongAnswerCase(
     if (e.decision === "KEEP") {
       if (!check.deletionsOnly)
         reasons.push("keep: not deletions only from their line");
-      if (check.kept < THEIR_WORDS_MIN_KEPT)
+      if (check.deletionsOnly && !check.cleaned)
         reasons.push(`keep: kept ${check.kept.toFixed(2)} of their line`);
       contentOk = check.cleaned;
     } else {

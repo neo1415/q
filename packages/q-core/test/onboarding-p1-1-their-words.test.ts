@@ -71,6 +71,33 @@ describe("cleanedFromTheirLine", () => {
     expect(check.cleaned).toBe(false);
   });
 
+  it("keeps the rest of a short line after a short lead-in (an instruction, not the answer)", () => {
+    const check = checkTheirWords(
+      "Robotics for warehouse logistics.",
+      "Change our description to robotics for warehouse logistics.",
+    );
+    expect(check.kept).toBeLessThan(THEIR_WORDS_MIN_KEPT);
+    expect(check.afterLeadIn).toBe(true);
+    expect(check.cleaned).toBe(true);
+  });
+
+  it("refuses a cut inside or after the answer, or a long lead-in, below the floor", () => {
+    // A lead-in dropped but the end cut too ("not to banks" lost).
+    expect(
+      cleanedFromTheirLine(
+        "we sell payroll software",
+        "Put it as: we sell payroll software, but not to banks or insurers.",
+      ),
+    ).toBe(false);
+    // A ramble's middle: a long lead-in and a long tail.
+    expect(
+      cleanedFromTheirLine(
+        "we help grain co-ops track their silos",
+        "So basically, um, what we do, right, is we help grain co-ops track their silos, and also the paperwork, the bank paperwork, and payments, sort of.",
+      ),
+    ).toBe(false);
+  });
+
   it("refuses an empty value", () => {
     expect(cleanedFromTheirLine("", LINE)).toBe(false);
     expect(cleanedFromTheirLine("...", LINE)).toBe(false);

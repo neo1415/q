@@ -10,7 +10,9 @@
  * Their words cleaned means:
  * - every token of the value, in order, is a token of their line
  *   (deletions only: nothing added, reworded or reordered); and
- * - it keeps at least THEIR_WORDS_MIN_KEPT of their line's tokens.
+ * - it keeps at least THEIR_WORDS_MIN_KEPT of their line's tokens, or it
+ *   is the rest of their line, whole, after a short lead-in of at most
+ *   THEIR_WORDS_MAX_LEAD_IN tokens ("change our description to …").
  */
 
 /**
@@ -23,6 +25,16 @@
  * back for their yes instead. The safe direction is always the read-back.
  */
 export const THEIR_WORDS_MIN_KEPT = 0.7;
+
+/**
+ * A short instruction or lead-in before the answer ("change our
+ * description to", "put it as", "the website, then") is not part of it:
+ * dropping only that, with every word after it kept whole to the end of
+ * their line, is not a selection, however short the line. Five tokens
+ * covers such a lead-in; a longer cut, or any cut inside or after the
+ * answer, must meet THEIR_WORDS_MIN_KEPT (a ramble's middle never does).
+ */
+export const THEIR_WORDS_MAX_LEAD_IN = 5;
 
 /** Lower-cased letters and digits in any script; punctuation splits. */
 export function wordTokens(text: string): string[] {
@@ -51,7 +63,9 @@ export type TheirWordsCheck = {
   readonly deletionsOnly: boolean;
   /** Share of their line's tokens kept (0 when the line is empty). */
   readonly kept: number;
-  /** Both hold: the value is their words with filler removed. */
+  /** The value is the rest of their line after a short lead-in. */
+  readonly afterLeadIn: boolean;
+  /** Deletions only, and enough kept (or only a lead-in dropped). */
   readonly cleaned: boolean;
 };
 
@@ -61,10 +75,17 @@ export function checkTheirWords(value: string, line: string): TheirWordsCheck {
   const given = wordTokens(value);
   const deletionsOnly = given.length > 0 && isTokenSubsequence(given, theirs);
   const kept = theirs.length === 0 ? 0 : given.length / theirs.length;
+  const leadIn = theirs.length - given.length;
+  const afterLeadIn =
+    given.length > 0 &&
+    leadIn >= 0 &&
+    leadIn <= THEIR_WORDS_MAX_LEAD_IN &&
+    given.every((token, i) => theirs[leadIn + i] === token);
   return {
     deletionsOnly,
     kept,
-    cleaned: deletionsOnly && kept >= THEIR_WORDS_MIN_KEPT,
+    afterLeadIn,
+    cleaned: deletionsOnly && (kept >= THEIR_WORDS_MIN_KEPT || afterLeadIn),
   };
 }
 

@@ -123,6 +123,7 @@ export {
   checkTheirWords,
   cleanedFromTheirLine,
   isTokenSubsequence,
+  THEIR_WORDS_MAX_LEAD_IN,
   THEIR_WORDS_MIN_KEPT,
   wordTokens,
   type TheirWordsCheck,
