@@ -31,6 +31,9 @@ type Row = {
   passive_view_notifications: boolean;
   intent_signal_notifications: boolean;
   q_uses_passive_signals: boolean;
+  headline_floor: number;
+  slice_floor: number;
+  passive_batch: string;
   version: number;
   updated_by_name: string | null;
   reason: string | null;
@@ -48,6 +51,9 @@ function toSettings(row: Row): AnalyticsSettings {
     passiveViewNotifications: row.passive_view_notifications,
     intentSignalNotifications: row.intent_signal_notifications,
     qUsesPassiveSignals: row.q_uses_passive_signals,
+    headlineFloor: row.headline_floor,
+    sliceFloor: row.slice_floor,
+    passiveBatch: row.passive_batch,
   });
 }
 
@@ -111,8 +117,9 @@ export async function updateAnalyticsSettings(
     readonly settings: AnalyticsSettings;
     readonly expectedVersion: number;
     readonly reason: string;
+    readonly acknowledgeInvestorTrustRisk?: true | undefined;
   },
-): Promise<"CHANGED" | "UNCHANGED" | "STALE"> {
+): Promise<"CHANGED" | "UNCHANGED" | "STALE" | "NEEDS_ACKNOWLEDGEMENT"> {
   const next = AnalyticsSettingsSchema.parse(input.settings);
   return transactions.run(async (tx) => {
     const [row] = await tx.sql<Row[]>`
@@ -125,6 +132,16 @@ export async function updateAnalyticsSettings(
     const before = toSettings(row);
     const changed = changedKeys(before, next);
     if (changed.length === 0) return "UNCHANGED";
+    // The Anonymous override is locked: turning it on breaks the promise
+    // made to investors, so it needs the admin's explicit acknowledgement
+    // on top of the step-up every write already needs.
+    if (
+      next.paidRevealOverridesAnonymous &&
+      !before.paidRevealOverridesAnonymous &&
+      input.acknowledgeInvestorTrustRisk !== true
+    ) {
+      return "NEEDS_ACKNOWLEDGEMENT";
+    }
     await tx.sql`
       update analytics.platform_settings
          set default_visibility = ${next.defaultVisibility},
@@ -136,6 +153,9 @@ export async function updateAnalyticsSettings(
              passive_view_notifications = ${next.passiveViewNotifications},
              intent_signal_notifications = ${next.intentSignalNotifications},
              q_uses_passive_signals = ${next.qUsesPassiveSignals},
+             headline_floor = ${next.headlineFloor},
+             slice_floor = ${next.sliceFloor},
+             passive_batch = ${next.passiveBatch},
              version = version + 1,
              updated_by = ${grant.userId},
              reason = ${input.reason},
@@ -150,7 +170,11 @@ export async function updateAnalyticsSettings(
       resourceType: "analytics_settings",
       resourceId: "platform",
       reason: input.reason,
-      metadata: { changed },
+      metadata: {
+        changed,
+        investorTrustRiskAcknowledged:
+          input.acknowledgeInvestorTrustRisk === true,
+      },
     });
     return "CHANGED";
   });

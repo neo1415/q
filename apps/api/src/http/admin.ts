@@ -876,6 +876,14 @@ export function registerAdminRoutes(
       );
       if (input === null) return reply;
       const outcome = await admin.updateAnalyticsSettings(grant, input);
+      if (outcome === "NEEDS_ACKNOWLEDGEMENT") {
+        return send(
+          request,
+          reply,
+          "VALIDATION_FAILED",
+          "Revealing Anonymous investors breaks the promise made to them. Acknowledge the investor-trust risk to continue.",
+        );
+      }
       if (outcome === "STALE") {
         return send(
           request,

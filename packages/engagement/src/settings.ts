@@ -27,6 +27,9 @@ type Row = {
   passive_view_notifications: boolean;
   intent_signal_notifications: boolean;
   q_uses_passive_signals: boolean;
+  headline_floor: number;
+  slice_floor: number;
+  passive_batch: string;
 };
 
 export function settingsFromRow(row: Row): AnalyticsSettings {
@@ -40,6 +43,9 @@ export function settingsFromRow(row: Row): AnalyticsSettings {
     passiveViewNotifications: row.passive_view_notifications,
     intentSignalNotifications: row.intent_signal_notifications,
     qUsesPassiveSignals: row.q_uses_passive_signals,
+    headlineFloor: row.headline_floor,
+    sliceFloor: row.slice_floor,
+    passiveBatch: row.passive_batch,
   });
 }
 

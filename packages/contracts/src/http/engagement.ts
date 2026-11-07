@@ -156,11 +156,22 @@ export type UpdateViewingPrivacyRequest = z.infer<
 
 export const ENGAGEMENT_SHOWN_BASES = ["VIEWER_CHOICE", "PAID_REVEAL"] as const;
 
+/**
+ * What a founder is shown: a viewer's own level where the founder sees
+ * viewers individually (Founder Pro, or the admin's named-viewers switch),
+ * else one merged AGGREGATE row. ANONYMOUS reads "an investor".
+ */
+export const ENGAGEMENT_SHOWN_LEVELS = [
+  ...VIEWING_VISIBILITIES,
+  "AGGREGATE",
+] as const;
+export const EngagementShownLevelSchema = z.enum(ENGAGEMENT_SHOWN_LEVELS);
+
 export const EngagementViewerDtoSchema = z
   .object({
     /** The level the founder is shown, after the platform settings. */
-    visibility: ViewingVisibilitySchema,
-    /** PAID_REVEAL where the shown level is less private than the viewer's own. */
+    visibility: EngagementShownLevelSchema,
+    /** PAID_REVEAL only where the admin override named an Anonymous viewer. */
     basis: z.enum(ENGAGEMENT_SHOWN_BASES),
     /** Only for FULL_IDENTITY. */
     viewerUserId: UuidSchema.nullable(),
@@ -168,6 +179,7 @@ export const EngagementViewerDtoSchema = z
     viewerOrganisationId: UuidSchema.nullable(),
     viewerName: z.string().nullable(),
     organisationName: z.string().nullable(),
+    organisations: z.number().int().min(0),
     people: z.number().int().min(0),
     events: z.number().int().min(0),
     profileViews: z.number().int().min(0),
@@ -177,15 +189,17 @@ export const EngagementViewerDtoSchema = z
     videoWatchMs: z.number().int().min(0).nullable(),
     qCardViews: z.number().int().min(0),
     dataRoomDocumentViews: z.number().int().min(0),
-    /** Null for the anonymous bucket. */
-    lastViewedAt: z.iso.datetime({ offset: true }).nullable(),
+    /** The batch (week) of the latest view; never a time. Null for merged rows. */
+    lastPeriodStart: z.iso.date().nullable(),
   })
   .strict();
 export type EngagementViewerDto = z.infer<typeof EngagementViewerDtoSchema>;
 
-export const EngagementDayDtoSchema = z
+export const EngagementPeriodDtoSchema = z
   .object({
-    day: z.iso.date(),
+    /** The start of a completed batch (a week by default). */
+    periodStart: z.iso.date(),
+    organisations: z.number().int().min(0),
     viewers: z.number().int().min(0),
     profileViews: z.number().int().min(0),
     deckOpens: z.number().int().min(0),
@@ -228,10 +242,27 @@ export const CompanyEngagementDtoSchema = z
   .object({
     companyId: UuidSchema,
     since: z.iso.datetime({ offset: true }).nullable(),
-    /** False when fewer than the floor of organisations engaged: aggregates are withheld. */
+    /** False below the headline floor: passive aggregates are withheld. */
     floorMet: z.boolean(),
-    floor: z.number().int().min(1),
-    daily: z.array(EngagementDayDtoSchema),
+    floor: z.number().int().min(3),
+    sliceFloor: z.number().int().min(5),
+    passiveBatch: z.enum(["WEEKLY", "DAILY"]),
+    /** Whether viewers appear individually (Founder Pro or the admin switch). */
+    perViewer: z.boolean(),
+    /** Whether this company's plan includes viewer identity. */
+    entitled: z.boolean(),
+    periods: z.array(EngagementPeriodDtoSchema),
+    slices: z.array(
+      z
+        .object({
+          dimension: z.enum(["INVESTOR_TYPE", "GEOGRAPHY"]),
+          /** OTHER for the merged, suppressed slices. */
+          slice: z.string(),
+          organisations: z.number().int().min(0).nullable(),
+          suppressed: z.boolean(),
+        })
+        .strict(),
+    ),
     deckFunnel: z.array(DeckFunnelStepDtoSchema),
     videos: z.array(VideoCompletionDtoSchema),
     documents: z.array(DocumentViewsDtoSchema),
@@ -280,6 +311,12 @@ export const AnalyticsSettingsSchema = z
     passiveViewNotifications: z.boolean(),
     intentSignalNotifications: z.boolean(),
     qUsesPassiveSignals: z.boolean(),
+    /** Distinct organisations before any passive total; admins raise it, never below 3. */
+    headlineFloor: z.number().int().min(3).max(100),
+    /** Distinct organisations for any breakdown slice; never below 5. */
+    sliceFloor: z.number().int().min(5).max(100),
+    /** Passive figures in completed batches only; WEEKLY by default. */
+    passiveBatch: z.enum(["WEEKLY", "DAILY"]),
   })
   .strict()
   .superRefine((value, context) => {
@@ -318,15 +355,22 @@ export const ANALYTICS_SETTINGS_DEFAULTS: AnalyticsSettings = {
   defaultVisibility: "ORGANISATION_ONLY",
   allowedVisibilities: ["FULL_IDENTITY", "ORGANISATION_ONLY", "ANONYMOUS"],
   namedPassiveViewers: false,
-  paidIdentityReveal: false,
+  paidIdentityReveal: true,
   paidRevealOverridesAnonymous: false,
   perPersonPassiveAnalytics: false,
   passiveViewNotifications: false,
   intentSignalNotifications: true,
   qUsesPassiveSignals: true,
+  headlineFloor: 3,
+  sliceFloor: 5,
+  passiveBatch: "WEEKLY",
 };
 
-/** Plain English for the admin console; `beyondSpec` marks what changes §6.7. */
+/**
+ * Plain English for the admin console. `beyondSpec` marks a value that goes
+ * beyond the Product Specification §6.7; `locked` marks a setting whose
+ * change needs an explicit acknowledgement of the investor-trust risk.
+ */
 export const ANALYTICS_SETTING_DESCRIPTIONS: Readonly<
   Record<
     keyof AnalyticsSettings,
@@ -334,13 +378,14 @@ export const ANALYTICS_SETTING_DESCRIPTIONS: Readonly<
       readonly title: string;
       readonly description: string;
       readonly beyondSpec: (value: unknown) => boolean;
+      readonly locked?: true;
     }
   >
 > = {
   defaultVisibility: {
     title: "Default viewer identity",
     description:
-      'What founders see about an investor who has not chosen: their name, their organisation ("Someone from Apex Capital"), or nothing. Investors may always choose to be more private.',
+      'What an investor who has not chosen shows to founders: their name, their organisation ("Someone from Apex Capital"), or nothing. Investors may always choose to be more private, for free.',
     beyondSpec: (value) => value === "FULL_IDENTITY",
   },
   allowedVisibilities: {
@@ -349,29 +394,48 @@ export const ANALYTICS_SETTING_DESCRIPTIONS: Readonly<
       "Which visibility levels an investor can pick. The default and anything more private are always allowed. A stored choice that is later disallowed is still honoured, never made less private.",
     beyondSpec: () => false,
   },
-  namedPassiveViewers: {
-    title: 'Named viewers ("who viewed you")',
+  paidIdentityReveal: {
+    title: "Viewer identity for Founder Pro",
     description:
-      "Show founders the name of an investor who chose Full identity when they only viewed. Off shows their organisation. Specification §6.7.12: passive viewing is generally not granular founder analytics.",
+      'Founders whose plan includes "Viewer identity" (Founder Pro) see each viewer at the level the investor chose: name, organisation, or just "an investor". It never reveals an Anonymous investor. A subscription feature, not credits; investors never pay for visibility or anonymity. The specification (§6.7.12) says passive viewing is generally not granular founder analytics.',
     beyondSpec: (value) => value === true,
   },
-  paidIdentityReveal: {
-    title: "Paid identity reveal",
+  namedPassiveViewers: {
+    title: "Viewer identity for every founder",
     description:
-      'A founder whose plan includes "Viewer identity reveal" sees viewers by name, even those who chose Organisation only. Overrides the investor\'s choice (§6.7.13). Anonymous stays anonymous unless the next setting is on.',
+      "The same per-viewer display for every founder, without the plan. Off: free founders see aggregates and every intent signal.",
     beyondSpec: (value) => value === true,
   },
   paidRevealOverridesAnonymous: {
-    title: "Paid reveal overrides Anonymous",
+    title: "Reveal Anonymous investors (locked)",
     description:
-      "Lets a paid reveal name investors who chose Anonymous. Needs paid identity reveal on. Directly overrides §6.7.13.",
+      "Lets Founder Pro name investors who chose Anonymous. This breaks the promise Capital Q makes to investors (§6.7.13) and can end their trust in the platform. Needs Viewer identity on, a step-up and an explicit acknowledgement of that risk.",
     beyondSpec: (value) => value === true,
+    locked: true,
   },
   perPersonPassiveAnalytics: {
-    title: "Per-person viewing detail",
+    title: "Per-person viewing time",
     description:
-      "Slide-by-slide time and video time for each named viewer. Off shows these only as aggregates across at least 3 organisations.",
+      'Slide-by-slide and video time for each named viewer. Off by default: time tied to a person invites the "I saw you spent four minutes on slide 7" follow-up investors find invasive.',
     beyondSpec: (value) => value === true,
+  },
+  headlineFloor: {
+    title: "Minimum organisations for totals",
+    description:
+      'No passive total appears until this many distinct organisations viewed in the period. Below it founders read "Fewer than 3 investor organisations viewed this week". Never below 3.',
+    beyondSpec: () => false,
+  },
+  sliceFloor: {
+    title: "Minimum organisations per breakdown",
+    description:
+      "Any breakdown (investor type, geography) shows a slice only at this many organisations, and hides the next-smallest too so nothing can be found by subtraction. Never below 5.",
+    beyondSpec: () => false,
+  },
+  passiveBatch: {
+    title: "Viewing figures refresh",
+    description:
+      "Weekly: viewing figures cover completed weeks only, with no view times, so a founder cannot match a view to a meeting. Intent signals always arrive in real time.",
+    beyondSpec: (value) => value === "DAILY",
   },
   passiveViewNotifications: {
     title: "View notifications",
@@ -382,7 +446,7 @@ export const ANALYTICS_SETTING_DESCRIPTIONS: Readonly<
   intentSignalNotifications: {
     title: "Intent notifications",
     description:
-      "Email and push to founders on a save, an expression of interest, a connection request or a data-room request (§6.7.12 intent signals).",
+      "Email and push to founders on a save, an expression of interest, a connection request or a data-room request, in real time (§6.7.12 intent signals).",
     beyondSpec: () => false,
   },
   qUsesPassiveSignals: {
@@ -420,6 +484,11 @@ export const UpdateAnalyticsSettingsRequestSchema = z
     /** Optimistic concurrency: the version the admin was looking at. */
     expectedVersion: z.number().int().min(1),
     reason: z.string().trim().min(3).max(500),
+    /**
+     * Required to turn the locked Anonymous override on: the admin has read
+     * that it breaks the anonymity promise made to investors.
+     */
+    acknowledgeInvestorTrustRisk: z.literal(true).optional(),
   })
   .strict();
 export type UpdateAnalyticsSettingsRequest = z.infer<

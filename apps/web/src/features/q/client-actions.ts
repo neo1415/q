@@ -150,7 +150,8 @@ export function recordPagePath(
     case "WORK_ITEM":
       return `/work/${safe}`;
     case "CAPITAL_ROUND":
-      return `/capital?round=${safe}#round-${safe}`;
+      // Q Workspace W3: the real landing (/capital redirects here).
+      return `/relationships?view=capital&round=${safe}#round-${safe}`;
     case "GATEQ_APPLICATION":
       return `/gateq?item=${safe}`;
     // P4: one Q Daily edition (the story or section is the intent's anchor).

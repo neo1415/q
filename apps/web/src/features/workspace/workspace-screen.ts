@@ -2,6 +2,11 @@
 
 import { useEffect, useId } from "react";
 
+import {
+  Q_WORKSPACE_PATH_MAX,
+  type QWorkspaceScreen,
+} from "@capital-q/contracts";
+
 import { getWorkspaceLayout } from "./layout-store";
 
 /**
@@ -11,18 +16,21 @@ import { getWorkspaceLayout } from "./layout-store";
  * Present only when the workspace shell is on screen. Hints for Q's
  * navigation policy, never authority (the server re-authorises everything).
  */
-export type WorkspaceScreen = {
-  readonly qPane: "open" | "collapsed";
-  readonly pagePane: "open" | "collapsed";
-  /** The page pane's current path (with its query). */
-  readonly at?: string | undefined;
-  /** The page before Q's last move (what Back returns to). */
-  readonly previous?: string | undefined;
-  /** The page has registered unsaved work (a leave guard applies). */
-  readonly dirty?: true | undefined;
-  /** The person typed, scrolled or pressed in the page pane in the last ~2 s. */
-  readonly busy?: true | undefined;
-};
+export type WorkspaceScreen = QWorkspaceScreen;
+
+/**
+ * A path as the contract carries it (at most Q_WORKSPACE_PATH_MAX): a long
+ * query is dropped before the path; a path still too long is left out,
+ * because one over-long field would void the whole request.
+ */
+export function fitPath(path: string | undefined): string | undefined {
+  if (path === undefined) return undefined;
+  if (path.length <= Q_WORKSPACE_PATH_MAX) return path;
+  const bare = path.split("?")[0] ?? "";
+  return bare.length > 0 && bare.length <= Q_WORKSPACE_PATH_MAX
+    ? bare
+    : undefined;
+}
 
 /** How recent page-pane activity counts as "busy". */
 export const BUSY_WINDOW_MS = 2000;
@@ -106,14 +114,13 @@ export function workspaceScreen(
     return undefined;
   }
   const layout = getWorkspaceLayout();
-  const at = `${window.location.pathname}${window.location.search}`;
+  const at = fitPath(`${window.location.pathname}${window.location.search}`);
+  const previous = fitPath(previousBeforeQ);
   return {
     qPane: layout.qPane,
     pagePane: layout.pagePane,
-    at,
-    ...(previousBeforeQ === undefined || previousBeforeQ === at
-      ? {}
-      : { previous: previousBeforeQ }),
+    ...(at === undefined ? {} : { at }),
+    ...(previous === undefined || previous === at ? {} : { previous }),
     ...(hasDirtyWork() ? { dirty: true } : {}),
     ...(now - lastPageActivity < BUSY_WINDOW_MS ? { busy: true } : {}),
   };

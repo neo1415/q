@@ -92,6 +92,10 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "Who can see my financials?",
       "Which investors can open my cap table?",
     ],
+    engagement: [
+      "Who has been looking at my company?",
+      "Can founders see that I viewed them?",
+    ],
   };
 
 export function parityCases(

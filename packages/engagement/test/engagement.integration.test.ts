@@ -78,7 +78,8 @@ async function document(tx: TransactionContext, company: Org) {
 
 let counter = 0;
 const clientId = () => `evt-${String(++counter).padStart(8, "0")}`;
-const at = "2026-11-06T10:00:00.000Z";
+// In a completed week: passive figures exclude the current one.
+const at = "2026-10-20T10:00:00.000Z";
 
 describe("@capital-q/engagement against local Postgres", () => {
   let db: RequestDatabase;
@@ -238,7 +239,7 @@ describe("@capital-q/engagement against local Postgres", () => {
     });
   });
 
-  it("the founder read follows the spec defaults: no names, floored aggregates", async () => {
+  it("the founder read: aggregates on a free plan, each viewer's own level on Founder Pro", async () => {
     await scenario(async (tx) => {
       const repo = createPostgresEngagementRepository(tx.sql);
       const reader = createPostgresCompanyEngagementReader(tx.sql);
@@ -265,34 +266,75 @@ describe("@capital-q/engagement against local Postgres", () => {
         since: null,
       };
       const below = await reader.read(query);
-      expect(below?.floorMet).toBe(false);
-      expect(below?.daily).toEqual([]);
-      // Named passive viewers is OFF by default: even a Full identity
-      // viewer is shown as their organisation, with no time per person.
-      expect(below?.viewers).toHaveLength(1);
-      expect(below?.viewers[0]).toMatchObject({
-        visibility: "ORGANISATION_ONLY",
-        basis: "VIEWER_CHOICE",
-        viewerUserId: null,
-        viewerName: null,
-        viewerOrganisationId: named.viewer.organisationId,
-        deckDwellMs: null,
+      expect(below).toMatchObject({
+        floorMet: false,
+        floor: 3,
+        sliceFloor: 5,
+        passiveBatch: "WEEKLY",
+        perViewer: false,
+        entitled: false,
+        periods: [],
+        viewers: [],
+        slices: [],
+        viewerDeckDetail: [],
       });
-      expect(below?.viewerDeckDetail).toEqual([]);
 
       await viewOf(third.viewer);
-      const at3 = await reader.read(query);
-      expect(at3?.floorMet).toBe(true);
-      expect(at3?.daily[0]?.viewers).toBe(3);
-      const anonymous = at3?.viewers.filter(
-        (v) => v.visibility === "ANONYMOUS",
-      );
-      // One anonymous viewer cannot reach the floor on their own.
-      expect(anonymous).toEqual([]);
+      const free = await reader.read(query);
+      expect(free?.floorMet).toBe(true);
+      expect(free?.periods).toHaveLength(1);
+      expect(free?.periods[0]?.organisations).toBe(3);
+      // A free plan: one aggregate row, no names, no organisations.
+      expect(free?.viewers).toEqual([
+        expect.objectContaining({
+          visibility: "AGGREGATE",
+          viewerUserId: null,
+          viewerOrganisationId: null,
+          organisations: 3,
+          lastPeriodStart: null,
+        }),
+      ]);
+      // Three VC firms is below the slice floor of 5: hidden.
       expect(
-        at3?.viewers.filter((v) => v.visibility === "ORGANISATION_ONLY"),
-      ).toHaveLength(2);
-      expect(at3?.viewers.every((v) => v.viewerUserId === null)).toBe(true);
+        free?.slices.filter((slice) => slice.dimension === "INVESTOR_TYPE"),
+      ).toEqual([
+        {
+          dimension: "INVESTOR_TYPE",
+          slice: "OTHER",
+          organisations: null,
+          suppressed: true,
+        },
+      ]);
+
+      // Founder Pro: each viewer at the level they chose.
+      await tx.sql`insert into billing.plan_assignments (organisation_id, plan_id, source, assigned_by_user_id, reason)
+        select ${company.viewer.organisationId}, p.id, 'ADMIN', ${company.viewer.userId}, 'Founder Pro test'
+          from billing.plans p where p.key = 'founder_pro'`;
+      const pro = await reader.read(query);
+      expect(pro).toMatchObject({ perViewer: true, entitled: true });
+      expect(
+        pro?.viewers.find((v) => v.viewerUserId === named.viewer.userId),
+      ).toMatchObject({
+        visibility: "FULL_IDENTITY",
+        basis: "VIEWER_CHOICE",
+        deckDwellMs: null,
+        lastPeriodStart: "2026-10-19",
+      });
+      expect(
+        pro?.viewers.find(
+          (v) => v.viewerOrganisationId === third.viewer.organisationId,
+        ),
+      ).toMatchObject({ visibility: "ORGANISATION_ONLY", viewerUserId: null });
+      // The Anonymous viewer: never named, never their organisation, and a
+      // lone anonymous viewer is below the floor even as "an investor".
+      expect(
+        pro?.viewers.some(
+          (v) =>
+            v.viewerUserId === quiet.viewer.userId ||
+            v.viewerOrganisationId === quiet.viewer.organisationId ||
+            v.visibility === "ANONYMOUS",
+        ),
+      ).toBe(false);
 
       // Someone outside the company reads nothing.
       expect(

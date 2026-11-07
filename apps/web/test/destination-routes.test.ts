@@ -56,7 +56,7 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   REHEARSALS: "/rehearsals",
   DOCUMENTS: "/documents",
   DAILY: "/daily",
-  RESULTS: "/results",
+  RESULTS: "/relationships?view=overview",
   REVIEWS: "/reviews",
   WORK: "/work",
   WORK_NEEDS: "/work?view=needs",
@@ -98,6 +98,8 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
     "the bare company address, redirects to the founder's own /company/<id> (Q opens it by name)",
   "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",
   "/capital": "old address, redirects to the CRM's Capital tab (Q's CAPITAL)",
+  "/results":
+    "old address, redirects to the CRM's overview (Q's RESULTS goes there directly)",
   "/discover/yours": "old address, redirects to /discover?tab=yours",
   "/settings/reconnect/google": "a hand-off from Google, not a page to visit",
   "/join": "an invitation link",

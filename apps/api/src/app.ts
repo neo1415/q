@@ -691,6 +691,10 @@ export function createApp(
               return pitch === undefined ? null : pitchSummary(pitch);
             },
           }),
+      // Q Workspace §8: the person's own viewing visibility.
+      ...(modules.engagement === undefined
+        ? {}
+        : { viewingPrivacy: modules.engagement.engagement }),
       ...(modules.discovery?.interactions === undefined
         ? {}
         : { interactions: modules.discovery.interactions }),
