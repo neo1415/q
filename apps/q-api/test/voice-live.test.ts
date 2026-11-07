@@ -8,6 +8,7 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type QSensitivityClass,
 } from "@capital-q/contracts";
+import { INVESTOR_LIST_THEMES } from "@capital-q/investor-onboarding";
 import { createInMemoryModelUsageRepository } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
 import { spokenFactsOfAttention } from "@capital-q/q-core";
@@ -31,7 +32,10 @@ import {
 import { liveContextPackage, referentsOf } from "../src/voice/live/context.js";
 import { heardRequest, spokenWords } from "../src/voice/live/heard.js";
 import { LIVE_DEFAULTS, liveConfigFrom } from "../src/voice/live/config.js";
-import { livePrompt } from "../src/voice/live/prompt.js";
+import {
+  LIVE_INVESTOR_LIST_THEMES,
+  livePrompt,
+} from "../src/voice/live/prompt.js";
 import {
   createGptLiveProvider,
   GPT_LIVE_USD_PER_SECOND,
@@ -1962,6 +1966,35 @@ describe("the live setup call: a needed topic they decline (e2e run 3)", () => {
     const prompt = livePrompt({ interview: "CHECKLIST" });
     expect(prompt).toMatch(
       /would rather not answer a needed topic, never just set it aside: say in a few plain words why Capital Q needs it/u,
+    );
+  });
+});
+
+describe("the live setup call: the investor's lists by theme (e2e run 4)", () => {
+  it("asks the lists as the journey's three questions, never list by list", () => {
+    expect(LIVE_INVESTOR_LIST_THEMES).toEqual(
+      INVESTOR_LIST_THEMES.map((theme) => theme.question),
+    );
+    const prompt = livePrompt({ role: "investor", interview: "CHECKLIST" });
+    for (const question of LIVE_INVESTOR_LIST_THEMES) {
+      expect(prompt).toContain(JSON.stringify(question));
+    }
+    expect(prompt).toMatch(/never list by list/u);
+    expect(prompt).toMatch(
+      /covers only some of a question's lists, ask once, briefly, about just the rest together/u,
+    );
+    expect(prompt).toMatch(
+      /Never assume "none" for something they did not address/u,
+    );
+  });
+
+  it("is said to investors only", () => {
+    expect(livePrompt({ role: "founder", interview: "CHECKLIST" })).not.toMatch(
+      /preference lists \(investor setup\)/u,
+    );
+    // Not in an ordinary call either.
+    expect(livePrompt({ role: "investor" })).not.toMatch(
+      /preference lists \(investor setup\)/u,
     );
   });
 });

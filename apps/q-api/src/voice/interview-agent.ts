@@ -2898,9 +2898,11 @@ export function createInterviewAgent(
         result.raised.filter((id) => open.has(id)),
       );
     }
-    // e2e run 4 (owner: one answer fills several lists): the lists a
-    // themed question asked that their answer left out, and a concept they
-    // said "None" to, are settled by code -- never asked one by one.
+    // e2e run 4 (owner: one answer fills several lists): a plain "none" to
+    // a themed question settles the lists it asked; a plain skip of its
+    // follow-up leaves them not known; "None" to one list of a concept is
+    // "None" for the rest of it. A list their answer did not touch stays
+    // open (unknown stays unknown) and is asked once more, briefly.
     const settledByCode = new Set<string>();
     if (input.journeyType === "investor" && !opening) {
       const now = port.view();
@@ -2918,28 +2920,33 @@ export function createInterviewAgent(
             )
             .map((e) => e.stepKey),
         );
-        const toNone = listsSettledByAnswer({
+        const settled = listsSettledByAnswer({
           lastQTurn,
           utterance,
           recordedThisTurn: port.recorded(),
           open,
           answers,
         });
-        if (toNone.length > 0) {
+        for (const [keys, as] of [
+          [settled.none, "NONE"],
+          [settled.notKnown, "NOT_KNOWN"],
+        ] as const) {
+          if (keys.length === 0) continue;
           const results = await port
             .recordNone(
-              toNone.map((stepKey) => ({ stepKey, quote: utterance })),
+              keys.map((stepKey) => ({ stepKey, quote: utterance })),
+              as,
             )
             .catch(() => []);
           for (const item of results) {
             if (item.outcome === "COMMITTED") settledByCode.add(item.stepKey);
           }
-          if (settledByCode.size > 0) {
-            logger.info(
-              { settled: [...settledByCode] },
-              "lists their answer left out settled as None",
-            );
-          }
+        }
+        if (settledByCode.size > 0) {
+          logger.info(
+            { settled: [...settledByCode] },
+            "lists their plain answer settled",
+          );
         }
       }
     }

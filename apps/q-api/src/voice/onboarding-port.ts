@@ -821,15 +821,16 @@ export type BoundOnboardingPort = OnboardingToolPort &
       items: readonly { readonly stepKey: string; readonly quote: string }[],
     ) => Promise<readonly OnboardingRecordResult[]>;
     /**
-     * Investor lists their answer to a themed question left out (e2e run
-     * 4, owner: one answer fills several lists): asked, and nothing for
-     * them, so "None" (NONE_ANSWER_TEXT). Code decides which (the interview
-     * agent's `listsSettledByAnswer`); this only writes, and only a
-     * required list "None" answers (INVESTOR_NONE_STEPS) that holds no
-     * answer yet, quoting their latest words. Never overwrites anything.
+     * Investor lists their explicit answer settles (e2e run 4): a plain
+     * "none" to a themed question is "None" (NONE_ANSWER_TEXT); a plain
+     * skip of its follow-up is not known (NOT_KNOWN_TEXT). Code decides
+     * which (`listsSettledByAnswer`); this only writes, and only a required
+     * list "None" answers (INVESTOR_NONE_STEPS) that holds no answer yet,
+     * quoting their latest words. Never overwrites anything.
      */
     readonly recordNone: (
       items: readonly { readonly stepKey: string; readonly quote: string }[],
+      as?: "NONE" | "NOT_KNOWN",
     ) => Promise<readonly OnboardingRecordResult[]>;
   };
 
@@ -5652,7 +5653,8 @@ export function createOnboardingPort(input: {
       }
       return results;
     },
-    recordNone: async (items) => {
+    recordNone: async (items, as = "NONE") => {
+      const text = as === "NONE" ? NONE_ANSWER_TEXT : NOT_KNOWN_TEXT;
       const results: OnboardingRecordResult[] = [];
       for (const item of items) {
         const step = steps.get(item.stepKey);
@@ -5689,13 +5691,13 @@ export function createOnboardingPort(input: {
             });
             continue;
           }
-          await submit(step.stepKey, { type: "TEXT", text: NONE_ANSWER_TEXT });
+          await submit(step.stepKey, { type: "TEXT", text });
           written.push(step.stepKey);
           results.push({
             stepKey: step.stepKey,
             outcome: "COMMITTED",
             question,
-            recorded: NONE_ANSWER_TEXT,
+            recorded: text,
           });
         } catch (error: unknown) {
           results.push(refused(step.stepKey, error));

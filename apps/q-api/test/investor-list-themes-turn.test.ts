@@ -13,6 +13,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 
+import { readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
 
 /**
@@ -116,5 +117,69 @@ describe("a plain None to the themed exclusions question", () => {
     for (const key of OFF?.stepKeys ?? []) {
       expect(world.recordedValue(key)).toBeUndefined();
     }
+  });
+});
+
+describe("an answer to some lists of a theme (owner, batch 9)", () => {
+  const LEAN = INVESTOR_LIST_THEMES.find((t) => t.key === "what_you_look_for");
+
+  it("records only what they said; the lists it did not touch stay open", async () => {
+    const world = investorSession({
+      steps: INVESTOR_DEFINITION_CURRENT.steps,
+      currentStepKey: I.founderPreferences,
+    });
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve(
+          calls === 1
+            ? {
+                output: {
+                  kind: "TOOL_CALLS",
+                  calls: [
+                    {
+                      callId: "call_1",
+                      name: "record_answers",
+                      arguments: {
+                        answers: [
+                          {
+                            stepKey: I.customCriteria,
+                            value: "Capital efficiency",
+                            quote: "capital efficiency",
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              }
+            : {
+                output: {
+                  kind: "TEXT",
+                  text: JSON.stringify({
+                    reply:
+                      "Noted. Anything on founding team or green flags, or no preference?",
+                    asking: I.founderPreferences,
+                  }),
+                },
+              },
+        );
+      },
+    } as unknown as ModelGateway;
+    await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: [I.customCriteria] })),
+    }).turn({
+      ...turn(world, "Mostly capital efficiency."),
+      recentTurns: [{ role: "q", text: LEAN?.question ?? "" }],
+      actor,
+    });
+    expect(world.recordedValue(I.customCriteria)).toBeDefined();
+    // Never None for what they did not address.
+    expect(world.recordedValue(I.founderPreferences)).toBeUndefined();
+    expect(world.recordedValue(I.greenFlags)).toBeUndefined();
   });
 });

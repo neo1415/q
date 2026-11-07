@@ -1,6 +1,7 @@
 import { investorListThemeOf } from "@capital-q/investor-onboarding";
 import type { OnboardingState } from "@capital-q/q-tools";
 
+import { themeFollowUp } from "./list-settle.js";
 import {
   EVIDENCE_QUESTION_FALLBACK,
   EVIDENCE_QUESTIONS,
@@ -181,7 +182,7 @@ export function onboardingFlowFor(input: {
   }
   if (next?.theme !== undefined) {
     lines.push(
-      `Then ask exactly one question, in these words: ${quoted(next.question)} It asks several of their lists at once (${next.theme.stepKeys.join(", ")}): never ask them one by one. Their one answer may fill several of them: record each list it speaks to; a list it leaves out is settled by code.`,
+      `Then ask exactly one question, in these words: ${quoted(next.question)} It asks several of their lists at once (${next.theme.stepKeys.join(", ")}): never ask them one by one. Their one answer may fill several of them: record each list it speaks to, and only those; a list their answer does not speak to stays open (never record none for it). A plain "none" to the whole question is settled by code.`,
       "Never ask how you can help, never end without that question, and do not interrogate: warm, concise, plain English.",
     );
   } else if (next !== null) {
@@ -208,8 +209,11 @@ export function onboardingFlowFor(input: {
 }
 
 /**
- * A theme with two or more of its lists still open to ask (OPEN, not held
- * by a family sibling, not saving), with those lists; else undefined.
+ * What to ask of a theme (e2e run 4): its own question while two or more of
+ * its lists are open and none is answered; once some are answered, one
+ * short follow-up naming just the lists still open (never "none" assumed
+ * for them: unknown stays unknown). Open: OPEN, not held by a family
+ * sibling, not saving. Undefined: ask the step on its own.
  */
 function themeOpen(
   theme: ReturnType<typeof investorListThemeOf>,
@@ -231,6 +235,12 @@ function themeOpen(
       step.coveredBy === undefined
     );
   });
+  const answered = theme.stepKeys.some(
+    (stepKey) => byKey.get(stepKey)?.status === "ANSWERED",
+  );
+  if (answered && open.length > 0) {
+    return { key: theme.key, question: themeFollowUp(open), stepKeys: open };
+  }
   return open.length >= 2
     ? { key: theme.key, question: theme.question, stepKeys: open }
     : undefined;

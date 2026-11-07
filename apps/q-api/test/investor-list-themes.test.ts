@@ -9,8 +9,10 @@ import type { OnboardingState } from "@capital-q/q-tools";
 
 import {
   isWholeNone,
+  isWholeSkip,
   listsSettledByAnswer,
   themeAskedIn,
+  themeFollowUp,
 } from "../src/voice/list-settle.js";
 import {
   onboardingFlowFor,
@@ -71,27 +73,18 @@ const flowFor = (
   });
 
 describe("the investor's lists, by theme", () => {
-  it("covers every list None answers in exactly one theme, at most three questions", () => {
-    expect(INVESTOR_LIST_THEMES.length).toBeLessThanOrEqual(3);
+  it("asks the fourteen lists in five questions, none of them twice", () => {
+    // Three themes cover twelve lists, each exactly once; the portfolio and
+    // the anything-else note are their own words, one question each.
+    expect(INVESTOR_LIST_THEMES).toHaveLength(3);
     const themed = INVESTOR_LIST_THEMES.flatMap((theme) => theme.stepKeys);
     expect(new Set(themed).size).toBe(themed.length);
+    expect(themed).toHaveLength(12);
     for (const key of themed) expect(INVESTOR_NONE_STEPS.has(key)).toBe(true);
-    for (const key of [
-      I.sectorsAvoid,
-      I.businessModels,
-      I.customerTypes,
-      I.capitalIntensity,
-      I.regulatoryAppetite,
-      I.revenueState,
-      I.founderPreferences,
-      I.greenFlags,
-      I.customCriteria,
-      I.avoid,
-      I.hardExclusions,
-      I.sectorExclusions,
-    ]) {
-      expect(themed).toContain(key);
-    }
+    expect(
+      [...INVESTOR_NONE_STEPS].filter((key) => !themed.includes(key)).sort(),
+    ).toEqual([I.portfolio, I.additionalContext].sort());
+    expect(INVESTOR_NONE_STEPS.size).toBe(14);
   });
 
   it("asks a list's whole theme as one question, never the list alone", () => {
@@ -119,8 +112,8 @@ describe("the investor's lists, by theme", () => {
     expect(flow.next?.question).toBe(off?.question);
   });
 
-  it("a theme with one list left asks that list on its own", () => {
-    const flow = flowFor(
+  it("one list left: the short follow-up after a partial answer, else the list's own question", () => {
+    const after = flowFor(
       [
         step(I.founderPreferences),
         step(I.greenFlags, { status: "ANSWERED" }),
@@ -128,10 +121,12 @@ describe("the investor's lists, by theme", () => {
       ],
       I.founderPreferences,
     );
-    expect(flow.next?.theme).toBeUndefined();
-    expect(flow.next?.question).not.toBe(
-      INVESTOR_LIST_THEMES.find((t) => t.key === "what_you_look_for")?.question,
+    expect(after.next?.question).toBe(
+      "Anything on founding team, or no preference?",
     );
+    // Nothing of the theme answered and one list on their path: asked alone.
+    const alone = flowFor([step(I.founderPreferences)], I.founderPreferences);
+    expect(alone.next?.theme).toBeUndefined();
   });
 
   it("founders are never asked an investor theme", () => {
@@ -144,91 +139,150 @@ describe("the investor's lists, by theme", () => {
   });
 });
 
-describe("one answer settles the theme it answers", () => {
+const sorted = (keys: readonly string[]) => [...keys].sort();
+
+describe("only an explicit answer settles a list (unknown stays unknown)", () => {
   const off = INVESTOR_LIST_THEMES.find((t) => t.key === "off_the_table");
   const fit = INVESTOR_LIST_THEMES.find((t) => t.key === "company_fit");
   const all = new Set(INVESTOR_LIST_THEMES.flatMap((t) => t.stepKeys));
+  const settle = (over: Partial<Parameters<typeof listsSettledByAnswer>[0]>) =>
+    listsSettledByAnswer({
+      lastQTurn: null,
+      utterance: "",
+      recordedThisTurn: [],
+      open: all,
+      answers: new Map(),
+      ...over,
+    });
 
-  it("reads a plain none as none, and nothing more", () => {
+  it("reads a plain none, and a plain skip, as nothing more", () => {
     for (const said of ["None.", "none", "No preference.", "Nothing really"]) {
       expect(isWholeNone(said)).toBe(true);
     }
     for (const said of ["None of the gambling stuff", "No tobacco", "B2B"]) {
       expect(isWholeNone(said)).toBe(false);
     }
+    for (const said of ["Skip.", "Not sure", "I don't know"]) {
+      expect(isWholeSkip(said)).toBe(true);
+    }
+    expect(isWholeSkip("Not sure about revenue, B2B though")).toBe(false);
   });
 
   it("knows which theme Q's last turn asked, by its words", () => {
-    expect(themeAskedIn(`Thanks. ${fit?.question ?? ""}`)?.key).toBe(
+    expect(themeAskedIn(`Thanks. ${fit?.question ?? ""}`)?.theme.key).toBe(
       "company_fit",
     );
     expect(themeAskedIn("What's your role at the firm?")).toBeUndefined();
   });
 
-  it("'None' to the exclusions question settles all four lists", () => {
+  it("'None' to the whole exclusions question settles all four lists", () => {
     expect(
-      listsSettledByAnswer({
-        lastQTurn: off?.question,
-        utterance: "None.",
-        recordedThisTurn: [],
-        open: all,
-        answers: new Map(),
-      }).sort(),
+      sorted(settle({ lastQTurn: off?.question, utterance: "None." }).none),
     ).toEqual([...(off?.stepKeys ?? [])].sort());
   });
 
-  it("an answer filling some lists settles the rest of that theme only", () => {
-    const settled = listsSettledByAnswer({
+  it("an answer filling some lists settles nothing else: the rest stay open", () => {
+    // Owner: "B2B SaaS, mostly SMEs" says nothing about capital intensity,
+    // regulation or revenue; recording None for them is false data.
+    const settled = settle({
       lastQTurn: fit?.question,
-      utterance: "B2B SaaS with some revenue.",
-      recordedThisTurn: [I.businessModels, I.revenueState],
+      utterance: "B2B SaaS, mostly SMEs.",
+      recordedThisTurn: [I.businessModels, I.customerTypes],
       open: new Set(
         [...all].filter(
-          (key) => key !== I.businessModels && key !== I.revenueState,
+          (key) => key !== I.businessModels && key !== I.customerTypes,
         ),
       ),
-      answers: new Map(),
     });
-    expect(settled.sort()).toEqual(
-      [I.customerTypes, I.capitalIntensity, I.regulatoryAppetite].sort(),
+    expect(settled).toEqual({ none: [], notKnown: [] });
+  });
+
+  it("then asks once, briefly, about just the lists left open", () => {
+    const flow = flowFor(
+      [
+        step(I.businessModels, { status: "ANSWERED" }),
+        step(I.customerTypes, { status: "ANSWERED" }),
+        step(I.capitalIntensity),
+        step(I.regulatoryAppetite),
+        step(I.revenueState),
+      ],
+      I.capitalIntensity,
     );
+    expect(flow.next?.question).toBe(
+      "Anything on capital intensity, regulated markets or revenue expectations, or no preference?",
+    );
+    expect(flow.next?.theme?.stepKeys).toEqual([
+      I.capitalIntensity,
+      I.regulatoryAppetite,
+      I.revenueState,
+    ]);
+    // One list left of a partly answered theme: the same short form.
+    expect(themeFollowUp([I.revenueState])).toBe(
+      "Anything on revenue expectations, or no preference?",
+    );
+  });
+
+  it("a plain none to the follow-up is None for just the lists it named", () => {
+    const follow = themeFollowUp([I.regulatoryAppetite, I.revenueState]);
+    expect(
+      sorted(
+        settle({
+          lastQTurn: `Noted. ${follow}`,
+          utterance: "No preference.",
+          open: new Set([I.regulatoryAppetite, I.revenueState, I.greenFlags]),
+        }).none,
+      ),
+    ).toEqual([I.regulatoryAppetite, I.revenueState].sort());
+  });
+
+  it("a plain skip of the follow-up is not known, never None", () => {
+    const follow = themeFollowUp([I.regulatoryAppetite, I.revenueState]);
+    expect(
+      settle({
+        lastQTurn: follow,
+        utterance: "Not sure.",
+        open: new Set([I.regulatoryAppetite, I.revenueState]),
+      }),
+    ).toEqual({
+      none: [],
+      notKnown: [I.regulatoryAppetite, I.revenueState],
+    });
+    // A skip of the theme's first question is the model's to handle.
+    expect(settle({ lastQTurn: fit?.question, utterance: "Skip." })).toEqual({
+      none: [],
+      notKnown: [],
+    });
   });
 
   it("an answer to something else settles nothing", () => {
     expect(
-      listsSettledByAnswer({
-        lastQTurn: "What's your typical cheque?",
-        utterance: "None.",
-        recordedThisTurn: [],
-        open: all,
-        answers: new Map(),
-      }),
-    ).toEqual([]);
+      settle({ lastQTurn: "What's your typical cheque?", utterance: "None." }),
+    ).toEqual({ none: [], notKnown: [] });
   });
 
   it("'None' to sectors to avoid answers the rest of what they do not want to see", () => {
     expect(
-      listsSettledByAnswer({
-        lastQTurn: "Are there any sectors you'd rather not see?",
-        utterance: "None.",
-        recordedThisTurn: [I.sectorsAvoid],
-        open: new Set([I.avoid, I.hardExclusions, I.sectorExclusions]),
-        answers: new Map([
-          [I.sectorsAvoid, { type: "TEXT", text: "None" } as const],
-        ]),
-      }).sort(),
+      sorted(
+        settle({
+          lastQTurn: "Are there any sectors you'd rather not see?",
+          utterance: "None.",
+          recordedThisTurn: [I.sectorsAvoid],
+          open: new Set([I.avoid, I.hardExclusions, I.sectorExclusions]),
+          answers: new Map([
+            [I.sectorsAvoid, { type: "TEXT", text: "None" } as const],
+          ]),
+        }).none,
+      ),
     ).toEqual([I.avoid, I.hardExclusions, I.sectorExclusions].sort());
   });
 
   it("never touches a list that already holds their answer", () => {
     expect(
-      listsSettledByAnswer({
+      settle({
         lastQTurn: off?.question,
         utterance: "None.",
-        recordedThisTurn: [],
         open: new Set([I.avoid]),
-        answers: new Map(),
-      }),
+      }).none,
     ).toEqual([I.avoid]);
   });
 });
