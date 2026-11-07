@@ -1962,6 +1962,7 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - root tsc 0;
   - Q-IQ 6/6;
   - eslint and prettier clean.
+
 ## 2026-11-07 07:10 UTC — batch 2 deployed (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 - CI 42344043063 on 64d51b965 was green, pgTAP included. The live notifications_kind_check was read first: 25 kinds, a strict subset of the new 27, and every stored kind is still allowed. Applied 20261231400000 then 20261231410000; hosted is now at 285.

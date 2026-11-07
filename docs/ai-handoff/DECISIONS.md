@@ -296,7 +296,7 @@ Core Seven remains the governing assessment framework. The new directive authori
       - switching between them with the same context;
       - the form, and continue later;
       - Q editing profile fields on request (mandate, description, geography and the rest).
-      Then report the premium-product gaps.
+        Then report the premium-product gaps.
 77. **Onboarding is a real conversation** (owner, 7 Nov 2026 ~08:30 UTC). Onboarding has been troubled for months; treat it carefully.
     - **Conversation, not a questionnaire.** Q asks things like "what do you do?" and "how do you make money?" and draws what it needs from the person's answers.
     - **Long answers.** Q judges when to summarise. A long, rambling spoken answer is summarised professionally and played back ("Is that right?"), and the person confirms, edits or types their own version. A clear or typed answer is kept whole, with filler removed. Q does not summarise every time.
