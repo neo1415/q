@@ -39,6 +39,8 @@ const CERT = "00000000-0000-4000-8000-00000000d003";
 const PRIVATE_DOC = "00000000-0000-4000-8000-00000000d0ff";
 const ARTIFACT_B = "00000000-0000-4000-8000-00000000a001";
 const ARTIFACT_A = "00000000-0000-4000-8000-00000000a0aa";
+const BOARD_ITEM_B = "00000000-0000-4000-8000-00000000b001";
+const BOARD_ITEM_B2 = "00000000-0000-4000-8000-00000000b002";
 
 /** Their own conversation: the actor-wide scope bound to this person. */
 function ownPlan(
@@ -192,6 +194,21 @@ function ports(): QToolPorts {
             : [],
         ),
     } as unknown as QToolPorts["documents"],
+    // Their own board: the service lists only the actor's own items.
+    board: {
+      list: (actor: ActorContext) =>
+        Promise.resolve({
+          items:
+            actor.userId === actorB.userId
+              ? [
+                  { id: BOARD_ITEM_B, title: "Follow up with Brightwell" },
+                  { id: BOARD_ITEM_B2, title: "Prepare the IC memo" },
+                ]
+              : [],
+          columns: [],
+          visibility: "personal_private",
+        }),
+    } as unknown as QToolPorts["board"],
   });
 }
 
@@ -397,5 +414,97 @@ describe("resolve_page_target: their own document", () => {
       });
       expect(decision).toMatchObject({ grant: { status: "NONE" } });
     }
+  });
+});
+
+describe("resolve_page_target: a company's or investor's page", () => {
+  it("finds a company they reach by hand, by name, with its profile path", async () => {
+    const decision = await resolveAs(actorB, ownPlan(actorB), {
+      target: "COMPANY",
+      counterpart: "Tamarind",
+    });
+    expect(decision).toMatchObject({
+      outcome: "ALLOW",
+      grant: {
+        status: "FOUND",
+        companyId: COMPANY_B_NETWORK,
+        route: "/company/[companyId]",
+        path: `/company/${COMPANY_B_NETWORK}`,
+      },
+    });
+  });
+
+  it("their own company by its id", async () => {
+    const decision = await resolveAs(actorA, ownPlan(actorA), {
+      target: "COMPANY",
+      counterpartId: COMPANY_A,
+    });
+    expect(decision).toMatchObject({
+      grant: { status: "FOUND", companyId: COMPANY_A },
+    });
+  });
+
+  it("another tenant's private company never resolves, by id or by name", async () => {
+    for (const input of [
+      { target: "COMPANY", counterpartId: COMPANY_B_PRIVATE },
+      { target: "COMPANY", counterpartId: OTHER_COMPANY },
+    ] as const) {
+      const decision = await resolveAs(actorA, ownPlan(actorA), input);
+      expect(decision).toMatchObject({ grant: { status: "NONE" } });
+    }
+  });
+
+  it("finds an investor they have a relationship with; another person's investor is NONE", async () => {
+    const found = await resolveAs(actorB, ownPlan(actorB), {
+      target: "INVESTOR",
+      counterpart: "Brightwell Capital",
+    });
+    expect(found).toMatchObject({
+      grant: {
+        status: "FOUND",
+        investorOrganisationId: INVESTOR_B,
+        route: "/investors/[investorOrganisationId]",
+        path: `/investors/${INVESTOR_B}`,
+      },
+    });
+    for (const input of [
+      { target: "INVESTOR", counterpartId: INVESTOR_B },
+      { target: "INVESTOR", counterpart: "Brightwell Capital" },
+    ] as const) {
+      const decision = await resolveAs(actorA, ownPlan(actorA), input);
+      expect(decision).toMatchObject({ grant: { status: "NONE" } });
+      expect(JSON.stringify(decision)).not.toContain(INVESTOR_B);
+    }
+  });
+});
+
+describe("resolve_page_target: an item on their own board", () => {
+  it("finds it by its title, with the board path and its itemId", async () => {
+    const decision = await resolveAs(actorB, ownPlan(actorB), {
+      target: "BOARD_ITEM",
+      document: "the follow-up with Brightwell",
+    });
+    expect(decision).toMatchObject({
+      grant: {
+        status: "FOUND",
+        itemId: BOARD_ITEM_B,
+        route: "/board",
+        path: "/board",
+      },
+    });
+  });
+
+  it("another person's item id never resolves; outside their conversation it is refused", async () => {
+    const other = await resolveAs(actorA, ownPlan(actorA), {
+      target: "BOARD_ITEM",
+      documentId: BOARD_ITEM_B,
+    });
+    expect(other).toMatchObject({ grant: { status: "NONE" } });
+    expect(JSON.stringify(other)).not.toContain("Brightwell");
+    const refused = await resolveAs(actorB, ownPlan(actorB, actorA.userId), {
+      target: "BOARD_ITEM",
+      documentId: BOARD_ITEM_B,
+    });
+    expect(refused.outcome).toBe("DENY");
   });
 });

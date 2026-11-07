@@ -15,7 +15,7 @@ import { APP_ROUTE_PATTERNS } from "@/features/q/control/app-routes";
 import { recordPagePath, settingsPath } from "@/features/q/client-actions";
 import { destinationPath } from "@/features/voice/destinations";
 
-import { SITE_MAP_PAGES, SITE_MAP_PARAMS } from "./pages";
+import { SITE_MAP_AUDIENCES, SITE_MAP_PAGES, SITE_MAP_PARAMS } from "./pages";
 
 /**
  * Q Workspace W2.1: the site map, built deterministically from
@@ -152,6 +152,7 @@ export function buildSiteMap(): QSiteMap {
     if (entry === undefined) {
       throw new Error(`site map: no registry entry for ${route}`);
     }
+    const audiences = SITE_MAP_AUDIENCES[route] ?? {};
     return {
       route,
       title: entry.title,
@@ -180,15 +181,37 @@ export function buildSiteMap(): QSiteMap {
         href: tab.href,
         destinations: destinations.get(`${route} ${tab.id}`) ?? [],
         subs: [...(tab.subs ?? [])],
+        ...(audiences.tabs?.[tab.id] === undefined
+          ? {}
+          : { audience: audiences.tabs[tab.id] }),
       })),
       sections: (entry.sections ?? []).map((section) => ({
         id: section.id,
         title: section.title,
         kind: section.kind,
         ...(section.tab === undefined ? {} : { tab: section.tab }),
+        ...(audiences.sections?.[section.id] === undefined
+          ? {}
+          : { audience: audiences.sections[section.id] }),
       })),
     };
   });
+  // An audience for a tab or section that is not there is a typo, not a rule.
+  for (const [route, audiences] of Object.entries(SITE_MAP_AUDIENCES)) {
+    const page = pages.find((one) => one.route === route);
+    for (const id of Object.keys(audiences.tabs ?? {})) {
+      if (page?.tabs.some((tab) => tab.id === id) !== true) {
+        throw new Error(`site map: audience for unknown tab ${route} ${id}`);
+      }
+    }
+    for (const id of Object.keys(audiences.sections ?? {})) {
+      if (page?.sections.some((section) => section.id === id) !== true) {
+        throw new Error(
+          `site map: audience for unknown section ${route} ${id}`,
+        );
+      }
+    }
+  }
   return QSiteMapSchema.parse({ version: Q_SITE_MAP_VERSION, pages });
 }
 
