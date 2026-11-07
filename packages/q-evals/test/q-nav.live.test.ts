@@ -29,7 +29,8 @@ import { navigationPipelineSubject, runQNav } from "../src/runner/q-nav.js";
  *
  * Off unless CQ_LIVE_MODEL_TESTS=1 and ANTHROPIC_API_KEY is set:
  *   CQ_LIVE_MODEL_TESTS=1 CQ_QNAV_SPLIT=dev node scripts/live-model-tests.mjs packages/q-evals/test/q-nav.live.test.ts
- * CQ_QNAV_SPLIT: dev (tuned against) or heldout (measured once; its misses
+ * CQ_QNAV_SPLIT: dev (tuned against), heldout or heldout4 (each measured
+ * once; heldout4 is the batch-8 set on conversation-driven placement; its misses
  * are reported by category only, never turn by turn, so nobody tunes
  * against it). CQ_QNAV_LIMIT=n: only the first n cases (a smoke run).
  * CQ_QNAV_REPORT=<file>: the JSON summary (dev: with every miss).
@@ -40,7 +41,11 @@ import { navigationPipelineSubject, runQNav } from "../src/runner/q-nav.js";
 
 const LIVE = process.env["CQ_LIVE_MODEL_TESTS"] === "1";
 const KEY = process.env["ANTHROPIC_API_KEY"];
-const SPLIT = process.env["CQ_QNAV_SPLIT"] === "heldout" ? "heldout" : "dev";
+const SPLIT =
+  process.env["CQ_QNAV_SPLIT"] === "heldout" ||
+  process.env["CQ_QNAV_SPLIT"] === "heldout4"
+    ? process.env["CQ_QNAV_SPLIT"]
+    : "dev";
 const LIMIT = Number(process.env["CQ_QNAV_LIMIT"] ?? "0");
 const REPORT = process.env["CQ_QNAV_REPORT"];
 const CONCURRENCY = Number(process.env["CQ_QNAV_CONCURRENCY"] ?? "4");

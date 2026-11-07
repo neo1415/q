@@ -30,6 +30,13 @@ export const NavigationDecisionVariablesSchema = z
     records: z.string().max(6_000),
     /** Which side of the platform they are on. */
     side: z.enum(["INVESTOR", "FOUNDER"]),
+    /**
+     * v10 (batch 7 replay): the one situation every reader and answer gets
+     * (W3's FOCUS: who they are, their own organisation, the record on
+     * their screen by name, how me/my and their/it resolve). Built by code
+     * from their own records; their names are data.
+     */
+    situation: z.string().max(1_600).optional(),
   })
   .strict();
 export type NavigationDecisionVariables = z.infer<
@@ -41,6 +48,12 @@ export const NAVIGATION_DECISION_UNTRUSTED = [
   "recentTurns",
   "pageText",
   "records",
+] as const;
+
+/** v10: the situation too (names from their records are data). */
+export const NAVIGATION_DECISION_UNTRUSTED_V10 = [
+  ...NAVIGATION_DECISION_UNTRUSTED,
+  "situation",
 ] as const;
 
 export const NAVIGATION_DECISIONS = ["MOVE", "OFFER", "STAY"] as const;

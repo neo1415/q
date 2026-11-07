@@ -20,7 +20,10 @@ import {
   type QNavReply,
   type QNavTarget,
 } from "../src/datasets/q-nav/index.js";
-import { Q_NAV_HELDOUT_SEAL } from "../src/datasets/q-nav/heldout-seal.js";
+import {
+  Q_NAV_HELDOUT4_SEAL,
+  Q_NAV_HELDOUT_SEAL,
+} from "../src/datasets/q-nav/heldout-seal.js";
 import { canonicalTarget, gradeQNavTurn } from "../src/graders/q-nav.js";
 import {
   naiveReferenceProposer,
@@ -73,7 +76,7 @@ describe("Q-NAV dataset", () => {
         .flatMap((c) => c.turns.map((t) => t.user.toLowerCase())),
     );
     const repeated = Q_NAV_DATASET.cases
-      .filter((c) => c.split === "heldout")
+      .filter((c) => c.split !== "dev")
       .flatMap((c) => c.turns.map((t) => t.user))
       .filter((user) => dev.has(user.toLowerCase()));
     expect(repeated).toEqual([]);
@@ -87,6 +90,17 @@ describe("Q-NAV dataset", () => {
     }).toEqual({
       sha256: Q_NAV_HELDOUT_SEAL.sha256,
       turns: Q_NAV_HELDOUT_SEAL.turns,
+    });
+  });
+
+  it("keeps the fourth held-out split sealed too (batch 8)", () => {
+    const held = Q_NAV_DATASET.cases.filter((c) => c.split === "heldout4");
+    expect({
+      sha256: createHash("sha256").update(JSON.stringify(held)).digest("hex"),
+      turns: turns(held),
+    }).toEqual({
+      sha256: Q_NAV_HELDOUT4_SEAL.sha256,
+      turns: Q_NAV_HELDOUT4_SEAL.turns,
     });
   });
 

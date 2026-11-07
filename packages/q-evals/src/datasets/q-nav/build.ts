@@ -142,7 +142,7 @@ export class CaseSet {
     const n = (this.counters.get(category) ?? 0) + 1;
     this.counters.set(category, n);
     this.out.push({
-      id: `QNAV-${this.split === "dev" ? "D" : "H"}-${PREFIX[category]}-${String(n).padStart(3, "0")}`,
+      id: `QNAV-${this.split === "dev" ? "D" : this.split === "heldout4" ? "H4" : "H"}-${PREFIX[category]}-${String(n).padStart(3, "0")}`,
       category,
       side,
       split: this.split,

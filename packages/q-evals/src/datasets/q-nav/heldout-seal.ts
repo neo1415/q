@@ -13,3 +13,15 @@ export const Q_NAV_HELDOUT_SEAL = {
   turns: 385,
   sealedAt: "2026-11-07",
 } as const;
+
+/**
+ * The fourth held-out set (batch 8, 7 Nov 2026): `heldout-fourth.ts`,
+ * written by a separate author from the app code only, after
+ * NAVIGATION_DECISION v10, on conversation-driven placement and tabs.
+ * Sealed before it is run; measured once.
+ */
+export const Q_NAV_HELDOUT4_SEAL = {
+  sha256: "882fffbfefc2dc3ad75de1179ceca504c189804aa9584e13e2425a6a6e6c407f",
+  turns: 120,
+  sealedAt: "2026-11-07",
+} as const;

@@ -1409,3 +1409,69 @@ describe("decision 78: self-consistency, three samples in parallel", () => {
     expect(voteNavigation([already, already, already])).toEqual(already);
   });
 });
+
+describe("batch 7 replay: the decision reads the same situation as every answer (W3 FOCUS)", () => {
+  const SITUATION =
+    "On their screen now: Harbourline Cargo (a company). When they point with their, it, this or that they mean what the conversation is about; only when the conversation names nothing, what is on their screen; never themselves.";
+
+  it("renders THEIR SITUATION into the prompt, fenced as data", async () => {
+    const requests: Record<string, unknown>[] = [];
+    const gateway = {
+      execute: (request: Record<string, unknown>) => {
+        requests.push(request);
+        return Promise.resolve({
+          output: {
+            kind: "STRUCTURED",
+            value: { decision: "STAY", reason: "" },
+          },
+        });
+      },
+    } as unknown as ModelGateway;
+    await createQNavigationDecider({ gateway, logger }).decide(
+      input({ situation: SITUATION }),
+      { tenantId: "t", userId: "u", correlationId: "c" },
+    );
+    const text = JSON.stringify(requests[0]?.["messages"]);
+    const at = text.indexOf("On their screen now: Harbourline Cargo");
+    expect(at).toBeGreaterThan(-1);
+    expect(
+      text.lastIndexOf('UNTRUSTED_CONTENT source=\\"situation\\"', at),
+    ).toBeGreaterThan(-1);
+  });
+
+  it("createQPageMoves reads the situation for the run and hands it to the decision", async () => {
+    const seen: (string | undefined)[] = [];
+    const moves = createQPageMoves({
+      decider: {
+        decide: (navigation) => {
+          seen.push(navigation.situation);
+          return Promise.resolve(null);
+        },
+      },
+      config: { movesAllowed: true },
+      situation: () => Promise.resolve(SITUATION),
+      settleWithinMs: 1_000,
+    });
+    const request = {
+      runId: "r1",
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "COMPANY",
+          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+        },
+      },
+    } as unknown as QAnswerRequest;
+    moves.start(request, {
+      utterance: "can i see it?",
+      recentTurns: [],
+      pageText: null,
+    });
+    await moves.settle(request, []);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((s) => s === SITUATION)).toBe(true);
+  });
+});

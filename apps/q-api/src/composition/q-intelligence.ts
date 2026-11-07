@@ -10,6 +10,7 @@ import {
   createModelGatewayQAnswer,
   createQNavigationDecider,
   createQPageMoves,
+  runSituation,
   createConversationRecall,
   createQTurnReader,
   createSmallTalkReply,
@@ -438,6 +439,8 @@ export function composeQIntelligence(
     }),
     config: { movesAllowed: dependencies.navigationMovesAllowed === true },
     records: counterpartNavigationRecords(dependencies.counterpartNames),
+    // Batch 7 replay: the same situation the answer reads (W3's FOCUS).
+    situation: (request) => runSituation(request, dependencies.situationOf),
     resolver: createOpenRecordNavigationResolver(
       createToolOpenRecordPort({
         tools,
