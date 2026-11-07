@@ -27,7 +27,7 @@ import {
   type ReminderDto,
 } from "@capital-q/contracts";
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
-import { Suspense, use } from "react";
+import { Suspense, use, type ReactNode } from "react";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
@@ -419,6 +419,85 @@ export default async function RelationshipsPage({
       side === "NONE" &&
       context.kind === "NONE" &&
       context.unavailable !== true;
+    // The period report: its header at once, its figures in their own
+    // boundary. Drawn as a shape too, inside the queue's fallback.
+    const periodWith = (figures: ReactNode) =>
+      unset ? null : (
+        <section
+          aria-labelledby="period-title"
+          className="flex flex-col"
+          data-period-report
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <h2
+              id="period-title"
+              className="text-lg font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+            >
+              {periodKey === "year"
+                ? t("This year")
+                : periodKey === "90"
+                  ? t("Last 90 days")
+                  : periodKey === "30"
+                    ? t("Last 30 days")
+                    : t("This period")}
+            </h2>
+            <Segmented
+              label={t("Period")}
+              className="ms-auto"
+              value={periodKey}
+              options={[
+                {
+                  key: "30",
+                  label: t("30 days"),
+                  href: "/relationships?view=overview&range=30d",
+                },
+                {
+                  key: "90",
+                  label: t("90 days"),
+                  href: "/relationships?view=overview&range=90d",
+                },
+                {
+                  key: "year",
+                  label: t("This year"),
+                  href: `/relationships?view=overview&from=${yearStart}`,
+                },
+              ]}
+            />
+          </div>
+          {figures}
+        </section>
+      );
+    const periodSection = periodWith(
+      <Suspense
+        key={`overview-period:${periodKey}`}
+        fallback={<HubPanelLoading rows={4} label="period" />}
+      >
+        <OverviewPeriod
+          read={periodRead}
+          side={side}
+          range={range}
+          stage={stage}
+          download={new URLSearchParams(period).toString()}
+          words={{
+            failed: t("The period report couldn't load"),
+            failedBody: t("Your records are unchanged. Try again in a moment."),
+            retry: t("Try again"),
+            section: t("Relationships in the overview"),
+            heading: t("This period"),
+          }}
+        />
+      </Suspense>,
+    );
+    const periodShape = periodWith(<HubPanelLoading rows={4} label="period" />);
+    const portfolioBlock =
+      portfolioRead === null ? null : (
+        <Suspense
+          key="overview-portfolio"
+          fallback={<HubPanelLoading rows={3} label="portfolio" />}
+        >
+          <OverviewPortfolio read={portfolioRead} />
+        </Suspense>
+      );
     return (
       // The Overview's blocks are separate questions (what needs me, what
       // I hold, how the period went): each its own panel, more air between
@@ -443,10 +522,29 @@ export default async function RelationshipsPage({
         {/* Morning brief (design 2026-10-20): what needs you, how the
             period went, then what you hold, in one reading column. */}
         <div className="flex w-full max-w-[860px] flex-col gap-7">
-          {queueRead === null || side === "NONE" ? null : (
+          {queueRead === null || side === "NONE" ? (
+            <>
+              {periodSection}
+              {portfolioBlock}
+            </>
+          ) : (
+            // CLS (batch 7, live 0.41 at 390): what needs you streams in
+            // far taller than any placeholder can guess (0-5 cards), and
+            // pushed the period report down. The blocks below it are drawn
+            // inside its boundary, so nothing is on screen under the queue
+            // until the queue is final; each keeps its own inner boundary
+            // and its reads still start together, above.
             <Suspense
               key="overview-queue"
-              fallback={<HubPanelLoading rows={3} label="queue" lead />}
+              fallback={
+                <>
+                  <HubPanelLoading rows={3} label="queue" lead />
+                  {periodShape}
+                  {portfolioRead === null ? null : (
+                    <HubPanelLoading rows={3} label="portfolio" />
+                  )}
+                </>
+              }
             >
               <OverviewQueue
                 read={queueRead}
@@ -454,79 +552,8 @@ export default async function RelationshipsPage({
                 side={side}
                 now={now}
               />
-            </Suspense>
-          )}
-          {unset ? null : (
-            <section
-              aria-labelledby="period-title"
-              className="flex flex-col"
-              data-period-report
-            >
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                <h2
-                  id="period-title"
-                  className="text-lg font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
-                >
-                  {periodKey === "year"
-                    ? t("This year")
-                    : periodKey === "90"
-                      ? t("Last 90 days")
-                      : periodKey === "30"
-                        ? t("Last 30 days")
-                        : t("This period")}
-                </h2>
-                <Segmented
-                  label={t("Period")}
-                  className="ms-auto"
-                  value={periodKey}
-                  options={[
-                    {
-                      key: "30",
-                      label: t("30 days"),
-                      href: "/relationships?view=overview&range=30d",
-                    },
-                    {
-                      key: "90",
-                      label: t("90 days"),
-                      href: "/relationships?view=overview&range=90d",
-                    },
-                    {
-                      key: "year",
-                      label: t("This year"),
-                      href: `/relationships?view=overview&from=${yearStart}`,
-                    },
-                  ]}
-                />
-              </div>
-              <Suspense
-                key={`overview-period:${periodKey}`}
-                fallback={<HubPanelLoading rows={4} label="period" />}
-              >
-                <OverviewPeriod
-                  read={periodRead}
-                  side={side}
-                  range={range}
-                  stage={stage}
-                  download={new URLSearchParams(period).toString()}
-                  words={{
-                    failed: t("The period report couldn't load"),
-                    failedBody: t(
-                      "Your records are unchanged. Try again in a moment.",
-                    ),
-                    retry: t("Try again"),
-                    section: t("Relationships in the overview"),
-                    heading: t("This period"),
-                  }}
-                />
-              </Suspense>
-            </section>
-          )}
-          {portfolioRead === null ? null : (
-            <Suspense
-              key="overview-portfolio"
-              fallback={<HubPanelLoading rows={3} label="portfolio" />}
-            >
-              <OverviewPortfolio read={portfolioRead} />
+              {periodSection}
+              {portfolioBlock}
             </Suspense>
           )}
         </div>

@@ -42,6 +42,8 @@ import { useWire } from "./use-wire";
 import { PlanCard } from "./plan-card";
 import { WorkInProgressCard } from "./work-canvas";
 import { NavigationOfferCard } from "./navigation-offer-card";
+import { setPane } from "@/features/workspace/layout-store";
+import { useWorkspacePlace } from "@/features/workspace/workspace-place";
 import { wireNow } from "./wire";
 import { useT } from "@/features/i18n/language";
 
@@ -678,17 +680,10 @@ export function QResultBlocks({
               return null;
             }
             return (
-              <QResultCard
+              <PlaceLinkCard
                 key={key}
-                label={t("Where this lives")}
-                actions={
-                  <Link
-                    href={href}
-                    className={buttonClassName("secondary", "compact")}
-                  >
-                    {intentLabel(block.intent)}
-                  </Link>
-                }
+                href={href}
+                label={intentLabel(block.intent)}
               />
             );
           }
@@ -847,5 +842,43 @@ function ComparisonTable({
         </table>
       </div>
     </QResultCard>
+  );
+}
+
+/**
+ * "Where this lives" with its link (UI_INTENT). In the Q Workspace a link
+ * to the place the page pane already shows is redundant (Q moved there):
+ * no card while the pane is open, "Show the page" while it is folded.
+ */
+function PlaceLinkCard({
+  href,
+  label,
+}: {
+  readonly href: string;
+  readonly label: string;
+}) {
+  const t = useT();
+  const place = useWorkspacePlace(href);
+  if (place === "SHOWN") return null;
+  return (
+    <QResultCard
+      label={t("Where this lives")}
+      actions={
+        place === "COLLAPSED" ? (
+          <button
+            type="button"
+            className={buttonClassName("secondary", "compact")}
+            onClick={() => setPane("pagePane", "open")}
+            data-q-show-page
+          >
+            {t("Show the page")}
+          </button>
+        ) : (
+          <Link href={href} className={buttonClassName("secondary", "compact")}>
+            {label}
+          </Link>
+        )
+      }
+    />
   );
 }

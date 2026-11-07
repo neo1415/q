@@ -303,6 +303,7 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "Hide pages": "إخفاء الصفحات",
   "Show pages": "إظهار الصفحات",
   "Open pages": "فتح الصفحات",
+  "Show the page": "إظهار الصفحة",
   "Resize Q": "تغيير حجم Q",
   Opened: "فُتحت",
   "the page": "الصفحة",

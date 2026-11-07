@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 
 import type { NotificationDto } from "@capital-q/contracts";
 
@@ -183,12 +183,22 @@ export function useWaitingOnYou(): number {
   });
 }
 
+/**
+ * The notices the server read with the page (batch 7, CLS: /work said
+ * "Nothing waits for you" until this tab's own read landed ~1.5-4 s later,
+ * then grew by every notice, pushing the page down). Used for the server
+ * render and hydration, and until this tab's own read has landed.
+ */
+export const NoticeSnapshotContext = createContext<NoticeState | null>(null);
+
 export function useNotices(): NoticeState {
-  return useSyncExternalStore(
+  const snapshot = useContext(NoticeSnapshotContext);
+  const live = useSyncExternalStore(
     subscribe,
     () => state,
-    () => EMPTY,
+    () => snapshot ?? EMPTY,
   );
+  return live.items === null && snapshot !== null ? snapshot : live;
 }
 
 /**
