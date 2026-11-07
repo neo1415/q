@@ -6,8 +6,9 @@ import type { SuitabilityRecord } from "../fit/order.js";
  * The two score projections, as discovery reads and writes them
  * (migration 20261228171500).
  *
- *   investability  read-only here: each company's latest SCORED
- *                  Investability (0-100). The projection is written by the
+ *   investability  read-only here: each company's latest SCORED,
+ *                  non-provisional Investability (0-100) under the current
+ *                  method version. The projection is written by the
  *                  readiness package from investor-eligible inputs only, so
  *                  reading it cannot carry founder-private material into an
  *                  order. Unknown (no row, insufficient evidence) is absent.
@@ -17,20 +18,39 @@ import type { SuitabilityRecord } from "../fit/order.js";
 
 export function createPostgresInvestabilityScores(options: {
   readonly sql: DatabaseExecutor;
+  /**
+   * The current Investability method. Only its latest revision is read:
+   * method versions are never mixed in one order (metrics audit P1-1).
+   */
+  readonly methodVersion: string;
 }): (companyIds: readonly string[]) => Promise<ReadonlyMap<string, number>> {
   return async (companyIds) => {
     const ids = [...new Set(companyIds)];
     if (ids.length === 0) return new Map();
     const rows = await options.sql<
-      { company_id: string; status: string; score: number | null }[]
+      {
+        company_id: string;
+        status: string;
+        score: number | null;
+        provisional: string | null;
+      }[]
     >`
-      select distinct on (company_id) company_id, status, score
+      select distinct on (company_id) company_id, status, score,
+             summary->>'provisional' as provisional
         from core.company_investability_assessments
        where company_id = any(${ids}::uuid[])
-       order by company_id, assessed_at desc, revision desc`;
+         and method_version = ${options.methodVersion}
+       order by company_id, revision desc`;
     const out = new Map<string, number>();
     for (const row of rows) {
-      if (row.status === "SCORED" && row.score !== null) {
+      // An early read (ADR 0075) may rest on Q's unconfirmed reading of a
+      // deck: shown with Low confidence, never an ordering input (metrics
+      // audit P0-3; no model output in the ranking path). Absent = unknown.
+      if (
+        row.status === "SCORED" &&
+        row.score !== null &&
+        row.provisional !== "true"
+      ) {
         out.set(row.company_id, Number(row.score));
       }
     }
