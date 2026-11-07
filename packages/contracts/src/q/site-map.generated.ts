@@ -50,6 +50,19 @@ export const Q_SITE_MAP: QSiteMap = {
       sections: [],
     },
     {
+      route: "/admin/analytics",
+      title: "Analytics privacy",
+      purpose: "Analytics privacy settings across the platform.",
+      audience: "ADMIN",
+      params: [],
+      shows: [],
+      destinations: [],
+      recordPages: [],
+      settingsSections: [],
+      tabs: [],
+      sections: [],
+    },
+    {
       route: "/admin/audit",
       title: "Audit",
       purpose: "The audit history.",
@@ -1040,8 +1053,13 @@ export const Q_SITE_MAP: QSiteMap = {
       sections: [
         {
           id: "q",
-          title: "Ask Q",
+          title: "Ask Q (workspace off)",
           kind: "OTHER",
+        },
+        {
+          id: "board",
+          title: "Your board (workspace on)",
+          kind: "WORK_LIST",
         },
         {
           id: "q-room-card",

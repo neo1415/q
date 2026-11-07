@@ -155,6 +155,10 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/admin": ADMIN("Operations", "Capital Q's operations console."),
   "/admin/accounts": ADMIN("Accounts", "Accounts on the platform."),
   "/admin/accounts/[userId]": ADMIN("Account", "One account."),
+  "/admin/analytics": ADMIN(
+    "Analytics privacy",
+    "Analytics privacy settings across the platform.",
+  ),
   "/admin/audit": ADMIN("Audit", "The audit history."),
   "/admin/billing": ADMIN("Billing", "Plans and billing across accounts."),
   "/admin/brand": ADMIN("Brand", "Capital Q's brand settings."),
@@ -247,7 +251,10 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     purpose: "Talk to Q: answers, cards, documents and the Board.",
     audience: "ANY",
     sections: [
-      { id: "q", title: "Ask Q", kind: "OTHER" },
+      // Workspace off: Home is Q itself. On: Q is the layout pane and
+      // Home's page side is the work board (W1.2).
+      { id: "q", title: "Ask Q (workspace off)", kind: "OTHER" },
+      { id: "board", title: "Your board (workspace on)", kind: "WORK_LIST" },
       { id: "q-room-card", title: "Q's card", kind: "Q_ROOM_CARD" },
     ],
   },
