@@ -97,7 +97,10 @@ import {
   heardBack,
   isParaphraseRationale,
   paraphraseRationale,
-  readBackReplyOf,
+  readBackQuestion,
+  readBackReplyBy,
+  type ReadBackCheck,
+  type ReadBackReply,
 } from "./paraphrase-confirmation.js";
 
 /**
@@ -1134,6 +1137,31 @@ export function createOnboardingPort(input: {
    */
   readonly reviewShown?: ((stepKey: string) => boolean) | undefined;
 }): BoundOnboardingPort {
+  /**
+   * Their latest words as a reply to Q's last line, read once per turn
+   * (P1-2): AFFIRM, CORRECT or UNCLEAR. Settled at each entry before any
+   * check that uses it; until then, and when unread, UNCLEAR.
+   */
+  let reply: ReadBackReply = "UNCLEAR";
+  let replyRead: Promise<ReadBackReply> | null = null;
+  const readReply = async (): Promise<ReadBackReply> => {
+    const wordsCheck = input.wordsCheck;
+    // Their reply to what Q just read back, by meaning (P1-2, DECISIONS
+    // 40), through the same one-question reader. No reader: no reply is
+    // read as agreement (fail closed).
+    const check: ReadBackCheck | undefined =
+      wordsCheck === undefined
+        ? undefined
+        : ({ readBack, reply: said }) =>
+            wordsCheck(readBackQuestion(readBack), said);
+    replyRead ??= readBackReplyBy(
+      check,
+      input.lastQTurn,
+      input.personTurns[0] ?? "",
+    );
+    reply = await replyRead;
+    return reply;
+  };
   /**
    * A failure on a save or reading path, reported with its reason (live
    * recheck 2026-10-30: a reading that failed behind a catch-all left no
@@ -2957,7 +2985,7 @@ export function createOnboardingPort(input: {
       textStatedIn(text, input.lastQTurn) &&
       latest !== undefined &&
       quoteOccursIn(quote, latest) &&
-      readBackReplyOf(latest) !== "CORRECT";
+      reply !== "CORRECT";
     return (
       readBack ||
       agreedReadBack(text, quote) ||
@@ -3559,6 +3587,7 @@ export function createOnboardingPort(input: {
     }
   };
   const recordOne = async (answer: Answer): Promise<OnboardingRecordResult> => {
+    await readReply();
     const plan = await planOne(answer);
     if (plan.kind === "DONE") return plan.result;
     if (plan.kind === "CONFIRM") return confirmStep(plan.step, plan.value);
@@ -3575,6 +3604,7 @@ export function createOnboardingPort(input: {
    */
   const warmed = new Map<Answer, ReturnType<typeof resolve>>();
   const planOne = async (answer: Answer): Promise<Planned> => {
+    await readReply();
     if (!said(answer.quote)) return done(unsaid(answer.stepKey));
     // A delegation is an instruction given now, "in the same instruction"
     // (lead decision, 2026-09-25): an earlier question or remark is not
@@ -4668,7 +4698,7 @@ export function createOnboardingPort(input: {
         // heard is decided by code; anything else is the reader's.
         const affirmed =
           (paraphrase || (await readBackHeard(step, held))) &&
-          readBackReplyOf(input.personTurns[0] ?? "") === "AFFIRM";
+          (await readReply()) === "AFFIRM";
         const authority = affirmed
           ? null
           : ((await input.authority?.()) ?? null);
@@ -5375,7 +5405,7 @@ export function createOnboardingPort(input: {
     replayHeld: () => replayHeldWrites(),
     affirmedParaphrases: async () => {
       const latest = input.personTurns[0];
-      if (latest === undefined || readBackReplyOf(latest) !== "AFFIRM") {
+      if (latest === undefined || (await readReply()) !== "AFFIRM") {
         return new Set<string>();
       }
       const affirmed = new Set<string>();

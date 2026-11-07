@@ -1,3 +1,4 @@
+import type { ActorContext } from "@capital-q/security";
 import {
   getOnboardingSession,
   listOnboardingInterviewTurns,
@@ -76,6 +77,18 @@ const REPLY_BUDGET = {
 const THREAD_LIMIT = 60;
 
 export function createTypedOnboarding(dependencies: {
+  /**
+   * One closed question about their words, by meaning (P1-2): whether
+   * their reply agrees to what Q just read back. Absent: no reply counts
+   * as agreement (fail closed).
+   */
+  readonly wordsCheck?:
+    | ((
+        actor: ActorContext,
+        question: string,
+        words: string,
+      ) => Promise<"YES" | "NO" | "UNSURE" | null>)
+    | undefined;
   readonly conversation: Pick<
     OnboardingConversation,
     "said" | "flush" | "answered"
@@ -171,6 +184,13 @@ export function createTypedOnboarding(dependencies: {
       ) =>
         createOnboardingPort({
           logger,
+          ...(dependencies.wordsCheck === undefined
+            ? {}
+            : {
+                wordsCheck: (question: string, words: string) =>
+                  dependencies.wordsCheck?.(actor, question, words) ??
+                  Promise.resolve(null),
+              }),
           session: input.session,
           onboardingSessionId: input.onboardingSessionId,
           journeyType: input.journeyType,
