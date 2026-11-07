@@ -394,6 +394,20 @@ export function createFitTopCandidatesTool(
           ),
         };
       }
+      // Still too large: the fit's score out of 10 (ranking-config.v8) is
+      // in the text, once per company; drop the typed copy.
+      if (
+        JSON.stringify(output).length > MODEL_TOOL_RESULT_MAX_CHARS &&
+        output.comparison !== null
+      ) {
+        output.comparison = {
+          ...output.comparison,
+          entries: output.comparison.entries.map((entry) => {
+            const { scoreOutOf10: _score, ...profile } = entry.profile;
+            return { ...entry, profile };
+          }),
+        };
+      }
       return output;
     },
   });

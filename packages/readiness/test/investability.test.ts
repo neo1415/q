@@ -432,7 +432,7 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     expect(width(doc)).toBeLessThan(width(self));
   });
 
-  it("investiq/v3 credibility: the same facts verified move further from the norm", () => {
+  it("investiq/v3 credibility: the same facts better evidenced move further from the norm", () => {
     const deck = (evidenceStatus: DeckFact["evidenceStatus"]) =>
       fullDeck(
         Object.fromEntries(
@@ -450,7 +450,7 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     const self = assessInvestability(inputs({}, deck("SELF_REPORTED")), AS_OF)
       .view.score;
     const verified = assessInvestability(
-      inputs({}, deck("EXTERNALLY_VERIFIED")),
+      inputs({}, deck("DOCUMENT_SUPPORTED")),
       AS_OF,
     ).view.score;
     if (self === null || verified === null) throw new Error("unscored");
