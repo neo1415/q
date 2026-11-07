@@ -536,6 +536,12 @@ export const Q_SITE_MAP: QSiteMap = {
           tab: "dataroom",
         },
         {
+          id: "missing",
+          title: "Still to add (owner)",
+          kind: "DATA_ROOM",
+          tab: "dataroom",
+        },
+        {
           id: "deck",
           title: "Pitch deck",
           kind: "DECK",
@@ -1555,7 +1561,7 @@ export const Q_SITE_MAP: QSiteMap = {
         },
         {
           id: "capital",
-          title: "Capital (founder)",
+          title: "Capital",
           href: "/relationships?view=capital",
           destinations: ["CAPITAL"],
           subs: [],
@@ -1613,6 +1619,18 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "relationships",
           title: "Relationships",
           kind: "RELATIONSHIP_LIST",
+        },
+        {
+          id: "mandate",
+          title: "Your mandate",
+          kind: "OTHER",
+          tab: "capital",
+        },
+        {
+          id: "commitments",
+          title: "Your book (commitments)",
+          kind: "CAPITAL_ROUNDS",
+          tab: "capital",
         },
         {
           id: "capital-overview",
@@ -1823,6 +1841,11 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "CHAT",
         },
         {
+          id: "draft",
+          title: "Your reply (Q's draft)",
+          kind: "CHAT",
+        },
+        {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
@@ -2002,6 +2025,11 @@ export const Q_SITE_MAP: QSiteMap = {
         {
           id: "chat",
           title: "Messages",
+          kind: "CHAT",
+        },
+        {
+          id: "draft",
+          title: "Your reply (Q's draft)",
           kind: "CHAT",
         },
         {

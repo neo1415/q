@@ -129,6 +129,7 @@ function relationshipPage(
       part === "messages"
         ? [
             { id: "chat", title: "Messages", kind: "CHAT" },
+            { id: "draft", title: "Your reply (Q's draft)", kind: "CHAT" },
             ...RELATIONSHIP_SECTIONS,
           ]
         : RELATIONSHIP_SECTIONS,
@@ -457,6 +458,12 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         kind: "DATA_ROOM",
         tab: "dataroom",
       },
+      {
+        id: "missing",
+        title: "Still to add (owner)",
+        kind: "DATA_ROOM",
+        tab: "dataroom",
+      },
       { id: "deck", title: "Pitch deck", kind: "DECK", tab: "deck" },
       { id: "team", title: "Team", kind: "TEAM", tab: "team" },
     ],
@@ -525,7 +532,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       },
       {
         id: "capital",
-        title: "Capital (founder)",
+        title: "Capital",
         href: "/relationships?view=capital",
       },
       {
@@ -571,6 +578,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         id: "relationships",
         title: "Relationships",
         kind: "RELATIONSHIP_LIST",
+      },
+      { id: "mandate", title: "Your mandate", kind: "OTHER", tab: "capital" },
+      {
+        id: "commitments",
+        title: "Your book (commitments)",
+        kind: "CAPITAL_ROUNDS",
+        tab: "capital",
       },
       {
         id: "capital-overview",

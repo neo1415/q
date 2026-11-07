@@ -29,6 +29,17 @@ export const Q_SITE_MAP_VERSION = 1 as const;
 /** A tab, section or sub-part id: lowercase words joined by hyphens or underscores. */
 export const QSiteMapIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,47}$/u);
 
+/**
+ * A section id: exactly the page's QSection id, and the navigation
+ * target's `sectionId` (W3: `#section-<id>`, `[data-q-section]`).
+ */
+export const QSiteMapSectionIdSchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9-]{0,39}$/u);
+
+/** A tab key, as the navigation target's `tab` (W3). */
+export const QSiteMapTabIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/u);
+
 /** A route pattern of the app (`[param]` is one segment), as `APP_ROUTE_PATTERNS` lists it. */
 export const QSiteMapRouteSchema = z
   .string()
@@ -93,7 +104,7 @@ export type QSiteMapSub = z.infer<typeof QSiteMapSubSchema>;
 
 export const QSiteMapTabSchema = z
   .object({
-    id: QSiteMapIdSchema,
+    id: QSiteMapTabIdSchema,
     title: TitleSchema,
     /** Where it opens: the page's route with the tab's own query or path. */
     href: QSiteMapHrefSchema,
@@ -112,11 +123,11 @@ export type QSiteMapTab = z.infer<typeof QSiteMapTabSchema>;
  */
 export const QSiteMapSectionSchema = z
   .object({
-    id: QSiteMapIdSchema,
+    id: QSiteMapSectionIdSchema,
     title: TitleSchema,
     kind: QManifestSectionKindSchema,
     /** The tab it is on; absent: on the page whatever the tab. */
-    tab: QSiteMapIdSchema.optional(),
+    tab: QSiteMapTabIdSchema.optional(),
   })
   .strict();
 export type QSiteMapSection = z.infer<typeof QSiteMapSectionSchema>;
@@ -300,6 +311,38 @@ export function qSiteMapPageFor(
         (other) => other.route === `/${parts.join("/")}`,
       );
       return literal ?? page;
+    }
+  }
+  return null;
+}
+
+/** Where a navigation target's `page` (a destination or a record page) lands in the map. */
+export type QSiteMapLanding = {
+  readonly page: QSiteMapPage;
+  /** The tab the destination opens; null: the page itself. */
+  readonly tab: QSiteMapTab | null;
+};
+
+/**
+ * W3/W4: the site-map entry a `QNavigateTarget.page` names -- a named
+ * destination (`QNavigateDestination`) or a record page (`QRecordPage`) --
+ * so a target's tab and section can be checked against the page it lands
+ * on. Null: the key lands on no page of the map.
+ */
+export function qSiteMapLandingFor(
+  map: QSiteMap,
+  key: string,
+): QSiteMapLanding | null {
+  for (const page of map.pages) {
+    if ((page.destinations as readonly string[]).includes(key)) {
+      return { page, tab: null };
+    }
+    const tab = page.tabs.find((one) =>
+      (one.destinations as readonly string[]).includes(key),
+    );
+    if (tab !== undefined) return { page, tab };
+    if ((page.recordPages as readonly string[]).includes(key)) {
+      return { page, tab: null };
     }
   }
   return null;
