@@ -1956,3 +1956,12 @@ describe("GPT-Live persona line for a rehearsal with a researched external perso
     ]);
   });
 });
+
+describe("the live setup call: a needed topic they decline (e2e run 3)", () => {
+  it("is never just set aside: Q says why it is needed and that it can wait", () => {
+    const prompt = livePrompt({ interview: "CHECKLIST" });
+    expect(prompt).toMatch(
+      /would rather not answer a needed topic, never just set it aside: say in a few plain words why Capital Q needs it/u,
+    );
+  });
+});

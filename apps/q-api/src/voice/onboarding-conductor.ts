@@ -1287,6 +1287,58 @@ export function createOnboardingConductor(
     };
   };
 
+  /**
+   * e2e run 3 (production 57e7289b6, J4): "two full-time founders" was
+   * held for its read-back (a figure, D-OWN-3), and the voice turn ended
+   * "And how many founders are there?" as if never said. When the turn asks
+   * a step whose answer waits for their yes, its last question puts that
+   * answer back to them instead, as the resume line does. Code decides;
+   * the model's wording of the rest stands.
+   */
+  const putBackHeld = async (
+    input: InterviewAgentTurnInput,
+    outcome: InterviewTurnOutcome,
+  ): Promise<InterviewTurnOutcome> => {
+    const stepKey = outcome.asking?.stepKey;
+    if (stepKey === undefined || input.actor === undefined) return outcome;
+    const port = dependencies.portFor({
+      actor: input.actor,
+      session: input.session,
+      onboardingSessionId: input.onboardingSessionId,
+      journeyType: input.journeyType,
+    });
+    if (port.pendingRecommendations === undefined) return outcome;
+    const held = (
+      await port
+        .pendingRecommendations()
+        .catch(reported("held suggestions read", []))
+    )
+      .find((item) => item.stepKey === stepKey)
+      ?.value.trim()
+      .replace(/[.;\s]+$/u, "");
+    if (held === undefined || held.length === 0) return outcome;
+    // Already put to them (the model did as told): nothing to change.
+    if (outcome.reply.toLowerCase().includes(held.toLowerCase())) {
+      return outcome;
+    }
+    const sentences = outcome.reply.match(/[^.?!]+[.?!]*/gu) ?? [];
+    const lastQuestion = sentences.findLastIndex((one) => one.includes("?"));
+    const putBack = `From what you said earlier, ${lowerFirst(plainStepLabel(stepKey))}: ${held}. Shall I keep that?`;
+    const kept =
+      lastQuestion < 0
+        ? sentences
+        : sentences.filter((_, index) => index !== lastQuestion);
+    // "And how many founders are there?": the lead-in goes with it.
+    const before = kept
+      .join("")
+      .replace(/\s+(?:and|so)\s*$/iu, "")
+      .trim();
+    return {
+      ...outcome,
+      reply: before.length === 0 ? putBack : `${before} ${putBack}`,
+    };
+  };
+
   const conduct = async (
     input: InterviewAgentTurnInput,
   ): Promise<InterviewTurnOutcome> => {
@@ -1316,7 +1368,7 @@ export function createOnboardingConductor(
         });
       if (typed !== null) return typed;
     }
-    const outcome = await agent.turn(input);
+    const outcome = await putBackHeld(input, await agent.turn(input));
     if (input.signal?.aborted === true) return outcome;
     const view = outcome.view;
     const extra: Line[] = [];

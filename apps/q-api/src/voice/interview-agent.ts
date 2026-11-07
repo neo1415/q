@@ -2476,7 +2476,18 @@ export function createInterviewAgent(
         }
       }
       try {
-        input.onSentence(receipt);
+        // Through the reply stream, so the stream knows it was said: the
+        // settled reply opens with it and is not said again from the top,
+        // and a model sentence restating it is not said at all
+        // (production 2026-11-07: "I've saved…" spoken twice).
+        if (stream === undefined) input.onSentence(receipt);
+        else {
+          stream.lead(
+            receipt,
+            (sentence) =>
+              withoutRepeatedReceipt(sentence, receiptValues).length === 0,
+          );
+        }
       } catch {
         // Display only.
       }

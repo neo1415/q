@@ -114,7 +114,7 @@ describe("ONBOARDING_TRANSCRIPT_READER v15 and ONBOARDING_TYPED_REPLY v8 (P1-1)"
 
   it("carry into the active versions (reader v17, reply v9: DECISIONS 79)", () => {
     expect(reader.version).toBe(17);
-    expect(reply.version).toBe(9);
+    expect(reply.version).toBe(10);
   });
 
   it("the reader judges a LONG_TEXT answer clear (their words, filler removed) or rambling (a summary)", () => {
@@ -201,8 +201,12 @@ describe("DECISIONS 79: Q stops advertising optionality", () => {
     expect(reply.template).toMatch(
       /Never say a question is optional or can be skipped/u,
     );
+    // A skip or "I don't know" they offer is still accepted (v10 says how).
     expect(reply.template).toMatch(
-      /If they ask to skip something, or say they don't know, move on/u,
+      /If they say they don't know, that is an answer/u,
+    );
+    expect(reply.template).toMatch(
+      /If they ask to skip an Other topic, move on/u,
     );
   });
 
@@ -235,6 +239,25 @@ describe("batch 7: None answers a required list; drafts for the one line and the
   it("drafts the one line and the firm description as INFERRED, for their yes", () => {
     expect(reader.template).toMatch(
       /company in one line, or for a description of the firm[^\n]*source INFERRED/u,
+    );
+  });
+});
+
+describe("e2e run 3: a needed topic they decline is never just set aside", () => {
+  const reply = createDefaultPromptRegistry().getActive(
+    "ONBOARDING_TYPED_REPLY",
+  ).definition;
+
+  it("the template itself gives the reason for a Needed topic, and lets an Other one go", () => {
+    expect(reply.version).toBe(10);
+    expect(reply.template).toMatch(
+      /would rather not answer a Needed topic[^\n]*never just set it aside: say in a few plain words why Capital Q needs it/u,
+    );
+    expect(reply.template).toMatch(
+      /If they ask to skip an Other topic, move on and do not ask it again now/u,
+    );
+    expect(reply.template).not.toContain(
+      "If they ask to skip something, or say they don't know, move on to the next thing",
     );
   });
 });

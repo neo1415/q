@@ -957,3 +957,195 @@ describe("the reply is in their language (ob1 live on AF)", () => {
     ];
   }
 });
+
+describe("the receipt is said once in a voice turn (e2e run 3, production 57e7289b6)", () => {
+  it("paying customers, a kept revenue note and the count: one 'I've saved', never two", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F5.signal",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Tamarind Ledger",
+        "F1.stage": "seed",
+      },
+    });
+    const said =
+      "We have paying customers, about 40 shops, and the revenue is recurring.";
+    const model = recordingModel([
+      { stepKey: "F5.signal", value: "paying", quote: "paying customers" },
+      { stepKey: "F5.customers", value: 40, quote: "about 40 shops" },
+      {
+        stepKey: "F5.revenue_status",
+        value: "recurring",
+        quote: "the revenue is recurring",
+      },
+    ]);
+    const sentences: string[] = [];
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(
+        reading({
+          stated: ["F5.signal", "F5.customers", "F5.revenue_status"],
+        }),
+      ),
+      replyByCodeAfterCleanSave: true,
+    }).turn({
+      ...turn(world, said),
+      actor,
+      channel: "voice",
+      onSentence: (sentence) => sentences.push(sentence),
+    });
+    expect(outcome.reply.match(/I've saved/gu) ?? []).toHaveLength(1);
+    // What the voice speaks: the stream, not only the stored reply
+    // (production 2026-11-07: stored once, streamed twice).
+    expect(sentences.join(" ").match(/I've saved/gu) ?? []).toHaveLength(1);
+    expect(outcome.reply.match(/Paying customers/gu) ?? []).toHaveLength(1);
+  });
+});
+
+describe("a model reply that restates the receipt in its own words (e2e run 3)", () => {
+  it("the save is said once: the code's receipt, never the model's echo of it", async () => {
+    const said = "Seed stage, based in Kenya.";
+    const answers = [
+      { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
+      { stepKey: "F1.country", value: "Kenya", quote: "based in Kenya" },
+    ];
+    const world = founderWorld();
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve(
+          calls === 1
+            ? {
+                output: {
+                  kind: "TOOL_CALLS",
+                  calls: [
+                    {
+                      callId: "call_1",
+                      name: "record_answers",
+                      arguments: { answers },
+                    },
+                  ],
+                },
+              }
+            : {
+                output: {
+                  kind: "TEXT",
+                  text: JSON.stringify({
+                    // Production: the model restated the save with another
+                    // lead word, so the reply did not start with the receipt.
+                    reply:
+                      "Noted, I've saved Seed (stage) and Kenya (country). How many founders are there?",
+                    asking: "F4.founder_count",
+                  }),
+                },
+              },
+        );
+      },
+    } as unknown as ModelGateway;
+    const sentences: string[] = [];
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
+    }).turn({
+      ...turn(world, said),
+      actor,
+      onSentence: (sentence) => sentences.push(sentence),
+    });
+    expect(sentences[0]).toMatch(/I've saved/u);
+    expect(outcome.reply.match(/I've saved/gu) ?? []).toHaveLength(1);
+    // What the voice speaks: the stream, not only the stored reply
+    // (production 2026-11-07: stored once, streamed twice).
+    expect(sentences.join(" ").match(/I've saved/gu) ?? []).toHaveLength(1);
+    expect(outcome.reply).toMatch(/How many founders are there\?$/u);
+  });
+});
+
+describe("the production echo, word for word (e2e run 3, J4)", () => {
+  it("a kept note and a count, restated by the model after the receipt: said once", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F5.signal",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Tamarind Ledger",
+        "F1.stage": "seed",
+      },
+    });
+    const said =
+      "We have paying customers, about 40 shops, and the revenue is recurring.";
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve(
+          calls === 1
+            ? {
+                output: {
+                  kind: "TOOL_CALLS",
+                  calls: [
+                    {
+                      callId: "call_1",
+                      name: "record_answers",
+                      arguments: {
+                        answers: [
+                          {
+                            stepKey: "F5.signal",
+                            value: "paying",
+                            quote: "paying customers",
+                          },
+                          {
+                            stepKey: "F5.customers",
+                            value: 40,
+                            quote: "about 40 shops",
+                          },
+                          {
+                            stepKey: "F5.revenue_status",
+                            value: "recurring",
+                            quote: "the revenue is recurring",
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              }
+            : {
+                output: {
+                  kind: "TEXT",
+                  text: JSON.stringify({
+                    reply:
+                      "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). How many founders are there?",
+                    asking: "F4.founder_count",
+                  }),
+                },
+              },
+        );
+      },
+    } as unknown as ModelGateway;
+    const sentences: string[] = [];
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation: readerOf(
+        reading({
+          stated: ["F5.signal", "F5.customers", "F5.revenue_status"],
+        }),
+      ),
+    }).turn({
+      ...turn(world, said),
+      actor,
+      onSentence: (sentence) => sentences.push(sentence),
+    });
+    expect(outcome.reply.match(/I've saved/gu) ?? []).toHaveLength(1);
+    // What the voice speaks: the stream, not only the stored reply
+    // (production 2026-11-07: stored once, streamed twice).
+    expect(sentences.join(" ").match(/I've saved/gu) ?? []).toHaveLength(1);
+  });
+});

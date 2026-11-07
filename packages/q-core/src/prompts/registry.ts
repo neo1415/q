@@ -387,6 +387,7 @@ import { ONBOARDING_TYPED_REPLY_V6 } from "./tasks/onboarding-typed-reply.v6.js"
 import { ONBOARDING_TYPED_REPLY_V7 } from "./tasks/onboarding-typed-reply.v7.js";
 import { ONBOARDING_TYPED_REPLY_V8 } from "./tasks/onboarding-typed-reply.v8.js";
 import { ONBOARDING_TYPED_REPLY_V9 } from "./tasks/onboarding-typed-reply.v9.js";
+import { ONBOARDING_TYPED_REPLY_V10 } from "./tasks/onboarding-typed-reply.v10.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 // DAILY block
@@ -621,7 +622,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // said back; a ramble or a summary not confirmed yet is.
     { ...ONBOARDING_TYPED_REPLY_V8, status: "DEPRECATED" },
     // DECISIONS 79: Q never advertises optionality; it just asks.
-    ONBOARDING_TYPED_REPLY_V9,
+    { ...ONBOARDING_TYPED_REPLY_V9, status: "DEPRECATED" },
+    // e2e run 3: a needed topic declined gets its reason, never set aside.
+    ONBOARDING_TYPED_REPLY_V10,
     WELCOME_CONDUCTOR_V1,
     WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,
