@@ -40,7 +40,9 @@ import {
  * separately (vocabulary `dev` / `heldout`, FORMS below).
  */
 
-const FORMS: Readonly<Record<QNavSplit, readonly ((n: string) => string)[]>> = {
+const FORMS: Readonly<
+  Record<"dev" | "heldout", readonly ((n: string) => string)[]>
+> = {
   dev: [
     (n) => `Open ${n}.`,
     (n) => `Take me to ${n}.`,
@@ -57,7 +59,14 @@ const FORMS: Readonly<Record<QNavSplit, readonly ((n: string) => string)[]>> = {
   ],
 };
 
-const form = (split: QNavSplit, seed: string, name: string): string => {
+/**
+ * The word bank a split draws from: the generated coverage is dev and the
+ * first held-out set only (heldout4 is written by hand, batch 8).
+ */
+const bankOf = (split: QNavSplit): "dev" | "heldout" =>
+  split === "dev" ? "dev" : "heldout";
+
+const form = (split: "dev" | "heldout", seed: string, name: string): string => {
   const forms = FORMS[split];
   return (forms[pick(seed, forms.length)] ?? forms[0] ?? ((n) => n))(name);
 };
@@ -152,7 +161,7 @@ const NO_ACCESS_CASE: readonly string[] = [
 ];
 
 function destinations(cases: CaseSet): void {
-  const split = cases.split;
+  const split = bankOf(cases.split);
   for (const def of Q_NAV_DESTINATIONS) {
     // A place the decision cannot name (a redirect-only page) is no MOVE.
     if (def.unreachable !== null) continue;
@@ -361,7 +370,7 @@ const COMPANY_ASKS: readonly RecordAsk[] = [
 ];
 
 function records(cases: CaseSet): void {
-  const split = cases.split;
+  const split = bankOf(cases.split);
   // Dev meets each ask with two companies, held-out with a third.
   const offsets = split === "dev" ? [0, 4] : [7];
   COMPANY_ASKS.forEach((ask, i) => {

@@ -78,8 +78,13 @@ export type QNavCategory = (typeof Q_NAV_CATEGORIES)[number];
 export const Q_NAV_SIDES = ["INVESTOR", "FOUNDER"] as const;
 export type QNavSide = (typeof Q_NAV_SIDES)[number];
 
-/** "dev" is tuned against; "heldout" is written separately, measured only. */
-export const Q_NAV_SPLITS = ["dev", "heldout"] as const;
+/**
+ * "dev" is tuned against; "heldout" is written separately, measured only.
+ * "heldout4" (batch 8, 7 Nov 2026): a fourth set, written by a separate
+ * author after NAVIGATION_DECISION v10, on conversation-driven placement
+ * and tabs; sealed and measured once like "heldout".
+ */
+export const Q_NAV_SPLITS = ["dev", "heldout", "heldout4"] as const;
 export type QNavSplit = (typeof Q_NAV_SPLITS)[number];
 
 export { QNavigateTargetSchema as QNavTargetSchema };
@@ -145,7 +150,7 @@ export type QNavTurn = z.infer<typeof QNavTurnSchema>;
 
 export const QNavCaseSchema = z
   .object({
-    id: z.string().regex(/^QNAV-[A-Z]{1,4}-[A-Z]{2,4}-\d{3}$/u),
+    id: z.string().regex(/^QNAV-[A-Z0-9]{1,4}-[A-Z]{2,4}-\d{3}$/u),
     category: z.enum(Q_NAV_CATEGORIES),
     side: z.enum(Q_NAV_SIDES),
     split: z.enum(Q_NAV_SPLITS),

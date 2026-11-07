@@ -18,4 +18,17 @@ Source: `receipts/2026-11-07-owner-replay-batch7/README.md`. R1 works: decisions
 
 **Eval:** the q-nav runner gives every turn a situation from the synthetic world (on-screen record, a founder's own company), as production does.
 
-**Live check:** `packages/q-evals/test/q-nav-replay.live.test.ts` runs the replay sentences through the real decision (3 votes, MEDIUM), with the companies NOT in the held records, and stops at $1. Its result goes here when it runs.
+**Live check, run by integration on `a707264e7`:** 8/8, $0.2257, 24 calls, 1.4–2.2 s per sentence. Receipt: `receipts/2026-11-07-qnav-replay-live.md`. Each sentence landed where expected:
+
+| Sentence                   | Landed on              |
+| -------------------------- | ---------------------- |
+| Harbourline's pitch deck   | Harbourline › deck     |
+| Harbourline's profile      | Harbourline › overview |
+| "their team"               | Harbourline › team     |
+| "can I see it?"            | Harbourline › team     |
+| "tell me about clinicrest" | Clinicrest › overview  |
+| "their elevator"           | Clinicrest › elevator  |
+| "who viewed my profile"    | Analytics              |
+| "find me online"           | STAY                   |
+
+**Caution:** v10 changed the prompt, so the third held-out set's 88.1% no longer describes production. A fourth set (`heldout-fourth.ts`, about 120 turns, separate author, conversation-driven placement and tabs) is sealed before it is run once.

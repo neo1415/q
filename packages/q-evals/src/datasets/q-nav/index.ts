@@ -16,6 +16,7 @@ import {
 } from "./contracts.js";
 import { coverage } from "./coverage.js";
 import { devCurveballs } from "./curveballs.js";
+import { heldoutFourth } from "./heldout-fourth.js";
 import { heldoutThird } from "./heldout-third.js";
 import {
   destinationDef,
@@ -58,7 +59,12 @@ export function buildQNavCases(): QNavCase[] {
   // earlier held-out set was measured once and is retired.
   const heldout = new CaseSet("heldout");
   heldoutThird(heldout);
-  return [...dev.out, ...heldout.out].map((c) => QNavCaseSchema.parse(c));
+  // Batch 8: the fourth held-out set, after v10 (sealed in heldout-seal.ts).
+  const heldout4 = new CaseSet("heldout4");
+  heldoutFourth(heldout4);
+  return [...dev.out, ...heldout.out, ...heldout4.out].map((c) =>
+    QNavCaseSchema.parse(c),
+  );
 }
 
 /** The fixed eval. Every case is validated when the module loads. */
