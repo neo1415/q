@@ -1846,3 +1846,37 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - vitest packages: 4925 passed;
   - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
   - eslint and prettier clean.
+
+## 2026-11-07 — q-nav tuning round 3, the last before held-out (`feat/q-navigation-policy`)
+
+- **Dev round 2** (live, c2d3d11): 502 turns, 89.8% pass (r1 72.9), move-target 89.5%, wrong-page 5.98%, forbidden 0, $2.02. Receipt: `docs/ai-handoff/receipts/2026-11-07-qnav-dev-r2.json`.
+- **Wrong-page and STAY misses by cause:**
+  - **Stale vocabulary:** W2's per-tab and per-section audiences replaced the "(investor)"/"(founder)" tab titles the vocabulary parsed, so the dataset asked founders for YOUR_COMPANIES and investors for GATEQ_APPLICATIONS. Sides now come from `audienceOf`, and the hand overrides are gone. The gateway's `canOpenFor` also uses tab audience.
+  - **Code:**
+    - a sub-route with no place of its own is its parent's section (/settings/team → SETTINGS#team, /settings/security);
+    - a founder's /company/data-room and deck are their own company's tabs (the page sends them there). `ownPlace` applies to resolution, Back and "already there", and the id never reaches the model. The grader gives founders the same-place alias, like SEARCH ≡ EXPLORE.
+  - **Ambiguous to a human, so documented dataset changes:**
+    - "search" (/search is People search) became "search the network";
+    - "my to-dos" (Board items too) became "what Q needs from me";
+    - "Who am I talking to" became "Which of my relationships are active right now?";
+    - "What did X ask me?" (diligence questions too) became "last write to me";
+    - "evidence behind X's numbers" (overview or data room) became headline figures;
+    - an investor's "visibility settings" (their privacy settings) gets no ACCESS case.
+  - **Wrong in the dataset**, fixed in both splits:
+    - WORK_TEAM is Q's team map, not their colleagues (/settings/activity);
+    - REVIEWS are reviews they asked for, not what waits for their review (Work approvals).
+- **NAVIGATION_DECISION v4** (schema version 2; v3 deprecated; v1–v3 hashes unchanged):
+  - `sure: false` when another page could equally be meant, and code then OFFERs (guard UNSURE) and never moves to a guess;
+  - two asks go to the one they ask to see, else the last;
+  - a tab whose title is asked for is named.
+- **Note:** the dataset regenerated (new sides, ids shifted), so r2 replays no longer align.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0, q-api tsc 0;
+  - vitest packages: 4928 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+- **For W2 (digest clarity):**
+  - /search vs /explore titles;
+  - per-tab purposes on the company profile (overview = headline figures);
+  - /work Team tab title ("Q's team").

@@ -83,6 +83,7 @@ export async function runQNav(
                 own: {
                   kind: "COMPANY" as const,
                   name: company(Q_NAV_FOUNDER_COMPANY_KEY).name,
+                  id: company(Q_NAV_FOUNDER_COMPANY_KEY).id,
                 },
               }
             : Q_NAV_RECORDS,
@@ -170,6 +171,7 @@ export function navigationPipelineSubject(
         pane: pipelineInput.pane,
         canOpen: (page) => sidesOf(page).includes(input.side),
         config,
+        records: input.records,
       });
       return {
         decision: outcome.decision,

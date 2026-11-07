@@ -5,7 +5,7 @@ import {
   NAVIGATION_DECISION_UNTRUSTED,
   NavigationDecisionResultSchema,
   NavigationDecisionVariablesSchema,
-  type NavigationDecisionResult,
+  type NavigationDecisionResultV1,
   type NavigationDecisionVariables,
 } from "../schemas/navigation-decision.js";
 
@@ -72,7 +72,7 @@ Respond with a single JSON object matching the NavigationDecisionResult schema.`
 
 export const NAVIGATION_DECISION_V3: PromptDefinition<
   NavigationDecisionVariables,
-  NavigationDecisionResult
+  NavigationDecisionResultV1
 > = {
   id: "NAVIGATION_DECISION",
   version: 3,

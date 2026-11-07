@@ -16,6 +16,7 @@ import {
   navigateTargetFromPath,
   navigationPaneFromWorkspace,
   navigationSiteMap,
+  navigationVariables,
   resolveNavigationPlace,
   resolveNavigationPlaceWith,
   sitePlaceToTarget,
@@ -967,5 +968,80 @@ describe("the site map's own place (q-nav round 2: resolution rules)", () => {
         input(),
       ),
     ).toEqual({ kind: "UNRESOLVED" });
+  });
+});
+
+describe("q-nav round 3: unsure moves, sub-routes, their own data room", () => {
+  const placeAt = (route: string) =>
+    sitePlaceToTarget(
+      { route, tab: null, sectionId: null, slide: null, position: null },
+      { recordId: null, documentId: null, itemId: null },
+    );
+
+  it("a sub-route with no place of its own is its parent's section", () => {
+    expect(placeAt("/settings/team")).toEqual({
+      page: "SETTINGS",
+      sectionId: "team",
+      position: "section",
+    });
+    expect(placeAt("/settings/security")).toEqual({
+      page: "SETTINGS",
+      sectionId: "security",
+      position: "section",
+    });
+  });
+
+  it("a MOVE the model is not sure of is an OFFER; a collapsed pane keeps it", () => {
+    const target = { page: "WORK" } as const;
+    const decide = (
+      sure: boolean | undefined,
+      paneOver: Partial<QNavigationPane> = {},
+    ) =>
+      applyNavigationPolicy({
+        proposal: proposal({ ...(sure === undefined ? {} : { sure }) }),
+        resolution: { kind: "TARGET", target },
+        pane: pane(paneOver),
+        canOpen: () => true,
+        config: { movesAllowed: true },
+      });
+    expect(decide(false)).toMatchObject({ decision: "OFFER", guard: "UNSURE" });
+    expect(decide(true).decision).toBe("MOVE");
+    // An older version's output has no `sure`: read as sure.
+    expect(decide(undefined).decision).toBe("MOVE");
+    expect(decide(false, { pane: "COLLAPSED" })).toMatchObject({
+      decision: "STAY",
+      remembered: target,
+    });
+  });
+
+  it("a founder's own data room is their company's tab, and already there knows it", () => {
+    const OWN = SILO;
+    const records = {
+      ...input().records,
+      own: { kind: "COMPANY" as const, name: "Silo Credit", id: OWN },
+    };
+    const moved = resolveNavigationPlace(
+      proposal({
+        place: place({ route: "/company/data-room", tab: "dataroom" }),
+      }),
+      input({ side: "FOUNDER", records }),
+    );
+    expect(moved).toEqual({
+      kind: "TARGET",
+      target: { page: "COMPANY", recordId: OWN, tab: "dataroom" },
+    });
+    const outcome = applyNavigationPolicy({
+      proposal: proposal({}),
+      resolution: moved,
+      pane: pane({ at: { page: "OWN_DATA_ROOM" } }),
+      canOpen: () => true,
+      config: { movesAllowed: true },
+      records,
+    });
+    expect(outcome).toMatchObject({ decision: "STAY", guard: "ALREADY_THERE" });
+    // The id never reaches the model: theirOwn is a name.
+    expect(
+      JSON.stringify(navigationVariables(input({ records }))),
+    ).not.toContain(OWN);
   });
 });

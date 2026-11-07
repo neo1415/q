@@ -193,6 +193,7 @@ export type QNavRecords = {
   readonly own?: {
     readonly kind: "COMPANY" | "INVESTOR";
     readonly name: string;
+    readonly id?: string;
   };
   /** Records that were deleted: never a target. */
   readonly deleted: readonly { readonly id: string; readonly name: string }[];

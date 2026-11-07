@@ -12194,6 +12194,7 @@ export {
   NAVIGATION_DECISION_TASK_CLASS,
   navigateTargetFromPath,
   navigationPaneFromWorkspace,
+  ownPlace,
   navigationSiteMap,
   samePlace as sameNavigationPlace,
   sitePlaceToTarget,

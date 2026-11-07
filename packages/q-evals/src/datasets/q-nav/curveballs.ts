@@ -597,7 +597,7 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       dest("CAPITAL_PLAN"),
-      "What did Savanna Seed ask me?",
+      "What did Savanna Seed last write to me?",
       threadWithInvestor("inv-savanna-seed"),
     ],
   ];
@@ -836,7 +836,7 @@ export function devCurveballs(cases: CaseSet): void {
     ["FOUNDER", "Open my data room.", dest("OWN_DATA_ROOM")],
     [
       "FOUNDER",
-      "What did Savanna Seed ask me?",
+      "What did Savanna Seed last write to me?",
       threadWithInvestor("inv-savanna-seed"),
     ],
   ];

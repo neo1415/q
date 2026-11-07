@@ -1,6 +1,7 @@
 import {
   navigateTargetToIntent,
   Q_NAVIGATION_OFFER_LABEL_MAX,
+  audienceOf,
   Q_SITE_MAP,
   QNavigateDestinationSchema,
   QNavigateTargetSchema,
@@ -18,7 +19,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  NavigationDecisionResultSchema,
+  NavigationDecisionResultV2Schema,
   renderPrompt,
   type NavigationDecisionResult,
   type NavigationDecisionVariables,
@@ -78,7 +79,12 @@ export type QNavigationRecords = {
   readonly deleted: readonly { readonly id: string; readonly name: string }[];
   /** Their own company or firm ("my company", "us"), by name. */
   readonly own?:
-    | { readonly kind: "COMPANY" | "INVESTOR"; readonly name: string }
+    | {
+        readonly kind: "COMPANY" | "INVESTOR";
+        readonly name: string;
+        /** Never shown to the model: it resolves "their own" pages. */
+        readonly id?: string | undefined;
+      }
     | undefined;
 };
 
@@ -116,6 +122,7 @@ export type QNavigationGuard =
   | "BUSY_PANE"
   | "COLLAPSED_PANE"
   | "BELOW_GATE"
+  | "UNSURE"
   | "NOTHING_BEFORE";
 
 // --- 0. The site map (W2) ---------------------------------------------
@@ -340,6 +347,31 @@ export function sitePlaceToTarget(
       tabId = tabId ?? owner.tab.id;
     }
   }
+  // A sub-route with no place of its own (/settings/team) is its parent
+  // page's section of the same name, when the parent lists one.
+  if (
+    page !== undefined &&
+    page.destinations.length === 0 &&
+    page.recordPages.length === 0 &&
+    page.tabs.length === 0 &&
+    place.sectionId === null &&
+    place.tab === null
+  ) {
+    const parentRoute = page.route.slice(0, page.route.lastIndexOf("/"));
+    const last = page.route.slice(page.route.lastIndexOf("/") + 1);
+    const parent = pageByRoute(map, parentRoute);
+    if (
+      parent !== undefined &&
+      parent.destinations.length > 0 &&
+      parent.sections.some((s) => s.id === last && s.tab === undefined)
+    ) {
+      return sitePlaceToTarget(
+        { ...place, route: parentRoute, sectionId: last, position: "section" },
+        ids,
+        map,
+      );
+    }
+  }
   if (page === undefined) return null;
   let tab = tabId === null ? undefined : page.tabs.find((t) => t.id === tabId);
   if (tabId !== null && tab === undefined) return null;
@@ -523,7 +555,15 @@ export function navigationVariables(
       t.route === undefined ? t.title : { title: t.title, opensOn: t.route },
     ),
     deleted: input.records.deleted.map((d) => d.name),
-    ...(input.records.own === undefined ? {} : { theirOwn: input.records.own }),
+    // Their own by name only: ids never reach the model.
+    ...(input.records.own === undefined
+      ? {}
+      : {
+          theirOwn: {
+            kind: input.records.own.kind,
+            name: input.records.own.name,
+          },
+        }),
   };
   return {
     utterance: input.utterance,
@@ -598,10 +638,10 @@ export function createQNavigationDecider(dependencies: {
             output: rendered.output,
             attribution,
           },
-          { schema: NavigationDecisionResultSchema },
+          { schema: NavigationDecisionResultV2Schema },
         );
         return result.output.kind === "STRUCTURED"
-          ? NavigationDecisionResultSchema.parse(result.output.value)
+          ? NavigationDecisionResultV2Schema.parse(result.output.value)
           : null;
       } catch (error: unknown) {
         // A failed decision costs the move, never the answer: STAY.
@@ -794,6 +834,40 @@ function askOf(
  * guess: two records that fit, or none, is UNRESOLVED; so is a route,
  * tab or section the site map does not have.
  */
+/**
+ * A founder's own data room and deck (/company/data-room) are their own
+ * company's tabs: the page sends them there. With their company known,
+ * the place is that record, so "already there" and Back compare true.
+ */
+function asOwnRecord(
+  resolution: QNavigationResolution,
+  records: QNavigationRecords,
+): QNavigationResolution {
+  return resolution.kind === "TARGET"
+    ? { kind: "TARGET", target: ownPlace(resolution.target, records) }
+    : resolution;
+}
+
+/** A founder's own data room or deck as their company's tab (else as is). */
+export function ownPlace(
+  target: QNavigateTarget,
+  records: QNavigationRecords,
+): QNavigateTarget {
+  const own = records.own;
+  if (own?.kind !== "COMPANY" || own.id === undefined) return target;
+  const { page, ...rest } = target;
+  const tab =
+    page === "OWN_DATA_ROOM" ? "dataroom" : page === "OWN_DECK" ? "deck" : null;
+  if (tab === null) return target;
+  const parsed = QNavigateTargetSchema.safeParse({
+    ...rest,
+    page: "COMPANY",
+    recordId: own.id,
+    tab,
+  });
+  return parsed.success ? parsed.data : target;
+}
+
 export function resolveNavigationPlace(
   proposal: NavigationDecisionResult,
   input: QNavigationInput,
@@ -803,10 +877,13 @@ export function resolveNavigationPlace(
   const place = proposal.place;
   if (place === null) return { kind: "UNRESOLVED" };
   const ask = askOf(place);
-  return placeTarget(
-    place,
-    ask === null ? null : findListedRecord(ask, input.records),
-    map,
+  return asOwnRecord(
+    placeTarget(
+      place,
+      ask === null ? null : findListedRecord(ask, input.records),
+      map,
+    ),
+    input.records,
   );
 }
 
@@ -830,13 +907,13 @@ export async function resolveNavigationPlaceWith(
       return { kind: "UNRESOLVED" };
     }
   }
-  return placeTarget(place, found, map);
+  return asOwnRecord(placeTarget(place, found, map), input.records);
 }
 
 function backTo(input: QNavigationInput): QNavigationResolution {
   return input.pane.previous === null
     ? { kind: "NOTHING_BEFORE" }
-    : { kind: "TARGET", target: input.pane.previous };
+    : { kind: "TARGET", target: ownPlace(input.pane.previous, input.records) };
 }
 
 // --- 3. Policy -------------------------------------------------------------
@@ -893,8 +970,15 @@ export function applyNavigationPolicy(input: {
   readonly pane: QNavigationPane;
   readonly canOpen: (page: string) => boolean;
   readonly config: QNavigationPolicyConfig;
+  /** Their records: where the pane is, read as their own record's place. */
+  readonly records?: QNavigationRecords | undefined;
 }): QNavigationOutcome {
-  const { proposal, resolution, pane } = input;
+  const { proposal, resolution } = input;
+  const records = input.records;
+  const pane =
+    records === undefined || input.pane.at === null
+      ? input.pane
+      : { ...input.pane, at: ownPlace(input.pane.at, records) };
   if (proposal === null || proposal.decision === "STAY") return STAY(null);
   if (resolution === null || resolution.kind !== "TARGET") {
     return STAY(resolution?.kind ?? "UNRESOLVED");
@@ -905,7 +989,9 @@ export function applyNavigationPolicy(input: {
     return STAY("ALREADY_THERE");
   if (pane.pane === "COLLAPSED") {
     // Open the pane only for a page they asked to see; otherwise keep it.
-    return proposal.decision === "MOVE" && proposal.askedForPage
+    return proposal.decision === "MOVE" &&
+      proposal.askedForPage &&
+      proposal.sure !== false
       ? {
           decision: "MOVE",
           target,
@@ -924,6 +1010,8 @@ export function applyNavigationPolicy(input: {
   });
   if (pane.dirty) return offer("UNSAVED_WORK");
   if (pane.busy !== null) return offer("BUSY_PANE");
+  // Not sure which place they mean: offer it, never move to a guess.
+  if (proposal.sure === false) return offer("UNSURE");
   if (proposal.decision === "OFFER") return offer(null);
   if (!input.config.movesAllowed) return offer("BELOW_GATE");
   return {
@@ -962,6 +1050,7 @@ export async function decideNavigation(
     pane: input.pane,
     canOpen: dependencies.canOpen,
     config: dependencies.config,
+    records: input.records,
   });
 }
 
@@ -1030,7 +1119,8 @@ export function canOpenFor(
     const landing = qSiteMapLandingFor(map, page);
     if (landing === null || landing.page.redirectsTo !== undefined)
       return false;
-    const audience = landing.page.audience;
+    // The tab's own audience, else the page's (W2).
+    const audience = audienceOf(landing.page, landing.tab ?? undefined);
     if (audience !== "ANY" && audience !== side) return false;
     const destination = QNavigateDestinationSchema.safeParse(page);
     return (
