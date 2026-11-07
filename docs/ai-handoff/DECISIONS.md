@@ -306,3 +306,13 @@ Core Seven remains the governing assessment framework. The new directive authori
       - Onboarding cannot be completed without the required answers.
     - **Background research in parallel.** Once Q has the person's name, the company name and the website (normalised so it can be searched), it researches them online in parallel while the conversation continues. What it finds is presented for confirmation; it is never silently made authoritative. If nothing is found (not a public figure), carry on without it, and don't mention a failure.
     - **Testing.** Fictional accounts can't exercise real research. The research path is tested on fixtures, and a live probe needs a stated reason and a small size, because paid search providers are the founder's credits.
+78. **Owner answers to the open questions** (owner, 7 Nov 2026 ~13:15 UTC).
+    - **Navigation:** go ahead with the next round (self-consistency, a third sealed held-out set, ~$14 Anthropic). Q opening pages by itself was always the goal. When the round is done, switch it on so the owner can test it live: workspace labs with moves allowed for the owner and the fictional accounts first, then everyone after the owner has tried it.
+    - **Onboarding:**
+      - "I don't know" on a required question is recorded as unknown, and the person carries on.
+      - Numbers are read back for confirmation.
+      - The mandatory set is what the profile needs, plus what creating the mandate (investor) or matching (founder) needs; everything else is optional and kept for Q's context. List the set first for the owner, then enforce it.
+    - **Unicorn Potential:** keep the name; it is what users asked for. This records the owner's decision on the PADL #046 tension: the score is presented as "based on published research on startup outcomes", with one compact confidence line.
+    - **Investability:** show its parts (Business Quality and Readiness) separately, with plain names and one short sentence each, no jargon, under the headline number.
+    - **Q Pitch:** the demo should stay consistent with the product's own score rules, so the story card follows the same band cap.
+    - **SB_KEY:** the owner permits fetching the Supabase keys with the management token, for creating fictional test accounts only. Never printed or committed.
