@@ -613,7 +613,9 @@ if (STEPS.has("J6")) {
   // specific first: run 2 answered "Which currency are you raising in?"
   // with the raising line because /raising/ came before /currency/.
   const READ_BACK = [
-    /shall i keep|keep that|is that right|right\?|correct\?|confirm|look right|shall i save/i,
+    // Run 4: "right\?" matched "excluded outright?", so the exclusions
+    // were answered "Yes, that's right." three times. A whole word now.
+    /shall i keep|keep that|is that right|\bright\?|correct\?|confirm|look right|shall i save/i,
     "Yes, that's right.",
   ];
   // Run 3: the founder v9/v10 and investor v4/v5 required steps too, so J6
@@ -669,7 +671,36 @@ if (STEPS.has("J6")) {
           [/anything else|anything more|missed/i, "No, that's everything."],
         ]
       : [
+          // Run 4: one answer for every cheque question, all three figures,
+          // before the read-back: a proposal of other figures is corrected,
+          // never agreed to, and never answered one figure at a time (the
+          // range looped ten turns on mismatched single figures).
+          [
+            /cheque|ticket|minimum|typical|maximum|smallest|largest/i,
+            "Minimum $250,000, typical $500,000, maximum $1,000,000.",
+          ],
+          // Making the mandate live is a yes, not the discovery style.
+          [
+            /mandate live|make .* live|go live|activate/i,
+            "Yes, make it live.",
+          ],
           READ_BACK,
+          // The themed "what makes you lean in" question (batch 9) and a
+          // green-flags question name "anything else" and "revenue" too.
+          [
+            /lean in|green flag/i,
+            "Repeat founders and capital efficiency.",
+          ],
+          // Before "founder" and "look for": what else, and inbound, are
+          // their own questions (run 4: both got the founder answer).
+          [
+            /anything else|anything more|missed|haven.t covered/i,
+            "No, that's everything.",
+          ],
+          [
+            /inbound|reaching out|reach (you|out)|approach/i,
+            "Only well-matched founders.",
+          ],
           [/website|site\b|web address/i, "wadden.example"],
           [/which country|what country|based|headquarter/i, "The Netherlands."],
           [/your role|role there|title/i, "Partner."],
@@ -678,10 +709,6 @@ if (STEPS.has("J6")) {
             "We back early fintech and climate companies in West Africa.",
           ],
           [/currency/i, "US dollars."],
-          [/minimum|smallest/i, "$250,000."],
-          [/typical/i, "$500,000."],
-          [/maximum|largest/i, "$1,000,000."],
-          [/cheque|ticket|how much/i, "Between $250,000 and $1,000,000."],
           [/lead|co-?invest|follow/i, "We lead and co-invest."],
           [
             /how firm|must match|strong preference|nice to have/i,
@@ -689,23 +716,19 @@ if (STEPS.has("J6")) {
           ],
           [/where do you invest|geograph|region/i, "West Africa."],
           [
-            /rather not see|avoid|never (want|show)|exclude|exclusion/i,
+            /off the table|rather not see|avoid|never (want|show|be shown)|exclude|exclusion/i,
             "None.",
           ],
           [/sector|industr|product area/i, "Fintech and climate."],
           [
-            /business model|customer type|capital[- ]intens|regulat|revenue/i,
+            /company fits|business model|customer type|capital[- ]intens|regulat|revenue/i,
             "No preference.",
           ],
           [
-            /founder|founding team|green flag|signal|look for/i,
+            /lean in|founder|founding team|green flag|signal|look for/i,
             "Repeat founders and capital efficiency.",
           ],
           [/portfolio/i, "None yet."],
-          [
-            /inbound|approach|reach (you|out)/i,
-            "Founders can reach out directly.",
-          ],
           [/deploy/i, "Actively deploying."],
           [/stage/i, "Pre-seed and seed."],
           [/type of investor|what kind of investor|type/i, "A VC fund."],
