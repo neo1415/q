@@ -492,6 +492,7 @@ export const Q_SITE_MAP: QSiteMap = {
               title: "Closing",
             },
           ],
+          purpose: "headline figures, the story and the raise, by section",
         },
         {
           id: "diligence",
@@ -499,6 +500,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/[companyId]?tab=diligence",
           destinations: [],
           subs: [],
+          purpose: "questions, evidence and risks",
         },
         {
           id: "elevator",
@@ -506,6 +508,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/[companyId]?tab=elevator",
           destinations: [],
           subs: [],
+          purpose: "the short pitch",
         },
         {
           id: "dataroom",
@@ -513,6 +516,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/[companyId]?tab=dataroom",
           destinations: [],
           subs: [],
+          purpose: "the company's documents",
         },
         {
           id: "deck",
@@ -569,6 +573,7 @@ export const Q_SITE_MAP: QSiteMap = {
               title: "Team",
             },
           ],
+          purpose: "the deck and Q's reading of it, by section",
         },
         {
           id: "team",
@@ -576,6 +581,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/company/[companyId]?tab=team",
           destinations: [],
           subs: [],
+          purpose: "the founders and team",
         },
       ],
       sections: [
@@ -979,8 +985,9 @@ export const Q_SITE_MAP: QSiteMap = {
     },
     {
       route: "/explore",
-      title: "Explore",
-      purpose: "Search the network and browse pitches.",
+      title: "Explore the network",
+      purpose:
+        "Search Capital Q's own network of companies and browse pitches; not people on the public web.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY", "PITCH_VIDEO"],
@@ -2181,8 +2188,9 @@ export const Q_SITE_MAP: QSiteMap = {
     },
     {
       route: "/search",
-      title: "People search",
-      purpose: "Find people, organisations and agencies in public.",
+      title: "People search (public web)",
+      purpose:
+        "Find people, organisations and agencies on the public web; not Capital Q's own network.",
       audience: "ANY",
       params: [],
       shows: ["EXTERNAL_PERSON"],
@@ -2507,10 +2515,11 @@ export const Q_SITE_MAP: QSiteMap = {
         },
         {
           id: "team",
-          title: "Team",
+          title: "Q's team",
           href: "/work?view=team",
           destinations: ["WORK_TEAM"],
           subs: [],
+          purpose: "the specialists Q runs for your work; not your colleagues",
         },
         {
           id: "cost",

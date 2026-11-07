@@ -181,6 +181,7 @@ export function buildSiteMap(): QSiteMap {
         href: tab.href,
         destinations: destinations.get(`${route} ${tab.id}`) ?? [],
         subs: [...(tab.subs ?? [])],
+        ...(tab.purpose === undefined ? {} : { purpose: tab.purpose }),
         ...(audiences.tabs?.[tab.id] === undefined
           ? {}
           : { audience: audiences.tabs[tab.id] }),
