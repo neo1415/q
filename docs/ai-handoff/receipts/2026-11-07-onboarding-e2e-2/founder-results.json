@@ -1,0 +1,157 @@
+{
+  "email": "e2e-fou-202611071401-8mzn@fictional.capitalq.local",
+  "journey": "founder",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": true,
+      "detail": "1 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": true,
+      "detail": "F1.country, F1.stage, F1.categories, F4.founder_role, F4.founder_count, F4.full_time, F4.team_size"
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": "Thanks, Ada — I have Tamarind Ledger as a seed-stage fintech based in Lagos, with you as CEO, two full-time founders, and a nine-person team. Do you have a website you’d like to add, or would you pref"
+    },
+    {
+      "journey": "J2",
+      "name": "a ramble is said back for a yes",
+      "ok": true,
+      "detail": "The company: Tamarind Ledger helps small shops and market traders, mainly in Lagos and some in Ibadan, manage informal credit and collect payments digitally. The problem: Many traders still track cust"
+    },
+    {
+      "journey": "J2",
+      "name": "nothing saved before the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "saved after the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "Q after a clear typed answer",
+      "ok": null,
+      "detail": "That adds useful context on the scale of the repayment problem. Do you have a website for Tamarind Ledger, or would you prefer to skip it for now?"
+    },
+    {
+      "journey": "J2",
+      "name": "a clear typed answer is saved in their words, not read back",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": "Understood—we’ll skip the website. Earlier you mentioned a team of nine, but you’d now rather not give the team size; which should I use?"
+    },
+    {
+      "journey": "J3",
+      "name": "stored for F4.team_size",
+      "ok": null,
+      "detail": "{\"type\":\"RANGE\",\"value\":\"9\"}"
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": false,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. What early traction do you have: pilots, paying customers, a waitlist, signed partners?"
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Are you raising right now? "
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Are you raising right now?"
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": true,
+      "detail": "before:  saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Are you raising right now? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Are you raising right now?"
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "What do you already have? / What do you already have?"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": false,
+      "detail": "/onboarding/founder"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
