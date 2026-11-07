@@ -471,7 +471,10 @@ import {
   createReadCache,
   recalledText,
   situationHeader,
+  type QSituationOnScreen,
+  type QSituationOwnOrganisation,
   type QSituationPort,
+  type QSituationScreenIds,
 } from "@capital-q/model-gateway/q";
 import {
   budgetForTaskClass,
@@ -4962,19 +4965,91 @@ const arrivalSnapshots = createArrivalSnapshots({
 // model step is told. The role is the side of the organisation their actor
 // context's membership grants (the rehearsal's own viewer read), never
 // anything the client says; the name and zone are their own profile's.
-const situationOfActor: QSituationPort = async (actor) => {
+const situationOfActor: QSituationPort = async (actor, screen) => {
   if (actor.actorType !== "HUMAN") return null;
-  const [profile, viewer] = await Promise.all([
+  const [profile, viewer, own, onScreen] = await Promise.all([
     people.read(actor.userId).catch(() => null),
     rehearsalMaterial.viewer(actor).catch(() => null),
+    ownOrganisationOf(actor).catch(() => null),
+    onScreenOf(actor, screen ?? null).catch(() => null),
   ]);
   return {
     displayName: profile?.displayName ?? null,
     role: viewer?.role ?? null,
     organisation: viewer?.organisationName ?? null,
     timeZone: profile?.timeZone ?? null,
+    own,
+    onScreen,
   };
 };
+/**
+ * Owner live test 7 Nov (R3: "where is Zino Aviation located?" about their
+ * own firm went to company search): where their own organisation is based
+ * and its site, from their own record. A company through its canonical
+ * profile (theirs by membership); an investor organisation through the
+ * service's own read as them (investor.view on the exact resource).
+ */
+async function ownOrganisationOf(
+  actor: ActorContext,
+): Promise<QSituationOwnOrganisation | null> {
+  const companyId = await runtimeDependencies.ownCompany(actor);
+  if (companyId !== null) {
+    const company = await companies.findCanonicalCompanyProfile(
+      CompanyIdSchema.parse(companyId),
+    );
+    return company === null
+      ? null
+      : {
+          kind: "COMPANY",
+          city: company.headquartersCity,
+          country: company.headquartersCountry,
+          website: company.websiteUrl,
+        };
+  }
+  const firmId = await runtimeDependencies.ownInvestorOrganisation(actor);
+  if (firmId === null) return null;
+  const firm = await investorService.getInvestorOrganisation({
+    actor,
+    investorOrganisationId: InvestorOrganisationIdSchema.parse(firmId),
+  });
+  return {
+    kind: "INVESTOR_ORGANISATION",
+    city: null,
+    country: firm.hqCountry,
+    website: firm.websiteUrl,
+  };
+}
+/**
+ * Owner live test 7 Nov (R2): the record on their screen, by name. The ids
+ * may come straight from the client (the early reading runs before the
+ * firewall's plan), so they are input, never proof: the name is read only
+ * through the counterpart read rehearsals use, which answers null unless
+ * they have a relationship with it or may view it (subjectView, as them).
+ */
+async function onScreenOf(
+  actor: ActorContext,
+  screen: QSituationScreenIds | null,
+): Promise<QSituationOnScreen | null> {
+  if (screen?.companyId !== undefined) {
+    const seen = await rehearsalMaterial.counterpart(
+      actor,
+      "COMPANY",
+      screen.companyId,
+    );
+    return seen === null ? null : { kind: "COMPANY", name: seen.name };
+  }
+  if (screen?.investorOrganisationId !== undefined) {
+    const seen = await rehearsalMaterial.counterpart(
+      actor,
+      "INVESTOR_ORGANISATION",
+      screen.investorOrganisationId,
+    );
+    return seen === null
+      ? null
+      : { kind: "INVESTOR_ORGANISATION", name: seen.name };
+  }
+  return null;
+}
 const qIntelligence = composeQIntelligence({
   readCache: qReadCache,
   // Situation-first planning (S5, S6): the reader's planAsk starts the plan
@@ -7891,7 +7966,15 @@ const duplexBroker =
         situation: async (actor, screen) =>
           situationHeader({
             now: new Date(),
-            asker: await situationOfActor(actor).catch(() => null),
+            // R2: the record on screen, named only through a read as them.
+            asker: await situationOfActor(actor, {
+              ...(screen?.companyId === undefined
+                ? {}
+                : { companyId: screen.companyId }),
+              ...(screen?.investorOrganisationId === undefined
+                ? {}
+                : { investorOrganisationId: screen.investorOrganisationId }),
+            }).catch(() => null),
             deviceTimeZone: screen?.timeZone,
             surface: "VOICE",
             page: screen?.route ?? null,

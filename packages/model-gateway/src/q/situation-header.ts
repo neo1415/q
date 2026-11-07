@@ -20,11 +20,50 @@ export type QSituationAsker = {
   readonly organisation: string | null;
   /** Their saved IANA zone (profile); null when they never saved one. */
   readonly timeZone: string | null;
+  /**
+   * Owner live test 7 Nov (R3): their own organisation as their own
+   * record holds it -- where it is based and its site -- read as them.
+   * Absent: not read; each part null when not declared.
+   */
+  readonly own?: QSituationOwnOrganisation | null | undefined;
+  /**
+   * Owner live test 7 Nov (R2): the record on their screen now, by name
+   * -- one the firewall already resolved for them (the run's screen),
+   * never one the client named unchecked. Absent: nothing on screen.
+   */
+  readonly onScreen?: QSituationOnScreen | null | undefined;
+};
+
+export type QSituationOwnOrganisation = {
+  readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+  readonly city: string | null;
+  /** ISO 3166-1 alpha-2, as the record stores it. */
+  readonly country: string | null;
+  readonly website: string | null;
+};
+
+export type QSituationOnScreen = {
+  readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+  readonly name: string;
+};
+
+/**
+ * The record on screen, by id, as the firewall passed it on: what a
+ * situation port may name for them.
+ */
+export type QSituationScreenIds = {
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
 };
 
 export type QSituationSurface = QAskSurface | "VOICE";
 
-export const SITUATION_HEADER_MAX_CHARS = 600;
+/**
+ * One bounded line. 7 Nov: it grew from 600 to carry who they are, what is
+ * theirs, what is on their screen and how pointing words and Q's voice
+ * work -- the one source every reader and answer is told (R2, R3, R6).
+ */
+export const SITUATION_HEADER_MAX_CHARS = 1_500;
 
 const UTC_LIKE = /^(Etc\/)?(UTC|UCT|GMT|Universal|Zulu|Greenwich)$/i;
 
@@ -166,11 +205,83 @@ export function situationHeader(input: {
     when,
     `Tomorrow is ${dateIn(tomorrow, "UTC")}.`,
     `Asking: ${who}.`,
+    ...ownLine(organisation, input.asker?.own ?? null),
+    ...screenLine(input.asker?.onScreen ?? null),
+    referenceLine(name),
+    VOICE_LINE,
     `Surface: ${input.surface === null ? "unknown" : SURFACE_NAMES[input.surface]}.`,
     `Page: ${input.page === null ? "unknown" : PAGE_NAMES[input.page]}.`,
     "Use this date for today, tomorrow, ages and deadlines; never another.",
   ].join(" ");
   return header.slice(0, SITUATION_HEADER_MAX_CHARS);
+}
+
+/**
+ * R2: how pointing words resolve, said once for every reader and answer.
+ * First person is always the person (owner live 7 Nov: "i meant me" was
+ * taken as the company on screen); a pointing word follows the
+ * conversation, then the screen, and is never the person.
+ */
+function referenceLine(name: string | null): string {
+  const self = name === null ? "themselves" : `themselves (${name})`;
+  return [
+    `When they say me, my, I or myself they mean ${self}, never a company or the record on their screen.`,
+    "When they point with their, it, this or that (they, them, that one) they mean what the conversation is about; only when the conversation names nothing, what is on their screen; never themselves.",
+  ].join(" ");
+}
+
+/**
+ * R6: Q speaks to them, never about them (owner live 7 Nov: replies said
+ * "the user", "the person's screen", "the previous screen action").
+ * Notes and records Q is given are written about them; that is not how Q
+ * talks.
+ */
+const VOICE_LINE =
+  "Speak to them as you and of yourself as I; never call them the user or the person, and never narrate screen actions or records (the page was opened on screen): say what you did, I have opened it.";
+
+const KIND_WORDS: Readonly<Record<QSituationOwnOrganisation["kind"], string>> =
+  {
+    COMPANY: "a company",
+    INVESTOR_ORGANISATION: "an investor organisation",
+  };
+
+function countryName(code: string | null): string | null {
+  if (code === null || !/^[A-Z]{2}$/u.test(code)) return null;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** R3: their own organisation, as theirs, with where it is and its site. */
+function ownLine(
+  organisation: string | null,
+  own: QSituationOwnOrganisation | null,
+): readonly string[] {
+  if (organisation === null || own === null) return [];
+  const where = [plain(own.city, 80), countryName(own.country)].filter(
+    (part): part is string => part !== null,
+  );
+  const website = plain(own.website, 200);
+  const details = [
+    KIND_WORDS[own.kind],
+    ...(where.length === 0 ? [] : [`based in ${where.join(", ")}`]),
+    ...(website === null ? [] : [`website ${website}`]),
+  ].join("; ");
+  const theirs =
+    own.kind === "COMPANY" ? "my company, my startup" : "my firm, my fund";
+  return [
+    `Their own organisation: ${organisation} (${details}).`,
+    `When they say ${theirs}, we, us or our they mean ${organisation}: read it as their own record, never search for it as someone else's.`,
+  ];
+}
+
+/** R2: the record on their screen now, by name. */
+function screenLine(onScreen: QSituationOnScreen | null): readonly string[] {
+  const name = plain(onScreen?.name ?? null, 120);
+  if (onScreen === null || name === null) return [];
+  return [`On their screen now: ${name} (${KIND_WORDS[onScreen.kind]}).`];
 }
 
 /**
@@ -190,4 +301,6 @@ export function situationSurfaceOf(
  */
 export type QSituationPort = (
   actor: ActorContext,
+  /** The firewall-filtered screen's record, when the caller has one. */
+  screen?: QSituationScreenIds | null,
 ) => Promise<QSituationAsker | null>;

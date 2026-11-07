@@ -85,6 +85,7 @@ import {
   situationSurfaceOf,
   SITUATION_HEADER_MAX_CHARS,
   type QSituationPort,
+  type QSituationScreenIds,
 } from "./situation-header.js";
 import {
   createSentenceCutter,
@@ -612,7 +613,10 @@ export {
   situationSurfaceOf,
   SITUATION_HEADER_MAX_CHARS,
   type QSituationAsker,
+  type QSituationOnScreen,
+  type QSituationOwnOrganisation,
   type QSituationPort,
+  type QSituationScreenIds,
   type QSituationSurface,
 } from "./situation-header.js";
 export {
@@ -1460,7 +1464,7 @@ export function screenActsNote(facts: readonly string[]): ModelMessage | null {
   if (facts.length === 0) return null;
   return {
     role: "SYSTEM",
-    content: `WHAT YOUR RECENT SCREEN ACTS AND MOVES DID (receipts from their screen, oldest first): ${facts.slice(-8).join(" ")} Only an act or move marked DONE happened. If they ask, or the last one was NOT done, say so plainly in a few words and offer what would work (another control on this page, or opening the right page first); never say a NOT done act or move worked.`,
+    content: `WHAT YOUR RECENT SCREEN ACTS AND MOVES DID (receipts from their screen, oldest first): ${facts.slice(-8).join(" ")} Only an act or move marked DONE happened. If they ask, or the last one was NOT done, say so plainly in a few words and offer what would work (another control on this page, or opening the right page first); never say a NOT done act or move worked. These are records for you, never words to repeat: say it to them as you (I opened it for you), never the user, the person, on screen or the previous screen action.`,
   };
 }
 
@@ -1614,7 +1618,7 @@ export function screenSubjectNote(
   if (shown === null) return null;
   return {
     role: "SYSTEM",
-    content: `Your reply asked them who or what they mean. Their screen shows ${shown}: words that point (this, this one, them, this person, it) mean it. If your question was about who or what, do not ask it: act on that subject now with the tools (prepare the step for their approval when it acts), or say plainly why that step is not possible yet and what is. If your question was about something else (a time, an amount), keep it.`,
+    content: `Your reply asked them who or what they mean. Their screen shows ${shown}: words that point (this, this one, them, this person, it) mean it, unless the conversation names another; me, my, I and myself are always themselves. If your question was about who or what, do not ask it: act on that subject now with the tools (prepare the step for their approval when it acts), or say plainly why that step is not possible yet and what is. If your question was about something else (a time, an amount), keep it.`,
   };
 }
 
@@ -5927,7 +5931,11 @@ export function createModelGatewayQAnswer(
       const situationRead =
         dependencies.situationOf === undefined
           ? Promise.resolve(null)
-          : dependencies.situationOf(request.actor).catch(() => null);
+          : dependencies
+              // R2: the record on their screen, as the firewall passed
+              // it on (plan.screen), so the situation can name it.
+              .situationOf(request.actor, screenIdsOf(request.plan.screen))
+              .catch(() => null);
       const askerRead =
         dependencies.askerOf === undefined
           ? Promise.resolve(null)
@@ -12220,3 +12228,25 @@ export {
   type QPageMovePort,
   type QPageMoveTurn,
 } from "./navigation-decision.js";
+
+/**
+ * R2 (owner live 7 Nov): the record on their screen, by id, as the firewall
+ * passed it on -- what the situation port may name for them.
+ */
+function screenIdsOf(
+  screen:
+    | {
+        readonly companyId?: string | undefined;
+        readonly investorOrganisationId?: string | undefined;
+      }
+    | null
+    | undefined,
+): QSituationScreenIds | null {
+  if (screen === null || screen === undefined) return null;
+  return {
+    ...(screen.companyId === undefined ? {} : { companyId: screen.companyId }),
+    ...(screen.investorOrganisationId === undefined
+      ? {}
+      : { investorOrganisationId: screen.investorOrganisationId }),
+  };
+}

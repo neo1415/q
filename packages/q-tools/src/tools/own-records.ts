@@ -82,7 +82,7 @@ export const ReadMyRecordInputSchema = z
     record: z
       .enum(OWN_RECORD_KINDS)
       .describe(
-        "VERIFICATION_STATUS (what is verified), MARKETPLACE_READINESS (the requirements to appear in investor recommendations and feeds: the answer to why investors do not see their company or pitch in Discover; a visible pitch alone is not enough), COMPANY_NETWORK_PREVIEW (how investors on the network see their company), COMPANY_AUDIENCE_PREVIEW (what one audience sees: give audience), COMPANY_TEAM (their role, founder profile, team facts), RAISE_HISTORY (their raises, past and current), PROFILE_FINDINGS (what Q found about them in public), INVESTOR_ORGANISATION (their organisation's profile), INVESTOR_NETWORK_PREVIEW (how founders see it), INVESTOR_REPRESENTATIVE (their own role there), INVESTOR_MANDATES (their mandates).",
+        "VERIFICATION_STATUS (what is verified), MARKETPLACE_READINESS (the requirements to appear in investor recommendations and feeds: the answer to why investors do not see their company or pitch in Discover; a visible pitch alone is not enough), COMPANY_NETWORK_PREVIEW (how investors on the network see their company), COMPANY_AUDIENCE_PREVIEW (what one audience sees: give audience), COMPANY_TEAM (their role, founder profile, team facts), RAISE_HISTORY (their raises, past and current), PROFILE_FINDINGS (what Q found about them in public), INVESTOR_ORGANISATION (their own firm's profile: its name, where it is based, its website, how it describes itself; the answer to where is my firm, our HQ, our website), INVESTOR_NETWORK_PREVIEW (how founders see it), INVESTOR_REPRESENTATIVE (their own role there), INVESTOR_MANDATES (their mandates).",
       ),
     subject: z
       .enum(["COMPANY", "INVESTOR_ORGANISATION"])
@@ -175,7 +175,7 @@ export function createReadMyRecordTool(
     ],
     providerName: "read_my_record",
     description:
-      "Reads one of their own records exactly as its screen shows it: verification status, marketplace readiness, how the network or one audience sees their company, their team and role, their raise history, what Q found about them publicly, their investor organisation, how founders see it, their role there, or their mandates. NONE means there is nothing to show; never guess it.",
+      "Reads one of their own records exactly as its screen shows it: verification status, marketplace readiness, how the network or one audience sees their company, their team and role, their raise history, what Q found about them publicly, their own investor organisation (where it is based, its website: where is my firm, our HQ), how founders see it, their role there, or their mandates. NONE means there is nothing to show; never guess it.",
     requiredScopeKinds: ["COMPANY_PROFILE", "INVESTOR_PROFILE"],
     input: ReadMyRecordInputSchema,
     output: OwnRecordOutputSchema,

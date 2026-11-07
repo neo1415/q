@@ -671,12 +671,18 @@ export type QPrereadInput = {
    * Q intelligence step 1: the screen's route, device zone and surface,
    * for the early reading's situation header. Closed kinds and their own
    * clock only; no entity rides here.
+   * Owner live 7 Nov (R2): plus the record on screen by id, as the
+   * firewall passed it on (screenWithin), so the reader is told what is
+   * on their screen by name -- it resolved "their elevator" by recency
+   * alone, to a company no longer on screen.
    */
   readonly situationScreen?:
     | {
         readonly route: QScreenRoute;
         readonly timeZone?: string | undefined;
         readonly surface?: QAskSurface | undefined;
+        readonly companyId?: string | undefined;
+        readonly investorOrganisationId?: string | undefined;
       }
     | undefined;
 };

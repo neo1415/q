@@ -237,7 +237,7 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
  * Trusted guidance about reference, never a list the code matches.
  */
 export const POINTING_LINE =
-  "When they point instead of naming (this, this one, them, here, this person, this company, it), they mean what their screen shows: a company's person is its founder, an investor organisation's person is its team. Never ask which one they mean when the screen answers it. When they hand it over without saying what to do (handle this, take care of it), take the next step its state calls for (read the relationship when there is one) and prepare it for their approval; ask only when two different next steps are equally likely, naming both.";
+  "When they point instead of naming (this, this one, them, here, this person, this company, it), they mean what the conversation is about, and when it names nothing, what their screen shows: a company's person is its founder, an investor organisation's person is its team. Me, my, I and myself always mean themselves, never what is on their screen. Never ask which one they mean when the conversation or the screen answers it. When they hand it over without saying what to do (handle this, take care of it), take the next step its state calls for (read the relationship when there is one) and prepare it for their approval; ask only when two different next steps are equally likely, naming both.";
 
 /**
  * "Here" is the screen (founder live 2026-10-01: "summarize everything

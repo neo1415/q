@@ -428,7 +428,9 @@ describe("Q knows who it is talking to", () => {
     expect(facts).toContain("Requests waiting for them to answer: none.");
     expect(facts).toContain("Saved in Discover: Kora.");
     expect(facts).toContain(
-      "The company on their screen (the one they mean by",
+      // R2 (owner live 7 Nov): the screen answers "this company" only when
+      // the conversation names no other (the facts are JSON: no quotes here).
+      "when the conversation names no other; never what they mean by me or my",
     );
     expect(facts).toContain("Ajopot -- stage SEED; based in Lagos, NG.");
     expect(facts).toContain(
