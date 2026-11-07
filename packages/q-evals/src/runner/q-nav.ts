@@ -119,8 +119,10 @@ export function referenceQNavSubject(cases: readonly QNavCase[]): QNavSubject {
  */
 export function navigationPipelineSubject(
   name: string,
+  /** The proposer gets the turn and the pipeline's own model input. */
   propose: (
     input: QNavDecisionInput,
+    navigation: QNavigationInput,
   ) => Promise<NavigationDecisionResult | null>,
   config: QNavigationPolicyConfig = { movesAllowed: true },
 ): QNavSubject {
@@ -142,7 +144,7 @@ export function navigationPipelineSubject(
         records: input.records,
         siteMap: navigationSiteMap(input.side),
       };
-      const proposal = await propose(input);
+      const proposal = await propose(input, pipelineInput);
       const resolution =
         proposal === null || proposal.decision === "STAY"
           ? null

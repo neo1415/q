@@ -12,7 +12,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const NAMES = ["GEMINI_API_KEY", "GROQ_API_KEY", "TAVILY_API_KEY"];
+const NAMES = [
+  "GEMINI_API_KEY",
+  "GROQ_API_KEY",
+  "TAVILY_API_KEY",
+  "ANTHROPIC_API_KEY",
+];
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const envFile = resolve(root, ".env.local");
 const env = { ...process.env };

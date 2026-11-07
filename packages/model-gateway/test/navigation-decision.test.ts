@@ -11,12 +11,17 @@ import {
   applyNavigationPolicy,
   createQNavigationDecider,
   decideNavigation,
+  navigateTargetFromPath,
+  navigationPaneFromWorkspace,
   navigationSiteMap,
   resolveNavigationPlace,
+  resolveNavigationPlaceWith,
   sitePlaceToTarget,
   targetToSitePlace,
   type QNavigationInput,
   type QNavigationPane,
+  type QNavigationRecordAsk,
+  type QNavigationRecordFound,
 } from "../src/q/index.js";
 
 /**
@@ -272,6 +277,124 @@ describe("resolution: names to the ids they may open (W4.3)", () => {
   });
 });
 
+describe("resolution through the port (W2.3's resolve_page_target, called from code)", () => {
+  const port = (found: QNavigationRecordFound) => {
+    const asked: QNavigationRecordAsk[] = [];
+    return {
+      asked,
+      resolver: (ask: QNavigationRecordAsk) => {
+        asked.push(ask);
+        return Promise.resolve(found);
+      },
+    };
+  };
+
+  it("asks the port by name and route, never with an id, and maps what it found", async () => {
+    const { asked, resolver } = port({
+      status: "FOUND",
+      recordId: SILO,
+      documentId: CAP,
+    });
+    const got = await resolveNavigationPlaceWith(
+      proposal({
+        place: place({
+          record: company("silo"),
+          tab: "dataroom",
+          document: "the cap table",
+        }),
+      }),
+      input({
+        records: { companies: [], investors: [], things: [], deleted: [] },
+      }),
+      resolver,
+    );
+    expect(asked).toEqual([
+      {
+        kind: "COMPANY",
+        name: "silo",
+        document: "the cap table",
+        route: "/company/[companyId]",
+        tab: "dataroom",
+      },
+    ]);
+    expect(got).toEqual({
+      kind: "TARGET",
+      target: {
+        page: "COMPANY",
+        recordId: SILO,
+        tab: "dataroom",
+        documentId: CAP,
+      },
+    });
+  });
+
+  it("NONE, WHICH_ONE and a failed lookup are no move; DELETED says so; a place without a record needs no lookup", async () => {
+    const move = proposal({
+      place: place({ record: company("Silo"), tab: "deck" }),
+    });
+    for (const status of ["NONE", "WHICH_ONE"] as const)
+      expect(
+        await resolveNavigationPlaceWith(
+          move,
+          input(),
+          port({ status }).resolver,
+        ),
+      ).toEqual({ kind: "UNRESOLVED" });
+    expect(
+      await resolveNavigationPlaceWith(
+        move,
+        input(),
+        port({ status: "DELETED" }).resolver,
+      ),
+    ).toEqual({ kind: "DELETED" });
+    expect(
+      await resolveNavigationPlaceWith(move, input(), () =>
+        Promise.reject(new Error("down")),
+      ),
+    ).toEqual({ kind: "UNRESOLVED" });
+    const { asked, resolver } = port({ status: "NONE" });
+    expect(
+      await resolveNavigationPlaceWith(
+        proposal({ place: place({ route: "/work", tab: "needs" }) }),
+        input(),
+        resolver,
+      ),
+    ).toEqual({ kind: "TARGET", target: { page: "WORK_NEEDS" } });
+    expect(asked).toEqual([]);
+  });
+
+  it("decideNavigation uses the port when given, the listed records otherwise", async () => {
+    const decider = {
+      decide: () =>
+        Promise.resolve(
+          proposal({ place: place({ record: company("Nobody Listed") }) }),
+        ),
+    };
+    const deps = {
+      decider,
+      canOpen: () => true,
+      config: { movesAllowed: true },
+    };
+    const attribution = { tenantId: "t", userId: "u", correlationId: "c" };
+    expect((await decideNavigation(deps, input(), attribution)).decision).toBe(
+      "STAY",
+    );
+    const outcome = await decideNavigation(
+      {
+        ...deps,
+        resolver: port({ status: "FOUND", recordId: SILO, documentId: null })
+          .resolver,
+      },
+      input(),
+      attribution,
+    );
+    expect(outcome).toMatchObject({
+      decision: "MOVE",
+      target: { page: "COMPANY", recordId: SILO },
+    });
+  });
+});
+
 describe("the hard constraints, in code (W4.2)", () => {
   const target: QNavigateTarget = {
     page: "COMPANY",
@@ -481,5 +604,87 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
       route: "/relationships/company/[companyId]/messages",
       position: "latest",
     });
+  });
+});
+
+describe("the page pane's place from the screen (W1's screen.workspace paths)", () => {
+  const id = SILO;
+  it("reads W3's deep links back as targets", () => {
+    const cases: readonly (readonly [string, QNavigateTarget])[] = [
+      ["/home", { page: "HOME" }],
+      ["/work?view=needs", { page: "WORK_NEEDS" }],
+      ["/relationships?view=capital&tab=raise", { page: "CAPITAL_RAISE" }],
+      ["/relationships?view=capital", { page: "CAPITAL" }],
+      [
+        "/relationships?view=capital#section-commitments",
+        { page: "CAPITAL", sectionId: "commitments", position: "section" },
+      ],
+      [`/company/${id}`, { page: "COMPANY", recordId: id }],
+      [
+        `/company/${id}?tab=deck&slide=4&open=1`,
+        { page: "COMPANY", recordId: id, tab: "deck", slide: 4 },
+      ],
+      [
+        `/company/${id}?tab=dataroom&doc=${CAP}`,
+        { page: "COMPANY", recordId: id, tab: "dataroom", documentId: CAP },
+      ],
+      [
+        `/relationships/company/${id}/messages#latest`,
+        {
+          page: "RELATIONSHIP_COMPANY_MESSAGES",
+          recordId: id,
+          position: "latest",
+        },
+      ],
+      [`/board?item=${CARD}`, { page: "BOARD", itemId: CARD }],
+    ];
+    for (const [path, target] of cases)
+      expect(navigateTargetFromPath(path), path).toEqual(target);
+  });
+
+  it("a section the map does not list keeps the page; a path it does not have is null", () => {
+    expect(navigateTargetFromPath("/settings#section-nonsense")).toEqual({
+      page: "SETTINGS",
+    });
+    for (const path of [
+      "/nowhere",
+      "/company/not-an-id",
+      "https://evil.example/home",
+      "",
+    ])
+      expect(navigateTargetFromPath(path), path).toBeNull();
+  });
+
+  it("turns screen.workspace into the policy's pane: hints only, unknown is never 'already there'", () => {
+    expect(
+      navigationPaneFromWorkspace({
+        qPane: "open",
+        pagePane: "collapsed",
+        at: `/company/${id}?tab=team`,
+        previous: "/nowhere",
+        dirty: true,
+        busy: true,
+      }),
+    ).toEqual({
+      at: { page: "COMPANY", recordId: id, tab: "team" },
+      previous: null,
+      pane: "COLLAPSED",
+      dirty: true,
+      busy: "ACTIVE",
+    });
+    const unknown = navigationPaneFromWorkspace({
+      qPane: "open",
+      pagePane: "open",
+    });
+    expect(unknown).toMatchObject({ at: null, dirty: false, busy: null });
+    expect(
+      applyNavigationPolicy({
+        proposal: proposal({}),
+        resolution: { kind: "TARGET", target: { page: "HOME" } },
+        pane: unknown,
+        canOpen: () => true,
+        config: { movesAllowed: true },
+      }).decision,
+    ).toBe("MOVE");
   });
 });

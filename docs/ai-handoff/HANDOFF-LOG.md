@@ -1742,3 +1742,31 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - `screen.workspace` sends `at`/`previous` as paths; W4 needs path → QNavigateTarget, either from W3 or from site-map route matching.
   - resolve_page_target as the resolver port in decideNavigation.
   - Wiring in answer.ts waits on W3's schema SHA.
+
+## 2026-11-07 — W4 milestone 4: resolver port, screen.workspace reading, live q-nav suite (`feat/q-navigation-policy`)
+
+- **Resolver port (W4.3):** `decideNavigation` takes `resolver?: QNavigationRecordResolver`. The answer path will pass W2.3's resolve_page_target, called from code as the person and never offered to the model.
+  - The port is asked by kind, name, document, route and tab, never by id.
+  - NONE, WHICH_ONE or a failed lookup gives no move. DELETED says so.
+  - A place with no record needs no lookup.
+  - The eval and tests use `listedRecordResolver(records)`.
+  - New exports: `resolveNavigationPlaceWith` and `findListedRecord`.
+- **Pane from the screen:** `navigateTargetFromPath(path)` reads W3's deep links back through the site map (the inverse of `withNavigateTarget`): route params, `?tab`/`view`, doc, slide, item, message, `#section-<id>` and `#latest`.
+  - `navigationPaneFromWorkspace(screen.workspace)` gives the policy its pane state.
+  - An unknown path sets `at` to null, which is never "already there".
+  - busy:true becomes ACTIVE.
+- **Live suite:** `packages/q-evals/test/q-nav.live.test.ts` runs the real NAVIGATION_DECISION on the hosted NORMAL_DIALOGUE row (Claude Sonnet 5.5, $2/$0.20/$10 per M), through resolution and policy.
+  - Command: `CQ_LIVE_MODEL_TESTS=1 CQ_QNAV_SPLIT=dev|heldout [CQ_QNAV_LIMIT=n] [CQ_QNAV_REPORT=file] node scripts/live-model-tests.mjs packages/q-evals/test/q-nav.live.test.ts`.
+  - It is skipped otherwise. Held-out misses are reported by category only.
+  - `scripts/live-model-tests.mjs` now also reads ANTHROPIC_API_KEY by name.
+- **Size and cost:** a dev pass is 492 calls of about 20k characters (about 5.5k tokens) each. Estimated about $2.5 with the template and site map cached, up to about $7 uncached. Held-out (284 calls) is about 58% of that. This is against decision 62's $20 Anthropic test cap.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0;
+  - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4896 passed;
+  - the live suite skips when off;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+- **Open:**
+  - The answer.ts wiring waits on W3's screen.workspace schema SHA.
+  - resolve_page_target has no plain COMPANY/INVESTOR profile kind and no Board-item kind (W2.3 gap). The adapter will use it for threads, decks and documents, and the existing authorised `findRecordByName` for profiles.

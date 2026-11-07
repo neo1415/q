@@ -41,11 +41,13 @@ export type QNavigationSide = "INVESTOR" | "FOUNDER";
 
 /** Where the page pane is and what it is doing. */
 export type QNavigationPane = {
-  readonly at: QNavigateTarget;
+  /** Null: a page the site map cannot name (never "already there"). */
+  readonly at: QNavigateTarget | null;
   readonly previous: QNavigateTarget | null;
   readonly pane: "OPEN" | "COLLAPSED";
   readonly dirty: boolean;
-  readonly busy: "TYPING" | "SCROLLING" | null;
+  /** ACTIVE: recent input of a kind the screen did not say (W1). */
+  readonly busy: "TYPING" | "SCROLLING" | "ACTIVE" | null;
 };
 
 /** The records a person may open, by name (W2.3 resolves these). */
@@ -147,6 +149,148 @@ export function targetToSitePlace(
     route: landing.page.route,
     tab: landing.tab?.id ?? target.tab ?? null,
     ...common,
+  };
+}
+
+// --- The page pane's place, from the screen (W1/W3) -----------------------
+
+const PATH_BASE = "http://route.local";
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+/** A route template's segments against a path's: the params, or null. */
+function matchRoute(template: string, pathname: string): string[] | null {
+  const want = template.split("/").filter(Boolean);
+  const got = pathname.split("/").filter(Boolean);
+  if (want.length !== got.length) return null;
+  const params: string[] = [];
+  for (const [i, segment] of want.entries()) {
+    const actual = got[i] ?? "";
+    if (segment.startsWith("[") && segment.endsWith("]")) {
+      if (!UUID.test(actual)) return null;
+      params.push(actual.toLowerCase());
+    } else if (segment !== actual) return null;
+  }
+  return params;
+}
+
+/** How well a tab's href fits the URL: its query all present; null if not. */
+function tabFit(href: string, url: URL): number | null {
+  const tab = new URL(href, PATH_BASE);
+  let fit = 0;
+  for (const [key, value] of tab.searchParams) {
+    if (url.searchParams.get(key) !== value) return null;
+    fit += 1;
+  }
+  return fit;
+}
+
+const uuidParam = (url: URL, key: string): string | null => {
+  const value = url.searchParams.get(key);
+  return value !== null && UUID.test(value) ? value.toLowerCase() : null;
+};
+
+/**
+ * The inverse of W3's deep link (`withNavigateTarget`): a page pane path
+ * as the screen reports it (`/company/<id>?tab=deck&slide=4#section-team`)
+ * read back through the site map as a QNavigateTarget. Null for a path
+ * the map does not have; the policy then never thinks it is already there.
+ */
+export function navigateTargetFromPath(
+  path: string,
+  map: QSiteMap = Q_SITE_MAP,
+): QNavigateTarget | null {
+  let url: URL;
+  try {
+    url = new URL(path, PATH_BASE);
+  } catch {
+    return null;
+  }
+  if (url.origin !== PATH_BASE) return null;
+  const pathname = url.pathname.replace(/\/+$/u, "") || "/";
+  // The page whose route is the path; else a tab whose href's path is.
+  let best: {
+    page: QSiteMapPage;
+    tab: string | null;
+    params: string[];
+    fit: number;
+  } | null = null;
+  for (const page of map.pages) {
+    const pageParams = matchRoute(page.route, pathname);
+    for (const tab of page.tabs) {
+      const tabPath = new URL(tab.href, PATH_BASE).pathname;
+      const params = matchRoute(tabPath, pathname);
+      if (params === null) continue;
+      const fit = tabFit(tab.href, url);
+      if (fit === null) continue;
+      if (best === null || fit + 1 > best.fit)
+        best = { page, tab: tab.id, params, fit: fit + 1 };
+    }
+    if (pageParams !== null && (best === null || best.fit < 1))
+      best = { page, tab: null, params: pageParams, fit: 0.5 };
+  }
+  if (best === null) return null;
+  const hash = url.hash.replace(/^#/u, "");
+  const sectionId = hash.startsWith("section-")
+    ? hash.slice("section-".length)
+    : null;
+  const slideText = url.searchParams.get("slide");
+  const slide =
+    slideText !== null && /^[1-9]\d{0,2}$/u.test(slideText)
+      ? Number(slideText)
+      : null;
+  const [recordId = null] = best.params;
+  const place = (withSection: boolean) =>
+    sitePlaceToTarget(
+      {
+        route: best.page.route,
+        tab: best.tab,
+        sectionId: withSection ? sectionId : null,
+        slide,
+        position:
+          withSection && sectionId !== null
+            ? "section"
+            : hash === "latest"
+              ? "latest"
+              : null,
+      },
+      {
+        recordId,
+        documentId: uuidParam(url, "doc"),
+        itemId: uuidParam(url, "item"),
+      },
+      map,
+    );
+  // A section the map does not list still leaves the page known.
+  const target = place(true) ?? place(false);
+  if (target === null) return null;
+  const messageId = uuidParam(url, "message");
+  return messageId === null ? target : { ...target, messageId };
+}
+
+/** W3's screen.workspace as W1 sends it (present: the workspace is on). */
+export type QWorkspaceScreen = {
+  readonly qPane: "open" | "collapsed";
+  readonly pagePane: "open" | "collapsed";
+  readonly at?: string | undefined;
+  readonly previous?: string | undefined;
+  readonly dirty?: true | undefined;
+  readonly busy?: true | undefined;
+};
+
+/** The policy's pane state from the screen (hints; nothing here grants). */
+export function navigationPaneFromWorkspace(
+  screen: QWorkspaceScreen,
+  map: QSiteMap = Q_SITE_MAP,
+): QNavigationPane {
+  const read = (path: string | undefined) =>
+    path === undefined ? null : navigateTargetFromPath(path, map);
+  return {
+    at: read(screen.at),
+    previous: read(screen.previous),
+    pane: screen.pagePane === "open" ? "OPEN" : "COLLAPSED",
+    dirty: screen.dirty === true,
+    busy: screen.busy === true ? "ACTIVE" : null,
   };
 }
 
@@ -276,7 +420,7 @@ export function navigationVariables(
     recentTurns: JSON.stringify(input.recentTurns.slice(-6)).slice(0, 4_000),
     siteMap: input.siteMap.slice(0, 12_000),
     place: JSON.stringify({
-      at: placeOf(input.pane.at, input.records),
+      at: input.pane.at === null ? null : placeOf(input.pane.at, input.records),
       previous:
         input.pane.previous === null
           ? null
@@ -383,6 +527,123 @@ export type QNavigationResolution =
   | { readonly kind: "TARGET"; readonly target: QNavigateTarget }
   | { readonly kind: "UNRESOLVED" | "DELETED" | "NOTHING_BEFORE" };
 
+/** What the model named: a record (and maybe its document) on a page. */
+export type QNavigationRecordAsk = {
+  readonly kind: "COMPANY" | "INVESTOR" | "THING";
+  readonly name: string;
+  readonly document: string | null;
+  readonly route: string;
+  readonly tab: string | null;
+};
+
+/**
+ * The ids behind a name, among only what the person may open. NONE never
+ * says whether something exists out of reach; WHICH_ONE is two or more.
+ */
+export type QNavigationRecordFound =
+  | {
+      readonly status: "FOUND";
+      readonly recordId: string;
+      readonly documentId: string | null;
+    }
+  | { readonly status: "NONE" | "WHICH_ONE" | "DELETED" };
+
+/**
+ * W4.3's resolution port. In the answer path it is W2.3's
+ * resolve_page_target (site.target.resolve), called from code as the
+ * person, never offered to the model; the eval passes its records.
+ */
+export type QNavigationRecordResolver = (
+  ask: QNavigationRecordAsk,
+) => Promise<QNavigationRecordFound>;
+
+/** Resolution over a list of records the person may open (eval, tests). */
+export function findListedRecord(
+  ask: QNavigationRecordAsk,
+  records: QNavigationRecords,
+): QNavigationRecordFound {
+  if (byName(records.deleted, (d) => d.name, ask.name) !== null)
+    return { status: "DELETED" };
+  const company =
+    ask.kind === "COMPANY"
+      ? byName(records.companies, (c) => c.name, ask.name)
+      : null;
+  const found =
+    company ??
+    (ask.kind === "INVESTOR"
+      ? byName(records.investors, (i) => i.name, ask.name)
+      : ask.kind === "THING"
+        ? byName(records.things, (t) => t.title, ask.name)
+        : null);
+  if (found === null) return { status: "NONE" };
+  if (ask.document === null)
+    return { status: "FOUND", recordId: found.id, documentId: null };
+  const doc =
+    company === null
+      ? null
+      : byName(company.documents ?? [], (d) => d.title, ask.document);
+  return doc === null
+    ? { status: "NONE" }
+    : { status: "FOUND", recordId: found.id, documentId: doc.id };
+}
+
+export function listedRecordResolver(
+  records: QNavigationRecords,
+): QNavigationRecordResolver {
+  return (ask) => Promise.resolve(findListedRecord(ask, records));
+}
+
+function siteProposal(place: NonNullable<NavigationDecisionResult["place"]>) {
+  return {
+    route: place.route,
+    tab: place.tab,
+    sectionId: place.sectionId,
+    slide: place.slide,
+    position:
+      place.position === "section" || place.position === "latest"
+        ? place.position
+        : null,
+  } as const;
+}
+
+/** The place once its names are ids (or it named none). */
+function placeTarget(
+  place: NonNullable<NavigationDecisionResult["place"]>,
+  found: QNavigationRecordFound | null,
+  map: QSiteMap,
+): QNavigationResolution {
+  if (found !== null && found.status === "DELETED") return { kind: "DELETED" };
+  if (found !== null && found.status !== "FOUND") return { kind: "UNRESOLVED" };
+  // A document named without a record has nothing to belong to.
+  if (found === null && place.document !== null) return { kind: "UNRESOLVED" };
+  const onBoard = place.route === "/board" && place.record?.kind === "THING";
+  const id = found?.recordId ?? null;
+  const target = sitePlaceToTarget(
+    siteProposal(place),
+    {
+      recordId: onBoard ? null : id,
+      documentId: found?.documentId ?? null,
+      itemId: onBoard ? id : null,
+    },
+    map,
+  );
+  return target === null ? { kind: "UNRESOLVED" } : { kind: "TARGET", target };
+}
+
+function askOf(
+  place: NonNullable<NavigationDecisionResult["place"]>,
+): QNavigationRecordAsk | null {
+  return place.record === null
+    ? null
+    : {
+        kind: place.record.kind,
+        name: place.record.name,
+        document: place.document,
+        route: place.route,
+        tab: place.tab,
+      };
+}
+
 /**
  * The model's place, with every name turned into the id of a record the
  * person may open, mapped through the site map to W3.1's target. Never a
@@ -394,70 +655,44 @@ export function resolveNavigationPlace(
   input: QNavigationInput,
   map: QSiteMap = Q_SITE_MAP,
 ): QNavigationResolution {
-  if (proposal.back) {
-    return input.pane.previous === null
-      ? { kind: "NOTHING_BEFORE" }
-      : { kind: "TARGET", target: input.pane.previous };
-  }
+  if (proposal.back) return backTo(input);
   const place = proposal.place;
   if (place === null) return { kind: "UNRESOLVED" };
-  const record = place.record;
-  if (
-    record !== null &&
-    byName(input.records.deleted, (d) => d.name, record.name) !== null
-  ) {
-    return { kind: "DELETED" };
-  }
-  const company =
-    record?.kind === "COMPANY"
-      ? byName(input.records.companies, (c) => c.name, record.name)
-      : null;
-  const investor =
-    record?.kind === "INVESTOR"
-      ? byName(input.records.investors, (i) => i.name, record.name)
-      : null;
-  const thing =
-    record?.kind === "THING"
-      ? byName(input.records.things, (t) => t.title, record.name)
-      : null;
-  if (
-    record !== null &&
-    company === null &&
-    investor === null &&
-    thing === null
-  )
-    return { kind: "UNRESOLVED" };
-  let documentId: string | null = null;
-  if (place.document !== null) {
-    const doc =
-      company === null
-        ? null
-        : byName(company.documents ?? [], (d) => d.title, place.document);
-    if (doc === null) return { kind: "UNRESOLVED" };
-    documentId = doc.id;
-  }
-  const onBoard = place.route === "/board" && thing !== null;
-  const target = sitePlaceToTarget(
-    {
-      route: place.route,
-      tab: place.tab,
-      sectionId: place.sectionId,
-      slide: place.slide,
-      position:
-        place.position === "section" || place.position === "latest"
-          ? place.position
-          : null,
-    },
-    {
-      recordId: onBoard
-        ? null
-        : (company?.id ?? investor?.id ?? thing?.id ?? null),
-      documentId,
-      itemId: onBoard ? thing.id : null,
-    },
+  const ask = askOf(place);
+  return placeTarget(
+    place,
+    ask === null ? null : findListedRecord(ask, input.records),
     map,
   );
-  return target === null ? { kind: "UNRESOLVED" } : { kind: "TARGET", target };
+}
+
+/** The same, through a resolver port (resolve_page_target in the answer path). */
+export async function resolveNavigationPlaceWith(
+  proposal: NavigationDecisionResult,
+  input: QNavigationInput,
+  resolver: QNavigationRecordResolver,
+  map: QSiteMap = Q_SITE_MAP,
+): Promise<QNavigationResolution> {
+  if (proposal.back) return backTo(input);
+  const place = proposal.place;
+  if (place === null) return { kind: "UNRESOLVED" };
+  const ask = askOf(place);
+  let found: QNavigationRecordFound | null = null;
+  if (ask !== null) {
+    try {
+      found = await resolver(ask);
+    } catch {
+      // A failed lookup costs the move, never the answer.
+      return { kind: "UNRESOLVED" };
+    }
+  }
+  return placeTarget(place, found, map);
+}
+
+function backTo(input: QNavigationInput): QNavigationResolution {
+  return input.pane.previous === null
+    ? { kind: "NOTHING_BEFORE" }
+    : { kind: "TARGET", target: input.pane.previous };
 }
 
 // --- 3. Policy -------------------------------------------------------------
@@ -522,7 +757,8 @@ export function applyNavigationPolicy(input: {
   }
   const target = resolution.target;
   if (!input.canOpen(target.page)) return STAY("NO_ACCESS");
-  if (samePlace(target, pane.at)) return STAY("ALREADY_THERE");
+  if (pane.at !== null && samePlace(target, pane.at))
+    return STAY("ALREADY_THERE");
   if (pane.pane === "COLLAPSED") {
     // Open the pane only for a page they asked to see; otherwise keep it.
     return proposal.decision === "MOVE" && proposal.askedForPage
@@ -561,6 +797,8 @@ export async function decideNavigation(
     readonly decider: QNavigationDecider;
     readonly canOpen: (page: string) => boolean;
     readonly config: QNavigationPolicyConfig;
+    /** W2.3's resolve_page_target in the answer path; else `input.records`. */
+    readonly resolver?: QNavigationRecordResolver | undefined;
   },
   input: QNavigationInput,
   attribution: Parameters<QNavigationDecider["decide"]>[1],
@@ -569,7 +807,11 @@ export async function decideNavigation(
   const resolution =
     proposal === null || proposal.decision === "STAY"
       ? null
-      : resolveNavigationPlace(proposal, input);
+      : await resolveNavigationPlaceWith(
+          proposal,
+          input,
+          dependencies.resolver ?? listedRecordResolver(input.records),
+        );
   return applyNavigationPolicy({
     proposal,
     resolution,
