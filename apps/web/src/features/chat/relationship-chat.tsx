@@ -18,6 +18,7 @@ import { Send, FileText, ICON_SIZE, Play, Upload } from "@capital-q/ui/icons";
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { QCircle, TILE } from "@/features/relationships/record-parts";
 import { QAperture } from "@/features/q-aperture";
+import { QSection } from "@/features/q/q-section";
 import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
@@ -696,141 +697,147 @@ export function RelationshipChat({
       ) : null}
 
       {status === "OPEN" ? (
-        <form
-          ref={composer}
-          onSubmit={(event) => void submit(event)}
-          className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-canvas) px-3 pt-2.5 pb-1"
-        >
-          {documents === null ? null : documents.length === 0 ? (
-            <p className="cq-body-sm px-2 text-(--cq-text-secondary)">
-              {t("No documents yet.")}
-            </p>
-          ) : (
-            <ul
-              className="flex max-h-48 flex-col gap-1 overflow-y-auto"
-              aria-label={t("Your documents")}
-            >
-              {documents.map((document) => (
-                <li key={document.id}>
-                  <Button
-                    type="button"
-                    variant="quiet"
-                    className="w-full justify-start"
-                    disabled={!document.ready || busy}
-                    onClick={() => void share(document.id)}
-                  >
-                    <FileText size={ICON_SIZE.regular} aria-hidden="true" />
-                    <span className="truncate">{document.name}</span>
-                    {document.ready ? null : (
-                      <span className="cq-caption text-(--cq-text-tertiary)">
-                        {t("Still being checked")}
-                      </span>
-                    )}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div
-            className="flex gap-2 overflow-x-auto [scrollbar-width:none]"
-            role="group"
-            aria-label={t("Attach")}
+        // Q Workspace W2: the reply composer, where Q's prepared draft sits
+        // until the person sends it; a section Q can name.
+        <QSection id="draft" kind="CHAT" label={t("Reply")}>
+          <form
+            ref={composer}
+            onSubmit={(event) => void submit(event)}
+            className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-canvas) px-3 pt-2.5 pb-1"
           >
-            <button
-              type="button"
-              disabled={busy || drafting}
-              onClick={() => void draftWithQ()}
-              className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary) disabled:opacity-60"
-              data-draft-reply
+            {documents === null ? null : documents.length === 0 ? (
+              <p className="cq-body-sm px-2 text-(--cq-text-secondary)">
+                {t("No documents yet.")}
+              </p>
+            ) : (
+              <ul
+                className="flex max-h-48 flex-col gap-1 overflow-y-auto"
+                aria-label={t("Your documents")}
+              >
+                {documents.map((document) => (
+                  <li key={document.id}>
+                    <Button
+                      type="button"
+                      variant="quiet"
+                      className="w-full justify-start"
+                      disabled={!document.ready || busy}
+                      onClick={() => void share(document.id)}
+                    >
+                      <FileText size={ICON_SIZE.regular} aria-hidden="true" />
+                      <span className="truncate">{document.name}</span>
+                      {document.ready ? null : (
+                        <span className="cq-caption text-(--cq-text-tertiary)">
+                          {t("Still being checked")}
+                        </span>
+                      )}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div
+              className="flex gap-2 overflow-x-auto [scrollbar-width:none]"
+              role="group"
+              aria-label={t("Attach")}
             >
-              <QCircle />
-              {drafting ? t("Q is drafting…") : t("Draft a reply")}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void openDocuments()}
-              aria-expanded={documents !== null}
-              className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
-            >
-              <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-              {t("Attach a shared document")}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileInput.current?.click()}
-              className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
-            >
-              <Upload size={ICON_SIZE.compact} aria-hidden="true" />
-              {t("Upload a file")}
-            </button>
-          </div>
-          {qDrafted && hasDraft ? (
-            <span
-              className="cq-caption cq-swap flex items-center gap-1.5 text-(--cq-accent)"
-              data-q-draft-note
-            >
-              <QCircle className="size-4 text-[9px]" />
-              {t("Draft by Q from your conversation. Edit it before sending.")}
-            </span>
-          ) : null}
-          <div className="flex items-end gap-2 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) py-1.5 ps-3.5 pe-1.5 transition-[border-color,box-shadow] duration-(--cq-motion-fast) focus-within:border-(--cq-text-secondary) focus-within:shadow-[0_0_0_3px_var(--cq-accent-soft)]">
-            <label htmlFor="chat-draft" className="sr-only">
-              Message {counterpart}
-            </label>
-            <textarea
-              ref={draftField}
-              id="chat-draft"
-              value={draft}
-              maxLength={4000}
-              rows={1}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                if (event.target.value.trim() === "") setQDrafted(false);
-              }}
-              onKeyDown={onKeyDown}
-              placeholder={t(`Write to ${counterpart}`)}
-              className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none bg-transparent py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-none"
-            />
-            {hasDraft ? null : (
-              <VoiceRecorder
-                compact
+              <button
+                type="button"
+                disabled={busy || drafting}
+                onClick={() => void draftWithQ()}
+                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary) disabled:opacity-60"
+                data-draft-reply
+              >
+                <QCircle />
+                {drafting ? t("Q is drafting…") : t("Draft a reply")}
+              </button>
+              <button
+                type="button"
                 disabled={busy}
-                onRecorded={(file, durationMs) =>
-                  void sendVoiceNote(file, durationMs)
-                }
-                onError={setNotice}
+                onClick={() => void openDocuments()}
+                aria-expanded={documents !== null}
+                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
+              >
+                <FileText size={ICON_SIZE.compact} aria-hidden="true" />
+                {t("Attach a shared document")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileInput.current?.click()}
+                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
+              >
+                <Upload size={ICON_SIZE.compact} aria-hidden="true" />
+                {t("Upload a file")}
+              </button>
+            </div>
+            {qDrafted && hasDraft ? (
+              <span
+                className="cq-caption cq-swap flex items-center gap-1.5 text-(--cq-accent)"
+                data-q-draft-note
+              >
+                <QCircle className="size-4 text-[9px]" />
+                {t(
+                  "Draft by Q from your conversation. Edit it before sending.",
+                )}
+              </span>
+            ) : null}
+            <div className="flex items-end gap-2 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) py-1.5 ps-3.5 pe-1.5 transition-[border-color,box-shadow] duration-(--cq-motion-fast) focus-within:border-(--cq-text-secondary) focus-within:shadow-[0_0_0_3px_var(--cq-accent-soft)]">
+              <label htmlFor="chat-draft" className="sr-only">
+                Message {counterpart}
+              </label>
+              <textarea
+                ref={draftField}
+                id="chat-draft"
+                value={draft}
+                maxLength={4000}
+                rows={1}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  if (event.target.value.trim() === "") setQDrafted(false);
+                }}
+                onKeyDown={onKeyDown}
+                placeholder={t(`Write to ${counterpart}`)}
+                className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none bg-transparent py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-none"
               />
-            )}
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={busy || !hasDraft}
-              aria-label={t("Send")}
-            >
-              <Send size={ICON_SIZE.compact} aria-hidden="true" />
-              {t("Send")}
-            </Button>
-            <input
-              ref={fileInput}
-              type="file"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              accept=".pdf,.pptx,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file !== undefined) void upload(file);
-              }}
-            />
-          </div>
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            {t(
-              "Both sides see this conversation. Private notes stay on the Overview.",
-            )}
-          </span>
-        </form>
+              {hasDraft ? null : (
+                <VoiceRecorder
+                  compact
+                  disabled={busy}
+                  onRecorded={(file, durationMs) =>
+                    void sendVoiceNote(file, durationMs)
+                  }
+                  onError={setNotice}
+                />
+              )}
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={busy || !hasDraft}
+                aria-label={t("Send")}
+              >
+                <Send size={ICON_SIZE.compact} aria-hidden="true" />
+                {t("Send")}
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                accept=".pdf,.pptx,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file !== undefined) void upload(file);
+                }}
+              />
+            </div>
+            <span className="cq-caption text-(--cq-text-tertiary)">
+              {t(
+                "Both sides see this conversation. Private notes stay on the Overview.",
+              )}
+            </span>
+          </form>
+        </QSection>
       ) : null}
     </section>
   );
