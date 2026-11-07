@@ -8,6 +8,7 @@ import {
 } from "../src/features/workspace/layout-store";
 import {
   BUSY_WINDOW_MS,
+  fitPath,
   notePageActivity,
   notePageMove,
   resetWorkspaceScreenForTests,
@@ -91,5 +92,27 @@ describe("screen.workspace", () => {
     pane.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }));
     expect(workspaceScreen(Date.now())?.busy).toBeUndefined();
     pane.remove();
+  });
+
+  it("keeps paths within the contract's limit, never voiding the request", () => {
+    expect(fitPath("/capital?round=r1")).toBe("/capital?round=r1");
+    const longQuery = `/discover?${"q=x&".repeat(200)}`;
+    expect(fitPath(longQuery)).toBe("/discover");
+    expect(fitPath(`/${"a".repeat(600)}`)).toBeUndefined();
+    expect(fitPath(undefined)).toBeUndefined();
+  });
+
+  it("rides on currentScreen only while the shell is on, valid to the contract", async () => {
+    const { currentScreen } = await import("../src/features/q/screen");
+    const { QScreenContextSchema } = await import("@capital-q/contracts");
+    expect(currentScreen("/capital").workspace).toBeUndefined();
+    mountShell();
+    const screen = currentScreen("/capital");
+    expect(screen.workspace).toMatchObject({
+      qPane: "open",
+      pagePane: "open",
+      at: "/capital?round=r1",
+    });
+    expect(QScreenContextSchema.safeParse(screen).success).toBe(true);
   });
 });

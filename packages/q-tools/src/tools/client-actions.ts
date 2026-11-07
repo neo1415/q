@@ -312,11 +312,19 @@ export const SetLayoutInputSchema = z
 export type SetLayoutInput = z.infer<typeof SetLayoutInputSchema>;
 
 /**
- * Whether this run's screen is the Q Workspace. Supplied by the
- * composition (q-api) per run; absent means no: a client without the
- * workspace must never be sent LAYOUT_SET (it drops unknown frames whole).
+ * Whether this run's screen is the Q Workspace. By default, whether the
+ * run's screen carries `workspace`: a client without the workspace must
+ * never be sent LAYOUT_SET (it drops unknown frames whole).
  */
 export type WorkspaceReader = (execution: QToolExecutionContext) => boolean;
+
+/**
+ * The default: this run's screen says it is the Q Workspace (the web sets
+ * screen.workspace only while the shell is on in that tab). A hint that
+ * only gates a layout change, which touches nobody's data.
+ */
+const onWorkspaceScreen: WorkspaceReader = (execution) =>
+  execution.plan.screen?.workspace !== undefined;
 
 export function createSetLayoutTool(
   options: { readonly workspaceFor?: WorkspaceReader | undefined } = {},
@@ -344,7 +352,7 @@ export function createSetLayoutTool(
     authorize: (input, execution) =>
       Promise.resolve(
         ownConversation(execution.actor, execution.plan) &&
-          options.workspaceFor?.(execution) === true
+          (options.workspaceFor ?? onWorkspaceScreen)(execution)
           ? allowed({
               kind: "LAYOUT_SET",
               ...(input.qPane === undefined ? {} : { qPane: input.qPane }),

@@ -6,6 +6,7 @@ import type {
 
 import { currentManifest } from "./manifest";
 import { viewingOf, type QMomentSource } from "./q-moment";
+import { workspaceScreen } from "@/features/workspace/workspace-screen";
 
 /**
  * What is on screen as the person asks Q (R21): the route mapped onto the
@@ -281,6 +282,10 @@ export function currentScreen(
   if (zone !== undefined) screen = { ...screen, timeZone: zone };
   // Q intelligence step 1: which of Q's surfaces they asked from.
   screen = { ...screen, surface: qPageView ?? "DOCK" };
+  // Q Workspace (W1/W3): the panes and the page side, only while the
+  // workspace shell is on in this tab. A hint for Q's moves, never authority.
+  const workspace = workspaceScreen();
+  if (workspace !== undefined) screen = { ...screen, workspace };
   // What Q's viewers show are documents Q made for them (artifacts): they
   // ride as artifactId, read on the server through read_my_document.
   const open = openDocumentId ?? viewerDocumentId;
