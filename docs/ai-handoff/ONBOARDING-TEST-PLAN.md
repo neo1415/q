@@ -290,8 +290,8 @@ Short names used below:
 
 - **Founder v9** (migration `20261231440000`):
   - Now required: F1.website, F1.country, F1.description and F1.categories. On their own paths: F5.pilots, F5.customers, F5.growth, F6.instrument, F6.timeframe and F6.use_of_funds.
-  - Now optional: F0.intent.
-  - Unchanged: the deck (F2.materials) stays optional. The founder's role is the founder information asked for. The team counts stay required, as before.
+  - Now optional: F0.intent, and the team counts F4.founder_count, F4.full_time and F4.team_size (owner: the founder's role is enough; `/profile` renders no team-count rows).
+  - Unchanged: the deck (F2.materials) stays optional; the founder's role stays required.
 - **Investor v4** (migration `20261231450000`):
   - New, required: I0.hq_country (one geography country, after the role). It writes `core.investor_organisations.hq_country`.
   - Now required: I0.website, I0.business_title, I2.cheque_min, I2.cheque_typical, I2.cheque_max, I2.investment_role, I3.geography and I3.sectors.
