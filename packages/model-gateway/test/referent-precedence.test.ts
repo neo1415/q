@@ -115,23 +115,20 @@ describe("a screen act's result says how to tell them (#8)", () => {
   it("SCREEN_WILL_DO_IT carries tellThem; other results are unchanged", async () => {
     const { toolResultMessage } = await import("../src/q/index.js");
     const call = { callId: "c1", name: "operate_screen", arguments: {} };
-    const acted = toolResultMessage(
-      call as never,
-      {
-        result: {
-          ok: true,
-          data: {
-            status: "SCREEN_WILL_DO_IT",
-            clientAction: {
-              kind: "UI_ACT",
-              actId: "uia_send000001",
-              act: "ACTIVATE",
-              target: "button.send-questions",
-            },
+    const acted = toolResultMessage(call, {
+      result: {
+        ok: true,
+        data: {
+          status: "SCREEN_WILL_DO_IT",
+          clientAction: {
+            kind: "UI_ACT",
+            actId: "uia_send000001",
+            act: "ACTIVATE",
+            target: "button.send-questions",
           },
         },
-      } as never,
-    );
+      },
+    } as never);
     const body = JSON.parse(acted.content) as { tellThem?: string };
     expect(body.tellThem).toMatch(
       /Tell them in the first person, to them, what you did: I've prepared it for your approval/u,
@@ -140,7 +137,7 @@ describe("a screen act's result says how to tell them (#8)", () => {
       /never describe the step \(activated, the page action, on screen\)/u,
     );
     const read = toolResultMessage(
-      { callId: "c2", name: "read_my", arguments: {} } as never,
+      { callId: "c2", name: "read_my", arguments: {} },
       { result: { ok: true, data: { kind: "media", items: [] } } } as never,
     );
     expect(JSON.parse(read.content)).toEqual({

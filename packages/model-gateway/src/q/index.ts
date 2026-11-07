@@ -2077,7 +2077,7 @@ export const REMEMBER_FIRST_NOTE =
  * and is never a reason to contact (Product Specification §6.7.12-14).
  */
 export const VIEWING_NOT_DISCLOSED_NOTE =
-  "WHO VIEWED THEM: asked who viewed or played their profile, pitch or deck, read it with read_my with kind engagement before answering, never what they themselves viewed. It shows viewers at the level each viewer chose (a founder may see some only as an investor, an investor sees founder organisations by week, never by name); say what it shows and never say Capital Q does not show viewers. Viewing is not interest and never a reason to contact anyone: give their intent signals (expressed interest, requests to connect) from list_incoming_interest or list_my_relationships beside it, counted, never estimated.";
+  "WHO VIEWED THEM: read it with read_my with kind engagement (never what they viewed); it shows viewers at the level each viewer chose; never say Capital Q does not show viewers. Viewing is not interest and never a reason to contact anyone: add their intent signals (interest, requests to connect) from list_incoming_interest or list_my_relationships, counted.";
 
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, research, investigation, screen change or record change can be started on this turn, and no public search is run. If they asked for any of those, say plainly that you could not read the request just now and offer to start it: asking again in a moment should work. Never write a requested document's or report's content into the chat instead, never present an answer from what you hold as the research they asked for, and never say it is done.";
