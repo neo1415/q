@@ -22,6 +22,7 @@ import {
   FIT_CONFIG_V4,
   FIT_CONFIG_V6,
   FIT_CONFIG_V7,
+  FIT_CONFIG_V8,
   FIT_CONFIGS,
   FitConfigSchema,
   fitConfigByVersion,
@@ -123,7 +124,8 @@ describe("fit config ranking-config.v4", () => {
     expect(FIT_CONFIG_V4.extends).toBe("ranking-config.v3");
     // v6 (owner 23 Oct 2026): v4's weights and rules, fit-reasons.v2.
     // v7 (owner 23 Oct 2026): v6's rules, fit-reasons.v3.
-    expect(FIT_CONFIG_CURRENT).toBe(FIT_CONFIG_V7);
+    // v8 (metrics methods 2026-11-07): research-based weights, one score.
+    expect(FIT_CONFIG_CURRENT).toBe(FIT_CONFIG_V8);
     expect(fitConfigByVersion("ranking-config.v7")).toBe(FIT_CONFIG_V7);
     expect(FIT_CONFIG_V7.parameters).toEqual(FIT_CONFIG_V6.parameters);
     expect(FIT_CONFIG_V7.reasonTemplatesVersion).toBe("fit-reasons.v3");
@@ -1337,3 +1339,57 @@ function snapshotWith(
 
 const PINNED_V4_DIGEST =
   "d248597c4bf8195b241d66c813c9b923889333bd0411a7226812db94dc684b83";
+
+describe("fit config ranking-config.v8 (metrics methods)", () => {
+  const score = (pattern: string) =>
+    fitScoreOutOf10(assessFit(row(pattern), FIT_CONFIG_V8, AT).profile);
+
+  it("is valid, frozen, research weights summing to one, v7 unedited", () => {
+    expect(FitConfigSchema.parse(FIT_CONFIG_V8)).toEqual(FIT_CONFIG_V8);
+    expect(Object.isFrozen(FIT_CONFIG_V8)).toBe(true);
+    const w = Object.fromEntries(
+      FIT_CONFIG_V8.parameters.map((p) => [p.parameter, p.weight]),
+    );
+    expect(w).toEqual({
+      STAGE: 0.18,
+      SECTOR: 0.2,
+      GEOGRAPHY: 0.12,
+      CHEQUE_SIZE: 0.14,
+      BUSINESS_MODEL: 0.07,
+      TRACTION: 0.09,
+      TEAM: 0.07,
+      THESIS: 0.08,
+      ROUND_TERMS: 0.05,
+    });
+    expect(fitConfigByVersion("ranking-config.v8")).toBe(FIT_CONFIG_V8);
+    expect(FIT_CONFIG_V7.score).toBeUndefined();
+  });
+
+  it("the score out of 10 is the weighted value of the known parameters (P1-4)", () => {
+    // Stage S, sector P, geography M, cheque S; the rest unknown:
+    // (0.18·1 + 0.20·0.5 + 0.12·0 + 0.14·1) / 0.64 = 0.656 → 6.6.
+    expect(score("SPMSUUUUU")).toBe("6.6");
+    // The legacy unweighted 10/4/0 mean would say (10+4+0+10)/4 = 6.
+    const legacy = assessFit(row("SPMSUUUUU"), FIT_CONFIG_V7, AT).profile;
+    expect(legacy.scoreOutOf10).toBeUndefined();
+  });
+
+  it("shows no number from too little: fewer than 3 known, or under half the weight", () => {
+    expect(score("SSUUUUUUU")).toBeNull();
+    // Three soft parameters known, no mandate constraint: no number.
+    expect(score("UUUUSSSUU")).toBeNull();
+  });
+
+  it("needs two of stage, sector, geography and cheque known", () => {
+    // Sector + 4 soft parameters: coverage 0.51, only one constraint known.
+    expect(score("USUUSSSSU")).toBeNull();
+    expect(score("SSUUSSSSU")).toBe("10");
+  });
+
+  it("unknown is never zero: a mismatch lowers the score, an unknown does not", () => {
+    const withUnknown = Number(score("SSSSUUUUU"));
+    const withMismatch = Number(score("SSSSMUUUU"));
+    expect(withUnknown).toBe(10);
+    expect(withMismatch).toBeLessThan(withUnknown);
+  });
+});

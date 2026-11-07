@@ -112,6 +112,24 @@ export const FitConfigSchema = z
       })
       .strict(),
     reasonTemplatesVersion: z.string().regex(/^fit-reasons\.v[0-9]+$/),
+    /**
+     * ranking-config.v8 (metrics methods 2026-11-07): the number shown out
+     * of 10 is the weighted value of the known parameters (the same weights
+     * as the band), shown only when enough is known. Absent (v4-v7): the
+     * legacy unweighted 10/4/0 mean of three or more known parameters.
+     */
+    score: z
+      .object({
+        method: z.literal("WEIGHTED_KNOWN_VALUE"),
+        minKnown: z.number().int().min(1),
+        /** Known weight over applicable weight. */
+        minCoverage: z.number().min(0).max(1),
+        /** Mandate constraints, of which at least `minConstraintsKnown`. */
+        constraints: z.array(FitParameterSchema).min(1),
+        minConstraintsKnown: z.number().int().min(0),
+      })
+      .strict()
+      .optional(),
     tieBreak: z.literal("VALUE_DESC_THEN_CONFIDENCE_DESC_THEN_COMPANY_ID_ASC"),
     precision: z.number().int().min(6).max(15),
     description: z.string().min(1).max(800),
@@ -233,14 +251,64 @@ export const FIT_CONFIG_V7: FitConfig = deepFreeze(
   }),
 );
 
+/**
+ * Fit profile `ranking-config.v8` (metrics methods 2026-11-07, owner
+ * decision 76): research-based weights and one weighted score.
+ *
+ *   score out of 10 = 10 × Σ_known w_k·v_k / Σ_known w_k
+ *   coverage        = Σ_known w_k / Σ_applicable w_k
+ *   shown only when ≥ 3 parameters are known, coverage ≥ 0.5 and at least
+ *   two of stage, sector, geography and cheque size are known.
+ *
+ * Outcome values stay STRONG 1, PARTIAL 0.5, MISMATCH 0: a near miss is
+ * about half a match (VCs invest at 10 miles at twice the rate of 100
+ * miles, Sorenson & Stuart 2001; adjacent-stage deals are the commonest
+ * drift, Cumming, Schwienbacher & Zhang 2024). Weights (JUDGMENT, sized
+ * from Gompers, Gornall, Kaplan & Strebulaev 2020; Sorenson & Stuart 2001;
+ * Gompers, Kovner & Lerner 2009; Chen, Gompers, Kovner & Lerner 2010):
+ * sector 0.20, stage 0.18, cheque 0.14, geography 0.12, traction 0.09,
+ * thesis 0.08, business model 0.07, team 0.07, round terms 0.05. Sources:
+ * docs/specs/metrics/METRICS-METHODS.md. Still uncalibrated. v7 stays
+ * published, unedited.
+ */
+export const FIT_CONFIG_V8: FitConfig = deepFreeze(
+  FitConfigSchema.parse({
+    ...FIT_CONFIG_V7,
+    version: "ranking-config.v8",
+    label: "8",
+    extends: "ranking-config.v7",
+    parameters: [
+      { parameter: "STAGE", weight: 0.18, values: values(0.5) },
+      { parameter: "SECTOR", weight: 0.2, values: values(0.5) },
+      { parameter: "GEOGRAPHY", weight: 0.12, values: values(0.5) },
+      { parameter: "CHEQUE_SIZE", weight: 0.14, values: values(0.5) },
+      { parameter: "BUSINESS_MODEL", weight: 0.07, values: values(0.5) },
+      { parameter: "TRACTION", weight: 0.09, values: values(0.5) },
+      { parameter: "TEAM", weight: 0.07, values: values(0.5) },
+      { parameter: "THESIS", weight: 0.08, values: values(0.5) },
+      { parameter: "ROUND_TERMS", weight: 0.05, values: values(0.5) },
+    ],
+    score: {
+      method: "WEIGHTED_KNOWN_VALUE",
+      minKnown: 3,
+      minCoverage: 0.5,
+      constraints: ["STAGE", "SECTOR", "GEOGRAPHY", "CHEQUE_SIZE"],
+      minConstraintsKnown: 2,
+    },
+    description:
+      "Research-based fit profile (metrics methods 2026-11-07): sector 0.20, stage 0.18, cheque 0.14, geography 0.12, traction 0.09, thesis 0.08, business model 0.07, team 0.07, round terms 0.05; strong 1, partial 0.5, mismatch 0. The score out of 10 is the weighted value of the known parameters, shown only with 3+ known, half the weight known and 2 of stage, sector, geography and cheque known. Unknown is never zero. Uncalibrated; not a probability.",
+  }),
+);
+
 /** The config new profiles are computed under. */
-export const FIT_CONFIG_CURRENT: FitConfig = FIT_CONFIG_V7;
+export const FIT_CONFIG_CURRENT: FitConfig = FIT_CONFIG_V8;
 
 /** Every published fit config, oldest first; never edited. */
 export const FIT_CONFIGS: readonly FitConfig[] = Object.freeze([
   FIT_CONFIG_V4,
   FIT_CONFIG_V6,
   FIT_CONFIG_V7,
+  FIT_CONFIG_V8,
 ]);
 
 export function fitConfigByVersion(version: string): FitConfig | null {

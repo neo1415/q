@@ -227,6 +227,17 @@ export const FitProfileDtoSchema = z
     mainMismatch: FitParameterResultDtoSchema.nullable(),
     /** Set only when a declared hard rule excludes the company. */
     hardRule: FitHardRuleDtoSchema.nullable(),
+    /**
+     * ranking-config.v8+: the score out of 10 the config computed (the
+     * weighted value of the known parameters, one decimal), or null when
+     * too little is known to show one. Absent on older profiles: the
+     * legacy unweighted mean applies (fitScoreOutOf10).
+     */
+    scoreOutOf10: z
+      .string()
+      .regex(/^(10|[0-9](\.[0-9])?)$/u)
+      .nullable()
+      .optional(),
     computedAt: UtcTimestampSchema,
   })
   .strict();
@@ -439,9 +450,12 @@ const FIT_SCORE_POINTS: Readonly<Record<FitOutcome, number | null>> = {
 export function fitScoreOutOf10(profile: {
   readonly band: FitBand;
   readonly parameters: readonly { readonly outcome: FitOutcome }[];
+  readonly scoreOutOf10?: string | null | undefined;
 }): string | null {
   if (profile.band === "OUTSIDE_MANDATE") return null;
   if (profile.band === "NOT_ENOUGH_INFORMATION") return null;
+  // ranking-config.v8+: the config's own weighted score (metrics methods).
+  if (profile.scoreOutOf10 !== undefined) return profile.scoreOutOf10;
   const known = profile.parameters
     .map((parameter) => FIT_SCORE_POINTS[parameter.outcome])
     .filter((points): points is number => points !== null);
