@@ -39,6 +39,7 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerWorkspaceGate } from "./security/workspace-gate.js";
 import { registerRequestTiming } from "./http/request-timing.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
 import type { QRoomFeed } from "./room/feed.js";
@@ -415,6 +416,9 @@ export function createApp(
 
   registerProblemHandling(app, logger);
   registerRequestTiming(app);
+  // Before every route: the workspace hint survives only for a person who
+  // opted in (Q's page moves run for nobody else).
+  registerWorkspaceGate(app);
   if (modules.arrivalSnapshots !== undefined) {
     registerArrivalSnapshotInvalidation(app, modules.arrivalSnapshots);
   }
